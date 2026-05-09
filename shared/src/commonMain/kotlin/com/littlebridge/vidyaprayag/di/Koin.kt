@@ -6,6 +6,9 @@ import com.littlebridge.vidyaprayag.feature.schools.data.repository.SchoolReposi
 import com.littlebridge.vidyaprayag.feature.schools.domain.repository.SchoolRepository
 import com.littlebridge.vidyaprayag.feature.schools.domain.usecase.GetSchoolsUseCase
 import com.littlebridge.vidyaprayag.presentation.MainViewModel
+import com.littlebridge.vidyaprayag.presentation.ParentDashboardViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolDashboardViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.BasicOnboardingViewModel
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
@@ -35,6 +38,9 @@ val commonModule = module {
 
 val viewModelModule = module {
     factory { MainViewModel(get(), get()) }
+    factory { ParentDashboardViewModel(get()) }
+    factory { SchoolDashboardViewModel() }
+    factory { BasicOnboardingViewModel() }
 }
 
 fun initKoin(appDeclaration: KoinAppDeclaration = {}) =
