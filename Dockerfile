@@ -1,30 +1,39 @@
-# Use an official JDK image as the base for building
-FROM openjdk:21-slim AS build
+# =========================
+# BUILD STAGE
+# =========================
 
-# Set the working directory
+FROM eclipse-temurin:21-jdk AS build
+
+# Set working directory
 WORKDIR /app
 
-# Copy the entire project
+# Copy complete KMP monorepo
 COPY . .
 
-# Grant execution permissions to gradlew
+# Give execute permission to gradlew
 RUN chmod +x ./gradlew
 
-# Build the shadowJar for the server module
+# Build fat jar for server module
 RUN ./gradlew :server:shadowJar --no-daemon
 
-# Use a slim JRE image for the final run stage
-FROM openjdk:21-slim
 
-# Set the working directory
+# =========================
+# RUNTIME STAGE
+# =========================
+
+FROM eclipse-temurin:21-jre
+
+# Set working directory
 WORKDIR /app
 
-# Copy the built shadowJar from the build stage
+# Copy generated fat jar from build stage
 COPY --from=build /app/server/build/libs/server-all.jar app.jar
 
-# The server port is configurable via the PORT environment variable (default 8080)
+# Render provides PORT dynamically
 ENV PORT=8080
+
+# Expose application port
 EXPOSE 8080
 
-# Command to run the application
+# Start Ktor server
 CMD ["java", "-jar", "app.jar"]

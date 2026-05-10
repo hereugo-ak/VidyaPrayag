@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.kotlinJvm)
     alias(libs.plugins.ktor)
     application
+    id("com.gradleup.shadow") version "8.3.5"
 }
 
 kotlin {
