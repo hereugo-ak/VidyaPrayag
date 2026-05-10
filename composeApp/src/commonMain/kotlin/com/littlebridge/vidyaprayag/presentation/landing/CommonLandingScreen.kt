@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -38,7 +39,7 @@ fun CommonLandingScreen() {
     
     var showAuthSheet by remember { mutableStateOf(false) }
 
-    BaseScreen { paddingValues ->
+    BaseScreen { paddingValues, scrollModifier ->
         if (showAuthSheet) {
             AuthBottomSheet(onDismissRequest = { showAuthSheet = false })
         }
@@ -59,8 +60,9 @@ fun CommonLandingScreen() {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
+                        .then(scrollModifier)
                         .padding(paddingValues),
-                    contentPadding = PaddingValues(bottom = 32.dp)
+                    contentPadding = PaddingValues(top = 80.dp, bottom = 32.dp)
                 ) {
                     item { 
                         HeroSection(onSearchClick = { navigator.navigateTo(Destination.Search) }) 
@@ -77,7 +79,7 @@ fun CommonLandingScreen() {
                     item { SocialProofSection() }
                     item { EntryPointsSection(onJoinClick = { showAuthSheet = true }) }
                     item { MoatShowcaseSection() }
-                    item { PortalAccessSection(onLoginClick = { showAuthSheet = true }) }
+                    //item { PortalAccessSection(onLoginClick = { showAuthSheet = true }) }
                     item { FinalCtaSection(onJoinClick = { showAuthSheet = true }) }
                     item { FooterSection() }
                 }
@@ -225,7 +227,7 @@ private fun EntryPointsSection(onJoinClick: () -> Unit) {
     Column(modifier = Modifier.padding(24.dp)) {
         EntryPointCard(
             label = "FOR PARENTS",
-            title = "Find the perfect school for your child's unique journey",
+            title = "Find the perfect school for your child\'s unique journey",
             description = "Empowering parents with data-driven insights and verified institutional profiles.",
             features = listOf("Verified institutional profiles", "Smart Comparison highlights", "AI Career Paths & Talent ID"),
             buttonText = "Start Your Search",
@@ -296,7 +298,7 @@ private fun MoatShowcaseSection() {
         Row(
             modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 24.dp)
         ) {
-            MoatCard("WhatsApp-First", "Seamless communication between parents and faculty without app fatigue.", "https://lh3.googleusercontent.com/aida/ADBb0uhupW5U-PHnHTPXDYeq9A90Omu-E8beJf0uK7eTRa-L8daRVU5rvILYqec9IZN74A8Y3KFYBo3z_7iRzrZiZhb_Zvpe2YH0_1xFY06JNxAcgV57Zvaf80QtV7PjL4UeBY-zJLUw1iODOqF5uHXssbGzkhmW4NnHlnXxYLpnK1hYG3zeHtky2MNngvRtWCWa6oR3KaTLKFAw_eGHOL_p0t60JAn5Ha52Sr5FfKiB7e7slDlCphIIUa_y2m7n")
+            MoatCard("WhatsApp-First", "Seamless communication between parents and faculty without app fatigue.", "https://lh3.googleusercontent.com/aida/ADBb0uhupW5U-PHnHTPXDYeq9A90Omu-E8beJf0uK7eTRa-L8daRVU5rvILYqec9IZN74A8Y3KFYBo3z_7iRzrZiZhb_Zvpe2YH0_1xFY06JNxAcgV57Zvaf80QtV7PjL4UeBY-zJLUw1iODOqF5uHXssbGzkhmW4NnHlnXxYLpnK1hYG3zeHtky2MNngvRtWCWa6oR3KaTLKFAw_eGHOL_p0t60JAn5Ha52Sr5FfKiB7e7slDLCphIIUa_y2m7n")
             Spacer(modifier = Modifier.width(16.dp))
             MoatCard("SRI Index", "Standardized Reliability Index for objective school performance tracking.", "https://lh3.googleusercontent.com/aida/ADBb0uja34Re_-MtOF9jh5ZyVhQGKS4GfxPzJYtBhBlW10Xem3awSStEWcQapUQMn84PxpJewsaPADpJFUHEmmurRCYaMQxn0RrEMUfKnhgm5x3e5L9NVqRF2PYk3JLfBHm3wWG-9FO94L6Jfs9G9hvcp3m8H9AaL9HhsNrARYaA6ptaWgvQCqXhGxbZi53-E2MLeaH0zRuQxWq_uOFhJXfrZhZ3jYiOErFrXZwdVHYDZTVj-ULoIjrXMisgtdSn")
         }

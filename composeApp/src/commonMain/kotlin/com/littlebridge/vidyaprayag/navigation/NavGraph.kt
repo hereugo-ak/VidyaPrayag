@@ -17,6 +17,15 @@ sealed interface Destination {
     
     @Serializable
     data object Search : Destination
+
+    @Serializable
+    data object ParentDashboard : Destination
+
+    @Serializable
+    data object SchoolDashboard : Destination
+
+    @Serializable
+    data object BasicOnboarding : Destination
 }
 
 @Composable
@@ -35,6 +44,18 @@ fun NavGraph(navController: NavHostController) {
         
         composable<Destination.SchoolDetails> {
             // Placeholder for Details Screen
+        }
+
+        composable<Destination.ParentDashboard> {
+            com.littlebridge.vidyaprayag.ui.screens.dashboard.ParentDashboardScreen()
+        }
+
+        composable<Destination.SchoolDashboard> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.SchoolDashboardScreen()
+        }
+
+        composable<Destination.BasicOnboarding> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.BasicOnboardingScreen()
         }
     }
 }

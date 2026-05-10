@@ -33,7 +33,10 @@ fun SchoolEntity.toDomain() = School(
     location = location,
     board = board,
     description = description,
-    imageUrl = imageUrl
+    imageUrl = imageUrl,
+    sriScore = 0.0, // Default for now
+    feesRange = "",
+    isVerified = true
 )
 
 fun School.toEntity() = SchoolEntity(
