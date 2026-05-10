@@ -17,7 +17,8 @@ object DatabaseFactory {
             ignoreIfMissing = true
         }
         
-        val databaseUrl = dotenv["DATABASE_URL"] ?: System.getenv("DATABASE_URL")
+        val databaseUrl = dotenv["DATABASE_URL"]?.takeIf { it.isNotBlank() } 
+            ?: System.getenv("DATABASE_URL")?.takeIf { it.isNotBlank() }
 
         val dataSource = if (databaseUrl != null) {
             createPostgresDataSource(databaseUrl)
@@ -33,21 +34,39 @@ object DatabaseFactory {
     }
 
     private fun createPostgresDataSource(databaseUrl: String): HikariDataSource {
-        val uri = URI(databaseUrl)
-        val username = uri.userInfo.split(":")[0]
-        val password = uri.userInfo.split(":")[1]
-        val jdbcUrl = "jdbc:postgresql://${uri.host}:${uri.port}${uri.path}?sslmode=require"
-
         val config = HikariConfig().apply {
             driverClassName = "org.postgresql.Driver"
-            this.jdbcUrl = jdbcUrl
-            this.username = username
-            this.password = password
             maximumPoolSize = 3
             isAutoCommit = false
             transactionIsolation = "TRANSACTION_REPEATABLE_READ"
-            validate()
         }
+
+        if (databaseUrl.startsWith("jdbc:postgresql:")) {
+            config.jdbcUrl = databaseUrl
+        } else {
+            val uri = try {
+                URI(databaseUrl)
+            } catch (e: Exception) {
+                throw IllegalArgumentException("Invalid DATABASE_URL format: $databaseUrl. Expected postgresql://user:password@host:port/dbname", e)
+            }
+            
+            val host = uri.host ?: throw IllegalArgumentException("DATABASE_URL is missing host information: $databaseUrl")
+            val port = if (uri.port != -1) uri.port else 5432
+            val path = uri.path ?: ""
+            
+            config.jdbcUrl = "jdbc:postgresql://$host:$port$path?sslmode=require"
+            
+            uri.userInfo?.let { userInfo ->
+                if (":" in userInfo) {
+                    config.username = userInfo.substringBefore(':')
+                    config.password = userInfo.substringAfter(':')
+                } else {
+                    config.username = userInfo
+                }
+            } ?: throw IllegalArgumentException("DATABASE_URL is missing user info (username/password): $databaseUrl")
+        }
+        
+        config.validate()
         return HikariDataSource(config)
     }
 
