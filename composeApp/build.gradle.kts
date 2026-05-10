@@ -95,14 +95,10 @@ android {
     productFlavors {
         create("dev") {
             dimension = "environment"
-            applicationIdSuffix = ".dev"
-            versionNameSuffix = "-dev"
             buildConfigField("String", "ENVIRONMENT", "\"DEV\"")
         }
         create("staging") {
             dimension = "environment"
-            applicationIdSuffix = ".staging"
-            versionNameSuffix = "-staging"
             buildConfigField("String", "ENVIRONMENT", "\"STAGING\"")
         }
         create("prod") {
