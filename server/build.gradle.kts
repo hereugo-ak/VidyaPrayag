@@ -26,6 +26,16 @@ dependencies {
     implementation(libs.ktor.serverNetty)
     implementation("io.ktor:ktor-server-content-negotiation:3.4.3")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.4.3")
+
+    // Database
+    implementation(libs.exposed.core)
+    implementation(libs.exposed.dao)
+    implementation(libs.exposed.jdbc)
+    implementation(libs.postgres)
+    implementation(libs.hikaricp)
+    implementation(libs.sqlite)
+    implementation(libs.dotenv)
+
     testImplementation(libs.ktor.serverTestHost)
     testImplementation(libs.kotlin.testJunit)
 }
