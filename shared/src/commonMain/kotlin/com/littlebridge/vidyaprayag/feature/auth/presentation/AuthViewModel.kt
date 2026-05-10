@@ -1,0 +1,136 @@
+package com.littlebridge.vidyaprayag.feature.auth.presentation
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.littlebridge.vidyaprayag.feature.auth.domain.model.*
+import com.littlebridge.vidyaprayag.feature.auth.domain.repository.AuthRepository
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+
+sealed class AuthStep {
+    object Identifier : AuthStep()
+    object LoginPassword : AuthStep()
+    object SignupDetails : AuthStep()
+    object Otp : AuthStep()
+}
+
+data class AuthUiState(
+    val step: AuthStep = AuthStep.Identifier,
+    val flow: AuthFlow? = null,
+    val identifier: String = "",
+    val name: String = "",
+    val password: String = "",
+    val confirmPassword: String = "",
+    val otp: String = "",
+    val role: String = "PARENT", // "ADMIN" or "PARENT"
+    val isLoading: Boolean = false,
+    val error: String? = null,
+    val isAuthSuccessful: Boolean = false
+)
+
+class AuthViewModel(
+    private val repository: AuthRepository
+) : ViewModel() {
+
+    private val _state = MutableStateFlow(AuthUiState())
+    val state = _state.asStateFlow()
+
+    fun onIdentifierChanged(value: String) = _state.update { it.copy(identifier = value, error = null) }
+    fun onNameChanged(value: String) = _state.update { it.copy(name = value) }
+    fun onPasswordChanged(value: String) = _state.update { it.copy(password = value) }
+    fun onConfirmPasswordChanged(value: String) = _state.update { it.copy(confirmPassword = value) }
+    fun onOtpChanged(value: String) = _state.update { it.copy(otp = value) }
+    fun onRoleChanged(value: String) = _state.update { it.copy(role = value) }
+
+    fun onContinue() {
+        val currentState = _state.value
+        if (currentState.identifier.isBlank()) {
+            _state.update { it.copy(error = "Please enter email or phone") }
+            return
+        }
+
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null) }
+            repository.checkUser(currentState.identifier)
+                .onSuccess { flow ->
+                    _state.update { 
+                        it.copy(
+                            isLoading = false,
+                            flow = flow,
+                            step = when (flow) {
+                                AuthFlow.LOGIN_EMAIL -> AuthStep.LoginPassword
+                                AuthFlow.SIGNUP_EMAIL -> AuthStep.SignupDetails
+                                AuthFlow.LOGIN_PHONE, AuthFlow.SIGNUP_PHONE -> AuthStep.Otp
+                            }
+                        )
+                    }
+                    if (flow == AuthFlow.LOGIN_PHONE || flow == AuthFlow.SIGNUP_PHONE) {
+                        repository.sendOtp(currentState.identifier)
+                    }
+                }
+                .onFailure { e ->
+                    _state.update { it.copy(isLoading = false, error = "Connection error. Please try again.") }
+                }
+        }
+    }
+
+    fun onSubmit() {
+        val currentState = _state.value
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null) }
+            
+            val result = when (currentState.step) {
+                AuthStep.LoginPassword -> {
+                    repository.login(LoginRequest(
+                        contact = currentState.identifier,
+                        password = currentState.password,
+                        role = currentState.role
+                    ))
+                }
+                AuthStep.SignupDetails -> {
+                    if (currentState.password != currentState.confirmPassword) {
+                        _state.update { it.copy(isLoading = false, error = "Passwords do not match") }
+                        return@launch
+                    }
+                    repository.signup(SignupRequest(
+                        name = currentState.name,
+                        contact = currentState.identifier,
+                        password = currentState.password,
+                        role = currentState.role
+                    ))
+                }
+                AuthStep.Otp -> {
+                    if (currentState.flow == AuthFlow.SIGNUP_PHONE && currentState.name.isBlank()) {
+                        _state.update { it.copy(isLoading = false, error = "Please enter your name") }
+                        return@launch
+                    }
+                    
+                    if (currentState.flow == AuthFlow.SIGNUP_PHONE) {
+                        repository.signup(SignupRequest(
+                            name = currentState.name,
+                            contact = currentState.identifier,
+                            role = currentState.role
+                        ))
+                    } else {
+                        repository.login(LoginRequest(
+                            contact = currentState.identifier,
+                            otp = currentState.otp,
+                            role = currentState.role
+                        ))
+                    }
+                }
+                else -> return@launch
+            }
+
+            result.onSuccess {
+                _state.update { it.copy(isLoading = false, isAuthSuccessful = true) }
+            }.onFailure { e ->
+                _state.update { it.copy(isLoading = false, error = e.message ?: "Action failed") }
+            }
+        }
+    }
+    
+    fun goBack() {
+        _state.update { it.copy(step = AuthStep.Identifier, error = null) }
+    }
+}
