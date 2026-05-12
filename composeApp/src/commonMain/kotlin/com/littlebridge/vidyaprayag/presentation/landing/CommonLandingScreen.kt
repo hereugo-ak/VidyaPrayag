@@ -81,7 +81,7 @@ fun CommonLandingScreen() {
                     item { MoatShowcaseSection() }
                     //item { PortalAccessSection(onLoginClick = { showAuthSheet = true }) }
                     item { FinalCtaSection(onJoinClick = { showAuthSheet = true }) }
-                    item { FooterSection() }
+                   // item { FooterSection() }
                 }
             }
         }

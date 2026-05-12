@@ -10,7 +10,6 @@ import com.littlebridge.vidyaprayag.presentation.ParentDashboardViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolDashboardViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.BasicOnboardingViewModel
 import com.littlebridge.vidyaprayag.util.AppConfig
-import com.littlebridge.vidyaprayag.util.Environment
 import com.littlebridge.vidyaprayag.util.AppLogger
 import io.ktor.client.*
 import io.ktor.client.plugins.*
@@ -37,11 +36,11 @@ val commonModule = module {
             }
         }
     }
-    single { KtorSchoolApi(get()) }
+    single { KtorSchoolApi(get(), AppConfig.schoolBaseUrl) }
     single { 
         com.littlebridge.vidyaprayag.feature.auth.data.remote.AuthApi(
             client = get(),
-            baseUrl = AppConfig.current.baseUrl
+            baseUrl = AppConfig.authBaseUrl
         ) 
     }
 
@@ -64,10 +63,8 @@ val viewModelModule = module {
 }
 
 fun initKoin(
-    environment: Environment = Environment.DEV,
     appDeclaration: KoinAppDeclaration = {}
 ) = startKoin {
-    AppConfig.current = environment
     appDeclaration()
     modules(commonModule, viewModelModule, platformModule())
 }

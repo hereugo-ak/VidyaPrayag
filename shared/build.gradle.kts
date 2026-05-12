@@ -78,6 +78,29 @@ android {
     defaultConfig {
         minSdk = libs.versions.android.minSdk.get().toInt()
     }
+    
+    buildFeatures {
+        buildConfig = true
+    }
+    
+    flavorDimensions += "environment"
+    productFlavors {
+        create("dev") {
+            dimension = "environment"
+            buildConfigField("String", "AUTH_BASE_URL", "\"http://192.168.1.9:8080\"")
+            buildConfigField("String", "SCHOOL_BASE_URL", "\"http://192.168.1.9:8080\"")
+        }
+        create("staging") {
+            dimension = "environment"
+            buildConfigField("String", "AUTH_BASE_URL", "\"http://vidyaprayag-1.onrender.com\"")
+            buildConfigField("String", "SCHOOL_BASE_URL", "\"http://vidyaprayag-1.onrender.com\"")
+        }
+        create("prod") {
+            dimension = "environment"
+            buildConfigField("String", "AUTH_BASE_URL", "\"https://vidyaprayag-1.onrender.com\"")
+            buildConfigField("String", "SCHOOL_BASE_URL", "\"https://vidyaprayag-1.onrender.com\"")
+        }
+    }
 }
 
 dependencies {

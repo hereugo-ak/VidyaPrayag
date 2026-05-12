@@ -9,7 +9,7 @@ import io.ktor.http.*
 
 class AuthApi(
     private val client: HttpClient,
-    private val baseUrl: String = "https://vidyaprayag-1.onrender.com"
+    private val baseUrl: String
 ) {
     suspend fun checkUser(identifier: String): NetworkResult<UserFlowResponse> {
         return safeApiCall {

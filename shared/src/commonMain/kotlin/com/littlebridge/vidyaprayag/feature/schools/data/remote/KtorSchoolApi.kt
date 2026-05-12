@@ -7,7 +7,8 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 
 class KtorSchoolApi(
-    private val client: HttpClient
+    private val client: HttpClient,
+    private val baseUrl: String
 ) {
     // In a real app, this would be an actual URL.
     // For now, we simulate a network response.

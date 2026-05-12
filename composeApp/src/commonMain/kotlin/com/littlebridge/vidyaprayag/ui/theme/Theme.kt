@@ -67,6 +67,9 @@ fun EduTrustTheme(
         AppTheme.MIDNIGHT -> MidnightColorScheme
     }
 
+    val isDark = currentTheme == AppTheme.DARK || currentTheme == AppTheme.MIDNIGHT
+    ChangeSystemAppearance(isDark)
+
     CompositionLocalProvider(
         LocalAppTheme provides currentTheme,
         LocalThemeSwitcher provides { 
