@@ -56,6 +56,7 @@ class AuthViewModel(
             when (val result = repository.checkUser(currentState.identifier)) {
                 is NetworkResult.Success -> {
                     val flow = result.data
+                    AppLogger.d("AuthViewModel", "Check user success. Flow determined: $flow")
                     _state.update { 
                         it.copy(
                             isLoading = false,

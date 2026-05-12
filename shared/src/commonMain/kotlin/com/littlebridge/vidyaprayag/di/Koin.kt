@@ -12,6 +12,7 @@ import com.littlebridge.vidyaprayag.feature.admin.presentation.BasicOnboardingVi
 import com.littlebridge.vidyaprayag.util.AppConfig
 import com.littlebridge.vidyaprayag.util.AppLogger
 import io.ktor.client.*
+import io.ktor.client.engine.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
@@ -24,9 +25,13 @@ import org.koin.dsl.module
 val commonModule = module {
     // Remote
     single {
-        HttpClient {
+        HttpClient(get()) {
             install(ContentNegotiation) {
                 json(Json { ignoreUnknownKeys = true })
+            }
+            
+            install(HttpRedirect) {
+                checkHttpMethod = false
             }
             
             install(HttpTimeout) {

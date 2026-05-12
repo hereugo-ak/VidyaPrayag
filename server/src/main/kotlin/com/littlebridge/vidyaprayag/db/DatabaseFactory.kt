@@ -31,7 +31,7 @@ object DatabaseFactory {
         Database.connect(dataSource)
 
         transaction {
-            SchemaUtils.create(UserTable)
+            SchemaUtils.createMissingTablesAndColumns(UserTable)
         }
     }
 

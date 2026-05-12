@@ -21,13 +21,13 @@ fun hashPassword(password: String): String {
 }
 
 fun Route.authRouting() {
-    route("/auth") {
-        post("/check-user") {
+    route("auth") {
+        post("check-user") {
             try {
                 val request = call.receive<CheckUserRequest>()
                 val identifier = request.identifier.trim()
                 
-                println("DEBUG: Checking user with identifier: '$identifier'")
+                println("DEBUG: [check-user] Received request for: '$identifier'")
                 
                 val user = dbQuery {
                     UserTable.selectAll()
@@ -43,8 +43,8 @@ fun Route.authRouting() {
                     else -> AuthFlow.SIGNUP_PHONE
                 }
 
-                println("DEBUG: Determined flow: $flow for '$identifier'")
-                call.respond(UserFlowResponse(flow))
+                println("DEBUG: [check-user] Identifier: '$identifier', User found: ${user != null}, Flow: $flow")
+                call.respond(HttpStatusCode.OK, UserFlowResponse(flow))
             } catch (e: ContentTransformationException) {
                 println("DEBUG: Content transformation error: ${e.message}")
                 call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid data format: ${e.message}"))
@@ -55,10 +55,12 @@ fun Route.authRouting() {
             }
         }
 
-        post("/signup") {
+        post("signup") {
             try {
                 val request = call.receive<SignupRequest>()
                 val identifier = request.contact.trim()
+                
+                println("DEBUG: [signup] Received request for: '$identifier'")
                 
                 val userExists = dbQuery {
                     UserTable.selectAll()
@@ -98,10 +100,12 @@ fun Route.authRouting() {
             }
         }
 
-        post("/login") {
+        post("login") {
             try {
                 val request = call.receive<LoginRequest>()
                 val identifier = request.contact.trim()
+                
+                println("DEBUG: [login] Received request for: '$identifier'")
                 
                 val user = dbQuery {
                     UserTable.selectAll()
@@ -142,8 +146,9 @@ fun Route.authRouting() {
             }
         }
 
-        post("/send-otp") {
+        post("send-otp") {
             // Mock OTP sending
+            println("DEBUG: [send-otp] Mocking OTP for contact")
             call.respond(OtpResponse("OTP sent successfully to 123456 (Mock)"))
         }
     }

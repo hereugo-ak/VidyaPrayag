@@ -100,8 +100,8 @@ android {
         }
         create("staging") {
             dimension = "environment"
-            buildConfigField("String", "AUTH_BASE_URL", "\"http://vidyaprayag-1.onrender.com\"")
-            buildConfigField("String", "SCHOOL_BASE_URL", "\"http://vidyaprayag-1.onrender.com\"")
+            buildConfigField("String", "AUTH_BASE_URL", "\"https://vidyaprayag-1.onrender.com\"")
+            buildConfigField("String", "SCHOOL_BASE_URL", "\"https://vidyaprayag-1.onrender.com\"")
         }
         create("prod") {
             dimension = "environment"

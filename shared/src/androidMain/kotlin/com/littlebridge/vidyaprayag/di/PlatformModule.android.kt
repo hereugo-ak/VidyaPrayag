@@ -7,11 +7,13 @@ import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
 import com.littlebridge.vidyaprayag.core.prefs.createDataStore
 import com.littlebridge.vidyaprayag.feature.schools.data.local.RoomSchoolLocalDataSource
 import com.littlebridge.vidyaprayag.feature.schools.data.local.SchoolLocalDataSource
+import io.ktor.client.engine.okhttp.*
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
 actual fun platformModule(): Module = module {
+    single { OkHttp.create() }
     single { DatabaseFactory(androidContext()) }
     single<AppDatabase> { get<DatabaseFactory>().createBuilder().build() }
     single { get<AppDatabase>().schoolDao() }

@@ -19,6 +19,7 @@ fun main() {
 }
 
 fun Application.module() {
+    install(IgnoreTrailingSlash)
     install(ContentNegotiation) {
         json(Json {
             ignoreUnknownKeys = true
