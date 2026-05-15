@@ -8,7 +8,14 @@ import com.littlebridge.vidyaprayag.feature.schools.domain.usecase.GetSchoolsUse
 import com.littlebridge.vidyaprayag.presentation.MainViewModel
 import com.littlebridge.vidyaprayag.presentation.ParentDashboardViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolDashboardViewModel
-import com.littlebridge.vidyaprayag.feature.admin.presentation.BasicOnboardingViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.InstitutionalBasicOBViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.BrandingInfoOBViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.AcademicInfoOBViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.LaunchInfoOBViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.InstitutionalProfileViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.AdmissionCRMViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolAnnouncementsViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.MessagesViewModel
 import com.littlebridge.vidyaprayag.util.AppConfig
 import com.littlebridge.vidyaprayag.util.AppLogger
 import io.ktor.client.*
@@ -63,7 +70,14 @@ val viewModelModule = module {
     factory { MainViewModel(get(), get()) }
     factory { ParentDashboardViewModel(get()) }
     factory { SchoolDashboardViewModel() }
-    factory { BasicOnboardingViewModel() }
+    factory { InstitutionalBasicOBViewModel() }
+    factory { BrandingInfoOBViewModel() }
+    factory { AcademicInfoOBViewModel() }
+    factory { LaunchInfoOBViewModel() }
+    factory { InstitutionalProfileViewModel() }
+    factory { AdmissionCRMViewModel() }
+    factory { SchoolAnnouncementsViewModel() }
+    factory { MessagesViewModel() }
     factory { com.littlebridge.vidyaprayag.feature.auth.presentation.AuthViewModel(get()) }
 }
 

@@ -45,15 +45,7 @@ fun SchoolDashboardScreen() {
 
         BaseScreen(
             bottomBar = {
-                EduTrustBottomBar(
-                    items = listOf(
-                        BottomNavItem("Info", Icons.Default.Info, isSelected = true),
-                        BottomNavItem("Brand", Icons.Default.PhotoLibrary),
-                        BottomNavItem("Fees", Icons.Default.Payments),
-                        BottomNavItem("Study", Icons.Default.School),
-                        BottomNavItem("Launch", Icons.Default.CheckCircle)
-                    )
-                )
+                SchoolDashboardBottomBar(selectedTab = SchoolTab.HOME)
             }
         ) { paddingValues, scrollModifier ->
             LazyColumn(
@@ -67,7 +59,7 @@ fun SchoolDashboardScreen() {
                 item {
                     WelcomeHeroCard(
                         progress = progress,
-                        onStartOnboarding = { navigator.navigateTo(Destination.BasicOnboarding) }
+                        onStartOnboarding = { navigator.navigateTo(Destination.InstitutionalBasicOB) }
                     )
                 }
 

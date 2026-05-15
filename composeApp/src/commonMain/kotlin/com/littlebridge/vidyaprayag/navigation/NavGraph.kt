@@ -6,6 +6,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.littlebridge.vidyaprayag.presentation.landing.CommonLandingScreen
 import kotlinx.serialization.Serializable
+import androidx.compose.material3.Text
 
 @Serializable
 sealed interface Destination {
@@ -25,7 +26,28 @@ sealed interface Destination {
     data object SchoolDashboard : Destination
 
     @Serializable
-    data object BasicOnboarding : Destination
+    data object InstitutionalBasicOB : Destination
+    
+    @Serializable
+    data object BrandingInfoOB : Destination
+    
+    @Serializable
+    data object AcademicInfoOB : Destination
+
+    @Serializable
+    data object LaunchInfoOB : Destination
+
+    @Serializable
+    data object InstitutionalProfile : Destination
+
+    @Serializable
+    data object AdmissionCRMDashboard : Destination
+
+    @Serializable
+    data object SchoolAnnouncements : Destination
+
+    @Serializable
+    data object Messages : Destination
 }
 
 @Composable
@@ -54,8 +76,36 @@ fun NavGraph(navController: NavHostController) {
             com.littlebridge.vidyaprayag.ui.screens.admin.SchoolDashboardScreen()
         }
 
-        composable<Destination.BasicOnboarding> {
-            com.littlebridge.vidyaprayag.ui.screens.admin.BasicOnboardingScreen()
+        composable<Destination.InstitutionalBasicOB> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.InstitutionalBasicOBScreen()
+        }
+
+        composable<Destination.BrandingInfoOB> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.BrandingInfoOBScreen()
+        }
+
+        composable<Destination.AcademicInfoOB> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.AcademicInfoOBScreen()
+        }
+
+        composable<Destination.LaunchInfoOB> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.LaunchInfoOBScreen()
+        }
+
+        composable<Destination.InstitutionalProfile> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.InstitutionalProfileScreen()
+        }
+
+        composable<Destination.AdmissionCRMDashboard> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.AdmissionCRMDashboard()
+        }
+
+        composable<Destination.SchoolAnnouncements> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.SchoolAnnouncementsScreen()
+        }
+
+        composable<Destination.Messages> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.MessagesScreen()
         }
     }
 }

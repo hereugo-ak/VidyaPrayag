@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-class BasicOnboardingViewModel : ViewModel() {
+class InstitutionalBasicOBViewModel : ViewModel() {
     private val _state = MutableStateFlow(OnboardingBasics())
     val state: StateFlow<OnboardingBasics> = _state.asStateFlow()
 
