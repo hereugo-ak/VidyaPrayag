@@ -8,7 +8,7 @@ import com.littlebridge.vidyaprayag.navigation.NavGraph
 import com.littlebridge.vidyaprayag.navigation.ProvideAppNavigator
 import com.littlebridge.vidyaprayag.presentation.MainViewModel
 import com.littlebridge.vidyaprayag.ui.theme.AppTheme
-import com.littlebridge.vidyaprayag.ui.theme.EduTrustTheme
+import com.littlebridge.vidyaprayag.ui.theme.VidyaPrayagTheme
 import org.koin.compose.KoinContext
 import org.koin.core.annotation.KoinExperimentalAPI
 
@@ -24,7 +24,7 @@ fun App() {
         
         val appTheme = try { AppTheme.valueOf(themeName) } catch(e: Exception) { AppTheme.LIGHT }
 
-        EduTrustTheme(
+        VidyaPrayagTheme(
             initialTheme = appTheme,
             onThemeChange = { viewModel.setTheme(it.name) }
         ) {

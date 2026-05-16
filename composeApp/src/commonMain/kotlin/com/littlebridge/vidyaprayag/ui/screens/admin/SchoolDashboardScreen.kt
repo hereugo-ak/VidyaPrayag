@@ -102,7 +102,7 @@ private fun OrbGlow(modifier: Modifier = Modifier) {
 
 @Composable
 private fun WelcomeHeroCard(progress: Float, onStartOnboarding: () -> Unit) {
-    EduTrustCard(
+    VidyaPrayagCard(
         modifier = Modifier.fillMaxWidth(),
         backgroundColor = MaterialTheme.colorScheme.primaryContainer,
         elevation = 8
@@ -203,7 +203,7 @@ private fun SetupStepsHeader(stepCount: Int) {
 
 @Composable
 private fun OnboardingStepItem(step: OnboardingStep) {
-    EduTrustCard(
+    VidyaPrayagCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -261,7 +261,7 @@ private fun OnboardingStepItem(step: OnboardingStep) {
 @Composable
 private fun SupportSection() {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        EduTrustCard(
+        VidyaPrayagCard(
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(

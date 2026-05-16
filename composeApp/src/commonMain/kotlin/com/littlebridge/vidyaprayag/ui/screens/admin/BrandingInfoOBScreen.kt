@@ -197,7 +197,7 @@ private fun MissionVisionSection(
 
 @Composable
 private fun VirtualTourSection(url: String, onUrlChange: (String) -> Unit) {
-    EduTrustCard(modifier = Modifier.fillMaxWidth()) {
+    VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Default.ViewInAr, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)

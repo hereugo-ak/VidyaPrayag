@@ -117,7 +117,7 @@ private fun SchoolCard(
     school: School,
     onClick: () -> Unit
 ) {
-    EduTrustCard(
+    VidyaPrayagCard(
         modifier = Modifier.width(240.dp).clickable { onClick() }
     ) {
         Column {
@@ -176,7 +176,7 @@ private fun HeroSection(onSearchClick: () -> Unit) {
 
         Spacer(modifier = Modifier.height(32.dp))
         
-        EduTrustSearchBar(
+        VidyaPrayagSearchBar(
             modifier = Modifier.padding(horizontal = 16.dp),
             onSearchClick = onSearchClick
         )
@@ -254,7 +254,7 @@ private fun EntryPointCard(
     buttonText: String,
     onButtonClick: () -> Unit
 ) {
-    EduTrustCard(modifier = Modifier.fillMaxWidth()) {
+    VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(32.dp)) {
             Box(
                 modifier = Modifier
@@ -278,7 +278,7 @@ private fun EntryPointCard(
                 Spacer(modifier = Modifier.height(16.dp))
             }
             Spacer(modifier = Modifier.height(16.dp))
-            EduTrustPrimaryButton(
+            VidyaPrayagPrimaryButton(
                 text = buttonText,
                 onClick = onButtonClick,
                 modifier = Modifier.fillMaxWidth()
@@ -307,7 +307,7 @@ private fun MoatShowcaseSection() {
 
 @Composable
 private fun MoatCard(title: String, description: String, imageUrl: String) {
-    EduTrustCard(modifier = Modifier.width(300.dp)) {
+    VidyaPrayagCard(modifier = Modifier.width(300.dp)) {
         Column(modifier = Modifier.padding(32.dp)) {
             AsyncImage(
                 model = imageUrl,
@@ -328,7 +328,7 @@ private fun PortalAccessSection(onLoginClick: () -> Unit) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
             Column {
                 Text("Access Your Portal", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
-                Text("Already part of the EduTrust ecosystem?", color = MaterialTheme.colorScheme.outline)
+                Text("Already part of the VidyaPrayag ecosystem?", color = MaterialTheme.colorScheme.outline)
             }
             Text("View All Portals", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.SemiBold)
         }
@@ -343,7 +343,7 @@ private fun PortalAccessSection(onLoginClick: () -> Unit) {
 
 @Composable
 private fun PortalCard(icon: ImageVector, title: String, description: String, onLoginClick: () -> Unit) {
-    EduTrustCard(
+    VidyaPrayagCard(
         modifier = Modifier.fillMaxWidth(),
         backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
         elevation = 0
@@ -360,7 +360,7 @@ private fun PortalCard(icon: ImageVector, title: String, description: String, on
             Spacer(modifier = Modifier.height(8.dp))
             Text(description, color = MaterialTheme.colorScheme.outline)
             Spacer(modifier = Modifier.height(24.dp))
-            EduTrustOutlinedButton(
+            VidyaPrayagOutlinedButton(
                 text = "Log In",
                 onClick = onLoginClick,
                 modifier = Modifier.fillMaxWidth()
@@ -396,13 +396,13 @@ private fun FinalCtaSection(onJoinClick: () -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
             Text("Join the ecosystem where trust meets technology. Join over 50k+ parents today.", color = MaterialTheme.colorScheme.onPrimaryContainer, textAlign = TextAlign.Center)
             Spacer(modifier = Modifier.height(40.dp))
-            EduTrustSecondaryButton(
+            VidyaPrayagSecondaryButton(
                 text = "Join as a Parent",
                 onClick = onJoinClick,
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(16.dp))
-            EduTrustOutlinedButton(
+            VidyaPrayagOutlinedButton(
                 text = "Register Your School",
                 onClick = onJoinClick,
                 modifier = Modifier.fillMaxWidth(),
@@ -419,11 +419,11 @@ private fun FooterSection() {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.School, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("EduTrust", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MaterialTheme.colorScheme.primary)
+            Text("VidyaPrayag", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MaterialTheme.colorScheme.primary)
         }
         Spacer(modifier = Modifier.height(24.dp))
         Text(
-            "© 2024 EduTrust Ecosystem. Built for modern institutional excellence and parent-child security. Innovating education through trust.",
+            "© 2024 VidyaPrayag Ecosystem. Built for modern institutional excellence and parent-child security. Innovating education through trust.",
             color = Color.Gray,
             lineHeight = 24.sp
         )

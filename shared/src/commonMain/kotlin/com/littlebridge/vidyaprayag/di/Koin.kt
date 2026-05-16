@@ -16,6 +16,16 @@ import com.littlebridge.vidyaprayag.feature.admin.presentation.InstitutionalProf
 import com.littlebridge.vidyaprayag.feature.admin.presentation.AdmissionCRMViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolAnnouncementsViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.MessagesViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.SchedulePTMViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.AcademicCalendarViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.LeaveRequestsViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.DailyAttendanceViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.AnalyticsDashboardViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentAnalyticsViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.TeacherPerformanceViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.ClassPerformanceViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.SyllabusCoverageViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.ResultsViewModel
 import com.littlebridge.vidyaprayag.util.AppConfig
 import com.littlebridge.vidyaprayag.util.AppLogger
 import io.ktor.client.*
@@ -78,6 +88,16 @@ val viewModelModule = module {
     factory { AdmissionCRMViewModel() }
     factory { SchoolAnnouncementsViewModel() }
     factory { MessagesViewModel() }
+    factory { SchedulePTMViewModel() }
+    factory { AcademicCalendarViewModel() }
+    factory { LeaveRequestsViewModel() }
+    factory { DailyAttendanceViewModel() }
+    factory { AnalyticsDashboardViewModel() }
+    factory { StudentAnalyticsViewModel() }
+    factory { TeacherPerformanceViewModel() }
+    factory { ClassPerformanceViewModel() }
+    factory { SyllabusCoverageViewModel() }
+    factory { ResultsViewModel() }
     factory { com.littlebridge.vidyaprayag.feature.auth.presentation.AuthViewModel(get()) }
 }
 

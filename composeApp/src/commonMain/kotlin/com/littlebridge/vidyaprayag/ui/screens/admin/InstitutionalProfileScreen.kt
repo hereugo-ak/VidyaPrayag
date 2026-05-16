@@ -85,7 +85,7 @@ fun InstitutionalProfileScreen() {
 
 @Composable
 private fun ProfileHeaderSection(isPublic: Boolean, onTogglePublic: (Boolean) -> Unit) {
-    EduTrustCard(modifier = Modifier.fillMaxWidth()) {
+    VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(24.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -130,7 +130,7 @@ private fun PhilosophyForm(
     language: String,
     onLanguageChange: (String) -> Unit
 ) {
-    EduTrustCard(modifier = Modifier.fillMaxWidth()) {
+    VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(Icons.Default.School, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
@@ -169,7 +169,7 @@ private fun PhilosophyForm(
                 }
             }
 
-            EduTrustPrimaryButton(
+            VidyaPrayagPrimaryButton(
                 text = "UPDATE PHILOSOPHY",
                 onClick = { },
                 modifier = Modifier.fillMaxWidth()
@@ -180,7 +180,7 @@ private fun PhilosophyForm(
 
 @Composable
 private fun VirtualTourPreview(tourName: String) {
-    EduTrustCard(modifier = Modifier.fillMaxWidth()) {
+    VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
             Row(
                 modifier = Modifier.padding(24.dp).fillMaxWidth(),
@@ -266,7 +266,7 @@ private fun VirtualTourPreview(tourName: String) {
 
 @Composable
 private fun GallerySection(images: List<GalleryImage>, storageUsage: Float) {
-    EduTrustCard(modifier = Modifier.fillMaxWidth()) {
+    VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

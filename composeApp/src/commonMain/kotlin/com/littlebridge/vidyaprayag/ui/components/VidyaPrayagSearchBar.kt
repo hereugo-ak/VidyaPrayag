@@ -19,13 +19,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun EduTrustSearchBar(
+fun VidyaPrayagSearchBar(
     modifier: Modifier = Modifier,
     locationText: String = "Enter City/Region",
     boardText: String = "CBSE Board",
     onSearchClick: () -> Unit = {}
 ) {
-    EduTrustCard(
+    VidyaPrayagCard(
         modifier = modifier.fillMaxWidth(),
         backgroundColor = MaterialTheme.colorScheme.surface
     ) {

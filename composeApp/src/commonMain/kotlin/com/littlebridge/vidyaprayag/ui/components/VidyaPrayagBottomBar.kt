@@ -18,7 +18,7 @@ data class BottomNavItem(
 )
 
 @Composable
-fun EduTrustBottomBar(
+fun VidyaPrayagBottomBar(
     items: List<BottomNavItem>
 ) {
     NavigationBar(

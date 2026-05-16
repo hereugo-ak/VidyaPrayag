@@ -6,7 +6,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.littlebridge.vidyaprayag.presentation.landing.CommonLandingScreen
 import kotlinx.serialization.Serializable
-import androidx.compose.material3.Text
 
 @Serializable
 sealed interface Destination {
@@ -48,6 +47,36 @@ sealed interface Destination {
 
     @Serializable
     data object Messages : Destination
+
+    @Serializable
+    data object SchedulePTM : Destination
+
+    @Serializable
+    data object AcademicCalendar : Destination
+
+    @Serializable
+    data object DailyAttendance : Destination
+
+    @Serializable
+    data object LeaveRequests : Destination
+
+    @Serializable
+    data object Results : Destination
+
+    @Serializable
+    data object AnalyticsDashboard : Destination
+
+    @Serializable
+    data object StudentAnalytics : Destination
+
+    @Serializable
+    data object ClassPerformance : Destination
+
+    @Serializable
+    data object TeacherPerformance : Destination
+
+    @Serializable
+    data object SyllabusCoverage : Destination
 }
 
 @Composable
@@ -69,7 +98,7 @@ fun NavGraph(navController: NavHostController) {
         }
 
         composable<Destination.ParentDashboard> {
-            com.littlebridge.vidyaprayag.ui.screens.dashboard.ParentDashboardScreen()
+            com.littlebridge.vidyaprayag.ui.screens.parent.ParentDashboardScreen()
         }
 
         composable<Destination.SchoolDashboard> {
@@ -106,6 +135,46 @@ fun NavGraph(navController: NavHostController) {
 
         composable<Destination.Messages> {
             com.littlebridge.vidyaprayag.ui.screens.admin.MessagesScreen()
+        }
+
+        composable<Destination.SchedulePTM> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.SchedulePTMScreen()
+        }
+
+        composable<Destination.AcademicCalendar> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.AcademicCalendarScreen()
+        }
+
+        composable<Destination.DailyAttendance> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.DailyAttendanceScreen()
+        }
+
+        composable<Destination.LeaveRequests> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.LeaveRequestsScreen()
+        }
+
+        composable<Destination.Results> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.ResultsScreen()
+        }
+
+        composable<Destination.AnalyticsDashboard> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.AnalyticsDashboardScreen()
+        }
+
+        composable<Destination.StudentAnalytics> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.StudentAnalyticsScreen()
+        }
+
+        composable<Destination.TeacherPerformance> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.TeacherPerformanceScreen()
+        }
+
+        composable<Destination.ClassPerformance> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.ClassPerformanceScreen()
+        }
+
+        composable<Destination.SyllabusCoverage> {
+            com.littlebridge.vidyaprayag.ui.screens.admin.SyllabusCoverageScreen()
         }
     }
 }

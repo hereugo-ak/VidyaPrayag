@@ -131,7 +131,7 @@ private fun StatCard(
     modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.primary
 ) {
-    EduTrustCard(modifier = modifier) {
+    VidyaPrayagCard(modifier = modifier) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -170,7 +170,7 @@ private fun SectionTitle(title: String, action: String) {
 
 @Composable
 private fun EnquiryCard(enquiry: Enquiry) {
-    EduTrustCard(modifier = Modifier.fillMaxWidth()) {
+    VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,

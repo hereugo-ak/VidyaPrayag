@@ -108,7 +108,7 @@ fun LaunchInfoOBScreen() {
 
 @Composable
 private fun InstitutionalIdentityCard(state: com.littlebridge.vidyaprayag.feature.admin.presentation.LaunchInfoState) {
-    EduTrustCard(modifier = Modifier.fillMaxWidth()) {
+    VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

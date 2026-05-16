@@ -177,7 +177,7 @@ private fun FilterChipsSection() {
 
 @Composable
 private fun FeaturedAnnouncementCard(announcement: Announcement) {
-    EduTrustCard(modifier = Modifier.fillMaxWidth()) {
+    VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Column {
             Row(
                 modifier = Modifier.padding(24.dp),
@@ -236,7 +236,7 @@ private fun AnnouncementCard(announcement: Announcement) {
     
     val contentColor = if (isEvent) Color.White else MaterialTheme.colorScheme.onSurface
 
-    EduTrustCard(
+    VidyaPrayagCard(
         modifier = Modifier.fillMaxWidth(),
         backgroundColor = containerColor
     ) {

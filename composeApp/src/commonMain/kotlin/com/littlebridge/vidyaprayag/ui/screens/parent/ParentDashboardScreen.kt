@@ -1,4 +1,4 @@
-package com.littlebridge.vidyaprayag.ui.screens.dashboard
+package com.littlebridge.vidyaprayag.ui.screens.parent
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -36,7 +36,7 @@ fun ParentDashboardScreen() {
 
     BaseScreen(
         bottomBar = {
-            EduTrustBottomBar(
+            VidyaPrayagBottomBar(
                 items = listOf(
                     BottomNavItem("Discover", Icons.Default.Search, isSelected = true),
                     BottomNavItem("Compare", Icons.AutoMirrored.Filled.CompareArrows),
@@ -178,7 +178,7 @@ private fun ComparisonShortlistSection(
     selectedSchools: List<School>,
     totalCount: Int
 ) {
-    EduTrustCard(
+    VidyaPrayagCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -235,7 +235,7 @@ private fun SchoolDashboardCard(
     isShortlisted: Boolean,
     onShortlistToggle: () -> Unit
 ) {
-    EduTrustCard(
+    VidyaPrayagCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {

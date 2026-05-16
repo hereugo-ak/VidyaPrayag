@@ -149,7 +149,7 @@ fun BaseScreen(
         drawerState = drawerState,
 
         drawerContent = {
-            EduTrustDrawerSheet()
+            VidyaPrayagDrawerSheet()
         }
     ) {
 
@@ -236,7 +236,7 @@ fun BaseScreen(
                         Spacer(modifier = Modifier.width(8.dp))
 
                         Text(
-                            text = "EduTrust",
+                            text = "VidyaPrayag",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -270,7 +270,7 @@ fun BaseScreen(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            EduTrustDrawerSheet()
+            VidyaPrayagDrawerSheet()
         }
     ) {
 
@@ -298,7 +298,7 @@ fun BaseScreen(
                     content(PaddingValues())
 
                     // Floating/Hovering TopBar
-                    EduTrustTopBar(
+                    VidyaPrayagTopBar(
                         onMenuClick = {
                             scope.launch {
                                 drawerState.open()
@@ -320,7 +320,7 @@ fun BaseScreen(
                 modifier = Modifier.fillMaxSize(),
 
                 topBar = {
-                    EduTrustTopBar(
+                    VidyaPrayagTopBar(
                         onMenuClick = {
                             scope.launch {
                                 drawerState.open()

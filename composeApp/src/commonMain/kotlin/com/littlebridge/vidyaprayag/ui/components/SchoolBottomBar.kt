@@ -20,7 +20,7 @@ enum class SchoolTab {
 fun SchoolDashboardBottomBar(selectedTab: SchoolTab) {
     val navigator = LocalAppNavigator.current
     
-    EduTrustBottomBar(
+    VidyaPrayagBottomBar(
         items = listOf(
             BottomNavItem(
                 label = "HOME", 

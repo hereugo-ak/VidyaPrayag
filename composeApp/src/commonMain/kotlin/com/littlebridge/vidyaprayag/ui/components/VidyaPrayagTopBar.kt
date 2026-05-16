@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun EduTrustTopBar(
+fun VidyaPrayagTopBar(
     onMenuClick: () -> Unit,
     onBackClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -61,7 +61,7 @@ fun EduTrustTopBar(
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    "EduTrust",
+                    "VidyaPrayag",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,

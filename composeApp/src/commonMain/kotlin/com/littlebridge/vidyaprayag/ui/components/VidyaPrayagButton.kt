@@ -15,7 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun EduTrustPrimaryButton(
+fun VidyaPrayagPrimaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -36,7 +36,7 @@ fun EduTrustPrimaryButton(
 }
 
 @Composable
-fun EduTrustSecondaryButton(
+fun VidyaPrayagSecondaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -55,7 +55,7 @@ fun EduTrustSecondaryButton(
 }
 
 @Composable
-fun EduTrustOutlinedButton(
+fun VidyaPrayagOutlinedButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,

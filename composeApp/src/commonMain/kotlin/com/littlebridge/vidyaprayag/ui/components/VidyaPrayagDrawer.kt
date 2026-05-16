@@ -3,8 +3,11 @@ package com.littlebridge.vidyaprayag.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -16,25 +19,39 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.littlebridge.vidyaprayag.navigation.Destination
+import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
+import com.littlebridge.vidyaprayag.presentation.MainViewModel
 import com.littlebridge.vidyaprayag.ui.theme.AppTheme
 import com.littlebridge.vidyaprayag.ui.theme.LocalAppTheme
 import com.littlebridge.vidyaprayag.ui.theme.LocalThemeSwitcher
+import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
-fun EduTrustDrawerSheet() {
+fun VidyaPrayagDrawerSheet() {
+    val mainViewModel: MainViewModel = koinViewModel()
+    val userRole by mainViewModel.userRole.collectAsState()
+    val navigator = LocalAppNavigator.current
+
     ModalDrawerSheet(
         drawerContainerColor = MaterialTheme.colorScheme.surface,
         modifier = Modifier.width(280.dp)
     ) {
-        DrawerHeader()
-        DrawerContent()
+        DrawerHeader(userRole)
+        DrawerContent(userRole) {
+            navigator.navigateTo(it)
+        }
         Spacer(modifier = Modifier.weight(1f))
         DrawerFooter()
     }
 }
 
 @Composable
-private fun DrawerHeader() {
+private fun DrawerHeader(userRole: String) {
+    val title = if (userRole == "ADMIN") "School Admin" else if (userRole == "PARENT") "Parent User" else "Guest User"
+    
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -53,30 +70,50 @@ private fun DrawerHeader() {
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column {
-                Text("Guest User", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(title, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Text("Welcome back!", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
             }
         }
-        Spacer(modifier = Modifier.height(24.dp))
-        EduTrustPrimaryButton(
-            text = "Get Started",
-            onClick = {},
-            modifier = Modifier.fillMaxWidth()
-        )
+        if (userRole == "GUEST") {
+            Spacer(modifier = Modifier.height(24.dp))
+            VidyaPrayagPrimaryButton(
+                text = "Get Started",
+                onClick = {},
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 
 @Composable
-private fun DrawerContent() {
+private fun DrawerContent(userRole: String, onNavigate: (Destination) -> Unit) {
     val currentTheme = LocalAppTheme.current
     val themeSwitcher = LocalThemeSwitcher.current
 
-    Column(modifier = Modifier.padding(24.dp)) {
-        DrawerItem(Icons.Default.Home, "Home", isSelected = true)
-        DrawerItem(Icons.Default.Search, "Discovery")
-        DrawerItem(Icons.Default.Dashboard, "Management")
-        DrawerItem(Icons.Default.Hub, "Tech Ecosystem")
+    Column(
+        modifier = Modifier
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp)
+    ) {
+        DrawerItem(Icons.Default.Home, "Home", isSelected = true) { onNavigate(Destination.SchoolDashboard) }
         
+        if (userRole == "ADMIN") {
+            Text("SCHOOL OPTIONS", modifier = Modifier.padding(vertical = 12.dp), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline, letterSpacing = 2.sp)
+            DrawerItem(Icons.Default.Analytics, "Analytics") { onNavigate(Destination.AnalyticsDashboard) }
+            DrawerItem(Icons.Default.CalendarMonth, "Academic Calendar") { onNavigate(Destination.AcademicCalendar) }
+            DrawerItem(Icons.Default.AssignmentTurnedIn, "Daily Attendance") { onNavigate(Destination.DailyAttendance) }
+            DrawerItem(Icons.Default.PendingActions, "Leave Request") { onNavigate(Destination.LeaveRequests) }
+            DrawerItem(Icons.Default.Assessment, "Results") { onNavigate(Destination.Results) }
+            DrawerItem(Icons.Default.Groups, "Schedule PTM") { onNavigate(Destination.SchedulePTM) }
+        }
+        
+        if (userRole == "PARENT") {
+            Text("PARENT OPTIONS", modifier = Modifier.padding(vertical = 12.dp), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline, letterSpacing = 2.sp)
+            DrawerItem(Icons.Default.School, "Child Progress")
+            DrawerItem(Icons.Default.Payments, "Fee Payment")
+            DrawerItem(Icons.AutoMirrored.Filled.Chat, "Teacher Chat")
+        }
+
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.1f))
         
         Text("THEME", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline, letterSpacing = 2.sp)
@@ -88,13 +125,18 @@ private fun DrawerContent() {
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.1f))
         
-        DrawerItem(Icons.Default.Login, "Sign In")
+        val signText = if (userRole == "GUEST") "Sign In" else "Sign Out"
+        val signIcon = if (userRole == "GUEST") Icons.Default.Login else Icons.AutoMirrored.Filled.Logout
+        
+        DrawerItem(signIcon, signText)
         DrawerItem(Icons.Default.Help, "Support")
+        DrawerItem(Icons.Default.Security, "Privacy Policy")
+        DrawerItem(Icons.Default.Description, "Terms & Conditions")
     }
 }
 
 @Composable
-private fun DrawerItem(icon: ImageVector, label: String, isSelected: Boolean = false) {
+private fun DrawerItem(icon: ImageVector, label: String, isSelected: Boolean = false, onClick: () -> Unit = {}) {
     val backgroundColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
     val contentColor = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
 
@@ -103,7 +145,7 @@ private fun DrawerItem(icon: ImageVector, label: String, isSelected: Boolean = f
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(backgroundColor)
-            .clickable { }
+            .clickable { onClick() }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -138,7 +180,7 @@ private fun DrawerFooter() {
             .padding(24.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text("EDUTRUST V2.4", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
+        Text("VIDYAPRAYAG V2.4", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(6.dp).clip(RoundedCornerShape(3.dp)).background(MaterialTheme.colorScheme.secondary))
             Spacer(modifier = Modifier.width(4.dp))

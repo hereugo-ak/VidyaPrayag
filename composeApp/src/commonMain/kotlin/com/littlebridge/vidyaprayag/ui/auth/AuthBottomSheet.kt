@@ -31,6 +31,7 @@ import com.littlebridge.vidyaprayag.ui.components.*
 import com.littlebridge.vidyaprayag.feature.auth.presentation.AuthViewModel
 import com.littlebridge.vidyaprayag.feature.auth.presentation.AuthStep
 import com.littlebridge.vidyaprayag.feature.auth.domain.model.AuthFlow
+import com.littlebridge.vidyaprayag.presentation.MainViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,6 +41,7 @@ fun AuthBottomSheet(
     sheetState: SheetState = rememberModalBottomSheetState()
 ) {
     val viewModel: AuthViewModel = koinViewModel()
+    val mainViewModel: MainViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
     val navigator = LocalAppNavigator.current
 
@@ -99,7 +101,7 @@ fun AuthBottomSheet(
             Spacer(modifier = Modifier.height(16.dp))
             
             Text(
-                text = "Access EduTrust",
+                text = "Access VidyaPrayag",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
@@ -144,6 +146,7 @@ fun AuthBottomSheet(
                         isLoading = state.isLoading,
                         onContinue = {
                             onDismissRequest()
+                            mainViewModel.setRole(state.role)
                             if (state.role == "ADMIN") {
                                 navigator.navigateTo(Destination.SchoolDashboard)
                             } else {
@@ -186,7 +189,7 @@ fun AuthBottomSheet(
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "By continuing, you agree to EduTrust's Terms of Service and Privacy Policy.",
+                text = "By continuing, you agree to VidyaPrayag's Terms of Service and Privacy Policy.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline,
                 textAlign = TextAlign.Center,
@@ -249,7 +252,7 @@ private fun IdentifierSection(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        EduTrustPrimaryButton(
+        VidyaPrayagPrimaryButton(
             text = if (isLoading) "Checking..." else "Continue",
             onClick = onContinue,
             modifier = Modifier.fillMaxWidth(),
@@ -295,7 +298,7 @@ private fun LoginPasswordSection(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        EduTrustPrimaryButton(
+        VidyaPrayagPrimaryButton(
             text = if (isLoading) "Logging in..." else "Login",
             onClick = onLogin,
             modifier = Modifier.fillMaxWidth(),
@@ -379,7 +382,7 @@ private fun SignupDetailsSection(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        EduTrustPrimaryButton(
+        VidyaPrayagPrimaryButton(
             text = if (isLoading) "Creating Account..." else "Create Account",
             onClick = onSignup,
             modifier = Modifier.fillMaxWidth(),
@@ -456,7 +459,7 @@ private fun OtpSection(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        EduTrustPrimaryButton(
+        VidyaPrayagPrimaryButton(
             text = if (isLoading) "Verifying..." else "Verify & Continue",
             onClick = onVerify,
             modifier = Modifier.fillMaxWidth(),

@@ -96,7 +96,7 @@ Text(
 ```
 
 ### 4.3 App Theme Component
-Wrap your screen with `EduTrustTheme` to ensure proper support for Light, Dark, and Midnight modes.
+Wrap your screen with `VidyaPrayagTheme` to ensure proper support for Light, Dark, and Midnight modes.
 
 ---
 

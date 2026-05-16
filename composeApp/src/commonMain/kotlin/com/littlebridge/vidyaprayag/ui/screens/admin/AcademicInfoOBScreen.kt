@@ -188,7 +188,7 @@ private fun SectionHeader(title: String, subtitle: String) {
 
 @Composable
 private fun SubjectCard(subject: Subject) {
-    EduTrustCard(modifier = Modifier.fillMaxWidth()) {
+    VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
