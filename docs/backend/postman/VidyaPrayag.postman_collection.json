@@ -1,0 +1,542 @@
+{
+  "info": {
+    "_postman_id": "vp-backend-by-abuzar-2026-05-20",
+    "name": "VidyaPrayag API (backend-by-abuzar)",
+    "description": "End-to-end Postman collection for the Ktor backend introduced in PR #1 (branch `backend-by-abuzar`).\n\nCovers all 23 endpoints across 9 feature groups: landing, app-status, auth (+ legacy aliases), user details, user profile, onboarding, announcements, admissions, school (analytics / calendar / holidays / attendance).\n\n## How to use\n\n1. Import this collection AND `VidyaPrayag.local.postman_environment.json` into Postman.\n2. Select the **VidyaPrayag — Local** environment in the top-right dropdown.\n3. Make sure `{{baseUrl}}` points to your running server (default `http://localhost:8080`).\n4. Run the requests **in order from the first folder to the last**. The login/signup requests have test scripts that auto-store `token`, `refreshToken` and `userId` into the environment — every subsequent authenticated request reads `{{token}}` automatically.\n\nSee `docs/backend/POSTMAN_TESTING_GUIDE.md` for the full step-by-step walkthrough.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{token}}", "type": "string" }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// No-op global pre-request. Per-request scripts handle token saving."
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Liveness",
+      "item": [
+        {
+          "name": "GET / (root greeting)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/", "host": ["{{baseUrl}}"], "path": [""] },
+            "description": "Liveness check. Should return a plain-text greeting like:\n`Ktor: Hello, Java! — VidyaPrayag API v1 is live`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Landing (public)",
+      "item": [
+        {
+          "name": "GET /api/v1/content/landing",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/content/landing", "host": ["{{baseUrl}}"], "path": ["api", "v1", "content", "landing"] },
+            "description": "Returns CMS-driven landing-page content (taglines, login modes, parent/school info blocks, offerings, portals). Seeded by `Seed.kt → seedLanding()`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. App Status (public)",
+      "item": [
+        {
+          "name": "GET /api/v1/config/app-status",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [
+              { "key": "App-Version", "value": "2.4.0" },
+              { "key": "Platform", "value": "android" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/v1/config/app-status", "host": ["{{baseUrl}}"], "path": ["api", "v1", "config", "app-status"] },
+            "description": "Returns version-check + maintenance + feature flags. Used by the Splash screen."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Auth (public)",
+      "item": [
+        {
+          "name": "POST /auth/check-user (existing demo admin)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"demo.admin@vidyaprayag.com\",\n  \"role\": \"ADMIN\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/check-user", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "check-user"] },
+            "description": "The seeded demo admin already exists, so this should return `is_new_user: false`.\n\nThe alias `/auth/check-user` (without `/api/v1`) also works for legacy clients."
+          }
+        },
+        {
+          "name": "POST /auth/check-user (brand-new contact)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"[email protected]\",\n  \"role\": \"ADMIN\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/check-user", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "check-user"] },
+            "description": "Should return `is_new_user: true` and `auth_method_required: \"PASSWORD\"` because the identifier looks like an email."
+          }
+        },
+        {
+          "name": "POST /auth/signup (email + password — ADMIN)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('Signup returns 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Envelope success=true', () => pm.expect(json.success).to.eql(true));",
+                  "pm.test('Returns token', () => pm.expect(json.data.token).to.be.a('string'));",
+                  "// Persist token + ids for later authenticated requests.",
+                  "pm.environment.set('token', json.data.token);",
+                  "pm.environment.set('refreshToken', json.data.refresh_token);",
+                  "pm.environment.set('userId', json.data.user_id);",
+                  "pm.environment.set('role', json.data.role);",
+                  "console.log('Saved token for user', json.data.user_id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Tester\",\n  \"identifier\": \"[email protected]\",\n  \"password\": \"hunter2\",\n  \"role\": \"ADMIN\",\n  \"device_info\": {\n    \"device_id\": \"postman-1\",\n    \"platform\": \"web\"\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/signup", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "signup"] },
+            "description": "Creates a brand-new ADMIN account and **automatically saves the JWT into `{{token}}`** for the rest of this collection.\n\nRe-running this exact request will return 409 (account exists). Change the email to test again, or just run the login below."
+          }
+        },
+        {
+          "name": "POST /auth/login (email + password — re-login)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('Login returns 200', () => pm.response.to.have.status(200));",
+                  "pm.environment.set('token', json.data.token);",
+                  "pm.environment.set('refreshToken', json.data.refresh_token);",
+                  "pm.environment.set('userId', json.data.user_id);",
+                  "pm.environment.set('role', json.data.role);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"[email protected]\",\n  \"password\": \"hunter2\",\n  \"role\": \"ADMIN\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "login"] },
+            "description": "Re-issues a JWT for the account created above. Use this if you closed Postman and lost `{{token}}`."
+          }
+        },
+        {
+          "name": "POST /auth/send-otp (mock)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"9876543210\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/send-otp", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "send-otp"] },
+            "description": "Always returns success and the dev OTP is **`123456`** (see `AuthRouting.kt` — this is a mock until an SMS provider is wired in)."
+          }
+        },
+        {
+          "name": "POST /auth/signup (phone + OTP — ADMIN, optional)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  pm.environment.set('token', json.data.token);",
+                  "  pm.environment.set('userId', json.data.user_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Phone Tester\",\n  \"identifier\": \"9000000001\",\n  \"otp\": \"123456\",\n  \"role\": \"ADMIN\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/signup", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "signup"] },
+            "description": "Optional: shows the phone+OTP signup path. The hard-coded dev OTP is `123456`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. User Details (jwt)",
+      "item": [
+        {
+          "name": "GET /api/v1/user/details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/user/details", "host": ["{{baseUrl}}"], "path": ["api", "v1", "user", "details"] },
+            "description": "Returns the logged-in user's identity + onboarding step status (BASIC / BRANDING / ACADEMIC / REVIEW with COMPLETED/PENDING/LOCKED).\n\nUses `{{token}}` automatically."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Onboarding (jwt)",
+      "item": [
+        {
+          "name": "GET /api/v1/onboarding/step?obStepType=BASIC",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/onboarding/step?obStepType=BASIC",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "onboarding", "step"],
+              "query": [{ "key": "obStepType", "value": "BASIC" }]
+            },
+            "description": "Returns the dynamic field list for the BASIC step (school_name, board_affiliation, official_email, contact_number, country_code, address)."
+          }
+        },
+        {
+          "name": "POST /api/v1/onboarding/submit (BASIC)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ob_step_type\": \"BASIC\",\n  \"is_final_submission\": false,\n  \"data_payload\": {\n    \"school_name\": \"Postman Test Academy\",\n    \"board_affiliation\": \"CBSE\",\n    \"official_email\": \"[email protected]\",\n    \"contact_number\": \"9000000001\",\n    \"country_code\": \"+91\",\n    \"address\": \"Test Lane, Sector 1, New Delhi\"\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/onboarding/submit", "host": ["{{baseUrl}}"], "path": ["api", "v1", "onboarding", "submit"] },
+            "description": "Saves BASIC step drafts. `next_step` should be `\"BRANDING\"`."
+          }
+        },
+        {
+          "name": "GET /api/v1/onboarding/step?obStepType=BRANDING",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/onboarding/step?obStepType=BRANDING",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "onboarding", "step"],
+              "query": [{ "key": "obStepType", "value": "BRANDING" }]
+            }
+          }
+        },
+        {
+          "name": "POST /api/v1/onboarding/submit (BRANDING)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ob_step_type\": \"BRANDING\",\n  \"is_final_submission\": false,\n  \"data_payload\": {\n    \"logo_url\": \"https://example.com/logo.png\",\n    \"theme_color\": \"#0F62FE\"\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/onboarding/submit", "host": ["{{baseUrl}}"], "path": ["api", "v1", "onboarding", "submit"] }
+          }
+        },
+        {
+          "name": "GET /api/v1/onboarding/step?obStepType=ACADEMIC",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/onboarding/step?obStepType=ACADEMIC",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "onboarding", "step"],
+              "query": [{ "key": "obStepType", "value": "ACADEMIC" }]
+            },
+            "description": "Returns `list_of_active_classes` for the user's school (empty for brand-new accounts; the demo admin has Grade 10 + Grade 5)."
+          }
+        },
+        {
+          "name": "GET /api/v1/onboarding/academic/class-details?classId=C10",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/onboarding/academic/class-details?classId=C10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "onboarding", "academic", "class-details"],
+              "query": [{ "key": "classId", "value": "C10" }]
+            },
+            "description": "Lists the subjects under classId=`C10` (Grade 10) for the demo school. Returns 404 if the new account has no class C10 yet — log in as the demo admin to see seeded data (see guide)."
+          }
+        },
+        {
+          "name": "GET /api/v1/onboarding/step?obStepType=REVIEW",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/onboarding/step?obStepType=REVIEW",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "onboarding", "step"],
+              "query": [{ "key": "obStepType", "value": "REVIEW" }]
+            }
+          }
+        },
+        {
+          "name": "POST /api/v1/onboarding/submit (REVIEW — final)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ob_step_type\": \"REVIEW\",\n  \"is_final_submission\": true,\n  \"data_payload\": {}\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/onboarding/submit", "host": ["{{baseUrl}}"], "path": ["api", "v1", "onboarding", "submit"] },
+            "description": "Final submission. Promotes drafts → SchoolTable, flips `onboarding_status` to `COMPLETED`. Response: `is_onboarding_complete=true`, `redirect_to_home=true`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Announcements (jwt)",
+      "item": [
+        {
+          "name": "GET /api/v1/school/announcements",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/school/announcements", "host": ["{{baseUrl}}"], "path": ["api", "v1", "school", "announcements"] },
+            "description": "All announcements for the user's school, newest first."
+          }
+        },
+        {
+          "name": "GET /api/v1/school/announcements/search?query=summer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/school/announcements/search?query=summer",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "school", "announcements", "search"],
+              "query": [{ "key": "query", "value": "summer" }]
+            },
+            "description": "Case-insensitive LIKE search over title + description."
+          }
+        },
+        {
+          "name": "POST /api/v1/school/announcements/sync-whatsapp (mock)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"announcement_ids\": null\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/school/announcements/sync-whatsapp", "host": ["{{baseUrl}}"], "path": ["api", "v1", "school", "announcements", "sync-whatsapp"] },
+            "description": "If `announcement_ids` is null/empty, syncs every unsynced announcement. Inserts QUEUED rows in `whatsapp_logs` — no real WhatsApp call yet (mock)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Admissions (jwt)",
+      "item": [
+        {
+          "name": "GET /api/v1/admissions/enquiries/summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/admissions/enquiries/summary", "host": ["{{baseUrl}}"], "path": ["api", "v1", "admissions", "enquiries", "summary"] },
+            "description": "Counts (total / new / followup / converted) + 5 most-recent enquiries + an efficiency string like `\"50%\"`."
+          }
+        },
+        {
+          "name": "GET /api/v1/admissions/enquiries?page=1&limit=20",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admissions/enquiries?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admissions", "enquiries"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "Paginated list of enquiries (page≥1, 1≤limit≤100)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. User Profile (jwt)",
+      "item": [
+        {
+          "name": "GET /api/v1/user/profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/user/profile", "host": ["{{baseUrl}}"], "path": ["api", "v1", "user", "profile"] },
+            "description": "Returns philosophy, video_tour_data list, and gallery block. Empty for fresh accounts until the demo admin's school is associated to your user."
+          }
+        },
+        {
+          "name": "PUT /api/v1/user/profile/philosophy",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"core_mission\": \"Holistic learning for every child.\",\n  \"learning_model\": \"Inquiry-based\",\n  \"primary_language\": \"English\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/user/profile/philosophy", "host": ["{{baseUrl}}"], "path": ["api", "v1", "user", "profile", "philosophy"] }
+          }
+        },
+        {
+          "name": "PUT /api/v1/user/profile/tour-videos (sync-replace)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"video_tour_data\": [\n    \"https://example.com/v1.mp4\",\n    \"https://example.com/v2.mp4\"\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/user/profile/tour-videos", "host": ["{{baseUrl}}"], "path": ["api", "v1", "user", "profile", "tour-videos"] },
+            "description": "Replaces the entire VIDEO media list for the school."
+          }
+        },
+        {
+          "name": "PUT /api/v1/user/profile/gallery (sync-replace)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"images\": [\n    \"https://example.com/img1.jpg\",\n    \"https://example.com/img2.jpg\",\n    \"https://example.com/img3.jpg\"\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/user/profile/gallery", "host": ["{{baseUrl}}"], "path": ["api", "v1", "user", "profile", "gallery"] },
+            "description": "Replaces the IMAGE media list. Storage usage is approximated as 0.2 GB × imageCount (mock)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. School / Drawer (jwt)",
+      "item": [
+        {
+          "name": "GET /api/v1/school/analytics (Coming Soon)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/school/analytics", "host": ["{{baseUrl}}"], "path": ["api", "v1", "school", "analytics"] },
+            "description": "Placeholder: returns `{ isAvailable: false, expectedRelease: \"Q3 2024\" }` — by design (no UI dashboard yet)."
+          }
+        },
+        {
+          "name": "GET /api/v1/school/calendar?view_type=month&date=2024-05-15",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/school/calendar?view_type=month&date=2024-05-15",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "school", "calendar"],
+              "query": [
+                { "key": "view_type", "value": "month" },
+                { "key": "date", "value": "2024-05-15" },
+                { "key": "standard", "value": "", "disabled": true }
+              ]
+            },
+            "description": "`view_type` ∈ {month, week}. `date` is YYYY-MM-DD. Optional `standard` (e.g. `Grade 5`) filters class-specific events."
+          }
+        },
+        {
+          "name": "GET /api/v1/school/holidays?filter_type=yearly",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/school/holidays?filter_type=yearly",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "school", "holidays"],
+              "query": [{ "key": "filter_type", "value": "yearly" }]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/school/attendance/daily?type=student&grade=Grade 5",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/school/attendance/daily?type=student&grade=Grade 5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "school", "attendance", "daily"],
+              "query": [
+                { "key": "type", "value": "student" },
+                { "key": "grade", "value": "Grade 5" }
+              ]
+            },
+            "description": "`type` ∈ {student, faculty}. `grade` is required when type=student. Returns name/profile_pic joined from StudentTable/FacultyTable."
+          }
+        },
+        {
+          "name": "GET /api/v1/school/attendance/daily?type=faculty",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/school/attendance/daily?type=faculty",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "school", "attendance", "daily"],
+              "query": [{ "key": "type", "value": "faculty" }]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" }
+  ]
+}
