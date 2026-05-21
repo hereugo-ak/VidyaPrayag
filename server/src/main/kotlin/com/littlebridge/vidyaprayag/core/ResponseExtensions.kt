@@ -12,7 +12,7 @@
  *   - call.accepted(data, message)            → 202 Accepted envelope (used by /sync-whatsapp)
  *   - call.fail(message, status, errorCode)   → error envelope w/ chosen HTTP code
  *
- * Used by: every *Routing.kt file under feature/**.
+ * Used by: every *Routing.kt file under the feature package.
  */
 package com.littlebridge.vidyaprayag.core
 

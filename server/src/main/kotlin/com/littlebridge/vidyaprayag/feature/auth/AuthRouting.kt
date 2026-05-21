@@ -10,7 +10,7 @@
  *   POST /api/v1/auth/send-otp         (public — MOCK, always returns 123456)
  *
  * Backward-compat aliases (the existing shared/.../AuthApi.kt still posts to
- * /auth/* without the /api/v1 prefix):
+ * /auth/... without the /api/v1 prefix):
  *   POST /auth/check-user, /auth/signup, /auth/login, /auth/send-otp
  *
  * Spec-vs-legacy field mapping:
@@ -22,8 +22,8 @@
  *          adequate for an MVP / hackathon-grade backend.
  *
  * NOTE for FRONTEND TEAM:
- *   The legacy `/auth/*` paths are kept alive so the current app keeps working
- *   while you migrate AuthApi.kt to the new `/api/v1/auth/*` paths. Once
+ *   The legacy `/auth/...` paths are kept alive so the current app keeps working
+ *   while you migrate AuthApi.kt to the new `/api/v1/auth/...` paths. Once
  *   migrated, you can delete the legacy block at the bottom of this file.
  */
 package com.littlebridge.vidyaprayag.feature.auth
