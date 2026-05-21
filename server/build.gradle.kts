@@ -21,7 +21,19 @@ application {
 }
 
 dependencies {
-    implementation(projects.shared)
+    // NOTE: `:server` no longer depends on `:shared`.
+    //
+    // The `:shared` module is a Kotlin Multiplatform module (Android + iOS +
+    // JVM + JS + wasmJs, plus AGP, Compose Multiplatform, Room/KSP). Depending
+    // on it forces a full KMP configuration on every Gradle build of `:server`,
+    // which on a cold clone downloads gigabytes of artifacts and can take 30+
+    // minutes on average hardware/internet. `:server` only used two trivial
+    // symbols from `:shared` (SERVER_PORT, Greeting), which are now inlined in
+    // `server/src/main/kotlin/com/littlebridge/vidyaprayag/ServerEntry.kt`.
+    //
+    // If you ever need to share more code between server and the mobile/web
+    // apps, prefer creating a JVM-only sub-module (e.g. `:shared-jvm`) instead
+    // of reintroducing the full multiplatform dependency here.
     implementation(libs.logback)
     implementation(libs.ktor.serverCore)
     implementation(libs.ktor.serverNetty)
