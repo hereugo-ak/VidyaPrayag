@@ -8,28 +8,31 @@
  *   error response shape.
  *
  * Maps:
- *   - ContentTransformationException → 400 Bad Request ("Invalid request body")
- *   - IllegalArgumentException       → 400 Bad Request (message preserved)
- *   - NotFoundException              → 404 Not Found
- *   - Throwable (catch-all)          → 500 Internal Server Error
+ *   - BadRequestException (parent of ContentTransformationException in Ktor 3.x)
+ *                                    -> 400 Bad Request ("Invalid request body")
+ *   - IllegalArgumentException       -> 400 Bad Request (message preserved)
+ *   - NotFoundException              -> 404 Not Found
+ *   - Throwable (catch-all)          -> 500 Internal Server Error
  *
  * Used by:
- *   - Application.kt → install(StatusPages) { configureErrorHandling() }
+ *   - Application.kt -> install(StatusPages) { configureErrorHandling() }
  */
 package com.littlebridge.vidyaprayag.core
 
-import io.ktor.http.*
-import io.ktor.server.application.*
-import io.ktor.server.plugins.*
-import io.ktor.server.plugins.statuspages.*
-import io.ktor.server.request.*
-import io.ktor.server.response.*
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.plugins.BadRequestException
+import io.ktor.server.plugins.NotFoundException
+import io.ktor.server.plugins.statuspages.StatusPagesConfig
+import io.ktor.server.request.uri
+import io.ktor.server.response.respond
 
 fun StatusPagesConfig.configureErrorHandling() {
-    exception<ContentTransformationException> { call, cause ->
+    // BadRequestException is the parent of Ktor's ContentTransformationException,
+    // so this also catches malformed JSON / missing fields during deserialization.
+    exception<BadRequestException> { call, cause ->
         call.respond(
             HttpStatusCode.BadRequest,
-            ApiError(message = "Invalid request body: ${cause.message ?: "malformed JSON"}")
+            ApiError(message = "Invalid request: ${cause.message ?: "malformed body"}")
         )
     }
     exception<IllegalArgumentException> { call, cause ->

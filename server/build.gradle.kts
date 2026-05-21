@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.kotlinJvm)
     alias(libs.plugins.ktor)
+    kotlin("plugin.serialization") version libs.versions.kotlin.get()
     application
 }
 
@@ -36,6 +37,7 @@ dependencies {
     implementation(libs.exposed.core)
     implementation(libs.exposed.dao)
     implementation(libs.exposed.jdbc)
+    implementation(libs.exposed.javaTime)
     implementation(libs.postgres)
     implementation(libs.hikaricp)
     implementation(libs.sqlite)

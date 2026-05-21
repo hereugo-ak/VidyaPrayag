@@ -17,10 +17,10 @@
  *   - GET  /                              — liveness greeting
  *   - landingRouting()                    — /api/v1/content/landing
  *   - appStatusRouting()                  — /api/v1/config/app-status
- *   - authRouting()                       — /api/v1/auth/* (+ legacy /auth/*)
+ *   - authRouting()                       — /api/v1/auth/... (+ legacy /auth/...)
  *   - userDetailsRouting()                — /api/v1/user/details
  *   - userProfileRouting()                — /api/v1/user/profile[…]
- *   - onboardingRouting()                 — /api/v1/onboarding/*
+ *   - onboardingRouting()                 — /api/v1/onboarding/...
  *   - announcementRouting()               — /api/v1/school/announcements[…]
  *   - admissionRouting()                  — /api/v1/admissions/enquiries[…]
  *   - schoolRouting()                     — /api/v1/school/{analytics,calendar,holidays,attendance/daily}
