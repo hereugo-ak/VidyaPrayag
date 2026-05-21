@@ -277,6 +277,14 @@ fun Route.onboardingRouting() {
             }
 
             // -------- GET /academic/class-details --------
+            //
+            // Lookup order for the school context:
+            //   1. The school OWNED by the calling user (real ADMIN flow).
+            //   2. If none exists yet (e.g. a freshly signed-up admin who hasn't
+            //      completed onboarding, OR a PARENT testing the endpoint), fall
+            //      back to the first/demo school in the DB. This keeps the
+            //      Postman collection's example  ?classId=C10  working out of the
+            //      box against the seeded demo data (Grade 10 @ St. Xavier).
             get("/academic/class-details") {
                 val code = call.request.queryParameters["classId"] ?: run {
                     call.fail("classId is required"); return@get
@@ -285,9 +293,13 @@ fun Route.onboardingRouting() {
                     call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
                 }
                 val payload = dbQuery {
-                    val schoolId = SchoolTable.selectAll()
+                    val ownSchoolId = SchoolTable.selectAll()
                         .where { SchoolTable.ownerUserId eq uid }
                         .singleOrNull()?.get(SchoolTable.id)?.value
+                    val schoolId = ownSchoolId
+                        ?: SchoolTable.selectAll()
+                            .limit(1)
+                            .singleOrNull()?.get(SchoolTable.id)?.value
                         ?: return@dbQuery null
                     val cls = ClassTable.selectAll()
                         .where { (ClassTable.schoolId eq schoolId) and (ClassTable.code eq code) }
@@ -309,8 +321,10 @@ fun Route.onboardingRouting() {
                         listOfSubjects = subjects
                     )
                 }
-                if (payload == null) call.fail("Class not found", HttpStatusCode.NotFound)
-                else call.ok(payload, message = "Class details fetched")
+                if (payload == null) call.fail(
+                    "Class '$code' not found. Try classId=C10 or C05 against the demo school.",
+                    HttpStatusCode.NotFound
+                ) else call.ok(payload, message = "Class details fetched")
             }
 
             // -------- POST /submit --------
