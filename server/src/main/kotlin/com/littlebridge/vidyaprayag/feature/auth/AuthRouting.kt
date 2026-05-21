@@ -199,10 +199,34 @@ fun Route.authRouting() {
             }
 
             // -------- login --------
+            //
+            // Accepts credentials from EITHER:
+            //   (a) JSON body  (preferred, per spec):
+            //       { "identifier": "...", "password": "...", "role": "..." }
+            //       { "identifier": "+91...", "otp": "123456", "role": "PARENT" }
+            //   (b) Query/form parameters as a fallback so that quick manual tests
+            //       like  POST /api/v1/auth/login?identifier=...&otp=123456  also
+            //       work (this is what tripped up the Postman re-test).
+            // The body wins when both are present.
             post("/login") {
-                val req = call.receive<LoginDto>()
+                // Try to read JSON body; if missing/invalid, fall back to empty DTO.
+                val bodyReq: LoginDto? = runCatching { call.receive<LoginDto>() }.getOrNull()
+                val q = call.request.queryParameters
+
+                val req = LoginDto(
+                    identifier = bodyReq?.identifier ?: q["identifier"],
+                    contact    = bodyReq?.contact    ?: q["contact"],
+                    password   = bodyReq?.password   ?: q["password"],
+                    otp        = bodyReq?.otp        ?: q["otp"],
+                    role       = bodyReq?.role       ?: q["role"] ?: ""
+                )
                 val id = req.id()
-                if (id.isBlank()) { call.fail("Identifier is required"); return@post }
+                if (id.isBlank()) {
+                    call.fail(
+                        "Identifier is required. Send JSON body {identifier,password|otp,role} " +
+                        "or use ?identifier=...&password=... query params."
+                    ); return@post
+                }
 
                 val row = dbQuery {
                     UserTable.selectAll().where { UserTable.contact eq id }.singleOrNull()
