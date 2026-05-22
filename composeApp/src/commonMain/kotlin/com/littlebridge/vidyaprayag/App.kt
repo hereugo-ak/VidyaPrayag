@@ -57,7 +57,6 @@ fun App() {
                     DiskCache.Builder()
                         .directory(platform.cacheDir / "image_cache")
                         .maxSizeBytes(512L * 1024 * 1024) // 512MB
-                        .fileSystem(okio.FileSystem.SYSTEM)
                         .build()
                 }
                 .logger(coil3.util.DebugLogger())
