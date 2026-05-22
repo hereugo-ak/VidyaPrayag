@@ -92,8 +92,11 @@ object DatabaseFactory {
 
         Database.connect(dataSource)
 
-        if (!isPostgres) {
-            // Local-dev convenience only. Never touch production schema.
+        val autoCreate = (dotenv["AUTO_CREATE_TABLES"] ?: System.getenv("AUTO_CREATE_TABLES"))
+            .equals("true", ignoreCase = true)
+
+        if (!isPostgres || autoCreate) {
+            // Local-dev convenience OR explicit opt-in for production auto-creation
             transaction {
                 SchemaUtils.createMissingTablesAndColumns(*allTables)
             }
