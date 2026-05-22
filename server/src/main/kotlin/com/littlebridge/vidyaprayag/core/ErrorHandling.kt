@@ -53,9 +53,17 @@ fun StatusPagesConfig.configureErrorHandling() {
         // Log to stderr; production should pipe this to a real logger / Sentry.
         System.err.println("[VidyaPrayag] Unhandled error on ${call.request.uri}: ${cause.message}")
         cause.printStackTrace()
+
+        val showFullError = System.getenv("DEBUG_ERRORS") == "true"
+        val message = if (showFullError) {
+            "DEBUG_ERROR: ${cause.message ?: cause.toString()}"
+        } else {
+            "Something went wrong. Please try again later."
+        }
+
         call.respond(
             HttpStatusCode.InternalServerError,
-            ApiError(message = "Something went wrong. Please try again later.")
+            ApiError(message = message)
         )
     }
 
