@@ -1,22 +1,31 @@
 /*
  * File: DatabaseFactory.kt
  * Module: db
- * Purpose:
- *   - Initialises the JDBC connection pool (HikariCP).
- *   - Picks Postgres (Supabase / Render) when DATABASE_URL env is set,
- *     otherwise falls back to local SQLite (data.db) so the server boots on
- *     a fresh clone without any configuration.
- *   - Registers ALL Exposed tables via SchemaUtils.createMissingTablesAndColumns
- *     so adding columns to a Table object automatically migrates existing rows
- *     (Postgres) or recreates the local SQLite file.
- *   - Calls Seed.populateIfEmpty() so the CMS / config / demo-school endpoints
- *     return realistic data the first time the app is launched.
  *
- * Used by: Application.kt → DatabaseFactory.init()
+ * Connects the Ktor backend to the configured database:
+ *   - PRODUCTION / STAGING : Supabase Postgres (DATABASE_URL set)
+ *   - LOCAL DEV (default)  : SQLite file `data.db` in CWD
  *
- * NOTE for DevOps (manual step):
- *   Set DATABASE_URL (postgres://… or jdbc:postgresql://…) in .env or the
- *   Render dashboard. See .env.example.
+ * IMPORTANT: against Postgres we DO NOT run any schema migration from code.
+ * The source of truth is two SQL files run manually in Supabase SQL Editor:
+ *     1.  /supabase_schema                              (operational tables)
+ *     2.  /docs/backend/sql/01_supplementary_schema.sql (this backend's tables)
+ *
+ * Why?  Letting an ORM mutate production schema silently is a recipe for
+ * downtime.  All schema changes go through a reviewed SQL migration PR
+ * and are executed by a human in the Supabase dashboard.
+ *
+ * Against SQLite (no DATABASE_URL), we *do* call
+ * SchemaUtils.createMissingTablesAndColumns(...) so the server boots on
+ * a fresh clone with zero setup.
+ *
+ * ENVIRONMENT VARIABLES READ
+ *   DATABASE_URL       : full JDBC or postgres:// URL
+ *   DATABASE_USER      : Postgres user (optional if encoded in URL)
+ *   DATABASE_PASSWORD  : Postgres password (optional if encoded in URL)
+ *   DB_POOL_SIZE       : HikariCP pool size (default 5)
+ *   APP_SEED_CMS       : "true" to seed/upsert landing+app_config rows
+ *                        (default "true" — these are CMS strings, safe to seed)
  */
 package com.littlebridge.vidyaprayag.db
 
@@ -31,74 +40,107 @@ import org.jetbrains.exposed.sql.transactions.transaction
 
 object DatabaseFactory {
 
-    /** All registered tables. Add new Table objects here so they get migrated. */
+    /** All tables the backend reads/writes. Order matters for SQLite FKs. */
     private val allTables = arrayOf(
-        UserTable,
-        SchoolTable,
-        OnboardingDraftTable,
-        ClassTable,
-        SubjectTable,
-        AnnouncementTable,
-        WhatsappLogTable,
-        AdmissionEnquiryTable,
+        AppUsersTable,
+        AuthOtpsTable,
+        UserSessionsTable,
+        LandingContentTable,
+        AppConfigTable,
+        SchoolsTable,
+        OnboardingDraftsTable,
+        SchoolClassesTable,
+        SchoolSubjectsTable,
+        AnnouncementsTable,
+        WhatsappLogsTable,
+        AdmissionEnquiriesTable,
         SchoolPhilosophyTable,
         SchoolMediaTable,
         StorageMetricsTable,
-        LandingContentTable,
-        AppConfigTable,
-        CalendarEventTable,
-        HolidayTable,
+        AcademicCalendarTable,
+        HolidayListTable,
         FacultyTable,
-        StudentTable,
-        AttendanceTable
+        AttendanceRecordsTable,
+        StudentsTable
     )
 
-    fun init() {
+    /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */
+    var isPostgres: Boolean = false
+        private set
 
+    fun init() {
         val dotenv = dotenv {
             ignoreIfMalformed = true
             ignoreIfMissing = true
         }
 
-        val databaseUrl =
-            dotenv["DATABASE_URL"]?.takeIf { it.isNotBlank() }
-                ?: System.getenv("DATABASE_URL")?.takeIf { it.isNotBlank() }
+        val databaseUrl = (dotenv["DATABASE_URL"] ?: System.getenv("DATABASE_URL"))
+            ?.takeIf { it.isNotBlank() }
 
         val dataSource = if (databaseUrl != null) {
-            createPostgresDataSource(databaseUrl)
+            isPostgres = true
+            createPostgresDataSource(
+                databaseUrl,
+                user = dotenv["DATABASE_USER"] ?: System.getenv("DATABASE_USER"),
+                password = dotenv["DATABASE_PASSWORD"] ?: System.getenv("DATABASE_PASSWORD"),
+                poolSize = (dotenv["DB_POOL_SIZE"] ?: System.getenv("DB_POOL_SIZE"))
+                    ?.toIntOrNull() ?: 5
+            )
         } else {
             createSqliteDataSource()
         }
 
         Database.connect(dataSource)
 
-        transaction {
-            SchemaUtils.createMissingTablesAndColumns(*allTables)
+        if (!isPostgres) {
+            // Local-dev convenience only. Never touch production schema.
+            transaction {
+                SchemaUtils.createMissingTablesAndColumns(*allTables)
+            }
         }
 
-        // Populate landing CMS, app-config, demo school, demo announcements etc.
-        // Idempotent — only writes when target tables are empty.
-        Seed.populateIfEmpty()
+        // CMS seed (landing + app_config). Always idempotent — only inserts
+        // missing keys; never overwrites operator-edited values.
+        val seedCms = (dotenv["APP_SEED_CMS"] ?: System.getenv("APP_SEED_CMS") ?: "true")
+            .equals("true", ignoreCase = true)
+        if (seedCms) {
+            CmsSeed.ensureLandingAndConfig()
+        }
     }
 
-    private fun createPostgresDataSource(databaseUrl: String): HikariDataSource {
-
-        val username = System.getenv("DATABASE_USER")
-            ?: dotenv { ignoreIfMalformed = true; ignoreIfMissing = true }["DATABASE_USER"]
-
-        val password = System.getenv("DATABASE_PASSWORD")
-            ?: dotenv { ignoreIfMalformed = true; ignoreIfMissing = true }["DATABASE_PASSWORD"]
-
-        val jdbcUrl = if (databaseUrl.startsWith("jdbc:postgresql://")) databaseUrl else "jdbc:$databaseUrl"
+    private fun createPostgresDataSource(
+        databaseUrl: String,
+        user: String?,
+        password: String?,
+        poolSize: Int
+    ): HikariDataSource {
+        // Accept both forms:
+        //   postgresql://USER:PASS@HOST:5432/DB?sslmode=require
+        //   jdbc:postgresql://HOST:5432/DB?sslmode=require
+        //   postgres://USER:PASS@HOST:5432/DB
+        val jdbcUrl = when {
+            databaseUrl.startsWith("jdbc:") -> databaseUrl
+            databaseUrl.startsWith("postgres://") ->
+                "jdbc:" + databaseUrl.replaceFirst("postgres://", "postgresql://")
+            databaseUrl.startsWith("postgresql://") -> "jdbc:$databaseUrl"
+            else -> "jdbc:postgresql://$databaseUrl"
+        }
 
         val config = HikariConfig().apply {
             driverClassName = "org.postgresql.Driver"
             this.jdbcUrl = jdbcUrl
-            this.username = username
-            this.password = password
-            maximumPoolSize = 3
+            if (!user.isNullOrBlank()) this.username = user
+            if (!password.isNullOrBlank()) this.password = password
+            maximumPoolSize = poolSize
+            minimumIdle = 1
             isAutoCommit = false
             transactionIsolation = "TRANSACTION_REPEATABLE_READ"
+            // Sensible defaults for Supabase (pooled, IPv4 PgBouncer port 6543).
+            addDataSourceProperty("ApplicationName", "vidyaprayag-ktor")
+            addDataSourceProperty("reWriteBatchedInserts", "true")
+            connectionTimeout = 30_000
+            validationTimeout = 5_000
+            maxLifetime = 30 * 60 * 1000L
             validate()
         }
         return HikariDataSource(config)

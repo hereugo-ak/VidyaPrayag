@@ -1,30 +1,36 @@
 /*
- * File: AuthRouting.kt   (feature.auth — v2, spec-compliant)
+ * File: AuthRouting.kt
  * Module: feature.auth
  *
- * Endpoints implemented (per vidya_prayag_api_spec.artifact.md §Module: User
- * Authentication):
- *   POST /api/v1/auth/check-user       (public)
- *   POST /api/v1/auth/signup           (public — issues JWT + refresh token)
- *   POST /api/v1/auth/login            (public — issues JWT)
- *   POST /api/v1/auth/send-otp         (public — MOCK, always returns 123456)
+ * Auth endpoints (REAL — no hardcoded OTP, no demo users):
  *
- * Backward-compat aliases (the existing shared/.../AuthApi.kt still posts to
- * /auth/... without the /api/v1 prefix):
- *   POST /auth/check-user, /auth/signup, /auth/login, /auth/send-otp
+ *   POST /api/v1/auth/check-user   (public)
+ *   POST /api/v1/auth/send-otp     (public)            -- generates real OTP
+ *   POST /api/v1/auth/verify-otp   (public)            -- verifies + (optional) logs in
+ *   POST /api/v1/auth/signup       (public)            -- needs verified OTP for phone OR password+email
+ *   POST /api/v1/auth/login        (public)            -- password (email) OR OTP (phone)
+ *   POST /api/v1/auth/refresh      (public)            -- exchange refresh token for new access token
  *
- * Spec-vs-legacy field mapping:
- *   - spec uses { "identifier": "..." }
- *   - legacy uses { "contact": "..." }
- *   The DTOs below accept BOTH (identifier preferred, contact as fallback).
+ * Identifier rules
+ * ----------------
+ *  - Phone:  E.164 form expected (e.g. +919876543210).  We normalise:
+ *      "9876543210"      → "+919876543210"  (assume IN)
+ *      "+919876543210"   → unchanged
+ *      "+1 415 555 2671" → "+14155552671"   (strip spaces)
+ *  - Email:  trim + lower-case.
  *
- * Hashing: SHA-256 (same as legacy). For production swap to BCrypt; this is
- *          adequate for an MVP / hackathon-grade backend.
+ * OTP flow
+ * --------
+ *   1) Client calls /send-otp { "identifier": "+91…", "purpose": "login" }
+ *      → server generates code, persists in auth_otps, dispatches via the
+ *        configured provider (mock prints to stdout).  If OTP_DEV_RETURN_CODE
+ *        is true the response includes `"dev_code": "123456"` for testing.
+ *   2) Client calls /verify-otp { "identifier", "code", "purpose" }
+ *      → on success the OTP row is marked verified.
+ *   3) Client calls /login (phone path) or /signup (creates app_users row).
  *
- * NOTE for FRONTEND TEAM:
- *   The legacy `/auth/...` paths are kept alive so the current app keeps working
- *   while you migrate AuthApi.kt to the new `/api/v1/auth/...` paths. Once
- *   migrated, you can delete the legacy block at the bottom of this file.
+ * Spec ref:
+ *   - vidya_prayag_api_spec.artifact.md §Module: User Authentication
  */
 package com.littlebridge.vidyaprayag.feature.auth
 
@@ -32,42 +38,77 @@ import com.littlebridge.vidyaprayag.core.JwtConfig
 import com.littlebridge.vidyaprayag.core.created
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
+import com.littlebridge.vidyaprayag.db.AppUsersTable
+import com.littlebridge.vidyaprayag.db.AuthOtpsTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
-import com.littlebridge.vidyaprayag.db.UserTable
+import com.littlebridge.vidyaprayag.db.UserSessionsTable
 import io.ktor.http.*
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import java.security.MessageDigest
+import java.time.Instant
+import java.time.temporal.ChronoUnit
+import java.util.UUID
 
-// ---------- DTOs (accept both `identifier` and legacy `contact`) ----------
+// ============================================================
+// DTOs
+// ============================================================
+@Serializable
+data class CheckUserDto(val identifier: String, val role: String? = null)
 
 @Serializable
-data class CheckUserDto(
-    val identifier: String? = null,
-    val contact: String? = null,
-    val role: String? = null
-) {
-    fun id(): String = (identifier ?: contact ?: "").trim()
-}
+data class CheckUserResponse(
+    @SerialName("is_new_user") val isNewUser: Boolean,
+    @SerialName("auth_method_required") val authMethodRequired: String,
+    val message: String
+)
+
+@Serializable
+data class SendOtpDto(
+    val identifier: String,
+    val purpose: String? = null,
+    @SerialName("device_id") val deviceId: String? = null
+)
+
+@Serializable
+data class SendOtpResponse(
+    @SerialName("expires_at") val expiresAt: String,
+    @SerialName("resend_count") val resendCount: Int,
+    @SerialName("dev_code") val devCode: String? = null,
+    val message: String
+)
+
+@Serializable
+data class VerifyOtpDto(
+    val identifier: String,
+    val code: String,
+    val purpose: String? = null
+)
+
+@Serializable
+data class VerifyOtpResponse(
+    val verified: Boolean,
+    val message: String
+)
 
 @Serializable
 data class SignupDto(
     val name: String,
-    val identifier: String? = null,
-    val contact: String? = null,
+    val identifier: String,
+    val role: String,
     val password: String? = null,
     val otp: String? = null,
-    val role: String,
     @SerialName("device_info") val deviceInfo: DeviceInfo? = null
-) {
-    fun id(): String = (identifier ?: contact ?: "").trim()
-}
+)
 
 @Serializable
 data class DeviceInfo(
@@ -77,36 +118,17 @@ data class DeviceInfo(
 
 @Serializable
 data class LoginDto(
-    val identifier: String? = null,
-    val contact: String? = null,
+    val identifier: String,
+    val role: String? = null,
     val password: String? = null,
     val otp: String? = null,
-    val role: String
-) {
-    fun id(): String = (identifier ?: contact ?: "").trim()
-}
-
-@Serializable
-data class OtpDto(
-    val identifier: String? = null,
-    val contact: String? = null
-) {
-    fun id(): String = (identifier ?: contact ?: "").trim()
-}
-
-// ---------- Response DTOs ----------
-
-@Serializable
-data class CheckUserResponse(
-    @SerialName("is_new_user") val isNewUser: Boolean,
-    @SerialName("auth_method_required") val authMethodRequired: String, // PASSWORD | OTP | SOCIAL
-    val message: String
+    @SerialName("device_info") val deviceInfo: DeviceInfo? = null
 )
 
 @Serializable
 data class AuthTokenResponse(
     val token: String,
-    @SerialName("refresh_token") val refreshToken: String? = null,
+    @SerialName("refresh_token") val refreshToken: String,
     @SerialName("user_id") val userId: String,
     val name: String,
     val role: String,
@@ -114,162 +136,374 @@ data class AuthTokenResponse(
 )
 
 @Serializable
-data class OtpResponse(val message: String)
+data class RefreshDto(@SerialName("refresh_token") val refreshToken: String)
 
-// ---------- helpers ----------
-
-internal fun hashPassword(password: String): String {
-    val md = MessageDigest.getInstance("SHA-256")
-    return md.digest(password.toByteArray()).joinToString("") { "%02x".format(it) }
-}
-
+// ============================================================
+// Helpers
+// ============================================================
 private fun isEmail(id: String) = id.contains("@")
 
-// ---------- Routing ----------
+/** Normalise raw identifier text per the rules in the file header. */
+internal fun normaliseIdentifier(raw: String): String {
+    val trimmed = raw.trim()
+    if (isEmail(trimmed)) return trimmed.lowercase()
+    val digits = trimmed.replace("\\s|-".toRegex(), "")
+    return when {
+        digits.startsWith("+") -> digits
+        digits.length == 10 && digits.all { it.isDigit() } -> "+91$digits"
+        digits.length == 12 && digits.startsWith("91") -> "+$digits"
+        else -> digits
+    }
+}
 
+internal fun sha256Hex(s: String): String {
+    val md = MessageDigest.getInstance("SHA-256")
+    return md.digest(s.toByteArray()).joinToString("") { "%02x".format(it) }
+}
+
+/** Plain SHA-256 password hash. Adequate for MVP; swap to bcrypt later. */
+internal fun hashPassword(p: String): String = sha256Hex("pwd:$p")
+
+private fun lookupUserByIdentifier(identifier: String): org.jetbrains.exposed.sql.ResultRow? {
+    return AppUsersTable.selectAll()
+        .where { (AppUsersTable.phone eq identifier) or (AppUsersTable.email eq identifier) }
+        .firstOrNull()
+}
+
+private fun roleNormalised(input: String?): String {
+    val r = (input ?: "parent").lowercase()
+    return when (r) {
+        "admin", "school_admin" -> "school_admin"
+        "teacher" -> "teacher"
+        "super_admin" -> "super_admin"
+        else -> "parent"
+    }
+}
+
+// ============================================================
+// Routing
+// ============================================================
 fun Route.authRouting() {
-    val v1 = "/api/v1/auth"
-    val legacy = "/auth"
+    route("/api/v1/auth") {
 
-    listOf(v1, legacy).forEach { base ->
-        route(base) {
+        // -------- check-user --------
+        post("/check-user") {
+            val req = call.receive<CheckUserDto>()
+            val id = normaliseIdentifier(req.identifier)
+            if (id.isBlank()) { call.fail("identifier is required"); return@post }
 
-            // -------- check-user --------
-            post("/check-user") {
-                val req = call.receive<CheckUserDto>()
-                val id = req.id()
-                if (id.isBlank()) {
-                    call.fail("Identifier is required"); return@post
-                }
-                val user = dbQuery {
-                    UserTable.selectAll().where { UserTable.contact eq id }.singleOrNull()
-                }
-                val isNew = user == null
-                val method = if (isEmail(id)) "PASSWORD" else "OTP"
-                call.ok(
-                    CheckUserResponse(
-                        isNewUser = isNew,
-                        authMethodRequired = method,
-                        message = if (isNew) "User does not exist. Proceed to signup."
-                                  else "User found. Please continue with $method."
+            val user = dbQuery { lookupUserByIdentifier(id) }
+            val method = if (isEmail(id)) "PASSWORD" else "OTP"
+            call.ok(
+                CheckUserResponse(
+                    isNewUser = user == null,
+                    authMethodRequired = method,
+                    message = if (user == null) "User does not exist. Proceed to signup."
+                              else "User found. Please continue with $method."
+                ),
+                message = "Check completed"
+            )
+        }
+
+        // -------- send-otp --------
+        post("/send-otp") {
+            val req = runCatching { call.receive<SendOtpDto>() }.getOrNull()
+                ?: run { call.fail("Invalid body: expected { identifier, purpose? }"); return@post }
+            val id = normaliseIdentifier(req.identifier)
+            if (id.isBlank()) { call.fail("identifier is required"); return@post }
+
+            val ip = call.request.origin.remoteHost
+            val ua = call.request.headers["User-Agent"]
+            val purpose = req.purpose ?: "login"
+
+            val result = OtpService.send(
+                identifier = id,
+                purpose = purpose,
+                ipAddress = ip,
+                userAgent = ua,
+                deviceId = req.deviceId
+            )
+            when (result) {
+                is OtpSendResult.Sent -> call.ok(
+                    SendOtpResponse(
+                        expiresAt = result.expiresAt.toString(),
+                        resendCount = result.resendCount,
+                        devCode = result.devCode,
+                        message = "OTP sent. Valid for 10 minutes."
                     ),
-                    message = "Check completed"
+                    message = "OTP sent"
+                )
+                is OtpSendResult.RateLimited -> call.fail(
+                    "Too many OTP requests. Please wait an hour and try again.",
+                    HttpStatusCode.TooManyRequests,
+                    errorCode = "OTP_RATE_LIMITED"
+                )
+                is OtpSendResult.DeliveryFailed -> call.fail(
+                    "Failed to deliver OTP: ${result.reason}",
+                    HttpStatusCode.BadGateway,
+                    errorCode = "OTP_DELIVERY_FAILED"
                 )
             }
+        }
 
-            // -------- signup --------
-            post("/signup") {
-                val req = call.receive<SignupDto>()
-                val id = req.id()
-                if (id.isBlank() || req.name.isBlank() || req.role.isBlank()) {
-                    call.fail("name, identifier and role are required"); return@post
-                }
-                val exists = dbQuery {
-                    UserTable.selectAll().where { UserTable.contact eq id }.count() > 0L
-                }
-                if (exists) { call.fail("Account already exists", HttpStatusCode.Conflict); return@post }
+        // -------- verify-otp --------
+        post("/verify-otp") {
+            val req = runCatching { call.receive<VerifyOtpDto>() }.getOrNull()
+                ?: run { call.fail("Invalid body: expected { identifier, code, purpose? }"); return@post }
+            val id = normaliseIdentifier(req.identifier)
+            if (id.isBlank() || req.code.isBlank()) { call.fail("identifier and code are required"); return@post }
+            val purpose = req.purpose ?: "login"
 
-                val pwHash = req.password?.takeIf { it.isNotBlank() }?.let { hashPassword(it) }
-                val newId = dbQuery {
-                    UserTable.insert {
-                        it[name] = req.name
-                        it[contact] = id
-                        it[passwordHash] = pwHash
-                        it[role] = req.role
-                        if (isEmail(id)) it[email] = id else it[phone] = id
-                        it[isEmailVerified] = isEmail(id) && pwHash != null
-                        it[isPhoneVerified] = !isEmail(id) && req.otp == "123456"
-                        it[profileCompleted] = false
-                    } get UserTable.id
-                }
-
-                val token = JwtConfig.issueToken(newId.toString(), req.role, req.name)
-                val refresh = JwtConfig.issueRefreshToken(newId.toString())
-                dbQuery {
-                    UserTable.update({ UserTable.id eq newId }) { it[refreshToken] = refresh }
-                }
-                call.created(
-                    AuthTokenResponse(
-                        token = token, refreshToken = refresh,
-                        userId = newId.toString(), name = req.name, role = req.role,
-                        profileCompleted = false
-                    ),
-                    message = "Account created successfully"
+            when (val r = OtpService.verify(id, req.code, purpose)) {
+                OtpVerifyResult.Ok -> call.ok(VerifyOtpResponse(true, "OTP verified"), "OK")
+                OtpVerifyResult.NotFound -> call.fail(
+                    "No active OTP for this identifier. Please request a new one.",
+                    HttpStatusCode.NotFound, "OTP_NOT_FOUND"
+                )
+                OtpVerifyResult.Expired -> call.fail(
+                    "OTP expired (10-minute window elapsed). Please request a new one.",
+                    HttpStatusCode.Gone, "OTP_EXPIRED"
+                )
+                OtpVerifyResult.Locked -> call.fail(
+                    "Too many wrong attempts. OTP locked — request a new one.",
+                    HttpStatusCode.Locked, "OTP_LOCKED"
+                )
+                is OtpVerifyResult.Invalid -> call.fail(
+                    "Incorrect OTP. Attempts left: ${r.attemptsLeft}",
+                    HttpStatusCode.Unauthorized, "OTP_INVALID"
                 )
             }
+        }
 
-            // -------- login --------
-            //
-            // Accepts credentials from EITHER:
-            //   (a) JSON body  (preferred, per spec):
-            //       { "identifier": "...", "password": "...", "role": "..." }
-            //       { "identifier": "+91...", "otp": "123456", "role": "PARENT" }
-            //   (b) Query/form parameters as a fallback so that quick manual tests
-            //       like  POST /api/v1/auth/login?identifier=...&otp=123456  also
-            //       work (this is what tripped up the Postman re-test).
-            // The body wins when both are present.
-            post("/login") {
-                // Try to read JSON body; if missing/invalid, fall back to empty DTO.
-                val bodyReq: LoginDto? = runCatching { call.receive<LoginDto>() }.getOrNull()
-                val q = call.request.queryParameters
+        // -------- signup --------
+        post("/signup") {
+            val req = runCatching { call.receive<SignupDto>() }.getOrNull()
+                ?: run { call.fail("Invalid body"); return@post }
+            val id = normaliseIdentifier(req.identifier)
+            if (id.isBlank() || req.name.isBlank() || req.role.isBlank()) {
+                call.fail("name, identifier and role are required"); return@post
+            }
 
-                val req = LoginDto(
-                    identifier = bodyReq?.identifier ?: q["identifier"],
-                    contact    = bodyReq?.contact    ?: q["contact"],
-                    password   = bodyReq?.password   ?: q["password"],
-                    otp        = bodyReq?.otp        ?: q["otp"],
-                    role       = bodyReq?.role       ?: q["role"] ?: ""
-                )
-                val id = req.id()
-                if (id.isBlank()) {
-                    call.fail(
-                        "Identifier is required. Send JSON body {identifier,password|otp,role} " +
-                        "or use ?identifier=...&password=... query params."
-                    ); return@post
+            val existing = dbQuery { lookupUserByIdentifier(id) }
+            if (existing != null) {
+                call.fail("Account already exists. Please login.", HttpStatusCode.Conflict, "USER_EXISTS")
+                return@post
+            }
+
+            // Phone signup → require verified OTP first.
+            // Email signup → require password.
+            if (isEmail(id)) {
+                if (req.password.isNullOrBlank()) {
+                    call.fail("password is required for email signup", HttpStatusCode.BadRequest)
+                    return@post
                 }
-
-                val row = dbQuery {
-                    UserTable.selectAll().where { UserTable.contact eq id }.singleOrNull()
-                } ?: run {
-                    call.fail("User not found", HttpStatusCode.Unauthorized); return@post
+            } else {
+                val verified = dbQuery {
+                    AuthOtpsTable.selectAll()
+                        .where {
+                            (AuthOtpsTable.identifier eq id) and
+                                (AuthOtpsTable.purpose eq "signup") and
+                                (AuthOtpsTable.isVerified eq true)
+                        }.singleOrNull()
                 }
-
-                // Email → password check; Phone → OTP check (mock "123456").
-                if (isEmail(id)) {
-                    val stored = row[UserTable.passwordHash]
-                    if (stored == null || stored != hashPassword(req.password.orEmpty())) {
-                        call.fail("Invalid password", HttpStatusCode.Unauthorized); return@post
+                if (verified == null) {
+                    // Allow `purpose=login` verified OTP too, for clients that
+                    // don't distinguish login/signup until the user is found.
+                    val verifiedAny = dbQuery {
+                        AuthOtpsTable.selectAll()
+                            .where {
+                                (AuthOtpsTable.identifier eq id) and
+                                    (AuthOtpsTable.isVerified eq true)
+                            }.singleOrNull()
                     }
-                } else {
-                    if (req.otp != "123456") {
-                        call.fail("Invalid OTP code", HttpStatusCode.Unauthorized); return@post
+                    if (verifiedAny == null) {
+                        call.fail(
+                            "Phone signup requires a verified OTP. Call /send-otp then /verify-otp first.",
+                            HttpStatusCode.PreconditionRequired, "OTP_REQUIRED"
+                        )
+                        return@post
                     }
                 }
+            }
 
-                val userId = row[UserTable.id].toString()
-                val name = row[UserTable.name]
-                val role = row[UserTable.role]
-                val token = JwtConfig.issueToken(userId, role, name)
-                val refresh = JwtConfig.issueRefreshToken(userId)
-                dbQuery {
-                    UserTable.update({ UserTable.id eq row[UserTable.id] }) { it[refreshToken] = refresh }
+            val role = roleNormalised(req.role)
+            val now = Instant.now()
+            val newId = UUID.randomUUID()
+            dbQuery {
+                val normId = id
+                AppUsersTable.insert {
+                    it[AppUsersTable.id] = newId
+                    it[fullName] = req.name.trim()
+                    it[AppUsersTable.role] = role
+                    if (isEmail(normId)) {
+                        it[email] = normId
+                        it[passwordHash] = req.password?.let { p -> hashPassword(p) }
+                        it[isEmailVerified] = true
+                    } else {
+                        it[phone] = normId
+                        it[isPhoneVerified] = true
+                    }
+                    it[profileCompleted] = false
+                    it[isActive] = true
+                    it[createdAt] = now
+                    it[updatedAt] = now
                 }
-                call.ok(
-                    AuthTokenResponse(
-                        token = token, refreshToken = refresh,
-                        userId = userId, name = name, role = role,
-                        profileCompleted = row[UserTable.profileCompleted]
-                    ),
-                    message = "Login successful"
-                )
             }
 
-            // -------- send-otp (mock) --------
-            post("/send-otp") {
-                // Read body if present, ignore otherwise.
-                runCatching { call.receive<OtpDto>() }
-                call.ok(OtpResponse("OTP sent successfully. Use 123456 in dev."), "OTP issued")
+            val token = JwtConfig.issueToken(newId.toString(), role, req.name)
+            val refresh = JwtConfig.issueRefreshToken(newId.toString())
+            persistSession(
+                userId = newId,
+                refreshToken = refresh,
+                deviceId = req.deviceInfo?.deviceId,
+                platform = req.deviceInfo?.platform,
+                ip = call.request.origin.remoteHost,
+                ua = call.request.headers["User-Agent"]
+            )
+
+            call.created(
+                AuthTokenResponse(
+                    token = token, refreshToken = refresh,
+                    userId = newId.toString(), name = req.name,
+                    role = role, profileCompleted = false
+                ),
+                message = "Account created successfully"
+            )
+        }
+
+        // -------- login --------
+        post("/login") {
+            val bodyReq: LoginDto? = runCatching { call.receive<LoginDto>() }.getOrNull()
+            val q = call.request.queryParameters
+            val req = LoginDto(
+                identifier = bodyReq?.identifier ?: q["identifier"] ?: "",
+                role = bodyReq?.role ?: q["role"],
+                password = bodyReq?.password ?: q["password"],
+                otp = bodyReq?.otp ?: q["otp"],
+                deviceInfo = bodyReq?.deviceInfo
+            )
+            val id = normaliseIdentifier(req.identifier)
+            if (id.isBlank()) { call.fail("identifier is required"); return@post }
+
+            val row = dbQuery { lookupUserByIdentifier(id) }
+                ?: run { call.fail("User not found", HttpStatusCode.Unauthorized, "USER_NOT_FOUND"); return@post }
+
+            // Email → password.  Phone → OTP.
+            if (isEmail(id)) {
+                val stored = row[AppUsersTable.passwordHash]
+                if (stored == null || stored != hashPassword(req.password.orEmpty())) {
+                    call.fail("Invalid password", HttpStatusCode.Unauthorized, "INVALID_CREDENTIALS")
+                    return@post
+                }
+            } else {
+                if (req.otp.isNullOrBlank()) {
+                    call.fail("otp is required for phone login", HttpStatusCode.BadRequest, "OTP_REQUIRED")
+                    return@post
+                }
+                when (val r = OtpService.verify(id, req.otp, "login")) {
+                    OtpVerifyResult.Ok -> Unit
+                    OtpVerifyResult.NotFound -> { call.fail("No active OTP. Call /send-otp first.", HttpStatusCode.NotFound, "OTP_NOT_FOUND"); return@post }
+                    OtpVerifyResult.Expired -> { call.fail("OTP expired. Please request a new one.", HttpStatusCode.Gone, "OTP_EXPIRED"); return@post }
+                    OtpVerifyResult.Locked -> { call.fail("OTP locked. Request a new one.", HttpStatusCode.Locked, "OTP_LOCKED"); return@post }
+                    is OtpVerifyResult.Invalid -> { call.fail("Invalid OTP. Attempts left: ${r.attemptsLeft}", HttpStatusCode.Unauthorized, "OTP_INVALID"); return@post }
+                }
             }
+
+            val userId = row[AppUsersTable.id].value
+            val name = row[AppUsersTable.fullName]
+            val role = row[AppUsersTable.role]
+            val token = JwtConfig.issueToken(userId.toString(), role, name)
+            val refresh = JwtConfig.issueRefreshToken(userId.toString())
+
+            dbQuery {
+                AppUsersTable.update({ AppUsersTable.id eq userId }) {
+                    it[lastLoginAt] = Instant.now()
+                    it[updatedAt] = Instant.now()
+                }
+            }
+            persistSession(
+                userId = userId,
+                refreshToken = refresh,
+                deviceId = req.deviceInfo?.deviceId,
+                platform = req.deviceInfo?.platform,
+                ip = call.request.origin.remoteHost,
+                ua = call.request.headers["User-Agent"]
+            )
+
+            call.ok(
+                AuthTokenResponse(
+                    token = token, refreshToken = refresh,
+                    userId = userId.toString(), name = name, role = role,
+                    profileCompleted = row[AppUsersTable.profileCompleted]
+                ),
+                message = "Login successful"
+            )
+        }
+
+        // -------- refresh --------
+        post("/refresh") {
+            val req = runCatching { call.receive<RefreshDto>() }.getOrNull()
+                ?: run { call.fail("Invalid body: expected { refresh_token }"); return@post }
+            val hash = sha256Hex(req.refreshToken)
+            val now = Instant.now()
+            val row = dbQuery {
+                UserSessionsTable.selectAll()
+                    .where { UserSessionsTable.refreshTokenHash eq hash }
+                    .singleOrNull()
+            } ?: run {
+                call.fail("Invalid refresh token", HttpStatusCode.Unauthorized, "REFRESH_INVALID")
+                return@post
+            }
+            if (row[UserSessionsTable.revokedAt] != null ||
+                row[UserSessionsTable.expiresAt].isBefore(now)
+            ) {
+                call.fail("Refresh token expired", HttpStatusCode.Unauthorized, "REFRESH_EXPIRED")
+                return@post
+            }
+            val uid = row[UserSessionsTable.userId]
+            val user = dbQuery { AppUsersTable.selectAll().where { AppUsersTable.id eq uid }.singleOrNull() }
+                ?: run { call.fail("User not found", HttpStatusCode.Unauthorized, "USER_NOT_FOUND"); return@post }
+            val token = JwtConfig.issueToken(uid.toString(), user[AppUsersTable.role], user[AppUsersTable.fullName])
+            dbQuery {
+                UserSessionsTable.update({ UserSessionsTable.id eq row[UserSessionsTable.id] }) {
+                    it[lastUsedAt] = now
+                }
+            }
+            call.ok(
+                AuthTokenResponse(
+                    token = token, refreshToken = req.refreshToken,
+                    userId = uid.toString(),
+                    name = user[AppUsersTable.fullName],
+                    role = user[AppUsersTable.role],
+                    profileCompleted = user[AppUsersTable.profileCompleted]
+                ),
+                message = "Token refreshed"
+            )
         }
     }
 }
+
+private suspend fun persistSession(
+    userId: UUID,
+    refreshToken: String,
+    deviceId: String?,
+    platform: String?,
+    ip: String?,
+    ua: String?
+) {
+    val now = Instant.now()
+    dbQuery {
+        UserSessionsTable.insert {
+            it[UserSessionsTable.userId] = userId
+            it[refreshTokenHash] = sha256Hex(refreshToken)
+            it[UserSessionsTable.deviceId] = deviceId
+            it[UserSessionsTable.platform] = platform
+            it[ipAddress] = ip
+            it[userAgent] = ua
+            it[issuedAt] = now
+            it[expiresAt] = now.plus(30, ChronoUnit.DAYS)
+            it[createdAt] = now
+        }
+    }
+}
+

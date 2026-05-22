@@ -2,59 +2,55 @@
  * File: OnboardingRouting.kt
  * Module: feature.onboarding
  *
- * Endpoints implemented:
+ * Endpoints:
  *   GET  /api/v1/onboarding/step?obStepType={BASIC|BRANDING|ACADEMIC|REVIEW}
  *   GET  /api/v1/onboarding/academic/class-details?classId={code}
  *   POST /api/v1/onboarding/submit
  *
- * Spec ref: vidya_prayag_api_spec.artifact.md §Module: School Onboarding Flow
+ * Spec ref: vidya_prayag_api_spec.artifact.md §School Onboarding Flow
  *
- * Design notes:
- *   - Drafts are stored in school_onboarding_drafts as (userId, stepType, key, value)
- *     so any step can be saved partial. The final REVIEW submission promotes the
- *     drafts into the proper feature tables (SchoolTable, ClassTable, SubjectTable …)
- *     and flips school.onboarding_status to COMPLETED.
- *   - On POST /submit, the data_payload is a free-form JSON object whose keys
- *     match the `key` field returned by GET /step.
+ * Drafts:
+ *   Stored in `school_onboarding_drafts` keyed by (user_id, step_type, key).
+ *   On REVIEW with `is_final_submission=true`:
+ *     - We create/update a row in `schools` for this user.
+ *     - We set `app_users.school_id` so subsequent calls resolve the school.
+ *     - We stamp `schools.onboarded_at = NOW()` to flip status to COMPLETED.
  *
- * Used by UI:
- *   - composeApp/.../ui/screens/admin/InstitutionalBasicOBScreen.kt
- *   - composeApp/.../ui/screens/admin/BrandingInfoOBScreen.kt
- *   - composeApp/.../ui/screens/admin/AcademicInfoOBScreen.kt
- *   - composeApp/.../ui/screens/admin/LaunchInfoOBScreen.kt
+ * Real data flow (no hardcoded school fallbacks):
+ *   If the calling user has not created a school yet, ACADEMIC/REVIEW
+ *   responses are empty lists / a 404 instead of mock data.
  */
 package com.littlebridge.vidyaprayag.feature.onboarding
 
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.principalUserId
-import com.littlebridge.vidyaprayag.db.ClassTable
+import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
-import com.littlebridge.vidyaprayag.db.OnboardingDraftTable
-import com.littlebridge.vidyaprayag.db.SchoolTable
-import com.littlebridge.vidyaprayag.db.SubjectTable
+import com.littlebridge.vidyaprayag.db.OnboardingDraftsTable
+import com.littlebridge.vidyaprayag.db.SchoolClassesTable
+import com.littlebridge.vidyaprayag.db.SchoolSubjectsTable
+import com.littlebridge.vidyaprayag.db.SchoolsTable
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
-import java.time.LocalDateTime
+import java.time.Instant
 import java.util.UUID
 
 // ---------- DTOs ----------
-
 @Serializable
 data class OnboardingFieldDto(
     val key: String,
@@ -79,10 +75,7 @@ data class ReviewComplianceDoc(
 )
 
 @Serializable
-data class ReviewModule(
-    val name: String,
-    val isSelected: Boolean
-)
+data class ReviewModule(val name: String, val isSelected: Boolean)
 
 @Serializable
 data class ReviewIdentity(
@@ -134,24 +127,26 @@ data class SubmitResponse(
     @SerialName("redirect_to_home") val redirectToHome: Boolean
 )
 
-// ---------- Field schemas per step (these power the dynamic UI) ----------
-
+// ---------- Field schemas per step ----------
 private val BASIC_FIELDS = listOf(
     Triple("school_name", "SchoolName", "line"),
-    Triple("board_affiliation", "BoardAffiliation", "dropdown"),
-    Triple("official_email", "Email", "line"),
-    Triple("contact_number", "Phone", "line"),
-    Triple("country_code", "CountryCode", "dropdown"),
-    Triple("address", "Address", "multiline")
+    Triple("board", "Board", "dropdown"),               // CBSE|ICSE|UP_STATE…
+    Triple("medium", "Medium", "dropdown"),
+    Triple("school_gender", "Gender", "dropdown"),
+    Triple("contact_email", "Email", "line"),
+    Triple("contact_phone", "Phone", "line"),
+    Triple("city", "City", "line"),
+    Triple("district", "District", "line"),
+    Triple("state", "State", "line"),
+    Triple("pincode", "Pincode", "line"),
+    Triple("full_address", "Address", "multiline")
 )
-
 private val BRANDING_FIELDS = listOf(
     Triple("logo_url", "Logo", "image"),
-    Triple("theme_color", "ThemeColor", "color")
+    Triple("brand_color", "ThemeColor", "color")
 )
 
 // ---------- Helpers ----------
-
 private fun nextStepAfter(step: String): String? = when (step) {
     "BASIC"    -> "BRANDING"
     "BRANDING" -> "ACADEMIC"
@@ -159,13 +154,19 @@ private fun nextStepAfter(step: String): String? = when (step) {
     "REVIEW"   -> null
     else       -> null
 }
-
 private fun stepIndex(step: String): Int = when (step) {
     "BASIC" -> 1; "BRANDING" -> 2; "ACADEMIC" -> 3; "REVIEW" -> 4; else -> 1
 }
+private val lenientJson = Json { ignoreUnknownKeys = true; isLenient = true }
+
+private suspend fun resolveSchoolIdForUser(uid: UUID): UUID? = dbQuery {
+    AppUsersTable.selectAll().where { AppUsersTable.id eq uid }
+        .singleOrNull()?.get(AppUsersTable.schoolId)
+}
+
+private fun slugify(name: String) = name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
 
 // ---------- Routing ----------
-
 fun Route.onboardingRouting() {
     authenticate("jwt") {
         route("/api/v1/onboarding") {
@@ -178,19 +179,20 @@ fun Route.onboardingRouting() {
                 }
 
                 val drafts: Map<String, String> = dbQuery {
-                    OnboardingDraftTable.selectAll()
-                        .where { (OnboardingDraftTable.userId eq uid) and (OnboardingDraftTable.stepType eq type) }
-                        .associate { it[OnboardingDraftTable.key] to it[OnboardingDraftTable.value] }
+                    OnboardingDraftsTable.selectAll()
+                        .where { (OnboardingDraftsTable.userId eq uid) and (OnboardingDraftsTable.stepType eq type) }
+                        .associate { it[OnboardingDraftsTable.key] to it[OnboardingDraftsTable.value] }
                 }
 
                 when (type) {
                     "BASIC", "BRANDING" -> {
                         val fields = if (type == "BASIC") BASIC_FIELDS else BRANDING_FIELDS
                         val list = fields.map { (k, t, input) ->
-                            val v = drafts[k]
                             OnboardingFieldDto(
                                 key = k, type = t,
-                                draftExists = v != null, draftValue = v, inputType = input
+                                draftExists = drafts[k] != null,
+                                draftValue = drafts[k],
+                                inputType = input
                             )
                         }
                         call.ok(
@@ -208,19 +210,21 @@ fun Route.onboardingRouting() {
                     }
 
                     "ACADEMIC" -> {
-                        val schoolId = dbQuery {
-                            SchoolTable.selectAll()
-                                .where { SchoolTable.ownerUserId eq uid }
-                                .singleOrNull()?.get(SchoolTable.id)?.value
-                        }
+                        val schoolId = resolveSchoolIdForUser(uid)
                         val classes = if (schoolId == null) emptyList() else dbQuery {
-                            ClassTable.selectAll().where { ClassTable.schoolId eq schoolId }.map {
-                                ClassSummaryDto(
-                                    id = it[ClassTable.code],
-                                    name = it[ClassTable.name],
-                                    sections = it[ClassTable.sections].split(',').filter { s -> s.isNotBlank() }
-                                )
-                            }
+                            SchoolClassesTable.selectAll()
+                                .where { SchoolClassesTable.schoolId eq schoolId }
+                                .map {
+                                    val secs = runCatching {
+                                        lenientJson.parseToJsonElement(it[SchoolClassesTable.sections])
+                                            .let { e -> (e as? JsonArray)?.map { p -> (p as JsonPrimitive).content } }
+                                    }.getOrNull() ?: emptyList()
+                                    ClassSummaryDto(
+                                        id = it[SchoolClassesTable.code],
+                                        name = it[SchoolClassesTable.name],
+                                        sections = secs
+                                    )
+                                }
                         }
                         call.ok(
                             OnboardingStepResponse(
@@ -236,26 +240,22 @@ fun Route.onboardingRouting() {
                     }
 
                     "REVIEW" -> {
-                        val school = dbQuery {
-                            SchoolTable.selectAll()
-                                .where { SchoolTable.ownerUserId eq uid }
-                                .singleOrNull()
+                        val schoolId = resolveSchoolIdForUser(uid)
+                        val school = schoolId?.let {
+                            dbQuery { SchoolsTable.selectAll().where { SchoolsTable.id eq it }.singleOrNull() }
                         }
                         val identity = ReviewIdentity(
-                            institutionName = school?.get(SchoolTable.name) ?: "—",
-                            isVerified = school?.get(SchoolTable.isVerified) ?: false
+                            institutionName = school?.get(SchoolsTable.name) ?: "—",
+                            isVerified = (school?.get(SchoolsTable.onboardedAt) != null)
                         )
-                        // Compliance docs are not yet stored — return a stub list so
-                        // the UI can render the section. Replace with a real query
-                        // once the upload flow lands.
                         val docs = listOf(
-                            ReviewComplianceDoc("d_1", "Affiliation Cert", school?.get(SchoolTable.isVerified) ?: false),
+                            ReviewComplianceDoc("d_1", "Affiliation Cert", false),
                             ReviewComplianceDoc("d_2", "Building Safety", false)
                         )
                         val modules = listOf(
-                            ReviewModule("Analytics", isSelected = true),
-                            ReviewModule("PTM Management", isSelected = true),
-                            ReviewModule("Scholarships", isSelected = false)
+                            ReviewModule("Analytics", true),
+                            ReviewModule("PTM Management", true),
+                            ReviewModule("Scholarships", false)
                         )
                         call.ok(
                             OnboardingStepResponse(
@@ -277,14 +277,6 @@ fun Route.onboardingRouting() {
             }
 
             // -------- GET /academic/class-details --------
-            //
-            // Lookup order for the school context:
-            //   1. The school OWNED by the calling user (real ADMIN flow).
-            //   2. If none exists yet (e.g. a freshly signed-up admin who hasn't
-            //      completed onboarding, OR a PARENT testing the endpoint), fall
-            //      back to the first/demo school in the DB. This keeps the
-            //      Postman collection's example  ?classId=C10  working out of the
-            //      box against the seeded demo data (Grade 10 @ St. Xavier).
             get("/academic/class-details") {
                 val code = call.request.queryParameters["classId"] ?: run {
                     call.fail("classId is required"); return@get
@@ -292,39 +284,32 @@ fun Route.onboardingRouting() {
                 val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
                     call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
                 }
+                val schoolId = resolveSchoolIdForUser(uid) ?: run {
+                    call.fail("User has no school yet. Complete onboarding first.", HttpStatusCode.NotFound); return@get
+                }
                 val payload = dbQuery {
-                    val ownSchoolId = SchoolTable.selectAll()
-                        .where { SchoolTable.ownerUserId eq uid }
-                        .singleOrNull()?.get(SchoolTable.id)?.value
-                    val schoolId = ownSchoolId
-                        ?: SchoolTable.selectAll()
-                            .limit(1)
-                            .singleOrNull()?.get(SchoolTable.id)?.value
-                        ?: return@dbQuery null
-                    val cls = ClassTable.selectAll()
-                        .where { (ClassTable.schoolId eq schoolId) and (ClassTable.code eq code) }
+                    val cls = SchoolClassesTable.selectAll()
+                        .where { (SchoolClassesTable.schoolId eq schoolId) and (SchoolClassesTable.code eq code) }
                         .singleOrNull() ?: return@dbQuery null
-                    val classRowId = cls[ClassTable.id].value
-                    val subjects = SubjectTable.selectAll()
-                        .where { SubjectTable.classId eq classRowId }
+                    val classRowId = cls[SchoolClassesTable.id].value
+                    val subjects = SchoolSubjectsTable.selectAll()
+                        .where { SchoolSubjectsTable.classId eq classRowId }
                         .map {
                             SubjectDetailDto(
-                                subName = it[SubjectTable.subName],
-                                subCode = it[SubjectTable.subCode],
-                                teacherAssigned = it[SubjectTable.teacherAssigned]
+                                subName = it[SchoolSubjectsTable.subName],
+                                subCode = it[SchoolSubjectsTable.subCode],
+                                teacherAssigned = it[SchoolSubjectsTable.teacherAssigned]
                             )
                         }
                     ClassDetailsResponse(
-                        classId = cls[ClassTable.code],
-                        className = cls[ClassTable.name],
+                        classId = cls[SchoolClassesTable.code],
+                        className = cls[SchoolClassesTable.name],
                         totalSubjects = subjects.size,
                         listOfSubjects = subjects
                     )
                 }
-                if (payload == null) call.fail(
-                    "Class '$code' not found. Try classId=C10 or C05 against the demo school.",
-                    HttpStatusCode.NotFound
-                ) else call.ok(payload, message = "Class details fetched")
+                if (payload == null) call.fail("Class '$code' not found", HttpStatusCode.NotFound)
+                else call.ok(payload, message = "Class details fetched")
             }
 
             // -------- POST /submit --------
@@ -335,67 +320,91 @@ fun Route.onboardingRouting() {
                 }
                 val step = req.obStepType.uppercase()
 
-                // 1. Upsert every (key,value) pair into the draft table.
+                // 1. Upsert (key,value) into drafts.
                 dbQuery {
                     req.dataPayload.forEach { (k, v) ->
                         val text = if (v is JsonPrimitive && v.isString) v.content else v.toString()
-                        // Delete-then-insert because Exposed 0.50 lacks upsert on SQLite.
-                        OnboardingDraftTable.deleteWhere {
-                            (OnboardingDraftTable.userId eq uid) and
-                            (OnboardingDraftTable.stepType eq step) and
-                            (OnboardingDraftTable.key eq k)
+                        OnboardingDraftsTable.deleteWhere {
+                            (OnboardingDraftsTable.userId eq uid) and
+                                (OnboardingDraftsTable.stepType eq step) and
+                                (OnboardingDraftsTable.key eq k)
                         }
-                        OnboardingDraftTable.insert {
-                            it[OnboardingDraftTable.userId] = uid
+                        OnboardingDraftsTable.insert {
+                            it[OnboardingDraftsTable.userId] = uid
                             it[stepType] = step
-                            it[OnboardingDraftTable.key] = k
+                            it[OnboardingDraftsTable.key] = k
                             it[value] = text
+                            it[updatedAt] = Instant.now()
                         }
                     }
                 }
 
                 val complete = req.isFinalSubmission && step == "REVIEW"
                 if (complete) {
-                    // Promote drafts → SchoolTable, ensure a school row exists.
                     dbQuery {
-                        val basics = OnboardingDraftTable.selectAll()
-                            .where { (OnboardingDraftTable.userId eq uid) and (OnboardingDraftTable.stepType eq "BASIC") }
-                            .associate { it[OnboardingDraftTable.key] to it[OnboardingDraftTable.value] }
-                        val branding = OnboardingDraftTable.selectAll()
-                            .where { (OnboardingDraftTable.userId eq uid) and (OnboardingDraftTable.stepType eq "BRANDING") }
-                            .associate { it[OnboardingDraftTable.key] to it[OnboardingDraftTable.value] }
+                        val basics = OnboardingDraftsTable.selectAll()
+                            .where { (OnboardingDraftsTable.userId eq uid) and (OnboardingDraftsTable.stepType eq "BASIC") }
+                            .associate { it[OnboardingDraftsTable.key] to it[OnboardingDraftsTable.value] }
+                        val branding = OnboardingDraftsTable.selectAll()
+                            .where { (OnboardingDraftsTable.userId eq uid) and (OnboardingDraftsTable.stepType eq "BRANDING") }
+                            .associate { it[OnboardingDraftsTable.key] to it[OnboardingDraftsTable.value] }
 
-                        val existing = SchoolTable.selectAll()
-                            .where { SchoolTable.ownerUserId eq uid }
-                            .singleOrNull()
+                        val schoolName = basics["school_name"] ?: "Unnamed School"
+                        val now = Instant.now()
 
-                        val now = LocalDateTime.now()
-                        if (existing == null) {
-                            SchoolTable.insert {
-                                it[ownerUserId] = uid
-                                it[name] = basics["school_name"] ?: "Unnamed School"
-                                it[boardAffiliation] = basics["board_affiliation"]
-                                it[officialEmail] = basics["official_email"]
-                                it[contactNumber] = basics["contact_number"]
-                                it[countryCode] = basics["country_code"] ?: "+91"
-                                it[address] = basics["address"]
+                        // Find existing school via app_users.school_id
+                        val u = AppUsersTable.selectAll().where { AppUsersTable.id eq uid }.singleOrNull()
+                        val existingSchoolId = u?.get(AppUsersTable.schoolId)
+
+                        if (existingSchoolId == null) {
+                            val newSchoolId = UUID.randomUUID()
+                            SchoolsTable.insert {
+                                it[id] = newSchoolId
+                                it[name] = schoolName
+                                it[slug] = slugify(schoolName) + "-" + newSchoolId.toString().take(6)
+                                it[board] = basics["board"] ?: "CBSE"
+                                it[medium] = basics["medium"] ?: "English"
+                                it[schoolGender] = basics["school_gender"] ?: "co_ed"
+                                it[contactEmail] = basics["contact_email"]
+                                it[contactPhone] = basics["contact_phone"]
+                                it[fullAddress] = basics["full_address"]
+                                it[city] = basics["city"] ?: "Unknown"
+                                it[district] = basics["district"] ?: "Unknown"
+                                it[state] = basics["state"] ?: "Uttar Pradesh"
+                                it[pincode] = basics["pincode"]
                                 it[logoUrl] = branding["logo_url"]
-                                it[themeColor] = branding["theme_color"]
-                                it[onboardingStatus] = "COMPLETED"
+                                it[brandColor] = branding["brand_color"] ?: "#2563EB"
+                                it[isActive] = true
+                                it[onboardedAt] = now
                                 it[createdAt] = now
                                 it[updatedAt] = now
                             }
+                            AppUsersTable.update({ AppUsersTable.id eq uid }) {
+                                it[schoolId] = newSchoolId
+                                it[role] = "school_admin"
+                                it[profileCompleted] = true
+                                it[updatedAt] = now
+                            }
                         } else {
-                            SchoolTable.update({ SchoolTable.ownerUserId eq uid }) {
+                            SchoolsTable.update({ SchoolsTable.id eq existingSchoolId }) {
                                 basics["school_name"]?.let { v -> it[name] = v }
-                                basics["board_affiliation"]?.let { v -> it[boardAffiliation] = v }
-                                basics["official_email"]?.let { v -> it[officialEmail] = v }
-                                basics["contact_number"]?.let { v -> it[contactNumber] = v }
-                                basics["country_code"]?.let { v -> it[countryCode] = v }
-                                basics["address"]?.let { v -> it[address] = v }
+                                basics["board"]?.let { v -> it[board] = v }
+                                basics["medium"]?.let { v -> it[medium] = v }
+                                basics["school_gender"]?.let { v -> it[schoolGender] = v }
+                                basics["contact_email"]?.let { v -> it[contactEmail] = v }
+                                basics["contact_phone"]?.let { v -> it[contactPhone] = v }
+                                basics["full_address"]?.let { v -> it[fullAddress] = v }
+                                basics["city"]?.let { v -> it[city] = v }
+                                basics["district"]?.let { v -> it[district] = v }
+                                basics["state"]?.let { v -> it[state] = v }
+                                basics["pincode"]?.let { v -> it[pincode] = v }
                                 branding["logo_url"]?.let { v -> it[logoUrl] = v }
-                                branding["theme_color"]?.let { v -> it[themeColor] = v }
-                                it[onboardingStatus] = "COMPLETED"
+                                branding["brand_color"]?.let { v -> it[brandColor] = v }
+                                it[onboardedAt] = now
+                                it[updatedAt] = now
+                            }
+                            AppUsersTable.update({ AppUsersTable.id eq uid }) {
+                                it[profileCompleted] = true
                                 it[updatedAt] = now
                             }
                         }

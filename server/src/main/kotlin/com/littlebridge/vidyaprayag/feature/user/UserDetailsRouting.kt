@@ -2,44 +2,41 @@
  * File: UserDetailsRouting.kt
  * Module: feature.user
  *
- * Endpoints implemented:
- *   GET /api/v1/user/details        (JWT required)
+ * GET /api/v1/user/details   (JWT required)
  *
- * Spec ref: vidya_prayag_api_spec.artifact.md §Module: Role-Specific Experience
- *           §Get User Details & Onboarding State
+ * Spec ref: vidya_prayag_api_spec.artifact.md §Get User Details & Onboarding State
  *
- * Purpose:
- *   "Source of Truth" the app calls after login (or on cold start while a
- *   valid token exists) to decide:
- *     - whether to send the user to onboarding
- *     - which side-drawer features to show
- *     - which themes are unlocked for the account
+ * Source of truth (post-login):
+ *   - app_users           : personal_details (id, role, name, email, mobile, pic)
+ *   - schools             : the school this user belongs to (via app_users.school_id)
+ *   - school_classes      : Step 3 (ACADEMIC) completion check
+ *   - app_config "flags"  : drives menu_features (is_enabled/is_live) so ops can
+ *                           toggle modules without redeploying
  *
- * Onboarding step status logic:
- *   Step 1 (BASIC)     COMPLETED  ↔ school.name + boardAffiliation are set
- *   Step 2 (BRANDING)  COMPLETED  ↔ school.logoUrl IS NOT NULL
- *   Step 3 (ACADEMIC)  COMPLETED  ↔ at least 1 row in school_classes
- *   Step 4 (REVIEW)    COMPLETED  ↔ school.onboarding_status = 'COMPLETED'
- *   Subsequent steps become PENDING; later ones LOCKED until the prior is done.
- *
- * Used by mobile UI:
- *   - composeApp/.../ui/screens/admin/SchoolDashboardScreen.kt (and parent equivalent)
- *   - shared/.../presentation/MainViewModel.kt drives the post-login routing
+ * Onboarding step status logic (only meaningful for school_admin / super_admin):
+ *   Step 1 (BASIC)     → school name + contact_email/phone set
+ *   Step 2 (BRANDING)  → logo_url present
+ *   Step 3 (ACADEMIC)  → at least one row in school_classes
+ *   Step 4 (REVIEW)    → school.onboarded_at IS NOT NULL
  */
 package com.littlebridge.vidyaprayag.feature.user
 
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.principalUserId
+import com.littlebridge.vidyaprayag.db.AppConfigTable
+import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
-import com.littlebridge.vidyaprayag.db.ClassTable
-import com.littlebridge.vidyaprayag.db.SchoolTable
-import com.littlebridge.vidyaprayag.db.UserTable
+import com.littlebridge.vidyaprayag.db.SchoolClassesTable
+import com.littlebridge.vidyaprayag.db.SchoolsTable
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.selectAll
 import java.util.UUID
@@ -58,7 +55,7 @@ data class PersonalDetails(
 data class OnboardingStepDto(
     val name: String,
     val description: String,
-    val status: String,           // COMPLETED | PENDING | LOCKED
+    val status: String,
     val icon: String,
     @SerialName("is_enabled") val isEnabled: Boolean,
     @SerialName("is_required") val isRequired: Boolean
@@ -114,19 +111,13 @@ private val DEFAULT_SUPPORT = SupportInfo(
     icon = "support_agent"
 )
 
-private val DEFAULT_MENU = listOf(
-    MenuFeature("Analytics", isEnabled = true, isLive = true),
-    MenuFeature("PTM Management", isEnabled = true, isLive = true),
-    MenuFeature("Scholarships", isEnabled = false, isLive = false),
-    MenuFeature("Attendance", isEnabled = true, isLive = true),
-    MenuFeature("Calendar", isEnabled = true, isLive = true)
-)
-
 private val DEFAULT_THEMES = listOf(
     AppTheme("LIGHT", isEnabled = true, isLive = true),
     AppTheme("DARK", isEnabled = true, isLive = true),
     AppTheme("MIDNIGHT", isEnabled = true, isLive = true)
 )
+
+private val lenientJson = Json { ignoreUnknownKeys = true; isLenient = true }
 
 fun Route.userDetailsRouting() {
     authenticate("jwt") {
@@ -140,33 +131,36 @@ fun Route.userDetailsRouting() {
                 }
 
                 val payload = dbQuery {
-                    val u = UserTable.selectAll().where { UserTable.id eq userUuid }.singleOrNull()
+                    val u = AppUsersTable.selectAll()
+                        .where { AppUsersTable.id eq userUuid }
+                        .singleOrNull()
                         ?: return@dbQuery null
 
                     val personal = PersonalDetails(
-                        role = u[UserTable.role],
-                        id = u[UserTable.id].toString(),
-                        name = u[UserTable.name],
-                        profilePic = u[UserTable.profilePic],
-                        email = u[UserTable.email],
-                        mobile = u[UserTable.phone]
+                        role = u[AppUsersTable.role].uppercase(),
+                        id = u[AppUsersTable.id].value.toString(),
+                        name = u[AppUsersTable.fullName],
+                        profilePic = u[AppUsersTable.profilePicUrl],
+                        email = u[AppUsersTable.email],
+                        mobile = u[AppUsersTable.phone]
                     )
 
-                    // Find this user's school (if ADMIN). PARENT/TEACHER will simply
-                    // get an empty/READY onboarding block.
-                    val school = SchoolTable.selectAll()
-                        .where { SchoolTable.ownerUserId eq userUuid }
-                        .singleOrNull()
+                    // Resolve the school the user belongs to (admin or teacher).
+                    val schoolId = u[AppUsersTable.schoolId]
+                    val school = schoolId?.let {
+                        SchoolsTable.selectAll().where { SchoolsTable.id eq it }.singleOrNull()
+                    }
 
-                    val schoolId = school?.get(SchoolTable.id)?.value
                     val basicsDone = school != null &&
-                        !school[SchoolTable.boardAffiliation].isNullOrBlank() &&
-                        school[SchoolTable.name].isNotBlank()
-                    val brandingDone = school?.get(SchoolTable.logoUrl)?.isNotBlank() == true
+                        school[SchoolsTable.name].isNotBlank() &&
+                        (school[SchoolsTable.contactEmail] != null || school[SchoolsTable.contactPhone] != null)
+                    val brandingDone = school?.get(SchoolsTable.logoUrl)?.isNotBlank() == true
                     val academicDone = schoolId?.let {
-                        ClassTable.selectAll().where { ClassTable.schoolId eq it }.count() > 0L
+                        SchoolClassesTable.selectAll()
+                            .where { SchoolClassesTable.schoolId eq it }
+                            .count() > 0L
                     } ?: false
-                    val finalDone = school?.get(SchoolTable.onboardingStatus) == "COMPLETED"
+                    val finalDone = school?.get(SchoolsTable.onboardedAt) != null
 
                     fun statusFor(done: Boolean, prevDone: Boolean) = when {
                         done -> "COMPLETED"
@@ -176,13 +170,13 @@ fun Route.userDetailsRouting() {
 
                     val steps = listOf(
                         OnboardingStepDto("Institutional Basics", "Core school info and identity",
-                            statusFor(basicsDone, true), "school", isEnabled = true, isRequired = true),
+                            statusFor(basicsDone, true), "school", true, true),
                         OnboardingStepDto("Branding & Visuals", "Logo and portal themes",
-                            statusFor(brandingDone, basicsDone), "palette", isEnabled = basicsDone, isRequired = true),
+                            statusFor(brandingDone, basicsDone), "palette", basicsDone, true),
                         OnboardingStepDto("Academic Structure", "Grade levels and curricula",
-                            statusFor(academicDone, brandingDone), "history_edu", isEnabled = brandingDone, isRequired = true),
+                            statusFor(academicDone, brandingDone), "history_edu", brandingDone, true),
                         OnboardingStepDto("Launch & Review", "Final check & go live",
-                            statusFor(finalDone, academicDone), "rocket_launch", isEnabled = academicDone, isRequired = true)
+                            statusFor(finalDone, academicDone), "rocket_launch", academicDone, true)
                     )
 
                     val overall = when {
@@ -191,13 +185,35 @@ fun Route.userDetailsRouting() {
                         else -> "NOT_STARTED"
                     }
 
+                    // Menu features come from app_config.flags.
+                    val flagsRaw = AppConfigTable.selectAll()
+                        .where { AppConfigTable.key eq "flags" }
+                        .singleOrNull()
+                        ?.get(AppConfigTable.value)
+                    val flags: JsonObject = flagsRaw?.let {
+                        runCatching { lenientJson.parseToJsonElement(it).let { e -> e as JsonObject } }
+                            .getOrNull() ?: JsonObject(emptyMap())
+                    } ?: JsonObject(emptyMap())
+                    fun flag(name: String, default: Boolean = true): Boolean =
+                        flags[name]?.jsonPrimitive?.content?.equals("true", true) ?: default
+
+                    val menu = listOf(
+                        MenuFeature("Analytics", isEnabled = true, isLive = flag("is_ai_narrative_live", false)),
+                        MenuFeature("PTM Management", isEnabled = true, isLive = true),
+                        MenuFeature("Scholarships",
+                            isEnabled = flag("show_scholarships", false),
+                            isLive = flag("show_scholarships", false)),
+                        MenuFeature("Attendance", isEnabled = true, isLive = true),
+                        MenuFeature("Calendar", isEnabled = true, isLive = true)
+                    )
+
                     val ob = OnboardingDetails(
                         onboardingStatus = overall,
                         totalSteps = steps.size,
                         listOfSteps = steps,
                         supportInfo = DEFAULT_SUPPORT,
                         tutorialVideoLink = "https://vidyaprayag.com/tutorials/onboarding",
-                        menuFeatures = DEFAULT_MENU,
+                        menuFeatures = menu,
                         appThemes = DEFAULT_THEMES,
                         tosLink = "https://vidyaprayag.com/terms",
                         privacyPolicyLink = "https://vidyaprayag.com/privacy"

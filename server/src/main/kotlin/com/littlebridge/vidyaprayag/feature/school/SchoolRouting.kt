@@ -2,51 +2,40 @@
  * File: SchoolRouting.kt
  * Module: feature.school
  *
- * Endpoints implemented (all under "Drawer Options" in the spec):
- *   GET /api/v1/school/analytics                  (Coming Soon placeholder)
+ * Endpoints (Drawer Options in spec):
+ *   GET /api/v1/school/analytics                                  (Coming Soon)
  *   GET /api/v1/school/calendar?date=&view_type=&standard=
  *   GET /api/v1/school/holidays?filter_type=weekly|monthly|yearly
  *   GET /api/v1/school/attendance/daily?type=student|faculty&grade=
  *
- * Spec ref: vidya_prayag_api_spec2.artifact.md §Screen: Drawer Options
+ * Spec ref: vidya_prayag_api_spec2.artifact.md §Drawer Options
  *
  * Calendar filtering:
- *   - view_type=week  → events whose date is within ±3 days of `date`
- *   - view_type=month → events whose date starts with the YYYY-MM of `date`
- *   - `standard` (optional) restricts to events tagged for that grade
- *     (or null-standard events, which are global).
+ *   view_type=week  → events within ±3 days of `date`
+ *   view_type=month → events starting with YYYY-MM of `date`
+ *   standard (opt)  → filter to that grade; null-standard rows are global
  *
- * Holidays:
- *   `filter_type` simply selects rows by frequency column. yearly is the
- *   default if the param is missing.
+ * Holidays: `filter_type` selects rows by frequency column (default yearly).
  *
- * Attendance:
- *   Today's date (LocalDate.now()) is used by default. If you want historical
- *   queries we'd add a `date` query param later — the spec only describes
- *   "Daily Attendance" so we keep it implicitly today-only.
- *
- * Used by UI:
- *   - composeApp/.../ui/screens/admin/AnalyticsDashboardScreen.kt
- *   - composeApp/.../ui/screens/admin/AcademicCalendarScreen.kt
- *   - composeApp/.../ui/screens/admin/DailyAttendanceScreen.kt
+ * Attendance: today's date by default; pass `?date=YYYY-MM-DD` for historical.
  */
 package com.littlebridge.vidyaprayag.feature.school
 
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.principalUserId
-import com.littlebridge.vidyaprayag.db.AttendanceTable
-import com.littlebridge.vidyaprayag.db.CalendarEventTable
+import com.littlebridge.vidyaprayag.db.AcademicCalendarTable
+import com.littlebridge.vidyaprayag.db.AppUsersTable
+import com.littlebridge.vidyaprayag.db.AttendanceRecordsTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.FacultyTable
-import com.littlebridge.vidyaprayag.db.HolidayTable
-import com.littlebridge.vidyaprayag.db.SchoolTable
-import com.littlebridge.vidyaprayag.db.StudentTable
+import com.littlebridge.vidyaprayag.db.HolidayListTable
+import com.littlebridge.vidyaprayag.db.StudentsTable
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.or
@@ -54,8 +43,6 @@ import org.jetbrains.exposed.sql.selectAll
 import java.time.LocalDate
 import java.time.YearMonth
 import java.util.UUID
-
-// ---------- DTOs ----------
 
 @Serializable
 data class AnalyticsResponse(
@@ -86,11 +73,7 @@ data class CalendarResponse(
 )
 
 @Serializable
-data class HolidayDto(
-    val date: String,
-    val title: String,
-    val type: String
-)
+data class HolidayDto(val date: String, val title: String, val type: String)
 
 @Serializable
 data class HolidaysResponse(val holidays: List<HolidayDto>)
@@ -104,7 +87,7 @@ data class AttendanceEntry(
 )
 
 @Serializable
-data class DailyAttendanceResponse(
+data class AttendanceResponse(
     val type: String,
     val grade: String? = null,
     @SerialName("present_count") val presentCount: Int,
@@ -114,31 +97,25 @@ data class DailyAttendanceResponse(
     @SerialName("attendance_list") val attendanceList: List<AttendanceEntry>
 )
 
-// ---------- helpers ----------
-
-private suspend fun resolveSchoolId(uid: UUID): Long? = dbQuery {
-    SchoolTable.selectAll().where { SchoolTable.ownerUserId eq uid }
-        .singleOrNull()?.get(SchoolTable.id)?.value
+private suspend fun resolveSchoolId(uid: UUID): UUID? = dbQuery {
+    AppUsersTable.selectAll().where { AppUsersTable.id eq uid }
+        .singleOrNull()?.get(AppUsersTable.schoolId)
 }
 
-private fun pct(num: Int, denom: Int): String =
-    if (denom == 0) "0%" else "${"%.1f".format(num * 100.0 / denom)}%"
-
-// ---------- Routing ----------
-
 fun Route.schoolRouting() {
-    authenticate("jwt") {
-        route("/api/v1/school") {
+    route("/api/v1/school") {
 
-            // -------- analytics (Coming Soon) --------
-            get("/analytics") {
-                call.ok(
-                    AnalyticsResponse(isAvailable = false, expectedRelease = "Q3 2024"),
-                    message = "Analytics feature is coming soon!"
-                )
-            }
+        // ---- analytics (public placeholder) ----
+        get("/analytics") {
+            call.ok(
+                AnalyticsResponse(isAvailable = false, expectedRelease = "Q3 2026"),
+                message = "Analytics feature is coming soon!"
+            )
+        }
 
-            // -------- calendar --------
+        authenticate("jwt") {
+
+            // ---- calendar ----
             get("/calendar") {
                 val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
                     call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
@@ -146,70 +123,66 @@ fun Route.schoolRouting() {
                 val schoolId = resolveSchoolId(uid) ?: run {
                     call.fail("User not associated with any school", HttpStatusCode.NotFound); return@get
                 }
-                val dateStr = call.request.queryParameters["date"] ?: LocalDate.now().toString()
-                val view = call.request.queryParameters["view_type"]?.lowercase() ?: "month"
+                val dateStr = call.request.queryParameters["date"]
+                    ?: LocalDate.now().toString()
+                val viewType = call.request.queryParameters["view_type"]?.lowercase() ?: "month"
                 val standard = call.request.queryParameters["standard"]
 
-                val refDate = runCatching { LocalDate.parse(dateStr) }.getOrElse {
-                    call.fail("Invalid date '$dateStr', expected YYYY-MM-DD"); return@get
+                val refDate = runCatching { LocalDate.parse(dateStr) }.getOrNull()
+                    ?: run { call.fail("Invalid date format (YYYY-MM-DD)"); return@get }
+
+                val (rangeStart, rangeEnd) = when (viewType) {
+                    "week" -> refDate.minusDays(3) to refDate.plusDays(3)
+                    else  -> refDate.withDayOfMonth(1) to refDate.withDayOfMonth(refDate.lengthOfMonth())
                 }
 
-                val data = dbQuery {
-                    val all = CalendarEventTable.selectAll()
-                        .where { CalendarEventTable.schoolId eq schoolId }
-                        .toList()
-                    val filteredByDate = all.filter { row ->
-                        val rd = runCatching { LocalDate.parse(row[CalendarEventTable.date]) }.getOrNull()
-                            ?: return@filter false
-                        when (view) {
-                            "week"  -> !rd.isBefore(refDate.minusDays(3)) && !rd.isAfter(refDate.plusDays(3))
-                            else    -> YearMonth.from(rd) == YearMonth.from(refDate)
+                val events = dbQuery {
+                    AcademicCalendarTable.selectAll()
+                        .where { AcademicCalendarTable.schoolId eq schoolId }
+                        .filter { row ->
+                            val d = runCatching { LocalDate.parse(row[AcademicCalendarTable.date]) }.getOrNull()
+                                ?: return@filter false
+                            val inRange = !d.isBefore(rangeStart) && !d.isAfter(rangeEnd)
+                            val stdOk = standard.isNullOrBlank() ||
+                                row[AcademicCalendarTable.standard] == null ||
+                                row[AcademicCalendarTable.standard] == standard
+                            inRange && stdOk
                         }
-                    }
-                    val filteredByStd = if (standard.isNullOrBlank()) filteredByDate
-                        else filteredByDate.filter {
-                            val s = it[CalendarEventTable.standard]
-                            s == null || s == standard
+                        .map {
+                            CalendarEventDto(
+                                date = it[AcademicCalendarTable.date],
+                                day = it[AcademicCalendarTable.day],
+                                eventId = it[AcademicCalendarTable.eventId],
+                                eventTitle = it[AcademicCalendarTable.eventTitle],
+                                eventDescription = it[AcademicCalendarTable.eventDescription] ?: ""
+                            )
                         }
-                    val events = filteredByStd.map {
-                        CalendarEventDto(
-                            date = it[CalendarEventTable.date],
-                            day = it[CalendarEventTable.day],
-                            eventId = it[CalendarEventTable.eventId],
-                            eventTitle = it[CalendarEventTable.title],
-                            eventDescription = it[CalendarEventTable.description]
-                        )
-                    }
-                    // Summary derived from holiday_list within the same period.
-                    val holidaysInPeriod = HolidayTable.selectAll()
-                        .where { HolidayTable.schoolId eq schoolId }
-                        .mapNotNull { row ->
-                            val hd = runCatching { LocalDate.parse(row[HolidayTable.date]) }.getOrNull()
-                            if (hd != null && YearMonth.from(hd) == YearMonth.from(refDate)) row else null
-                        }
-                    val publicHolidays = holidaysInPeriod.count { it[HolidayTable.type] == "Public" }
-                    val schoolHolidays = holidaysInPeriod.count { it[HolidayTable.type] == "School" }
-                    val daysInMonth = YearMonth.from(refDate).lengthOfMonth()
-                    val totalWorking = daysInMonth - publicHolidays - schoolHolidays -
-                        // count weekend days
-                        (1..daysInMonth).count { d ->
-                            val day = refDate.withDayOfMonth(d).dayOfWeek.value
-                            day == 6 || day == 7
-                        }
+                }
 
+                // Working-day math is approximate (Mon-Fri count in range).
+                val workingDays = generateSequence(rangeStart) { it.plusDays(1) }
+                    .takeWhile { !it.isAfter(rangeEnd) }
+                    .count { it.dayOfWeek.value < 6 }
+                val pubHolidays = dbQuery {
+                    HolidayListTable.selectAll()
+                        .where { (HolidayListTable.schoolId eq schoolId) and (HolidayListTable.type eq "Public") }
+                        .count().toInt()
+                }
+                val schoolHolidays = dbQuery {
+                    HolidayListTable.selectAll()
+                        .where { (HolidayListTable.schoolId eq schoolId) and (HolidayListTable.type eq "School") }
+                        .count().toInt()
+                }
+                call.ok(
                     CalendarResponse(
                         calendarEvents = events,
-                        summary = CalendarSummary(
-                            totalWorkingDays = totalWorking.coerceAtLeast(0),
-                            publicHolidays = publicHolidays,
-                            schoolHolidays = schoolHolidays
-                        )
-                    )
-                }
-                call.ok(data, message = "Academic calendar fetched successfully")
+                        summary = CalendarSummary(workingDays, pubHolidays, schoolHolidays)
+                    ),
+                    message = "Academic calendar fetched successfully"
+                )
             }
 
-            // -------- holidays --------
+            // ---- holidays ----
             get("/holidays") {
                 val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
                     call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
@@ -218,23 +191,18 @@ fun Route.schoolRouting() {
                     call.fail("User not associated with any school", HttpStatusCode.NotFound); return@get
                 }
                 val filter = call.request.queryParameters["filter_type"]?.lowercase() ?: "yearly"
-
+                if (filter !in setOf("weekly", "monthly", "yearly")) {
+                    call.fail("filter_type must be weekly|monthly|yearly"); return@get
+                }
                 val list = dbQuery {
-                    HolidayTable.selectAll()
-                        .where { (HolidayTable.schoolId eq schoolId) and (HolidayTable.frequency eq filter) }
-                        .orderBy(HolidayTable.date)
-                        .map {
-                            HolidayDto(
-                                date = it[HolidayTable.date],
-                                title = it[HolidayTable.title],
-                                type = it[HolidayTable.type]
-                            )
-                        }
+                    HolidayListTable.selectAll()
+                        .where { (HolidayListTable.schoolId eq schoolId) and (HolidayListTable.frequency eq filter) }
+                        .map { HolidayDto(it[HolidayListTable.date], it[HolidayListTable.title], it[HolidayListTable.type]) }
                 }
                 call.ok(HolidaysResponse(list), message = "Holidays list fetched")
             }
 
-            // -------- attendance/daily --------
+            // ---- attendance/daily ----
             get("/attendance/daily") {
                 val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
                     call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
@@ -242,60 +210,57 @@ fun Route.schoolRouting() {
                 val schoolId = resolveSchoolId(uid) ?: run {
                     call.fail("User not associated with any school", HttpStatusCode.NotFound); return@get
                 }
-                val type = call.request.queryParameters["type"]?.lowercase() ?: "student"
+                val type  = call.request.queryParameters["type"]?.lowercase() ?: "student"
                 val grade = call.request.queryParameters["grade"]
-                val today = LocalDate.now().toString()
+                val date  = call.request.queryParameters["date"] ?: LocalDate.now().toString()
 
-                if (type !in listOf("student", "faculty")) {
+                if (type !in setOf("student", "faculty")) {
                     call.fail("type must be 'student' or 'faculty'"); return@get
                 }
                 if (type == "student" && grade.isNullOrBlank()) {
-                    call.fail("grade is required when type=student"); return@get
+                    call.fail("'grade' is required for type=student"); return@get
                 }
 
-                val data = dbQuery {
-                    val records = AttendanceTable.selectAll()
-                        .where {
-                            val base = (AttendanceTable.schoolId eq schoolId) and
-                                       (AttendanceTable.date eq today) and
-                                       (AttendanceTable.type eq type)
-                            if (type == "student") base and (AttendanceTable.grade eq grade!!)
-                            else base
-                        }
-                        .toList()
-
-                    // Join to name/profile-pic via the people tables.
-                    val entries = records.map { row ->
-                        val pid = row[AttendanceTable.personId]
-                        val (name, pic) = if (type == "student") {
-                            val s = StudentTable.selectAll()
-                                .where { StudentTable.externalId eq pid }.singleOrNull()
-                            (s?.get(StudentTable.name) ?: pid) to s?.get(StudentTable.profilePic)
-                        } else {
-                            val f = FacultyTable.selectAll()
-                                .where { FacultyTable.externalId eq pid }.singleOrNull()
-                            (f?.get(FacultyTable.name) ?: pid) to f?.get(FacultyTable.profilePic)
-                        }
-                        AttendanceEntry(
-                            profilePic = pic,
-                            name = name,
-                            id = pid,
-                            status = row[AttendanceTable.status]
-                        )
+                val resp = dbQuery {
+                    // Pull people list (students of that grade, or all faculty).
+                    val people: List<Triple<String, String, String?>> = if (type == "student") {
+                        StudentsTable.selectAll()
+                            .where { (StudentsTable.schoolId eq schoolId) and (StudentsTable.className eq grade!!) and (StudentsTable.isActive eq true) }
+                            .map { Triple(it[StudentsTable.studentCode], it[StudentsTable.fullName], it[StudentsTable.profilePhotoUrl]) }
+                    } else {
+                        FacultyTable.selectAll()
+                            .where { (FacultyTable.schoolId eq schoolId) and (FacultyTable.isActive eq true) }
+                            .map { Triple(it[FacultyTable.externalId], it[FacultyTable.name], it[FacultyTable.profilePic]) }
                     }
-                    val present = entries.count { it.status == "present" }
-                    val absent = entries.count { it.status == "absent" }
-                    DailyAttendanceResponse(
+
+                    // Pull today's records once.
+                    val records = AttendanceRecordsTable.selectAll()
+                        .where {
+                            (AttendanceRecordsTable.schoolId eq schoolId) and
+                                (AttendanceRecordsTable.date eq date) and
+                                (AttendanceRecordsTable.type eq type)
+                        }
+                        .associate { it[AttendanceRecordsTable.personId] to it[AttendanceRecordsTable.status] }
+
+                    val rows = people.map { (id, name, pic) ->
+                        val status = records[id] ?: "absent"
+                        AttendanceEntry(profilePic = pic, name = name, id = id, status = status)
+                    }
+                    val present = rows.count { it.status == "present" || it.status == "late" || it.status == "half_day" }
+                    val absent  = rows.size - present
+                    val pct = if (rows.isEmpty()) "0%" else "${present * 100 / rows.size}%"
+
+                    AttendanceResponse(
                         type = type,
                         grade = if (type == "student") grade else null,
                         presentCount = present,
                         absentCount = absent,
-                        totalCount = entries.size,
-                        attendancePercentage = pct(present, entries.size),
-                        attendanceList = entries
+                        totalCount = rows.size,
+                        attendancePercentage = pct,
+                        attendanceList = rows
                     )
                 }
-                call.ok(data, message = "Daily attendance fetched successfully")
+                call.ok(resp, message = "Daily attendance fetched successfully")
             }
         }
     }

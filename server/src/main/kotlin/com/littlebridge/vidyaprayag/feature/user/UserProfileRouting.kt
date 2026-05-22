@@ -10,10 +10,10 @@
  *
  * Spec ref: vidya_prayag_api_spec2.artifact.md §Screen: User Profile / School Profile
  *
- * Storage strategy:
- *   - philosophy   → 1 row in school_philosophy keyed by schoolId
- *   - videos+gallery images → many rows in school_media (kind = "VIDEO" or "IMAGE")
- *   - storage info → 1 row in storage_metrics keyed by schoolId
+ * Storage strategy (aligned to Supabase schema v2.1):
+ *   - philosophy            → 1 row in school_philosophy keyed by school_id (UUID)
+ *   - videos + gallery imgs → many rows in school_media (kind = "VIDEO" | "IMAGE")
+ *   - storage info          → 1 row in storage_metrics keyed by school_id (UUID)
  *
  *   For PUT /tour-videos and PUT /gallery, the request body holds the FULL
  *   desired list. We DELETE-then-INSERT all rows of the matching kind to keep
@@ -21,10 +21,11 @@
  *   this "Delete / Insert (Sync list)".
  *
  * Storage stats:
- *   storage_used is currently a string ("2.4 GB"). When real uploads land we'll
- *   compute this from file sizes; for now we just bump the displayed string by
- *   0.2 GB per added image so the UI shows movement. This is intentional MVP
- *   behaviour — flagged as TODO in UserProfileRouting.kt.
+ *   bytes_used is computed as SUM(school_media.size_bytes) WHERE kind='IMAGE'.
+ *   storage_used (human-readable) is rendered from bytes_used via formatBytes().
+ *   Since binary upload isn't wired in yet, individual rows currently have
+ *   size_bytes = 0; an MVP estimate of 200 KB per image is applied so the UI
+ *   shows movement until real uploads land.
  *
  * Used by UI:
  *   - composeApp/.../ui/screens/admin/InstitutionalProfileScreen.kt
@@ -35,23 +36,25 @@ import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.okMessage
 import com.littlebridge.vidyaprayag.core.principalUserId
+import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.SchoolMediaTable
 import com.littlebridge.vidyaprayag.db.SchoolPhilosophyTable
-import com.littlebridge.vidyaprayag.db.SchoolTable
 import com.littlebridge.vidyaprayag.db.StorageMetricsTable
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.sum
 import org.jetbrains.exposed.sql.update
+import java.time.Instant
 import java.util.UUID
 
 // ---------- DTOs ----------
@@ -96,32 +99,91 @@ data class GalleryUpdateResponse(
 
 // ---------- helpers ----------
 
-private suspend fun resolveSchoolId(uid: UUID): Long? = dbQuery {
-    SchoolTable.selectAll().where { SchoolTable.ownerUserId eq uid }
-        .singleOrNull()?.get(SchoolTable.id)?.value
+/**
+ * Resolve the school owned/operated by a given user. Returns null when the
+ * user has not completed onboarding (no school created yet).
+ */
+private fun resolveSchoolId(uid: UUID): UUID? =
+    AppUsersTable.selectAll()
+        .where { AppUsersTable.id eq uid }
+        .firstOrNull()
+        ?.get(AppUsersTable.schoolId)
+
+/** Format a byte count as a human-readable string (GB / MB / KB / B). */
+private fun formatBytes(bytes: Long): String {
+    if (bytes <= 0) return "0 B"
+    val gb = 1024.0 * 1024 * 1024
+    val mb = 1024.0 * 1024
+    val kb = 1024.0
+    return when {
+        bytes >= gb -> String.format("%.1f GB", bytes / gb)
+        bytes >= mb -> String.format("%.1f MB", bytes / mb)
+        bytes >= kb -> String.format("%.1f KB", bytes / kb)
+        else -> "$bytes B"
+    }
 }
 
-private fun ensureStorageRow(schoolId: Long) {
+/** MVP estimate: 200 KB per image until binary uploads land. */
+private const val MVP_BYTES_PER_IMAGE: Long = 200L * 1024L
+
+private fun ensureStorageRow(schoolId: UUID) {
     val exists = StorageMetricsTable.selectAll()
-        .where { StorageMetricsTable.schoolId eq schoolId }.count() > 0L
+        .where { StorageMetricsTable.schoolId eq schoolId }
+        .count() > 0L
     if (!exists) {
         StorageMetricsTable.insert {
             it[StorageMetricsTable.schoolId] = schoolId
             it[totalStorage] = "10 GB"
             it[storageUsed] = "0 B"
+            it[bytesUsed] = 0L
+            it[updatedAt] = Instant.now()
         }
     }
 }
 
-private fun ensurePhilosophyRow(schoolId: Long) {
+private fun ensurePhilosophyRow(schoolId: UUID) {
     val exists = SchoolPhilosophyTable.selectAll()
-        .where { SchoolPhilosophyTable.schoolId eq schoolId }.count() > 0L
+        .where { SchoolPhilosophyTable.schoolId eq schoolId }
+        .count() > 0L
     if (!exists) {
         SchoolPhilosophyTable.insert {
             it[SchoolPhilosophyTable.schoolId] = schoolId
             it[publicProfile] = true
+            it[updatedAt] = Instant.now()
         }
     }
+}
+
+/**
+ * Recompute storage_metrics.bytes_used / storage_used from the actual rows
+ * in school_media (sum of size_bytes for IMAGE kind). Always called after
+ * a /gallery sync so the UI reflects truth.
+ */
+private fun recomputeStorageUsage(schoolId: UUID): Pair<Long, String> {
+    val sumExpr = SchoolMediaTable.sizeBytes.sum()
+    val realBytes = SchoolMediaTable
+        .select(sumExpr)
+        .where { (SchoolMediaTable.schoolId eq schoolId) and (SchoolMediaTable.kind eq "IMAGE") }
+        .firstOrNull()
+        ?.get(sumExpr) ?: 0L
+
+    // If no real bytes are recorded (size_bytes=0 across rows), fall back to
+    // the MVP estimate of 200KB per image. This avoids "0 B" while we wait
+    // for real file uploads to be wired in.
+    val imageCount = SchoolMediaTable.selectAll()
+        .where { (SchoolMediaTable.schoolId eq schoolId) and (SchoolMediaTable.kind eq "IMAGE") }
+        .count()
+
+    val effectiveBytes = if (realBytes > 0) realBytes else imageCount * MVP_BYTES_PER_IMAGE
+    val human = formatBytes(effectiveBytes)
+
+    ensureStorageRow(schoolId)
+    StorageMetricsTable.update({ StorageMetricsTable.schoolId eq schoolId }) {
+        it[bytesUsed] = effectiveBytes
+        it[storageUsed] = human
+        it[updatedAt] = Instant.now()
+    }
+    return effectiveBytes to human
 }
 
 // ---------- Routing ----------
@@ -132,24 +194,32 @@ fun Route.userProfileRouting() {
 
             // -------- GET /profile --------
             get {
-                val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
-                    call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
-                }
-                val schoolId = resolveSchoolId(uid) ?: run {
-                    call.fail("User not associated with any school", HttpStatusCode.NotFound); return@get
+                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                    ?: run {
+                        call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
+                    }
+                val schoolId = dbQuery { resolveSchoolId(uid) } ?: run {
+                    call.fail(
+                        "User not associated with any school. Complete onboarding first.",
+                        HttpStatusCode.NotFound
+                    )
+                    return@get
                 }
                 val data = dbQuery {
                     val phil = SchoolPhilosophyTable.selectAll()
-                        .where { SchoolPhilosophyTable.schoolId eq schoolId }.singleOrNull()
+                        .where { SchoolPhilosophyTable.schoolId eq schoolId }
+                        .firstOrNull()
                     val mediaRows = SchoolMediaTable.selectAll()
                         .where { SchoolMediaTable.schoolId eq schoolId }
-                        .orderBy(SchoolMediaTable.position).toList()
+                        .orderBy(SchoolMediaTable.position)
+                        .toList()
                     val videos = mediaRows.filter { it[SchoolMediaTable.kind] == "VIDEO" }
                         .map { it[SchoolMediaTable.url] }
                     val images = mediaRows.filter { it[SchoolMediaTable.kind] == "IMAGE" }
                         .map { it[SchoolMediaTable.url] }
                     val storage = StorageMetricsTable.selectAll()
-                        .where { StorageMetricsTable.schoolId eq schoolId }.singleOrNull()
+                        .where { StorageMetricsTable.schoolId eq schoolId }
+                        .firstOrNull()
 
                     UserProfileResponse(
                         publicProfile = phil?.get(SchoolPhilosophyTable.publicProfile) ?: true,
@@ -171,12 +241,17 @@ fun Route.userProfileRouting() {
 
             // -------- PUT /philosophy --------
             put("/philosophy") {
-                val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
-                    call.fail("Invalid token", HttpStatusCode.Unauthorized); return@put
-                }
+                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                    ?: run {
+                        call.fail("Invalid token", HttpStatusCode.Unauthorized); return@put
+                    }
                 val req = call.receive<PhilosophyDetails>()
-                val schoolId = resolveSchoolId(uid) ?: run {
-                    call.fail("User not associated with any school", HttpStatusCode.NotFound); return@put
+                val schoolId = dbQuery { resolveSchoolId(uid) } ?: run {
+                    call.fail(
+                        "User not associated with any school. Complete onboarding first.",
+                        HttpStatusCode.NotFound
+                    )
+                    return@put
                 }
                 dbQuery {
                     ensurePhilosophyRow(schoolId)
@@ -184,6 +259,7 @@ fun Route.userProfileRouting() {
                         req.coreMission?.let { v -> it[coreMission] = v }
                         req.learningModel?.let { v -> it[learningModel] = v }
                         req.primaryLanguage?.let { v -> it[primaryLanguage] = v }
+                        it[updatedAt] = Instant.now()
                     }
                 }
                 call.okMessage("Philosophy updated successfully")
@@ -191,12 +267,17 @@ fun Route.userProfileRouting() {
 
             // -------- PUT /tour-videos --------
             put("/tour-videos") {
-                val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
-                    call.fail("Invalid token", HttpStatusCode.Unauthorized); return@put
-                }
+                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                    ?: run {
+                        call.fail("Invalid token", HttpStatusCode.Unauthorized); return@put
+                    }
                 val req = call.receive<TourVideosRequest>()
-                val schoolId = resolveSchoolId(uid) ?: run {
-                    call.fail("User not associated with any school", HttpStatusCode.NotFound); return@put
+                val schoolId = dbQuery { resolveSchoolId(uid) } ?: run {
+                    call.fail(
+                        "User not associated with any school. Complete onboarding first.",
+                        HttpStatusCode.NotFound
+                    )
+                    return@put
                 }
                 dbQuery {
                     SchoolMediaTable.deleteWhere {
@@ -208,6 +289,9 @@ fun Route.userProfileRouting() {
                             it[kind] = "VIDEO"
                             it[SchoolMediaTable.url] = url
                             it[position] = idx
+                            it[sizeBytes] = 0L
+                            it[uploadedBy] = uid
+                            it[createdAt] = Instant.now()
                         }
                     }
                 }
@@ -216,12 +300,17 @@ fun Route.userProfileRouting() {
 
             // -------- PUT /gallery --------
             put("/gallery") {
-                val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
-                    call.fail("Invalid token", HttpStatusCode.Unauthorized); return@put
-                }
+                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                    ?: run {
+                        call.fail("Invalid token", HttpStatusCode.Unauthorized); return@put
+                    }
                 val req = call.receive<GalleryRequest>()
-                val schoolId = resolveSchoolId(uid) ?: run {
-                    call.fail("User not associated with any school", HttpStatusCode.NotFound); return@put
+                val schoolId = dbQuery { resolveSchoolId(uid) } ?: run {
+                    call.fail(
+                        "User not associated with any school. Complete onboarding first.",
+                        HttpStatusCode.NotFound
+                    )
+                    return@put
                 }
                 val data = dbQuery {
                     SchoolMediaTable.deleteWhere {
@@ -233,17 +322,18 @@ fun Route.userProfileRouting() {
                             it[kind] = "IMAGE"
                             it[SchoolMediaTable.url] = url
                             it[position] = idx
+                            // size_bytes will be populated once binary upload
+                            // is wired in. For now we leave it 0 and rely on
+                            // recomputeStorageUsage()'s MVP fallback.
+                            it[sizeBytes] = 0L
+                            it[uploadedBy] = uid
+                            it[createdAt] = Instant.now()
                         }
                     }
-                    // TODO: replace with real usage calculation when binary upload
-                    // is wired in. For now, approximate 0.2 GB per image.
-                    ensureStorageRow(schoolId)
-                    val used = String.format("%.1f GB", req.images.size * 0.2)
-                    StorageMetricsTable.update({ StorageMetricsTable.schoolId eq schoolId }) {
-                        it[storageUsed] = used
-                    }
+                    recomputeStorageUsage(schoolId)
                     val row = StorageMetricsTable.selectAll()
-                        .where { StorageMetricsTable.schoolId eq schoolId }.single()
+                        .where { StorageMetricsTable.schoolId eq schoolId }
+                        .single()
                     GalleryUpdateResponse(
                         storageUsed = row[StorageMetricsTable.storageUsed],
                         totalStorage = row[StorageMetricsTable.totalStorage]
