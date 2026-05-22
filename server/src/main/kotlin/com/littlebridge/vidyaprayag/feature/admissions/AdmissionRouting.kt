@@ -157,7 +157,7 @@ fun Route.admissionRouting() {
                     val list = AdmissionEnquiriesTable.selectAll()
                         .where { AdmissionEnquiriesTable.schoolId eq schoolId }
                         .orderBy(AdmissionEnquiriesTable.date, SortOrder.DESC)
-                        .limit(limit, offset)
+                        .limit(limit).offset(offset)
                         .map { it.toEnquiryDto() }
                     val totalPages = if (total == 0) 0 else (total + limit - 1) / limit
                     EnquiryListResponse(list, PaginationDto(page, totalPages, total))

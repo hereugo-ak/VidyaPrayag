@@ -52,7 +52,6 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.sum
 import org.jetbrains.exposed.sql.update
 import java.time.Instant
 import java.util.UUID
@@ -158,22 +157,22 @@ private fun ensurePhilosophyRow(schoolId: UUID) {
  * Recompute storage_metrics.bytes_used / storage_used from the actual rows
  * in school_media (sum of size_bytes for IMAGE kind). Always called after
  * a /gallery sync so the UI reflects truth.
+ *
+ * We compute the sum client-side (one query, all rows mapped) instead of
+ * via a SQL aggregate to keep the Exposed call surface minimal and
+ * unambiguously portable across SQLite (local dev) and Postgres (prod).
+ * Row counts are small (≤ a few hundred per school).
  */
 private fun recomputeStorageUsage(schoolId: UUID): Pair<Long, String> {
-    val sumExpr = SchoolMediaTable.sizeBytes.sum()
-    val realBytes = SchoolMediaTable
-        .select(sumExpr)
+    val imageRows = SchoolMediaTable.selectAll()
         .where { (SchoolMediaTable.schoolId eq schoolId) and (SchoolMediaTable.kind eq "IMAGE") }
-        .firstOrNull()
-        ?.get(sumExpr) ?: 0L
+        .toList()
+    val realBytes = imageRows.sumOf { it[SchoolMediaTable.sizeBytes] }
+    val imageCount = imageRows.size.toLong()
 
     // If no real bytes are recorded (size_bytes=0 across rows), fall back to
     // the MVP estimate of 200KB per image. This avoids "0 B" while we wait
     // for real file uploads to be wired in.
-    val imageCount = SchoolMediaTable.selectAll()
-        .where { (SchoolMediaTable.schoolId eq schoolId) and (SchoolMediaTable.kind eq "IMAGE") }
-        .count()
-
     val effectiveBytes = if (realBytes > 0) realBytes else imageCount * MVP_BYTES_PER_IMAGE
     val human = formatBytes(effectiveBytes)
 
