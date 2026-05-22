@@ -77,8 +77,10 @@ fun AuthBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 48.dp)
+                .padding(bottom = 32.dp)
                 .animateContentSize(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

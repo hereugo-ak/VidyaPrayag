@@ -30,7 +30,9 @@ import com.littlebridge.vidyaprayag.ui.theme.LocalThemeSwitcher
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
-fun VidyaPrayagDrawerSheet() {
+fun VidyaPrayagDrawerSheet(
+    onShowAuthSheet: () -> Unit
+) {
     val mainViewModel: MainViewModel = koinViewModel()
     val userRole by mainViewModel.userRole.collectAsState()
     val navigator = LocalAppNavigator.current
@@ -39,8 +41,12 @@ fun VidyaPrayagDrawerSheet() {
         drawerContainerColor = MaterialTheme.colorScheme.surface,
         modifier = Modifier.width(280.dp)
     ) {
-        DrawerHeader(userRole)
-        DrawerContent(userRole) {
+        DrawerHeader(userRole, onShowAuthSheet)
+        DrawerContent(
+            userRole = userRole,
+            onShowAuthSheet = onShowAuthSheet,
+            onLogout = { mainViewModel.logout() }
+        ) {
             navigator.navigateTo(it)
         }
         Spacer(modifier = Modifier.weight(1f))
@@ -49,14 +55,18 @@ fun VidyaPrayagDrawerSheet() {
 }
 
 @Composable
-private fun DrawerHeader(userRole: String) {
+private fun DrawerHeader(
+    userRole: String,
+    onShowAuthSheet: () -> Unit
+) {
     val title = if (userRole == "ADMIN") "School Admin" else if (userRole == "PARENT") "Parent User" else "Guest User"
+    val subTitle = if (userRole == "GUEST") "Welcome to VidyaPrayag" else "Welcome back!"
     
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-            .padding(32.dp)
+            .padding(top = 48.dp, start = 32.dp, end = 32.dp, bottom = 32.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -71,14 +81,14 @@ private fun DrawerHeader(userRole: String) {
             Spacer(modifier = Modifier.width(16.dp))
             Column {
                 Text(title, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                Text("Welcome back!", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
+                Text(subTitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
             }
         }
         if (userRole == "GUEST") {
             Spacer(modifier = Modifier.height(24.dp))
             VidyaPrayagPrimaryButton(
-                text = "Get Started",
-                onClick = {},
+                text = "Login / Signup",
+                onClick = onShowAuthSheet,
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -86,7 +96,12 @@ private fun DrawerHeader(userRole: String) {
 }
 
 @Composable
-private fun DrawerContent(userRole: String, onNavigate: (Destination) -> Unit) {
+private fun DrawerContent(
+    userRole: String,
+    onShowAuthSheet: () -> Unit,
+    onLogout: () -> Unit,
+    onNavigate: (Destination) -> Unit
+) {
     val currentTheme = LocalAppTheme.current
     val themeSwitcher = LocalThemeSwitcher.current
 
@@ -95,7 +110,9 @@ private fun DrawerContent(userRole: String, onNavigate: (Destination) -> Unit) {
             .verticalScroll(rememberScrollState())
             .padding(24.dp)
     ) {
-        DrawerItem(Icons.Default.Home, "Home", isSelected = true) { onNavigate(Destination.SchoolDashboard) }
+        if (userRole != "GUEST") {
+            DrawerItem(Icons.Default.Home, "Home", isSelected = true) { onNavigate(Destination.SchoolDashboard) }
+        }
         
         if (userRole == "ADMIN") {
             Text("SCHOOL OPTIONS", modifier = Modifier.padding(vertical = 12.dp), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline, letterSpacing = 2.sp)
@@ -130,7 +147,13 @@ private fun DrawerContent(userRole: String, onNavigate: (Destination) -> Unit) {
         val signText = if (userRole == "GUEST") "Sign In" else "Sign Out"
         val signIcon = if (userRole == "GUEST") Icons.Default.Login else Icons.AutoMirrored.Filled.Logout
         
-        DrawerItem(signIcon, signText)
+        DrawerItem(signIcon, signText) {
+            if (userRole == "GUEST") {
+                onShowAuthSheet()
+            } else {
+                onLogout()
+            }
+        }
         DrawerItem(Icons.Default.Help, "Support")
         DrawerItem(Icons.Default.Security, "Privacy Policy")
         DrawerItem(Icons.Default.Description, "Terms & Conditions")

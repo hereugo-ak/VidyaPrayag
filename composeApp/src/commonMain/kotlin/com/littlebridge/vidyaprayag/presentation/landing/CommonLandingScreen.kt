@@ -44,7 +44,9 @@ fun CommonLandingScreen() {
     
     var showAuthSheet by remember { mutableStateOf(false) }
 
-    BaseScreen { paddingValues, scrollModifier ->
+    BaseScreen(
+        onShowAuthSheet = { showAuthSheet = true }
+    ) { paddingValues, scrollModifier ->
         if (showAuthSheet) {
             AuthBottomSheet(onDismissRequest = { showAuthSheet = false })
         }
@@ -111,7 +113,7 @@ fun CommonLandingScreen() {
                     }
                 }
 
-                item { FinalCtaSection(onJoinClick = { showAuthSheet = true }) }
+               // item { FinalCtaSection(onJoinClick = { showAuthSheet = true }) }
             }
         }
     }
@@ -351,11 +353,11 @@ private fun MoatShowcaseSection(
 @Composable
 private fun MoatCard(title: String, description: String, imageUrl: String) {
     VidyaPrayagCard(modifier = Modifier.width(300.dp)) {
-        Column(modifier = Modifier.padding(32.dp)) {
+        Column(modifier = Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             AsyncImage(
                 model = imageUrl,
                 contentDescription = null,
-                modifier = Modifier.size(80.dp).clip(RoundedCornerShape(16.dp))
+                modifier = Modifier.size(120.dp).clip(RoundedCornerShape(16.dp))
             )
             Spacer(modifier = Modifier.height(24.dp))
             Text(title, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
@@ -371,12 +373,14 @@ private fun PortalAccessSection(
     onLoginClick: () -> Unit
 ) {
     Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 40.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-            Column {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(0.75f)) {
                 Text("Access Your Portal", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
                 Text("Already part of the VidyaPrayag ecosystem?", color = MaterialTheme.colorScheme.outline)
             }
-            Text("View All Portals", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.SemiBold)
+            Text(
+                modifier = Modifier.weight(0.25f), textAlign = TextAlign.Center,
+                text = "View All Portals", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.SemiBold, maxLines = 2, minLines = 2)
         }
         Spacer(modifier = Modifier.height(32.dp))
         

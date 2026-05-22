@@ -61,6 +61,7 @@ kotlin {
             implementation("io.insert-koin:koin-compose-viewmodel:4.0.0")
             implementation(libs.coil.compose)
             implementation(libs.coil.network.ktor)
+            implementation(libs.okio)
             implementation("org.jetbrains.compose.material:material-icons-extended:1.7.3")
             implementation(libs.androidx.navigation.compose)
             implementation(projects.shared)

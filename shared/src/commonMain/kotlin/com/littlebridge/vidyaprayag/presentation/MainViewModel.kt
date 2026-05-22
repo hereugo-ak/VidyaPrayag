@@ -51,4 +51,10 @@ class MainViewModel(
             preferenceRepository.setUserRole(role)
         }
     }
+
+    fun logout() {
+        viewModelScope.launch {
+            preferenceRepository.setUserRole("GUEST")
+        }
+    }
 }

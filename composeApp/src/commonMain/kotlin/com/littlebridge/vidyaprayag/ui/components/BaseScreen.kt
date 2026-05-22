@@ -33,6 +33,8 @@ import kotlinx.coroutines.launch
 fun BaseScreen(
     onBackClick: (() -> Unit)? = null,
 
+    onShowAuthSheet: (() -> Unit)? = null,
+
     bottomBar: @Composable () -> Unit = {},
 
     immersiveTopBar: Boolean = true,
@@ -149,7 +151,12 @@ fun BaseScreen(
         drawerState = drawerState,
 
         drawerContent = {
-            VidyaPrayagDrawerSheet()
+            VidyaPrayagDrawerSheet(
+                onShowAuthSheet = {
+                    onShowAuthSheet?.invoke()
+                    scope.launch { drawerState.close() }
+                }
+            )
         }
     ) {
 

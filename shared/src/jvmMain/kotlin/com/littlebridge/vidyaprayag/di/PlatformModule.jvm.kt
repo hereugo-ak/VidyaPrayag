@@ -13,6 +13,7 @@ import org.koin.dsl.module
 import java.io.File
 
 actual fun platformModule(): Module = module {
+    single<com.littlebridge.vidyaprayag.Platform> { com.littlebridge.vidyaprayag.getPlatform() }
     single { OkHttp.create() }
     single { DatabaseFactory() }
     single<AppDatabase> { get<DatabaseFactory>().createBuilder().build() }

@@ -9,6 +9,7 @@ import org.koin.core.module.Module
 import org.koin.dsl.module
 
 actual fun platformModule(): Module = module {
+    single<com.littlebridge.vidyaprayag.Platform> { com.littlebridge.vidyaprayag.getPlatform() }
     single { Js.create() }
     single<SchoolLocalDataSource> { InMemorySchoolLocalDataSource() }
     single<PreferenceRepository> { InMemoryPreferenceManager() }
