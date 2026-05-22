@@ -60,9 +60,27 @@ object CmsSeed {
                 "list_of_offerings" to """
                     [
                       {
-                        "icon_url": "https://cdn.vidyaprayag.com/icons/intel.png",
-                        "heading": "Next-Gen Intelligence",
-                        "description": "Proprietary systems powering the ecosystem.",
+                        "icon_url": "https://dumoiojpkizxkzzxdzss.supabase.co/storage/v1/object/sign/vidya-prayag/ic_chat_wa.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9kMWZmYzY2Ni04YTcwLTRmMmItODE3OC00YzBlZGM0YjA2ODIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ2aWR5YS1wcmF5YWcvaWNfY2hhdF93YS5wbmciLCJpYXQiOjE3Nzk0ODM5MzAsImV4cCI6MTgxMTAxOTkzMH0.qEp2WtNkLSDRC9YKu4cf0lEy7DnOa8gS1xW_-DpGdSU",
+                        "heading": "WhatsApp-First",
+                        "description": "Seamless communication between parents and faculty without app fatigue.",
+                        "is_live": true
+                      },
+                      {
+                        "icon_url": "https://dumoiojpkizxkzzxdzss.supabase.co/storage/v1/object/sign/vidya-prayag/ic_sri.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9kMWZmYzY2Ni04YTcwLTRmMmItODE3OC00YzBlZGM0YjA2ODIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ2aWR5YS1wcmF5YWcvaWNfc3JpLnBuZyIsImlhdCI6MTc3OTQ4Mzk1NiwiZXhwIjoxODExMDE5OTU2fQ.9sJQ16aDwGJJiR8ryYVBUzDiOUuTtBoTRSqc22A2G1Q",
+                        "heading": "SRI Index",
+                        "description": "Standardized Reliability Index for objective school performance tracking.",
+                        "is_live": true
+                      },
+                      {
+                        "icon_url": "https://dumoiojpkizxkzzxdzss.supabase.co/storage/v1/object/sign/vidya-prayag/ic_pews.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9kMWZmYzY2Ni04YTcwLTRmMmItODE3OC00YzBlZGM0YjA2ODIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ2aWR5YS1wcmF5YWcvaWNfcGV3cy5wbmciLCJpYXQiOjE3Nzk0ODM5NzAsImV4cCI6MTgxMTAxOTk3MH0.fQ7ZrF9JQTWnFM8P8Oq6uAaqK5TTTaLYT3fDvll-2N0",
+                        "heading": "PEWS System",
+                        "description": "Predictive Early Warning System for student safety and academic risk.",
+                        "is_live": true
+                      },
+                      {
+                        "icon_url": "https://dumoiojpkizxkzzxdzss.supabase.co/storage/v1/object/sign/vidya-prayag/ic_intel_graph.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9kMWZmYzY2Ni04YTcwLTRmMmItODE3OC00YzBlZGM0YjA2ODIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ2aWR5YS1wcmF5YWcvaWNfaW50ZWxfZ3JhcGgucG5nIiwiaWF0IjoxNzc5NDgzOTgyLCJleHAiOjE4MTEwMTk5ODJ9.qf4Ty6iKGdJWB9rpSC0RkoRpC0iPoQvYUOSPAYEUJ9Q",
+                        "heading": "Intelligence Graph",
+                        "description": "Mapping student talent and progress across a decade of learning data.",
                         "is_live": true
                       }
                     ]
@@ -70,15 +88,9 @@ object CmsSeed {
                 "list_of_portals" to """
                     [
                       {
-                        "icon_url": "https://cdn.vidyaprayag.com/icons/parent.png",
-                        "heading": "Parent Portal",
-                        "description": "Monitor your child's holistic growth.",
-                        "is_live": true
-                      },
-                      {
-                        "icon_url": "https://cdn.vidyaprayag.com/icons/admin.png",
-                        "heading": "Admin Portal",
-                        "description": "Manage institutional performance and analytics.",
+                        "icon_url": "https://dumoiojpkizxkzzxdzss.supabase.co/storage/v1/object/sign/vidya-prayag/ic_intel_graph.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9kMWZmYzY2Ni04YTcwLTRmMmItODE3OC00YzBlZGM0YjA2ODIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ2aWR5YS1wcmF5YWcvaWNfaW50ZWxfZ3JhcGgucG5nIiwiaWF0IjoxNzc5NDgzOTgyLCJleHAiOjE4MTEwMTk5ODJ9.qf4Ty6iKGdJWB9rpSC0RkoRpC0iPoQvYUOSPAYEUJ9Q",
+                        "heading": "Teacher's Portal",
+                        "description": "Monitor your student's growth.",
                         "is_live": true
                       }
                     ]

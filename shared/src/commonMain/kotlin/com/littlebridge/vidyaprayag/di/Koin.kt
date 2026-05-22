@@ -64,13 +64,19 @@ val commonModule = module {
             }
             
             install(HttpTimeout) {
-                requestTimeoutMillis = 15000
-                connectTimeoutMillis = 15000
-                socketTimeoutMillis = 15000
+                requestTimeoutMillis = 60000
+                connectTimeoutMillis = 60000
+                socketTimeoutMillis = 60000
             }
         }
     }
     single { KtorSchoolApi(get(), AppConfig.schoolBaseUrl) }
+    single { 
+        com.littlebridge.vidyaprayag.feature.content.data.remote.ContentApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
     single { 
         com.littlebridge.vidyaprayag.feature.auth.data.remote.AuthApi(
             client = get(),
@@ -80,6 +86,9 @@ val commonModule = module {
 
     // Repositories
     single<SchoolRepository> { SchoolRepositoryImpl(get(), get()) }
+    single<com.littlebridge.vidyaprayag.feature.content.domain.repository.ContentRepository> { 
+        com.littlebridge.vidyaprayag.feature.content.data.repository.ContentRepositoryImpl(get())
+    }
     single<com.littlebridge.vidyaprayag.feature.auth.domain.repository.AuthRepository> { 
         com.littlebridge.vidyaprayag.feature.auth.data.repository.AuthRepositoryImpl(get()) 
     }
@@ -122,6 +131,7 @@ val viewModelModule = module {
     factory { ClassPerformanceViewModel() }
     factory { SyllabusCoverageViewModel() }
     factory { ResultsViewModel() }
+    factory { com.littlebridge.vidyaprayag.feature.content.presentation.LandingViewModel(get()) }
     factory { com.littlebridge.vidyaprayag.feature.auth.presentation.AuthViewModel(get()) }
 }
 
