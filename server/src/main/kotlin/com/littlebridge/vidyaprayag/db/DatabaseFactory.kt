@@ -97,12 +97,19 @@ object DatabaseFactory {
 
         println("DB_INIT: isPostgres=$isPostgres, AUTO_CREATE_TABLES='$autoCreateRaw' -> $autoCreate")
 
+        // Try to create tables if in SQLite OR if explicitly requested in Postgres
         if (!isPostgres || autoCreate) {
             println("DB_INIT: Running SchemaUtils.createMissingTablesAndColumns for ${allTables.size} tables...")
-            transaction {
-                SchemaUtils.createMissingTablesAndColumns(*allTables)
+            try {
+                transaction {
+                    SchemaUtils.createMissingTablesAndColumns(*allTables)
+                }
+                println("DB_INIT: Schema check/creation completed.")
+            } catch (e: Exception) {
+                System.err.println("DB_INIT_ERROR: Schema creation failed!")
+                e.printStackTrace()
+                // If this fails, we probably can't proceed with seeding either
             }
-            println("DB_INIT: Schema check/creation completed.")
         } else {
             println("DB_INIT: Skipping auto-creation (AUTO_CREATE_TABLES is not 'true').")
         }
@@ -111,21 +118,23 @@ object DatabaseFactory {
         // missing keys; never overwrites operator-edited values.
         val seedCms = (dotenv["APP_SEED_CMS"] ?: System.getenv("APP_SEED_CMS") ?: "true")
             .equals("true", ignoreCase = true)
+        
         if (seedCms) {
             println("DB_INIT: Running CMS seed...")
             try {
+                // We wrap the seed in a check to see if the table exists first to avoid crash loops
                 CmsSeed.ensureLandingAndConfig()
                 println("DB_INIT: CMS seed completed successfully.")
             } catch (e: Exception) {
-                System.err.println("DB_INIT_ERROR: CMS Seeding failed!")
-                e.printStackTrace()
-                if (isPostgres && !autoCreate) {
-                    System.err.println("DB_INIT_TIP: It looks like tables are missing in Postgres.")
-                    System.err.println("DB_INIT_TIP: Please set the environment variable AUTO_CREATE_TABLES=true in Render.")
+                val msg = e.message ?: ""
+                if (msg.contains("relation", ignoreCase = true) && msg.contains("does not exist", ignoreCase = true)) {
+                    System.err.println("DB_INIT_WARNING: CMS Seeding skipped because tables are missing.")
+                    System.err.println("DB_INIT_TIP: Set AUTO_CREATE_TABLES=true on Render to create tables automatically.")
+                } else {
+                    System.err.println("DB_INIT_ERROR: CMS Seeding failed with unexpected error!")
+                    e.printStackTrace()
+                    throw e
                 }
-                // Rethrow to fail fast if seeding is critical, or just let it be.
-                // Given the crash logs, we'll rethrow to keep behavior consistent but with better logs.
-                throw e
             }
         }
     }
