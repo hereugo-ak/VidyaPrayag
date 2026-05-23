@@ -45,10 +45,10 @@ fun AuthBottomSheet(
     val state by viewModel.state.collectAsState()
     val navigator = LocalAppNavigator.current
 
-    /*
     LaunchedEffect(state.isAuthSuccessful) {
         if (state.isAuthSuccessful) {
             onDismissRequest()
+            mainViewModel.setRole(state.role)
             if (state.role == "ADMIN") {
                 navigator.navigateTo(Destination.SchoolDashboard)
             } else {
@@ -56,7 +56,6 @@ fun AuthBottomSheet(
             }
         }
     }
-    */
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
@@ -146,15 +145,7 @@ fun AuthBottomSheet(
                         role = state.role,
                         onRoleChange = viewModel::onRoleChanged,
                         isLoading = state.isLoading,
-                        onContinue = {
-                            onDismissRequest()
-                            mainViewModel.setRole(state.role)
-                            if (state.role == "ADMIN") {
-                                navigator.navigateTo(Destination.SchoolDashboard)
-                            } else {
-                                navigator.navigateTo(Destination.ParentDashboard)
-                            }
-                        }
+                        onContinue = viewModel::onContinue
                     )
                     AuthStep.LoginPassword -> LoginPasswordSection(
                         password = state.password,

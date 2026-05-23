@@ -69,7 +69,7 @@ class AuthViewModel(
                         )
                     }
                     if (flow == AuthFlow.LOGIN_PHONE || flow == AuthFlow.SIGNUP_PHONE) {
-                        repository.sendOtp(currentState.identifier)
+                        repository.sendOtp(currentState.identifier, if (flow == AuthFlow.LOGIN_PHONE) "login" else "signup")
                     }
                 }
                 is NetworkResult.Error -> {
@@ -92,7 +92,7 @@ class AuthViewModel(
             val result = when (currentState.step) {
                 AuthStep.LoginPassword -> {
                     repository.login(LoginRequest(
-                        contact = currentState.identifier,
+                        identifier = currentState.identifier,
                         password = currentState.password,
                         role = currentState.role
                     ))
@@ -104,7 +104,7 @@ class AuthViewModel(
                     }
                     repository.signup(SignupRequest(
                         name = currentState.name,
-                        contact = currentState.identifier,
+                        identifier = currentState.identifier,
                         password = currentState.password,
                         role = currentState.role
                     ))
@@ -118,12 +118,13 @@ class AuthViewModel(
                     if (currentState.flow == AuthFlow.SIGNUP_PHONE) {
                         repository.signup(SignupRequest(
                             name = currentState.name,
-                            contact = currentState.identifier,
+                            identifier = currentState.identifier,
+                            otp = currentState.otp,
                             role = currentState.role
                         ))
                     } else {
                         repository.login(LoginRequest(
-                            contact = currentState.identifier,
+                            identifier = currentState.identifier,
                             otp = currentState.otp,
                             role = currentState.role
                         ))

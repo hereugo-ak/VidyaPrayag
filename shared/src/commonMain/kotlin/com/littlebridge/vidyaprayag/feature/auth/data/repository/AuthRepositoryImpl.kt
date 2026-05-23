@@ -12,7 +12,17 @@ class AuthRepositoryImpl(
 
     override suspend fun checkUser(identifier: String): NetworkResult<AuthFlow> {
         return when (val result = api.checkUser(identifier)) {
-            is NetworkResult.Success -> NetworkResult.Success(result.data.flow)
+            is NetworkResult.Success -> {
+                val data = result.data.data ?: return NetworkResult.Error("No data in response")
+                val isEmail = identifier.contains("@")
+                val flow = when {
+                    isEmail && data.isNewUser -> AuthFlow.SIGNUP_EMAIL
+                    isEmail && !data.isNewUser -> AuthFlow.LOGIN_EMAIL
+                    !isEmail && data.isNewUser -> AuthFlow.SIGNUP_PHONE
+                    else -> AuthFlow.LOGIN_PHONE
+                }
+                NetworkResult.Success(flow)
+            }
             is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)
             is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
         }
@@ -21,8 +31,9 @@ class AuthRepositoryImpl(
     override suspend fun signup(request: SignupRequest): NetworkResult<AuthResponse> {
         return when (val result = api.signup(request)) {
             is NetworkResult.Success -> {
-                saveSession(result.data)
-                NetworkResult.Success(result.data)
+                val data = result.data.data ?: return NetworkResult.Error("No data in response")
+                saveSession(data)
+                NetworkResult.Success(data)
             }
             is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)
             is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
@@ -32,17 +43,26 @@ class AuthRepositoryImpl(
     override suspend fun login(request: LoginRequest): NetworkResult<AuthResponse> {
         return when (val result = api.login(request)) {
             is NetworkResult.Success -> {
-                saveSession(result.data)
-                NetworkResult.Success(result.data)
+                val data = result.data.data ?: return NetworkResult.Error("No data in response")
+                saveSession(data)
+                NetworkResult.Success(data)
             }
             is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)
             is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
         }
     }
 
-    override suspend fun sendOtp(contact: String): NetworkResult<String> {
-        return when (val result = api.sendOtp(contact)) {
-            is NetworkResult.Success -> NetworkResult.Success(result.data.message)
+    override suspend fun sendOtp(identifier: String, purpose: String?): NetworkResult<String> {
+        return when (val result = api.sendOtp(identifier, purpose)) {
+            is NetworkResult.Success -> NetworkResult.Success(result.data.data?.message ?: result.data.message)
+            is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)
+            is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
+        }
+    }
+
+    override suspend fun verifyOtp(identifier: String, code: String, purpose: String?): NetworkResult<Boolean> {
+        return when (val result = api.verifyOtp(identifier, code, purpose)) {
+            is NetworkResult.Success -> NetworkResult.Success(result.data.success)
             is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)
             is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
         }
