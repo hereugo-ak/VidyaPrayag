@@ -215,13 +215,21 @@ fun Route.authRouting() {
             val ip = call.request.origin.remoteHost
             val ua = call.request.headers["User-Agent"]
             val purpose = req.purpose ?: "login"
+            // Honour Accept-Language header so the OTP body is in the user's
+            // language when the provider supports it (Fast2SMS DLT / WA / SMTP).
+            // We only need the primary subtag; "hi-IN,en;q=0.5" → "hi".
+            val locale = call.request.headers["Accept-Language"]
+                ?.substringBefore(',')?.substringBefore('-')?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?: "en"
 
             val result = OtpService.send(
                 identifier = id,
                 purpose = purpose,
                 ipAddress = ip,
                 userAgent = ua,
-                deviceId = req.deviceId
+                deviceId = req.deviceId,
+                locale = locale,
             )
             when (result) {
                 is OtpSendResult.Sent -> call.ok(

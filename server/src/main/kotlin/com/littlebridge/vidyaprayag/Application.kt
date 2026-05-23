@@ -40,6 +40,7 @@ import com.littlebridge.vidyaprayag.db.DatabaseFactory
 import com.littlebridge.vidyaprayag.feature.admissions.admissionRouting
 import com.littlebridge.vidyaprayag.feature.announcements.announcementRouting
 import com.littlebridge.vidyaprayag.feature.auth.authRouting
+import com.littlebridge.vidyaprayag.feature.auth.otpAdminRouting
 import com.littlebridge.vidyaprayag.feature.config.appStatusRouting
 import com.littlebridge.vidyaprayag.feature.content.landingRouting
 import com.littlebridge.vidyaprayag.feature.onboarding.onboardingRouting

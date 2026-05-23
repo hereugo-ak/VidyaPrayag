@@ -96,6 +96,34 @@ object AuthOtpsTable : UUIDTable("auth_otps", "id") {
 }
 
 // =====================================================================
+// otp_delivery_attempts
+//   FULL audit trail of every provider attempt during a single OTP send.
+//   `auth_otps` only tracks the WINNING provider; this table records the
+//   entire chain (sent / failed / skipped) so we can:
+//     • debug delivery problems per-vendor
+//     • compute per-provider success rate / latency dashboards
+//     • prove DLT compliance during a TRAI audit
+//
+//   Rows are short-lived — purged ~7 days after the parent OTP expires.
+//   See `01_supplementary_schema.sql` SECTION 2b for the SQL definition.
+// =====================================================================
+object OtpDeliveryAttemptsTable : UUIDTable("otp_delivery_attempts", "id") {
+    val otpId             = uuid("otp_id").nullable()       // FK auth_otps.id (nullable so we don't crash if parent already purged)
+    val identifier        = text("identifier")               // copied for forensics (parent may be gone)
+    val purpose           = varchar("purpose", 24)
+    val attemptIndex      = integer("attempt_index")         // 0 = first provider tried
+    val providerName      = varchar("provider_name", 64)     // "fast2sms" / "msg91" / ...
+    val channel           = varchar("channel", 16)           // "sms" / "whatsapp" / "email" / "voice" / "console"
+    val status            = varchar("status", 16)            // "sent" / "failed" / "skipped"
+    val providerMessageId = text("provider_message_id").nullable()
+    val httpStatus        = integer("http_status").nullable()
+    val latencyMs         = integer("latency_ms").default(0)
+    val reason            = text("reason").nullable()
+    val rawResponse       = text("raw_response").nullable()
+    val createdAt         = timestamp("created_at")
+}
+
+// =====================================================================
 // user_sessions  (rotating refresh-token store)
 // =====================================================================
 object UserSessionsTable : UUIDTable("user_sessions", "id") {
