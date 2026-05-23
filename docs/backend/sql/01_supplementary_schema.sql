@@ -205,6 +205,93 @@ $$;
 
 
 -- =============================================================================
+-- SECTION 2b — otp_delivery_attempts  (full forensic trail)
+--
+-- WHY THIS EXISTS
+-- ---------------
+-- `auth_otps` only records the WINNING provider for one OTP.  But when an
+-- OTP fails to arrive, support / ops need to know exactly which providers
+-- were tried, in what order, what each one returned, and how slow they
+-- were.  Without this table the only forensic source is stdout logs,
+-- which Render free tier truncates after a few hours.
+--
+-- HOW IT'S USED
+-- -------------
+-- The Ktor backend (OtpService.persistDeliveryAttempts) writes ONE row
+-- per provider attempt during a single /send-otp call:
+--
+--   identifier=+919876XXXX, purpose=login →
+--     row 0:  fast2sms     sms        sent       latency=512ms  msg_id=abc
+--   (chain stopped — first Sent wins)
+--
+-- Or on a multi-failure:
+--
+--   row 0:  whatsapp_cloud whatsapp   skipped    "not configured"
+--   row 1:  fast2sms       sms        failed     http=401  "invalid key"
+--   row 2:  msg91          sms        failed     http=500
+--   row 3:  twilio         sms        sent       latency=812ms
+--
+-- ADMIN ACCESS
+--   GET /api/v1/admin/otp/attempts?identifier=...  (gated by OTP_ADMIN_TOKEN)
+--
+-- RETENTION
+--   Rows are kept 7 days then purged by `purge_old_delivery_attempts()`
+--   below.  Run it from pg_cron OR let the Ktor backend call it
+--   opportunistically on every Nth send.  Default keeps the table small
+--   on Render free Postgres (500 MB limit).
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS otp_delivery_attempts (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  -- Soft-link to auth_otps. Nullable because the parent row may already
+  -- have been purged by the time we look at this audit row, and we still
+  -- want forensic value out of orphan rows.
+  otp_id              UUID,
+
+  identifier          TEXT NOT NULL,                  -- snapshot for forensics
+  purpose             TEXT NOT NULL DEFAULT 'login',
+
+  attempt_index       INTEGER NOT NULL DEFAULT 0,     -- 0 = first provider tried
+  provider_name       TEXT NOT NULL,                  -- 'fast2sms' | 'msg91' | ...
+  channel             TEXT NOT NULL                   -- 'sms' | 'whatsapp' | 'email' | 'voice' | 'console'
+                      CHECK (channel IN ('sms','whatsapp','email','voice','console')),
+  status              TEXT NOT NULL                   -- 'sent' | 'failed' | 'skipped'
+                      CHECK (status  IN ('sent','failed','skipped')),
+
+  provider_message_id TEXT,                            -- vendor-side id (Twilio SID, MSG91 request_id, ...)
+  http_status         INTEGER,                         -- upstream HTTP code
+  latency_ms          INTEGER NOT NULL DEFAULT 0,
+  reason              TEXT,                            -- failure / skip reason
+  raw_response        TEXT,                            -- 240-char trimmed body
+
+  created_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_oda_identifier_created
+  ON otp_delivery_attempts (identifier, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_oda_otp_id
+  ON otp_delivery_attempts (otp_id) WHERE otp_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_oda_provider
+  ON otp_delivery_attempts (provider_name, status, created_at DESC);
+
+-- ---- Retention helper. Keep 7 days of audit data; tune via the WHERE.
+CREATE OR REPLACE FUNCTION purge_old_delivery_attempts()
+RETURNS INTEGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_deleted INTEGER;
+BEGIN
+  DELETE FROM otp_delivery_attempts
+   WHERE created_at < NOW() - INTERVAL '7 days';
+  GET DIAGNOSTICS v_deleted = ROW_COUNT;
+  RETURN v_deleted;
+END;
+$$;
+
+
+-- =============================================================================
 -- SECTION 3 — user_sessions  (rotating refresh tokens)
 -- =============================================================================
 
@@ -496,6 +583,7 @@ CREATE INDEX IF NOT EXISTS idx_att_school_date ON attendance_records (school_id,
 
 ALTER TABLE app_users               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auth_otps               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE otp_delivery_attempts   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_sessions           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cms_landing_content     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app_config              ENABLE ROW LEVEL SECURITY;
@@ -538,7 +626,19 @@ CREATE POLICY "anon reads app_config" ON app_config FOR SELECT USING (TRUE);
 --   $$ SELECT purge_expired_otps(); $$
 -- );
 
+-- Audit retention — keep otp_delivery_attempts at 7 days max.
+-- SELECT cron.schedule(
+--   'vp_purge_old_delivery_attempts',
+--   '17 3 * * *',                              -- 03:17 UTC daily
+--   $$ SELECT purge_old_delivery_attempts(); $$
+-- );
+
 
 -- =============================================================================
--- DONE — supplementary schema v1.0 loaded.
+-- DONE — supplementary schema v1.1 loaded.
+--
+-- CHANGELOG
+--   v1.1  (2026-05-24) — adds otp_delivery_attempts (audit table) +
+--                       purge_old_delivery_attempts() helper for ops use.
+--   v1.0  (initial)    — app_users, auth_otps, user_sessions, CMS, …
 -- =============================================================================
