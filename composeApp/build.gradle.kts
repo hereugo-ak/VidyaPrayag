@@ -96,8 +96,8 @@ android {
     productFlavors {
         create("dev") {
             dimension = "environment"
-            buildConfigField("String", "AUTH_BASE_URL", "\"http://192.168.1.9:8080\"")
-            buildConfigField("String", "SCHOOL_BASE_URL", "\"http://192.168.1.9:8080\"")
+            buildConfigField("String", "AUTH_BASE_URL", "\"https://vidyaprayag-1.onrender.com\"")
+            buildConfigField("String", "SCHOOL_BASE_URL", "\"https://vidyaprayag-1.onrender.com\"")
         }
         create("staging") {
             dimension = "environment"

@@ -109,6 +109,18 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.AnnouncementsApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.PtmApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
 
     // Repositories
     single<SchoolRepository> { SchoolRepositoryImpl(get(), get()) }
@@ -129,6 +141,12 @@ val commonModule = module {
     }
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.MessagesRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.MessagesRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AnnouncementsRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.AnnouncementsRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.PtmRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.PtmRepositoryImpl(get())
     }
 
     // UseCases
@@ -157,9 +175,9 @@ val viewModelModule = module {
     factory { LaunchInfoOBViewModel(get(), get()) }
     factory { InstitutionalProfileViewModel() }
     factory { AdmissionCRMViewModel(get(), get()) }
-    factory { SchoolAnnouncementsViewModel() }
+    factory { SchoolAnnouncementsViewModel(get(), get()) }
     factory { MessagesViewModel(get(), get()) }
-    factory { SchedulePTMViewModel() }
+    factory { SchedulePTMViewModel(get(), get()) }
     factory { AcademicCalendarViewModel() }
     factory { LeaveRequestsViewModel() }
     factory { DailyAttendanceViewModel() }
