@@ -103,6 +103,12 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.MessagesApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
 
     // Repositories
     single<SchoolRepository> { SchoolRepositoryImpl(get(), get()) }
@@ -120,6 +126,9 @@ val commonModule = module {
     }
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AdmissionRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.AdmissionRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.MessagesRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.MessagesRepositoryImpl(get())
     }
 
     // UseCases
@@ -149,7 +158,7 @@ val viewModelModule = module {
     factory { InstitutionalProfileViewModel() }
     factory { AdmissionCRMViewModel(get(), get()) }
     factory { SchoolAnnouncementsViewModel() }
-    factory { MessagesViewModel() }
+    factory { MessagesViewModel(get(), get()) }
     factory { SchedulePTMViewModel() }
     factory { AcademicCalendarViewModel() }
     factory { LeaveRequestsViewModel() }

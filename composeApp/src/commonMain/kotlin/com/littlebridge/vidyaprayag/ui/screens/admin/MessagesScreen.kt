@@ -22,7 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import com.littlebridge.vidyaprayag.feature.admin.presentation.MessageThread
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.MessageThread
 import com.littlebridge.vidyaprayag.feature.admin.presentation.MessagesViewModel
 import com.littlebridge.vidyaprayag.ui.components.*
 import org.koin.compose.viewmodel.koinViewModel
@@ -32,6 +32,11 @@ import org.koin.compose.viewmodel.koinViewModel
 fun MessagesScreen() {
     val viewModel: MessagesViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+
+    // Re-sync on screen entry, matching SchoolDashboard / AdmissionCRM.
+    LaunchedEffect(Unit) { viewModel.refresh() }
 
     BaseScreen(
         bottomBar = {
@@ -47,18 +52,28 @@ fun MessagesScreen() {
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             item {
-                MessagesHeader()
+                MessagesHeader(isLoading = isLoading, onRefresh = { viewModel.refresh() })
+            }
+
+            errorMessage?.let { msg ->
+                item {
+                    MessagesErrorBanner(message = msg, onDismiss = { viewModel.clearError() })
+                }
             }
 
             item {
                 SearchAndActions()
             }
 
-            items(state.threads) { thread ->
-                MessageThreadItem(
-                    thread = thread,
-                    onClick = { viewModel.markAsRead(thread.id) }
-                )
+            if (state.threads.isEmpty() && !isLoading) {
+                item { EmptyMessagesCard() }
+            } else {
+                items(state.threads, key = { it.id }) { thread ->
+                    MessageThreadItem(
+                        thread = thread,
+                        onClick = { viewModel.markAsRead(thread.id) }
+                    )
+                }
             }
 
             item {
@@ -69,19 +84,93 @@ fun MessagesScreen() {
 }
 
 @Composable
-private fun MessagesHeader() {
+private fun MessagesHeader(isLoading: Boolean, onRefresh: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            "Direct Messaging",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Direct Messaging",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            } else {
+                IconButton(onClick = onRefresh) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                }
+            }
+        }
         Text(
             "Communicate with staff and departments",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+@Composable
+private fun MessagesErrorBanner(message: String, onDismiss: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.errorContainer,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                Icons.Default.ErrorOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer
+            )
+            Text(
+                message,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            TextButton(onClick = onDismiss) {
+                Text("DISMISS", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyMessagesCard() {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                Icons.Default.Inbox,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                "No messages yet",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                "Conversations from staff and departments will appear here.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
