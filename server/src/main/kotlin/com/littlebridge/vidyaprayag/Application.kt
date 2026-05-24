@@ -45,6 +45,7 @@ import com.littlebridge.vidyaprayag.feature.config.appStatusRouting
 import com.littlebridge.vidyaprayag.feature.content.landingRouting
 import com.littlebridge.vidyaprayag.feature.onboarding.onboardingRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRouting
+import com.littlebridge.vidyaprayag.feature.user.parentRouting
 import com.littlebridge.vidyaprayag.feature.user.userDetailsRouting
 import com.littlebridge.vidyaprayag.feature.user.userProfileRouting
 import io.ktor.http.*
@@ -120,6 +121,7 @@ fun Application.module() {
         // Authenticated
         userDetailsRouting()
         userProfileRouting()
+        parentRouting()
         onboardingRouting()
         announcementRouting()
         admissionRouting()

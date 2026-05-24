@@ -1,9 +1,15 @@
 package com.littlebridge.vidyaprayag.feature.parent.presentation
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.littlebridge.vidyaprayag.core.network.NetworkResult
+import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.feature.parent.domain.repository.ParentRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class FeeAnnouncement(
     val id: String,
@@ -16,18 +22,56 @@ data class FeeAnnouncement(
 )
 
 data class FeeState(
-    val totalCollected: String = "$428,500",
-    val collectionProgress: Float = 0.85f,
-    val outstandingFees: String = "$72,120",
-    val overdueCount: Int = 145,
-    val announcements: List<FeeAnnouncement> = listOf(
-        FeeAnnouncement("1", "Annual Sports Day Schedule", "2h ago", "Detailed itinerary for the upcoming Sports Day has been released. Please review the volunteer assignments.", "94%", "24", "Campaign"),
-        FeeAnnouncement("2", "Weather Alert: Early Closure", "5h ago", "Due to anticipated heavy snowfall, the campus will close at 2:00 PM today. School buses will depart early.", "98%", "812", "Emergency"),
-        FeeAnnouncement("3", "Fee Submission Deadline", "Yesterday", "Final reminder for Q3 tuition fee submission. Late fees will apply starting next Monday.", "62%", "3", "Payment")
-    )
+    val totalCollected: String = "$0",
+    val collectionProgress: Float = 0f,
+    val outstandingFees: String = "$0",
+    val overdueCount: Int = 0,
+    val announcements: List<FeeAnnouncement> = emptyList(),
+    val isLoading: Boolean = false,
+    val error: String? = null
 )
 
-class FeeViewModel : ViewModel() {
+class FeeViewModel(
+    private val repository: ParentRepository,
+    private val preferenceRepository: PreferenceRepository
+) : ViewModel() {
     private val _state = MutableStateFlow(FeeState())
     val state: StateFlow<FeeState> = _state.asStateFlow()
+
+    init {
+        loadFees()
+    }
+
+    private fun loadFees() {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null) }
+            preferenceRepository.getUserToken().collect { token ->
+                if (token != null) {
+                    when (val result = repository.getFees(token)) {
+                        is NetworkResult.Success -> {
+                            val data = result.data.data
+                            _state.update {
+                                it.copy(
+                                    isLoading = false,
+                                    totalCollected = data.totalCollected,
+                                    collectionProgress = data.collectionProgress,
+                                    outstandingFees = data.outstandingFees,
+                                    overdueCount = data.overdueCount,
+                                    announcements = data.announcements.map { a ->
+                                        FeeAnnouncement(a.id, a.title, a.time, a.description, a.openRate, a.engagement, a.type)
+                                    }
+                                )
+                            }
+                        }
+                        is NetworkResult.Error -> {
+                            _state.update { it.copy(isLoading = false, error = result.message) }
+                        }
+                        is NetworkResult.ConnectionError -> {
+                            _state.update { it.copy(isLoading = false, error = "Connection error") }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

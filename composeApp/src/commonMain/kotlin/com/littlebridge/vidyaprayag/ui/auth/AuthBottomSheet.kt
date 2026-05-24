@@ -50,9 +50,9 @@ fun AuthBottomSheet(
             onDismissRequest()
             mainViewModel.setRole(state.role)
             if (state.role == "ADMIN") {
-                navigator.navigateTo(Destination.SchoolDashboard)
+                navigator.navigateToAndClear(Destination.SchoolDashboard)
             } else {
-                navigator.navigateTo(Destination.ParentDashboard)
+                navigator.navigateToAndClear(Destination.ParentDashboard)
             }
         }
     }

@@ -7,6 +7,7 @@ import androidx.navigation.NavHostController
 
 interface AppNavigator {
     fun navigateTo(destination: Destination)
+    fun navigateToAndClear(destination: Destination)
     fun goBack()
 }
 
@@ -15,6 +16,12 @@ class ComposeAppNavigator(
 ) : AppNavigator {
     override fun navigateTo(destination: Destination) {
         navController.navigate(destination)
+    }
+
+    override fun navigateToAndClear(destination: Destination) {
+        navController.navigate(destination) {
+            popUpTo(0) { inclusive = true }
+        }
     }
 
     override fun goBack() {
