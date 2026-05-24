@@ -121,6 +121,24 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.CalendarApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.AttendanceApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.LeaveRequestsApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
 
     // Repositories
     single<SchoolRepository> { SchoolRepositoryImpl(get(), get()) }
@@ -147,6 +165,15 @@ val commonModule = module {
     }
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.PtmRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.PtmRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.CalendarRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.CalendarRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AttendanceRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.AttendanceRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.LeaveRequestsRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.LeaveRequestsRepositoryImpl(get())
     }
 
     // UseCases
@@ -178,9 +205,9 @@ val viewModelModule = module {
     factory { SchoolAnnouncementsViewModel(get(), get()) }
     factory { MessagesViewModel(get(), get()) }
     factory { SchedulePTMViewModel(get(), get()) }
-    factory { AcademicCalendarViewModel() }
-    factory { LeaveRequestsViewModel() }
-    factory { DailyAttendanceViewModel() }
+    factory { AcademicCalendarViewModel(get(), get()) }
+    factory { LeaveRequestsViewModel(get(), get()) }
+    factory { DailyAttendanceViewModel(get(), get()) }
     factory { AnalyticsDashboardViewModel() }
     factory { StudentAnalyticsViewModel() }
     factory { TeacherPerformanceViewModel() }
