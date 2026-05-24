@@ -45,6 +45,33 @@ dependencies {
     implementation("io.ktor:ktor-server-auth-jwt:3.4.3")
     implementation("io.ktor:ktor-server-call-logging:3.4.3")
 
+    // -----------------------------------------------------------------
+    // Ktor HTTP CLIENT — used by the OTP delivery layer (Fast2SMS, MSG91,
+    // Twilio, WhatsApp Cloud API, generic webhook). Kept on the server
+    // module only; the mobile/web apps have their own client config in
+    // :shared.
+    //
+    // CIO engine is chosen because it's pure-Kotlin/JVM (no JNI native
+    // libs) and works identically on Railway / Render / Fly.io / bare-metal
+    // without any platform-specific dance. It's also the lightest engine
+    // — adds ~2 MB to the fat jar.
+    // -----------------------------------------------------------------
+    implementation("io.ktor:ktor-client-core:3.4.3")
+    implementation("io.ktor:ktor-client-cio:3.4.3")
+    implementation("io.ktor:ktor-client-content-negotiation:3.4.3")
+    implementation("io.ktor:ktor-client-logging:3.4.3")
+    implementation("io.ktor:ktor-client-auth:3.4.3")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.4.3")
+
+    // -----------------------------------------------------------------
+    // Jakarta Mail (formerly JavaMail) — pure-Java SMTP client used by
+    // the SMTP email OTP provider. Works against any RFC-compliant
+    // server: Gmail, Resend, SES, Mailgun, Postmark, Brevo (Sendinblue),
+    // your own Postfix, etc. Zero hardcoding — host/port/credentials
+    // all come from env vars.
+    // -----------------------------------------------------------------
+    implementation("org.eclipse.angus:jakarta.mail:2.0.3")
+
     // Database
     implementation(libs.exposed.core)
     implementation(libs.exposed.dao)

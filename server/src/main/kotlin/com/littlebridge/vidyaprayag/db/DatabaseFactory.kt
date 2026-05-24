@@ -44,6 +44,7 @@ object DatabaseFactory {
     private val allTables = arrayOf(
         AppUsersTable,
         AuthOtpsTable,
+        OtpDeliveryAttemptsTable,
         UserSessionsTable,
         LandingContentTable,
         AppConfigTable,

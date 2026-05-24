@@ -62,6 +62,7 @@ package com.littlebridge.vidyaprayag.feature.auth
 
 import com.littlebridge.vidyaprayag.db.AuthOtpsTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
+import com.littlebridge.vidyaprayag.db.OtpDeliveryAttemptsTable
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.and
@@ -70,6 +71,7 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
+import org.slf4j.LoggerFactory
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Instant
@@ -103,6 +105,8 @@ sealed class OtpVerifyResult {
 // =================================================================
 object OtpService {
 
+    private val log = LoggerFactory.getLogger("OtpService")
+
     private fun env(name: String, default: String): String =
         System.getenv(name)?.takeIf { it.isNotBlank() } ?: default
 
@@ -133,7 +137,8 @@ object OtpService {
         ipAddress: String? = null,
         userAgent: String? = null,
         deviceId: String? = null,
-        identifierType: String = if (identifier.contains("@")) "email" else "phone"
+        identifierType: String = if (identifier.contains("@")) "email" else "phone",
+        locale: String = "en",
     ): OtpSendResult {
 
         // Purge stale rows opportunistically (cheap; <1ms in steady state).
@@ -213,16 +218,43 @@ object OtpService {
             }
         }
 
-        // Deliver. Today: mock (print to server stdout). Drop in real SMS
-        // provider behind OtpDeliveryProvider when ready.
+        // Deliver via the multi-provider chain (WhatsApp Cloud → Fast2SMS →
+        // MSG91 → Twilio → SMTP → Console).  The dispatcher picks the
+        // cheapest configured provider that supports this identifier type.
         val delivered = OtpDeliveryProvider.deliver(
             identifier = identifier,
             identifierType = identifierType,
             code = code,
-            purpose = purpose
+            purpose = purpose,
+            locale = locale,
+            ttlMinutes = expiryMinutes,
         )
 
-        if (!delivered.ok) {
+        // Persist the FULL attempt log (every provider tried) for forensics
+        // and per-vendor success-rate dashboards.  We do this regardless of
+        // outcome so we have a paper trail even if every provider failed.
+        persistDeliveryAttempts(identifier, purpose, delivered.attempts)
+
+        // If at least one provider succeeded, update the auth_otps row with
+        // the WINNING provider's metadata so /verify-otp and admin tooling
+        // can surface "delivered by Fast2SMS, ref id #abc" if support asks.
+        if (delivered.ok) {
+            val now = Instant.now()
+            dbQuery {
+                AuthOtpsTable.update({
+                    (AuthOtpsTable.identifier eq identifier) and (AuthOtpsTable.purpose eq purpose)
+                }) {
+                    it[deliveryChannel] = delivered.channelWire
+                    it[deliveryProvider] = delivered.providerName
+                    it[providerMessageId] = delivered.providerMessageId
+                    it[updatedAt] = now
+                }
+            }
+        } else {
+            log.warn(
+                "[OtpService] delivery failed identifier-type={} purpose={} reason={}",
+                identifierType, purpose, delivered.reason,
+            )
             return OtpSendResult.DeliveryFailed(delivered.reason ?: "unknown")
         }
 
@@ -237,6 +269,58 @@ object OtpService {
             resendCount = resendsNow,
             devCode = if (devReturnCode) code else null
         )
+    }
+
+    /**
+     * Write one row per provider attempt to `otp_delivery_attempts`.
+     *
+     * We do best-effort: a failure to write the audit row MUST NOT break
+     * the user's OTP flow.  Audit is observability, not user-critical.
+     */
+    private suspend fun persistDeliveryAttempts(
+        identifier: String,
+        purpose: String,
+        attempts: List<DeliveryAttemptRecord>,
+    ) {
+        if (attempts.isEmpty()) return
+        val now = Instant.now()
+        // Best-effort fetch of the parent otp_id; ignore if not found
+        // (could be a race with purge).
+        val otpId: UUID? = runCatching {
+            dbQuery {
+                AuthOtpsTable.selectAll()
+                    .where { (AuthOtpsTable.identifier eq identifier) and (AuthOtpsTable.purpose eq purpose) }
+                    .singleOrNull()
+                    ?.get(AuthOtpsTable.id)?.value
+            }
+        }.getOrNull()
+
+        runCatching {
+            dbQuery {
+                attempts.forEachIndexed { idx, a ->
+                    OtpDeliveryAttemptsTable.insert {
+                        it[OtpDeliveryAttemptsTable.otpId] = otpId
+                        it[OtpDeliveryAttemptsTable.identifier] = identifier
+                        it[OtpDeliveryAttemptsTable.purpose] = purpose
+                        it[attemptIndex] = idx
+                        it[providerName] = a.providerName
+                        it[channel] = a.channelWire
+                        it[status] = a.status
+                        it[providerMessageId] = a.providerMessageId
+                        it[httpStatus] = a.httpStatus
+                        it[latencyMs] = a.latencyMillis.toInt().coerceAtLeast(0)
+                        it[reason] = a.reason
+                        it[rawResponse] = a.rawResponseSummary
+                        it[createdAt] = now
+                    }
+                }
+            }
+        }.onFailure {
+            log.warn(
+                "[OtpService] failed to persist {} delivery attempts: {}",
+                attempts.size, it.javaClass.simpleName,
+            )
+        }
     }
 
     // --------------------------------------------------------------

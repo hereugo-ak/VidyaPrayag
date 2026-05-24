@@ -40,6 +40,7 @@ import com.littlebridge.vidyaprayag.db.DatabaseFactory
 import com.littlebridge.vidyaprayag.feature.admissions.admissionRouting
 import com.littlebridge.vidyaprayag.feature.announcements.announcementRouting
 import com.littlebridge.vidyaprayag.feature.auth.authRouting
+import com.littlebridge.vidyaprayag.feature.auth.otpAdminRouting
 import com.littlebridge.vidyaprayag.feature.config.appStatusRouting
 import com.littlebridge.vidyaprayag.feature.content.landingRouting
 import com.littlebridge.vidyaprayag.feature.onboarding.onboardingRouting
@@ -109,6 +110,12 @@ fun Application.module() {
         landingRouting()
         appStatusRouting()
         authRouting()
+
+        // Ops-only — entire route group is unmounted (404) unless
+        // OTP_ADMIN_TOKEN env var is set. See feature/auth/OtpAdminRouting.kt.
+        // Safe to leave wired up on Render free tier — no overhead when
+        // the token env is empty.
+        otpAdminRouting()
 
         // Authenticated
         userDetailsRouting()
