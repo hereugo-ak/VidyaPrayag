@@ -1,9 +1,24 @@
 package com.littlebridge.vidyaprayag.feature.admin.presentation
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.littlebridge.vidyaprayag.core.network.NetworkResult
+import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.feature.admin.domain.repository.AnalyticsRepository
+import com.littlebridge.vidyaprayag.util.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 data class DepartmentProgress(
     val name: String,
@@ -31,24 +46,120 @@ data class AcademicMilestone(
 )
 
 data class SyllabusCoverageState(
-    val departmentStats: List<Float> = listOf(0.82f, 0.65f, 0.92f, 0.40f, 0.70f),
-    val departmentProgress: List<DepartmentProgress> = listOf(
-        DepartmentProgress("Science Dept", 0.75f, "+5% from last week"),
-        DepartmentProgress("Mathematics", 0.90f, "On Target"),
-        DepartmentProgress("Humanities", 0.42f, "Delayed Entry", isDelayed = true),
-        DepartmentProgress("Fine Arts", 0.60f, "Steady Growth")
-    ),
-    val alerts: List<LaggingAlert> = listOf(
-        LaggingAlert("1", "Chemistry", "Grade 10-B", 14, "Dr. Miller", isCritical = true),
-        LaggingAlert("2", "World History", "Grade 8-C", 8, "Sarah J.")
-    ),
-    val milestones: List<AcademicMilestone> = listOf(
-        AcademicMilestone("1", "Oct", "12", "Mid-Term Syllabus Verification", "Department heads to submit progress audits for Q2.", isVerified = true),
-        AcademicMilestone("2", "Oct", "28", "Practical Assessment Window", "Science labs opening for senior grade assessments.")
-    )
+    val departmentStats: List<Float> = emptyList(),
+    val departmentProgress: List<DepartmentProgress> = emptyList(),
+    val alerts: List<LaggingAlert> = emptyList(),
+    val milestones: List<AcademicMilestone> = emptyList(),
+    val overallPercentage: Int = 0,
+    val overallTrend: String = "",
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
 )
 
-class SyllabusCoverageViewModel : ViewModel() {
+class SyllabusCoverageViewModel(
+    private val analyticsRepository: AnalyticsRepository,
+    private val preferenceRepository: PreferenceRepository
+) : ViewModel() {
+
     private val _state = MutableStateFlow(SyllabusCoverageState())
     val state: StateFlow<SyllabusCoverageState> = _state.asStateFlow()
+
+    init { load() }
+
+    fun load() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isLoading = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isLoading = false); return@launch
+            }
+            when (val result = analyticsRepository.getSyllabusCoverage(token)) {
+                is NetworkResult.Success -> {
+                    _state.value = parseSyllabus(result.data.data).copy(isLoading = false)
+                }
+                is NetworkResult.Error -> {
+                    AppLogger.e("SyllabusCoverageVM", "getSyllabusCoverage error: ${result.message}")
+                    _state.value = _state.value.copy(isLoading = false, errorMessage = result.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    AppLogger.e("SyllabusCoverageVM", "getSyllabusCoverage connection error")
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        errorMessage = "Connection error. Check your internet."
+                    )
+                }
+            }
+        }
+    }
+
+    private fun parseSyllabus(element: JsonElement?): SyllabusCoverageState {
+        val obj = (element as? JsonObject) ?: return SyllabusCoverageState()
+        return try {
+            val overall = obj["overall"] as? JsonObject
+            val bySubject = (obj["by_subject"] as? JsonArray) ?: JsonArray(emptyList())
+
+            // departmentStats: just the % normalized to 0..1, in subject order.
+            val stats = bySubject.mapNotNull { it.jsonObject["percentage"]?.jsonPrimitive?.intOrNull }
+                .map { it.coerceIn(0, 100) / 100f }
+
+            // departmentProgress: 1:1 with by_subject, semantic trend / delay
+            // derived from behind_by_days when no explicit `trend` field is set.
+            val progress = bySubject.mapNotNull { el ->
+                runCatching {
+                    val o = el.jsonObject
+                    val name = o["name"]?.jsonPrimitive?.contentOrNull ?: return@runCatching null
+                    val pct = (o["percentage"]?.jsonPrimitive?.intOrNull ?: 0).coerceIn(0, 100)
+                    val behind = o["behind_by_days"]?.jsonPrimitive?.intOrNull ?: 0
+                    val explicitTrend = o["trend"]?.jsonPrimitive?.contentOrNull
+                    DepartmentProgress(
+                        name     = name,
+                        progress = pct / 100f,
+                        trend    = explicitTrend ?: if (behind > 0) "Delayed by $behind days" else "On Target",
+                        isDelayed = behind > 0
+                    )
+                }.getOrNull()
+            }
+
+            // Optional CMS keys — server may add these later without a deploy.
+            val alerts = (obj["alerts"] as? JsonArray)?.mapNotNull { parseAlert(it) } ?: emptyList()
+            val milestones = (obj["milestones"] as? JsonArray)?.mapNotNull { parseMilestone(it) } ?: emptyList()
+
+            SyllabusCoverageState(
+                departmentStats    = stats,
+                departmentProgress = progress,
+                alerts             = alerts,
+                milestones         = milestones,
+                overallPercentage  = overall?.get("percentage")?.jsonPrimitive?.intOrNull ?: 0,
+                overallTrend       = overall?.get("trend")?.jsonPrimitive?.contentOrNull ?: ""
+            )
+        } catch (e: Exception) {
+            AppLogger.e("SyllabusCoverageVM", "parseSyllabus failed: ${e.message}")
+            SyllabusCoverageState(errorMessage = "Could not parse server response")
+        }
+    }
+
+    private fun parseAlert(el: JsonElement): LaggingAlert? = try {
+        val o = el.jsonObject
+        LaggingAlert(
+            id               = o["id"]?.jsonPrimitive?.contentOrNull ?: return null,
+            subject          = o["subject"]?.jsonPrimitive?.contentOrNull ?: "",
+            className        = o["class_name"]?.jsonPrimitive?.contentOrNull
+                ?: o["class"]?.jsonPrimitive?.contentOrNull ?: "",
+            delayPercentage  = o["delay_percentage"]?.jsonPrimitive?.intOrNull ?: 0,
+            instructor       = o["instructor"]?.jsonPrimitive?.contentOrNull ?: "",
+            isCritical       = o["is_critical"]?.jsonPrimitive?.booleanOrNull ?: false
+        )
+    } catch (_: Exception) { null }
+
+    private fun parseMilestone(el: JsonElement): AcademicMilestone? = try {
+        val o = el.jsonObject
+        AcademicMilestone(
+            id          = o["id"]?.jsonPrimitive?.contentOrNull ?: return null,
+            month       = o["month"]?.jsonPrimitive?.contentOrNull ?: "",
+            day         = o["day"]?.jsonPrimitive?.contentOrNull ?: "",
+            title       = o["title"]?.jsonPrimitive?.contentOrNull ?: "",
+            description = o["description"]?.jsonPrimitive?.contentOrNull ?: "",
+            isVerified  = o["is_verified"]?.jsonPrimitive?.booleanOrNull ?: false
+        )
+    } catch (_: Exception) { null }
 }

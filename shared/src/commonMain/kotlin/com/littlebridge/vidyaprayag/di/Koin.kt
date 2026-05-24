@@ -151,6 +151,12 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.UserProfileApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
 
     // Repositories
     single<SchoolRepository> { SchoolRepositoryImpl(get(), get()) }
@@ -193,6 +199,9 @@ val commonModule = module {
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.ResultsRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.ResultsRepositoryImpl(get())
     }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.UserProfileRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.UserProfileRepositoryImpl(get())
+    }
 
     // UseCases
     factory { GetSchoolsUseCase(get()) }
@@ -218,7 +227,7 @@ val viewModelModule = module {
     factory { BrandingInfoOBViewModel(get(), get()) }
     factory { AcademicInfoOBViewModel(get(), get()) }
     factory { LaunchInfoOBViewModel(get(), get()) }
-    factory { InstitutionalProfileViewModel() }
+    factory { InstitutionalProfileViewModel(get(), get()) }
     factory { AdmissionCRMViewModel(get(), get()) }
     factory { SchoolAnnouncementsViewModel(get(), get()) }
     factory { MessagesViewModel(get(), get()) }
@@ -227,10 +236,10 @@ val viewModelModule = module {
     factory { LeaveRequestsViewModel(get(), get()) }
     factory { DailyAttendanceViewModel(get(), get()) }
     factory { AnalyticsDashboardViewModel(get(), get()) }
-    factory { StudentAnalyticsViewModel() }
-    factory { TeacherPerformanceViewModel() }
-    factory { ClassPerformanceViewModel() }
-    factory { SyllabusCoverageViewModel() }
+    factory { StudentAnalyticsViewModel(get(), get()) }
+    factory { TeacherPerformanceViewModel(get(), get()) }
+    factory { ClassPerformanceViewModel(get(), get()) }
+    factory { SyllabusCoverageViewModel(get(), get()) }
     factory { ResultsViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.content.presentation.LandingViewModel(get()) }
     factory { com.littlebridge.vidyaprayag.feature.auth.presentation.AuthViewModel(get()) }
