@@ -1,12 +1,14 @@
 package com.littlebridge.vidyaprayag.feature.auth.data.repository
 
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
+import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
 import com.littlebridge.vidyaprayag.feature.auth.data.remote.AuthApi
 import com.littlebridge.vidyaprayag.feature.auth.domain.model.*
 import com.littlebridge.vidyaprayag.feature.auth.domain.repository.AuthRepository
 
 class AuthRepositoryImpl(
-    private val api: AuthApi
+    private val api: AuthApi,
+    private val preferenceRepository: PreferenceRepository
 ) : AuthRepository {
     private var cachedSession: AuthResponse? = null
 
@@ -70,11 +72,18 @@ class AuthRepositoryImpl(
 
     override suspend fun saveSession(response: AuthResponse) {
         cachedSession = response
+        preferenceRepository.setUserToken(response.token)
+        preferenceRepository.setUserRole(response.role)
     }
 
     override suspend fun getSession(): AuthResponse? = cachedSession
 
     override suspend fun logout() {
         cachedSession = null
+        preferenceRepository.clearSession()
+    }
+
+    override suspend fun getUserDetails(token: String): NetworkResult<UserDetailsResponse> {
+        return api.getUserDetails(token)
     }
 }

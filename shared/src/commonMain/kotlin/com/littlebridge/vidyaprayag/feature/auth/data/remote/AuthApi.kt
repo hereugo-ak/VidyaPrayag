@@ -62,4 +62,12 @@ class AuthApi(
             }
         }
     }
+
+    suspend fun getUserDetails(token: String): NetworkResult<UserDetailsResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/user/details")) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+            }
+        }
+    }
 }

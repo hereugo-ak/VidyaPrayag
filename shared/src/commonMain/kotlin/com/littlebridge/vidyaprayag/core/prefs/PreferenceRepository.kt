@@ -8,4 +8,9 @@ interface PreferenceRepository {
     
     fun getUserRole(): Flow<String>
     suspend fun setUserRole(role: String)
+
+    fun getUserToken(): Flow<String?>
+    suspend fun setUserToken(token: String?)
+
+    suspend fun clearSession()
 }
