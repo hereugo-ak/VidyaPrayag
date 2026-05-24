@@ -21,7 +21,13 @@
  *     id 3 → ACADEMIC
  *     id 4 → REVIEW
  * (mapping kept here, not in CMS, because it's the contract with the existing
- *  /api/v1/onboarding/* implementation).
+ *  /api/v1/onboarding/[step] implementation).
+ *
+ * NOTE: Do NOT write a literal "/" + "*" sequence in this block comment.
+ * Kotlin block comments are NESTABLE — an inner "/" + "*" opens a new
+ * nested comment that must be closed by its own "*" + "/", otherwise the
+ * outer comment runs all the way to EOF and the compiler reports
+ * "Syntax error: Unclosed comment" on the line after this file.
  *
  * If the user has not started any onboarding, all four steps return
  * is_completed=false and progress=0.0 (the UI shows "Pending").

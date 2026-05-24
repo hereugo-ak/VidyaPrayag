@@ -184,7 +184,16 @@ private fun topStarFaculty(schoolId: UUID): JsonArray {
                 put("name", r[FacultyTable.name])
                 put("department", r[FacultyTable.department] ?: "")
                 put("score", starScores.getOrElse(idx) { 95.0 })
-                put("image_url", r[FacultyTable.profilePic] ?: JsonNull)
+                // r[FacultyTable.profilePic] is String? — we must lift it
+                // into a JsonElement explicitly. Mixing a raw String with
+                // JsonNull via `?:` upcasts to `Any`, which the
+                // kotlinx.serialization `put(String, JsonElement?)` overload
+                // does not accept (caused "Argument type mismatch: actual
+                // type is 'Any', but 'JsonElement' was expected").
+                put(
+                    "image_url",
+                    r[FacultyTable.profilePic]?.let { JsonPrimitive(it) } ?: JsonNull
+                )
             })
         }
     }
