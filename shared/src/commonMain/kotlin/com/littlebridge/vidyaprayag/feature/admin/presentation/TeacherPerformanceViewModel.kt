@@ -1,9 +1,25 @@
 package com.littlebridge.vidyaprayag.feature.admin.presentation
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.littlebridge.vidyaprayag.core.network.NetworkResult
+import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.feature.admin.domain.repository.AnalyticsRepository
+import com.littlebridge.vidyaprayag.util.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.floatOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 data class StarTeacher(
     val rank: Int,
@@ -30,27 +46,105 @@ data class DeptEfficiency(
 )
 
 data class TeacherPerformanceState(
-    val aggregateCompliance: String = "94.2%",
-    val complianceTrend: String = "+2.4% from last month",
-    val syllabusUpdateTrend: List<Float> = listOf(0.4f, 0.6f, 0.5f, 0.85f, 0.7f, 1.0f, 0.5f, 0.75f),
-    val starFaculty: List<StarTeacher> = listOf(
-        StarTeacher(1, "Dr. Sarah Jenkins", "Mathematics", 99.8, "https://lh3.googleusercontent.com/aida-public/AB6AXuC4bGKo5RDKEDVsqEANNGgLXgIlytdpqdrdA_0ZgHuCQGXpXdtFHxG3o7NqqVJ2omzhFKSILPKQ7zrevPEfbnZrtnqv9oMjaTvV6zQzlVckP-xwUNiRk1_cW8yHIK9-bnN1fvx4ZMaigbyh5AUwLsYzOfZ7xmkV15fr7Be-5nBa-7DKkZp5w5phY_k9KE40NjIFiULHjjEsVQfz7umnAyrGU_SsRtB7EeCeC8I0D_smfiUfWmSZSstZJ1NCShIzXAzOTFRIqS-JI5YQ"),
-        StarTeacher(2, "Prof. Michael Chen", "Advanced Physics", 98.2, "https://lh3.googleusercontent.com/aida-public/AB6AXuAmb6zEpF5u9hV-p8tcioMul2YEOpXplnJzyO4v94TGPz7O5-rMyRWrc8DigbRApilTWxPxBpUs2NpGbY_XOS7G0KPrdxixuMU9tvfPeTqt9K5j7ur7-aJp6gPMvAqfTjlUOyME8dLfobMYSNIh4-Ql9nt7yKq9-GqjfAlyOLf0QPFzUzdX0AV_UcJQvSy1H3jFFvqJr-E-q8O31aRJLqRL3AqkDo3nvr0wXF9GCFcHJN9Cq-My4KBJKlvKKrhHlC8mtLNiMXygdQzL"),
-        StarTeacher(3, "Elena Rodriguez", "History", 97.5, "https://lh3.googleusercontent.com/aida-public/AB6AXuANstZzXeW5n85JbsAoy4FuQwl7oBhuluVyIFBXrmva3zbK6IW0OaE_aqbz21DoKHhJzCuscLVcdXXjycLVdktBY1SZ-Ex8m_8KvjCpdPEwZzXFUyX5Awc97KWg9uRwxI89lvhkEZZFFC6N1wLILdRxZM3fdA5hmCMF-2jVjmPWIKGxZmvCytwz--hYKh99l9nNfQuM8o5TuqnrBXClgF-xDIInr4WLMDBni_FQXyB3ehMlpUtomOwU5kigI5AWN5dlHeEfUDDcODAV")
-    ),
-    val accountabilityMatrix: List<FacultyAccountability> = listOf(
-        FacultyAccountability("1", "James Miller", "Chemistry Dept.", 92, "1.2 Days", "84.5%", "Stable", "JM"),
-        FacultyAccountability("2", "Bradley Thompson", "Literature Dept.", 68, "5.8 Days", "71.2%", "High Risk", "BT"),
-        FacultyAccountability("3", "Linda Wright", "Sociology Dept.", 81, "2.5 Days", "78.0%", "Watching", "LW")
-    ),
-    val deptEfficiencies: List<DeptEfficiency> = listOf(
-        DeptEfficiency("Science & Technology", 96),
-        DeptEfficiency("Humanities", 84),
-        DeptEfficiency("Physical Education", 92)
-    )
+    val aggregateCompliance: String = "",
+    val complianceTrend: String = "",
+    val syllabusUpdateTrend: List<Float> = emptyList(),
+    val starFaculty: List<StarTeacher> = emptyList(),
+    val accountabilityMatrix: List<FacultyAccountability> = emptyList(),
+    val deptEfficiencies: List<DeptEfficiency> = emptyList(),
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
 )
 
-class TeacherPerformanceViewModel : ViewModel() {
+class TeacherPerformanceViewModel(
+    private val analyticsRepository: AnalyticsRepository,
+    private val preferenceRepository: PreferenceRepository
+) : ViewModel() {
+
     private val _state = MutableStateFlow(TeacherPerformanceState())
     val state: StateFlow<TeacherPerformanceState> = _state.asStateFlow()
+
+    init { load() }
+
+    fun load() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isLoading = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isLoading = false); return@launch
+            }
+            when (val result = analyticsRepository.getTeacherPerformance(token)) {
+                is NetworkResult.Success -> {
+                    _state.value = parseTeacher(result.data.data).copy(isLoading = false)
+                }
+                is NetworkResult.Error -> {
+                    AppLogger.e("TeacherPerformanceVM", "getTeacherPerformance error: ${result.message}")
+                    _state.value = _state.value.copy(isLoading = false, errorMessage = result.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    AppLogger.e("TeacherPerformanceVM", "getTeacherPerformance connection error")
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        errorMessage = "Connection error. Check your internet."
+                    )
+                }
+            }
+        }
+    }
+
+    private fun parseTeacher(element: JsonElement?): TeacherPerformanceState {
+        val obj = (element as? JsonObject) ?: return TeacherPerformanceState()
+        return try {
+            val trend = (obj["syllabus_update_trend"] as? JsonArray)
+                ?.mapNotNull { it.jsonPrimitive.floatOrNull } ?: emptyList()
+            val stars = (obj["star_faculty"] as? JsonArray)?.mapNotNull { parseStar(it) } ?: emptyList()
+            val matrix = (obj["accountability_matrix"] as? JsonArray)?.mapNotNull { parseAccountability(it) } ?: emptyList()
+            val depts = (obj["dept_efficiencies"] as? JsonArray)?.mapNotNull { parseDept(it) } ?: emptyList()
+
+            TeacherPerformanceState(
+                aggregateCompliance  = obj["aggregate_compliance"]?.jsonPrimitive?.contentOrNull ?: "",
+                complianceTrend      = obj["compliance_trend"]?.jsonPrimitive?.contentOrNull ?: "",
+                syllabusUpdateTrend  = trend,
+                starFaculty          = stars,
+                accountabilityMatrix = matrix,
+                deptEfficiencies     = depts
+            )
+        } catch (e: Exception) {
+            AppLogger.e("TeacherPerformanceVM", "parseTeacher failed: ${e.message}")
+            TeacherPerformanceState(errorMessage = "Could not parse server response")
+        }
+    }
+
+    private fun parseStar(el: JsonElement): StarTeacher? = try {
+        val o = el.jsonObject
+        StarTeacher(
+            rank       = o["rank"]?.jsonPrimitive?.intOrNull ?: 0,
+            name       = o["name"]?.jsonPrimitive?.contentOrNull ?: return null,
+            department = o["department"]?.jsonPrimitive?.contentOrNull ?: "",
+            score      = o["score"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
+            imageUrl   = o["image_url"]?.jsonPrimitive?.contentOrNull ?: ""
+        )
+    } catch (_: Exception) { null }
+
+    private fun parseAccountability(el: JsonElement): FacultyAccountability? = try {
+        val o = el.jsonObject
+        FacultyAccountability(
+            id              = o["id"]?.jsonPrimitive?.contentOrNull ?: return null,
+            name            = o["name"]?.jsonPrimitive?.contentOrNull ?: "",
+            department      = o["department"]?.jsonPrimitive?.contentOrNull ?: "",
+            complianceScore = o["compliance_score"]?.jsonPrimitive?.intOrNull ?: 0,
+            avgUpdateDelay  = o["avg_update_delay"]?.jsonPrimitive?.contentOrNull ?: "",
+            studentAvgMark  = o["student_avg_mark"]?.jsonPrimitive?.contentOrNull ?: "",
+            riskCorrelation = o["risk_correlation"]?.jsonPrimitive?.contentOrNull ?: "Stable",
+            initials        = o["initials"]?.jsonPrimitive?.contentOrNull ?: ""
+        )
+    } catch (_: Exception) { null }
+
+    private fun parseDept(el: JsonElement): DeptEfficiency? = try {
+        val o = el.jsonObject
+        DeptEfficiency(
+            name       = o["name"]?.jsonPrimitive?.contentOrNull ?: return null,
+            percentage = o["percentage"]?.jsonPrimitive?.intOrNull ?: 0
+        )
+    } catch (_: Exception) { null }
 }

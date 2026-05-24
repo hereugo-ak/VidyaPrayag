@@ -1,6 +1,7 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -10,6 +11,17 @@ plugins {
     alias(libs.plugins.composeHotReload)
     kotlin("plugin.serialization")
 }
+
+// ---------------------------------------------------------------------------
+// local.properties — devBaseUrl lets you point the dev flavor at your laptop
+// (http://192.168.1.9:8080) while on the same WiFi as your phone.
+// Falls back to render.com when the key is absent.
+// ---------------------------------------------------------------------------
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) load(f.inputStream())
+}
+val devBaseUrl: String = localProps.getProperty("devBaseUrl", "https://vidyaprayag-1.onrender.com")
 
 kotlin {
     androidTarget {
@@ -96,8 +108,8 @@ android {
     productFlavors {
         create("dev") {
             dimension = "environment"
-            buildConfigField("String", "AUTH_BASE_URL", "\"http://192.168.1.9:8080\"")
-            buildConfigField("String", "SCHOOL_BASE_URL", "\"http://192.168.1.9:8080\"")
+            buildConfigField("String", "AUTH_BASE_URL", "\"$devBaseUrl\"")
+            buildConfigField("String", "SCHOOL_BASE_URL", "\"$devBaseUrl\"")
         }
         create("staging") {
             dimension = "environment"
