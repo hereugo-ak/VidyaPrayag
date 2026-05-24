@@ -91,12 +91,6 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
-    single {
-        com.littlebridge.vidyaprayag.feature.admin.data.remote.OnboardingApi(
-            client = get(),
-            baseUrl = AppConfig.schoolBaseUrl
-        )
-    }
 
     // Repositories
     single<SchoolRepository> { SchoolRepositoryImpl(get(), get()) }
@@ -108,9 +102,6 @@ val commonModule = module {
     }
     single<com.littlebridge.vidyaprayag.feature.parent.domain.repository.ParentRepository> {
         com.littlebridge.vidyaprayag.feature.parent.data.repository.ParentRepositoryImpl(get())
-    }
-    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.OnboardingRepository> {
-        com.littlebridge.vidyaprayag.feature.admin.data.repository.OnboardingRepositoryImpl(get())
     }
 
     // UseCases
@@ -133,10 +124,10 @@ val viewModelModule = module {
     factory { ParentMessageViewModel() }
     factory { TrackProgressViewModel(get(), get()) }
     factory { SchoolDashboardViewModel(get(), get()) }
-    factory { InstitutionalBasicOBViewModel(get(), get()) }
-    factory { BrandingInfoOBViewModel(get(), get()) }
-    factory { AcademicInfoOBViewModel(get(), get()) }
-    factory { LaunchInfoOBViewModel(get(), get()) }
+    factory { InstitutionalBasicOBViewModel() }
+    factory { BrandingInfoOBViewModel() }
+    factory { AcademicInfoOBViewModel() }
+    factory { LaunchInfoOBViewModel() }
     factory { InstitutionalProfileViewModel() }
     factory { AdmissionCRMViewModel() }
     factory { SchoolAnnouncementsViewModel() }
