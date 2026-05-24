@@ -365,3 +365,187 @@ object StudentsTable : UUIDTable("students", "id") {
     val isActive   = bool("is_active").default(true)
     val createdAt  = timestamp("created_at")
 }
+
+// =====================================================================
+// Parent Ecosystem Tables (spec: parent_api_spec.artifact.md)
+// =====================================================================
+
+/**
+ * Children registered by parents during onboarding (Module: Child Onboarding).
+ * A child belongs to a parent (app_users.role = 'parent') and OPTIONALLY to a
+ * school (set when the parent enrols them somewhere). `interests` and the
+ * holistic progress JSON columns are persisted as plain text and parsed/
+ * encoded with kotlinx.serialization at the route layer.
+ *
+ * Spec ref: parent_api_spec.artifact.md §Module: Child Onboarding
+ *           parent_api_spec.artifact.md §Module: Core Dashboard & Progress
+ */
+object ChildrenTable : UUIDTable("children", "id") {
+    val parentId         = uuid("parent_id")                            // FK app_users.id
+    val schoolId         = uuid("school_id").nullable()                 // FK schools.id (optional)
+    val childName        = text("child_name")
+    val dateOfBirth      = varchar("date_of_birth", 12).nullable()      // YYYY-MM-DD
+    val gender           = varchar("gender", 16).nullable()             // MALE | FEMALE | OTHER
+    val currentGrade     = varchar("current_grade", 32).nullable()      // e.g. "Grade 1"
+    val interests        = text("interests").default("[]")              // JSON array of strings
+    val profilePic       = text("profile_pic").nullable()
+    val overallProgress  = double("overall_progress").default(0.0)      // 0..1
+    val currentLevel     = integer("current_level").default(1)
+    val attendanceStatus = varchar("attendance_status", 16).default("PRESENT")
+    val isActive         = bool("is_active").default(true)
+    val createdAt        = timestamp("created_at")
+    val updatedAt        = timestamp("updated_at")
+}
+
+/**
+ * Parent fee records — driven by GET /api/v1/parent/fees.
+ *
+ * Stores per-line-item fees for a (parent, child) pair.  The aggregate
+ * `stats` block in the response is computed on-the-fly:
+ *   total_collected  = SUM(amount) WHERE status='PAID'
+ *   outstanding      = SUM(amount) WHERE status IN ('DUE','OVERDUE')
+ *   overdue_count    = COUNT(*) WHERE status='OVERDUE'
+ *   progress         = total_collected / (total_collected + outstanding)
+ *
+ * Spec ref: parent_api_spec.artifact.md §Module: School Management §Screen: Fees
+ */
+object FeeRecordsTable : UUIDTable("fee_records", "id") {
+    val parentId    = uuid("parent_id")
+    val childId     = uuid("child_id").nullable()
+    val schoolId    = uuid("school_id").nullable()
+    val title       = text("title")
+    val description = text("description").nullable()
+    val amount      = double("amount").default(0.0)
+    val currency    = varchar("currency", 8).default("USD")
+    val dueDate     = varchar("due_date", 12).nullable()                // YYYY-MM-DD
+    val status      = varchar("status", 16).default("DUE")              // PAID | DUE | OVERDUE
+    val category    = varchar("category", 32).default("Tuition")        // Tuition | Transport | ...
+    val createdAt   = timestamp("created_at")
+    val updatedAt   = timestamp("updated_at")
+}
+
+// =====================================================================
+// School Ecosystem Tables  (spec: school_api_spec.artifact.md)
+// =====================================================================
+
+/**
+ * Leave applications submitted by students or teachers.
+ *
+ * `request_type` is "student" or "teacher" so the same table powers both
+ * tabs on the Leave Requests screen.  `image_url` is the avatar of the
+ * requester (mirrors what the UI shows).
+ *
+ * Spec ref: school_api_spec.artifact.md §Module: Leave Requests
+ */
+object LeaveRequestsTable : UUIDTable("leave_requests", "id") {
+    val schoolId      = uuid("school_id")
+    val requesterId   = uuid("requester_id").nullable()                 // FK app_users.id (optional)
+    val requesterName = text("requester_name")
+    val requesterRole = varchar("requester_role", 16).default("student") // student | teacher
+    val dateFrom      = varchar("date_from", 12)                        // YYYY-MM-DD
+    val dateTo        = varchar("date_to", 12)                          // YYYY-MM-DD
+    val reason        = text("reason")
+    val imageUrl      = text("image_url").nullable()
+    val status        = varchar("status", 16).default("Pending")        // Pending | Approved | Rejected
+    val actionedBy    = uuid("actioned_by").nullable()
+    val actionedAt    = timestamp("actioned_at").nullable()
+    val createdAt     = timestamp("created_at")
+    val updatedAt     = timestamp("updated_at")
+}
+
+/**
+ * Parent-Teacher Meeting events — drives the Schedule PTM screen.
+ * The "active event" is computed at request-time as either the next
+ * upcoming row or, in absence, the most recent past row.
+ *
+ * Spec ref: school_api_spec.artifact.md §Module: PTM
+ */
+object PtmEventsTable : UUIDTable("ptm_events", "id") {
+    val schoolId         = uuid("school_id")
+    val title            = text("title")
+    val date             = varchar("date", 12)                          // YYYY-MM-DD
+    val slot             = text("slot")                                 // e.g. "09:00 - 13:00"
+    val expectedParents  = integer("expected_parents").default(0)
+    val checkedInParents = integer("checked_in_parents").default(0)
+    val invitesDelivered = integer("invites_delivered").default(0)
+    val readReceipts     = integer("read_receipts").default(0)
+    val turnout          = integer("turnout").default(0)                // historical metric for past events
+    val totalMet         = integer("total_met").default(0)
+    val createdBy        = uuid("created_by").nullable()
+    val createdAt        = timestamp("created_at")
+    val updatedAt        = timestamp("updated_at")
+}
+
+/**
+ * Per-class PTM rollup (met_count / total_count) belonging to a PTM event.
+ * Two reasons we keep this as its own table instead of a JSON column:
+ *   - Faculty teams update one row at a time as they hold meetings.
+ *   - We want to index/filter by class_name later.
+ *
+ * Spec ref: school_api_spec.artifact.md §Module: PTM
+ */
+object PtmClassProgressTable : UUIDTable("ptm_class_progress", "id") {
+    val ptmEventId  = uuid("ptm_event_id")                              // FK ptm_events.id
+    val className   = text("class_name")
+    val teacherName = text("teacher_name")
+    val metCount    = integer("met_count").default(0)
+    val totalCount  = integer("total_count").default(0)
+    val updatedAt   = timestamp("updated_at")
+    init {
+        uniqueIndex("ux_ptm_class_progress_unique", ptmEventId, className)
+    }
+}
+
+/**
+ * Admin inbox: a thread is the conversation header (sender / preview /
+ * unread counter), and `MessagesTable` rows are the individual messages.
+ *
+ * Spec ref: school_api_spec.artifact.md §Module: Messages
+ */
+object MessageThreadsTable : UUIDTable("message_threads", "id") {
+    val schoolId       = uuid("school_id")
+    val ownerUserId    = uuid("owner_user_id")                          // recipient (admin) — JWT.sub
+    val senderName     = text("sender_name")
+    val senderRole     = text("sender_role")
+    val senderImageUrl = text("sender_image_url").nullable()
+    val iconName       = text("icon_name").nullable()                   // when no avatar (e.g. "payments")
+    val lastMessage    = text("last_message").default("")
+    val lastMessageAt  = timestamp("last_message_at")
+    val unreadCount    = integer("unread_count").default(0)
+    val isRead         = bool("is_read").default(true)
+    val createdAt      = timestamp("created_at")
+    val updatedAt      = timestamp("updated_at")
+}
+
+object MessagesTable : UUIDTable("messages", "id") {
+    val threadId  = uuid("thread_id")                                   // FK message_threads.id
+    val senderId  = uuid("sender_id").nullable()                        // null for system messages
+    val body      = text("body")
+    val createdAt = timestamp("created_at")
+}
+
+/**
+ * Per-student exam results upserted via Results screen.
+ * The (school, test, class, subject, student_id) tuple is unique so
+ * publishing the same test twice updates rather than duplicates.
+ *
+ * Spec ref: school_api_spec.artifact.md §Module: Results
+ */
+object ExamResultsTable : UUIDTable("exam_results", "id") {
+    val schoolId   = uuid("school_id")
+    val test       = text("test")
+    val className  = text("class_name")
+    val subject    = text("subject")
+    val studentId  = text("student_id")                                 // matches students.student_code
+    val studentName = text("student_name")
+    val imageUrl   = text("image_url").nullable()
+    val attendance = varchar("attendance", 8).default("0%")             // e.g. "92%"
+    val score      = varchar("score", 8).default("")                    // string keeps "98", "A+", "Pending"
+    val status     = varchar("status", 16).default("Pending")           // Exceeding | Meeting | Below | Pending
+    val trend      = varchar("trend", 8).default("0%")                  // e.g. "+2.4%"
+    val createdAt  = timestamp("created_at")
+    val updatedAt  = timestamp("updated_at")
+    init {
+        uniqueIndex("ux_exam_results_unique", schoolId, test, className, subject, studentId)
+    }
+}
