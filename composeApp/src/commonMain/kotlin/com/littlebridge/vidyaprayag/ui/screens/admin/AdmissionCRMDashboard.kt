@@ -78,7 +78,14 @@ fun AdmissionCRMDashboard() {
                 item { EmptyEnquiriesCard() }
             } else {
                 items(state.recentEnquiries, key = { it.id ?: it.studentName + it.date }) { enquiry ->
-                    EnquiryCard(enquiry = enquiry)
+                    EnquiryCard(
+                        enquiry = enquiry,
+                        onStatusChange = { newStatus ->
+                            enquiry.id?.let { id ->
+                                viewModel.updateEnquiryStatus(id, newStatus)
+                            }
+                        }
+                    )
                 }
             }
 
@@ -208,7 +215,10 @@ private fun SectionTitle(title: String, action: String) {
 }
 
 @Composable
-private fun EnquiryCard(enquiry: Enquiry) {
+private fun EnquiryCard(
+    enquiry: Enquiry,
+    onStatusChange: (String) -> Unit
+) {
     VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -236,32 +246,98 @@ private fun EnquiryCard(enquiry: Enquiry) {
                 }
             }
 
-            EnquiryStatusBadge(status = enquiry.status)
+            // Tap the status badge to open a dropdown that lets the admin move
+            // the enquiry through the funnel. The VM handles optimistic patch +
+            // server PATCH, so we just need the new status code.
+            EnquiryStatusMenu(
+                currentStatus = enquiry.status,
+                enabled = !enquiry.id.isNullOrBlank(),
+                onStatusSelected = onStatusChange
+            )
         }
     }
 }
 
 /**
- * Renders the server's lowercase status code ("new", "followup", "converted",
- * "rejected") as a coloured pill. Unknown values fall back to a neutral chip.
+ * Tappable status badge that opens a [DropdownMenu] with the four canonical
+ * enquiry stages. Disabled when [enabled] is false (e.g. missing id).
  */
 @Composable
-private fun EnquiryStatusBadge(status: String) {
-    val (label, container) = when (status.lowercase()) {
+private fun EnquiryStatusMenu(
+    currentStatus: String,
+    enabled: Boolean,
+    onStatusSelected: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val (label, container) = statusVisuals(currentStatus)
+
+    Box {
+        Surface(
+            color = container,
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.clickable(enabled = enabled) { expanded = true }
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 8.sp
+                )
+                if (enabled) {
+                    Icon(
+                        Icons.Default.ArrowDropDown,
+                        contentDescription = "Change status",
+                        modifier = Modifier.size(12.dp)
+                    )
+                }
+            }
+        }
+
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            val options = listOf(
+                Enquiry.STATUS_NEW to "New",
+                Enquiry.STATUS_FOLLOWUP to "Follow-up",
+                Enquiry.STATUS_CONVERTED to "Converted",
+                Enquiry.STATUS_REJECTED to "Rejected"
+            )
+            options.forEach { (code, displayName) ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            displayName,
+                            fontWeight = if (code == currentStatus.lowercase()) {
+                                FontWeight.Bold
+                            } else {
+                                FontWeight.Normal
+                            }
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        if (code != currentStatus.lowercase()) {
+                            onStatusSelected(code)
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+/** Resolves the label + container colour for a status code. */
+@Composable
+private fun statusVisuals(status: String): Pair<String, Color> {
+    return when (status.lowercase()) {
         Enquiry.STATUS_NEW -> "NEW" to MaterialTheme.colorScheme.secondaryContainer
         Enquiry.STATUS_FOLLOWUP -> "FOLLOW-UP" to MaterialTheme.colorScheme.surfaceVariant
         Enquiry.STATUS_CONVERTED -> "CONVERTED" to MaterialTheme.colorScheme.primaryContainer
         Enquiry.STATUS_REJECTED -> "REJECTED" to MaterialTheme.colorScheme.errorContainer
         else -> status.uppercase() to MaterialTheme.colorScheme.surfaceVariant
-    }
-    Surface(color = container, shape = RoundedCornerShape(8.dp)) {
-        Text(
-            label,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Black,
-            fontSize = 8.sp
-        )
     }
 }
 

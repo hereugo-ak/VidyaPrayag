@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.CreatePtmRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.PtmActiveEventDto
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.PtmClassProgressDto
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.PtmHistoryDto
@@ -43,7 +44,9 @@ data class SchedulePTMState(
     val history: List<PTMHistoryItem> = emptyList(),
     val classProgress: List<ClassPTMProgress> = emptyList(),
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    val isCreating: Boolean = false,
+    val errorMessage: String? = null,
+    val infoMessage: String? = null
 )
 
 class SchedulePTMViewModel(
@@ -101,6 +104,56 @@ class SchedulePTMViewModel(
                 }
             }
         }
+    }
+
+    /**
+     * Schedule a new PTM event. On success the screen dismisses its dialog
+     * via [onCreated] and we re-pull `/api/v1/school/ptm` to refresh the
+     * active-event banner + history.
+     */
+    fun createPtm(
+        title: String,
+        date: String,
+        slot: String,
+        onCreated: (() -> Unit)? = null
+    ) {
+        if (title.isBlank() || date.isBlank() || slot.isBlank()) {
+            _state.value = _state.value.copy(errorMessage = "Title, date and slot are required.")
+            return
+        }
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isCreating = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isCreating = false, errorMessage = "Not signed in")
+                return@launch
+            }
+            val body = CreatePtmRequest(title = title.trim(), date = date.trim(), slot = slot.trim())
+            when (val r = ptmRepository.createPtm(token, body)) {
+                is NetworkResult.Success -> {
+                    _state.value = _state.value.copy(
+                        isCreating = false,
+                        infoMessage = "PTM scheduled"
+                    )
+                    onCreated?.invoke()
+                    loadPtm()
+                }
+                is NetworkResult.Error -> {
+                    AppLogger.e("SchedulePTMVM", "createPtm error: ${r.message}")
+                    _state.value = _state.value.copy(isCreating = false, errorMessage = r.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(
+                        isCreating = false,
+                        errorMessage = "Connection error. Check your internet."
+                    )
+                }
+            }
+        }
+    }
+
+    fun clearMessages() {
+        _state.value = _state.value.copy(errorMessage = null, infoMessage = null)
     }
 
     private fun PtmHistoryDto.toUiModel() = PTMHistoryItem(
