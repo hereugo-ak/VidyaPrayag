@@ -102,30 +102,36 @@ class AnalyticsDashboardViewModel(
     // composeApp only ever sees the typed data classes above.
     // -----------------------------------------------------------------------
 
-    private fun parseCard(element: JsonElement): AnalyticsCardData? = try {
-        val obj = element.jsonObject
-        AnalyticsCardData(
-            title    = obj["title"]?.jsonPrimitive?.contentOrNull    ?: return null,
-            value    = obj["value"]?.jsonPrimitive?.contentOrNull    ?: "",
-            subValue = obj["sub_value"]?.jsonPrimitive?.contentOrNull ?: "",
-            iconUrl  = obj["icon_url"]?.jsonPrimitive?.contentOrNull  ?: "",
-            trend    = obj["trend"]?.jsonPrimitive?.contentOrNull
-        )
-    } catch (e: Exception) {
-        AppLogger.e("AnalyticsDashboardVM", "parseCard failed: ${e.message}")
-        null
+    private fun parseCard(element: JsonElement): AnalyticsCardData? {
+        return try {
+            val obj   = element.jsonObject
+            val title = obj["title"]?.jsonPrimitive?.contentOrNull ?: return null
+            AnalyticsCardData(
+                title    = title,
+                value    = obj["value"]?.jsonPrimitive?.contentOrNull    ?: "",
+                subValue = obj["sub_value"]?.jsonPrimitive?.contentOrNull ?: "",
+                iconUrl  = obj["icon_url"]?.jsonPrimitive?.contentOrNull  ?: "",
+                trend    = obj["trend"]?.jsonPrimitive?.contentOrNull
+            )
+        } catch (e: Exception) {
+            AppLogger.e("AnalyticsDashboardVM", "parseCard failed: ${e.message}")
+            null
+        }
     }
 
-    private fun parseInsight(element: JsonElement): InsightItem? = try {
-        val obj = element.jsonObject
-        InsightItem(
-            title       = obj["title"]?.jsonPrimitive?.contentOrNull       ?: return null,
-            description = obj["description"]?.jsonPrimitive?.contentOrNull ?: "",
-            iconName    = obj["icon_name"]?.jsonPrimitive?.contentOrNull   ?: "insights",
-            iconColor   = obj["icon_color"]?.jsonPrimitive?.longOrNull     ?: 0xFF6200EE
-        )
-    } catch (e: Exception) {
-        AppLogger.e("AnalyticsDashboardVM", "parseInsight failed: ${e.message}")
-        null
+    private fun parseInsight(element: JsonElement): InsightItem? {
+        return try {
+            val obj   = element.jsonObject
+            val title = obj["title"]?.jsonPrimitive?.contentOrNull ?: return null
+            InsightItem(
+                title       = title,
+                description = obj["description"]?.jsonPrimitive?.contentOrNull ?: "",
+                iconName    = obj["icon_name"]?.jsonPrimitive?.contentOrNull   ?: "insights",
+                iconColor   = obj["icon_color"]?.jsonPrimitive?.longOrNull     ?: 0xFF6200EE
+            )
+        } catch (e: Exception) {
+            AppLogger.e("AnalyticsDashboardVM", "parseInsight failed: ${e.message}")
+            null
+        }
     }
 }
