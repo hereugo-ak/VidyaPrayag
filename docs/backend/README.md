@@ -39,7 +39,14 @@ server/src/main/kotlin/com/littlebridge/vidyaprayag/
     ├── onboarding/OnboardingRouting.kt  → /api/v1/onboarding/*
     ├── announcements/AnnouncementRouting.kt → /api/v1/school/announcements*
     ├── admissions/AdmissionRouting.kt   → /api/v1/admissions/enquiries[…]
-    ├── school/SchoolRouting.kt          → /api/v1/school/{analytics,calendar,holidays,attendance/daily}
+    ├── school/                          ← parent_api_spec.artifact.md + school_api_spec.artifact.md
+    │   ├── SchoolRouting.kt             → /api/v1/school/{analytics,calendar,holidays,attendance/daily}
+    │   ├── SchoolDashboardRouting.kt    → /api/v1/school/dashboard
+    │   ├── SchoolAnalyticsRouting.kt    → /api/v1/school/analytics/{overview,class-performance,teacher-performance,student/{id},syllabus-coverage}
+    │   ├── LeaveRequestsRouting.kt      → /api/v1/school/leave-requests[…]
+    │   ├── PtmRouting.kt                → /api/v1/school/ptm
+    │   ├── MessagesRouting.kt           → /api/v1/school/messages[…]
+    │   └── ResultsRouting.kt            → /api/v1/school/results
     └── parent/                          ← parent_api_spec.artifact.md
         ├── ParentOnboardingRouting.kt   → /api/v1/parent/onboarding/{metadata,child-info,preference-options}
         ├── ParentDashboardRouting.kt    → /api/v1/parent/dashboard
@@ -87,6 +94,22 @@ touched, JWT requirements, and which UI screen consumes it.
 | GET    | `/api/v1/parent/track-progress`                  | JWT    | [12-parent-ecosystem.md](./12-parent-ecosystem.md) |
 | GET    | `/api/v1/parent/fees`                            | JWT    | [12-parent-ecosystem.md](./12-parent-ecosystem.md) |
 | GET    | `/api/v1/content/support`                        | public | [12-parent-ecosystem.md](./12-parent-ecosystem.md) |
+| GET    | `/api/v1/school/dashboard`                       | JWT    | [13-school-ecosystem.md](./13-school-ecosystem.md) |
+| GET    | `/api/v1/school/analytics/overview`              | JWT    | [13-school-ecosystem.md](./13-school-ecosystem.md) |
+| GET    | `/api/v1/school/analytics/class-performance`     | JWT    | [13-school-ecosystem.md](./13-school-ecosystem.md) |
+| GET    | `/api/v1/school/analytics/teacher-performance`   | JWT    | [13-school-ecosystem.md](./13-school-ecosystem.md) |
+| GET    | `/api/v1/school/analytics/student/{studentId}`   | JWT    | [13-school-ecosystem.md](./13-school-ecosystem.md) |
+| GET    | `/api/v1/school/analytics/syllabus-coverage`     | JWT    | [13-school-ecosystem.md](./13-school-ecosystem.md) |
+| GET    | `/api/v1/school/leave-requests`                  | JWT    | [13-school-ecosystem.md](./13-school-ecosystem.md) |
+| POST   | `/api/v1/school/leave-requests`                  | JWT    | [13-school-ecosystem.md](./13-school-ecosystem.md) |
+| PATCH  | `/api/v1/school/leave-requests/{id}/status`      | JWT    | [13-school-ecosystem.md](./13-school-ecosystem.md) |
+| GET    | `/api/v1/school/ptm`                             | JWT    | [13-school-ecosystem.md](./13-school-ecosystem.md) |
+| POST   | `/api/v1/school/ptm`                             | JWT    | [13-school-ecosystem.md](./13-school-ecosystem.md) |
+| GET    | `/api/v1/school/messages/threads`                | JWT    | [13-school-ecosystem.md](./13-school-ecosystem.md) |
+| POST   | `/api/v1/school/messages/threads/{id}/read`      | JWT    | [13-school-ecosystem.md](./13-school-ecosystem.md) |
+| POST   | `/api/v1/school/messages`                        | JWT    | [13-school-ecosystem.md](./13-school-ecosystem.md) |
+| GET    | `/api/v1/school/results`                         | JWT    | [13-school-ecosystem.md](./13-school-ecosystem.md) |
+| POST   | `/api/v1/school/results`                         | JWT    | [13-school-ecosystem.md](./13-school-ecosystem.md) |
 
 Legacy `/auth/*` (without `/api/v1` prefix) are also wired and resolve to the
 same handlers, so the existing `shared/.../AuthApi.kt` keeps working until the

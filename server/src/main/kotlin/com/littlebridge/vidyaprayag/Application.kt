@@ -29,6 +29,12 @@
  *   - parentDashboardRouting()            — /api/v1/parent/dashboard
  *   - trackProgressRouting()              — /api/v1/parent/track-progress
  *   - parentFeesRouting()                 — /api/v1/parent/fees
+ *   - schoolDashboardRouting()            — /api/v1/school/dashboard
+ *   - schoolAnalyticsRouting()            — /api/v1/school/analytics/{overview,class-performance,teacher-performance,student/{id},syllabus-coverage}
+ *   - leaveRequestsRouting()              — /api/v1/school/leave-requests[…]
+ *   - ptmRouting()                        — /api/v1/school/ptm
+ *   - messagesRouting()                   — /api/v1/school/messages[…]
+ *   - resultsRouting()                    — /api/v1/school/results
  *
  * On boot:
  *   DatabaseFactory.init() creates/migrates all tables and seeds CMS + demo data.
@@ -54,6 +60,12 @@ import com.littlebridge.vidyaprayag.feature.parent.parentDashboardRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentFeesRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentOnboardingRouting
 import com.littlebridge.vidyaprayag.feature.parent.trackProgressRouting
+import com.littlebridge.vidyaprayag.feature.school.leaveRequestsRouting
+import com.littlebridge.vidyaprayag.feature.school.messagesRouting
+import com.littlebridge.vidyaprayag.feature.school.ptmRouting
+import com.littlebridge.vidyaprayag.feature.school.resultsRouting
+import com.littlebridge.vidyaprayag.feature.school.schoolAnalyticsRouting
+import com.littlebridge.vidyaprayag.feature.school.schoolDashboardRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRouting
 import com.littlebridge.vidyaprayag.feature.user.parentRouting
 import com.littlebridge.vidyaprayag.feature.user.userDetailsRouting
@@ -143,5 +155,13 @@ fun Application.module() {
         parentDashboardRouting()     // /api/v1/parent/dashboard
         trackProgressRouting()       // /api/v1/parent/track-progress
         parentFeesRouting()          // /api/v1/parent/fees
+
+        // School ecosystem (school_api_spec.artifact.md)
+        schoolDashboardRouting()     // /api/v1/school/dashboard
+        schoolAnalyticsRouting()     // /api/v1/school/analytics/{overview,class-performance,teacher-performance,student/{id},syllabus-coverage}
+        leaveRequestsRouting()       // /api/v1/school/leave-requests[…]
+        ptmRouting()                 // /api/v1/school/ptm
+        messagesRouting()            // /api/v1/school/messages[…]
+        resultsRouting()             // /api/v1/school/results
     }
 }
