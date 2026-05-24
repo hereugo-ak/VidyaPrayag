@@ -19,8 +19,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.Enquiry
+import com.littlebridge.vidyaprayag.feature.admin.presentation.AdmissionCRMState
 import com.littlebridge.vidyaprayag.feature.admin.presentation.AdmissionCRMViewModel
-import com.littlebridge.vidyaprayag.feature.admin.presentation.Enquiry
 import com.littlebridge.vidyaprayag.ui.components.*
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -29,6 +30,12 @@ import org.koin.compose.viewmodel.koinViewModel
 fun AdmissionCRMDashboard() {
     val viewModel: AdmissionCRMViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+
+    // Re-sync on screen entry (e.g. coming back from another tab) - mirrors
+    // the SchoolDashboard pattern.
+    LaunchedEffect(Unit) { viewModel.refresh() }
 
     BaseScreen(
         bottomBar = {
@@ -44,7 +51,19 @@ fun AdmissionCRMDashboard() {
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             item {
-                CRMHeaderSection()
+                CRMHeaderSection(
+                    isLoading = isLoading,
+                    onRefresh = { viewModel.refresh() }
+                )
+            }
+
+            errorMessage?.let { msg ->
+                item {
+                    ErrorBanner(
+                        message = msg,
+                        onDismiss = { viewModel.clearError() }
+                    )
+                }
             }
 
             item {
@@ -55,12 +74,16 @@ fun AdmissionCRMDashboard() {
                 SectionTitle(title = "Recent Enquiries", action = "View All")
             }
 
-            items(state.recentEnquiries) { enquiry ->
-                EnquiryCard(enquiry = enquiry)
+            if (state.recentEnquiries.isEmpty() && !isLoading) {
+                item { EmptyEnquiriesCard() }
+            } else {
+                items(state.recentEnquiries, key = { it.id ?: it.studentName + it.date }) { enquiry ->
+                    EnquiryCard(enquiry = enquiry)
+                }
             }
 
             item {
-                ConversionInsightCard(rate = state.conversionRate)
+                ConversionInsightCard(label = state.efficiencyLabel)
             }
 
             item {
@@ -71,14 +94,30 @@ fun AdmissionCRMDashboard() {
 }
 
 @Composable
-private fun CRMHeaderSection() {
+private fun CRMHeaderSection(isLoading: Boolean, onRefresh: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            "Admission CRM",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Admission CRM",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp
+                )
+            } else {
+                IconButton(onClick = onRefresh) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                }
+            }
+        }
         Text(
             "Track, manage, and convert institutional enquiries efficiently.",
             style = MaterialTheme.typography.bodyMedium,
@@ -88,7 +127,7 @@ private fun CRMHeaderSection() {
 }
 
 @Composable
-private fun QuickStatsGrid(state: com.littlebridge.vidyaprayag.feature.admin.presentation.AdmissionCRMState) {
+private fun QuickStatsGrid(state: AdmissionCRMState) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             StatCard(
@@ -180,7 +219,11 @@ private fun EnquiryCard(enquiry: Enquiry) {
                 modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                Text(enquiry.studentName.take(1), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    enquiry.studentName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
 
             Column(modifier = Modifier.weight(1f)) {
@@ -193,28 +236,94 @@ private fun EnquiryCard(enquiry: Enquiry) {
                 }
             }
 
-            Surface(
-                color = when(enquiry.status) {
-                    "New" -> MaterialTheme.colorScheme.secondaryContainer
-                    "Converted" -> MaterialTheme.colorScheme.primaryContainer
-                    else -> MaterialTheme.colorScheme.surfaceVariant
-                },
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(
-                    enquiry.status.uppercase(),
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Black,
-                    fontSize = 8.sp
-                )
+            EnquiryStatusBadge(status = enquiry.status)
+        }
+    }
+}
+
+/**
+ * Renders the server's lowercase status code ("new", "followup", "converted",
+ * "rejected") as a coloured pill. Unknown values fall back to a neutral chip.
+ */
+@Composable
+private fun EnquiryStatusBadge(status: String) {
+    val (label, container) = when (status.lowercase()) {
+        Enquiry.STATUS_NEW -> "NEW" to MaterialTheme.colorScheme.secondaryContainer
+        Enquiry.STATUS_FOLLOWUP -> "FOLLOW-UP" to MaterialTheme.colorScheme.surfaceVariant
+        Enquiry.STATUS_CONVERTED -> "CONVERTED" to MaterialTheme.colorScheme.primaryContainer
+        Enquiry.STATUS_REJECTED -> "REJECTED" to MaterialTheme.colorScheme.errorContainer
+        else -> status.uppercase() to MaterialTheme.colorScheme.surfaceVariant
+    }
+    Surface(color = container, shape = RoundedCornerShape(8.dp)) {
+        Text(
+            label,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Black,
+            fontSize = 8.sp
+        )
+    }
+}
+
+@Composable
+private fun EmptyEnquiriesCard() {
+    VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                Icons.Default.Inbox,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                "No enquiries yet",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                "New admission enquiries from your school will appear here.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun ErrorBanner(message: String, onDismiss: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.errorContainer,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                Icons.Default.ErrorOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer
+            )
+            Text(
+                message,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            TextButton(onClick = onDismiss) {
+                Text("DISMISS", fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
 @Composable
-private fun ConversionInsightCard(rate: Float) {
+private fun ConversionInsightCard(label: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -228,7 +337,7 @@ private fun ConversionInsightCard(rate: Float) {
                 Text("Efficiency Insight", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
             }
             Text(
-                "Your lead conversion rate is $rate% this month. Highly personalized follow-ups could improve this by 15%.",
+                "Your lead conversion rate is $label this month. Highly personalized follow-ups could improve this by 15%.",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.7f)
             )

@@ -97,6 +97,12 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.AdmissionApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
 
     // Repositories
     single<SchoolRepository> { SchoolRepositoryImpl(get(), get()) }
@@ -111,6 +117,9 @@ val commonModule = module {
     }
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.OnboardingRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.OnboardingRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AdmissionRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.AdmissionRepositoryImpl(get())
     }
 
     // UseCases
@@ -138,7 +147,7 @@ val viewModelModule = module {
     factory { AcademicInfoOBViewModel(get(), get()) }
     factory { LaunchInfoOBViewModel(get(), get()) }
     factory { InstitutionalProfileViewModel() }
-    factory { AdmissionCRMViewModel() }
+    factory { AdmissionCRMViewModel(get(), get()) }
     factory { SchoolAnnouncementsViewModel() }
     factory { MessagesViewModel() }
     factory { SchedulePTMViewModel() }
