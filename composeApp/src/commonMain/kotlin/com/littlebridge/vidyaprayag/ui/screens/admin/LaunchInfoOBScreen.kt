@@ -32,6 +32,8 @@ import org.koin.compose.viewmodel.koinViewModel
 fun LaunchInfoOBScreen() {
     val viewModel: LaunchInfoOBViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
+    val isSubmitting by viewModel.isSubmitting.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
     val navigator = LocalAppNavigator.current
 
     BaseScreen(
@@ -39,8 +41,14 @@ fun LaunchInfoOBScreen() {
         bottomBar = {
             OnboardingBottomBar(
                 onSaveDraft = { /* Save draft */ },
-                onContinue = { navigator.navigateTo(Destination.SchoolDashboard) },
-                continueText = "Launch Profile"
+                onContinue = {
+                    if (!isSubmitting) {
+                        viewModel.submit {
+                            navigator.navigateTo(Destination.SchoolDashboard)
+                        }
+                    }
+                },
+                continueText = if (isSubmitting) "Launching..." else "Launch Profile"
             )
         }
     ) { paddingValues, scrollModifier ->
@@ -54,6 +62,15 @@ fun LaunchInfoOBScreen() {
         ) {
             item {
                 StepProgressHeader(currentStep = 4, totalSteps = 4, currentLabel = "Verification & Launch")
+            }
+
+            if (errorMessage != null) {
+                item {
+                    OnboardingErrorBanner(
+                        message = errorMessage!!,
+                        onDismiss = { viewModel.clearError() }
+                    )
+                }
             }
 
             item {

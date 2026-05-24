@@ -29,6 +29,8 @@ import org.koin.compose.viewmodel.koinViewModel
 fun BrandingInfoOBScreen() {
     val viewModel: BrandingInfoOBViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
+    val isSubmitting by viewModel.isSubmitting.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
     val navigator = LocalAppNavigator.current
 
     BaseScreen(
@@ -36,7 +38,14 @@ fun BrandingInfoOBScreen() {
         bottomBar = {
             OnboardingBottomBar(
                 onSaveDraft = { /* Save draft */ },
-                onContinue = { navigator.navigateTo(Destination.AcademicInfoOB) }
+                onContinue = {
+                    if (!isSubmitting) {
+                        viewModel.submit {
+                            navigator.navigateTo(Destination.AcademicInfoOB)
+                        }
+                    }
+                },
+                continueText = if (isSubmitting) "Saving..." else "Continue"
             )
         }
     ) { paddingValues, scrollModifier ->
@@ -50,6 +59,15 @@ fun BrandingInfoOBScreen() {
         ) {
             item {
                 StepProgressHeader(currentStep = 2, totalSteps = 4, currentLabel = "Branding")
+            }
+
+            if (errorMessage != null) {
+                item {
+                    OnboardingErrorBanner(
+                        message = errorMessage!!,
+                        onDismiss = { viewModel.clearError() }
+                    )
+                }
             }
 
             item {
