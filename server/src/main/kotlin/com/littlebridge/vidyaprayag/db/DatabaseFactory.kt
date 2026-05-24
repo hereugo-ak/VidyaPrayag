@@ -64,7 +64,14 @@ object DatabaseFactory {
         AttendanceRecordsTable,
         StudentsTable,
         ChildrenTable,
-        FeeRecordsTable
+        FeeRecordsTable,
+        // School ecosystem (school_api_spec.artifact.md)
+        LeaveRequestsTable,
+        PtmEventsTable,
+        PtmClassProgressTable,
+        MessageThreadsTable,
+        MessagesTable,
+        ExamResultsTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */
