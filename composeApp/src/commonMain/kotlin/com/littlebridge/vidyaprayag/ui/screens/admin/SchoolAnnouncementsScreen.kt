@@ -86,7 +86,10 @@ fun SchoolAnnouncementsScreen() {
             }
 
             item {
-                FilterChipsSection()
+                FilterChipsSection(
+                    selectedCategory = state.selectedCategory,
+                    onSelect = { viewModel.setCategoryFilter(it) }
+                )
             }
 
             // Featured Announcement (Bento Style)
@@ -286,16 +289,27 @@ private fun SearchBarSection(
 }
 
 @Composable
-private fun FilterChipsSection() {
+private fun FilterChipsSection(
+    selectedCategory: String?,
+    onSelect: (String?) -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         val filters = listOf("All", "Holidays", "PTM", "Events")
         filters.forEach { filter ->
-            val isSelected = filter == "All"
+            // "All" is selected when no category filter is active; otherwise
+            // case-insensitive match against the server-side category.
+            val isSelected = when {
+                filter.equals("All", ignoreCase = true) -> selectedCategory.isNullOrBlank()
+                else -> filter.equals(selectedCategory, ignoreCase = true)
+            }
             Surface(
-                onClick = { },
+                onClick = {
+                    if (filter.equals("All", ignoreCase = true)) onSelect(null)
+                    else onSelect(filter)
+                },
                 shape = RoundedCornerShape(12.dp),
                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White,
                 border = if (isSelected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)

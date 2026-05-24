@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.Enquiry
 import com.littlebridge.vidyaprayag.feature.admin.presentation.AdmissionCRMState
 import com.littlebridge.vidyaprayag.feature.admin.presentation.AdmissionCRMViewModel
+import com.littlebridge.vidyaprayag.navigation.Destination
+import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
 import com.littlebridge.vidyaprayag.ui.components.*
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -32,6 +34,7 @@ fun AdmissionCRMDashboard() {
     val state by viewModel.state.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val navigator = LocalAppNavigator.current
 
     // Re-sync on screen entry (e.g. coming back from another tab) - mirrors
     // the SchoolDashboard pattern.
@@ -90,7 +93,16 @@ fun AdmissionCRMDashboard() {
             }
 
             item {
-                ConversionInsightCard(label = state.efficiencyLabel)
+                ConversionInsightCard(
+                    label = state.efficiencyLabel,
+                    onGenerateReport = {
+                        // Funnel insight → deep analytics dashboard for the
+                        // full breakdown (this is the closest available report
+                        // view; a dedicated CRM report screen can replace it
+                        // when one is added).
+                        navigator.navigateTo(Destination.AnalyticsDashboard)
+                    }
+                )
             }
 
             item {
@@ -399,7 +411,7 @@ private fun ErrorBanner(message: String, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun ConversionInsightCard(label: String) {
+private fun ConversionInsightCard(label: String, onGenerateReport: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -418,7 +430,7 @@ private fun ConversionInsightCard(label: String) {
                 color = Color.White.copy(alpha = 0.7f)
             )
             Button(
-                onClick = { },
+                onClick = onGenerateReport,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f)),
                 border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),

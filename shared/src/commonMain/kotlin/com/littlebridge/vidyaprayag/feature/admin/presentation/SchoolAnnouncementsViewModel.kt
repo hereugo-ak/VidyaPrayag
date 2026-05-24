@@ -26,7 +26,15 @@ data class Announcement(
 )
 
 data class SchoolAnnouncementsState(
+    /** Filtered list shown in the UI (after category + search). */
     val announcements: List<Announcement> = emptyList(),
+    /**
+     * Unfiltered cache so we can re-derive [announcements] without re-hitting
+     * the network when the user toggles a category chip.
+     */
+    val allAnnouncements: List<Announcement> = emptyList(),
+    /** null = "All" (show everything). */
+    val selectedCategory: String? = null,
     val isWhatsAppSyncEnabled: Boolean = true,
     val isLoading: Boolean = false,
     val isCreating: Boolean = false,
@@ -59,9 +67,10 @@ class SchoolAnnouncementsViewModel(
 
             when (val result = announcementsRepository.getAnnouncements(token)) {
                 is NetworkResult.Success -> {
-                    val dtos = result.data.data?.announcements ?: emptyList()
+                    val all = result.data.data?.announcements.orEmpty().map { it.toUiModel() }
                     _state.value = _state.value.copy(
-                        announcements = dtos.map { it.toUiModel() },
+                        allAnnouncements = all,
+                        announcements = applyCategoryFilter(all, _state.value.selectedCategory),
                         isLoading = false
                     )
                 }
@@ -93,9 +102,10 @@ class SchoolAnnouncementsViewModel(
             val token = preferenceRepository.getUserToken().first() ?: return@launch
             when (val result = announcementsRepository.searchAnnouncements(token, query)) {
                 is NetworkResult.Success -> {
-                    val dtos = result.data.data?.announcements ?: emptyList()
+                    val all = result.data.data?.announcements.orEmpty().map { it.toUiModel() }
                     _state.value = _state.value.copy(
-                        announcements = dtos.map { it.toUiModel() },
+                        allAnnouncements = all,
+                        announcements = applyCategoryFilter(all, _state.value.selectedCategory),
                         isLoading = false
                     )
                 }
@@ -107,6 +117,28 @@ class SchoolAnnouncementsViewModel(
                 }
             }
         }
+    }
+
+    /**
+     * Switch the active category filter. Pass null (or "All") to clear the
+     * filter. Operates on the cached [SchoolAnnouncementsState.allAnnouncements]
+     * to avoid an extra network round-trip.
+     */
+    fun setCategoryFilter(category: String?) {
+        val normalized = category?.takeIf { it.isNotBlank() && !it.equals("All", ignoreCase = true) }
+        val filtered = applyCategoryFilter(_state.value.allAnnouncements, normalized)
+        _state.value = _state.value.copy(
+            selectedCategory = normalized,
+            announcements = filtered
+        )
+    }
+
+    private fun applyCategoryFilter(
+        items: List<Announcement>,
+        category: String?
+    ): List<Announcement> {
+        if (category.isNullOrBlank()) return items
+        return items.filter { it.category.equals(category, ignoreCase = true) }
     }
 
     /**
