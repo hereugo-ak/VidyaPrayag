@@ -34,6 +34,7 @@ fun MessagesScreen() {
     val state by viewModel.state.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    var showCompose by remember { mutableStateOf(false) }
 
     // Re-sync on screen entry, matching SchoolDashboard / AdmissionCRM.
     LaunchedEffect(Unit) { viewModel.refresh() }
@@ -62,7 +63,7 @@ fun MessagesScreen() {
             }
 
             item {
-                SearchAndActions()
+                SearchAndActions(onCompose = { showCompose = true })
             }
 
             if (state.threads.isEmpty() && !isLoading) {
@@ -80,7 +81,68 @@ fun MessagesScreen() {
                 Spacer(modifier = Modifier.height(100.dp))
             }
         }
+
+        if (showCompose) {
+            ComposeMessageDialog(
+                isSending = state.isSending,
+                onDismiss = { showCompose = false },
+                onSend = { body ->
+                    viewModel.sendMessage(body = body, onSent = { showCompose = false })
+                }
+            )
+        }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ComposeMessageDialog(
+    isSending: Boolean,
+    onDismiss: () -> Unit,
+    onSend: (String) -> Unit
+) {
+    var body by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = { if (!isSending) onDismiss() },
+        title = { Text("New message", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Sends a broadcast message to the school inbox. Replies create a new thread.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = body,
+                    onValueChange = { body = it },
+                    label = { Text("Message") },
+                    minLines = 4,
+                    maxLines = 8,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isSending
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = !isSending && body.isNotBlank(),
+                onClick = { onSend(body.trim()) }
+            ) {
+                if (isSending) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("Send")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isSending) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable
@@ -175,7 +237,7 @@ private fun EmptyMessagesCard() {
 }
 
 @Composable
-private fun SearchAndActions() {
+private fun SearchAndActions(onCompose: () -> Unit = {}) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -206,7 +268,7 @@ private fun SearchAndActions() {
         }
 
         Button(
-            onClick = { },
+            onClick = onCompose,
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.height(48.dp),
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
