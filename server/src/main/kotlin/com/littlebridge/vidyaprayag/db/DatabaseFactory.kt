@@ -167,13 +167,25 @@ object DatabaseFactory {
             else -> "jdbc:postgresql://$databaseUrl"
         }
 
-        // Auto-append SSL mode if missing and we are talking to Supabase/Render
-        val finalJdbcUrl = if (!jdbcUrl.contains("sslmode=") && isPostgres) {
+        // Auto-append SSL mode and PgBouncer threshold if missing
+        val finalJdbcUrl = buildString {
+            append(jdbcUrl)
             val separator = if (jdbcUrl.contains("?")) "&" else "?"
-            jdbcUrl + separator + "sslmode=require"
-        } else {
-            jdbcUrl
+            
+            if (!jdbcUrl.contains("sslmode=") && isPostgres) {
+                append(separator).append("sslmode=require")
+            }
+            
+            if (!contains("prepareThreshold=")) {
+                append(if (contains("?")) "&" else "?").append("prepareThreshold=0")
+            }
+            
+            if (!contains("currentSchema=")) {
+                append(if (contains("?")) "&" else "?").append("currentSchema=public")
+            }
         }
+
+        println("DB_INIT: Connecting to $finalJdbcUrl")
 
         val config = HikariConfig().apply {
             driverClassName = "org.postgresql.Driver"

@@ -187,3 +187,46 @@ fun OnboardingBottomBar(
         }
     }
 }
+
+/**
+ * A red-tinted banner used at the top of an onboarding screen to surface a
+ * network / validation error that came back from the backend. Tap the X to
+ * dismiss; the ViewModel's clearError() is invoked.
+ */
+@Composable
+fun OnboardingErrorBanner(
+    message: String,
+    onDismiss: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.errorContainer,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.ErrorOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer
+            )
+            Text(
+                text = message,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                fontWeight = FontWeight.Medium
+            )
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Dismiss",
+                    tint = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+        }
+    }
+}
