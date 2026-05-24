@@ -139,6 +139,18 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.AnalyticsApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.ResultsApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
 
     // Repositories
     single<SchoolRepository> { SchoolRepositoryImpl(get(), get()) }
@@ -175,6 +187,12 @@ val commonModule = module {
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.LeaveRequestsRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.LeaveRequestsRepositoryImpl(get())
     }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AnalyticsRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.AnalyticsRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.ResultsRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.ResultsRepositoryImpl(get())
+    }
 
     // UseCases
     factory { GetSchoolsUseCase(get()) }
@@ -208,12 +226,12 @@ val viewModelModule = module {
     factory { AcademicCalendarViewModel(get(), get()) }
     factory { LeaveRequestsViewModel(get(), get()) }
     factory { DailyAttendanceViewModel(get(), get()) }
-    factory { AnalyticsDashboardViewModel() }
+    factory { AnalyticsDashboardViewModel(get(), get()) }
     factory { StudentAnalyticsViewModel() }
     factory { TeacherPerformanceViewModel() }
     factory { ClassPerformanceViewModel() }
     factory { SyllabusCoverageViewModel() }
-    factory { ResultsViewModel() }
+    factory { ResultsViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.content.presentation.LandingViewModel(get()) }
     factory { com.littlebridge.vidyaprayag.feature.auth.presentation.AuthViewModel(get()) }
 }
