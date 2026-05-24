@@ -30,6 +30,7 @@ server/src/main/kotlin/com/littlebridge/vidyaprayag/
 │   └── Seed.kt                          ← idempotent first-run seeder
 └── feature/
     ├── content/LandingRouting.kt        → /api/v1/content/landing
+    ├── content/SupportRouting.kt        → /api/v1/content/support
     ├── config/AppStatusRouting.kt       → /api/v1/config/app-status
     ├── auth/AuthRouting.kt              → /api/v1/auth/* (+ legacy /auth/*)
     ├── user/
@@ -38,7 +39,12 @@ server/src/main/kotlin/com/littlebridge/vidyaprayag/
     ├── onboarding/OnboardingRouting.kt  → /api/v1/onboarding/*
     ├── announcements/AnnouncementRouting.kt → /api/v1/school/announcements*
     ├── admissions/AdmissionRouting.kt   → /api/v1/admissions/enquiries[…]
-    └── school/SchoolRouting.kt          → /api/v1/school/{analytics,calendar,holidays,attendance/daily}
+    ├── school/SchoolRouting.kt          → /api/v1/school/{analytics,calendar,holidays,attendance/daily}
+    └── parent/                          ← parent_api_spec.artifact.md
+        ├── ParentOnboardingRouting.kt   → /api/v1/parent/onboarding/{metadata,child-info,preference-options}
+        ├── ParentDashboardRouting.kt    → /api/v1/parent/dashboard
+        ├── TrackProgressRouting.kt      → /api/v1/parent/track-progress
+        └── ParentFeesRouting.kt         → /api/v1/parent/fees
 ```
 
 Every routing file has a header comment with: purpose, endpoints, tables
@@ -74,6 +80,13 @@ touched, JWT requirements, and which UI screen consumes it.
 | GET    | `/api/v1/school/calendar`                        | JWT    | [09-drawer.md](./09-drawer.md) |
 | GET    | `/api/v1/school/holidays`                        | JWT    | [09-drawer.md](./09-drawer.md) |
 | GET    | `/api/v1/school/attendance/daily`                | JWT    | [09-drawer.md](./09-drawer.md) |
+| GET    | `/api/v1/parent/onboarding/metadata`             | JWT    | [12-parent-ecosystem.md](./12-parent-ecosystem.md) |
+| POST   | `/api/v1/parent/onboarding/child-info`           | JWT    | [12-parent-ecosystem.md](./12-parent-ecosystem.md) |
+| GET    | `/api/v1/parent/onboarding/preference-options`   | JWT    | [12-parent-ecosystem.md](./12-parent-ecosystem.md) |
+| GET    | `/api/v1/parent/dashboard`                       | JWT    | [12-parent-ecosystem.md](./12-parent-ecosystem.md) |
+| GET    | `/api/v1/parent/track-progress`                  | JWT    | [12-parent-ecosystem.md](./12-parent-ecosystem.md) |
+| GET    | `/api/v1/parent/fees`                            | JWT    | [12-parent-ecosystem.md](./12-parent-ecosystem.md) |
+| GET    | `/api/v1/content/support`                        | public | [12-parent-ecosystem.md](./12-parent-ecosystem.md) |
 
 Legacy `/auth/*` (without `/api/v1` prefix) are also wired and resolve to the
 same handlers, so the existing `shared/.../AuthApi.kt` keeps working until the

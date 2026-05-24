@@ -62,7 +62,9 @@ object DatabaseFactory {
         HolidayListTable,
         FacultyTable,
         AttendanceRecordsTable,
-        StudentsTable
+        StudentsTable,
+        ChildrenTable,
+        FeeRecordsTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

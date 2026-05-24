@@ -155,6 +155,112 @@ object CmsSeed {
                     }
                 }
             }
+
+            // -------------------------------------------------------------
+            // Parent ecosystem CMS defaults (parent_api_spec.artifact.md).
+            //
+            // All UI strings, statistics, and configurations for the Parent
+            // module are backend-driven. The keys below match what the
+            // routes in feature.parent / feature.content.SupportRouting
+            // look up at runtime; defaults are used as fallbacks if a key
+            // is ever missing in production.
+            //
+            // Idempotent: inserted only when the key does not already exist.
+            // -------------------------------------------------------------
+            val parentDefaults = mapOf(
+                // Onboarding Step 1
+                "parent_onboarding_step1_screen_config" to """
+                    {
+                      "header_title": "Let's build a profile for your child.",
+                      "header_subtitle": "We use this information to curate the best learning path.",
+                      "progress_label": "Step 1 of 3",
+                      "progress_value": 0.33
+                    }
+                """.trimIndent(),
+                "parent_available_grades" to """["Grade 1","Grade 2","Grade 3","Nursery","KG"]""",
+                "parent_available_interests" to """["Music","Art","STEM","Sports","Languages"]""",
+                "parent_onboarding_footer_text" to "\"Your data is encrypted and secure.\"",
+
+                // Onboarding Step 2
+                "parent_available_boards" to """["CBSE","ICSE","IB","State Board"]""",
+                "parent_available_focus_areas" to """
+                    [
+                      {"id":"acad","title":"Academics","icon":"school"},
+                      {"id":"sports","title":"Sports","icon":"sports_soccer"}
+                    ]
+                """.trimIndent(),
+                "parent_budget_config" to """
+                    {
+                      "min_value": 0,
+                      "max_value": 10000,
+                      "default_range": [2000, 5000],
+                      "currency_symbol": "$"
+                    }
+                """.trimIndent(),
+
+                // Dashboard
+                "parent_dashboard_curation_logic" to "\"Curation aligned with NEP 2020 developmental milestones.\"",
+                "parent_dashboard_info_alerts" to """
+                    [
+                      {"id":"ptm_upcoming","title":"Upcoming PTM","value":"Nov 25","type":"INFO"}
+                    ]
+                """.trimIndent(),
+
+                // Track Progress
+                "parent_track_journey_description" to "\"On track for next grade transition\"",
+                "parent_track_academic_label" to "\"NEP ALIGNED\"",
+                "parent_track_badges" to """
+                    [
+                      {"title":"Social Star","icon":"workspace_premium","is_locked":false,"colors":["#B6C7EB","#006C49"]},
+                      {"title":"Math Whiz","icon":"calculate","is_locked":true,"colors":["#FFD580","#B26A00"]}
+                    ]
+                """.trimIndent(),
+                "parent_track_academic_competencies" to """
+                    [
+                      {"title":"Literacy","progress":0.85,"icon":"translate"},
+                      {"title":"Numeracy","progress":0.78,"icon":"calculate"},
+                      {"title":"Creativity","progress":0.72,"icon":"palette"}
+                    ]
+                """.trimIndent(),
+                "parent_track_ei_description" to "\"Significant growth in Social Interaction this month.\"",
+                "parent_track_ei_metrics" to """{"Empathy":0.8,"Resilience":0.7,"Social":0.9}""",
+                "parent_track_play_discovery" to """
+                    [
+                      {"title":"Agility","description":"Gross motor met","status":"MET"},
+                      {"title":"Curiosity","description":"Exploration in progress","status":"IN_PROGRESS"}
+                    ]
+                """.trimIndent(),
+
+                // Fees CMS
+                "parent_fees_announcements" to """
+                    [
+                      {"id":"f1","title":"Deadline","time":"2h ago","desc":"Submit Q3 fees.","type":"Payment"}
+                    ]
+                """.trimIndent(),
+
+                // Support / Drawer
+                "parent_support_config" to """
+                    {
+                      "support_contact": "+91-9876543210",
+                      "categories": ["TECHNICAL","ACADEMIC","ADMISSIONS","FEES"],
+                      "help_center_url": "https://vidyaprayag.com/help"
+                    }
+                """.trimIndent()
+            )
+
+            val existingCfg2 = AppConfigTable
+                .selectAll()
+                .map { it[AppConfigTable.key] }
+                .toSet()
+            parentDefaults.forEach { (k, v) ->
+                if (k !in existingCfg2) {
+                    AppConfigTable.insert {
+                        it[key] = k
+                        it[value] = v
+                        it[updatedAt] = Instant.now()
+                    }
+                }
+            }
         }
     }
 }

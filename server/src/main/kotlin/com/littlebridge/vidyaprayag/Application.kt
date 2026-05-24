@@ -18,12 +18,17 @@
  *   - landingRouting()                    — /api/v1/content/landing
  *   - appStatusRouting()                  — /api/v1/config/app-status
  *   - authRouting()                       — /api/v1/auth/... (+ legacy /auth/...)
+ *   - supportRouting()                    — /api/v1/content/support
  *   - userDetailsRouting()                — /api/v1/user/details
  *   - userProfileRouting()                — /api/v1/user/profile[…]
  *   - onboardingRouting()                 — /api/v1/onboarding/...
  *   - announcementRouting()               — /api/v1/school/announcements[…]
  *   - admissionRouting()                  — /api/v1/admissions/enquiries[…]
  *   - schoolRouting()                     — /api/v1/school/{analytics,calendar,holidays,attendance/daily}
+ *   - parentOnboardingRouting()           — /api/v1/parent/onboarding/{metadata, child-info, preference-options}
+ *   - parentDashboardRouting()            — /api/v1/parent/dashboard
+ *   - trackProgressRouting()              — /api/v1/parent/track-progress
+ *   - parentFeesRouting()                 — /api/v1/parent/fees
  *
  * On boot:
  *   DatabaseFactory.init() creates/migrates all tables and seeds CMS + demo data.
@@ -43,7 +48,12 @@ import com.littlebridge.vidyaprayag.feature.auth.authRouting
 import com.littlebridge.vidyaprayag.feature.auth.otpAdminRouting
 import com.littlebridge.vidyaprayag.feature.config.appStatusRouting
 import com.littlebridge.vidyaprayag.feature.content.landingRouting
+import com.littlebridge.vidyaprayag.feature.content.supportRouting
 import com.littlebridge.vidyaprayag.feature.onboarding.onboardingRouting
+import com.littlebridge.vidyaprayag.feature.parent.parentDashboardRouting
+import com.littlebridge.vidyaprayag.feature.parent.parentFeesRouting
+import com.littlebridge.vidyaprayag.feature.parent.parentOnboardingRouting
+import com.littlebridge.vidyaprayag.feature.parent.trackProgressRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRouting
 import com.littlebridge.vidyaprayag.feature.user.parentRouting
 import com.littlebridge.vidyaprayag.feature.user.userDetailsRouting
@@ -111,6 +121,7 @@ fun Application.module() {
         landingRouting()
         appStatusRouting()
         authRouting()
+        supportRouting()
 
         // Ops-only — entire route group is unmounted (404) unless
         // OTP_ADMIN_TOKEN env var is set. See feature/auth/OtpAdminRouting.kt.
@@ -126,5 +137,11 @@ fun Application.module() {
         announcementRouting()
         admissionRouting()
         schoolRouting()
+
+        // Parent ecosystem (parent_api_spec.artifact.md)
+        parentOnboardingRouting()    // /api/v1/parent/onboarding/{metadata, child-info, preference-options}
+        parentDashboardRouting()     // /api/v1/parent/dashboard
+        trackProgressRouting()       // /api/v1/parent/track-progress
+        parentFeesRouting()          // /api/v1/parent/fees
     }
 }
