@@ -101,7 +101,12 @@ fun SchoolDashboardScreen() {
                 }
 
                 item {
-                    SupportSection()
+                    SupportSection(
+                        onChatClick = { navigator.navigateTo(Destination.Messages) },
+                        onWatchVideoClick = {
+                            navigator.navigateTo(Destination.InstitutionalProfile)
+                        }
+                    )
                 }
 
                 item {
@@ -452,10 +457,17 @@ private fun String.toMaterialIcon() = when (uppercase()) {
 }
 
 @Composable
-private fun SupportSection() {
+private fun SupportSection(
+    onChatClick: () -> Unit,
+    onWatchVideoClick: () -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Whole card is tappable so "anywhere in the support row" → chat,
+        // not just the small "CHAT" pill. Matches industrial-app convention.
         VidyaPrayagCard(
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onChatClick() }
         ) {
             Row(
                 modifier = Modifier.padding(16.dp),
@@ -483,7 +495,7 @@ private fun SupportSection() {
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        "Available 24/7 for institutions",
+                        "Open the messages inbox to reach support",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
@@ -494,13 +506,13 @@ private fun SupportSection() {
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 1.sp,
-                    modifier = Modifier.clickable { }
+                    modifier = Modifier.clickable { onChatClick() }
                 )
             }
         }
 
         OutlinedButton(
-            onClick = {},
+            onClick = onWatchVideoClick,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
