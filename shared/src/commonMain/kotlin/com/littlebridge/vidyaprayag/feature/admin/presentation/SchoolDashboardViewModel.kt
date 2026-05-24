@@ -2,21 +2,55 @@ package com.littlebridge.vidyaprayag.feature.admin.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.littlebridge.vidyaprayag.domain.util.UiState
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingStep
+import com.littlebridge.vidyaprayag.feature.auth.domain.model.UserDetailsData
+import com.littlebridge.vidyaprayag.core.network.NetworkResult
+import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.feature.auth.domain.repository.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
-class SchoolDashboardViewModel : ViewModel() {
+class SchoolDashboardViewModel(
+    private val authRepository: AuthRepository,
+    private val preferenceRepository: PreferenceRepository
+) : ViewModel() {
     private val _steps = MutableStateFlow<List<OnboardingStep>>(emptyList())
     val steps: StateFlow<List<OnboardingStep>> = _steps.asStateFlow()
+
+    private val _userDetails = MutableStateFlow<UiState<UserDetailsData>>(UiState.Loading)
+    val userDetails: StateFlow<UiState<UserDetailsData>> = _userDetails.asStateFlow()
 
     private val _progress = MutableStateFlow(0f)
     val progress: StateFlow<Float> = _progress.asStateFlow()
 
     init {
         loadSteps()
+        loadUserDetails()
+    }
+
+    private fun loadUserDetails() {
+        viewModelScope.launch {
+            _userDetails.value = UiState.Loading
+            preferenceRepository.getUserToken().collect { token ->
+                if (token != null) {
+                    when (val result = authRepository.getUserDetails(token)) {
+                        is NetworkResult.Success -> {
+                            _userDetails.value = UiState.Success(result.data.data)
+                        }
+                        is NetworkResult.Error -> {
+                            _userDetails.value = UiState.Error(result.message)
+                        }
+                        is NetworkResult.ConnectionError -> {
+                            _userDetails.value = UiState.Error("Connection error")
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun loadSteps() {

@@ -82,4 +82,8 @@ class AuthRepositoryImpl(
         cachedSession = null
         preferenceRepository.clearSession()
     }
+
+    override suspend fun getUserDetails(token: String): NetworkResult<UserDetailsResponse> {
+        return api.getUserDetails(token)
+    }
 }

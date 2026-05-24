@@ -1,9 +1,15 @@
 package com.littlebridge.vidyaprayag.feature.parent.presentation
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.littlebridge.vidyaprayag.core.network.NetworkResult
+import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.feature.parent.domain.repository.ParentRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class Scholarship(
     val id: String,
@@ -24,45 +30,58 @@ data class ScholarshipApplication(
 )
 
 data class ScholarshipsState(
-    val scholarships: List<Scholarship> = listOf(
-        Scholarship(
-            "1",
-            "Global Excellence STEM Award 2024",
-            "Awarded to top 5% of applicants pursuing Engineering or Mathematics in Central District partner institutions.",
-            "$45,000",
-            "3d : 12h",
-            "Full Funding",
-            isCritical = true
-        ),
-        Scholarship(
-            "2",
-            "Social Impact Grant",
-            "Supporting student-led community initiatives.",
-            "$5,000",
-            "24h left",
-            "Merit Based",
-            isCritical = true
-        ),
-        Scholarship(
-            "3",
-            "Bridge-to-Learning Fund",
-            "First-generation college student assistance program.",
-            "$12,000",
-            "14 days",
-            "International"
-        )
-    ),
-    val applications: List<ScholarshipApplication> = listOf(
-        ScholarshipApplication("1", "University of Applied Sciences", "B.Arch - Sustainable Urbanism", "Shortlisted", "architecture"),
-        ScholarshipApplication("2", "Tech Institute of Innovation", "M.Sc - Artificial Intelligence", "Under Review", "biotech"),
-        ScholarshipApplication("3", "Royal Academy of Arts", "BFA - Digital Media Design", "Received", "history_edu")
-    ),
-    val profileStrength: Int = 85,
-    val streakDays: Int = 3,
-    val currentLevel: Int = 4
+    val scholarships: List<Scholarship> = emptyList(),
+    val applications: List<ScholarshipApplication> = emptyList(),
+    val profileStrength: Int = 0,
+    val streakDays: Int = 0,
+    val currentLevel: Int = 0,
+    val isLoading: Boolean = false,
+    val error: String? = null
 )
 
-class ScholarshipsViewModel : ViewModel() {
+class ScholarshipsViewModel(
+    private val repository: ParentRepository,
+    private val preferenceRepository: PreferenceRepository
+) : ViewModel() {
     private val _state = MutableStateFlow(ScholarshipsState())
     val state: StateFlow<ScholarshipsState> = _state.asStateFlow()
+
+    init {
+        loadScholarships()
+    }
+
+    private fun loadScholarships() {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null) }
+            preferenceRepository.getUserToken().collect { token ->
+                if (token != null) {
+                    when (val result = repository.getScholarships(token)) {
+                        is NetworkResult.Success -> {
+                            val data = result.data.data
+                            _state.update {
+                                it.copy(
+                                    isLoading = false,
+                                    scholarships = data.scholarships.map { s ->
+                                        Scholarship(s.id, s.title, s.description, s.amount, s.timeLeft, s.category, s.isCritical)
+                                    },
+                                    applications = data.applications.map { a ->
+                                        ScholarshipApplication(a.id, a.institution, a.program, a.status, a.iconName)
+                                    },
+                                    profileStrength = data.profileStrength,
+                                    streakDays = data.streakDays,
+                                    currentLevel = data.currentLevel
+                                )
+                            }
+                        }
+                        is NetworkResult.Error -> {
+                            _state.update { it.copy(isLoading = false, error = result.message) }
+                        }
+                        is NetworkResult.ConnectionError -> {
+                            _state.update { it.copy(isLoading = false, error = "Connection error") }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

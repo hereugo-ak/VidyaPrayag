@@ -1,9 +1,15 @@
 package com.littlebridge.vidyaprayag.feature.parent.presentation
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.littlebridge.vidyaprayag.core.network.NetworkResult
+import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.feature.parent.domain.repository.ParentRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class ParentAnnouncement(
     val id: String,
@@ -16,37 +22,52 @@ data class ParentAnnouncement(
 )
 
 data class ParentAnnouncementState(
-    val announcements: List<ParentAnnouncement> = listOf(
-        ParentAnnouncement(
-            "1", 
-            "Annual Sports Day 2024", 
-            "Join us for a day of athletic excellence and school spirit. Parents are invited to participate in the relay race!",
-            "Oct 24, 2023",
-            "Events",
-            isFeatured = true,
-            imageUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuBJ0iy3QHsYrDK9vkmt05wDdmHmpgT8gBlcip2cJxtHhEZh8aRcsRMENEot_fma9PHySR3i7uOBCkzywjgrnyRweoIcsAippP8X0A0wqcgX-r5pfZvIL5UF_FG0Q8N_eb8FdFdPyQ48xEiykqbtT-Uh3PpA4KeOf2vv6fzHKyIidF-Y8ldvErlwE50_WVwRhhK7TMiQuKDOR9LRFN7cqu9v5ygC0nl9_0IMd4GuMkFoiDefldCGJStlfH48L5RIjTUZfLrJ-EITce_3"
-        ),
-        ParentAnnouncement(
-            "2",
-            "Mid-Term PTM",
-            "Schedule your slot to discuss your child's progress for the first half of the academic year.",
-            "Oct 28, 2023",
-            "PTM"
-        ),
-        ParentAnnouncement(
-            "3",
-            "Winter Vacation Notice",
-            "School will remain closed from Dec 20th to Jan 5th for the winter break.",
-            "Dec 15, 2023",
-            "Holidays"
-        )
-    ),
-    val isWhatsAppSyncEnabled: Boolean = true
+    val announcements: List<ParentAnnouncement> = emptyList(),
+    val isWhatsAppSyncEnabled: Boolean = false,
+    val isLoading: Boolean = false,
+    val error: String? = null
 )
 
-class ParentAnnouncementViewModel : ViewModel() {
+class ParentAnnouncementViewModel(
+    private val repository: ParentRepository,
+    private val preferenceRepository: PreferenceRepository
+) : ViewModel() {
     private val _state = MutableStateFlow(ParentAnnouncementState())
     val state: StateFlow<ParentAnnouncementState> = _state.asStateFlow()
+
+    init {
+        loadAnnouncements()
+    }
+
+    private fun loadAnnouncements() {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null) }
+            preferenceRepository.getUserToken().collect { token ->
+                if (token != null) {
+                    when (val result = repository.getAnnouncements(token)) {
+                        is NetworkResult.Success -> {
+                            val data = result.data.data
+                            _state.update {
+                                it.copy(
+                                    isLoading = false,
+                                    announcements = data.announcements.map { a ->
+                                        ParentAnnouncement(a.id, a.title, a.description, a.date, a.category, a.isFeatured, a.imageUrl)
+                                    },
+                                    isWhatsAppSyncEnabled = data.isWhatsAppSyncEnabled
+                                )
+                            }
+                        }
+                        is NetworkResult.Error -> {
+                            _state.update { it.copy(isLoading = false, error = result.message) }
+                        }
+                        is NetworkResult.ConnectionError -> {
+                            _state.update { it.copy(isLoading = false, error = "Connection error") }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     fun toggleWhatsAppSync(enabled: Boolean) {
         _state.value = _state.value.copy(isWhatsAppSyncEnabled = enabled)

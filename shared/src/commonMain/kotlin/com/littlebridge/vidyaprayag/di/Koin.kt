@@ -44,6 +44,8 @@ import io.ktor.client.*
 import io.ktor.client.engine.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.*
+import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import org.koin.core.context.startKoin
@@ -83,6 +85,12 @@ val commonModule = module {
             baseUrl = AppConfig.authBaseUrl
         ) 
     }
+    single {
+        com.littlebridge.vidyaprayag.feature.parent.data.remote.ParentApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
 
     // Repositories
     single<SchoolRepository> { SchoolRepositoryImpl(get(), get()) }
@@ -92,6 +100,9 @@ val commonModule = module {
     single<com.littlebridge.vidyaprayag.feature.auth.domain.repository.AuthRepository> { 
         com.littlebridge.vidyaprayag.feature.auth.data.repository.AuthRepositoryImpl(get(), get())
     }
+    single<com.littlebridge.vidyaprayag.feature.parent.domain.repository.ParentRepository> {
+        com.littlebridge.vidyaprayag.feature.parent.data.repository.ParentRepositoryImpl(get())
+    }
 
     // UseCases
     factory { GetSchoolsUseCase(get()) }
@@ -99,20 +110,20 @@ val commonModule = module {
 
 val viewModelModule = module {
     factory { MainViewModel(get(), get(), get()) }
-    factory { ParentDashboardViewModel(get()) }
-    factory { FeeViewModel() }
+    factory { ParentDashboardViewModel(get(), get(), get()) }
+    factory { FeeViewModel(get(), get()) }
     factory { ChildBasicInfoViewModel() }
     factory { YourPreferencesViewModel() }
     factory { LocationRequestViewModel() }
     factory { CareerPathViewModel() }
-    factory { ScholarshipsViewModel() }
+    factory { ScholarshipsViewModel(get(), get()) }
     factory { DailyStatusViewModel() }
     factory { ParentReportsViewModel() }
     factory { ParentSchedulePTMViewModel() }
-    factory { ParentAnnouncementViewModel() }
+    factory { ParentAnnouncementViewModel(get(), get()) }
     factory { ParentMessageViewModel() }
-    factory { TrackProgressViewModel() }
-    factory { SchoolDashboardViewModel() }
+    factory { TrackProgressViewModel(get(), get()) }
+    factory { SchoolDashboardViewModel(get(), get()) }
     factory { InstitutionalBasicOBViewModel() }
     factory { BrandingInfoOBViewModel() }
     factory { AcademicInfoOBViewModel() }

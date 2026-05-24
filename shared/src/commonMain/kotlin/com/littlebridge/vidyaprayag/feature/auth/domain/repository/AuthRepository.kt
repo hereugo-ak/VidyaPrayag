@@ -12,4 +12,5 @@ interface AuthRepository {
     suspend fun saveSession(response: AuthResponse)
     suspend fun getSession(): AuthResponse?
     suspend fun logout()
+    suspend fun getUserDetails(token: String): NetworkResult<UserDetailsResponse>
 }
