@@ -11,9 +11,11 @@ import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.crossfade
+import com.littlebridge.vidyaprayag.navigation.Destination
 import com.littlebridge.vidyaprayag.navigation.NavGraph
 import com.littlebridge.vidyaprayag.navigation.ProvideAppNavigator
 import com.littlebridge.vidyaprayag.presentation.MainViewModel
+import com.littlebridge.vidyaprayag.ui.screens.SplashScreen
 import com.littlebridge.vidyaprayag.ui.theme.AppTheme
 import com.littlebridge.vidyaprayag.ui.theme.VidyaPrayagTheme
 import io.ktor.client.*
@@ -31,6 +33,7 @@ fun App() {
     KoinContext {
         val viewModel: MainViewModel = koinViewModel()
         val themeName by viewModel.themeName.collectAsState()
+        val authState by viewModel.authState.collectAsState()
         
         val httpClient = koinInject<HttpClient>()
         val platform = koinInject<Platform>()
@@ -73,9 +76,23 @@ fun App() {
             initialTheme = appTheme,
             onThemeChange = { viewModel.setTheme(it.name) }
         ) {
-            val navController = rememberNavController()
-            ProvideAppNavigator(navController) {
-                NavGraph(navController = navController)
+            if (!authState.isLoaded) {
+                SplashScreen()
+            } else {
+                val navController = rememberNavController()
+                val startDestination = when {
+                    authState.token.isNullOrBlank() -> Destination.Landing
+                    authState.role == "ADMIN" -> Destination.SchoolDashboard
+                    authState.role == "PARENT" -> Destination.ParentDashboard
+                    else -> Destination.Landing
+                }
+
+                ProvideAppNavigator(navController) {
+                    NavGraph(
+                        navController = navController,
+                        startDestination = startDestination
+                    )
+                }
             }
         }
     }

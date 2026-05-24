@@ -41,11 +41,14 @@ fun VidyaPrayagDrawerSheet(
         drawerContainerColor = MaterialTheme.colorScheme.surface,
         modifier = Modifier.width(280.dp)
     ) {
-        DrawerHeader(userRole, onShowAuthSheet)
+        DrawerHeader(userRole ?: "GUEST", onShowAuthSheet)
         DrawerContent(
-            userRole = userRole,
+            userRole = userRole ?: "GUEST",
             onShowAuthSheet = onShowAuthSheet,
-            onLogout = { mainViewModel.logout() }
+            onLogout = { 
+                mainViewModel.logout()
+                navigator.navigateToAndClear(Destination.Landing)
+            }
         ) {
             navigator.navigateTo(it)
         }

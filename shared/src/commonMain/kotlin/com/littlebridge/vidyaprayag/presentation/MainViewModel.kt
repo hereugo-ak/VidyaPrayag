@@ -9,9 +9,16 @@ import com.littlebridge.vidyaprayag.domain.util.UiState
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
+data class AuthState(
+    val role: String? = null,
+    val token: String? = null,
+    val isLoaded: Boolean = false
+)
+
 class MainViewModel(
     private val getSchoolsUseCase: GetSchoolsUseCase,
-    private val preferenceRepository: PreferenceRepository
+    private val preferenceRepository: PreferenceRepository,
+    private val authRepository: com.littlebridge.vidyaprayag.feature.auth.domain.repository.AuthRepository,
 ) : ViewModel() {
 
     private val _schools = MutableStateFlow<UiState<List<School>>>(UiState.Loading)
@@ -20,8 +27,18 @@ class MainViewModel(
     val themeName: StateFlow<String> = preferenceRepository.getThemeName()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "LIGHT")
 
-    val userRole: StateFlow<String> = preferenceRepository.getUserRole()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "GUEST")
+    val authState: StateFlow<AuthState> = combine(
+        preferenceRepository.getUserRole(),
+        preferenceRepository.getUserToken()
+    ) { role, token ->
+        AuthState(role, token, isLoaded = true)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AuthState())
+
+    val userRole: StateFlow<String?> = preferenceRepository.getUserRole()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val userToken: StateFlow<String?> = preferenceRepository.getUserToken()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     init {
         refreshSchools()
@@ -54,7 +71,7 @@ class MainViewModel(
 
     fun logout() {
         viewModelScope.launch {
-            preferenceRepository.setUserRole("GUEST")
+            authRepository.logout()
         }
     }
 }

@@ -90,7 +90,7 @@ val commonModule = module {
         com.littlebridge.vidyaprayag.feature.content.data.repository.ContentRepositoryImpl(get())
     }
     single<com.littlebridge.vidyaprayag.feature.auth.domain.repository.AuthRepository> { 
-        com.littlebridge.vidyaprayag.feature.auth.data.repository.AuthRepositoryImpl(get()) 
+        com.littlebridge.vidyaprayag.feature.auth.data.repository.AuthRepositoryImpl(get(), get())
     }
 
     // UseCases
@@ -98,7 +98,7 @@ val commonModule = module {
 }
 
 val viewModelModule = module {
-    factory { MainViewModel(get(), get()) }
+    factory { MainViewModel(get(), get(), get()) }
     factory { ParentDashboardViewModel(get()) }
     factory { FeeViewModel() }
     factory { ChildBasicInfoViewModel() }

@@ -1,11 +1,10 @@
-package com.littlebridge.vidyaprayag.presentation.landing
+package com.littlebridge.vidyaprayag.ui.screens
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,6 +26,8 @@ import org.koin.compose.viewmodel.koinViewModel
 import com.littlebridge.vidyaprayag.presentation.MainViewModel
 import com.littlebridge.vidyaprayag.domain.util.UiState
 import com.littlebridge.vidyaprayag.feature.content.domain.model.LandingItem
+import com.littlebridge.vidyaprayag.feature.content.domain.model.LandingSection
+import com.littlebridge.vidyaprayag.feature.content.presentation.LandingViewModel
 import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
 import com.littlebridge.vidyaprayag.navigation.Destination
 import com.littlebridge.vidyaprayag.ui.auth.AuthBottomSheet
@@ -35,7 +36,7 @@ import com.littlebridge.vidyaprayag.ui.auth.AuthBottomSheet
 @Composable
 fun CommonLandingScreen() {
     val mainViewModel: MainViewModel = koinViewModel()
-    val landingViewModel: com.littlebridge.vidyaprayag.feature.content.presentation.LandingViewModel = koinViewModel()
+    val landingViewModel: LandingViewModel = koinViewModel()
     
     val schoolsState by mainViewModel.schools.collectAsState()
     val landingState by landingViewModel.landingState.collectAsState()
@@ -251,8 +252,8 @@ private fun MarqueeItem(icon: ImageVector, text: String) {
 
 @Composable
 private fun EntryPointsSection(
-    parentInfo: com.littlebridge.vidyaprayag.feature.content.domain.model.LandingSection?,
-    schoolInfo: com.littlebridge.vidyaprayag.feature.content.domain.model.LandingSection?,
+    parentInfo: LandingSection?,
+    schoolInfo: LandingSection?,
     onJoinClick: () -> Unit
 ) {
     Column(modifier = Modifier.padding(24.dp)) {
@@ -369,7 +370,7 @@ private fun MoatCard(title: String, description: String, imageUrl: String) {
 
 @Composable
 private fun PortalAccessSection(
-    portals: List<com.littlebridge.vidyaprayag.feature.content.domain.model.LandingItem>,
+    portals: List<LandingItem>,
     onLoginClick: () -> Unit
 ) {
     Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 40.dp)) {

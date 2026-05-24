@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.littlebridge.vidyaprayag.presentation.landing.CommonLandingScreen
+import com.littlebridge.vidyaprayag.ui.screens.CommonLandingScreen
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -119,10 +119,13 @@ sealed interface Destination {
 }
 
 @Composable
-fun NavGraph(navController: NavHostController) {
+fun NavGraph(
+    navController: NavHostController,
+    startDestination: Destination = Destination.Landing
+) {
     NavHost(
         navController = navController,
-        startDestination = Destination.Landing
+        startDestination = startDestination
     ) {
         composable<Destination.Landing> {
             CommonLandingScreen()
