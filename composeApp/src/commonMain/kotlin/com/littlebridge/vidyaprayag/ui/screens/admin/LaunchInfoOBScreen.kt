@@ -44,7 +44,11 @@ fun LaunchInfoOBScreen() {
                 onContinue = {
                     if (!isSubmitting) {
                         viewModel.submit {
-                            navigator.navigateTo(Destination.SchoolDashboard)
+                            // Clear the entire onboarding back stack so the
+                            // user lands on a fresh SchoolDashboard and
+                            // can't accidentally back-navigate into the
+                            // just-completed onboarding screens.
+                            navigator.navigateToAndClear(Destination.SchoolDashboard)
                         }
                     }
                 },
