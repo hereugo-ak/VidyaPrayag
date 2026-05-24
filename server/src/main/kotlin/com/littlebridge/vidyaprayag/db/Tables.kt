@@ -365,3 +365,61 @@ object StudentsTable : UUIDTable("students", "id") {
     val isActive   = bool("is_active").default(true)
     val createdAt  = timestamp("created_at")
 }
+
+// =====================================================================
+// Parent Ecosystem Tables (spec: parent_api_spec.artifact.md)
+// =====================================================================
+
+/**
+ * Children registered by parents during onboarding (Module: Child Onboarding).
+ * A child belongs to a parent (app_users.role = 'parent') and OPTIONALLY to a
+ * school (set when the parent enrols them somewhere). `interests` and the
+ * holistic progress JSON columns are persisted as plain text and parsed/
+ * encoded with kotlinx.serialization at the route layer.
+ *
+ * Spec ref: parent_api_spec.artifact.md §Module: Child Onboarding
+ *           parent_api_spec.artifact.md §Module: Core Dashboard & Progress
+ */
+object ChildrenTable : UUIDTable("children", "id") {
+    val parentId         = uuid("parent_id")                            // FK app_users.id
+    val schoolId         = uuid("school_id").nullable()                 // FK schools.id (optional)
+    val childName        = text("child_name")
+    val dateOfBirth      = varchar("date_of_birth", 12).nullable()      // YYYY-MM-DD
+    val gender           = varchar("gender", 16).nullable()             // MALE | FEMALE | OTHER
+    val currentGrade     = varchar("current_grade", 32).nullable()      // e.g. "Grade 1"
+    val interests        = text("interests").default("[]")              // JSON array of strings
+    val profilePic       = text("profile_pic").nullable()
+    val overallProgress  = double("overall_progress").default(0.0)      // 0..1
+    val currentLevel     = integer("current_level").default(1)
+    val attendanceStatus = varchar("attendance_status", 16).default("PRESENT")
+    val isActive         = bool("is_active").default(true)
+    val createdAt        = timestamp("created_at")
+    val updatedAt        = timestamp("updated_at")
+}
+
+/**
+ * Parent fee records — driven by GET /api/v1/parent/fees.
+ *
+ * Stores per-line-item fees for a (parent, child) pair.  The aggregate
+ * `stats` block in the response is computed on-the-fly:
+ *   total_collected  = SUM(amount) WHERE status='PAID'
+ *   outstanding      = SUM(amount) WHERE status IN ('DUE','OVERDUE')
+ *   overdue_count    = COUNT(*) WHERE status='OVERDUE'
+ *   progress         = total_collected / (total_collected + outstanding)
+ *
+ * Spec ref: parent_api_spec.artifact.md §Module: School Management §Screen: Fees
+ */
+object FeeRecordsTable : UUIDTable("fee_records", "id") {
+    val parentId    = uuid("parent_id")
+    val childId     = uuid("child_id").nullable()
+    val schoolId    = uuid("school_id").nullable()
+    val title       = text("title")
+    val description = text("description").nullable()
+    val amount      = double("amount").default(0.0)
+    val currency    = varchar("currency", 8).default("USD")
+    val dueDate     = varchar("due_date", 12).nullable()                // YYYY-MM-DD
+    val status      = varchar("status", 16).default("DUE")              // PAID | DUE | OVERDUE
+    val category    = varchar("category", 32).default("Tuition")        // Tuition | Transport | ...
+    val createdAt   = timestamp("created_at")
+    val updatedAt   = timestamp("updated_at")
+}

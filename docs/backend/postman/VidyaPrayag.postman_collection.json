@@ -816,6 +816,131 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "10. Parent Ecosystem (parent_api_spec)",
+      "description": "Endpoints from parent_api_spec.artifact.md.  All UI strings/stats are backend-driven via app_config — operators can edit CMS keys in Supabase without redeploys.  All routes except /content/support require JWT (use the Login from section 3 to populate {{token}}).",
+      "item": [
+        {
+          "name": "GET /content/support (public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/content/support",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","v1","content","support"]
+            },
+            "description": "Drawer & Legal screen support config.  Backed by app_config[\"parent_support_config\"]; falls back to hard-coded defaults if not seeded."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /parent/onboarding/metadata",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/parent/onboarding/metadata",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","v1","parent","onboarding","metadata"]
+            },
+            "description": "Step 1: dropdown reference data + screen header copy.  CMS keys: parent_onboarding_step1_screen_config, parent_available_grades, parent_available_interests, parent_onboarding_footer_text."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /parent/onboarding/child-info",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  if (body && body.data && body.data.child_id) {",
+                  "    pm.environment.set('child_id', body.data.child_id);",
+                  "    console.log('[VP] child_id stored: ' + body.data.child_id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"child_name\": \"Aarav Sharma\",\n  \"date_of_birth\": \"2018-05-15\",\n  \"gender\": \"MALE\",\n  \"current_grade\": \"Grade 1\",\n  \"interests\": [\"Music\", \"STEM\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/parent/onboarding/child-info",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","v1","parent","onboarding","child-info"]
+            },
+            "description": "Step 1 submit.  Creates a row in `children` for the authenticated parent.  Returns 201 with child_id; the test script auto-saves it to {{child_id}}."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /parent/onboarding/preference-options",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/parent/onboarding/preference-options",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","v1","parent","onboarding","preference-options"]
+            },
+            "description": "Step 2: search filters (boards, focus areas, budget range).  CMS keys: parent_available_boards, parent_available_focus_areas, parent_budget_config."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /parent/dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/parent/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","v1","parent","dashboard"]
+            },
+            "description": "Home screen handshake.  Pulls first active child, OVERDUE fee total, info alerts (CMS), top 5 active schools, and curation_logic string.  Returns child_summary=null when the parent has not onboarded a child yet."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /parent/track-progress",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/parent/track-progress",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","v1","parent","track-progress"]
+            },
+            "description": "Holistic Growth screen.  Hero band uses children.overall_progress + current_level.  Badges, NEP competencies, EI metrics, play & discovery cards all come from CMS (app_config parent_track_* keys) so ops can edit copy without redeploys."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /parent/fees",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/parent/fees",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","v1","parent","fees"]
+            },
+            "description": "Fees screen.  Aggregates rows in fee_records for the JWT-authenticated parent: total_collected = SUM(amount WHERE status='PAID'); outstanding = SUM(amount WHERE status IN ('DUE','OVERDUE')); overdue_count = COUNT(status='OVERDUE').  Empty state returns 0/0/$0/0%."
+          },
+          "response": []
+        }
+      ]
     }
   ]
 }
