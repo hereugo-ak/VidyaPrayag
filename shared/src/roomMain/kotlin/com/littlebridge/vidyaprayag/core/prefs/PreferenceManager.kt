@@ -11,6 +11,7 @@ class PreferenceManager(
 ) : PreferenceRepository {
 
     private val THEME_NAME_KEY = stringPreferencesKey("theme_name")
+    private val USER_ROLE_KEY = stringPreferencesKey("user_role")
 
     override fun getThemeName(): Flow<String> {
         return dataStore.data.map { preferences ->
@@ -21,6 +22,18 @@ class PreferenceManager(
     override suspend fun setThemeName(name: String) {
         dataStore.edit { preferences ->
             preferences[THEME_NAME_KEY] = name
+        }
+    }
+
+    override fun getUserRole(): Flow<String> {
+        return dataStore.data.map { preferences ->
+            preferences[USER_ROLE_KEY] ?: "GUEST"
+        }
+    }
+
+    override suspend fun setUserRole(role: String) {
+        dataStore.edit { preferences ->
+            preferences[USER_ROLE_KEY] = role
         }
     }
 }

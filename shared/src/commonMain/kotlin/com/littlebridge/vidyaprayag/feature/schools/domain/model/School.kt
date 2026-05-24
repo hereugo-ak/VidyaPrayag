@@ -9,5 +9,9 @@ data class School(
     val location: String,
     val board: String,
     val description: String,
-    val imageUrl: String
+    val imageUrl: String,
+    val sriScore: Double = 0.0,
+    val feesRange: String = "",
+    val isVerified: Boolean = false,
+    val tags: List<String> = emptyList()
 )

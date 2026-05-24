@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,6 +26,7 @@ import com.littlebridge.vidyaprayag.feature.schools.domain.model.School
 import org.koin.compose.viewmodel.koinViewModel
 import com.littlebridge.vidyaprayag.presentation.MainViewModel
 import com.littlebridge.vidyaprayag.domain.util.UiState
+import com.littlebridge.vidyaprayag.feature.content.domain.model.LandingItem
 import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
 import com.littlebridge.vidyaprayag.navigation.Destination
 import com.littlebridge.vidyaprayag.ui.auth.AuthBottomSheet
@@ -32,55 +34,86 @@ import com.littlebridge.vidyaprayag.ui.auth.AuthBottomSheet
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommonLandingScreen() {
-    val viewModel: MainViewModel = koinViewModel()
-    val schoolsState by viewModel.schools.collectAsState()
+    val mainViewModel: MainViewModel = koinViewModel()
+    val landingViewModel: com.littlebridge.vidyaprayag.feature.content.presentation.LandingViewModel = koinViewModel()
+    
+    val schoolsState by mainViewModel.schools.collectAsState()
+    val landingState by landingViewModel.landingState.collectAsState()
+    
     val navigator = LocalAppNavigator.current
     
     var showAuthSheet by remember { mutableStateOf(false) }
 
-    BaseScreen { paddingValues ->
+    BaseScreen(
+        onShowAuthSheet = { showAuthSheet = true }
+    ) { paddingValues, scrollModifier ->
         if (showAuthSheet) {
             AuthBottomSheet(onDismissRequest = { showAuthSheet = false })
         }
         
-        when (val state = schoolsState) {
-            is UiState.Loading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+        // Show loading if both state is loading
+        if (landingState is UiState.Loading && schoolsState is UiState.Loading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
             }
-            is UiState.Error -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Error: ${state.message}", color = MaterialTheme.colorScheme.error)
-                }
+        } else if (landingState is UiState.Error) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Error: ${(landingState as UiState.Error).message}", color = MaterialTheme.colorScheme.error)
             }
-            is UiState.Success -> {
-                val schools = state.data
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentPadding = PaddingValues(bottom = 32.dp)
-                ) {
+        } else {
+            val landingData = (landingState as? UiState.Success)?.data
+            val schools = (schoolsState as? UiState.Success)?.data ?: emptyList()
+            
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(scrollModifier)
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(vertical = 32.dp)
+            ) {
+                item { 
+                    HeroSection(
+                        topTagline = landingData?.topTagline ?: "Education with Trust.",
+                        subTagline = landingData?.subTagline ?: "Progress with Purpose."
+                    ) 
+                }
+                
+                if (schools.isNotEmpty()) {
                     item { 
-                        HeroSection(onSearchClick = { navigator.navigateTo(Destination.Search) }) 
+                        FeaturedSchoolsSection(schools, onSchoolClick = { id -> 
+                            navigator.navigateTo(Destination.SchoolDetails(id)) 
+                        }) 
                     }
-                    
-                    if (schools.isNotEmpty()) {
-                        item { 
-                            FeaturedSchoolsSection(schools, onSchoolClick = { id -> 
-                                navigator.navigateTo(Destination.SchoolDetails(id)) 
-                            }) 
-                        }
-                    }
-
-                    item { SocialProofSection() }
-                    item { EntryPointsSection(onJoinClick = { showAuthSheet = true }) }
-                    item { MoatShowcaseSection() }
-                    item { PortalAccessSection(onLoginClick = { showAuthSheet = true }) }
-                    item { FinalCtaSection(onJoinClick = { showAuthSheet = true }) }
-                    item { FooterSection() }
                 }
+
+                item { SocialProofSection() }
+                
+                item { 
+                    EntryPointsSection(
+                        parentInfo = landingData?.parentInfo,
+                        schoolInfo = landingData?.schoolInfo,
+                        onJoinClick = { showAuthSheet = true }
+                    ) 
+                }
+                
+                item { 
+                    MoatShowcaseSection(
+                        title =  "Next-Gen Intelligence",
+                        description = "Proprietary systems powering the ecosystem.",
+                        listOfOfferings = landingData?.listOfOfferings
+                    ) 
+                }
+
+                if (landingData?.listOfPortals?.isNotEmpty() == true) {
+                    item { 
+                        PortalAccessSection(
+                            portals = landingData.listOfPortals,
+                            onLoginClick = { showAuthSheet = true }
+                        ) 
+                    }
+                }
+
+               // item { FinalCtaSection(onJoinClick = { showAuthSheet = true }) }
             }
         }
     }
@@ -115,7 +148,7 @@ private fun SchoolCard(
     school: School,
     onClick: () -> Unit
 ) {
-    EduTrustCard(
+    VidyaPrayagCard(
         modifier = Modifier.width(240.dp).clickable { onClick() }
     ) {
         Column {
@@ -136,7 +169,10 @@ private fun SchoolCard(
 }
 
 @Composable
-private fun HeroSection(onSearchClick: () -> Unit) {
+private fun HeroSection(
+    topTagline: String,
+    subTagline: String
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -144,39 +180,32 @@ private fun HeroSection(onSearchClick: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Education with Trust.",
+            text = topTagline,
             style = MaterialTheme.typography.displayLarge,
             color = MaterialTheme.colorScheme.primary,
             textAlign = TextAlign.Center,
             fontWeight = FontWeight.Bold,
-            lineHeight = 44.sp
+            lineHeight = 48.sp
         )
         Text(
-            text = "Progress with Purpose.",
+            text = subTagline,
             style = MaterialTheme.typography.displayLarge,
             color = MaterialTheme.colorScheme.secondary,
             textAlign = TextAlign.Center,
             fontWeight = FontWeight.Bold,
-            lineHeight = 44.sp
+            lineHeight = 48.sp
         )
         
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
         
         AsyncImage(
-            model = "https://lh3.googleusercontent.com/aida/ADBb0ujKS0F1JiULtLeeVDpTqgaNyFbwA67q0g2mU5kpdJ3STuxY-9WZXhkeDtjdHaEErpJQ2WGLrgQBMs8LG5ZxDw45A_TiYvX37WedwysCnF5r2iOJHOitbJg5S0uwgXuTeU1jGHtw6cEuOj-pNLPrdwJh92Cr8i2q0fXbSuAv0HWfUBbUGilE3F8PgjdfdfEe3SesTla-LxmAJWgi6JfGq4p3gTnHdmAkzetEsjjgZGiwHlacf8cCz-NRhWs",
+            model = "https://dumoiojpkizxkzzxdzss.supabase.co/storage/v1/object/sign/vidya-prayag/vp_home_offerings_grid.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9kMWZmYzY2Ni04YTcwLTRmMmItODE3OC00YzBlZGM0YjA2ODIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ2aWR5YS1wcmF5YWcvdnBfaG9tZV9vZmZlcmluZ3NfZ3JpZC5qcGciLCJpYXQiOjE3Nzk0ODE5NjMsImV4cCI6MTgxMTAxNzk2M30.-Em4Jf6nhaAwvAC7whJ0tph3ZntAQN7tHRmFBR8hA5I",
             contentDescription = null,
             modifier = Modifier
-                .size(320.dp)
+                .wrapContentSize()
                 .clip(RoundedCornerShape(40.dp))
                 .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), RoundedCornerShape(40.dp)),
             contentScale = ContentScale.Crop
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        EduTrustSearchBar(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            onSearchClick = onSearchClick
         )
     }
 }
@@ -186,7 +215,7 @@ private fun SocialProofSection() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 40.dp)
+            .padding(vertical = 32.dp)
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.3f))
     ) {
         Text(
@@ -198,7 +227,7 @@ private fun SocialProofSection() {
             color = MaterialTheme.colorScheme.outline,
             letterSpacing = 2.sp
         )
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -221,22 +250,26 @@ private fun MarqueeItem(icon: ImageVector, text: String) {
 }
 
 @Composable
-private fun EntryPointsSection(onJoinClick: () -> Unit) {
+private fun EntryPointsSection(
+    parentInfo: com.littlebridge.vidyaprayag.feature.content.domain.model.LandingSection?,
+    schoolInfo: com.littlebridge.vidyaprayag.feature.content.domain.model.LandingSection?,
+    onJoinClick: () -> Unit
+) {
     Column(modifier = Modifier.padding(24.dp)) {
         EntryPointCard(
-            label = "FOR PARENTS",
-            title = "Find the perfect school for your child's unique journey",
+            label = parentInfo?.topTagline ?: "FOR PARENTS",
+            title = parentInfo?.subTagline ?: "Find the perfect school for your child\'s unique journey",
             description = "Empowering parents with data-driven insights and verified institutional profiles.",
-            features = listOf("Verified institutional profiles", "Smart Comparison highlights", "AI Career Paths & Talent ID"),
+            features = parentInfo?.listOfFeatures ?: listOf("Verified institutional profiles", "Smart Comparison highlights", "AI Career Paths & Talent ID"),
             buttonText = "Start Your Search",
             onButtonClick = onJoinClick
         )
         Spacer(modifier = Modifier.height(24.dp))
         EntryPointCard(
-            label = "FOR SCHOOLS",
-            title = "Scale excellence with intelligence.",
+            label = schoolInfo?.topTagline ?: "FOR SCHOOLS",
+            title = schoolInfo?.subTagline ?: "Scale excellence with intelligence.",
             description = "Advanced institutional management tools designed for modern educational growth.",
-            features = listOf("Full Admissions CRM", "Teacher Accountability", "Automated Compliance"),
+            features = schoolInfo?.listOfFeatures ?: listOf("Full Admissions CRM", "Teacher Accountability", "Automated Compliance"),
             buttonText = "Onboard Your School",
             onButtonClick = onJoinClick
         )
@@ -252,7 +285,7 @@ private fun EntryPointCard(
     buttonText: String,
     onButtonClick: () -> Unit
 ) {
-    EduTrustCard(modifier = Modifier.fillMaxWidth()) {
+    VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(32.dp)) {
             Box(
                 modifier = Modifier
@@ -276,7 +309,7 @@ private fun EntryPointCard(
                 Spacer(modifier = Modifier.height(16.dp))
             }
             Spacer(modifier = Modifier.height(16.dp))
-            EduTrustPrimaryButton(
+            VidyaPrayagPrimaryButton(
                 text = buttonText,
                 onClick = onButtonClick,
                 modifier = Modifier.fillMaxWidth()
@@ -286,31 +319,45 @@ private fun EntryPointCard(
 }
 
 @Composable
-private fun MoatShowcaseSection() {
+private fun MoatShowcaseSection(
+    title: String,
+    description: String,
+    listOfOfferings: List<LandingItem>?
+) {
     Column(modifier = Modifier.padding(vertical = 40.dp).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f))) {
         Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-            Text("Next-Gen Intelligence", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
-            Text("Proprietary systems powering the ecosystem.", color = MaterialTheme.colorScheme.outline)
+            Text(title, style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
+            Text(description, color = MaterialTheme.colorScheme.outline)
         }
-        Spacer(modifier = Modifier.height(32.dp))
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 24.dp)
-        ) {
-            MoatCard("WhatsApp-First", "Seamless communication between parents and faculty without app fatigue.", "https://lh3.googleusercontent.com/aida/ADBb0uhupW5U-PHnHTPXDYeq9A90Omu-E8beJf0uK7eTRa-L8daRVU5rvILYqec9IZN74A8Y3KFYBo3z_7iRzrZiZhb_Zvpe2YH0_1xFY06JNxAcgV57Zvaf80QtV7PjL4UeBY-zJLUw1iODOqF5uHXssbGzkhmW4NnHlnXxYLpnK1hYG3zeHtky2MNngvRtWCWa6oR3KaTLKFAw_eGHOL_p0t60JAn5Ha52Sr5FfKiB7e7slDlCphIIUa_y2m7n")
-            Spacer(modifier = Modifier.width(16.dp))
-            MoatCard("SRI Index", "Standardized Reliability Index for objective school performance tracking.", "https://lh3.googleusercontent.com/aida/ADBb0uja34Re_-MtOF9jh5ZyVhQGKS4GfxPzJYtBhBlW10Xem3awSStEWcQapUQMn84PxpJewsaPADpJFUHEmmurRCYaMQxn0RrEMUfKnhgm5x3e5L9NVqRF2PYk3JLfBHm3wWG-9FO94L6Jfs9G9hvcp3m8H9AaL9HhsNrARYaA6ptaWgvQCqXhGxbZi53-E2MLeaH0zRuQxWq_uOFhJXfrZhZ3jYiOErFrXZwdVHYDZTVj-ULoIjrXMisgtdSn")
+        
+        if (!listOfOfferings.isNullOrEmpty()) {
+            Spacer(modifier = Modifier.height(32.dp))
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 24.dp)
+            ) {
+                listOfOfferings.forEachIndexed { index, offering ->
+                    MoatCard(
+                        title = offering.heading,
+                        description = offering.description,
+                        imageUrl = offering.iconUrl
+                    )
+                    if (index < listOfOfferings.lastIndex) {
+                        Spacer(modifier = Modifier.width(16.dp))
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun MoatCard(title: String, description: String, imageUrl: String) {
-    EduTrustCard(modifier = Modifier.width(300.dp)) {
-        Column(modifier = Modifier.padding(32.dp)) {
+    VidyaPrayagCard(modifier = Modifier.width(300.dp)) {
+        Column(modifier = Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             AsyncImage(
                 model = imageUrl,
                 contentDescription = null,
-                modifier = Modifier.size(80.dp).clip(RoundedCornerShape(16.dp))
+                modifier = Modifier.size(120.dp).clip(RoundedCornerShape(16.dp))
             )
             Spacer(modifier = Modifier.height(24.dp))
             Text(title, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
@@ -321,27 +368,39 @@ private fun MoatCard(title: String, description: String, imageUrl: String) {
 }
 
 @Composable
-private fun PortalAccessSection(onLoginClick: () -> Unit) {
+private fun PortalAccessSection(
+    portals: List<com.littlebridge.vidyaprayag.feature.content.domain.model.LandingItem>,
+    onLoginClick: () -> Unit
+) {
     Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 40.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-            Column {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(0.75f)) {
                 Text("Access Your Portal", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
-                Text("Already part of the EduTrust ecosystem?", color = MaterialTheme.colorScheme.outline)
+                Text("Already part of the VidyaPrayag ecosystem?", color = MaterialTheme.colorScheme.outline)
             }
-            Text("View All Portals", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.SemiBold)
+            Text(
+                modifier = Modifier.weight(0.25f), textAlign = TextAlign.Center,
+                text = "View All Portals", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.SemiBold, maxLines = 2, minLines = 2)
         }
         Spacer(modifier = Modifier.height(32.dp))
-        PortalCard(Icons.Default.FamilyRestroom, "Parent Portal", "Track progress, monitor safety, and connect with faculty.", onLoginClick)
-        Spacer(modifier = Modifier.height(16.dp))
-        PortalCard(Icons.Default.AdminPanelSettings, "Admin Center", "Manage institutional compliance and staff performance.", onLoginClick)
-        Spacer(modifier = Modifier.height(16.dp))
-        PortalCard(Icons.Default.AssignmentInd, "Teacher App", "Update attendance, grades, and student reports daily.", onLoginClick)
+        
+        portals.forEachIndexed { index, portal ->
+            PortalCard(
+                icon = if (portal.heading.contains("Parent")) Icons.Default.FamilyRestroom else Icons.Default.AdminPanelSettings,
+                title = portal.heading,
+                description = portal.description,
+                onLoginClick = onLoginClick
+            )
+            if (index < portals.lastIndex) {
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
     }
 }
 
 @Composable
 private fun PortalCard(icon: ImageVector, title: String, description: String, onLoginClick: () -> Unit) {
-    EduTrustCard(
+    VidyaPrayagCard(
         modifier = Modifier.fillMaxWidth(),
         backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
         elevation = 0
@@ -358,7 +417,7 @@ private fun PortalCard(icon: ImageVector, title: String, description: String, on
             Spacer(modifier = Modifier.height(8.dp))
             Text(description, color = MaterialTheme.colorScheme.outline)
             Spacer(modifier = Modifier.height(24.dp))
-            EduTrustOutlinedButton(
+            VidyaPrayagOutlinedButton(
                 text = "Log In",
                 onClick = onLoginClick,
                 modifier = Modifier.fillMaxWidth()
@@ -394,13 +453,13 @@ private fun FinalCtaSection(onJoinClick: () -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
             Text("Join the ecosystem where trust meets technology. Join over 50k+ parents today.", color = MaterialTheme.colorScheme.onPrimaryContainer, textAlign = TextAlign.Center)
             Spacer(modifier = Modifier.height(40.dp))
-            EduTrustSecondaryButton(
+            VidyaPrayagSecondaryButton(
                 text = "Join as a Parent",
                 onClick = onJoinClick,
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(16.dp))
-            EduTrustOutlinedButton(
+            VidyaPrayagOutlinedButton(
                 text = "Register Your School",
                 onClick = onJoinClick,
                 modifier = Modifier.fillMaxWidth(),
@@ -412,16 +471,19 @@ private fun FinalCtaSection(onJoinClick: () -> Unit) {
 }
 
 @Composable
-private fun FooterSection() {
+private fun FooterSection(
+    tosLink: String,
+    privacyPolicyLink: String
+) {
     Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)).padding(32.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.School, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("EduTrust", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MaterialTheme.colorScheme.primary)
+            Text("VidyaPrayag", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MaterialTheme.colorScheme.primary)
         }
         Spacer(modifier = Modifier.height(24.dp))
         Text(
-            "© 2024 EduTrust Ecosystem. Built for modern institutional excellence and parent-child security. Innovating education through trust.",
+            "© 2024 VidyaPrayag Ecosystem. Built for modern institutional excellence and parent-child security. Innovating education through trust.",
             color = Color.Gray,
             lineHeight = 24.sp
         )
@@ -429,6 +491,10 @@ private fun FooterSection() {
         FooterLinkSection("PORTALS", listOf("Parent Portal", "Admin Dashboard", "Teacher Console"))
         Spacer(modifier = Modifier.height(48.dp))
         FooterLinkSection("SUPPORT", listOf("Privacy Policy", "Terms of Service", "Help Desk"))
+        
+        // Hidden links for TOS and Privacy for now, or we can add them to FooterLinkSection
+        // For now, let's just log them to ensure they are used
+        println("Footer Links: $tosLink, $privacyPolicyLink")
     }
 }
 

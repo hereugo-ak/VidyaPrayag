@@ -20,6 +20,9 @@ class MainViewModel(
     val themeName: StateFlow<String> = preferenceRepository.getThemeName()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "LIGHT")
 
+    val userRole: StateFlow<String> = preferenceRepository.getUserRole()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "GUEST")
+
     init {
         refreshSchools()
     }
@@ -40,6 +43,18 @@ class MainViewModel(
     fun setTheme(name: String) {
         viewModelScope.launch {
             preferenceRepository.setThemeName(name)
+        }
+    }
+
+    fun setRole(role: String) {
+        viewModelScope.launch {
+            preferenceRepository.setUserRole(role)
+        }
+    }
+
+    fun logout() {
+        viewModelScope.launch {
+            preferenceRepository.setUserRole("GUEST")
         }
     }
 }

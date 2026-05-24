@@ -13,6 +13,7 @@ class VidyaPrayagApp : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        
         initKoin {
             androidContext(this@VidyaPrayagApp)
         }

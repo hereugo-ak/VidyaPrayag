@@ -54,7 +54,7 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 @Composable
-fun EduTrustTheme(
+fun VidyaPrayagTheme(
     initialTheme: AppTheme = if (isSystemInDarkTheme()) AppTheme.DARK else AppTheme.LIGHT,
     onThemeChange: (AppTheme) -> Unit = {},
     content: @Composable () -> Unit
@@ -66,6 +66,9 @@ fun EduTrustTheme(
         AppTheme.DARK -> DarkColorScheme
         AppTheme.MIDNIGHT -> MidnightColorScheme
     }
+
+    val isDark = currentTheme == AppTheme.DARK || currentTheme == AppTheme.MIDNIGHT
+    ChangeSystemAppearance(isDark)
 
     CompositionLocalProvider(
         LocalAppTheme provides currentTheme,

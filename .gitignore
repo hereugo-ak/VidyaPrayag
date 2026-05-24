@@ -6,7 +6,8 @@ xcuserdata
 !src/**/build/
 local.properties
 .idea
-.DS_Store
+# Local environment variables
+.env
 captures
 .externalNativeBuild
 .cxx
@@ -17,3 +18,11 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
+
+# Backend dev artifacts (server runtime DB + logs)
+data.db
+data.db-journal
+server/data.db
+server/data.db-journal
+server_*.log
+server_*.txt

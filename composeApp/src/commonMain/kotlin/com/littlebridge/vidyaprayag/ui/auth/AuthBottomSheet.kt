@@ -1,13 +1,16 @@
 package com.littlebridge.vidyaprayag.ui.auth
 
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,14 +19,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.littlebridge.vidyaprayag.navigation.Destination
+import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
 import com.littlebridge.vidyaprayag.ui.components.*
-
-enum class AuthRole {
-    ADMIN, PARENT
-}
+import com.littlebridge.vidyaprayag.feature.auth.presentation.AuthViewModel
+import com.littlebridge.vidyaprayag.feature.auth.presentation.AuthStep
+import com.littlebridge.vidyaprayag.feature.auth.domain.model.AuthFlow
+import com.littlebridge.vidyaprayag.presentation.MainViewModel
+import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,9 +40,22 @@ fun AuthBottomSheet(
     onDismissRequest: () -> Unit,
     sheetState: SheetState = rememberModalBottomSheetState()
 ) {
-    var role by remember { mutableStateOf(AuthRole.ADMIN) }
-    var isOtpSent by remember { mutableStateOf(false) }
-    var contactInfo by remember { mutableStateOf("") }
+    val viewModel: AuthViewModel = koinViewModel()
+    val mainViewModel: MainViewModel = koinViewModel()
+    val state by viewModel.state.collectAsState()
+    val navigator = LocalAppNavigator.current
+
+    LaunchedEffect(state.isAuthSuccessful) {
+        if (state.isAuthSuccessful) {
+            onDismissRequest()
+            mainViewModel.setRole(state.role)
+            if (state.role == "ADMIN") {
+                navigator.navigateTo(Destination.SchoolDashboard)
+            } else {
+                navigator.navigateTo(Destination.ParentDashboard)
+            }
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
@@ -54,8 +76,11 @@ fun AuthBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 48.dp),
+                .padding(bottom = 32.dp)
+                .animateContentSize(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Header
@@ -77,43 +102,87 @@ fun AuthBottomSheet(
             Spacer(modifier = Modifier.height(16.dp))
             
             Text(
-                text = "Access EduTrust",
+                text = "Access VidyaPrayag",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
             
             Text(
-                text = if (isOtpSent) "Verify your identity" else "Enter your credentials to continue",
+                text = when(state.step) {
+                    AuthStep.Identifier -> "Enter email or phone number"
+                    AuthStep.LoginPassword -> "Welcome back! Enter your password"
+                    AuthStep.SignupDetails -> "Create your account"
+                    AuthStep.Otp -> "Verify your identity"
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.outline,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 4.dp)
             )
 
+            if (state.error != null) {
+                Text(
+                    text = state.error!!,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(top = 16.dp)
+                )
+            }
+
             Spacer(modifier = Modifier.height(32.dp))
 
-            if (!isOtpSent) {
-                EntrySection(
-                    role = role,
-                    onRoleChange = { role = it },
-                    contactInfo = contactInfo,
-                    onContactInfoChange = { contactInfo = it },
-                    onContinue = { isOtpSent = true }
-                )
-            } else {
-                OtpSection(
-                    contactInfo = contactInfo,
-                    onVerify = { /* Handle login */ },
-                    onBack = { isOtpSent = false }
-                )
+            AnimatedContent(
+                targetState = state.step,
+                transitionSpec = {
+                    fadeIn() togetherWith fadeOut()
+                }
+            ) { step ->
+                when (step) {
+                    AuthStep.Identifier -> IdentifierSection(
+                        identifier = state.identifier,
+                        onIdentifierChange = viewModel::onIdentifierChanged,
+                        role = state.role,
+                        onRoleChange = viewModel::onRoleChanged,
+                        isLoading = state.isLoading,
+                        onContinue = viewModel::onContinue
+                    )
+                    AuthStep.LoginPassword -> LoginPasswordSection(
+                        password = state.password,
+                        onPasswordChange = viewModel::onPasswordChanged,
+                        isLoading = state.isLoading,
+                        onLogin = viewModel::onSubmit,
+                        onBack = viewModel::goBack
+                    )
+                    AuthStep.SignupDetails -> SignupDetailsSection(
+                        name = state.name,
+                        onNameChange = viewModel::onNameChanged,
+                        password = state.password,
+                        onPasswordChange = viewModel::onPasswordChanged,
+                        confirmPassword = state.confirmPassword,
+                        onConfirmPasswordChange = viewModel::onConfirmPasswordChanged,
+                        isLoading = state.isLoading,
+                        onSignup = viewModel::onSubmit,
+                        onBack = viewModel::goBack
+                    )
+                    AuthStep.Otp -> OtpSection(
+                        identifier = state.identifier,
+                        name = state.name,
+                        onNameChange = viewModel::onNameChanged,
+                        otp = state.otp,
+                        onOtpChange = viewModel::onOtpChanged,
+                        showNameField = state.flow == AuthFlow.SIGNUP_PHONE,
+                        isLoading = state.isLoading,
+                        onVerify = viewModel::onSubmit,
+                        onBack = viewModel::goBack
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Footer Terms
             Text(
-                text = "By continuing, you agree to EduTrust's Terms of Service and Privacy Policy. Protected by reCAPTCHA.",
+                text = "By continuing, you agree to VidyaPrayag's Terms of Service and Privacy Policy.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline,
                 textAlign = TextAlign.Center,
@@ -124,15 +193,15 @@ fun AuthBottomSheet(
 }
 
 @Composable
-private fun EntrySection(
-    role: AuthRole,
-    onRoleChange: (AuthRole) -> Unit,
-    contactInfo: String,
-    onContactInfoChange: (String) -> Unit,
+private fun IdentifierSection(
+    identifier: String,
+    onIdentifierChange: (String) -> Unit,
+    role: String,
+    onRoleChange: (String) -> Unit,
+    isLoading: Boolean,
     onContinue: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        // Role Toggle
+    Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -143,35 +212,121 @@ private fun EntrySection(
             RoleToggleButton(
                 text = "Administrator",
                 icon = Icons.Default.SupervisorAccount,
-                isSelected = role == AuthRole.ADMIN,
-                onClick = { onRoleChange(AuthRole.ADMIN) },
+                isSelected = role == "ADMIN",
+                onClick = { onRoleChange("ADMIN") },
                 modifier = Modifier.weight(1f)
             )
             RoleToggleButton(
                 text = "Parent",
                 icon = Icons.Default.FamilyRestroom,
-                isSelected = role == AuthRole.PARENT,
-                onClick = { onRoleChange(AuthRole.PARENT) },
+                isSelected = role == "PARENT",
+                onClick = { onRoleChange("PARENT") },
                 modifier = Modifier.weight(1f)
             )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text(
-            text = "Email or Mobile Number",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
-        )
-
         OutlinedTextField(
-            value = contactInfo,
-            onValueChange = onContactInfoChange,
+            value = identifier,
+            onValueChange = onIdentifierChange,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("admin@academy.edu", color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)) },
+            placeholder = { Text("Email or phone number", color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)) },
             leadingIcon = { Icon(Icons.Default.Mail, contentDescription = null, tint = MaterialTheme.colorScheme.outline) },
             shape = RoundedCornerShape(16.dp),
+            singleLine = true,
+            colors = TextFieldDefaults.colors(
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                unfocusedIndicatorColor = Color.Transparent,
+                focusedIndicatorColor = MaterialTheme.colorScheme.primary
+            )
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        VidyaPrayagPrimaryButton(
+            text = if (isLoading) "Checking..." else "Continue",
+            onClick = onContinue,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading && identifier.isNotBlank()
+        )
+    }
+}
+
+@Composable
+private fun LoginPasswordSection(
+    password: String,
+    onPasswordChange: (String) -> Unit,
+    isLoading: Boolean,
+    onLogin: () -> Unit,
+    onBack: () -> Unit
+) {
+    var passwordVisible by remember { mutableStateOf(false) }
+
+    Column {
+        OutlinedTextField(
+            value = password,
+            onValueChange = onPasswordChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Password", color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)) },
+            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.outline) },
+            trailingIcon = {
+                val image = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    Icon(imageVector = image, contentDescription = null)
+                }
+            },
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            shape = RoundedCornerShape(16.dp),
+            singleLine = true,
+            colors = TextFieldDefaults.colors(
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                unfocusedIndicatorColor = Color.Transparent,
+                focusedIndicatorColor = MaterialTheme.colorScheme.primary
+            )
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        VidyaPrayagPrimaryButton(
+            text = if (isLoading) "Logging in..." else "Login",
+            onClick = onLogin,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading && password.isNotBlank()
+        )
+
+        TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
+            Text("Back", color = MaterialTheme.colorScheme.outline)
+        }
+    }
+}
+
+@Composable
+private fun SignupDetailsSection(
+    name: String,
+    onNameChange: (String) -> Unit,
+    password: String,
+    onPasswordChange: (String) -> Unit,
+    confirmPassword: String,
+    onConfirmPasswordChange: (String) -> Unit,
+    isLoading: Boolean,
+    onSignup: () -> Unit,
+    onBack: () -> Unit
+) {
+    var passwordVisible by remember { mutableStateOf(false) }
+
+    Column {
+        OutlinedTextField(
+            value = name,
+            onValueChange = onNameChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Full Name", color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)) },
+            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.outline) },
+            shape = RoundedCornerShape(16.dp),
+            singleLine = true,
             colors = TextFieldDefaults.colors(
                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
                 focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
@@ -182,46 +337,154 @@ private fun EntrySection(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        EduTrustPrimaryButton(
-            text = "Continue",
-            onClick = onContinue,
-            modifier = Modifier.fillMaxWidth()
+        OutlinedTextField(
+            value = password,
+            onValueChange = onPasswordChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Create Password", color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)) },
+            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.outline) },
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            shape = RoundedCornerShape(16.dp),
+            singleLine = true,
+            colors = TextFieldDefaults.colors(
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                unfocusedIndicatorColor = Color.Transparent,
+                focusedIndicatorColor = MaterialTheme.colorScheme.primary
+            )
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = confirmPassword,
+            onValueChange = onConfirmPasswordChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Confirm Password", color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)) },
+            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.outline) },
+            visualTransformation = PasswordVisualTransformation(),
+            shape = RoundedCornerShape(16.dp),
+            singleLine = true,
+            colors = TextFieldDefaults.colors(
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                unfocusedIndicatorColor = Color.Transparent,
+                focusedIndicatorColor = MaterialTheme.colorScheme.primary
+            )
         )
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Divider
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
-            Text(
-                text = "TRUSTED SECURITY",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Black,
-                color = MaterialTheme.colorScheme.outlineVariant,
-                modifier = Modifier.padding(horizontal = 16.dp),
-                letterSpacing = 1.sp
+        VidyaPrayagPrimaryButton(
+            text = if (isLoading) "Creating Account..." else "Create Account",
+            onClick = onSignup,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading && name.isNotBlank() && password.isNotBlank() && confirmPassword.isNotBlank()
+        )
+
+        TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
+            Text("Back", color = MaterialTheme.colorScheme.outline)
+        }
+    }
+}
+
+@Composable
+private fun OtpSection(
+    identifier: String,
+    name: String,
+    onNameChange: (String) -> Unit,
+    otp: String,
+    onOtpChange: (String) -> Unit,
+    showNameField: Boolean,
+    isLoading: Boolean,
+    onVerify: () -> Unit,
+    onBack: () -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "Enter 6-digit code sent to $identifier",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.outline,
+            textAlign = TextAlign.Center
+        )
+
+        if (showNameField) {
+            Spacer(modifier = Modifier.height(24.dp))
+            OutlinedTextField(
+                value = name,
+                onValueChange = onNameChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Full Name", color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)) },
+                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.outline) },
+                shape = RoundedCornerShape(16.dp),
+                singleLine = true,
+                colors = TextFieldDefaults.colors(
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedIndicatorColor = MaterialTheme.colorScheme.primary
+                )
             )
-            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Social Logins
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            SocialButton(
-                text = "Google",
-                icon = Icons.Default.AccountCircle, // Placeholder
-                modifier = Modifier.weight(1f)
-            )
-            SocialButton(
-                text = "Apple ID",
-                icon = Icons.Default.Smartphone, // Using smartphone as placeholder for Apple ID
-                modifier = Modifier.weight(1f)
-            )
+        BasicTextField(
+            value = otp,
+            onValueChange = { if (it.length <= 6) onOtpChange(it) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            decorationBox = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    repeat(6) { index ->
+                        val char = when {
+                            index >= otp.length -> ""
+                            else -> otp[index].toString()
+                        }
+                        val isFocused = otp.length == index
+                        OtpBox(char, isFocused)
+                    }
+                }
+            }
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        VidyaPrayagPrimaryButton(
+            text = if (isLoading) "Verifying..." else "Verify & Continue",
+            onClick = onVerify,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading && otp.length == 6 && (!showNameField || name.isNotBlank())
+        )
+
+        TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
+            Text("Back", color = MaterialTheme.colorScheme.outline)
         }
+    }
+}
+
+@Composable
+private fun OtpBox(char: String, isFocused: Boolean) {
+    Box(
+        modifier = Modifier
+            .size(width = 44.dp, height = 56.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            .border(
+                width = if (isFocused) 2.dp else 1.dp,
+                color = if (isFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(12.dp)
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = char.ifEmpty { "•" },
+            style = MaterialTheme.typography.headlineMedium,
+            color = if (char.isEmpty()) MaterialTheme.colorScheme.outlineVariant else MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -255,93 +518,5 @@ private fun RoleToggleButton(
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
             color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
         )
-    }
-}
-
-@Composable
-private fun SocialButton(
-    text: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    modifier: Modifier = Modifier
-) {
-    OutlinedButton(
-        onClick = {},
-        modifier = modifier.height(56.dp),
-        shape = RoundedCornerShape(16.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(text, color = MaterialTheme.colorScheme.onSurface)
-    }
-}
-
-@Composable
-private fun OtpSection(
-    contactInfo: String,
-    onVerify: () -> Unit,
-    onBack: () -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "We've sent a 6-digit code to $contactInfo",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.outline,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // OTP Fields placeholder
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            repeat(6) {
-                OtpField()
-            }
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        EduTrustPrimaryButton(
-            text = "Verify & Secure Access",
-            onClick = onVerify,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        TextButton(onClick = {}) {
-            Text("Resend code", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        TextButton(onClick = onBack) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Back to entry", color = MaterialTheme.colorScheme.outline)
-            }
-        }
-    }
-}
-
-@Composable
-private fun OtpField() {
-    Box(
-        modifier = Modifier
-            .size(width = 44.dp, height = 56.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp)),
-        contentAlignment = Alignment.Center
-    ) {
-        // Just a placeholder for visual design
-        Text("-", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
