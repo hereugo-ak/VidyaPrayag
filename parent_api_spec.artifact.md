@@ -1,6 +1,6 @@
 # VidyaPrayag Exhaustive API Specification (Parent Ecosystem)
 
-This document serves as the formal technical contract for the VidyaPrayag ecosystem. **All UI strings, statistics, and configurations are backend-driven.**
+This document serves as the formal technical contract for the VidyaPrayag ecosystem. **All UI strings, statistics, and layout configurations are backend-driven.**
 
 ---
 
@@ -14,20 +14,10 @@ Get Onboarding Metadata
 #### Purpose
 Fetches reference data for onboarding dropdowns and the visual configuration for the screen.
 
-#### Used when:
-- User lands on Step 1.
-- Data refresh is triggered.
-
 #### Endpoint
 `GET /api/v1/parent/onboarding/metadata`
 
-#### Authentication
-**Required (JWT)**
-
 #### Success Response
-**Response Code: 200 OK**
-
-**Response JSON**
 ```json
 {
   "success": true,
@@ -47,35 +37,13 @@ Fetches reference data for onboarding dropdowns and the visual configuration for
 
 ---
 
-#### API Name
-Submit Child Basic Details
-
-#### Purpose
-Registers the child's identity.
-
-#### Endpoint
-`POST /api/v1/parent/onboarding/child-info`
-
-#### Request JSON
-```json
-{
-  "child_name": "Aarav Sharma",
-  "date_of_birth": "2018-05-15",
-  "gender": "MALE",
-  "current_grade": "Grade 1",
-  "interests": ["Music", "STEM"]
-}
-```
-
----
-
 ### Screen: Your Preferences (Step 2)
 
 #### API Name
 Get Preference Options
 
 #### Purpose
-Fetches available search filters (Boards, Budget ranges, etc.) for the preferences screen.
+Fetches available search filters for the preferences screen.
 
 #### Endpoint
 `GET /api/v1/parent/onboarding/preference-options`
@@ -110,7 +78,7 @@ Fetches available search filters (Boards, Budget ranges, etc.) for the preferenc
 Get Dashboard Overview
 
 #### Purpose
-The primary "Handshake" API. Drives the entire home screen content including child stats and alerts.
+The primary Handshake API driving the entire home screen.
 
 #### Endpoint
 `GET /api/v1/parent/dashboard`
@@ -126,17 +94,14 @@ The primary "Handshake" API. Drives the entire home screen content including chi
       "name": "Aarav",
       "overall_progress": 0.75,
       "current_level": 4,
-      "attendance_status": "PRESENT",
-      "profile_pic": "https://..."
+      "attendance_status": "PRESENT"
     },
     "alerts": [
-      { "id": "a1", "title": "Fees Due", "value": "$1,200", "type": "CRITICAL" },
-      { "id": "a2", "title": "Upcoming PTM", "value": "Nov 25", "type": "INFO" }
+      { "id": "a1", "title": "Fees Due", "value": "$1,200", "type": "CRITICAL" }
     ],
     "featured_schools": [
-      { "id": "s1", "name": "St. Xavier", "rating": 4.8, "location": "Noida", "image": "..." }
-    ],
-    "curation_logic": "Curation aligned with NEP 2020 developmental milestones."
+      { "id": "s1", "name": "St. Xavier", "rating": 4.8, "location": "Noida" }
+    ]
   }
 }
 ```
@@ -178,12 +143,84 @@ Drives the complex visual charts and milestones on the Track Progress screen.
       "metrics": { "Empathy": 0.8, "Resilience": 0.7, "Social": 0.9 }
     },
     "play_discovery": [
-      { "title": "Agility", "description": "Gross motor met", "image": "...", "status": "MET" }
-    ],
-    "last_updated": "Today, 10:45 AM"
+      { "title": "Agility", "description": "Gross motor met", "image_url": "...", "status": "MET" }
+    ]
   }
 }
 ```
+
+---
+
+## Module: Career Path & Future Roadmap
+
+### Screen: Career Path Discovery
+
+#### API Name
+Get AI Career Path Discovery
+
+#### Purpose
+Provides trajectory insights based on child’s talent mapping. **UI styling including floating app bar config and padding are backend-driven.**
+
+#### Endpoint
+`GET /api/v1/parent/career-path`
+
+#### Authentication
+**Required (JWT)**
+
+#### Success Response
+**Response Code: 200 OK**
+
+**Response JSON**
+```json
+{
+  "success": true,
+  "data": {
+    "screen_config": {
+      "app_bar": {
+        "title": "Future Roadmap",
+        "is_floating": true,
+        "is_transparent": true,
+        "background_colors": ["#10B9811A", "#FFFFFF"]
+      },
+      "layout": {
+        "vertical_padding": 24,
+        "horizontal_padding": 24,
+        "system_nav_padding": true
+      },
+      "celebration_icon": "verified",
+      "main_heading": "Career Insight!",
+      "sub_heading_template": "We've found {count} career paths matching {name}'s profile!",
+      "footer_description": "We've analyzed thousands of data points to predict the perfect fit."
+    },
+    "career_stats": {
+      "predicted_count": 12,
+      "top_match": {
+        "title": "Aerospace Engineering",
+        "match_percentage": 98,
+        "image_url": "https://...",
+        "industry_growth_label": "High Growth Industry",
+        "industry_growth_value": "+12.4% YoY",
+        "tags": [
+          { "label": "STEM Focus", "is_highlight": true },
+          { "label": "Innovation", "is_highlight": false }
+        ]
+      }
+    },
+    "action_buttons": {
+      "primary": { "text": "Explore Detailed Roadmap", "action": "OPEN_DETAILS" },
+      "secondary": { "text": "Recalibrate Profile", "action": "RESTART_ONBOARDING" }
+    }
+  }
+}
+```
+
+#### Response Field Definitions
+| Key | Type | Nullable | Description |
+|---|---|---|---|
+| app_bar | Object | No | Config for the floating top navigation |
+| system_nav_padding | Boolean | No | If true, applies window insets for gesture bars |
+| top_match | Object | No | The primary AI recommendation |
+| is_highlight | Boolean | No | Determines if the tag chip uses a distinctive color |
 
 ---
 
@@ -285,7 +322,7 @@ Drives the contact information and support categories dynamically.
 ### Analytics Events
 - `onboarding_abandoned`: Tracks which screen user left during onboarding.
 - `payment_failed`: Captures error codes for payment gateway issues.
-- `report_downloaded`: Tracks user interest in printable results.
+- `career_path_recalibrated`: Tracks user engagement with talent mapping.
 
 ### Database Tables Involved
 | Table Name | Operation | Purpose |
@@ -296,3 +333,4 @@ Drives the contact information and support categories dynamically.
 | announcements | Read | Communications |
 | app_config | Read | Global feature flags & text |
 | reference_grades | Read | Metadata for dropdowns |
+| student_talent_map | Read | AI Career predictions |

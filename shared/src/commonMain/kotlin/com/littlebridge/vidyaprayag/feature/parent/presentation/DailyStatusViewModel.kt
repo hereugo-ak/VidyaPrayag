@@ -1,9 +1,15 @@
 package com.littlebridge.vidyaprayag.feature.parent.presentation
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.littlebridge.vidyaprayag.core.network.NetworkResult
+import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.feature.parent.domain.repository.ParentRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class TopicCovered(
     val id: String,
@@ -30,28 +36,70 @@ data class UpcomingTest(
 )
 
 data class DailyStatusState(
-    val childName: String = "Rahul V.",
-    val absenceAlert: String? = "Rahul was not marked present for the first-period assembly. No prior leave application was found in the system.",
-    val attendancePercentage: Int = 90,
-    val attendanceNote: String = "Arrived 15m late for Math; attended all other sessions.",
-    val topicsCovered: List<TopicCovered> = listOf(
-        TopicCovered("1", "Biology", "Photosynthesis Phase II", "Exploration of the Calvin cycle and light-independent reactions."),
-        TopicCovered("2", "Literature", "The Great Gatsby", "Analysis of symbolism in Chapters 3-4 and character motivations.")
-    ),
-    val homeworkTasks: List<HomeworkTask> = listOf(
-        HomeworkTask("1", "Math", "Quadrants Worksheet", "Complete exercises 1-15 on page 84.", isCritical = true),
-        HomeworkTask("2", "Chemistry", "Lab Report Draft", "Observations from the titration experiment.")
-    ),
-    val upcomingTests: List<UpcomingTest> = listOf(
-        UpcomingTest("1", "OCT", "27", "Physics: Mid-Term", "Quantum Mechanics & Dynamics"),
-        UpcomingTest("2", "NOV", "02", "History Quiz", "Post-War Economics", isSecondary = true)
-    ),
-    val streakDays: Int = 12,
-    val streakMessage: String = "Rahul has completed all homework on time for 12 consecutive days. Keep it up!",
-    val schoolMessage: String = "Parents, please note the upcoming Winter Break starts Dec 15th."
+    val childName: String = "",
+    val absenceAlert: String? = null,
+    val attendancePercentage: Int = 0,
+    val attendanceNote: String = "",
+    val topicsCovered: List<TopicCovered> = emptyList(),
+    val homeworkTasks: List<HomeworkTask> = emptyList(),
+    val upcomingTests: List<UpcomingTest> = emptyList(),
+    val streakDays: Int = 0,
+    val streakMessage: String = "",
+    val schoolMessage: String = "",
+    val isLoading: Boolean = false,
+    val error: String? = null
 )
 
-class DailyStatusViewModel : ViewModel() {
+class DailyStatusViewModel(
+    private val repository: ParentRepository,
+    private val preferenceRepository: PreferenceRepository
+) : ViewModel() {
     private val _state = MutableStateFlow(DailyStatusState())
     val state: StateFlow<DailyStatusState> = _state.asStateFlow()
+
+    init {
+        loadDailyStatus()
+    }
+
+    private fun loadDailyStatus() {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null) }
+            preferenceRepository.getUserToken().collect { token ->
+                if (token != null) {
+                    when (val result = repository.getDailyStatus(token)) {
+                        is NetworkResult.Success -> {
+                            val data = result.data.data
+                            _state.update {
+                                it.copy(
+                                    isLoading = false,
+                                    childName = data.childName,
+                                    absenceAlert = data.absenceAlert,
+                                    attendancePercentage = data.attendancePercentage,
+                                    attendanceNote = data.attendanceNote,
+                                    topicsCovered = data.topicsCovered.mapIndexed { i, t ->
+                                        TopicCovered(i.toString(), t.subject, t.title, t.description)
+                                    },
+                                    homeworkTasks = data.homeworkTasks.mapIndexed { i, h ->
+                                        HomeworkTask(i.toString(), h.subject, h.title, h.description, h.isCritical)
+                                    },
+                                    upcomingTests = data.upcomingTests.mapIndexed { i, u ->
+                                        UpcomingTest(i.toString(), u.month, u.day, u.subject, u.topic, u.isSecondary)
+                                    },
+                                    streakDays = data.streakDays,
+                                    streakMessage = data.streakMessage,
+                                    schoolMessage = data.schoolMessage
+                                )
+                            }
+                        }
+                        is NetworkResult.Error -> {
+                            _state.update { it.copy(isLoading = false, error = result.message) }
+                        }
+                        is NetworkResult.ConnectionError -> {
+                            _state.update { it.copy(isLoading = false, error = "Connection error") }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

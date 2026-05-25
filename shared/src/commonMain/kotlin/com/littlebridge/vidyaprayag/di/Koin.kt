@@ -115,11 +115,11 @@ val viewModelModule = module {
     factory { ChildBasicInfoViewModel() }
     factory { YourPreferencesViewModel() }
     factory { LocationRequestViewModel() }
-    factory { CareerPathViewModel() }
+    factory { CareerPathViewModel(get(), get()) }
     factory { ScholarshipsViewModel(get(), get()) }
-    factory { DailyStatusViewModel() }
-    factory { ParentReportsViewModel() }
-    factory { ParentSchedulePTMViewModel() }
+    factory { DailyStatusViewModel(get(), get()) }
+    factory { ParentReportsViewModel(get(), get()) }
+    factory { ParentSchedulePTMViewModel(get(), get()) }
     factory { ParentAnnouncementViewModel(get(), get()) }
     factory { ParentMessageViewModel() }
     factory { TrackProgressViewModel(get(), get()) }

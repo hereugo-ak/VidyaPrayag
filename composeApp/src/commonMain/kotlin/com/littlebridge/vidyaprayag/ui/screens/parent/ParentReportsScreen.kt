@@ -34,10 +34,7 @@ fun ParentReportsScreen() {
     val state by viewModel.state.collectAsState()
 
     BaseScreen(
-        immersiveTopBar = true,
-        bottomBar = {
-            ParentDashboardBottomBar(selectedTab = ParentTab.TRACK_PROGRESS)
-        }
+        immersiveTopBar = true
     ) { paddingValues, scrollModi ->
         LazyColumn(
             modifier = Modifier

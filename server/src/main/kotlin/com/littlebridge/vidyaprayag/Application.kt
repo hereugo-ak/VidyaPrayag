@@ -56,10 +56,7 @@ import com.littlebridge.vidyaprayag.feature.config.appStatusRouting
 import com.littlebridge.vidyaprayag.feature.content.landingRouting
 import com.littlebridge.vidyaprayag.feature.content.supportRouting
 import com.littlebridge.vidyaprayag.feature.onboarding.onboardingRouting
-import com.littlebridge.vidyaprayag.feature.parent.parentDashboardRouting
-import com.littlebridge.vidyaprayag.feature.parent.parentFeesRouting
-import com.littlebridge.vidyaprayag.feature.parent.parentOnboardingRouting
-import com.littlebridge.vidyaprayag.feature.parent.trackProgressRouting
+import com.littlebridge.vidyaprayag.feature.parent.parentRouting
 import com.littlebridge.vidyaprayag.feature.school.leaveRequestsRouting
 import com.littlebridge.vidyaprayag.feature.school.messagesRouting
 import com.littlebridge.vidyaprayag.feature.school.ptmRouting
@@ -67,7 +64,6 @@ import com.littlebridge.vidyaprayag.feature.school.resultsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolAnalyticsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolDashboardRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRouting
-import com.littlebridge.vidyaprayag.feature.user.parentRouting
 import com.littlebridge.vidyaprayag.feature.user.userDetailsRouting
 import com.littlebridge.vidyaprayag.feature.user.userProfileRouting
 import io.ktor.http.*
@@ -152,12 +148,6 @@ fun Application.module() {
         announcementRouting()
         admissionRouting()
         schoolRouting()
-
-        // Parent ecosystem (parent_api_spec.artifact.md)
-        parentOnboardingRouting()    // /api/v1/parent/onboarding/{metadata, child-info, preference-options}
-        parentDashboardRouting()     // /api/v1/parent/dashboard
-        trackProgressRouting()       // /api/v1/parent/track-progress
-        parentFeesRouting()          // /api/v1/parent/fees
 
         // School ecosystem (school_api_spec.artifact.md)
         schoolDashboardRouting()     // /api/v1/school/dashboard

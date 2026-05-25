@@ -33,10 +33,7 @@ fun DailyStatusScreen() {
     val state by viewModel.state.collectAsState()
 
     BaseScreen(
-        immersiveTopBar = true,
-        bottomBar = {
-            ParentDashboardBottomBar(selectedTab = ParentTab.TRACK_PROGRESS) // Using Progress as active tab
-        }
+        immersiveTopBar = true
     ) { paddingValues, scrollModi ->
         LazyColumn(
             modifier = Modifier

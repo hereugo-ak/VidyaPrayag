@@ -32,10 +32,7 @@ fun ScholarshipsScreen() {
     val state by viewModel.state.collectAsState()
 
     BaseScreen(
-        immersiveTopBar = true,
-        bottomBar = {
-            ParentDashboardBottomBar(selectedTab = ParentTab.DISCOVER)
-        }
+        immersiveTopBar = true
     ) { paddingValues, scrollModi ->
         LazyColumn(
             modifier = Modifier

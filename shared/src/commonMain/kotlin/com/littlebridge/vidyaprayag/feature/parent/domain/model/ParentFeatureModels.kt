@@ -7,6 +7,7 @@ import kotlinx.serialization.SerialName
 @Serializable
 data class FeeResponse(
     val success: Boolean,
+    val message: String,
     val data: FeeData
 )
 
@@ -34,6 +35,7 @@ data class FeeAnnouncementDto(
 @Serializable
 data class ScholarshipsResponse(
     val success: Boolean,
+    val message: String,
     val data: ScholarshipsData
 )
 
@@ -70,6 +72,7 @@ data class ScholarshipApplicationDto(
 @Serializable
 data class ParentAnnouncementsResponse(
     val success: Boolean,
+    val message: String,
     val data: ParentAnnouncementsData
 )
 

@@ -23,4 +23,24 @@ class ParentRepositoryImpl(
     override suspend fun getAnnouncements(token: String): NetworkResult<ParentAnnouncementsResponse> {
         return api.getAnnouncements(token)
     }
+
+    override suspend fun getParentDashboard(token: String): NetworkResult<ParentDashboardResponse> {
+        return api.getParentDashboard(token)
+    }
+
+    override suspend fun getCareerPath(token: String): NetworkResult<CareerPathResponse> {
+        return api.getCareerPath(token)
+    }
+
+    override suspend fun getDailyStatus(token: String): NetworkResult<DailyStatusResponse> {
+        return api.getDailyStatus(token)
+    }
+
+    override suspend fun getReports(token: String): NetworkResult<ParentReportsResponse> {
+        return api.getReports(token)
+    }
+
+    override suspend fun getPtmScheduling(token: String): NetworkResult<PtmSchedulingResponse> {
+        return api.getPtmScheduling(token)
+    }
 }

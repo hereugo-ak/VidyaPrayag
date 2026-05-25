@@ -1,9 +1,15 @@
 package com.littlebridge.vidyaprayag.feature.parent.presentation
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.littlebridge.vidyaprayag.core.network.NetworkResult
+import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.feature.parent.domain.repository.ParentRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class AssessmentItem(
     val id: String,
@@ -16,30 +22,74 @@ data class AssessmentItem(
 )
 
 data class ParentReportsState(
-    val childName: String = "Arjun",
-    val termNarrative: String = "Arjun has shown exceptional resilience this term, particularly in grasping complex scientific concepts. His transition from theoretical understanding to practical application in Modern Science has been the highlight of his academic trajectory. While his focus remains sharp, encouraging peer-to-peer collaboration will further enhance his social interaction metrics.",
-    val averageScore: Int = 90,
-    val globalSubjectRank: Int = 4,
-    val totalStudents: Int = 45,
-    val improvementTrend: Float = 12.5f,
-    val monthlyScores: List<Int> = listOf(78, 80, 84, 82, 90),
-    val assessmentHistory: List<AssessmentItem> = listOf(
-        AssessmentItem("1", "Mathematics", "12 May 2024", 94, 100, 82, "functions"),
-        AssessmentItem("2", "Modern Science", "08 May 2024", 88, 100, 75, "biotech"),
-        AssessmentItem("3", "English Literature", "05 May 2024", 91, 100, 88, "menu_book")
-    ),
-    val teacherRemarks: String = "Arjun's curiosity is infectious. He often leads group discussions and isn't afraid to ask 'why'. His written assignments have improved in structure.",
-    val leadInstructor: String = "Mrs. Sarah Jenkins",
-    val pewsStatus: String = "Moderate Risk",
-    val pewsAlert: String = "Yellow Alert: Social Interaction metrics are 15% below term goals. Recommend team activities.",
-    val learningStreak: Int = 18,
-    val skillTrajectory: Map<String, Int> = mapOf(
-        "Critical Thinking" to 92,
-        "Social Interaction" to 64
-    )
+    val childName: String = "",
+    val termNarrative: String = "",
+    val averageScore: Int = 0,
+    val globalSubjectRank: Int = 0,
+    val totalStudents: Int = 0,
+    val improvementTrend: Float = 0f,
+    val monthlyScores: List<Int> = emptyList(),
+    val assessmentHistory: List<AssessmentItem> = emptyList(),
+    val teacherRemarks: String = "",
+    val leadInstructor: String = "",
+    val pewsStatus: String = "",
+    val pewsAlert: String = "",
+    val learningStreak: Int = 0,
+    val skillTrajectory: Map<String, Int> = emptyMap(),
+    val isLoading: Boolean = false,
+    val error: String? = null
 )
 
-class ParentReportsViewModel : ViewModel() {
+class ParentReportsViewModel(
+    private val repository: ParentRepository,
+    private val preferenceRepository: PreferenceRepository
+) : ViewModel() {
     private val _state = MutableStateFlow(ParentReportsState())
     val state: StateFlow<ParentReportsState> = _state.asStateFlow()
+
+    init {
+        loadReports()
+    }
+
+    private fun loadReports() {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null) }
+            preferenceRepository.getUserToken().collect { token ->
+                if (token != null) {
+                    when (val result = repository.getReports(token)) {
+                        is NetworkResult.Success -> {
+                            val data = result.data.data
+                            _state.update {
+                                it.copy(
+                                    isLoading = false,
+                                    childName = data.childName,
+                                    termNarrative = data.termNarrative,
+                                    averageScore = data.averageScore,
+                                    globalSubjectRank = data.globalSubjectRank,
+                                    totalStudents = data.totalStudents,
+                                    improvementTrend = data.improvementTrend,
+                                    monthlyScores = data.monthlyScores,
+                                    assessmentHistory = data.assessmentHistory.mapIndexed { i, a ->
+                                        AssessmentItem(i.toString(), a.subject, a.date, a.score, a.totalScore, a.classAverage, a.iconName)
+                                    },
+                                    teacherRemarks = data.teacherRemarks,
+                                    leadInstructor = data.leadInstructor,
+                                    pewsStatus = data.pewsStatus,
+                                    pewsAlert = data.pewsAlert,
+                                    learningStreak = data.learningStreak,
+                                    skillTrajectory = data.skillTrajectory
+                                )
+                            }
+                        }
+                        is NetworkResult.Error -> {
+                            _state.update { it.copy(isLoading = false, error = result.message) }
+                        }
+                        is NetworkResult.ConnectionError -> {
+                            _state.update { it.copy(isLoading = false, error = "Connection error") }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

@@ -2,7 +2,6 @@ package com.littlebridge.vidyaprayag.ui.screens.parent
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,7 +25,7 @@ import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.parent.presentation.CareerMatch
 import com.littlebridge.vidyaprayag.feature.parent.presentation.CareerPathViewModel
 import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
-import com.littlebridge.vidyaprayag.ui.components.VidyaPrayagCard
+import com.littlebridge.vidyaprayag.ui.components.*
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -35,38 +34,38 @@ fun CareerPathScreen() {
     val state by viewModel.state.collectAsState()
     val navigator = LocalAppNavigator.current
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.radialGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.1f),
-                        MaterialTheme.colorScheme.background
-                    )
-                )
-            )
-    ) {
+    BaseScreen(
+        onBackClick = { navigator.goBack() },
+        immersiveTopBar = true
+    ) { paddingValues, scrollModifier ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp)
-                .verticalScroll(rememberScrollState()),
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.1f),
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
+                .then(scrollModifier)
+                .padding(paddingValues)
+                .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.spacedBy(32.dp)
         ) {
-            CelebrationGraphic()
+            Spacer(modifier = Modifier.height(16.dp))
 
-            Spacer(modifier = Modifier.height(32.dp))
+            CelebrationGraphic()
 
             Text(
                 "Career Insight!",
                 style = MaterialTheme.typography.displayLarge,
                 fontWeight = FontWeight.Black,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center
             )
-
-            Spacer(modifier = Modifier.height(8.dp))
 
             Text(
                 text = buildAnnotatedString {
@@ -82,11 +81,7 @@ fun CareerPathScreen() {
                 modifier = Modifier.fillMaxWidth(0.9f)
             )
 
-            Spacer(modifier = Modifier.height(48.dp))
-
             CareerMatchCard(state.topMatch)
-
-            Spacer(modifier = Modifier.height(48.dp))
 
             Column(
                 modifier = Modifier.widthIn(max = 400.dp),
@@ -114,6 +109,8 @@ fun CareerPathScreen() {
                     Text("Recalibrate Profile", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
             }
+
+            Spacer(modifier = Modifier.height(48.dp))
         }
     }
 }

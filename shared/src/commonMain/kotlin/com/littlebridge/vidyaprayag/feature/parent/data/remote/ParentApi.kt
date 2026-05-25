@@ -47,4 +47,44 @@ class ParentApi(
             }
         }
     }
+
+    suspend fun getParentDashboard(token: String): NetworkResult<ParentDashboardResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/dashboard")) {
+                header("Authorization", "Bearer $token")
+            }
+        }
+    }
+
+    suspend fun getCareerPath(token: String): NetworkResult<CareerPathResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/career-path")) {
+                header("Authorization", "Bearer $token")
+            }
+        }
+    }
+
+    suspend fun getDailyStatus(token: String): NetworkResult<DailyStatusResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/daily-status")) {
+                header("Authorization", "Bearer $token")
+            }
+        }
+    }
+
+    suspend fun getReports(token: String): NetworkResult<ParentReportsResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/reports")) {
+                header("Authorization", "Bearer $token")
+            }
+        }
+    }
+
+    suspend fun getPtmScheduling(token: String): NetworkResult<PtmSchedulingResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/ptm")) {
+                header("Authorization", "Bearer $token")
+            }
+        }
+    }
 }

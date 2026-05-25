@@ -1,9 +1,15 @@
 package com.littlebridge.vidyaprayag.feature.parent.presentation
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.littlebridge.vidyaprayag.core.network.NetworkResult
+import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.feature.parent.domain.repository.ParentRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class PTMBooking(
     val id: String,
@@ -21,29 +27,67 @@ data class PTMTimeSlot(
 )
 
 data class ParentSchedulePTMState(
-    val selectedMonth: String = "October 2023",
-    val selectedDate: Int = 6,
-    val ptmWindowDays: List<Int> = listOf(6, 12),
-    val teacherName: String = "Dr. Sarah Henderson",
-    val teacherSubject: String = "Advanced Mathematics • Grade 10-A",
-    val teacherImageUrl: String = "https://lh3.googleusercontent.com/aida-public/AB6AXuA9ovXHkp7pMxJJl22f7fZy3tNdf5J5w36mJD5Tl-F0TXhnQ6I-FRbkTkFDu5iUp4zsRapf3mTuaiGWhFjPZ8FNVxRmNk6cxgdmZZXs3lUeLOLrdrkypser3od5vej76hIdSwN3LfpvBQ8OSL0EqjBl7d16AvoecEbLvO5TduBawveJLoVZNYHzNG1cwyWuFiX5CjX-qfWV2kRn15qWVYib6Zm7_OR3LGkZH5ZMQHDkF6OgBbtM6j1LMai9MineP9ZmY3fRCUV1NGyZ",
-    val slots: List<PTMTimeSlot> = listOf(
-        PTMTimeSlot("10:00 AM"),
-        PTMTimeSlot("10:15 AM", isSelected = true),
-        PTMTimeSlot("10:30 AM"),
-        PTMTimeSlot("10:45 AM", isAvailable = false),
-        PTMTimeSlot("11:00 AM"),
-        PTMTimeSlot("11:15 AM")
-    ),
-    val bookings: List<PTMBooking> = listOf(
-        PTMBooking("1", "Physics Review", "Mr. Robert Chen", "Oct 08, 2023", "02:30 PM - 02:45 PM")
-    ),
-    val email: String = "parent@example.com"
+    val selectedMonth: String = "",
+    val selectedDate: Int = 0,
+    val ptmWindowDays: List<Int> = emptyList(),
+    val teacherName: String = "",
+    val teacherSubject: String = "",
+    val teacherImageUrl: String = "",
+    val slots: List<PTMTimeSlot> = emptyList(),
+    val bookings: List<PTMBooking> = emptyList(),
+    val email: String = "",
+    val isLoading: Boolean = false,
+    val error: String? = null
 )
 
-class ParentSchedulePTMViewModel : ViewModel() {
+class ParentSchedulePTMViewModel(
+    private val repository: ParentRepository,
+    private val preferenceRepository: PreferenceRepository
+) : ViewModel() {
     private val _state = MutableStateFlow(ParentSchedulePTMState())
     val state: StateFlow<ParentSchedulePTMState> = _state.asStateFlow()
+
+    init {
+        loadPtmScheduling()
+    }
+
+    private fun loadPtmScheduling() {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null) }
+            preferenceRepository.getUserToken().collect { token ->
+                if (token != null) {
+                    when (val result = repository.getPtmScheduling(token)) {
+                        is NetworkResult.Success -> {
+                            val data = result.data.data
+                            _state.update {
+                                it.copy(
+                                    isLoading = false,
+                                    selectedMonth = data.selectedMonth,
+                                    selectedDate = data.selectedDate,
+                                    ptmWindowDays = data.ptmWindowDays,
+                                    teacherName = data.teacherName,
+                                    teacherSubject = data.teacherSubject,
+                                    teacherImageUrl = data.teacherImageUrl,
+                                    slots = data.slots.map { s ->
+                                        PTMTimeSlot(s.time, s.isAvailable, s.isSelected)
+                                    },
+                                    bookings = data.bookings.map { b ->
+                                        PTMBooking(b.teacher, b.subject, b.teacher, b.date, b.time, b.iconName)
+                                    }
+                                )
+                            }
+                        }
+                        is NetworkResult.Error -> {
+                            _state.update { it.copy(isLoading = false, error = result.message) }
+                        }
+                        is NetworkResult.ConnectionError -> {
+                            _state.update { it.copy(isLoading = false, error = "Connection error") }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     fun selectDate(date: Int) {
         _state.value = _state.value.copy(selectedDate = date)
