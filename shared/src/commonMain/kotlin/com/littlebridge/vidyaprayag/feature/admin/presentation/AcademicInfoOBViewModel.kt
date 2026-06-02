@@ -13,7 +13,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 data class Subject(
     val id: String,
@@ -189,10 +195,43 @@ class AcademicInfoOBViewModel(
     }
 
     /**
+     * Builds the ACADEMIC `data_payload` from the current UI state so the server
+     * persists REAL school_classes + school_subjects rows (instead of seeding
+     * defaults). Contract:
+     *   { "classes": [ { "code","name","sections":[...],
+     *                    "subjects":[ {"sub_name","sub_code","teacher_assigned"} ] } ] }
+     * Every available class is sent with the configured subject set; the section
+     * list defaults to ["A"] when unknown.
+     */
+    private fun buildAcademicPayload(): JsonObject {
+        val s = _state.value
+        val subjectsArray: JsonArray = buildJsonArray {
+            s.subjects.forEach { subj ->
+                add(buildJsonObject {
+                    put("sub_name", subj.name)
+                    put("sub_code", subj.id)
+                    if (subj.teacherName.isNullOrBlank()) put("teacher_assigned", JsonNull)
+                    else put("teacher_assigned", subj.teacherName)
+                })
+            }
+        }
+        return buildJsonObject {
+            put("classes", buildJsonArray {
+                s.availableClasses.forEach { className ->
+                    add(buildJsonObject {
+                        put("code", classCodeByName[className] ?: className.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-'))
+                        put("name", className)
+                        put("sections", buildJsonArray { add(JsonPrimitive("A")) })
+                        put("subjects", subjectsArray)
+                    })
+                }
+            })
+        }
+    }
+
+    /**
      * POST to /api/v1/onboarding/submit with ob_step_type = "ACADEMIC".
-     * The server's ACADEMIC schema has no required keys today; we send an
-     * empty payload, which is enough for the server to advance the user to
-     * the REVIEW step.
+     * We now send the real class/subject structure so the backend persists it.
      */
     fun submit(onSuccess: () -> Unit) {
         if (_isSubmitting.value) return
@@ -211,7 +250,7 @@ class AcademicInfoOBViewModel(
             val request = OnboardingSubmitRequest(
                 obStepType = ObStepType.ACADEMIC,
                 isFinalSubmission = false,
-                dataPayload = JsonObject(emptyMap())
+                dataPayload = buildAcademicPayload()
             )
 
             when (val result = onboardingRepository.submitStep(token, request)) {
