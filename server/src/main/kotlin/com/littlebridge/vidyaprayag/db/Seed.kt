@@ -347,6 +347,27 @@ object CmsSeed {
                     }
                 """.trimIndent(),
 
+                // ---------------- Student Analytics Cohort ---------------
+                // Cohort-level view consumed by StudentAnalyticsScreen.
+                // The per-student template is `school_student_analytics_template`
+                // (above); this blob is the school-wide rollup.
+                "school_student_analytics_cohort" to """
+                    {
+                      "daily_volatility": [0.92,0.88,0.94,0.91,0.98,0.89,0.95,0.93,0.90,0.64,0.85,0.89,0.91],
+                      "risk": {"critical_count":12,"medium_count":45,"low_count":782},
+                      "at_risk_students": [
+                        {"id":"1","name":"Julian Henderson","image_url":"","retention_risk":89,"mastery_trend":"-15% (1wk)","risk_level":"Critical"},
+                        {"id":"2","name":"Marcus Sterling","image_url":"","retention_risk":62,"mastery_trend":"-8% (1wk)","risk_level":"Medium"}
+                      ],
+                      "subject_engagements": [
+                        {"name":"Advanced Mathematics","percentage":0.942},
+                        {"name":"Physical Sciences","percentage":0.76,"status":"Risk Level High"},
+                        {"name":"Computer Programming","percentage":0.918}
+                      ],
+                      "cohort_comparison": [0.85,0.92,0.98,0.78]
+                    }
+                """.trimIndent(),
+
                 // ---------------- Teacher Performance --------------------
                 "school_teacher_performance" to """
                     {
@@ -388,15 +409,23 @@ object CmsSeed {
                     {
                       "overall": {"percentage":78,"trend":"+2.1%"},
                       "by_subject": [
-                        {"name":"Mathematics","percentage":82,"behind_by_days":0},
-                        {"name":"Science","percentage":76,"behind_by_days":3},
-                        {"name":"Literature","percentage":64,"behind_by_days":8},
-                        {"name":"History","percentage":71,"behind_by_days":5}
+                        {"name":"Science Dept","percentage":75,"behind_by_days":0,"trend":"+5% from last week"},
+                        {"name":"Mathematics","percentage":90,"behind_by_days":0,"trend":"On Target"},
+                        {"name":"Humanities","percentage":42,"behind_by_days":7,"trend":"Delayed Entry"},
+                        {"name":"Fine Arts","percentage":60,"behind_by_days":0,"trend":"Steady Growth"}
                       ],
                       "by_class": [
                         {"class":"Grade 10-A","percentage":88},
                         {"class":"Grade 10-B","percentage":72},
                         {"class":"Grade 9-A","percentage":81}
+                      ],
+                      "alerts": [
+                        {"id":"1","subject":"Chemistry","class_name":"Grade 10-B","delay_percentage":14,"instructor":"Dr. Miller","is_critical":true},
+                        {"id":"2","subject":"World History","class_name":"Grade 8-C","delay_percentage":8,"instructor":"Sarah J.","is_critical":false}
+                      ],
+                      "milestones": [
+                        {"id":"1","month":"Oct","day":"12","title":"Mid-Term Syllabus Verification","description":"Department heads to submit progress audits for Q2.","is_verified":true},
+                        {"id":"2","month":"Oct","day":"28","title":"Practical Assessment Window","description":"Science labs opening for senior grade assessments.","is_verified":false}
                       ]
                     }
                 """.trimIndent(),

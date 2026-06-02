@@ -1,9 +1,24 @@
 package com.littlebridge.vidyaprayag.feature.admin.presentation
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.littlebridge.vidyaprayag.core.network.NetworkResult
+import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.feature.admin.domain.repository.AnalyticsRepository
+import com.littlebridge.vidyaprayag.util.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.floatOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 data class RiskStudent(
     val id: String,
@@ -21,23 +36,97 @@ data class SubjectEngagement(
 )
 
 data class StudentAnalyticsState(
-    val dailyVolatility: List<Float> = listOf(0.92f, 0.88f, 0.94f, 0.91f, 0.98f, 0.89f, 0.95f, 0.93f, 0.90f, 0.64f, 0.85f, 0.89f, 0.91f),
-    val criticalRiskCount: Int = 12,
-    val mediumRiskCount: Int = 45,
-    val lowRiskCount: Int = 782,
-    val atRiskStudents: List<RiskStudent> = listOf(
-        RiskStudent("1", "Julian Henderson", "https://lh3.googleusercontent.com/aida-public/AB6AXuCGBEHMfmZeOWRD7hmkKP6sVAOQPV6zUu9E7u21BU7VKWDUWq1k8uGkf36mbO3nkKkQAkSPrFFUCj7Nt-7a8U8YXluRw3Ja9xmGfkjD0fURnSq9dzOCudcBMFDC9q_7Qt2GEVnhovvnc7X2OHCbx90BstBNkWu0ykuWR5qSLsSXEapUlRr9C5gyIA5TOjuJfTKan6rsScqQuLHVR8eE-1SXxZ2A7QXU010GQn4XEEVKEC3zevaIH1DAToEhgKF9rXTwjuNs47eoYb5Z", 89, "-15% (1wk)", "Critical"),
-        RiskStudent("2", "Marcus Sterling", "https://lh3.googleusercontent.com/aida-public/AB6AXuBe_PszObzkkoKHkUZgpntzEecc7yAvRf6Yss4uwd9yStT24uOdSck0TzWJFdIhsj8dY_ySayfmYl7vmKnCQKLJtIpwGhnBCUGPIVzetwAxn_Hi63DAyp-TL3Q4eMz032Rv7pUnCM8iXaDt30IVHO8NttQwxrEAeegQylZWxREDb7Lra30mspFIRjDEHF9aNq8jqinQshnDgFw-6R39ZEnSCqeJ8_cAvKIsxMyGTZYgYKHSkTOAVsCdVV9CXNqjkLGXgnbebWGRsmha", 62, "-8% (1wk)", "Medium")
-    ),
-    val subjectEngagements: List<SubjectEngagement> = listOf(
-        SubjectEngagement("Advanced Mathematics", 0.942f),
-        SubjectEngagement("Physical Sciences", 0.76f, "Risk Level High"),
-        SubjectEngagement("Computer Programming", 0.918f)
-    ),
-    val cohortComparison: List<Float> = listOf(0.85f, 0.92f, 0.98f, 0.78f) // G9, G10, G11, G12
+    val dailyVolatility: List<Float> = emptyList(),
+    val criticalRiskCount: Int = 0,
+    val mediumRiskCount: Int = 0,
+    val lowRiskCount: Int = 0,
+    val atRiskStudents: List<RiskStudent> = emptyList(),
+    val subjectEngagements: List<SubjectEngagement> = emptyList(),
+    val cohortComparison: List<Float> = emptyList(), // G9, G10, G11, G12
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
 )
 
-class StudentAnalyticsViewModel : ViewModel() {
+class StudentAnalyticsViewModel(
+    private val analyticsRepository: AnalyticsRepository,
+    private val preferenceRepository: PreferenceRepository
+) : ViewModel() {
+
     private val _state = MutableStateFlow(StudentAnalyticsState())
     val state: StateFlow<StudentAnalyticsState> = _state.asStateFlow()
+
+    init { load() }
+
+    fun load() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isLoading = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isLoading = false); return@launch
+            }
+            when (val result = analyticsRepository.getStudentCohort(token)) {
+                is NetworkResult.Success -> {
+                    _state.value = parseCohort(result.data.data).copy(isLoading = false)
+                }
+                is NetworkResult.Error -> {
+                    AppLogger.e("StudentAnalyticsVM", "getStudentCohort error: ${result.message}")
+                    _state.value = _state.value.copy(isLoading = false, errorMessage = result.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    AppLogger.e("StudentAnalyticsVM", "getStudentCohort connection error")
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        errorMessage = "Connection error. Check your internet."
+                    )
+                }
+            }
+        }
+    }
+
+    private fun parseCohort(element: JsonElement?): StudentAnalyticsState {
+        val obj = (element as? JsonObject) ?: return StudentAnalyticsState()
+        return try {
+            val volatility = (obj["daily_volatility"] as? JsonArray)
+                ?.mapNotNull { it.jsonPrimitive.floatOrNull } ?: emptyList()
+            val risk = obj["risk"] as? JsonObject
+            val atRisk = (obj["at_risk_students"] as? JsonArray)?.mapNotNull { parseRisk(it) } ?: emptyList()
+            val engagements = (obj["subject_engagements"] as? JsonArray)?.mapNotNull { parseEngagement(it) } ?: emptyList()
+            val cohort = (obj["cohort_comparison"] as? JsonArray)
+                ?.mapNotNull { it.jsonPrimitive.floatOrNull } ?: emptyList()
+
+            StudentAnalyticsState(
+                dailyVolatility    = volatility,
+                criticalRiskCount  = risk?.get("critical_count")?.jsonPrimitive?.intOrNull ?: 0,
+                mediumRiskCount    = risk?.get("medium_count")?.jsonPrimitive?.intOrNull ?: 0,
+                lowRiskCount       = risk?.get("low_count")?.jsonPrimitive?.intOrNull ?: 0,
+                atRiskStudents     = atRisk,
+                subjectEngagements = engagements,
+                cohortComparison   = cohort
+            )
+        } catch (e: Exception) {
+            AppLogger.e("StudentAnalyticsVM", "parseCohort failed: ${e.message}")
+            StudentAnalyticsState(errorMessage = "Could not parse server response")
+        }
+    }
+
+    private fun parseRisk(el: JsonElement): RiskStudent? = try {
+        val o = el.jsonObject
+        RiskStudent(
+            id            = o["id"]?.jsonPrimitive?.contentOrNull ?: return null,
+            name          = o["name"]?.jsonPrimitive?.contentOrNull ?: "",
+            imageUrl      = o["image_url"]?.jsonPrimitive?.contentOrNull ?: "",
+            retentionRisk = o["retention_risk"]?.jsonPrimitive?.intOrNull ?: 0,
+            masteryTrend  = o["mastery_trend"]?.jsonPrimitive?.contentOrNull ?: "",
+            riskLevel     = o["risk_level"]?.jsonPrimitive?.contentOrNull ?: "Low"
+        )
+    } catch (_: Exception) { null }
+
+    private fun parseEngagement(el: JsonElement): SubjectEngagement? = try {
+        val o = el.jsonObject
+        SubjectEngagement(
+            name       = o["name"]?.jsonPrimitive?.contentOrNull ?: return null,
+            percentage = o["percentage"]?.jsonPrimitive?.floatOrNull ?: 0f,
+            status     = o["status"]?.jsonPrimitive?.contentOrNull
+        )
+    } catch (_: Exception) { null }
 }

@@ -31,6 +31,10 @@ import org.koin.compose.viewmodel.koinViewModel
 fun SchoolAnnouncementsScreen() {
     val viewModel: SchoolAnnouncementsViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
+    var query by remember { mutableStateOf("") }
+    var showCreate by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) { viewModel.loadAnnouncements() }
 
     BaseScreen(
         bottomBar = {
@@ -53,11 +57,39 @@ fun SchoolAnnouncementsScreen() {
             }
 
             item {
-                SearchBarSection()
+                SearchBarSection(
+                    query = query,
+                    onQueryChange = {
+                        query = it
+                        viewModel.searchAnnouncements(it)
+                    }
+                )
+            }
+
+            state.errorMessage?.let { msg ->
+                item {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.errorContainer
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(msg, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.weight(1f))
+                            TextButton(onClick = { viewModel.clearMessages() }) { Text("Dismiss") }
+                        }
+                    }
+                }
             }
 
             item {
-                FilterChipsSection()
+                FilterChipsSection(
+                    selectedCategory = state.selectedCategory,
+                    onSelect = { viewModel.setCategoryFilter(it) }
+                )
             }
 
             // Featured Announcement (Bento Style)
@@ -77,7 +109,111 @@ fun SchoolAnnouncementsScreen() {
                 Spacer(modifier = Modifier.height(100.dp))
             }
         }
+
+        // Floating Create Announcement action (overlay bottom-end).
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            FloatingActionButton(
+                onClick = { showCreate = true },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
+                containerColor = MaterialTheme.colorScheme.secondary
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "New announcement", tint = Color.White)
+            }
+        }
+
+        if (showCreate) {
+            CreateAnnouncementDialog(
+                isCreating = state.isCreating,
+                onDismiss = { showCreate = false },
+                onCreate = { type, title, description, date ->
+                    viewModel.createAnnouncement(
+                        type = type,
+                        title = title,
+                        description = description,
+                        date = date,
+                        onCreated = { showCreate = false }
+                    )
+                }
+            )
+        }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CreateAnnouncementDialog(
+    isCreating: Boolean,
+    onDismiss: () -> Unit,
+    onCreate: (type: String, title: String, description: String, date: String) -> Unit
+) {
+    var type by remember { mutableStateOf("Update") }
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var date by remember { mutableStateOf("") }
+    val types = listOf("Update", "Holidays", "PTM", "Events", "Reminder")
+
+    AlertDialog(
+        onDismissRequest = { if (!isCreating) onDismiss() },
+        title = { Text("New announcement", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    types.forEach { t ->
+                        FilterChip(
+                            selected = type == t,
+                            onClick = { type = t },
+                            label = { Text(t) }
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isCreating
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    minLines = 3,
+                    maxLines = 6,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isCreating
+                )
+                OutlinedTextField(
+                    value = date,
+                    onValueChange = { date = it },
+                    label = { Text("Date (YYYY-MM-DD)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isCreating
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = !isCreating && title.isNotBlank() && description.isNotBlank() && date.isNotBlank(),
+                onClick = { onCreate(type, title.trim(), description.trim(), date.trim()) }
+            ) {
+                if (isCreating) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("Create")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isCreating) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable
@@ -133,10 +269,13 @@ private fun AnnouncementsHeader(
 }
 
 @Composable
-private fun SearchBarSection() {
+private fun SearchBarSection(
+    query: String = "",
+    onQueryChange: (String) -> Unit = {}
+) {
     OutlinedTextField(
-        value = "",
-        onValueChange = { },
+        value = query,
+        onValueChange = onQueryChange,
         modifier = Modifier.fillMaxWidth(),
         placeholder = { Text("Search announcements...", color = MaterialTheme.colorScheme.outline) },
         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.outline) },
@@ -150,16 +289,27 @@ private fun SearchBarSection() {
 }
 
 @Composable
-private fun FilterChipsSection() {
+private fun FilterChipsSection(
+    selectedCategory: String?,
+    onSelect: (String?) -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         val filters = listOf("All", "Holidays", "PTM", "Events")
         filters.forEach { filter ->
-            val isSelected = filter == "All"
+            // "All" is selected when no category filter is active; otherwise
+            // case-insensitive match against the server-side category.
+            val isSelected = when {
+                filter.equals("All", ignoreCase = true) -> selectedCategory.isNullOrBlank()
+                else -> filter.equals(selectedCategory, ignoreCase = true)
+            }
             Surface(
-                onClick = { },
+                onClick = {
+                    if (filter.equals("All", ignoreCase = true)) onSelect(null)
+                    else onSelect(filter)
+                },
                 shape = RoundedCornerShape(12.dp),
                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White,
                 border = if (isSelected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)

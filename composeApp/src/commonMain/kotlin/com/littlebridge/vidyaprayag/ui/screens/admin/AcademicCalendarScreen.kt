@@ -32,6 +32,10 @@ fun AcademicCalendarScreen() {
     val state by viewModel.state.collectAsState()
     val navigator = LocalAppNavigator.current
 
+    // Refresh on screen entry to keep the data fresh after returning from
+    // sibling screens (announcements, PTM, etc.).
+    LaunchedEffect(Unit) { viewModel.loadCalendar() }
+
     BaseScreen(
         onBackClick = { navigator.goBack() },
         immersiveTopBar = true
@@ -45,11 +49,39 @@ fun AcademicCalendarScreen() {
             verticalArrangement = Arrangement.spacedBy(32.dp)
         ) {
             item {
-                CalendarHeaderSection()
+                CalendarHeaderSection(
+                    isLoading = state.isLoading,
+                    onSyncSyllabus = { viewModel.syncSyllabus() },
+                    onShowHolidays = { viewModel.showHolidaysOnly() }
+                )
+            }
+
+            state.errorMessage?.let { msg ->
+                item {
+                    CalendarBanner(
+                        message = msg,
+                        isError = true,
+                        onDismiss = { viewModel.clearMessages() }
+                    )
+                }
+            }
+            state.infoMessage?.let { msg ->
+                item {
+                    CalendarBanner(
+                        message = msg,
+                        isError = false,
+                        onDismiss = { viewModel.clearMessages() }
+                    )
+                }
             }
 
             item {
-                MainCalendarCard(month = state.currentMonth)
+                MainCalendarCard(
+                    month = state.currentMonth.ifBlank { "This Month" },
+                    isLoading = state.isLoading,
+                    onPrev = { viewModel.goToPreviousMonth() },
+                    onNext = { viewModel.goToNextMonth() }
+                )
             }
 
             item {
@@ -76,17 +108,21 @@ fun AcademicCalendarScreen() {
 }
 
 @Composable
-private fun CalendarHeaderSection() {
+private fun CalendarHeaderSection(
+    isLoading: Boolean,
+    onSyncSyllabus: () -> Unit,
+    onShowHolidays: () -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column {
             Text(
-                "Academic Calendar 2023-24",
+                "Academic Calendar",
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                "Central District Administration Dashboard",
+                "Plan working days, holidays and syllabus targets across the year.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -94,18 +130,28 @@ private fun CalendarHeaderSection() {
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(
-                onClick = { },
+                onClick = onSyncSyllabus,
+                enabled = !isLoading,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                 contentPadding = PaddingValues(vertical = 12.dp)
             ) {
-                Icon(Icons.Default.Sync, null, modifier = Modifier.size(18.dp))
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White
+                    )
+                } else {
+                    Icon(Icons.Default.Sync, null, modifier = Modifier.size(18.dp))
+                }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Sync Syllabus", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
             Button(
-                onClick = { },
+                onClick = onShowHolidays,
+                enabled = !isLoading,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
@@ -120,7 +166,46 @@ private fun CalendarHeaderSection() {
 }
 
 @Composable
-private fun MainCalendarCard(month: String) {
+private fun CalendarBanner(message: String, isError: Boolean, onDismiss: () -> Unit) {
+    val container = if (isError) MaterialTheme.colorScheme.errorContainer
+                    else MaterialTheme.colorScheme.secondaryContainer
+    val onContainer = if (isError) MaterialTheme.colorScheme.onErrorContainer
+                      else MaterialTheme.colorScheme.onSecondaryContainer
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = container,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                if (isError) Icons.Default.ErrorOutline else Icons.Default.Info,
+                contentDescription = null,
+                tint = onContainer
+            )
+            Text(
+                message,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+                color = onContainer
+            )
+            TextButton(onClick = onDismiss) {
+                Text("DISMISS", fontWeight = FontWeight.Bold, color = onContainer)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MainCalendarCard(
+    month: String,
+    isLoading: Boolean,
+    onPrev: () -> Unit,
+    onNext: () -> Unit
+) {
     VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
             Row(
@@ -130,14 +215,16 @@ private fun MainCalendarCard(month: String) {
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     IconButton(
-                        onClick = { },
+                        onClick = onPrev,
+                        enabled = !isLoading,
                         modifier = Modifier.size(36.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
-                    ) { Icon(Icons.Default.ChevronLeft, null) }
+                    ) { Icon(Icons.Default.ChevronLeft, contentDescription = "Previous month") }
                     Text(month, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     IconButton(
-                        onClick = { },
+                        onClick = onNext,
+                        enabled = !isLoading,
                         modifier = Modifier.size(36.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
-                    ) { Icon(Icons.Default.ChevronRight, null) }
+                    ) { Icon(Icons.Default.ChevronRight, contentDescription = "Next month") }
                 }
                 
                 Surface(
