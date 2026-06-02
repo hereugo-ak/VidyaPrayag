@@ -138,28 +138,34 @@ class SyllabusCoverageViewModel(
         }
     }
 
-    private fun parseAlert(el: JsonElement): LaggingAlert? = try {
-        val o = el.jsonObject
-        LaggingAlert(
-            id               = o["id"]?.jsonPrimitive?.contentOrNull ?: return null,
-            subject          = o["subject"]?.jsonPrimitive?.contentOrNull ?: "",
-            className        = o["class_name"]?.jsonPrimitive?.contentOrNull
-                ?: o["class"]?.jsonPrimitive?.contentOrNull ?: "",
-            delayPercentage  = o["delay_percentage"]?.jsonPrimitive?.intOrNull ?: 0,
-            instructor       = o["instructor"]?.jsonPrimitive?.contentOrNull ?: "",
-            isCritical       = o["is_critical"]?.jsonPrimitive?.booleanOrNull ?: false
-        )
-    } catch (_: Exception) { null }
+    private fun parseAlert(el: JsonElement): LaggingAlert? {
+        return try {
+            val o = el.jsonObject
+            val id = o["id"]?.jsonPrimitive?.contentOrNull ?: return null
+            LaggingAlert(
+                id               = id,
+                subject          = o["subject"]?.jsonPrimitive?.contentOrNull ?: "",
+                className        = o["class_name"]?.jsonPrimitive?.contentOrNull
+                    ?: o["class"]?.jsonPrimitive?.contentOrNull ?: "",
+                delayPercentage  = o["delay_percentage"]?.jsonPrimitive?.intOrNull ?: 0,
+                instructor       = o["instructor"]?.jsonPrimitive?.contentOrNull ?: "",
+                isCritical       = o["is_critical"]?.jsonPrimitive?.booleanOrNull ?: false
+            )
+        } catch (_: Exception) { null }
+    }
 
-    private fun parseMilestone(el: JsonElement): AcademicMilestone? = try {
-        val o = el.jsonObject
-        AcademicMilestone(
-            id          = o["id"]?.jsonPrimitive?.contentOrNull ?: return null,
-            month       = o["month"]?.jsonPrimitive?.contentOrNull ?: "",
-            day         = o["day"]?.jsonPrimitive?.contentOrNull ?: "",
-            title       = o["title"]?.jsonPrimitive?.contentOrNull ?: "",
-            description = o["description"]?.jsonPrimitive?.contentOrNull ?: "",
-            isVerified  = o["is_verified"]?.jsonPrimitive?.booleanOrNull ?: false
-        )
-    } catch (_: Exception) { null }
+    private fun parseMilestone(el: JsonElement): AcademicMilestone? {
+        return try {
+            val o = el.jsonObject
+            val id = o["id"]?.jsonPrimitive?.contentOrNull ?: return null
+            AcademicMilestone(
+                id          = id,
+                month       = o["month"]?.jsonPrimitive?.contentOrNull ?: "",
+                day         = o["day"]?.jsonPrimitive?.contentOrNull ?: "",
+                title       = o["title"]?.jsonPrimitive?.contentOrNull ?: "",
+                description = o["description"]?.jsonPrimitive?.contentOrNull ?: "",
+                isVerified  = o["is_verified"]?.jsonPrimitive?.booleanOrNull ?: false
+            )
+        } catch (_: Exception) { null }
+    }
 }

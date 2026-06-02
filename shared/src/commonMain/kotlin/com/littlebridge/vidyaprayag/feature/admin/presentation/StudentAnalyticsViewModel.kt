@@ -109,24 +109,30 @@ class StudentAnalyticsViewModel(
         }
     }
 
-    private fun parseRisk(el: JsonElement): RiskStudent? = try {
-        val o = el.jsonObject
-        RiskStudent(
-            id            = o["id"]?.jsonPrimitive?.contentOrNull ?: return null,
-            name          = o["name"]?.jsonPrimitive?.contentOrNull ?: "",
-            imageUrl      = o["image_url"]?.jsonPrimitive?.contentOrNull ?: "",
-            retentionRisk = o["retention_risk"]?.jsonPrimitive?.intOrNull ?: 0,
-            masteryTrend  = o["mastery_trend"]?.jsonPrimitive?.contentOrNull ?: "",
-            riskLevel     = o["risk_level"]?.jsonPrimitive?.contentOrNull ?: "Low"
-        )
-    } catch (_: Exception) { null }
+    private fun parseRisk(el: JsonElement): RiskStudent? {
+        return try {
+            val o = el.jsonObject
+            val id = o["id"]?.jsonPrimitive?.contentOrNull ?: return null
+            RiskStudent(
+                id            = id,
+                name          = o["name"]?.jsonPrimitive?.contentOrNull ?: "",
+                imageUrl      = o["image_url"]?.jsonPrimitive?.contentOrNull ?: "",
+                retentionRisk = o["retention_risk"]?.jsonPrimitive?.intOrNull ?: 0,
+                masteryTrend  = o["mastery_trend"]?.jsonPrimitive?.contentOrNull ?: "",
+                riskLevel     = o["risk_level"]?.jsonPrimitive?.contentOrNull ?: "Low"
+            )
+        } catch (_: Exception) { null }
+    }
 
-    private fun parseEngagement(el: JsonElement): SubjectEngagement? = try {
-        val o = el.jsonObject
-        SubjectEngagement(
-            name       = o["name"]?.jsonPrimitive?.contentOrNull ?: return null,
-            percentage = o["percentage"]?.jsonPrimitive?.floatOrNull ?: 0f,
-            status     = o["status"]?.jsonPrimitive?.contentOrNull
-        )
-    } catch (_: Exception) { null }
+    private fun parseEngagement(el: JsonElement): SubjectEngagement? {
+        return try {
+            val o = el.jsonObject
+            val name = o["name"]?.jsonPrimitive?.contentOrNull ?: return null
+            SubjectEngagement(
+                name       = name,
+                percentage = o["percentage"]?.jsonPrimitive?.floatOrNull ?: 0f,
+                status     = o["status"]?.jsonPrimitive?.contentOrNull
+            )
+        } catch (_: Exception) { null }
+    }
 }
