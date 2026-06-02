@@ -10,12 +10,20 @@
  *
  * GET aggregates the filtered slice of `exam_results` (school + test +
  * class + subject) into a `summary` block:
- *   class_average      → arithmetic mean of numeric `score` values
- *   average_trend      → CMS-curated for now (real signal lives in a
- *                        future analytics service)
+ *   class_average      → mean of `score` values, where each score is converted
+ *                        to a 0-100 number via scoreToNumeric() so both numeric
+ *                        ("98", "92%") AND grade-style ("A+", "B") scores count.
+ *   average_trend      → REAL signal: this test's class average minus the
+ *                        previous test's class average for the same class +
+ *                        subject (the test whose rows were created most recently
+ *                        before the current one). Rendered as a signed delta
+ *                        e.g. "+2.4%" / "-1.0%" / "+0.0%" when no prior test.
  *   exceeding_count    → count where status == "Exceeding"
  *   meeting_count      → count where status == "Meeting"
  *   below_count        → count where status == "Below"
+ *
+ * Authorization: both endpoints require a school role + school via
+ * call.requireSchoolContext(); every query is scoped to the resolved school_id.
  *
  * `available_tests` / `available_classes` / `available_subjects` come from
  * CMS key `school_results_filters` so ops control curriculum metadata
@@ -32,9 +40,8 @@ package com.littlebridge.vidyaprayag.feature.school
 import com.littlebridge.vidyaprayag.core.created
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
-import com.littlebridge.vidyaprayag.core.principalUserId
+import com.littlebridge.vidyaprayag.core.requireSchoolContext
 import com.littlebridge.vidyaprayag.db.AppConfigTable
-import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.ExamResultsTable
 import com.littlebridge.vidyaprayag.db.StudentsTable
@@ -46,11 +53,10 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -123,11 +129,6 @@ data class PublishResultsResponse(val upserted: Int)
 
 private val LENIENT_JSON = Json { ignoreUnknownKeys = true; isLenient = true; explicitNulls = false }
 
-private fun resolveSchoolId(uid: UUID): UUID? = AppUsersTable
-    .selectAll().where { AppUsersTable.id eq uid }
-    .singleOrNull()
-    ?.get(AppUsersTable.schoolId)
-
 private fun cmsArrayStrings(rootKey: String, leafKey: String): List<String> {
     val raw = AppConfigTable.selectAll()
         .where { AppConfigTable.key eq rootKey }
@@ -142,8 +143,92 @@ private fun cmsArrayStrings(rootKey: String, leafKey: String): List<String> {
     }.getOrElse { emptyList() }
 }
 
-private fun numericScoreOrNull(score: String): Double? =
-    score.trim().trimEnd('%').toDoubleOrNull()
+/**
+ * Convert a score string to a 0-100 number for averaging.
+ *  - "98", "92%", "88.5" → their numeric value
+ *  - "A+"/"A"/"A-"/"B+".../"F" → conventional grade-point percentages
+ *  - "Pending"/blank/unknown → null (excluded from the average)
+ */
+private fun scoreToNumeric(score: String): Double? {
+    val s = score.trim()
+    if (s.isEmpty()) return null
+    s.trimEnd('%').toDoubleOrNull()?.let { return it }
+    return when (s.uppercase()) {
+        "A+" -> 98.0
+        "A"  -> 93.0
+        "A-" -> 90.0
+        "B+" -> 87.0
+        "B"  -> 83.0
+        "B-" -> 80.0
+        "C+" -> 77.0
+        "C"  -> 73.0
+        "C-" -> 70.0
+        "D+" -> 67.0
+        "D"  -> 63.0
+        "D-" -> 60.0
+        "F"  -> 50.0
+        else -> null
+    }
+}
+
+/** Mean of the numeric-convertible scores in a row set, or null if none. */
+private fun averageOf(scores: List<String>): Double? {
+    val nums = scores.mapNotNull { scoreToNumeric(it) }
+    return if (nums.isEmpty()) null else nums.average()
+}
+
+/**
+ * Compute the signed average-trend string for the current test by comparing its
+ * class average against the PREVIOUS test (same school/class/subject, a
+ * different test name) whose rows were created most recently before the current
+ * test's earliest row.
+ *
+ * MUST be called inside an active dbQuery {} transaction.
+ *
+ * Returns:
+ *   "+2.4%" / "-1.0%"  when a comparable prior test exists
+ *   "+0.0%"            when there's no prior test or no comparable averages
+ */
+private fun computePreviousTestTrend(
+    schoolId: UUID,
+    currentTest: String,
+    className: String,
+    subject: String,
+    currentRows: List<org.jetbrains.exposed.sql.ResultRow>,
+    currentAvg: Double?
+): String {
+    if (currentAvg == null || currentRows.isEmpty()) return "+0.0%"
+
+    // Earliest creation timestamp among the current test's rows.
+    val currentAnchor = currentRows.minOf { it[ExamResultsTable.createdAt] }
+
+    // All rows for the same class+subject but a DIFFERENT test, created before
+    // the current test, grouped by test name. We pick the test whose latest row
+    // is closest (but prior) to the current anchor.
+    val priorRows = ExamResultsTable.selectAll()
+        .where {
+            (ExamResultsTable.schoolId eq schoolId) and
+                (ExamResultsTable.className eq className) and
+                (ExamResultsTable.subject eq subject) and
+                (ExamResultsTable.test neq currentTest)
+        }
+        .toList()
+        .filter { it[ExamResultsTable.createdAt].isBefore(currentAnchor) }
+
+    if (priorRows.isEmpty()) return "+0.0%"
+
+    val previousTest = priorRows
+        .groupBy { it[ExamResultsTable.test] }
+        .maxByOrNull { (_, rows) -> rows.maxOf { it[ExamResultsTable.createdAt] } }
+        ?: return "+0.0%"
+
+    val previousAvg = averageOf(previousTest.value.map { it[ExamResultsTable.score] })
+        ?: return "+0.0%"
+
+    val delta = currentAvg - previousAvg
+    val sign = if (delta >= 0) "+" else "-"
+    return "$sign%.1f%%".format(kotlin.math.abs(delta))
+}
 
 fun Route.resultsRouting() {
     authenticate("jwt") {
@@ -151,16 +236,14 @@ fun Route.resultsRouting() {
 
             // -------- GET --------
             get {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
 
                 val test = call.request.queryParameters["test"].orEmpty()
                 val classFilter = call.request.queryParameters["class"].orEmpty()
                 val subject = call.request.queryParameters["subject"].orEmpty()
 
                 val payload = dbQuery {
-                    val schoolId = resolveSchoolId(uid)
-
                     val availableTests = cmsArrayStrings("school_results_filters", "available_tests")
                     val availableClasses = cmsArrayStrings("school_results_filters", "available_classes")
                     val availableSubjects = cmsArrayStrings("school_results_filters", "available_subjects")
@@ -169,17 +252,15 @@ fun Route.resultsRouting() {
                     val resolvedClass   = if (classFilter.isBlank()) availableClasses.firstOrNull().orEmpty() else classFilter
                     val resolvedSubject = if (subject.isBlank()) availableSubjects.firstOrNull().orEmpty() else subject
 
-                    val rows = if (schoolId == null) emptyList() else {
-                        ExamResultsTable.selectAll()
-                            .where {
-                                (ExamResultsTable.schoolId eq schoolId) and
-                                    (ExamResultsTable.test eq resolvedTest) and
-                                    (ExamResultsTable.className eq resolvedClass) and
-                                    (ExamResultsTable.subject eq resolvedSubject)
-                            }
-                            .orderBy(ExamResultsTable.studentName, SortOrder.ASC)
-                            .toList()
-                    }
+                    val rows = ExamResultsTable.selectAll()
+                        .where {
+                            (ExamResultsTable.schoolId eq schoolId) and
+                                (ExamResultsTable.test eq resolvedTest) and
+                                (ExamResultsTable.className eq resolvedClass) and
+                                (ExamResultsTable.subject eq resolvedSubject)
+                        }
+                        .orderBy(ExamResultsTable.studentName, SortOrder.ASC)
+                        .toList()
 
                     val students = rows.map { r ->
                         ResultStudentDto(
@@ -193,9 +274,20 @@ fun Route.resultsRouting() {
                         )
                     }
 
-                    val numericScores = rows.mapNotNull { numericScoreOrNull(it[ExamResultsTable.score]) }
-                    val classAverage = if (numericScores.isEmpty()) "0.0"
-                                       else "%.1f".format(numericScores.average())
+                    val currentAvg = averageOf(rows.map { it[ExamResultsTable.score] })
+                    val classAverage = if (currentAvg == null) "0.0" else "%.1f".format(currentAvg)
+
+                    // Real trend: find the previous test (same school/class/subject,
+                    // a DIFFERENT test name) whose rows were created most recently
+                    // BEFORE the current test's earliest row, and diff the averages.
+                    val averageTrend = computePreviousTestTrend(
+                        schoolId = schoolId,
+                        currentTest = resolvedTest,
+                        className = resolvedClass,
+                        subject = resolvedSubject,
+                        currentRows = rows,
+                        currentAvg = currentAvg
+                    )
 
                     val exceeding = rows.count { it[ExamResultsTable.status].equals("Exceeding", true) }
                     val meeting   = rows.count { it[ExamResultsTable.status].equals("Meeting",   true) }
@@ -212,7 +304,7 @@ fun Route.resultsRouting() {
                         ),
                         summary = ResultsSummaryDto(
                             classAverage = classAverage,
-                            averageTrend = "+0.0%", // placeholder until analytics pipeline lands
+                            averageTrend = averageTrend,
                             exceedingCount = exceeding,
                             meetingCount = meeting,
                             belowCount = below
@@ -225,8 +317,8 @@ fun Route.resultsRouting() {
 
             // -------- PUBLISH (bulk upsert) --------
             post {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@post }
+                val ctx = call.requireSchoolContext() ?: return@post
+                val schoolId = ctx.schoolId
                 val req = call.receive<PublishResultsDto>()
                 if (req.test.isBlank() || req.className.isBlank() || req.subject.isBlank()) {
                     call.fail("test, class, subject are required"); return@post
@@ -234,9 +326,6 @@ fun Route.resultsRouting() {
                 if (req.results.isEmpty()) {
                     call.fail("results must not be empty"); return@post
                 }
-
-                val schoolId = dbQuery { resolveSchoolId(uid) }
-                    ?: run { call.fail("User not associated with any school", HttpStatusCode.NotFound); return@post }
 
                 val now = Instant.now()
                 val upserted = dbQuery {

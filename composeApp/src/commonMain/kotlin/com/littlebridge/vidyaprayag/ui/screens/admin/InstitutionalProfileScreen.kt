@@ -29,58 +29,158 @@ import org.koin.compose.viewmodel.koinViewModel
 fun InstitutionalProfileScreen() {
     val viewModel: InstitutionalProfileViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Surface backend error / info messages to the user instead of swallowing them.
+    LaunchedEffect(state.errorMessage, state.infoMessage) {
+        state.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearMessages()
+        }
+        state.infoMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearMessages()
+        }
+    }
+
+    // Dialog state for adding a gallery photo / tour video by URL (binary upload
+    // is not wired yet; the backend accepts URL lists, so this is a real action).
+    var showAddPhoto by remember { mutableStateOf(false) }
+    var showAddTour by remember { mutableStateOf(false) }
 
     BaseScreen(
         bottomBar = {
             SchoolDashboardBottomBar(selectedTab = SchoolTab.PROFILE)
         }
     ) { paddingValues, scrollModifier ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(scrollModifier)
-                .padding(paddingValues),
-            contentPadding = PaddingValues(24.dp),
-            verticalArrangement = Arrangement.spacedBy(32.dp)
-        ) {
-            item {
-                ProfileHeaderSection(
-                    isPublic = state.isPublic,
-                    onTogglePublic = viewModel::togglePublic
-                )
+        Box(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(scrollModifier)
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(24.dp),
+                verticalArrangement = Arrangement.spacedBy(32.dp)
+            ) {
+                item {
+                    ProfileHeaderSection(
+                        isPublic = state.isPublic,
+                        onTogglePublic = viewModel::togglePublic
+                    )
+                }
+
+                item {
+                    PhilosophyForm(
+                        mission = state.missionStatement,
+                        onMissionChange = viewModel::updateMission,
+                        learningModel = state.learningModel,
+                        onModelChange = viewModel::updateLearningModel,
+                        language = state.primaryLanguage,
+                        onLanguageChange = viewModel::updateLanguage,
+                        isSaving = state.isSaving,
+                        onSave = viewModel::saveProfile
+                    )
+                }
+
+                item {
+                    VirtualTourPreview(
+                        tourName = state.activeTourName.ifBlank { "No active tour" },
+                        previewImageUrl = state.galleryImages.firstOrNull()?.url,
+                        onAddTour = { showAddTour = true }
+                    )
+                }
+
+                item {
+                    GallerySection(
+                        images = state.galleryImages,
+                        storageUsage = state.storageUsage,
+                        storageUsedHuman = state.storageUsedHuman,
+                        totalStorageHuman = state.totalStorageHuman,
+                        onAddPhoto = { showAddPhoto = true },
+                        onRemovePhoto = { url ->
+                            val remaining = state.galleryImages.map { it.url }.filterNot { it == url }
+                            viewModel.saveGallery(remaining)
+                        }
+                    )
+                }
+
+                item {
+                    ShowcaseHealthCard(completion = state.profileCompletion)
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(100.dp))
+                }
             }
 
-            item {
-                PhilosophyForm(
-                    mission = state.missionStatement,
-                    onMissionChange = viewModel::updateMission,
-                    learningModel = state.learningModel,
-                    onModelChange = viewModel::updateLearningModel,
-                    language = state.primaryLanguage,
-                    onLanguageChange = viewModel::updateLanguage
-                )
+            if (state.isLoading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
 
-            item {
-                VirtualTourPreview(tourName = state.activeTourName)
-            }
-
-            item {
-                GallerySection(
-                    images = state.galleryImages,
-                    storageUsage = state.storageUsage
-                )
-            }
-
-            item {
-                ShowcaseHealthCard(completion = state.profileCompletion)
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(100.dp))
-            }
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
         }
     }
+
+    if (showAddPhoto) {
+        AddUrlDialog(
+            title = "Add Gallery Photo",
+            label = "Image URL",
+            onDismiss = { showAddPhoto = false },
+            onConfirm = { url ->
+                showAddPhoto = false
+                val updated = state.galleryImages.map { it.url } + url
+                viewModel.saveGallery(updated)
+            }
+        )
+    }
+
+    if (showAddTour) {
+        AddUrlDialog(
+            title = "Add Virtual Tour Video",
+            label = "Video URL",
+            onDismiss = { showAddTour = false },
+            onConfirm = { url ->
+                showAddTour = false
+                // Put the new tour at the front so it becomes the active tour.
+                viewModel.saveTourVideos(listOf(url))
+            }
+        )
+    }
+}
+
+@Composable
+private fun AddUrlDialog(
+    title: String,
+    label: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var text by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text(label) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(
+                enabled = text.isNotBlank(),
+                onClick = { onConfirm(text.trim()) }
+            ) { Text("Add") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable
@@ -96,7 +196,7 @@ private fun ProfileHeaderSection(isPublic: Boolean, onTogglePublic: (Boolean) ->
                     Text("Institutional Profile", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Text("Manage your school\'s digital presence.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                
+
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                     shape = CircleShape,
@@ -107,7 +207,7 @@ private fun ProfileHeaderSection(isPublic: Boolean, onTogglePublic: (Boolean) ->
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("PUBLIC", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        Text(if (isPublic) "PUBLIC" else "PRIVATE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                         Switch(
                             checked = isPublic,
                             onCheckedChange = onTogglePublic,
@@ -128,7 +228,9 @@ private fun PhilosophyForm(
     learningModel: String,
     onModelChange: (String) -> Unit,
     language: String,
-    onLanguageChange: (String) -> Unit
+    onLanguageChange: (String) -> Unit,
+    isSaving: Boolean,
+    onSave: () -> Unit
 ) {
     VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -170,8 +272,8 @@ private fun PhilosophyForm(
             }
 
             VidyaPrayagPrimaryButton(
-                text = "UPDATE PHILOSOPHY",
-                onClick = { },
+                text = if (isSaving) "SAVING..." else "UPDATE PHILOSOPHY",
+                onClick = { if (!isSaving) onSave() },
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -179,7 +281,11 @@ private fun PhilosophyForm(
 }
 
 @Composable
-private fun VirtualTourPreview(tourName: String) {
+private fun VirtualTourPreview(
+    tourName: String,
+    previewImageUrl: String?,
+    onAddTour: () -> Unit
+) {
     VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
             Row(
@@ -189,9 +295,8 @@ private fun VirtualTourPreview(tourName: String) {
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Icon(Icons.Default.Visibility, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
-                    Text("True3D Virtual Tours", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("Virtual Tour", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
-                Text("Manage All", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
             }
 
             Box(
@@ -203,24 +308,21 @@ private fun VirtualTourPreview(tourName: String) {
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                AsyncImage(
-                    model = "https://lh3.googleusercontent.com/aida-public/AB6AXuC0jbPFgp5OeHQhsBlyFHD9XXCghVEX6Qo7b6d0pV4zFSlvw7_GTVgJsSz1bSlLXfbayz1w3_piVb87ntlYiB0VrisiKm0g_gCIPti9tee_vFwGV7XrXVQ1F0rrLA8dROILgEkZt7yk20bUfi_CWz-Zt2kG5Dnn8YOBlgfX4k5PuFZrgzUQBGb9LzmyHNISAsuObRmxqFi0PkvwHuI19NrgEebp5FoOwosga-ViAjqy0T2NPPlbMcJmmCVU_T4Aa3IS-mbe1s2JdEqT",
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                    alpha = 0.6f
-                )
-                
-                Surface(
-                    onClick = { },
-                    modifier = Modifier.size(64.dp),
-                    shape = CircleShape,
-                    color = Color.White.copy(alpha = 0.9f),
-                    shadowElevation = 8.dp
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
-                    }
+                if (previewImageUrl != null) {
+                    AsyncImage(
+                        model = previewImageUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        alpha = 0.6f
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Movie,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
                 }
 
                 Box(
@@ -232,32 +334,22 @@ private fun VirtualTourPreview(tourName: String) {
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Column {
-                        Text("CURRENT ACTIVE TOUR", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, fontSize = 8.sp)
-                        Text(tourName, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        Text("CURRENT ACTIVE TOUR", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, fontSize = 8.sp, color = Color.Black)
+                        Text(tourName, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.Black)
                     }
                 }
             }
-            
+
             Row(modifier = Modifier.padding(24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(
-                    onClick = { },
+                    onClick = onAddTour,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(2.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Icon(Icons.Default.AddCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("UPLOAD NEW 3D", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-                OutlinedButton(
-                    onClick = { },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                ) {
-                    Icon(Icons.Default.SettingsOverscan, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("TOUR SETTINGS", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("ADD TOUR VIDEO", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -265,7 +357,14 @@ private fun VirtualTourPreview(tourName: String) {
 }
 
 @Composable
-private fun GallerySection(images: List<GalleryImage>, storageUsage: Float) {
+private fun GallerySection(
+    images: List<GalleryImage>,
+    storageUsage: Float,
+    storageUsedHuman: String,
+    totalStorageHuman: String,
+    onAddPhoto: () -> Unit,
+    onRemovePhoto: (String) -> Unit
+) {
     VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             Row(
@@ -282,39 +381,86 @@ private fun GallerySection(images: List<GalleryImage>, storageUsage: Float) {
                 }
             }
 
-            // Simple bento grid mockup
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(modifier = Modifier.height(180.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(modifier = Modifier.weight(2f).fillMaxHeight().clip(RoundedCornerShape(16.dp)).background(Color.Gray)) {
-                        AsyncImage(model = images.getOrNull(0)?.url, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                    }
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Box(modifier = Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.Gray)) {
-                            AsyncImage(model = images.getOrNull(1)?.url, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                        }
-                        Box(modifier = Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.Gray)) {
-                            AsyncImage(model = images.getOrNull(2)?.url, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            if (images.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No photos yet. Add your first one below.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                // Render the real gallery images in a responsive wrapping grid.
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    images.chunked(3).forEach { rowImages ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().height(110.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            rowImages.forEach { img ->
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(Color.Gray)
+                                ) {
+                                    AsyncImage(
+                                        model = img.url,
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    Surface(
+                                        onClick = { onRemovePhoto(img.url) },
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(4.dp)
+                                            .size(24.dp),
+                                        shape = CircleShape,
+                                        color = Color.Black.copy(alpha = 0.5f)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "Remove",
+                                            tint = Color.White,
+                                            modifier = Modifier.padding(4.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            // Fill empty cells to keep alignment consistent.
+                            repeat(3 - rowImages.size) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
                         }
                     }
                 }
-                
-                OutlinedButton(
-                    onClick = { },
-                    modifier = Modifier.fillMaxWidth().height(80.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(2.dp, MaterialTheme.colorScheme.outlineVariant)
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
-                        Text("DRAG & DROP OR BROWSE PHOTOS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                    }
+            }
+
+            OutlinedButton(
+                onClick = onAddPhoto,
+                modifier = Modifier.fillMaxWidth().height(80.dp),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(2.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                    Text("ADD PHOTO BY URL", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                 }
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("STORAGE USAGE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                    Text("${(storageUsage * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                    Text("$storageUsedHuman / $totalStorageHuman", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
                 }
                 LinearProgressIndicator(
                     progress = { storageUsage },
@@ -338,15 +484,17 @@ private fun ShowcaseHealthCard(completion: Int) {
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Showcase Health", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Your profile is $completion% complete. Add a virtual tour video to reach 100%.", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
-            Button(
-                onClick = { },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("RUN SEO AUDIT", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            val hint = when {
+                completion >= 100 -> "Your profile is complete. Nice work!"
+                else -> "Your profile is $completion% complete. Fill the mission, learning model, language, add a gallery photo and a tour video to reach 100%."
             }
+            Text(hint, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
+            LinearProgressIndicator(
+                progress = { completion / 100f },
+                modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
+                color = MaterialTheme.colorScheme.secondary,
+                trackColor = Color.White.copy(alpha = 0.2f)
+            )
         }
     }
 }

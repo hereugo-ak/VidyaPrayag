@@ -33,9 +33,8 @@ package com.littlebridge.vidyaprayag.feature.school
 
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
-import com.littlebridge.vidyaprayag.core.principalUserId
+import com.littlebridge.vidyaprayag.core.requireSchoolContext
 import com.littlebridge.vidyaprayag.db.AppConfigTable
-import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.AttendanceRecordsTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.FacultyTable
@@ -133,13 +132,6 @@ private fun cmsArray(key: String): JsonArray {
     }.getOrElse { JsonArray(emptyList()) }
 }
 
-/** Resolve the school the authenticated admin belongs to.  Returns null if absent. */
-private fun resolveSchoolId(uid: UUID): UUID? = AppUsersTable
-    .selectAll()
-    .where { AppUsersTable.id eq uid }
-    .singleOrNull()
-    ?.get(AppUsersTable.schoolId)
-
 /** Compute avg attendance % across the last `days` for the given school. */
 private fun avgAttendancePct(schoolId: UUID, days: Int = 7): Int? {
     val rows = AttendanceRecordsTable.selectAll()
@@ -170,31 +162,53 @@ private fun patchAttendanceCard(template: JsonArray, livePct: Int?): List<JsonEl
     }
 }
 
-/** Top-3 active faculty become "star_faculty"; CMS supplies score & image fallback. */
+/**
+ * Real "star faculty": rank active faculty by their own attendance reliability
+ * (PRESENT rate over the last 30 days), highest first, top 3. This is a genuine
+ * server-side ranking rather than an arbitrary first-3 selection.
+ */
 private fun topStarFaculty(schoolId: UUID): JsonArray {
-    val rows = FacultyTable.selectAll()
+    val faculty = FacultyTable.selectAll()
         .where { (FacultyTable.schoolId eq schoolId) and (FacultyTable.isActive eq true) }
-        .limit(3)
         .toList()
-    if (rows.isEmpty()) return JsonArray(emptyList())
-    val starScores = listOf(99.8, 98.5, 96.1)
+    if (faculty.isEmpty()) return JsonArray(emptyList())
+
+    val cutoff = LocalDate.now().minusDays(30)
+    val facultyAttendance = AttendanceRecordsTable.selectAll()
+        .where {
+            (AttendanceRecordsTable.schoolId eq schoolId) and
+                (AttendanceRecordsTable.type eq "faculty")
+        }
+        .toList()
+        .filter {
+            runCatching { LocalDate.parse(it[AttendanceRecordsTable.date]).isAfter(cutoff) }
+                .getOrDefault(false)
+        }
+        .groupBy { it[AttendanceRecordsTable.personId] }
+
+    // score = present-rate*100 (falls back to a neutral 90 when no records).
+    data class Ranked(val name: String, val dept: String, val pic: String?, val score: Double)
+    val ranked = faculty.map { r ->
+        val ext = r[FacultyTable.externalId]
+        val recs = facultyAttendance[ext].orEmpty()
+        val score = if (recs.isEmpty()) 90.0
+            else recs.count { it[AttendanceRecordsTable.status].equals("PRESENT", true) } * 100.0 / recs.size
+        Ranked(
+            name = r[FacultyTable.name],
+            dept = r[FacultyTable.department] ?: "",
+            pic = r[FacultyTable.profilePic],
+            score = score
+        )
+    }.sortedByDescending { it.score }.take(3)
+
     return buildJsonArray {
-        rows.forEachIndexed { idx, r ->
+        ranked.forEachIndexed { idx, rk ->
             add(buildJsonObject {
                 put("rank", idx + 1)
-                put("name", r[FacultyTable.name])
-                put("department", r[FacultyTable.department] ?: "")
-                put("score", starScores.getOrElse(idx) { 95.0 })
-                // r[FacultyTable.profilePic] is String? — we must lift it
-                // into a JsonElement explicitly. Mixing a raw String with
-                // JsonNull via `?:` upcasts to `Any`, which the
-                // kotlinx.serialization `put(String, JsonElement?)` overload
-                // does not accept (caused "Argument type mismatch: actual
-                // type is 'Any', but 'JsonElement' was expected").
-                put(
-                    "image_url",
-                    r[FacultyTable.profilePic]?.let { JsonPrimitive(it) } ?: JsonNull
-                )
+                put("name", rk.name)
+                put("department", rk.dept)
+                put("score", (kotlin.math.round(rk.score * 10) / 10.0))
+                put("image_url", rk.pic?.let { JsonPrimitive(it) } ?: JsonNull)
             })
         }
     }
@@ -216,11 +230,10 @@ fun Route.schoolAnalyticsRouting() {
             //   insights           — CMS `school_analytics_insights`
             // ============================================================
             get("/overview") {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
 
                 val payload = dbQuery {
-                    val schoolId = resolveSchoolId(uid)
                     val overview = cmsObject("school_analytics_overview")
                     val trend = (overview["performance_trend"] as? JsonArray)
                         ?.mapNotNull { runCatching { it.jsonPrimitive.content.toDouble() }.getOrNull() }
@@ -228,7 +241,7 @@ fun Route.schoolAnalyticsRouting() {
                     val growth = (overview["current_growth"] as? JsonPrimitive)?.content ?: "0%"
 
                     val cardsTpl = cmsArray("school_analytics_cards_template")
-                    val livePct = schoolId?.let { avgAttendancePct(it) }
+                    val livePct = avgAttendancePct(schoolId)
                     val cards = patchAttendanceCard(cardsTpl, livePct)
 
                     val insights = cmsArray("school_analytics_insights").toList()
@@ -253,28 +266,29 @@ fun Route.schoolAnalyticsRouting() {
             // ops can add keys without us shipping a backend change.
             // ============================================================
             get("/class-performance") {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
                 val classFilter = call.request.queryParameters["class"]
 
                 val payload: JsonObject = dbQuery {
-                    val schoolId = resolveSchoolId(uid)
                     val blob = cmsObject("school_class_performance").toMutableMap()
 
-                    val liveActive: Int? = schoolId?.let { sid ->
-                        var q = StudentsTable.selectAll()
-                            .where { (StudentsTable.schoolId eq sid) and (StudentsTable.isActive eq true) }
-                        if (!classFilter.isNullOrBlank()) {
-                            q = StudentsTable.selectAll().where {
-                                (StudentsTable.schoolId eq sid) and
+                    val liveActive: Int = run {
+                        val q = if (!classFilter.isNullOrBlank()) {
+                            StudentsTable.selectAll().where {
+                                (StudentsTable.schoolId eq schoolId) and
                                     (StudentsTable.isActive eq true) and
                                     (StudentsTable.className eq classFilter)
+                            }
+                        } else {
+                            StudentsTable.selectAll().where {
+                                (StudentsTable.schoolId eq schoolId) and (StudentsTable.isActive eq true)
                             }
                         }
                         q.count().toInt()
                     }
 
-                    if (liveActive != null && liveActive > 0) {
+                    if (liveActive > 0) {
                         val summary = (blob["summary"] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
                         summary["active_students"] = JsonPrimitive(liveActive)
                         blob["summary"] = JsonObject(summary)
@@ -291,13 +305,12 @@ fun Route.schoolAnalyticsRouting() {
             // a "star_faculty" array computed from the live `faculty` table.
             // ============================================================
             get("/teacher-performance") {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
 
                 val payload: JsonObject = dbQuery {
-                    val schoolId = resolveSchoolId(uid)
                     val blob = cmsObject("school_teacher_performance").toMutableMap()
-                    val stars = schoolId?.let { topStarFaculty(it) } ?: JsonArray(emptyList())
+                    val stars = topStarFaculty(schoolId)
                     if (stars.isNotEmpty()) {
                         blob["star_faculty"] = stars
                     } else if (blob["star_faculty"] == null) {
@@ -319,22 +332,26 @@ fun Route.schoolAnalyticsRouting() {
             // are CMS-templated and `narrative` is CMS-stringified.
             // ============================================================
             get("/student/{studentId}") {
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
                 val rawId = call.parameters["studentId"]
                     ?: run { call.fail("studentId required"); return@get }
 
                 val payload = dbQuery {
-                    // Resolve as UUID first, fall back to student_code.
+                    // CRITICAL: scope the lookup to the caller's school so a known
+                    // id/code from ANOTHER school cannot be read (cross-school leak).
                     val byUuid = runCatching { UUID.fromString(rawId) }.getOrNull()?.let { id ->
-                        StudentsTable.selectAll().where { StudentsTable.id eq id }.singleOrNull()
+                        StudentsTable.selectAll()
+                            .where { (StudentsTable.id eq id) and (StudentsTable.schoolId eq schoolId) }
+                            .singleOrNull()
                     }
                     val row = byUuid ?: StudentsTable.selectAll()
-                        .where { StudentsTable.studentCode eq rawId }
+                        .where { (StudentsTable.studentCode eq rawId) and (StudentsTable.schoolId eq schoolId) }
                         .singleOrNull()
 
                     if (row == null) return@dbQuery null
 
                     val studentUuid = row[StudentsTable.id].value
-                    val schoolId = row[StudentsTable.schoolId]
 
                     // -- live attendance% over last 30 days --
                     val attendanceRows = AttendanceRecordsTable.selectAll()
@@ -398,8 +415,7 @@ fun Route.schoolAnalyticsRouting() {
             // Pure CMS — returns `school_syllabus_coverage` verbatim.
             // ============================================================
             get("/syllabus-coverage") {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get }
+                call.requireSchoolContext() ?: return@get
 
                 val payload = dbQuery { cmsObject("school_syllabus_coverage") }
                 call.ok(payload, message = "Syllabus coverage fetched successfully")
@@ -420,21 +436,18 @@ fun Route.schoolAnalyticsRouting() {
             //   - All other fields come verbatim from CMS so ops can iterate.
             // ============================================================
             get("/student-cohort") {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
 
                 val payload: JsonObject = dbQuery {
-                    val schoolId = resolveSchoolId(uid)
                     val blob = cmsObject("school_student_analytics_cohort").toMutableMap()
 
-                    val liveActive: Int? = schoolId?.let { sid ->
-                        StudentsTable.selectAll()
-                            .where { (StudentsTable.schoolId eq sid) and (StudentsTable.isActive eq true) }
-                            .count()
-                            .toInt()
-                    }
+                    val liveActive: Int = StudentsTable.selectAll()
+                        .where { (StudentsTable.schoolId eq schoolId) and (StudentsTable.isActive eq true) }
+                        .count()
+                        .toInt()
 
-                    if (liveActive != null && liveActive > 0) {
+                    if (liveActive > 0) {
                         val risk = (blob["risk"] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
                         val critical = (risk["critical_count"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
                         val medium   = (risk["medium_count"]   as? JsonPrimitive)?.content?.toIntOrNull() ?: 0

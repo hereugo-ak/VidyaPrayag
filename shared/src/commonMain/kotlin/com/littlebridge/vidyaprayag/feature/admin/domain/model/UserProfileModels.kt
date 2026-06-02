@@ -55,3 +55,13 @@ data class GalleryUpdateResponse(
     @SerialName("storage_used") val storageUsed: String,
     @SerialName("total_storage") val totalStorage: String
 )
+
+@Serializable
+data class VisibilityRequest(
+    @SerialName("public_profile") val publicProfile: Boolean
+)
+
+@Serializable
+data class VisibilityResponse(
+    @SerialName("public_profile") val publicProfile: Boolean
+)

@@ -7,6 +7,7 @@ import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.GalleryRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.PhilosophyDetailsDto
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.TourVideosRequest
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.VisibilityRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.repository.UserProfileRepository
 import com.littlebridge.vidyaprayag.util.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -111,9 +112,40 @@ class InstitutionalProfileViewModel(
 
     // -------- Local edits --------
 
+    /**
+     * Persist the public/private visibility toggle. We update the UI
+     * optimistically, call the dedicated /visibility endpoint, and roll back
+     * if the server rejects the change so the switch never lies about state.
+     */
     fun togglePublic(value: Boolean) {
-        _state.value = _state.value.copy(isPublic = value)
-        saveProfile()
+        val previous = _state.value.isPublic
+        _state.value = _state.value.copy(isPublic = value, errorMessage = null)
+        viewModelScope.launch {
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isPublic = previous)
+                return@launch
+            }
+            when (val r = userProfileRepository.updateVisibility(token, VisibilityRequest(value))) {
+                is NetworkResult.Success -> {
+                    val confirmed = r.data.data?.publicProfile ?: value
+                    _state.value = _state.value.copy(
+                        isPublic = confirmed,
+                        infoMessage = if (confirmed) "Profile is now public" else "Profile is now private"
+                    )
+                }
+                is NetworkResult.Error -> {
+                    AppLogger.e("InstitutionalProfileVM", "updateVisibility error: ${r.message}")
+                    _state.value = _state.value.copy(isPublic = previous, errorMessage = r.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(
+                        isPublic = previous,
+                        errorMessage = "Connection error. Check your internet."
+                    )
+                }
+            }
+        }
     }
 
     fun updateMission(text: String) {

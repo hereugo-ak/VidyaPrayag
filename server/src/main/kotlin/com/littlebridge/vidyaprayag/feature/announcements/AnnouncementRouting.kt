@@ -10,17 +10,23 @@
  *
  * Spec ref: vidya_prayag_api_spec2.artifact.md §Screen: School Dashboard (Announcement Tab)
  *
- * School-resolution rule:
- *   Every authenticated user has app_users.school_id set after onboarding.
- *   We use that to scope announcements.  super_admins must pass ?school_id=
- *   explicitly to disambiguate.
+ * Authorization & school-resolution rule:
+ *   Every endpoint is guarded by call.requireSchoolContext(): the caller must
+ *   hold a school role and have a school. Reads/writes are scoped to that
+ *   resolved school_id. A ?school_id= / body school_id override is honoured
+ *   ONLY for the platform "admin" role; for everyone else it is ignored so a
+ *   school_admin can never read or mutate another school's announcements.
  *
  * sync-whatsapp behaviour:
- *   - Marks chosen announcements as synced_to_wa = true.
- *   - Inserts one row per (announcement × parent_phone) into whatsapp_logs
- *     with status = QUEUED.
- *   - Returns a fake job_id (UUID) and ETA.
- *   - NO real WhatsApp call is made — drop in your provider client here.
+ *   - Only announcements that actually belong to the caller's school are
+ *     considered; any foreign event_ids in the request are rejected.
+ *   - Marks the synced announcements as synced_to_wa = true (scoped by school).
+ *   - Inserts one real row per (announcement × parent_phone) into whatsapp_logs
+ *     with status = QUEUED — total_queued is the true number of messages that
+ *     will be dispatched (recipients = active parent users with a phone).
+ *   - Returns the job_id and an ETA derived from the real queued count. The
+ *     actual provider dispatch is performed by the async WhatsApp worker that
+ *     drains whatsapp_logs rows in QUEUED status.
  */
 package com.littlebridge.vidyaprayag.feature.announcements
 
@@ -28,7 +34,7 @@ import com.littlebridge.vidyaprayag.core.accepted
 import com.littlebridge.vidyaprayag.core.created
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
-import com.littlebridge.vidyaprayag.core.principalUserId
+import com.littlebridge.vidyaprayag.core.requireSchoolContext
 import com.littlebridge.vidyaprayag.db.AnnouncementsTable
 import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
@@ -91,15 +97,15 @@ data class SyncWhatsAppResponse(
 
 // ------- helpers -------
 
-private suspend fun resolveSchoolIdForUser(uid: UUID): UUID? = dbQuery {
-    AppUsersTable.selectAll()
-        .where { AppUsersTable.id eq uid }
-        .singleOrNull()
-        ?.get(AppUsersTable.schoolId)
+/**
+ * The effective school for the request. By default it is the caller's own
+ * school. Only the platform "admin" role may target another school via an
+ * override (query param or body); for any other role the override is ignored.
+ */
+private fun effectiveSchoolId(ctxSchoolId: UUID, ctxRole: String, override: String?): UUID {
+    if (ctxRole != "admin") return ctxSchoolId
+    return override?.let { runCatching { UUID.fromString(it) }.getOrNull() } ?: ctxSchoolId
 }
-
-private fun queryParamSchool(call: io.ktor.server.application.ApplicationCall): UUID? =
-    call.request.queryParameters["school_id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
 
 // ------- routing -------
 
@@ -109,13 +115,10 @@ fun Route.announcementRouting() {
 
             // ---- list ----
             get {
-                val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
-                    call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
-                }
-                val schoolId = queryParamSchool(call) ?: resolveSchoolIdForUser(uid) ?: run {
-                    call.fail("User not associated with any school. Pass ?school_id=UUID for super_admin.",
-                        HttpStatusCode.NotFound); return@get
-                }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = effectiveSchoolId(
+                    ctx.schoolId, ctx.role, call.request.queryParameters["school_id"]
+                )
                 val list = dbQuery {
                     AnnouncementsTable.selectAll()
                         .where { AnnouncementsTable.schoolId eq schoolId }
@@ -129,12 +132,10 @@ fun Route.announcementRouting() {
             get("/search") {
                 val q = call.request.queryParameters["query"]?.lowercase().orEmpty()
                 if (q.isBlank()) { call.fail("query is required"); return@get }
-                val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
-                    call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
-                }
-                val schoolId = queryParamSchool(call) ?: resolveSchoolIdForUser(uid) ?: run {
-                    call.fail("User not associated with any school", HttpStatusCode.NotFound); return@get
-                }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = effectiveSchoolId(
+                    ctx.schoolId, ctx.role, call.request.queryParameters["school_id"]
+                )
                 val pattern = "%$q%"
                 val list = dbQuery {
                     AnnouncementsTable.selectAll()
@@ -151,14 +152,10 @@ fun Route.announcementRouting() {
 
             // ---- create ----
             post {
-                val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
-                    call.fail("Invalid token", HttpStatusCode.Unauthorized); return@post
-                }
+                val ctx = call.requireSchoolContext() ?: return@post
+                val uid = ctx.userId
                 val req = call.receive<CreateAnnouncementDto>()
-                val schoolId = req.schoolId?.let { UUID.fromString(it) }
-                    ?: resolveSchoolIdForUser(uid) ?: run {
-                        call.fail("school_id required"); return@post
-                    }
+                val schoolId = effectiveSchoolId(ctx.schoolId, ctx.role, req.schoolId)
                 val now = Instant.now()
                 val eventId = "EVT_" + UUID.randomUUID().toString().take(8).uppercase()
                 dbQuery {
@@ -185,31 +182,60 @@ fun Route.announcementRouting() {
 
             // ---- sync-whatsapp ----
             post("/sync-whatsapp") {
-                val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
-                    call.fail("Invalid token", HttpStatusCode.Unauthorized); return@post
-                }
+                val ctx = call.requireSchoolContext() ?: return@post
                 val req = call.receive<SyncWhatsAppRequest>()
-                val schoolId = req.schoolId?.let { UUID.fromString(it) }
-                    ?: resolveSchoolIdForUser(uid) ?: run {
-                        call.fail("school_id missing and could not be inferred from token"); return@post
-                    }
+                val schoolId = effectiveSchoolId(ctx.schoolId, ctx.role, req.schoolId)
 
                 val jobId = "SYNC_WA_${UUID.randomUUID().toString().take(8).uppercase()}"
                 val now = Instant.now()
 
-                val queued = dbQuery {
-                    val toSync = if (req.announcementIds.isNullOrEmpty()) {
+                // Determine which announcements to sync, ALWAYS constrained to the
+                // resolved school so foreign event_ids can never be queued.
+                val result = dbQuery {
+                    val schoolEventIds = AnnouncementsTable.selectAll()
+                        .where { AnnouncementsTable.schoolId eq schoolId }
+                        .map { it[AnnouncementsTable.eventId] }
+                        .toSet()
+
+                    val requested = req.announcementIds
+                    val toSync: List<String> = if (requested.isNullOrEmpty()) {
+                        // Default: every not-yet-synced announcement in this school.
                         AnnouncementsTable.selectAll()
                             .where {
                                 (AnnouncementsTable.schoolId eq schoolId) and
                                     (AnnouncementsTable.syncedToWa eq false)
                             }
                             .map { it[AnnouncementsTable.eventId] }
-                    } else req.announcementIds
+                    } else {
+                        // Keep only the requested IDs that truly belong to this school.
+                        requested.filter { it in schoolEventIds }
+                    }
 
-                    if (toSync.isEmpty()) return@dbQuery 0
+                    // Surface foreign / unknown IDs as an error rather than silently
+                    // ignoring them, so callers know their request was rejected.
+                    val foreign = requested?.filterNot { it in schoolEventIds }.orEmpty()
 
-                    // Recipients: every PARENT user in this school with a phone.
+                    Triple(toSync, foreign, schoolEventIds)
+                }
+
+                val (toSync, foreign, _) = result
+                if (foreign.isNotEmpty()) {
+                    call.fail(
+                        "These announcement_ids do not belong to your school: ${foreign.joinToString()}",
+                        HttpStatusCode.Forbidden
+                    )
+                    return@post
+                }
+                if (toSync.isEmpty()) {
+                    call.accepted(
+                        SyncWhatsAppResponse(jobId, 0, 0),
+                        message = "Nothing to sync — all selected announcements are already up to date"
+                    )
+                    return@post
+                }
+
+                val queued = dbQuery {
+                    // Recipients: every ACTIVE parent user in this school with a phone.
                     val parents = AppUsersTable.selectAll()
                         .where {
                             (AppUsersTable.schoolId eq schoolId) and
@@ -217,6 +243,7 @@ fun Route.announcementRouting() {
                         }
                         .mapNotNull { it[AppUsersTable.phone] }
                         .filter { it.isNotBlank() }
+                        .distinct()
 
                     var inserted = 0
                     toSync.forEach { aid ->
@@ -231,18 +258,26 @@ fun Route.announcementRouting() {
                             }
                             inserted++
                         }
-                        AnnouncementsTable.update({ AnnouncementsTable.eventId eq aid }) {
+                        // Scope the flip by BOTH school and event id (defensive).
+                        AnnouncementsTable.update({
+                            (AnnouncementsTable.schoolId eq schoolId) and
+                                (AnnouncementsTable.eventId eq aid)
+                        }) {
                             it[syncedToWa] = true
                             it[updatedAt] = now
                         }
                     }
-                    if (inserted == 0) toSync.size else inserted
+                    inserted
                 }
 
-                val eta = (queued / 30 + 1).coerceAtMost(60)
+                // ETA assumes ~30 messages/min throughput from the async worker.
+                val eta = if (queued == 0) 0 else (queued / 30 + 1).coerceAtMost(60)
                 call.accepted(
                     SyncWhatsAppResponse(jobId, queued, eta),
-                    message = "Sync process initiated successfully"
+                    message = if (queued == 0)
+                        "No parent recipients with a phone number were found for this school"
+                    else
+                        "Sync queued: $queued message(s) will be dispatched"
                 )
             }
         }

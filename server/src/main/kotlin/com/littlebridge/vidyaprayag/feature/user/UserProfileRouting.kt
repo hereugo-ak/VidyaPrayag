@@ -3,10 +3,17 @@
  * Module: feature.user
  *
  * Endpoints implemented:
- *   GET /api/v1/user/profile?user_id=…             (JWT)
- *   PUT /api/v1/user/profile/philosophy            (JWT)
- *   PUT /api/v1/user/profile/tour-videos           (JWT)
- *   PUT /api/v1/user/profile/gallery               (JWT)
+ *   GET /api/v1/user/profile?user_id=…             (JWT, school role)
+ *   PUT /api/v1/user/profile/philosophy            (JWT, school role)
+ *   PUT /api/v1/user/profile/tour-videos           (JWT, school role)
+ *   PUT /api/v1/user/profile/gallery               (JWT, school role)
+ *   PUT /api/v1/user/profile/visibility            (JWT, school role)
+ *
+ * Authorization:
+ *   Every endpoint is guarded by call.requireSchoolContext(): the caller must
+ *   hold a school role (school_admin/school_staff/admin) AND have a school. The
+ *   resolved school_id is the ONLY school any of these reads/writes touch, so a
+ *   caller can never read or mutate another school's profile/media.
  *
  * Spec ref: vidya_prayag_api_spec2.artifact.md §Screen: User Profile / School Profile
  *
@@ -32,11 +39,9 @@
  */
 package com.littlebridge.vidyaprayag.feature.user
 
-import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.okMessage
-import com.littlebridge.vidyaprayag.core.principalUserId
-import com.littlebridge.vidyaprayag.db.AppUsersTable
+import com.littlebridge.vidyaprayag.core.requireSchoolContext
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.SchoolMediaTable
 import com.littlebridge.vidyaprayag.db.SchoolPhilosophyTable
@@ -96,17 +101,17 @@ data class GalleryUpdateResponse(
     @SerialName("total_storage") val totalStorage: String
 )
 
-// ---------- helpers ----------
+@Serializable
+data class VisibilityRequest(
+    @SerialName("public_profile") val publicProfile: Boolean
+)
 
-/**
- * Resolve the school owned/operated by a given user. Returns null when the
- * user has not completed onboarding (no school created yet).
- */
-private fun resolveSchoolId(uid: UUID): UUID? =
-    AppUsersTable.selectAll()
-        .where { AppUsersTable.id eq uid }
-        .firstOrNull()
-        ?.get(AppUsersTable.schoolId)
+@Serializable
+data class VisibilityResponse(
+    @SerialName("public_profile") val publicProfile: Boolean
+)
+
+// ---------- helpers ----------
 
 /** Format a byte count as a human-readable string (GB / MB / KB / B). */
 private fun formatBytes(bytes: Long): String {
@@ -193,17 +198,8 @@ fun Route.userProfileRouting() {
 
             // -------- GET /profile --------
             get {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run {
-                        call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
-                    }
-                val schoolId = dbQuery { resolveSchoolId(uid) } ?: run {
-                    call.fail(
-                        "User not associated with any school. Complete onboarding first.",
-                        HttpStatusCode.NotFound
-                    )
-                    return@get
-                }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
                 val data = dbQuery {
                     val phil = SchoolPhilosophyTable.selectAll()
                         .where { SchoolPhilosophyTable.schoolId eq schoolId }
@@ -240,18 +236,9 @@ fun Route.userProfileRouting() {
 
             // -------- PUT /philosophy --------
             put("/philosophy") {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run {
-                        call.fail("Invalid token", HttpStatusCode.Unauthorized); return@put
-                    }
+                val ctx = call.requireSchoolContext() ?: return@put
+                val schoolId = ctx.schoolId
                 val req = call.receive<PhilosophyDetails>()
-                val schoolId = dbQuery { resolveSchoolId(uid) } ?: run {
-                    call.fail(
-                        "User not associated with any school. Complete onboarding first.",
-                        HttpStatusCode.NotFound
-                    )
-                    return@put
-                }
                 dbQuery {
                     ensurePhilosophyRow(schoolId)
                     SchoolPhilosophyTable.update({ SchoolPhilosophyTable.schoolId eq schoolId }) {
@@ -266,18 +253,10 @@ fun Route.userProfileRouting() {
 
             // -------- PUT /tour-videos --------
             put("/tour-videos") {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run {
-                        call.fail("Invalid token", HttpStatusCode.Unauthorized); return@put
-                    }
+                val ctx = call.requireSchoolContext() ?: return@put
+                val schoolId = ctx.schoolId
+                val uid = ctx.userId
                 val req = call.receive<TourVideosRequest>()
-                val schoolId = dbQuery { resolveSchoolId(uid) } ?: run {
-                    call.fail(
-                        "User not associated with any school. Complete onboarding first.",
-                        HttpStatusCode.NotFound
-                    )
-                    return@put
-                }
                 dbQuery {
                     SchoolMediaTable.deleteWhere {
                         (SchoolMediaTable.schoolId eq schoolId) and (SchoolMediaTable.kind eq "VIDEO")
@@ -299,18 +278,10 @@ fun Route.userProfileRouting() {
 
             // -------- PUT /gallery --------
             put("/gallery") {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run {
-                        call.fail("Invalid token", HttpStatusCode.Unauthorized); return@put
-                    }
+                val ctx = call.requireSchoolContext() ?: return@put
+                val schoolId = ctx.schoolId
+                val uid = ctx.userId
                 val req = call.receive<GalleryRequest>()
-                val schoolId = dbQuery { resolveSchoolId(uid) } ?: run {
-                    call.fail(
-                        "User not associated with any school. Complete onboarding first.",
-                        HttpStatusCode.NotFound
-                    )
-                    return@put
-                }
                 val data = dbQuery {
                     SchoolMediaTable.deleteWhere {
                         (SchoolMediaTable.schoolId eq schoolId) and (SchoolMediaTable.kind eq "IMAGE")
@@ -339,6 +310,25 @@ fun Route.userProfileRouting() {
                     )
                 }
                 call.ok(data, message = "Gallery updated successfully")
+            }
+
+            // -------- PUT /visibility --------
+            // Persists the public/private toggle to school_philosophy.public_profile.
+            put("/visibility") {
+                val ctx = call.requireSchoolContext() ?: return@put
+                val schoolId = ctx.schoolId
+                val req = call.receive<VisibilityRequest>()
+                dbQuery {
+                    ensurePhilosophyRow(schoolId)
+                    SchoolPhilosophyTable.update({ SchoolPhilosophyTable.schoolId eq schoolId }) {
+                        it[publicProfile] = req.publicProfile
+                        it[updatedAt] = Instant.now()
+                    }
+                }
+                call.ok(
+                    VisibilityResponse(publicProfile = req.publicProfile),
+                    message = if (req.publicProfile) "Profile is now public" else "Profile is now private"
+                )
             }
         }
     }

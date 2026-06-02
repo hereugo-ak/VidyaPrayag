@@ -8,6 +8,8 @@ import com.littlebridge.vidyaprayag.feature.admin.domain.model.GalleryUpdateResp
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.PhilosophyDetailsDto
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.TourVideosRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.UserProfileResponse
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.VisibilityRequest
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.VisibilityResponse
 import com.littlebridge.vidyaprayag.feature.admin.domain.repository.UserProfileRepository
 
 class UserProfileRepositoryImpl(private val api: UserProfileApi) : UserProfileRepository {
@@ -22,4 +24,7 @@ class UserProfileRepositoryImpl(private val api: UserProfileApi) : UserProfileRe
 
     override suspend fun updateGallery(token: String, body: GalleryRequest): NetworkResult<ApiResponse<GalleryUpdateResponse>> =
         api.updateGallery(token, body)
+
+    override suspend fun updateVisibility(token: String, body: VisibilityRequest): NetworkResult<ApiResponse<VisibilityResponse>> =
+        api.updateVisibility(token, body)
 }

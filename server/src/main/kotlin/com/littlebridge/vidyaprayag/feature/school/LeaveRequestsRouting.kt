@@ -26,8 +26,7 @@ import com.littlebridge.vidyaprayag.core.created
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.okMessage
-import com.littlebridge.vidyaprayag.core.principalUserId
-import com.littlebridge.vidyaprayag.db.AppUsersTable
+import com.littlebridge.vidyaprayag.core.requireSchoolContext
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.LeaveRequestsTable
 import io.ktor.http.*
@@ -86,10 +85,15 @@ data class UpdateLeaveStatusDto(val status: String)
 
 // ---------------- helpers ----------------
 
-private fun resolveSchoolId(uid: UUID): UUID? = AppUsersTable
-    .selectAll().where { AppUsersTable.id eq uid }
-    .singleOrNull()
-    ?.get(AppUsersTable.schoolId)
+/** Validates a YYYY-MM-DD pair: both parseable and from <= to. */
+private fun validateLeaveDates(from: String, to: String): String? {
+    val a = runCatching { LocalDate.parse(from) }.getOrNull()
+        ?: return "date_from must be a valid YYYY-MM-DD date"
+    val b = runCatching { LocalDate.parse(to) }.getOrNull()
+        ?: return "date_to must be a valid YYYY-MM-DD date"
+    if (b.isBefore(a)) return "date_to cannot be before date_from"
+    return null
+}
 
 /** "Dec 12 - Dec 14" / "Dec 12 - Jan 04, 2026" depending on whether years differ. */
 private fun formatDateRange(from: String, to: String): String {
@@ -126,20 +130,13 @@ fun Route.leaveRequestsRouting() {
 
             // -------- LIST --------
             get {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
 
                 val typeParam = call.request.queryParameters["type"]?.lowercase()
                 val statusParam = call.request.queryParameters["status"]?.trim()
 
                 val payload = dbQuery {
-                    val schoolId = resolveSchoolId(uid)
-                        ?: return@dbQuery LeaveRequestListResponse(
-                            type = typeParam ?: "student",
-                            approvalRate = 0,
-                            weeklyCount = 0,
-                            requests = emptyList()
-                        )
 
                     // Pull ALL school rows once — cheap for the volumes we expect
                     // and lets us compute both the filtered list and the unfiltered
@@ -179,17 +176,15 @@ fun Route.leaveRequestsRouting() {
 
             // -------- CREATE --------
             post {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@post }
+                val ctx = call.requireSchoolContext() ?: return@post
                 val req = call.receive<CreateLeaveRequestDto>()
 
                 if (req.requesterRole.lowercase() !in setOf("student", "teacher")) {
                     call.fail("requester_role must be student|teacher"); return@post
                 }
+                validateLeaveDates(req.dateFrom, req.dateTo)?.let { call.fail(it); return@post }
 
-                val schoolId = dbQuery { resolveSchoolId(uid) }
-                    ?: run { call.fail("User not associated with any school", HttpStatusCode.NotFound); return@post }
-
+                val schoolId = ctx.schoolId
                 val newId = UUID.randomUUID()
                 val now = Instant.now()
                 dbQuery {
@@ -226,8 +221,7 @@ fun Route.leaveRequestsRouting() {
 
             // -------- UPDATE STATUS --------
             patch("/{id}/status") {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@patch }
+                val ctx = call.requireSchoolContext() ?: return@patch
                 val id = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                     ?: run { call.fail("Invalid id"); return@patch }
                 val req = call.receive<UpdateLeaveStatusDto>()
@@ -239,10 +233,13 @@ fun Route.leaveRequestsRouting() {
                         call.fail("status must be Pending|Approved|Rejected"); return@patch
                     }
                 }
+                // Ownership enforced via school_id in WHERE.
                 val n = dbQuery {
-                    LeaveRequestsTable.update({ LeaveRequestsTable.id eq id }) {
+                    LeaveRequestsTable.update({
+                        (LeaveRequestsTable.id eq id) and (LeaveRequestsTable.schoolId eq ctx.schoolId)
+                    }) {
                         it[status] = normalized
-                        it[actionedBy] = uid
+                        it[actionedBy] = ctx.userId
                         it[actionedAt] = Instant.now()
                         it[updatedAt] = Instant.now()
                     }
