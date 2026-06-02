@@ -8,6 +8,7 @@
  *   GET /api/v1/school/analytics/teacher-performance
  *   GET /api/v1/school/analytics/student/{studentId}
  *   GET /api/v1/school/analytics/syllabus-coverage
+ *   GET /api/v1/school/analytics/student-cohort
  *
  * Spec ref: school_api_spec.artifact.md §Module: School Analytics
  *
@@ -402,6 +403,49 @@ fun Route.schoolAnalyticsRouting() {
 
                 val payload = dbQuery { cmsObject("school_syllabus_coverage") }
                 call.ok(payload, message = "Syllabus coverage fetched successfully")
+            }
+
+            // ============================================================
+            // GET /student-cohort
+            // ------------------------------------------------------------
+            // Cohort-level (school-wide) student analytics — drives
+            // StudentAnalyticsScreen (the dashboard view, NOT the
+            // per-student drilldown).
+            //
+            // Live overlays:
+            //   - risk.low_count is overlaid with the live count of active
+            //     students for the school when available (CMS supplies the
+            //     critical/medium counts since we don't yet compute risk
+            //     scoring server-side).
+            //   - All other fields come verbatim from CMS so ops can iterate.
+            // ============================================================
+            get("/student-cohort") {
+                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get }
+
+                val payload: JsonObject = dbQuery {
+                    val schoolId = resolveSchoolId(uid)
+                    val blob = cmsObject("school_student_analytics_cohort").toMutableMap()
+
+                    val liveActive: Int? = schoolId?.let { sid ->
+                        StudentsTable.selectAll()
+                            .where { (StudentsTable.schoolId eq sid) and (StudentsTable.isActive eq true) }
+                            .count()
+                            .toInt()
+                    }
+
+                    if (liveActive != null && liveActive > 0) {
+                        val risk = (blob["risk"] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
+                        val critical = (risk["critical_count"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+                        val medium   = (risk["medium_count"]   as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+                        // low = total active - already-flagged buckets, floored at 0
+                        val low = (liveActive - critical - medium).coerceAtLeast(0)
+                        risk["low_count"] = JsonPrimitive(low)
+                        blob["risk"] = JsonObject(risk)
+                    }
+                    JsonObject(blob)
+                }
+                call.ok(payload, message = "Student cohort analytics fetched successfully")
             }
         }
     }

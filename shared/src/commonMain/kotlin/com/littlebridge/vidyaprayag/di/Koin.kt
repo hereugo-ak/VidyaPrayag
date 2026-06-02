@@ -91,6 +91,72 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.OnboardingApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.AdmissionApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.MessagesApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.AnnouncementsApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.PtmApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.CalendarApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.AttendanceApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.LeaveRequestsApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.AnalyticsApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.ResultsApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.UserProfileApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
 
     // Repositories
     single<SchoolRepository> { SchoolRepositoryImpl(get(), get()) }
@@ -102,6 +168,39 @@ val commonModule = module {
     }
     single<com.littlebridge.vidyaprayag.feature.parent.domain.repository.ParentRepository> {
         com.littlebridge.vidyaprayag.feature.parent.data.repository.ParentRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.OnboardingRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.OnboardingRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AdmissionRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.AdmissionRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.MessagesRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.MessagesRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AnnouncementsRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.AnnouncementsRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.PtmRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.PtmRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.CalendarRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.CalendarRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AttendanceRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.AttendanceRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.LeaveRequestsRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.LeaveRequestsRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AnalyticsRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.AnalyticsRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.ResultsRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.ResultsRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.UserProfileRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.UserProfileRepositoryImpl(get())
     }
 
     // UseCases
@@ -124,24 +223,24 @@ val viewModelModule = module {
     factory { ParentMessageViewModel() }
     factory { TrackProgressViewModel(get(), get()) }
     factory { SchoolDashboardViewModel(get(), get()) }
-    factory { InstitutionalBasicOBViewModel() }
-    factory { BrandingInfoOBViewModel() }
-    factory { AcademicInfoOBViewModel() }
-    factory { LaunchInfoOBViewModel() }
-    factory { InstitutionalProfileViewModel() }
-    factory { AdmissionCRMViewModel() }
-    factory { SchoolAnnouncementsViewModel() }
-    factory { MessagesViewModel() }
-    factory { SchedulePTMViewModel() }
-    factory { AcademicCalendarViewModel() }
-    factory { LeaveRequestsViewModel() }
-    factory { DailyAttendanceViewModel() }
-    factory { AnalyticsDashboardViewModel() }
-    factory { StudentAnalyticsViewModel() }
-    factory { TeacherPerformanceViewModel() }
-    factory { ClassPerformanceViewModel() }
-    factory { SyllabusCoverageViewModel() }
-    factory { ResultsViewModel() }
+    factory { InstitutionalBasicOBViewModel(get(), get()) }
+    factory { BrandingInfoOBViewModel(get(), get()) }
+    factory { AcademicInfoOBViewModel(get(), get()) }
+    factory { LaunchInfoOBViewModel(get(), get()) }
+    factory { InstitutionalProfileViewModel(get(), get()) }
+    factory { AdmissionCRMViewModel(get(), get()) }
+    factory { SchoolAnnouncementsViewModel(get(), get()) }
+    factory { MessagesViewModel(get(), get()) }
+    factory { SchedulePTMViewModel(get(), get()) }
+    factory { AcademicCalendarViewModel(get(), get()) }
+    factory { LeaveRequestsViewModel(get(), get()) }
+    factory { DailyAttendanceViewModel(get(), get()) }
+    factory { AnalyticsDashboardViewModel(get(), get()) }
+    factory { StudentAnalyticsViewModel(get(), get()) }
+    factory { TeacherPerformanceViewModel(get(), get()) }
+    factory { ClassPerformanceViewModel(get(), get()) }
+    factory { SyllabusCoverageViewModel(get(), get()) }
+    factory { ResultsViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.content.presentation.LandingViewModel(get()) }
     factory { com.littlebridge.vidyaprayag.feature.auth.presentation.AuthViewModel(get()) }
 }
