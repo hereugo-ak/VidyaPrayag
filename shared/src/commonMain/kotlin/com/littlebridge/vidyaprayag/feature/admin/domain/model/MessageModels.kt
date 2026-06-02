@@ -68,3 +68,30 @@ data class SendMessageResponse(
     @SerialName("thread_id") val threadId: String,
     @SerialName("message_id") val messageId: String
 )
+
+/**
+ * A single message inside a thread.
+ * Mirrors the server `MessageDto` in MessagesRouting.kt.
+ * `isMine` lets the UI right-align the admin's own messages.
+ * `time` is server-formatted ("10:45 AM" / "Yesterday" / "MMM dd").
+ */
+@Serializable
+data class Message(
+    val id: String,
+    val body: String,
+    @SerialName("is_mine") val isMine: Boolean = false,
+    @SerialName("sender_id") val senderId: String? = null,
+    @SerialName("created_at") val createdAt: String,
+    val time: String
+)
+
+/**
+ * GET /api/v1/school/messages/threads/{id}/messages response payload.
+ * Mirrors the server `ThreadMessagesResponse`.
+ */
+@Serializable
+data class ThreadMessagesResponse(
+    @SerialName("thread_id") val threadId: String,
+    @SerialName("sender_name") val senderName: String,
+    val messages: List<Message>
+)
