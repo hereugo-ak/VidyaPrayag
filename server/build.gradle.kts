@@ -1,3 +1,6 @@
+import java.io.ByteArrayOutputStream
+import java.time.Instant
+
 plugins {
     alias(libs.plugins.kotlinJvm)
     alias(libs.plugins.ktor)
@@ -18,10 +21,13 @@ val gitSha: String = run {
             .directory(rootDir)
             .redirectErrorStream(true)
             .start()
-        proc.inputStream.bufferedReader().readText().trim().ifBlank { "unknown" }
+        val out = ByteArrayOutputStream()
+        proc.inputStream.copyTo(out)
+        proc.waitFor()
+        out.toString(Charsets.UTF_8.name()).trim().ifBlank { "unknown" }
     }.getOrDefault("unknown")
 }
-val buildTimeIso: String = java.time.Instant.now().toString()
+val buildTimeIso: String = Instant.now().toString()
 
 kotlin {
     compilerOptions {
