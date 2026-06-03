@@ -72,7 +72,7 @@ class AcademicCalendarViewModel(
                     val resolvedAnchor = anchor ?: _state.value.currentDate
                     _state.value = _state.value.copy(
                         calendarEvents = data?.calendarEvents ?: emptyList(),
-                        workingDays = summary?.workingDays ?: 0,
+                        workingDays = summary?.effectiveWorkingDays ?: 0,
                         holidays = (summary?.publicHolidays ?: 0) + (summary?.schoolHolidays ?: 0),
                         conflicts = 0,   // server doesn't return conflicts count yet
                         currentDate = resolvedAnchor,

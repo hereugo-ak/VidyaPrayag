@@ -67,6 +67,9 @@ data class CalendarEventDto(
 
 @Serializable
 data class CalendarSummary(
+    // `working_days` is the canonical field the client decodes. `total_working_days`
+    // is emitted as a backward-compatible alias so older clients keep working.
+    @SerialName("working_days") val workingDays: Int,
     @SerialName("total_working_days") val totalWorkingDays: Int,
     @SerialName("public_holidays") val publicHolidays: Int,
     @SerialName("school_holidays") val schoolHolidays: Int
@@ -178,7 +181,12 @@ fun Route.schoolRouting() {
                 call.ok(
                     CalendarResponse(
                         calendarEvents = events,
-                        summary = CalendarSummary(workingDays, pubHolidays, schoolHolidays)
+                        summary = CalendarSummary(
+                            workingDays = workingDays,
+                            totalWorkingDays = workingDays,
+                            publicHolidays = pubHolidays,
+                            schoolHolidays = schoolHolidays
+                        )
                     ),
                     message = "Academic calendar fetched successfully"
                 )

@@ -118,16 +118,21 @@ android {
             dimension = "environment"
             buildConfigField("String", "AUTH_BASE_URL", "\"$devBaseUrl\"")
             buildConfigField("String", "SCHOOL_BASE_URL", "\"$devBaseUrl\"")
+            // IS_DEV drives the in-app debug backend banner (see App.kt). It also
+            // lets the app warn the developer when dev still points at Render.
+            buildConfigField("Boolean", "IS_DEV", "true")
         }
         create("staging") {
             dimension = "environment"
             buildConfigField("String", "AUTH_BASE_URL", "\"https://vidyaprayag-1.onrender.com\"")
             buildConfigField("String", "SCHOOL_BASE_URL", "\"https://vidyaprayag-1.onrender.com\"")
+            buildConfigField("Boolean", "IS_DEV", "false")
         }
         create("prod") {
             dimension = "environment"
             buildConfigField("String", "AUTH_BASE_URL", "\"https://vidyaprayag-1.onrender.com\"")
             buildConfigField("String", "SCHOOL_BASE_URL", "\"https://vidyaprayag-1.onrender.com\"")
+            buildConfigField("Boolean", "IS_DEV", "false")
         }
     }
 }

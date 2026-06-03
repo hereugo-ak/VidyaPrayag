@@ -53,6 +53,7 @@ import com.littlebridge.vidyaprayag.feature.announcements.announcementRouting
 import com.littlebridge.vidyaprayag.feature.auth.authRouting
 import com.littlebridge.vidyaprayag.feature.auth.otpAdminRouting
 import com.littlebridge.vidyaprayag.feature.config.appStatusRouting
+import com.littlebridge.vidyaprayag.feature.config.versionRouting
 import com.littlebridge.vidyaprayag.feature.content.landingRouting
 import com.littlebridge.vidyaprayag.feature.content.supportRouting
 import com.littlebridge.vidyaprayag.feature.onboarding.onboardingRouting
@@ -135,6 +136,7 @@ fun Application.module() {
         // Public
         landingRouting()
         appStatusRouting()
+        versionRouting()             // /api/v1/config/version — backend-target visibility
         authRouting()
         supportRouting()
 

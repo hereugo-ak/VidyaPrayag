@@ -5,6 +5,24 @@ plugins {
     application
 }
 
+// ---------------------------------------------------------------------------
+// Build identity — capture the current git SHA + build time so the running
+// server can report exactly which commit is deployed. This is what lets a
+// phone screenshot prove whether it hit the laptop backend or stale Render.
+// Resolution is best-effort: if git isn't available (e.g. Render shallow
+// clone), we fall back to "unknown" instead of failing the build.
+// ---------------------------------------------------------------------------
+val gitSha: String = run {
+    runCatching {
+        val proc = ProcessBuilder("git", "rev-parse", "--short", "HEAD")
+            .directory(rootDir)
+            .redirectErrorStream(true)
+            .start()
+        proc.inputStream.bufferedReader().readText().trim().ifBlank { "unknown" }
+    }.getOrDefault("unknown")
+}
+val buildTimeIso: String = java.time.Instant.now().toString()
+
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
@@ -17,7 +35,14 @@ application {
     mainClass.set("com.littlebridge.vidyaprayag.ApplicationKt")
     
     val isDevelopment: Boolean = project.ext.has("development")
-    applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
+    applicationDefaultJvmArgs = listOf(
+        "-Dio.ktor.development=$isDevelopment",
+        // Surface build identity to the running process so /api/v1/config/version
+        // can report which commit is live. Render/Docker also pick these up.
+        "-Dvidyaprayag.git.sha=$gitSha",
+        "-Dvidyaprayag.build.time=$buildTimeIso",
+        "-Dvidyaprayag.version=$version"
+    )
 }
 
 dependencies {

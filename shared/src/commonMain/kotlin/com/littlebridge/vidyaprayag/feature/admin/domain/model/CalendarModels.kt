@@ -21,10 +21,16 @@ data class CalendarEventDto(
 
 @Serializable
 data class CalendarSummaryDto(
-    @SerialName("working_days") val workingDays: Int,
-    @SerialName("public_holidays") val publicHolidays: Int,
-    @SerialName("school_holidays") val schoolHolidays: Int
-)
+    // Defaults make decoding resilient to backend drift: a backend that only
+    // sends `total_working_days` (older deploy) won't crash the client anymore.
+    @SerialName("working_days") val workingDays: Int = 0,
+    @SerialName("total_working_days") val totalWorkingDays: Int = 0,
+    @SerialName("public_holidays") val publicHolidays: Int = 0,
+    @SerialName("school_holidays") val schoolHolidays: Int = 0
+) {
+    /** Prefer canonical `working_days`; fall back to `total_working_days`. */
+    val effectiveWorkingDays: Int get() = if (workingDays > 0) workingDays else totalWorkingDays
+}
 
 @Serializable
 data class CalendarResponse(
