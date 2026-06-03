@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.feature.admin.presentation.ClassPerformanceViewModel
@@ -168,7 +169,7 @@ private fun SubjectComparisonCard(matrix: List<SubjectMatrixItem>) {
                         border = if (isRisk) BorderStroke(1.dp, Color(0xFFFEE2E2)) else null
                     ) {
                         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            Text(item.name, modifier = Modifier.width(100.dp), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                            Text(item.name, modifier = Modifier.width(100.dp), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             LinearProgressIndicator(
                                 progress = { item.percentage / 100f },
                                 modifier = Modifier.weight(1f).height(6.dp).clip(CircleShape),

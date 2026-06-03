@@ -208,6 +208,7 @@ Run them in this order. All inherit `Authorization: Bearer {{token}}` from the c
 | 10 | GET `/school/ptm`                                      | `active_event` + history + per-class progress. |
 | 11 | POST `/school/ptm`                                     | Schedule new PTM; auto-saves `{{ptm_event_id}}`. |
 | 12 | GET `/school/messages/threads`                         | Owner-scoped inbox; server-formatted `time`. |
+| 12b | GET `/school/messages/threads/{{thread_id}}/messages` | **Conversation view** — all messages in a thread (oldest→newest); opening it clears the unread badge. Returns `{ thread_id, sender_name, messages:[{id,body,is_mine,created_at,time}] }`. |
 | 13 | POST `/school/messages` (thread_id=null)               | Creates a brand-new thread; auto-saves `{{thread_id}}`. |
 | 14 | POST `/school/messages/threads/{{thread_id}}/read`     | Marks the new thread read. |
 | 15 | GET `/school/results?test=Unit Test II&class=Grade 10-A&subject=Mathematics` | CMS filter lists + live aggregates. Initially empty `students` array. |
@@ -348,6 +349,10 @@ THREAD_ID=$(curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: 
   -d '{"thread_id":null,"sender_name":"Admin Desk","sender_role":"Support","body":"Welcome!"}' \
   $BASE/api/v1/school/messages | jq -r '.data.thread_id')
 echo "Created thread: $THREAD_ID"
+
+# 12b) Messages — open conversation (this is the endpoint the app modal hits)
+curl -s -H "Authorization: Bearer $TOKEN" \
+  $BASE/api/v1/school/messages/threads/$THREAD_ID/messages | jq
 
 # 14) Messages — mark read
 curl -s -X POST -H "Authorization: Bearer $TOKEN" $BASE/api/v1/school/messages/threads/$THREAD_ID/read | jq

@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -303,18 +304,19 @@ private fun RiskStudentItem(student: RiskStudent) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
                 AsyncImage(
                     model = student.imageUrl,
                     contentDescription = null,
                     modifier = Modifier.size(36.dp).clip(CircleShape),
                     contentScale = ContentScale.Crop
                 )
-                Column {
-                    Text(student.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                    Text("Retention Risk: ${student.retentionRisk}%", style = MaterialTheme.typography.labelSmall, color = if (student.riskLevel == "Critical") MaterialTheme.colorScheme.error else Color(0xFFF59E0B), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Column(modifier = Modifier.weight(1f, fill = false)) {
+                    Text(student.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("Retention Risk: ${student.retentionRisk}%", style = MaterialTheme.typography.labelSmall, color = if (student.riskLevel == "Critical") MaterialTheme.colorScheme.error else Color(0xFFF59E0B), fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
+            Spacer(Modifier.width(8.dp))
             IconButton(onClick = { }) {
                 Icon(Icons.AutoMirrored.Filled.Chat, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
             }
@@ -334,9 +336,10 @@ private fun SubjectEngagementCard(engagements: List<SubjectEngagement>) {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 engagements.forEach { engagement ->
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(engagement.name, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                            Text("${(engagement.percentage * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.secondary)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text(engagement.name, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                            Spacer(Modifier.width(8.dp))
+                            Text("${(engagement.percentage * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.secondary, maxLines = 1)
                         }
                         LinearProgressIndicator(
                             progress = { engagement.percentage },

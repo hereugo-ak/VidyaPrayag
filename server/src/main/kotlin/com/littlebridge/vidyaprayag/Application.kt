@@ -53,6 +53,7 @@ import com.littlebridge.vidyaprayag.feature.announcements.announcementRouting
 import com.littlebridge.vidyaprayag.feature.auth.authRouting
 import com.littlebridge.vidyaprayag.feature.auth.otpAdminRouting
 import com.littlebridge.vidyaprayag.feature.config.appStatusRouting
+import com.littlebridge.vidyaprayag.feature.config.versionRouting
 import com.littlebridge.vidyaprayag.feature.content.landingRouting
 import com.littlebridge.vidyaprayag.feature.content.supportRouting
 import com.littlebridge.vidyaprayag.feature.onboarding.onboardingRouting
@@ -68,6 +69,7 @@ import com.littlebridge.vidyaprayag.feature.school.schoolAnalyticsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolDashboardRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRouting
 import com.littlebridge.vidyaprayag.feature.user.parentRouting
+import com.littlebridge.vidyaprayag.feature.user.parentMessagesRouting
 import com.littlebridge.vidyaprayag.feature.user.userDetailsRouting
 import com.littlebridge.vidyaprayag.feature.user.userProfileRouting
 import io.ktor.http.*
@@ -135,6 +137,7 @@ fun Application.module() {
         // Public
         landingRouting()
         appStatusRouting()
+        versionRouting()             // /api/v1/config/version — backend-target visibility
         authRouting()
         supportRouting()
 
@@ -148,6 +151,7 @@ fun Application.module() {
         userDetailsRouting()
         userProfileRouting()
         parentRouting()
+        parentMessagesRouting()      // /api/v1/parent/messages[…] — parent-school harmony (report §9.2)
         onboardingRouting()
         announcementRouting()
         admissionRouting()

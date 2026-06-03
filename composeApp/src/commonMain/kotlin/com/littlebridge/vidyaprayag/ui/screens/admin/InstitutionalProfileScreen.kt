@@ -189,13 +189,18 @@ private fun ProfileHeaderSection(isPublic: Boolean, onTogglePublic: (Boolean) ->
         Column(modifier = Modifier.padding(24.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                // weight(1f) lets the title shrink first so it never squeezes the
+                // toggle below — fixes the clipped "P U B L I C" wrap on narrow
+                // phones (report §4.3). (false) keeps text from stealing all space.
+                Column(modifier = Modifier.weight(1f, fill = false)) {
                     Text("Institutional Profile", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Text("Manage your school\'s digital presence.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+
+                Spacer(modifier = Modifier.weight(1f))
 
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -203,11 +208,17 @@ private fun ProfileHeaderSection(isPublic: Boolean, onTogglePublic: (Boolean) ->
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(if (isPublic) "PUBLIC" else "PRIVATE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = if (isPublic) "PUBLIC" else "PRIVATE",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
                         Switch(
                             checked = isPublic,
                             onCheckedChange = onTogglePublic,

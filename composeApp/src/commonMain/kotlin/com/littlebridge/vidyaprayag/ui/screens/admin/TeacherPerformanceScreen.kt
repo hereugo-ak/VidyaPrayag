@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -214,7 +215,7 @@ private fun StarFacultyItem(teacher: StarTeacher) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.weight(1f)) {
                 Box {
                     AsyncImage(
                         model = teacher.imageUrl,
@@ -230,9 +231,9 @@ private fun StarFacultyItem(teacher: StarTeacher) {
                         Text("#${teacher.rank}", modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Black)
                     }
                 }
-                Column {
-                    Text(teacher.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                    Text(teacher.department.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                Column(modifier = Modifier.weight(1f, fill = false)) {
+                    Text(teacher.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(teacher.department.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, fontSize = 9.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             Column(horizontalAlignment = Alignment.End) {
@@ -263,9 +264,9 @@ private fun AccountabilityRow(faculty: FacultyAccountability) {
                 Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(if (faculty.riskCorrelation == "High Risk") Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
                     Text(faculty.initials, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = if (faculty.riskCorrelation == "High Risk") Color.Red else MaterialTheme.colorScheme.primary)
                 }
-                Column {
-                    Text(faculty.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                    Text(faculty.department, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, fontSize = 9.sp)
+                Column(modifier = Modifier.weight(1f, fill = false)) {
+                    Text(faculty.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(faculty.department, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
 
