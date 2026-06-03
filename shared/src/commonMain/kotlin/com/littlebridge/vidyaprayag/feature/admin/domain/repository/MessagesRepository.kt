@@ -13,6 +13,7 @@ import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.MessageThread
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.SendMessageRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.SendMessageResponse
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.ThreadMessagesResponse
 
 interface MessagesRepository {
 
@@ -23,6 +24,17 @@ interface MessagesRepository {
      * orders by lastMessageAt DESC).
      */
     suspend fun getThreads(token: String): NetworkResult<List<MessageThread>>
+
+    /**
+     * GET /api/v1/school/messages/threads/{id}/messages
+     *
+     * Returns the full conversation for a thread. The server clears the
+     * thread's unread badge as a side effect of opening it.
+     */
+    suspend fun getThreadMessages(
+        token: String,
+        threadId: String
+    ): NetworkResult<ThreadMessagesResponse>
 
     /**
      * POST /api/v1/school/messages/threads/{id}/read

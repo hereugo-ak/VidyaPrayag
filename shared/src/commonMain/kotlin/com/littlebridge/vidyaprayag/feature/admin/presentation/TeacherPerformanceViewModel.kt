@@ -115,36 +115,45 @@ class TeacherPerformanceViewModel(
         }
     }
 
-    private fun parseStar(el: JsonElement): StarTeacher? = try {
-        val o = el.jsonObject
-        StarTeacher(
-            rank       = o["rank"]?.jsonPrimitive?.intOrNull ?: 0,
-            name       = o["name"]?.jsonPrimitive?.contentOrNull ?: return null,
-            department = o["department"]?.jsonPrimitive?.contentOrNull ?: "",
-            score      = o["score"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
-            imageUrl   = o["image_url"]?.jsonPrimitive?.contentOrNull ?: ""
-        )
-    } catch (_: Exception) { null }
+    private fun parseStar(el: JsonElement): StarTeacher? {
+        return try {
+            val o = el.jsonObject
+            val name = o["name"]?.jsonPrimitive?.contentOrNull ?: return null
+            StarTeacher(
+                rank       = o["rank"]?.jsonPrimitive?.intOrNull ?: 0,
+                name       = name,
+                department = o["department"]?.jsonPrimitive?.contentOrNull ?: "",
+                score      = o["score"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
+                imageUrl   = o["image_url"]?.jsonPrimitive?.contentOrNull ?: ""
+            )
+        } catch (_: Exception) { null }
+    }
 
-    private fun parseAccountability(el: JsonElement): FacultyAccountability? = try {
-        val o = el.jsonObject
-        FacultyAccountability(
-            id              = o["id"]?.jsonPrimitive?.contentOrNull ?: return null,
-            name            = o["name"]?.jsonPrimitive?.contentOrNull ?: "",
-            department      = o["department"]?.jsonPrimitive?.contentOrNull ?: "",
-            complianceScore = o["compliance_score"]?.jsonPrimitive?.intOrNull ?: 0,
-            avgUpdateDelay  = o["avg_update_delay"]?.jsonPrimitive?.contentOrNull ?: "",
-            studentAvgMark  = o["student_avg_mark"]?.jsonPrimitive?.contentOrNull ?: "",
-            riskCorrelation = o["risk_correlation"]?.jsonPrimitive?.contentOrNull ?: "Stable",
-            initials        = o["initials"]?.jsonPrimitive?.contentOrNull ?: ""
-        )
-    } catch (_: Exception) { null }
+    private fun parseAccountability(el: JsonElement): FacultyAccountability? {
+        return try {
+            val o = el.jsonObject
+            val id = o["id"]?.jsonPrimitive?.contentOrNull ?: return null
+            FacultyAccountability(
+                id              = id,
+                name            = o["name"]?.jsonPrimitive?.contentOrNull ?: "",
+                department      = o["department"]?.jsonPrimitive?.contentOrNull ?: "",
+                complianceScore = o["compliance_score"]?.jsonPrimitive?.intOrNull ?: 0,
+                avgUpdateDelay  = o["avg_update_delay"]?.jsonPrimitive?.contentOrNull ?: "",
+                studentAvgMark  = o["student_avg_mark"]?.jsonPrimitive?.contentOrNull ?: "",
+                riskCorrelation = o["risk_correlation"]?.jsonPrimitive?.contentOrNull ?: "Stable",
+                initials        = o["initials"]?.jsonPrimitive?.contentOrNull ?: ""
+            )
+        } catch (_: Exception) { null }
+    }
 
-    private fun parseDept(el: JsonElement): DeptEfficiency? = try {
-        val o = el.jsonObject
-        DeptEfficiency(
-            name       = o["name"]?.jsonPrimitive?.contentOrNull ?: return null,
-            percentage = o["percentage"]?.jsonPrimitive?.intOrNull ?: 0
-        )
-    } catch (_: Exception) { null }
+    private fun parseDept(el: JsonElement): DeptEfficiency? {
+        return try {
+            val o = el.jsonObject
+            val name = o["name"]?.jsonPrimitive?.contentOrNull ?: return null
+            DeptEfficiency(
+                name       = name,
+                percentage = o["percentage"]?.jsonPrimitive?.intOrNull ?: 0
+            )
+        } catch (_: Exception) { null }
+    }
 }

@@ -8,6 +8,7 @@
  *   PUT  /api/v1/user/profile/philosophy
  *   PUT  /api/v1/user/profile/tour-videos
  *   PUT  /api/v1/user/profile/gallery
+ *   PUT  /api/v1/user/profile/visibility
  */
 package com.littlebridge.vidyaprayag.feature.admin.data.remote
 
@@ -19,6 +20,8 @@ import com.littlebridge.vidyaprayag.feature.admin.domain.model.GalleryUpdateResp
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.PhilosophyDetailsDto
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.TourVideosRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.UserProfileResponse
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.VisibilityRequest
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.VisibilityResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -74,6 +77,17 @@ class UserProfileApi(
         body: GalleryRequest
     ): NetworkResult<ApiResponse<GalleryUpdateResponse>> = safeApiCall {
         client.put(getUrl("api/v1/user/profile/gallery")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }
+    }
+
+    suspend fun updateVisibility(
+        token: String,
+        body: VisibilityRequest
+    ): NetworkResult<ApiResponse<VisibilityResponse>> = safeApiCall {
+        client.put(getUrl("api/v1/user/profile/visibility")) {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(body)

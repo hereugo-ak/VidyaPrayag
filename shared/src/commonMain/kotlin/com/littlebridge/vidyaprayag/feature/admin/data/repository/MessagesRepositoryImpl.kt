@@ -13,6 +13,7 @@ import com.littlebridge.vidyaprayag.feature.admin.data.remote.MessagesApi
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.MessageThread
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.SendMessageRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.SendMessageResponse
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.ThreadMessagesResponse
 import com.littlebridge.vidyaprayag.feature.admin.domain.repository.MessagesRepository
 
 class MessagesRepositoryImpl(
@@ -30,6 +31,27 @@ class MessagesRepositoryImpl(
                     )
                     data == null -> NetworkResult.Error("No data in response")
                     else -> NetworkResult.Success(data.threads)
+                }
+            }
+            is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)
+            is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
+        }
+    }
+
+    override suspend fun getThreadMessages(
+        token: String,
+        threadId: String
+    ): NetworkResult<ThreadMessagesResponse> {
+        return when (val result = api.getThreadMessages(token, threadId)) {
+            is NetworkResult.Success -> {
+                val envelope = result.data
+                val data = envelope.data
+                when {
+                    !envelope.success -> NetworkResult.Error(
+                        envelope.message.ifBlank { "Failed to fetch conversation" }
+                    )
+                    data == null -> NetworkResult.Error("No data in response")
+                    else -> NetworkResult.Success(data)
                 }
             }
             is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)

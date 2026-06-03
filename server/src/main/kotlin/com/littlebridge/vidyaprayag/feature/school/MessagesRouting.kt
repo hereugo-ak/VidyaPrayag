@@ -4,6 +4,7 @@
  *
  * Endpoints (all JWT):
  *   GET  /api/v1/school/messages/threads
+ *   GET  /api/v1/school/messages/threads/{id}/messages
  *   POST /api/v1/school/messages/threads/{id}/read
  *   POST /api/v1/school/messages
  *
@@ -26,8 +27,7 @@ import com.littlebridge.vidyaprayag.core.created
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.okMessage
-import com.littlebridge.vidyaprayag.core.principalUserId
-import com.littlebridge.vidyaprayag.db.AppUsersTable
+import com.littlebridge.vidyaprayag.core.requireSchoolContext
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.MessageThreadsTable
 import com.littlebridge.vidyaprayag.db.MessagesTable
@@ -84,12 +84,24 @@ data class SendMessageResponse(
     @SerialName("message_id") val messageId: String
 )
 
-// ---------------- helpers ----------------
+@Serializable
+data class MessageDto(
+    val id: String,
+    val body: String,
+    @SerialName("is_mine") val isMine: Boolean,
+    @SerialName("sender_id") val senderId: String? = null,
+    @SerialName("created_at") val createdAt: String,
+    val time: String
+)
 
-private fun resolveSchoolId(uid: UUID): UUID? = AppUsersTable
-    .selectAll().where { AppUsersTable.id eq uid }
-    .singleOrNull()
-    ?.get(AppUsersTable.schoolId)
+@Serializable
+data class ThreadMessagesResponse(
+    @SerialName("thread_id") val threadId: String,
+    @SerialName("sender_name") val senderName: String,
+    val messages: List<MessageDto>
+)
+
+// ---------------- helpers ----------------
 
 private fun formatThreadTime(ts: Instant): String {
     val zid = ZoneId.systemDefault()
@@ -120,12 +132,15 @@ fun Route.messagesRouting() {
 
             // -------- LIST THREADS --------
             get("/threads") {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val uid = ctx.userId
 
                 val payload = dbQuery {
                     val rows = MessageThreadsTable.selectAll()
-                        .where { MessageThreadsTable.ownerUserId eq uid }
+                        .where {
+                            (MessageThreadsTable.ownerUserId eq uid) and
+                                (MessageThreadsTable.schoolId eq ctx.schoolId)
+                        }
                         .orderBy(MessageThreadsTable.lastMessageAt, SortOrder.DESC)
                         .map { it.toThreadDto() }
                     MessageThreadsResponse(rows)
@@ -133,10 +148,64 @@ fun Route.messagesRouting() {
                 call.ok(payload, message = "Threads fetched successfully")
             }
 
+            // -------- CONVERSATION (messages inside a thread) --------
+            get("/threads/{id}/messages") {
+                val ctx = call.requireSchoolContext() ?: return@get
+                val id = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                    ?: run { call.fail("Invalid id"); return@get }
+
+                val payload = dbQuery {
+                    // The thread must belong to the caller (owner) AND school.
+                    val thread = MessageThreadsTable.selectAll()
+                        .where {
+                            (MessageThreadsTable.id eq id) and
+                                (MessageThreadsTable.ownerUserId eq ctx.userId) and
+                                (MessageThreadsTable.schoolId eq ctx.schoolId)
+                        }
+                        .singleOrNull()
+                        ?: return@dbQuery null
+
+                    val msgs = MessagesTable.selectAll()
+                        .where { MessagesTable.threadId eq id }
+                        .orderBy(MessagesTable.createdAt, SortOrder.ASC)
+                        .map { row ->
+                            val sid = row[MessagesTable.senderId]
+                            val createdInstant = row[MessagesTable.createdAt]
+                            MessageDto(
+                                id = row[MessagesTable.id].value.toString(),
+                                body = row[MessagesTable.body],
+                                isMine = sid == ctx.userId,
+                                senderId = sid?.toString(),
+                                createdAt = createdInstant.toString(),
+                                time = formatThreadTime(createdInstant)
+                            )
+                        }
+                    ThreadMessagesResponse(
+                        threadId = id.toString(),
+                        senderName = thread[MessageThreadsTable.senderName],
+                        messages = msgs
+                    )
+                }
+                if (payload == null) call.fail("Thread not found", HttpStatusCode.NotFound)
+                else {
+                    // Opening a conversation clears its unread badge.
+                    dbQuery {
+                        MessageThreadsTable.update({
+                            (MessageThreadsTable.id eq id) and (MessageThreadsTable.ownerUserId eq ctx.userId)
+                        }) {
+                            it[unreadCount] = 0
+                            it[isRead] = true
+                            it[updatedAt] = Instant.now()
+                        }
+                    }
+                    call.ok(payload, message = "Conversation fetched")
+                }
+            }
+
             // -------- MARK READ --------
             post("/threads/{id}/read") {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@post }
+                val ctx = call.requireSchoolContext() ?: return@post
+                val uid = ctx.userId
                 val id = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                     ?: run { call.fail("Invalid id"); return@post }
 
@@ -155,24 +224,39 @@ fun Route.messagesRouting() {
 
             // -------- SEND (creates thread on the fly when thread_id is null) --------
             post {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@post }
+                val ctx = call.requireSchoolContext() ?: return@post
+                val uid = ctx.userId
                 val req = call.receive<SendMessageDto>()
                 if (req.body.isBlank()) {
                     call.fail("body is required"); return@post
                 }
 
-                val schoolId = dbQuery { resolveSchoolId(uid) }
-                    ?: run { call.fail("User not associated with any school", HttpStatusCode.NotFound); return@post }
-
+                val schoolId = ctx.schoolId
                 val now = Instant.now()
+
+                // For an existing thread, verify ownership+school BEFORE writing.
+                if (req.threadId != null) {
+                    val parsed = runCatching { UUID.fromString(req.threadId) }.getOrNull()
+                        ?: run { call.fail("Invalid thread_id"); return@post }
+                    val owns = dbQuery {
+                        MessageThreadsTable.selectAll().where {
+                            (MessageThreadsTable.id eq parsed) and
+                                (MessageThreadsTable.ownerUserId eq uid) and
+                                (MessageThreadsTable.schoolId eq schoolId)
+                        }.count() > 0L
+                    }
+                    if (!owns) {
+                        call.fail("Thread not found", HttpStatusCode.NotFound); return@post
+                    }
+                }
 
                 val result = dbQuery {
                     val threadId: UUID = if (req.threadId != null) {
-                        val parsed = runCatching { UUID.fromString(req.threadId) }.getOrNull()
-                            ?: error("Invalid thread_id")
-                        // Refresh thread metadata.
-                        MessageThreadsTable.update({ MessageThreadsTable.id eq parsed }) {
+                        val parsed = UUID.fromString(req.threadId)
+                        // Refresh thread metadata (ownership already verified).
+                        MessageThreadsTable.update({
+                            (MessageThreadsTable.id eq parsed) and (MessageThreadsTable.ownerUserId eq uid)
+                        }) {
                             it[lastMessage] = req.body.take(200)
                             it[lastMessageAt] = now
                             it[updatedAt] = now
@@ -185,6 +269,7 @@ fun Route.messagesRouting() {
                         val recipient = req.recipientUserId
                             ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                             ?: uid
+                        // Fan out unread to the recipient when it isn't the sender.
                         val newThread = UUID.randomUUID()
                         MessageThreadsTable.insert {
                             it[id] = newThread

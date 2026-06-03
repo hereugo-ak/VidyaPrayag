@@ -39,7 +39,7 @@ import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.principalUserId
 import com.littlebridge.vidyaprayag.db.AppConfigTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
-import com.littlebridge.vidyaprayag.db.OnboardingDraftsTable
+import com.littlebridge.vidyaprayag.feature.onboarding.computeOnboardingStatus
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
@@ -48,7 +48,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import java.util.UUID
 
@@ -104,12 +103,12 @@ private data class StepTemplate(
     @SerialName("icon_url") val iconUrl: String? = null
 )
 
-// id -> step_type mapping per the existing onboarding contract
-private val STEP_TYPE_BY_ID = mapOf(
-    1 to "BASIC",
-    2 to "BRANDING",
-    3 to "ACADEMIC",
-    4 to "REVIEW"
+// Built-in fallback when the CMS template `school_dashboard_steps` is empty.
+private val DEFAULT_STEP_TEMPLATES = listOf(
+    StepTemplate(1, "Institutional Basics", "Core school info and identity", null),
+    StepTemplate(2, "Branding & Visuals", "Logo and portal themes", null),
+    StepTemplate(3, "Academic Structure", "Grade levels and curricula", null),
+    StepTemplate(4, "Launch & Review", "Final check & go live", null)
 )
 
 private val LENIENT_JSON = Json { ignoreUnknownKeys = true; isLenient = true; explicitNulls = false }
@@ -129,6 +128,11 @@ fun Route.schoolDashboardRouting() {
                     call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
                 }
 
+                // Single source of truth: derive completion from persisted school
+                // data (schools row + school_classes + onboarded_at), NOT from the
+                // presence of half-typed draft rows.
+                val status = computeOnboardingStatus(uid)
+
                 val payload = dbQuery {
                     // ---- 1. welcome ----
                     val welcomeRaw = cmsString(
@@ -143,27 +147,23 @@ fun Route.schoolDashboardRouting() {
 
                     // ---- 2. onboarding_progress ----
                     val stepsRaw = cmsString("school_dashboard_steps", "[]")
-                    val templates: List<StepTemplate> = runCatching {
+                    val templatesRaw: List<StepTemplate> = runCatching {
                         LENIENT_JSON.decodeFromString(
                             ListSerializer(StepTemplate.serializer()),
                             stepsRaw
                         )
                     }.getOrElse { emptyList() }
 
-                    // Pull completed step_types for this admin once.
-                    val completedTypes: Set<String> = OnboardingDraftsTable.selectAll()
-                        .where { OnboardingDraftsTable.userId eq uid }
-                        .map { it[OnboardingDraftsTable.stepType] }
-                        .toSet()
+                    // Fall back to a built-in 4-step template if CMS has none, so
+                    // the progress card always reflects the real status.
+                    val templates = templatesRaw.ifEmpty { DEFAULT_STEP_TEMPLATES }
 
                     val steps = templates.map { tpl ->
-                        val type = STEP_TYPE_BY_ID[tpl.id]
-                        val isDone = type != null && type in completedTypes
                         OnboardingStepDto(
                             id = tpl.id,
                             title = tpl.title,
                             description = tpl.description,
-                            isCompleted = isDone,
+                            isCompleted = status.isStepDone(tpl.id),
                             iconUrl = tpl.iconUrl
                         )
                     }

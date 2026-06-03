@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.MessageThread
+import com.littlebridge.vidyaprayag.feature.admin.presentation.ConversationState
 import com.littlebridge.vidyaprayag.feature.admin.presentation.MessagesViewModel
 import com.littlebridge.vidyaprayag.ui.components.*
 import org.koin.compose.viewmodel.koinViewModel
@@ -34,6 +35,7 @@ fun MessagesScreen() {
     val state by viewModel.state.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val conversation by viewModel.conversation.collectAsState()
     var showCompose by remember { mutableStateOf(false) }
 
     // Re-sync on screen entry, matching SchoolDashboard / AdmissionCRM.
@@ -72,7 +74,7 @@ fun MessagesScreen() {
                 items(state.threads, key = { it.id }) { thread ->
                     MessageThreadItem(
                         thread = thread,
-                        onClick = { viewModel.markAsRead(thread.id) }
+                        onClick = { viewModel.openConversation(thread.id) }
                     )
                 }
             }
@@ -90,6 +92,170 @@ fun MessagesScreen() {
                     viewModel.sendMessage(body = body, onSent = { showCompose = false })
                 }
             )
+        }
+
+        if (conversation.threadId != null) {
+            ConversationDialog(
+                conversation = conversation,
+                onDismiss = { viewModel.closeConversation() },
+                onSend = { body -> viewModel.sendReply(body) },
+                onDismissError = { viewModel.clearConversationError() }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ConversationDialog(
+    conversation: ConversationState,
+    onDismiss: () -> Unit,
+    onSend: (String) -> Unit,
+    onDismissError: () -> Unit
+) {
+    var reply by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = { if (!conversation.isSending) onDismiss() },
+        title = {
+            Text(
+                conversation.senderName.ifBlank { "Conversation" },
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                when {
+                    conversation.isLoading -> {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(28.dp),
+                                strokeWidth = 2.dp
+                            )
+                        }
+                    }
+                    conversation.messages.isEmpty() -> {
+                        Text(
+                            "No messages in this conversation yet.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    else -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 320.dp)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            conversation.messages.forEach { msg ->
+                                MessageBubble(
+                                    body = msg.body,
+                                    time = msg.time,
+                                    isMine = msg.isMine
+                                )
+                            }
+                        }
+                    }
+                }
+
+                conversation.error?.let { err ->
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                err,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            TextButton(onClick = onDismissError) { Text("OK") }
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = reply,
+                    onValueChange = { reply = it },
+                    label = { Text("Reply") },
+                    minLines = 2,
+                    maxLines = 5,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !conversation.isSending
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = !conversation.isSending && reply.isNotBlank(),
+                onClick = {
+                    onSend(reply.trim())
+                    reply = ""
+                }
+            ) {
+                if (conversation.isSending) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("Send")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !conversation.isSending) { Text("Close") }
+        }
+    )
+}
+
+@Composable
+private fun MessageBubble(body: String, time: String, isMine: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start
+    ) {
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = if (isMine) {
+                MaterialTheme.colorScheme.secondary
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            },
+            modifier = Modifier.widthIn(max = 260.dp)
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Text(
+                    body,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (isMine) Color.White else MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    time,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isMine) {
+                        Color.White.copy(alpha = 0.8f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.align(Alignment.End)
+                )
+            }
         }
     }
 }

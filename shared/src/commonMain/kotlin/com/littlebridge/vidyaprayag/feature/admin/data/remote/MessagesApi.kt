@@ -7,6 +7,7 @@
  *
  * Server routes:
  *   GET  /api/v1/school/messages/threads
+ *   GET  /api/v1/school/messages/threads/{id}/messages
  *   POST /api/v1/school/messages/threads/{id}/read
  *   POST /api/v1/school/messages
  */
@@ -18,6 +19,7 @@ import com.littlebridge.vidyaprayag.core.network.safeApiCall
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.MessageThreadsResponse
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.SendMessageRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.SendMessageResponse
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.ThreadMessagesResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -42,6 +44,21 @@ class MessagesApi(
         token: String
     ): NetworkResult<ApiResponse<MessageThreadsResponse>> = safeApiCall {
         client.get(getUrl("api/v1/school/messages/threads")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+    }
+
+    /**
+     * GET /api/v1/school/messages/threads/{id}/messages
+     *
+     * Returns the full conversation for a thread (ascending by created_at).
+     * The server also clears the thread's unread badge as a side effect.
+     */
+    suspend fun getThreadMessages(
+        token: String,
+        threadId: String
+    ): NetworkResult<ApiResponse<ThreadMessagesResponse>> = safeApiCall {
+        client.get(getUrl("api/v1/school/messages/threads/$threadId/messages")) {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
     }

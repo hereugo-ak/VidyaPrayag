@@ -76,7 +76,7 @@ fun StudentAnalyticsScreen() {
                         SubjectEngagementCard(state.subjectEngagements)
                     }
                     Box(modifier = Modifier.weight(1f)) {
-                        CohortComparisonCard(state.cohortComparison)
+                        CohortComparisonCard(state.cohortComparison, state.cohortLabels)
                     }
                 }
             }
@@ -142,21 +142,36 @@ private fun VolatilityIndexCard(trend: List<Float>) {
                 }
             }
 
-            // Mock Chart
-            Row(
-                modifier = Modifier.fillMaxWidth().height(160.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.Bottom
-            ) {
-                trend.forEachIndexed { index, value ->
-                    val isAnomaly = index == 9 // Mock Oct 26
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight(value)
-                            .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                            .background(if (isAnomaly) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f))
+            // Live volatility chart: anomaly = the day with the lowest value (biggest drop)
+            if (trend.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(160.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No volatility data available",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            } else {
+                // Detect the anomaly index = the minimum value (largest attendance drop)
+                val anomalyIndex = trend.indexOf(trend.minOrNull())
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(160.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    trend.forEachIndexed { index, value ->
+                        val isAnomaly = index == anomalyIndex
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(value.coerceIn(0f, 1f))
+                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                                .background(if (isAnomaly) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f))
+                        )
+                    }
                 }
             }
             
@@ -337,29 +352,48 @@ private fun SubjectEngagementCard(engagements: List<SubjectEngagement>) {
 }
 
 @Composable
-private fun CohortComparisonCard(comparison: List<Float>) {
+private fun CohortComparisonCard(comparison: List<Float>, labels: List<String>) {
     VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(Icons.Default.Groups, null, tint = MaterialTheme.colorScheme.secondary)
                 Text("Cohort Comparison", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
-            
-            Row(
-                modifier = Modifier.fillMaxWidth().height(120.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                comparison.forEachIndexed { index, value ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .width(32.dp)
-                                .fillMaxHeight(value)
-                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                                .background(if (index == 2) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant)
-                        )
-                        Text(listOf("G9", "G10", "G11", "G12")[index], style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+
+            if (comparison.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No cohort data",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                // Highlight the strongest-performing cohort (highest bar)
+                val topIndex = comparison.indexOf(comparison.maxOrNull())
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    comparison.forEachIndexed { index, value ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .width(32.dp)
+                                    .fillMaxHeight(value.coerceIn(0f, 1f))
+                                    .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                                    .background(if (index == topIndex) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant)
+                            )
+                            Text(
+                                labels.getOrNull(index) ?: "",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
                     }
                 }
             }

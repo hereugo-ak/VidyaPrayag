@@ -18,14 +18,23 @@
  * Holidays: `filter_type` selects rows by frequency column (default yearly).
  *
  * Attendance: today's date by default; pass `?date=YYYY-MM-DD` for historical.
+ *
+ * Authorization:
+ *   Every endpoint (except the public /analytics teaser) is guarded by
+ *   call.requireSchoolContext(): the caller must hold a school role and have a
+ *   school, and every query is scoped to that resolved school_id.
+ *
+ * Calendar summary correctness:
+ *   public_holidays / school_holidays count ONLY holidays falling inside the
+ *   requested calendar range [rangeStart, rangeEnd] — not every holiday the
+ *   school has ever recorded — so the summary matches what the user is viewing.
  */
 package com.littlebridge.vidyaprayag.feature.school
 
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
-import com.littlebridge.vidyaprayag.core.principalUserId
+import com.littlebridge.vidyaprayag.core.requireSchoolContext
 import com.littlebridge.vidyaprayag.db.AcademicCalendarTable
-import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.AttendanceRecordsTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.FacultyTable
@@ -38,11 +47,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import java.time.LocalDate
-import java.time.YearMonth
-import java.util.UUID
 
 @Serializable
 data class AnalyticsResponse(
@@ -97,11 +103,6 @@ data class AttendanceResponse(
     @SerialName("attendance_list") val attendanceList: List<AttendanceEntry>
 )
 
-private suspend fun resolveSchoolId(uid: UUID): UUID? = dbQuery {
-    AppUsersTable.selectAll().where { AppUsersTable.id eq uid }
-        .singleOrNull()?.get(AppUsersTable.schoolId)
-}
-
 fun Route.schoolRouting() {
     route("/api/v1/school") {
 
@@ -117,12 +118,8 @@ fun Route.schoolRouting() {
 
             // ---- calendar ----
             get("/calendar") {
-                val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
-                    call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
-                }
-                val schoolId = resolveSchoolId(uid) ?: run {
-                    call.fail("User not associated with any school", HttpStatusCode.NotFound); return@get
-                }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
                 val dateStr = call.request.queryParameters["date"]
                     ?: LocalDate.now().toString()
                 val viewType = call.request.queryParameters["view_type"]?.lowercase() ?: "month"
@@ -163,16 +160,21 @@ fun Route.schoolRouting() {
                 val workingDays = generateSequence(rangeStart) { it.plusDays(1) }
                     .takeWhile { !it.isAfter(rangeEnd) }
                     .count { it.dayOfWeek.value < 6 }
-                val pubHolidays = dbQuery {
+
+                // Count holidays that actually fall inside the viewed range, by
+                // type. `date` is a YYYY-MM-DD varchar, so we parse + range-check
+                // in memory (portable across SQLite/Postgres).
+                val holidayRows = dbQuery {
                     HolidayListTable.selectAll()
-                        .where { (HolidayListTable.schoolId eq schoolId) and (HolidayListTable.type eq "Public") }
-                        .count().toInt()
+                        .where { HolidayListTable.schoolId eq schoolId }
+                        .map { it[HolidayListTable.date] to it[HolidayListTable.type] }
                 }
-                val schoolHolidays = dbQuery {
-                    HolidayListTable.selectAll()
-                        .where { (HolidayListTable.schoolId eq schoolId) and (HolidayListTable.type eq "School") }
-                        .count().toInt()
+                val holidaysInRange = holidayRows.filter { (dateStr, _) ->
+                    val d = runCatching { LocalDate.parse(dateStr) }.getOrNull() ?: return@filter false
+                    !d.isBefore(rangeStart) && !d.isAfter(rangeEnd)
                 }
+                val pubHolidays = holidaysInRange.count { it.second.equals("Public", ignoreCase = true) }
+                val schoolHolidays = holidaysInRange.count { it.second.equals("School", ignoreCase = true) }
                 call.ok(
                     CalendarResponse(
                         calendarEvents = events,
@@ -184,12 +186,8 @@ fun Route.schoolRouting() {
 
             // ---- holidays ----
             get("/holidays") {
-                val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
-                    call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
-                }
-                val schoolId = resolveSchoolId(uid) ?: run {
-                    call.fail("User not associated with any school", HttpStatusCode.NotFound); return@get
-                }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
                 val filter = call.request.queryParameters["filter_type"]?.lowercase() ?: "yearly"
                 if (filter !in setOf("weekly", "monthly", "yearly")) {
                     call.fail("filter_type must be weekly|monthly|yearly"); return@get
@@ -204,12 +202,8 @@ fun Route.schoolRouting() {
 
             // ---- attendance/daily ----
             get("/attendance/daily") {
-                val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
-                    call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
-                }
-                val schoolId = resolveSchoolId(uid) ?: run {
-                    call.fail("User not associated with any school", HttpStatusCode.NotFound); return@get
-                }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
                 val type  = call.request.queryParameters["type"]?.lowercase() ?: "student"
                 val grade = call.request.queryParameters["grade"]
                 val date  = call.request.queryParameters["date"] ?: LocalDate.now().toString()

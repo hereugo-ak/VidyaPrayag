@@ -137,34 +137,43 @@ class ClassPerformanceViewModel(
         }
     }
 
-    private fun parseGrade(el: JsonElement): GradeDistribution? = try {
-        val o = el.jsonObject
-        GradeDistribution(
-            grade      = o["grade"]?.jsonPrimitive?.contentOrNull ?: return null,
-            percentage = o["percentage"]?.jsonPrimitive?.intOrNull ?: 0,
-            value      = o["value"]?.jsonPrimitive?.floatOrNull ?: 0f
-        )
-    } catch (_: Exception) { null }
+    private fun parseGrade(el: JsonElement): GradeDistribution? {
+        return try {
+            val o = el.jsonObject
+            val grade = o["grade"]?.jsonPrimitive?.contentOrNull ?: return null
+            GradeDistribution(
+                grade      = grade,
+                percentage = o["percentage"]?.jsonPrimitive?.intOrNull ?: 0,
+                value      = o["value"]?.jsonPrimitive?.floatOrNull ?: 0f
+            )
+        } catch (_: Exception) { null }
+    }
 
-    private fun parseSubject(el: JsonElement): SubjectMatrixItem? = try {
-        val o = el.jsonObject
-        SubjectMatrixItem(
-            name       = o["name"]?.jsonPrimitive?.contentOrNull ?: return null,
-            percentage = o["percentage"]?.jsonPrimitive?.intOrNull ?: 0,
-            trend      = o["trend"]?.jsonPrimitive?.contentOrNull ?: "flat"
-        )
-    } catch (_: Exception) { null }
+    private fun parseSubject(el: JsonElement): SubjectMatrixItem? {
+        return try {
+            val o = el.jsonObject
+            val name = o["name"]?.jsonPrimitive?.contentOrNull ?: return null
+            SubjectMatrixItem(
+                name       = name,
+                percentage = o["percentage"]?.jsonPrimitive?.intOrNull ?: 0,
+                trend      = o["trend"]?.jsonPrimitive?.contentOrNull ?: "flat"
+            )
+        } catch (_: Exception) { null }
+    }
 
-    private fun parseProgress(el: JsonElement): ProgressMonitoringItem? = try {
-        val o = el.jsonObject
-        ProgressMonitoringItem(
-            name       = o["name"]?.jsonPrimitive?.contentOrNull ?: return null,
-            initials   = o["initials"]?.jsonPrimitive?.contentOrNull ?: "",
-            math       = o["math"]?.jsonPrimitive?.contentOrNull ?: "",
-            science    = o["science"]?.jsonPrimitive?.contentOrNull ?: "",
-            literature = o["literature"]?.jsonPrimitive?.contentOrNull ?: "",
-            attendance = o["attendance"]?.jsonPrimitive?.contentOrNull ?: "",
-            status     = o["status"]?.jsonPrimitive?.contentOrNull ?: ""
-        )
-    } catch (_: Exception) { null }
+    private fun parseProgress(el: JsonElement): ProgressMonitoringItem? {
+        return try {
+            val o = el.jsonObject
+            val name = o["name"]?.jsonPrimitive?.contentOrNull ?: return null
+            ProgressMonitoringItem(
+                name       = name,
+                initials   = o["initials"]?.jsonPrimitive?.contentOrNull ?: "",
+                math       = o["math"]?.jsonPrimitive?.contentOrNull ?: "",
+                science    = o["science"]?.jsonPrimitive?.contentOrNull ?: "",
+                literature = o["literature"]?.jsonPrimitive?.contentOrNull ?: "",
+                attendance = o["attendance"]?.jsonPrimitive?.contentOrNull ?: "",
+                status     = o["status"]?.jsonPrimitive?.contentOrNull ?: ""
+            )
+        } catch (_: Exception) { null }
+    }
 }

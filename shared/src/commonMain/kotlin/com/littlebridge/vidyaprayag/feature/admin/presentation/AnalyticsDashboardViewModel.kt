@@ -44,6 +44,7 @@ data class InsightItem(
 
 data class AnalyticsDashboardState(
     val performanceTrend: List<Float> = emptyList(),
+    val trendLabels: List<String> = emptyList(),
     val currentGrowth: String = "0%",
     val cards: List<AnalyticsCardData> = emptyList(),
     val insights: List<InsightItem> = emptyList(),
@@ -78,6 +79,7 @@ class AnalyticsDashboardViewModel(
                     val data = result.data.data
                     _state.value = _state.value.copy(
                         performanceTrend = data?.performanceTrend?.map { it.toFloat() } ?: emptyList(),
+                        trendLabels      = data?.trendLabels ?: emptyList(),
                         currentGrowth    = data?.currentGrowth ?: "0%",
                         cards            = data?.cards?.mapNotNull { parseCard(it) } ?: emptyList(),
                         insights         = data?.insights?.mapNotNull { parseInsight(it) } ?: emptyList(),

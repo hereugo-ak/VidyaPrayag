@@ -23,6 +23,7 @@ import kotlinx.serialization.json.JsonElement
 @Serializable
 data class AnalyticsOverviewResponse(
     @SerialName("performance_trend") val performanceTrend: List<Double> = emptyList(),
+    @SerialName("trend_labels") val trendLabels: List<String> = emptyList(),
     @SerialName("current_growth") val currentGrowth: String = "0%",
     val cards: List<JsonElement> = emptyList(),
     val insights: List<JsonElement> = emptyList()

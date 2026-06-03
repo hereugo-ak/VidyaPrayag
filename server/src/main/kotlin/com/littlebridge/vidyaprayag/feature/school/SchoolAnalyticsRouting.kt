@@ -33,11 +33,11 @@ package com.littlebridge.vidyaprayag.feature.school
 
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
-import com.littlebridge.vidyaprayag.core.principalUserId
+import com.littlebridge.vidyaprayag.core.requireSchoolContext
 import com.littlebridge.vidyaprayag.db.AppConfigTable
-import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.AttendanceRecordsTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
+import com.littlebridge.vidyaprayag.db.ExamResultsTable
 import com.littlebridge.vidyaprayag.db.FacultyTable
 import com.littlebridge.vidyaprayag.db.StudentsTable
 import io.ktor.http.*
@@ -71,6 +71,7 @@ import java.util.UUID
 @Serializable
 data class AnalyticsOverviewResponse(
     @SerialName("performance_trend") val performanceTrend: List<Double>,
+    @SerialName("trend_labels") val trendLabels: List<String> = emptyList(),
     @SerialName("current_growth") val currentGrowth: String,
     val cards: List<JsonElement>,
     val insights: List<JsonElement>
@@ -133,13 +134,6 @@ private fun cmsArray(key: String): JsonArray {
     }.getOrElse { JsonArray(emptyList()) }
 }
 
-/** Resolve the school the authenticated admin belongs to.  Returns null if absent. */
-private fun resolveSchoolId(uid: UUID): UUID? = AppUsersTable
-    .selectAll()
-    .where { AppUsersTable.id eq uid }
-    .singleOrNull()
-    ?.get(AppUsersTable.schoolId)
-
 /** Compute avg attendance % across the last `days` for the given school. */
 private fun avgAttendancePct(schoolId: UUID, days: Int = 7): Int? {
     val rows = AttendanceRecordsTable.selectAll()
@@ -157,6 +151,158 @@ private fun avgAttendancePct(schoolId: UUID, days: Int = 7): Int? {
     return (present * 100) / pool.size
 }
 
+/**
+ * Real performance trend: the monthly student-attendance present-rate
+ * (0.0..1.0) for the last [months] calendar months, oldest-first. The UI
+ * renders these as bar heights, so a 0..1 fraction is exactly what it needs.
+ *
+ * Returns a Pair of (trend, monthLabels) so the screen can render real x-axis
+ * labels instead of hardcoded "Jan..Jun". Months with no records contribute
+ * 0.0 (an honest "no data" bar) rather than a fabricated value.
+ */
+private fun monthlyAttendanceTrend(
+    schoolId: UUID,
+    months: Int = 6
+): Pair<List<Double>, List<String>> {
+    val rows = AttendanceRecordsTable.selectAll()
+        .where {
+            (AttendanceRecordsTable.schoolId eq schoolId) and
+                (AttendanceRecordsTable.type eq "student")
+        }
+        .toList()
+
+    val monthNames = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+    val today = LocalDate.now()
+    // Build the ordered list of (year, month) buckets, oldest-first.
+    val buckets = (months - 1 downTo 0).map { back ->
+        val d = today.minusMonths(back.toLong())
+        d.year to d.monthValue
+    }
+
+    // Group attendance rows by (year, month).
+    val byMonth = rows.groupBy {
+        runCatching {
+            val d = LocalDate.parse(it[AttendanceRecordsTable.date])
+            d.year to d.monthValue
+        }.getOrNull()
+    }
+
+    val trend = ArrayList<Double>(months)
+    val labels = ArrayList<String>(months)
+    for ((y, m) in buckets) {
+        labels.add(monthNames[m - 1])
+        val pool = byMonth[y to m].orEmpty()
+        if (pool.isEmpty()) {
+            trend.add(0.0)
+        } else {
+            val present = pool.count { it[AttendanceRecordsTable.status].equals("PRESENT", true) }
+            trend.add((present.toDouble() / pool.size).let { kotlin.math.round(it * 1000) / 1000.0 })
+        }
+    }
+    return trend to labels
+}
+
+/**
+ * Parse a score string like "98", "85.5", or "A+" into a 0..100 numeric value.
+ * Letter grades are mapped to representative midpoints; non-numeric / "Pending"
+ * scores return null and are excluded from averages.
+ */
+private fun parseScore(raw: String?): Double? {
+    if (raw.isNullOrBlank()) return null
+    val s = raw.trim()
+    s.toDoubleOrNull()?.let { return it.coerceIn(0.0, 100.0) }
+    return when (s.uppercase()) {
+        "A+" -> 95.0
+        "A"  -> 88.0
+        "B+" -> 82.0
+        "B"  -> 75.0
+        "C+" -> 68.0
+        "C"  -> 60.0
+        "D"  -> 50.0
+        "E", "F" -> 35.0
+        else -> null
+    }
+}
+
+/**
+ * Real cohort comparison: the average exam score per class for the given school,
+ * normalised to a 0.0..1.0 fraction (bar height). Returns (values, labels) with
+ * classes ordered by their natural class-name ordering, capped to the top 6 so
+ * the chart stays readable.
+ */
+private fun cohortComparison(schoolId: UUID): Pair<List<Double>, List<String>> {
+    val rows = ExamResultsTable.selectAll()
+        .where { ExamResultsTable.schoolId eq schoolId }
+        .toList()
+    if (rows.isEmpty()) return emptyList<Double>() to emptyList()
+
+    val byClass = rows.groupBy { it[ExamResultsTable.className] }
+    val averages = byClass.mapNotNull { (className, recs) ->
+        val scores = recs.mapNotNull { parseScore(it[ExamResultsTable.score]) }
+        if (scores.isEmpty()) null
+        else className to (scores.average())
+    }
+    if (averages.isEmpty()) return emptyList<Double>() to emptyList()
+
+    // Stable, human-friendly ordering by class name; cap at 6 columns.
+    val ordered = averages.sortedBy { it.first }.take(6)
+    val values = ordered.map { kotlin.math.round(it.second / 100.0 * 1000) / 1000.0 }
+    val labels = ordered.map { it.first }
+    return values to labels
+}
+
+/**
+ * Real daily attendance volatility: the student present-rate (0.0..1.0) for each
+ * of the last [days] calendar days, oldest-first. Days with no records contribute
+ * 0.0. The UI highlights the lowest bar (biggest drop) as the anomaly.
+ */
+private fun dailyVolatility(schoolId: UUID, days: Int = 14): List<Double> {
+    val rows = AttendanceRecordsTable.selectAll()
+        .where {
+            (AttendanceRecordsTable.schoolId eq schoolId) and
+                (AttendanceRecordsTable.type eq "student")
+        }
+        .toList()
+    if (rows.isEmpty()) return emptyList()
+
+    val today = LocalDate.now()
+    val byDate = rows.groupBy { it[AttendanceRecordsTable.date] }
+    val series = ArrayList<Double>(days)
+    for (back in (days - 1) downTo 0) {
+        val key = today.minusDays(back.toLong()).toString()
+        val pool = byDate[key].orEmpty()
+        if (pool.isEmpty()) {
+            series.add(0.0)
+        } else {
+            val present = pool.count { it[AttendanceRecordsTable.status].equals("PRESENT", true) }
+            series.add(kotlin.math.round(present.toDouble() / pool.size * 1000) / 1000.0)
+        }
+    }
+    return series
+}
+
+/**
+ * Real per-subject coverage proxy: average exam score per subject for the school,
+ * as an integer percentage. Returns a list of (subjectName, percentage) ordered
+ * by subject name. The syllabus screen renders these as the intelligence graph
+ * bars + labels and the progress rings.
+ */
+private fun subjectCoverage(schoolId: UUID): List<Pair<String, Int>> {
+    val rows = ExamResultsTable.selectAll()
+        .where { ExamResultsTable.schoolId eq schoolId }
+        .toList()
+    if (rows.isEmpty()) return emptyList()
+
+    val bySubject = rows.groupBy { it[ExamResultsTable.subject] }
+    return bySubject.mapNotNull { (subject, recs) ->
+        val scores = recs.mapNotNull { parseScore(it[ExamResultsTable.score]) }
+        if (scores.isEmpty()) null
+        else subject to scores.average().toInt().coerceIn(0, 100)
+    }.sortedBy { it.first }
+}
+
 /** Stamp an existing CMS-driven `cards` array with the live attendance value. */
 private fun patchAttendanceCard(template: JsonArray, livePct: Int?): List<JsonElement> {
     if (livePct == null) return template.toList()
@@ -170,31 +316,53 @@ private fun patchAttendanceCard(template: JsonArray, livePct: Int?): List<JsonEl
     }
 }
 
-/** Top-3 active faculty become "star_faculty"; CMS supplies score & image fallback. */
+/**
+ * Real "star faculty": rank active faculty by their own attendance reliability
+ * (PRESENT rate over the last 30 days), highest first, top 3. This is a genuine
+ * server-side ranking rather than an arbitrary first-3 selection.
+ */
 private fun topStarFaculty(schoolId: UUID): JsonArray {
-    val rows = FacultyTable.selectAll()
+    val faculty = FacultyTable.selectAll()
         .where { (FacultyTable.schoolId eq schoolId) and (FacultyTable.isActive eq true) }
-        .limit(3)
         .toList()
-    if (rows.isEmpty()) return JsonArray(emptyList())
-    val starScores = listOf(99.8, 98.5, 96.1)
+    if (faculty.isEmpty()) return JsonArray(emptyList())
+
+    val cutoff = LocalDate.now().minusDays(30)
+    val facultyAttendance = AttendanceRecordsTable.selectAll()
+        .where {
+            (AttendanceRecordsTable.schoolId eq schoolId) and
+                (AttendanceRecordsTable.type eq "faculty")
+        }
+        .toList()
+        .filter {
+            runCatching { LocalDate.parse(it[AttendanceRecordsTable.date]).isAfter(cutoff) }
+                .getOrDefault(false)
+        }
+        .groupBy { it[AttendanceRecordsTable.personId] }
+
+    // score = present-rate*100 (falls back to a neutral 90 when no records).
+    data class Ranked(val name: String, val dept: String, val pic: String?, val score: Double)
+    val ranked = faculty.map { r ->
+        val ext = r[FacultyTable.externalId]
+        val recs = facultyAttendance[ext].orEmpty()
+        val score = if (recs.isEmpty()) 90.0
+            else recs.count { it[AttendanceRecordsTable.status].equals("PRESENT", true) } * 100.0 / recs.size
+        Ranked(
+            name = r[FacultyTable.name],
+            dept = r[FacultyTable.department] ?: "",
+            pic = r[FacultyTable.profilePic],
+            score = score
+        )
+    }.sortedByDescending { it.score }.take(3)
+
     return buildJsonArray {
-        rows.forEachIndexed { idx, r ->
+        ranked.forEachIndexed { idx, rk ->
             add(buildJsonObject {
                 put("rank", idx + 1)
-                put("name", r[FacultyTable.name])
-                put("department", r[FacultyTable.department] ?: "")
-                put("score", starScores.getOrElse(idx) { 95.0 })
-                // r[FacultyTable.profilePic] is String? — we must lift it
-                // into a JsonElement explicitly. Mixing a raw String with
-                // JsonNull via `?:` upcasts to `Any`, which the
-                // kotlinx.serialization `put(String, JsonElement?)` overload
-                // does not accept (caused "Argument type mismatch: actual
-                // type is 'Any', but 'JsonElement' was expected").
-                put(
-                    "image_url",
-                    r[FacultyTable.profilePic]?.let { JsonPrimitive(it) } ?: JsonNull
-                )
+                put("name", rk.name)
+                put("department", rk.dept)
+                put("score", (kotlin.math.round(rk.score * 10) / 10.0))
+                put("image_url", rk.pic?.let { JsonPrimitive(it) } ?: JsonNull)
             })
         }
     }
@@ -208,33 +376,54 @@ fun Route.schoolAnalyticsRouting() {
             // GET /overview
             // ------------------------------------------------------------
             // Composition:
-            //   performance_trend  — CMS `school_analytics_overview.performance_trend`
-            //   current_growth     — CMS `school_analytics_overview.current_growth`
+            //   performance_trend  — REAL: monthly student-attendance present
+            //                        rate for the last 6 months (from
+            //                        `attendance_records`). Falls back to CMS
+            //                        `school_analytics_overview.performance_trend`
+            //                        only when there is no live attendance data.
+            //   trend_labels       — REAL: month labels matching the trend.
+            //   current_growth     — REAL: last month vs previous month delta
+            //                        (signed %). Falls back to CMS when no data.
             //   cards              — CMS `school_analytics_cards_template` template;
-            //                        card[0].value patched with live avg attendance
-            //                        (from `attendance_records`).
+            //                        card[0].value patched with live avg attendance.
             //   insights           — CMS `school_analytics_insights`
             // ============================================================
             get("/overview") {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
 
                 val payload = dbQuery {
-                    val schoolId = resolveSchoolId(uid)
                     val overview = cmsObject("school_analytics_overview")
-                    val trend = (overview["performance_trend"] as? JsonArray)
+                    val cmsTrend = (overview["performance_trend"] as? JsonArray)
                         ?.mapNotNull { runCatching { it.jsonPrimitive.content.toDouble() }.getOrNull() }
                         ?: emptyList()
-                    val growth = (overview["current_growth"] as? JsonPrimitive)?.content ?: "0%"
+                    val cmsGrowth = (overview["current_growth"] as? JsonPrimitive)?.content ?: "0%"
+
+                    // --- REAL trend computed from attendance_records ---
+                    val (liveTrend, liveLabels) = monthlyAttendanceTrend(schoolId, months = 6)
+                    val hasLiveData = liveTrend.any { it > 0.0 }
+
+                    val trend = if (hasLiveData) liveTrend else cmsTrend
+                    val labels = if (hasLiveData) liveLabels else emptyList()
+
+                    // --- REAL growth: last month vs previous month ---
+                    val growth = if (hasLiveData && liveTrend.size >= 2) {
+                        val last = liveTrend[liveTrend.size - 1]
+                        val prev = liveTrend[liveTrend.size - 2]
+                        val deltaPts = (last - prev) * 100.0
+                        val sign = if (deltaPts >= 0) "+" else ""
+                        "$sign${(kotlin.math.round(deltaPts * 10) / 10.0)}%"
+                    } else cmsGrowth
 
                     val cardsTpl = cmsArray("school_analytics_cards_template")
-                    val livePct = schoolId?.let { avgAttendancePct(it) }
+                    val livePct = avgAttendancePct(schoolId)
                     val cards = patchAttendanceCard(cardsTpl, livePct)
 
                     val insights = cmsArray("school_analytics_insights").toList()
 
                     AnalyticsOverviewResponse(
                         performanceTrend = trend,
+                        trendLabels = labels,
                         currentGrowth = growth,
                         cards = cards,
                         insights = insights
@@ -253,28 +442,29 @@ fun Route.schoolAnalyticsRouting() {
             // ops can add keys without us shipping a backend change.
             // ============================================================
             get("/class-performance") {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
                 val classFilter = call.request.queryParameters["class"]
 
                 val payload: JsonObject = dbQuery {
-                    val schoolId = resolveSchoolId(uid)
                     val blob = cmsObject("school_class_performance").toMutableMap()
 
-                    val liveActive: Int? = schoolId?.let { sid ->
-                        var q = StudentsTable.selectAll()
-                            .where { (StudentsTable.schoolId eq sid) and (StudentsTable.isActive eq true) }
-                        if (!classFilter.isNullOrBlank()) {
-                            q = StudentsTable.selectAll().where {
-                                (StudentsTable.schoolId eq sid) and
+                    val liveActive: Int = run {
+                        val q = if (!classFilter.isNullOrBlank()) {
+                            StudentsTable.selectAll().where {
+                                (StudentsTable.schoolId eq schoolId) and
                                     (StudentsTable.isActive eq true) and
                                     (StudentsTable.className eq classFilter)
+                            }
+                        } else {
+                            StudentsTable.selectAll().where {
+                                (StudentsTable.schoolId eq schoolId) and (StudentsTable.isActive eq true)
                             }
                         }
                         q.count().toInt()
                     }
 
-                    if (liveActive != null && liveActive > 0) {
+                    if (liveActive > 0) {
                         val summary = (blob["summary"] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
                         summary["active_students"] = JsonPrimitive(liveActive)
                         blob["summary"] = JsonObject(summary)
@@ -291,13 +481,12 @@ fun Route.schoolAnalyticsRouting() {
             // a "star_faculty" array computed from the live `faculty` table.
             // ============================================================
             get("/teacher-performance") {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
 
                 val payload: JsonObject = dbQuery {
-                    val schoolId = resolveSchoolId(uid)
                     val blob = cmsObject("school_teacher_performance").toMutableMap()
-                    val stars = schoolId?.let { topStarFaculty(it) } ?: JsonArray(emptyList())
+                    val stars = topStarFaculty(schoolId)
                     if (stars.isNotEmpty()) {
                         blob["star_faculty"] = stars
                     } else if (blob["star_faculty"] == null) {
@@ -319,22 +508,26 @@ fun Route.schoolAnalyticsRouting() {
             // are CMS-templated and `narrative` is CMS-stringified.
             // ============================================================
             get("/student/{studentId}") {
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
                 val rawId = call.parameters["studentId"]
                     ?: run { call.fail("studentId required"); return@get }
 
                 val payload = dbQuery {
-                    // Resolve as UUID first, fall back to student_code.
+                    // CRITICAL: scope the lookup to the caller's school so a known
+                    // id/code from ANOTHER school cannot be read (cross-school leak).
                     val byUuid = runCatching { UUID.fromString(rawId) }.getOrNull()?.let { id ->
-                        StudentsTable.selectAll().where { StudentsTable.id eq id }.singleOrNull()
+                        StudentsTable.selectAll()
+                            .where { (StudentsTable.id eq id) and (StudentsTable.schoolId eq schoolId) }
+                            .singleOrNull()
                     }
                     val row = byUuid ?: StudentsTable.selectAll()
-                        .where { StudentsTable.studentCode eq rawId }
+                        .where { (StudentsTable.studentCode eq rawId) and (StudentsTable.schoolId eq schoolId) }
                         .singleOrNull()
 
                     if (row == null) return@dbQuery null
 
                     val studentUuid = row[StudentsTable.id].value
-                    val schoolId = row[StudentsTable.schoolId]
 
                     // -- live attendance% over last 30 days --
                     val attendanceRows = AttendanceRecordsTable.selectAll()
@@ -361,6 +554,34 @@ fun Route.schoolAnalyticsRouting() {
 
                     val attendanceStr = if (livePct != null) "${livePct}%" else cmsAttendance
 
+                    // --- REAL average + class rank from exam_results ---
+                    val studentCode = row[StudentsTable.studentCode]
+                    val className = row[StudentsTable.className]
+                    // All exam rows for this student's class, grouped by student code.
+                    val classExamRows = ExamResultsTable.selectAll()
+                        .where {
+                            (ExamResultsTable.schoolId eq schoolId) and
+                                (ExamResultsTable.className eq className)
+                        }
+                        .toList()
+                    val avgByStudent: Map<String, Double> = classExamRows
+                        .groupBy { it[ExamResultsTable.studentId] }
+                        .mapValues { (_, recs) ->
+                            val scores = recs.mapNotNull { parseScore(it[ExamResultsTable.score]) }
+                            if (scores.isEmpty()) 0.0 else scores.average()
+                        }
+                        .filterValues { it > 0.0 }
+
+                    val liveAverage: Double? = avgByStudent[studentCode]
+                    // Rank = 1 + number of classmates strictly above this student.
+                    val liveRank: Int? = liveAverage?.let { mine ->
+                        1 + avgByStudent.values.count { it > mine }
+                    }
+
+                    val averageStr = if (liveAverage != null)
+                        "${kotlin.math.round(liveAverage).toInt()}%" else cmsAverage
+                    val rankInt = liveRank ?: cmsRank
+
                     val subjects = (tpl["subjects"] as? JsonArray)?.toList() ?: emptyList()
                     val milestones = (tpl["milestones"] as? JsonArray)?.toList() ?: emptyList()
 
@@ -379,8 +600,8 @@ fun Route.schoolAnalyticsRouting() {
                         ),
                         kpi = StudentAnalyticsKpi(
                             attendance = attendanceStr,
-                            average = cmsAverage,
-                            rank = cmsRank
+                            average = averageStr,
+                            rank = rankInt
                         ),
                         subjects = subjects,
                         milestones = milestones,
@@ -398,10 +619,37 @@ fun Route.schoolAnalyticsRouting() {
             // Pure CMS — returns `school_syllabus_coverage` verbatim.
             // ============================================================
             get("/syllabus-coverage") {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
 
-                val payload = dbQuery { cmsObject("school_syllabus_coverage") }
+                val payload = dbQuery {
+                    val blob = cmsObject("school_syllabus_coverage").toMutableMap()
+
+                    // --- REAL per-subject coverage from exam_results ---
+                    val coverage = subjectCoverage(schoolId)
+                    if (coverage.isNotEmpty()) {
+                        // Rebuild by_subject from live data; keep behind_by_days at 0
+                        // (we don't yet track a curriculum schedule server-side).
+                        blob["by_subject"] = buildJsonArray {
+                            coverage.forEach { (subject, pct) ->
+                                add(buildJsonObject {
+                                    put("name", subject)
+                                    put("percentage", pct)
+                                    put("behind_by_days", 0)
+                                    put("trend", if (pct >= 75) "On Target" else "Needs Attention")
+                                })
+                            }
+                        }
+                        // Overall = mean of subject coverages.
+                        val overallPct = coverage.map { it.second }.average().toInt().coerceIn(0, 100)
+                        blob["overall"] = buildJsonObject {
+                            put("percentage", overallPct)
+                            put("trend", (blob["overall"] as? JsonObject)
+                                ?.get("trend")?.jsonPrimitive?.content ?: "")
+                        }
+                    }
+                    JsonObject(blob)
+                }
                 call.ok(payload, message = "Syllabus coverage fetched successfully")
             }
 
@@ -420,21 +668,18 @@ fun Route.schoolAnalyticsRouting() {
             //   - All other fields come verbatim from CMS so ops can iterate.
             // ============================================================
             get("/student-cohort") {
-                val uid = call.principalUserId()?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
 
                 val payload: JsonObject = dbQuery {
-                    val schoolId = resolveSchoolId(uid)
                     val blob = cmsObject("school_student_analytics_cohort").toMutableMap()
 
-                    val liveActive: Int? = schoolId?.let { sid ->
-                        StudentsTable.selectAll()
-                            .where { (StudentsTable.schoolId eq sid) and (StudentsTable.isActive eq true) }
-                            .count()
-                            .toInt()
-                    }
+                    val liveActive: Int = StudentsTable.selectAll()
+                        .where { (StudentsTable.schoolId eq schoolId) and (StudentsTable.isActive eq true) }
+                        .count()
+                        .toInt()
 
-                    if (liveActive != null && liveActive > 0) {
+                    if (liveActive > 0) {
                         val risk = (blob["risk"] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
                         val critical = (risk["critical_count"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
                         val medium   = (risk["medium_count"]   as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
@@ -443,6 +688,26 @@ fun Route.schoolAnalyticsRouting() {
                         risk["low_count"] = JsonPrimitive(low)
                         blob["risk"] = JsonObject(risk)
                     }
+
+                    // --- REAL daily volatility from attendance_records (last 14 days) ---
+                    val volatility = dailyVolatility(schoolId, days = 14)
+                    if (volatility.any { it > 0.0 }) {
+                        blob["daily_volatility"] = buildJsonArray {
+                            volatility.forEach { add(JsonPrimitive(it)) }
+                        }
+                    }
+
+                    // --- REAL cohort comparison: avg exam score per class ---
+                    val (cohortValues, cohortLabels) = cohortComparison(schoolId)
+                    if (cohortValues.isNotEmpty()) {
+                        blob["cohort_comparison"] = buildJsonArray {
+                            cohortValues.forEach { add(JsonPrimitive(it)) }
+                        }
+                        blob["cohort_labels"] = buildJsonArray {
+                            cohortLabels.forEach { add(JsonPrimitive(it)) }
+                        }
+                    }
+
                     JsonObject(blob)
                 }
                 call.ok(payload, message = "Student cohort analytics fetched successfully")

@@ -19,9 +19,8 @@ import com.littlebridge.vidyaprayag.core.created
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.okMessage
-import com.littlebridge.vidyaprayag.core.principalUserId
+import com.littlebridge.vidyaprayag.core.requireSchoolContext
 import com.littlebridge.vidyaprayag.db.AdmissionEnquiriesTable
-import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import io.ktor.http.*
 import io.ktor.server.auth.*
@@ -31,6 +30,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
@@ -89,11 +89,6 @@ data class CreateEnquiryDto(
 @Serializable
 data class UpdateStatusDto(val status: String)
 
-private suspend fun resolveSchoolId(uid: UUID): UUID? = dbQuery {
-    AppUsersTable.selectAll().where { AppUsersTable.id eq uid }
-        .singleOrNull()?.get(AppUsersTable.schoolId)
-}
-
 private fun org.jetbrains.exposed.sql.ResultRow.toEnquiryDto() = EnquiryDto(
     id = this[AdmissionEnquiriesTable.id].value.toString(),
     studentName = this[AdmissionEnquiriesTable.studentName],
@@ -110,12 +105,8 @@ fun Route.admissionRouting() {
 
             // -------- summary --------
             get("/summary") {
-                val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
-                    call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
-                }
-                val schoolId = resolveSchoolId(uid) ?: run {
-                    call.fail("User not associated with any school", HttpStatusCode.NotFound); return@get
-                }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
                 val data = dbQuery {
                     val rows = AdmissionEnquiriesTable.selectAll()
                         .where { AdmissionEnquiriesTable.schoolId eq schoolId }
@@ -140,12 +131,8 @@ fun Route.admissionRouting() {
 
             // -------- list (paginated) --------
             get {
-                val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
-                    call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
-                }
-                val schoolId = resolveSchoolId(uid) ?: run {
-                    call.fail("User not associated with any school", HttpStatusCode.NotFound); return@get
-                }
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
                 val page  = (call.request.queryParameters["page"]?.toIntOrNull() ?: 1).coerceAtLeast(1)
                 val limit = (call.request.queryParameters["limit"]?.toIntOrNull() ?: 20).coerceIn(1, 100)
                 val offset = ((page - 1) * limit).toLong()
@@ -167,12 +154,13 @@ fun Route.admissionRouting() {
 
             // -------- create --------
             post {
-                val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
-                    call.fail("Invalid token", HttpStatusCode.Unauthorized); return@post
-                }
+                val ctx = call.requireSchoolContext() ?: return@post
                 val req = call.receive<CreateEnquiryDto>()
-                val schoolId = req.schoolId?.let { UUID.fromString(it) } ?: resolveSchoolId(uid)
-                    ?: run { call.fail("school_id required"); return@post }
+                // Always bind the enquiry to the caller's own school. A body-
+                // supplied school_id is ignored so a school can't write into
+                // another school's pipeline.
+                val schoolId = ctx.schoolId
+                val uid = ctx.userId
                 val now = Instant.now()
                 val newId = UUID.randomUUID()
                 dbQuery {
@@ -208,14 +196,20 @@ fun Route.admissionRouting() {
 
             // -------- patch status --------
             patch("/{id}/status") {
+                val ctx = call.requireSchoolContext() ?: return@patch
                 val id = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                     ?: run { call.fail("Invalid id"); return@patch }
                 val req = call.receive<UpdateStatusDto>()
                 if (req.status !in setOf("new", "followup", "converted", "rejected")) {
                     call.fail("Invalid status. Allowed: new|followup|converted|rejected"); return@patch
                 }
+                // Ownership enforced in the WHERE clause: the row must belong to
+                // the caller's school. A foreign id matches 0 rows -> 404.
                 val n = dbQuery {
-                    AdmissionEnquiriesTable.update({ AdmissionEnquiriesTable.id eq id }) {
+                    AdmissionEnquiriesTable.update({
+                        (AdmissionEnquiriesTable.id eq id) and
+                            (AdmissionEnquiriesTable.schoolId eq ctx.schoolId)
+                    }) {
                         it[status] = req.status
                         it[updatedAt] = Instant.now()
                         if (req.status == "converted") it[convertedAt] = Instant.now()

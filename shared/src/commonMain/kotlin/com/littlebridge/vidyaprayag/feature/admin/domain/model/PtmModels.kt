@@ -55,5 +55,29 @@ data class PtmResponse(
 data class CreatePtmRequest(
     val title: String,
     val date: String,  // YYYY-MM-DD
-    val slot: String
+    val slot: String,
+    @SerialName("expected_parents") val expectedParents: Int = 0
+)
+
+/**
+ * PATCH /api/v1/school/ptm/{id}/metrics
+ * Only non-null fields are written server-side (partial update).
+ */
+@Serializable
+data class UpdatePtmMetricsRequest(
+    @SerialName("checked_in_parents") val checkedInParents: Int? = null,
+    @SerialName("invites_delivered") val invitesDelivered: Int? = null,
+    @SerialName("read_receipts") val readReceipts: Int? = null
+)
+
+/**
+ * PUT /api/v1/school/ptm/{id}/class-progress
+ * Upserts one class's met/total rollup for the event.
+ */
+@Serializable
+data class UpsertClassProgressRequest(
+    @SerialName("class_name") val className: String,
+    @SerialName("teacher_name") val teacherName: String = "",
+    @SerialName("met_count") val metCount: Int,
+    @SerialName("total_count") val totalCount: Int
 )

@@ -121,7 +121,17 @@ class InstitutionalBasicOBViewModel(
                 }
                 is NetworkResult.Error -> {
                     AppLogger.e("OnboardingBasic", "Submit failed: ${result.message} (code=${result.code})")
-                    _errorMessage.value = result.message
+                    // A 401 here means the saved token was rejected by the server
+                    // (expired, or the app is pointing at a different backend than
+                    // the one that issued it). Make the cause explicit instead of
+                    // showing the raw server "Session expired" string.
+                    _errorMessage.value = if (result.code == 401) {
+                        "Your session was rejected by the server. Please log out and " +
+                            "sign in again. (If you're testing against your laptop, " +
+                            "confirm the app is pointing at the same backend.)"
+                    } else {
+                        result.message
+                    }
                     _isSubmitting.value = false
                 }
                 is NetworkResult.ConnectionError -> {

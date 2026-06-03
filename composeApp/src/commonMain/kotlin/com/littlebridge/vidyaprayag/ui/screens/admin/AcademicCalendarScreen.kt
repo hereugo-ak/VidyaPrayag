@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.CalendarEventDto
 import com.littlebridge.vidyaprayag.feature.admin.presentation.AcademicCalendarViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SyllabusTarget
 import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
@@ -78,6 +79,8 @@ fun AcademicCalendarScreen() {
             item {
                 MainCalendarCard(
                     month = state.currentMonth.ifBlank { "This Month" },
+                    anchorDate = state.currentDate,
+                    events = state.calendarEvents,
                     isLoading = state.isLoading,
                     onPrev = { viewModel.goToPreviousMonth() },
                     onNext = { viewModel.goToNextMonth() }
@@ -202,6 +205,8 @@ private fun CalendarBanner(message: String, isError: Boolean, onDismiss: () -> U
 @Composable
 private fun MainCalendarCard(
     month: String,
+    anchorDate: String,
+    events: List<CalendarEventDto>,
     isLoading: Boolean,
     onPrev: () -> Unit,
     onNext: () -> Unit
@@ -249,7 +254,10 @@ private fun MainCalendarCard(
                 }
             }
 
-            // Grid mockup
+            // Real month grid, computed from the visible anchor month and
+            // overlaid with the real events returned by the API. No mock data.
+            val grid = remember(anchorDate, events) { buildMonthGrid(anchorDate, events) }
+
             Column(verticalArrangement = Arrangement.spacedBy(1.dp), modifier = Modifier.background(MaterialTheme.colorScheme.outlineVariant).border(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
                 // Header
                 Row(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))) {
@@ -264,38 +272,137 @@ private fun MainCalendarCard(
                         )
                     }
                 }
-                // Mock Week
-                Row(modifier = Modifier.fillMaxWidth().background(Color.White)) {
-                    repeat(7) { col ->
-                        val day = (col + 9) // Just a mock start
-                        val isSpecial = day == 15
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(80.dp)
-                                .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
-                                .background(if (isSpecial) MaterialTheme.colorScheme.secondary.copy(alpha = 0.05f) else Color.White)
-                                .padding(4.dp)
-                        ) {
-                            Text(day.toString(), style = MaterialTheme.typography.labelMedium, fontWeight = if (isSpecial) FontWeight.Bold else FontWeight.Normal)
-                            if (isSpecial) {
-                                Surface(
-                                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp),
-                                    color = MaterialTheme.colorScheme.secondaryContainer,
-                                    shape = RoundedCornerShape(4.dp)
-                                ) {
-                                    Text(
-                                        "UNIT 1 DEADLINE",
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                                        fontSize = 8.sp,
-                                        lineHeight = 10.sp,
-                                        fontWeight = FontWeight.Black,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                                    )
-                                }
+                if (grid.isEmpty()) {
+                    // No anchor date resolved yet — keep the header but show a
+                    // neutral empty row instead of fabricated days.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(80.dp)
+                            .background(Color.White),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            if (isLoading) "Loading…" else "No calendar data",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                } else {
+                    grid.forEach { week ->
+                        Row(modifier = Modifier.fillMaxWidth().background(Color.White)) {
+                            week.forEach { cell ->
+                                CalendarDayCell(cell = cell, modifier = Modifier.weight(1f))
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * One cell in the month grid. `dayOfMonth == 0` means the cell belongs to the
+ * leading/trailing padding (outside the visible month) and is rendered blank.
+ */
+private data class CalendarCell(
+    val dayOfMonth: Int,
+    val eventTitle: String? = null
+)
+
+/**
+ * Builds a 7-column month grid for the month anchored by [anchorIso]
+ * (YYYY-MM-DD). Each day that has a matching event in [events] gets its
+ * title attached so the cell can render a real marker. Returns an empty list
+ * when [anchorIso] cannot be parsed (no fabricated fallback).
+ */
+private fun buildMonthGrid(
+    anchorIso: String,
+    events: List<CalendarEventDto>
+): List<List<CalendarCell>> {
+    val parts = anchorIso.split("-")
+    if (parts.size < 3) return emptyList()
+    val year = parts[0].toIntOrNull() ?: return emptyList()
+    val month = parts[1].toIntOrNull() ?: return emptyList()
+    if (month !in 1..12) return emptyList()
+
+    val daysInMonth = daysInMonth(year, month)
+    val firstWeekday = dayOfWeek(year, month, 1) // 0=Sun..6=Sat
+
+    // Map day-of-month -> first event title that falls on it (this month/year).
+    val eventsByDay = HashMap<Int, String>()
+    val prefix = "$year-${month.toString().padStart(2, '0')}-"
+    for (e in events) {
+        if (!e.date.startsWith(prefix)) continue
+        val dom = e.date.split("-").getOrNull(2)?.take(2)?.toIntOrNull() ?: continue
+        if (dom in 1..daysInMonth && !eventsByDay.containsKey(dom)) {
+            eventsByDay[dom] = e.eventTitle
+        }
+    }
+
+    val cells = ArrayList<CalendarCell>()
+    repeat(firstWeekday) { cells.add(CalendarCell(0)) } // leading padding
+    for (d in 1..daysInMonth) cells.add(CalendarCell(d, eventsByDay[d]))
+    while (cells.size % 7 != 0) cells.add(CalendarCell(0)) // trailing padding
+
+    return cells.chunked(7)
+}
+
+/** Days in a given month, accounting for leap years. */
+private fun daysInMonth(year: Int, month: Int): Int = when (month) {
+    1, 3, 5, 7, 8, 10, 12 -> 31
+    4, 6, 9, 11 -> 30
+    2 -> if ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0) 29 else 28
+    else -> 30
+}
+
+/**
+ * Day of week for a date using Zeller-style Sakamoto algorithm.
+ * Returns 0=Sunday .. 6=Saturday (matches the SUN..SAT header order).
+ */
+private fun dayOfWeek(year: Int, month: Int, day: Int): Int {
+    val t = intArrayOf(0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4)
+    var y = year
+    if (month < 3) y -= 1
+    return (y + y / 4 - y / 100 + y / 400 + t[month - 1] + day) % 7
+}
+
+@Composable
+private fun CalendarDayCell(cell: CalendarCell, modifier: Modifier = Modifier) {
+    val hasEvent = cell.eventTitle != null
+    Box(
+        modifier = modifier
+            .height(80.dp)
+            .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+            .background(
+                if (cell.dayOfMonth == 0) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
+                else if (hasEvent) MaterialTheme.colorScheme.secondary.copy(alpha = 0.05f)
+                else Color.White
+            )
+            .padding(4.dp)
+    ) {
+        if (cell.dayOfMonth != 0) {
+            Text(
+                cell.dayOfMonth.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (hasEvent) FontWeight.Bold else FontWeight.Normal
+            )
+            if (hasEvent) {
+                Surface(
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(
+                        cell.eventTitle!!.uppercase(),
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                        fontSize = 8.sp,
+                        lineHeight = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 2,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
                 }
             }
         }
