@@ -220,10 +220,12 @@ private fun SectionTitle(title: String, action: String) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        TextButton(onClick = { }) {
-            Text(action, color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
-            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
-        }
+        Text(
+            action,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Medium,
+            style = MaterialTheme.typography.labelSmall
+        )
     }
 }
 

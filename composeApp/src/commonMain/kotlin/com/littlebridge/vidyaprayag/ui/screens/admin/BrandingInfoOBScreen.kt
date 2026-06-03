@@ -32,6 +32,20 @@ fun BrandingInfoOBScreen() {
     val isSubmitting by viewModel.isSubmitting.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     val navigator = LocalAppNavigator.current
+    var mediaUploadNotice by remember { mutableStateOf<String?>(null) }
+
+    mediaUploadNotice?.let { message ->
+        AlertDialog(
+            onDismissRequest = { mediaUploadNotice = null },
+            confirmButton = {
+                TextButton(onClick = { mediaUploadNotice = null }) {
+                    Text("OK")
+                }
+            },
+            title = { Text("Media upload not connected") },
+            text = { Text(message) }
+        )
+    }
 
     BaseScreen(
         onBackClick = { navigator.goBack() },
@@ -92,7 +106,7 @@ fun BrandingInfoOBScreen() {
                 CoverPhotoSection(
                     imageUrl = state.coverImageUrl,
                     onUploadClick = {
-                        viewModel.updateCoverImage("https://placehold.co/1920x820/0F172A/FFFFFF.png?text=VidyaPrayag+Campus")
+                        mediaUploadNotice = "Campus cover upload needs the backend storage endpoint and Android file picker. No placeholder URL was saved."
                     }
                 )
             }
@@ -101,7 +115,7 @@ fun BrandingInfoOBScreen() {
                 LogoSection(
                     logoUrl = state.logoUrl,
                     onUploadClick = {
-                        viewModel.updateLogo("https://placehold.co/512x512/2563EB/FFFFFF.png?text=VP")
+                        mediaUploadNotice = "School logo upload needs the backend storage endpoint and Android file picker. No placeholder URL was saved."
                     }
                 )
             }
@@ -153,7 +167,7 @@ private fun CoverPhotoSection(imageUrl: String?, onUploadClick: () -> Unit) {
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(48.dp))
-                    Text("Use Campus Cover", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
+                    Text("Connect Upload", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
                 }
             }
         }

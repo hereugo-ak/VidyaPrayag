@@ -106,12 +106,12 @@ private fun FacultyHealthHeader(compliance: String, trend: String) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                AsyncImage(
-                    model = "https://lh3.googleusercontent.com/aida/ADBb0uh6bmjgNB9R7rHkxFN9BAClzfBhfnkjVE0zLcy9Hoj06m6sDsFs2-XAOFwOYPYSudOEj0TwCaZgd6Qs9GjVvbBPIQovFw_xoUPtJ6-iStpw2G33aeFjRb8Pk4ZjqRZMPlfMcrg04-Sr83Dme580oa_3WpNDVDLJUVrCjCBQ_GQHowOqwoeMxEsMW1ogJyPeQ1GCHYU34dL7slNnrZs0o0SyZqAOpkLMwavAIfu-jfZXkhr9Mw0CRzOY7pl6",
-                    contentDescription = null,
-                    modifier = Modifier.size(80.dp),
-                    contentScale = ContentScale.Fit
-                )
+                Box(
+                    modifier = Modifier.size(80.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Groups, contentDescription = null, modifier = Modifier.size(38.dp), tint = MaterialTheme.colorScheme.secondary)
+                }
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Institutional Faculty Health", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Text("Real-time oversight of teacher engagement and accountability metrics.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -348,12 +348,13 @@ private fun PerformanceForecastingCard() {
             }
             
             Button(
-                onClick = { },
+                onClick = { Unit },
+                enabled = false,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Download Forecast", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("Forecast export pending", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
         }
     }

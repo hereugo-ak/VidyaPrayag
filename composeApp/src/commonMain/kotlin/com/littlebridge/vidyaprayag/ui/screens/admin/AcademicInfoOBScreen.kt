@@ -184,13 +184,13 @@ private fun ClassSelectionSection(
             }
         }
         
-        TextButton(
-            onClick = { /* Show more */ },
-            modifier = Modifier.align(Alignment.CenterHorizontally)
-        ) {
-            Text("Show More Classes", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
-            Icon(Icons.Default.ExpandMore, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
-        }
+        Text(
+            text = "Showing ${availableClasses.size} configured classes",
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
@@ -256,22 +256,24 @@ private fun SubjectCard(subject: Subject) {
 
             if (subject.teacherName != null) {
                 OutlinedButton(
-                    onClick = { /* Change */ },
+                    onClick = { Unit },
+                    enabled = false,
                     shape = RoundedCornerShape(8.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                     modifier = Modifier.height(32.dp)
                 ) {
-                    Text("Change", style = MaterialTheme.typography.labelSmall)
+                    Text("Assigned", style = MaterialTheme.typography.labelSmall)
                 }
             } else {
                 Button(
-                    onClick = { /* Assign */ },
+                    onClick = { Unit },
+                    enabled = false,
                     shape = RoundedCornerShape(8.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                     modifier = Modifier.height(32.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Text("Assign", style = MaterialTheme.typography.labelSmall)
+                    Text("Unassigned", style = MaterialTheme.typography.labelSmall)
                 }
             }
         }

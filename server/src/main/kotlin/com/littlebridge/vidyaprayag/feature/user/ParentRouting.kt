@@ -18,7 +18,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.inList
+import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 
 private val lenientJson = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -137,64 +137,6 @@ data class ParentAnnouncementsDataDto(
 fun Route.parentRouting() {
     authenticate("jwt") {
         route("/api/v1/parent") {
-            get("/track-progress") {
-                // Mock data matching the UI requirements
-                val data = TrackProgressDataDto(
-                    childName = "Aarav",
-                    overallProgress = 0.75f,
-                    currentLevel = 4,
-                    journeyDescription = "Developmental milestones on track for Term 2",
-                    badges = listOf(
-                        AchievementBadgeDto("Social Star", "workspace_premium", false, listOf(0xFFB6C7EB, 0xFF006C49)),
-                        AchievementBadgeDto("Book Worm", "auto_stories", false, listOf(0xFFCBDBF5, 0xFF8293B5)),
-                        AchievementBadgeDto("Fast Learner", "rocket_launch", false, listOf(0xFF4EDE93, 0xFF006C49)),
-                        AchievementBadgeDto("Upcoming", "lock", true, listOf(0xFFE5EEFF, 0xFFE5EEFF))
-                    ),
-                    academicCompetencies = listOf(
-                        AcademicCompetencyDto("Literacy", "translate", 0.85f),
-                        AcademicCompetencyDto("Numeracy", "calculate", 0.70f)
-                    ),
-                    emotionalIntelligence = mapOf(
-                        "Empathy" to 0.8f,
-                        "Resilience" to 0.7f,
-                        "Social" to 0.9f,
-                        "Control" to 0.6f,
-                        "Focus" to 0.75f,
-                        "Sharing" to 0.85f
-                    ),
-                    playIndicators = listOf(
-                        PlayIndicatorDto(
-                            "Creative Expression", 
-                            "Uses diverse materials to represent ideas", 
-                            "https://lh3.googleusercontent.com/aida-public/AB6AXuBJ0iy3QHsYrDK9vkmt05wDdmHmpgT8gBlcip2cJxtHhEZh8aRcsRMENEot_fma9PHySR3i7uOBCkzywjgrnyRweoIcsAippP8X0A0wqcgX-r5pfZvIL5UF_FG0Q8N_eb8FdFdPyQ48xEiykqbtT-Uh3PpA4KeOf2vv6fzHKyIidF-Y8ldvErlwE50_WVwRhhK7TMiQuKDOR9LRFN7cqu9v5ygC0nl9_0IMd4GuMkFoiDefldCGJStlfH48L5RIjTUZfLrJ-EITce_3",
-                            true
-                        ),
-                        PlayIndicatorDto(
-                            "Physical Agility", 
-                            "Gross motor coordination milestones met", 
-                            "https://lh3.googleusercontent.com/aida-public/AB6AXuC97aj-fXdWa8AknQylLrGHeKwdSE_wY776abXdGOHdPIyP7yGiA7uw8V8vXdYXudLVG-Sue3-oPaD7YeCkrMA9jLvA3cdnafmRz6kPJvG_QVv4_dfdXDGRVqTHRWTUUWzMrT85G_aJBx6fHQZtEKSfDOmAa0a22EmEhL6IIg4RHLERutQdBs7iO_oYDZ1Wy51bMcNXHZJ3S40pbvg_jqq0dvcBXWMeCetnJLVXn4PysxPN1MpyqE5i5yz6EgvotyPLPGpJ8xKgwtlv",
-                            true
-                        )
-                    )
-                )
-                call.ok(data, message = "Track progress data fetched")
-            }
-
-            get("/fees") {
-                val data = FeeDataDto(
-                    totalCollected = "$428,500",
-                    collectionProgress = 0.85f,
-                    outstandingFees = "$72,120",
-                    overdueCount = 145,
-                    announcements = listOf(
-                        FeeAnnouncementDto("1", "Annual Sports Day Schedule", "2h ago", "Detailed itinerary released.", "94%", "24", "Campaign"),
-                        FeeAnnouncementDto("2", "Weather Alert: Early Closure", "5h ago", "Campus closing at 2:00 PM.", "98%", "812", "Emergency"),
-                        FeeAnnouncementDto("3", "Fee Submission Deadline", "Yesterday", "Final reminder for Q3 fees.", "62%", "3", "Payment")
-                    )
-                )
-                call.ok(data, message = "Fees data fetched")
-            }
-
             get("/scholarships") {
                 val data = ScholarshipsDataDto(
                     scholarships = listOf(
@@ -237,8 +179,12 @@ fun Route.parentRouting() {
                     val rows = if (schoolIds.isEmpty()) {
                         emptyList()
                     } else {
+                        val schoolFilter = schoolIds
+                            .map { schoolId -> AnnouncementsTable.schoolId eq schoolId }
+                            .reduce { acc, op -> acc or op }
+
                         AnnouncementsTable.selectAll()
-                            .where { AnnouncementsTable.schoolId inList schoolIds }
+                            .where { schoolFilter }
                             .orderBy(AnnouncementsTable.createdAt, SortOrder.DESC)
                             .map { row ->
                                 ParentAnnouncementDto(

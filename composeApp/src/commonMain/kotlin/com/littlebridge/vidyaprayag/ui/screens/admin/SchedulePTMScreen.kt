@@ -234,11 +234,12 @@ private fun ActiveEventSection(title: String, date: String, slot: String) {
                 Box(modifier = Modifier.size(10.dp).alpha(alpha).clip(CircleShape).background(MaterialTheme.colorScheme.secondary))
                 Text("Active Event", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
-            TextButton(onClick = { }) {
-                Icon(Icons.Default.Settings, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.secondary)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Manage", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
-            }
+            Text(
+                "Managed from event setup",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium
+            )
         }
 
         VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
@@ -334,14 +335,15 @@ private fun LiveCommunicationCard(invites: Int, receipts: Int) {
             }
 
             Button(
-                onClick = { },
+                onClick = { Unit },
+                enabled = false,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Send Last-Hour Reminder", fontWeight = FontWeight.Bold)
+                Text("Reminder delivery pending", fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -399,8 +401,11 @@ private fun ClassProgressSection(progressList: List<ClassPTMProgress>) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("Live Progress by Class", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            IconButton(onClick = {}, modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))) {
-                Icon(Icons.Default.FilterList, null, modifier = Modifier.size(20.dp))
+            Box(
+                modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.FilterList, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.outline)
             }
         }
 
@@ -411,14 +416,15 @@ private fun ClassProgressSection(progressList: List<ClassPTMProgress>) {
         }
 
         OutlinedButton(
-            onClick = { },
+            onClick = { Unit },
+            enabled = false,
             modifier = Modifier.fillMaxWidth().height(56.dp),
             shape = RoundedCornerShape(16.dp),
             border = BorderStroke(2.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
         ) {
             Icon(Icons.Default.Groups, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.outline)
             Spacer(modifier = Modifier.width(8.dp))
-            Text("View All 42 Classes", color = MaterialTheme.colorScheme.outline, fontWeight = FontWeight.Bold)
+            Text("Class drilldown pending", color = MaterialTheme.colorScheme.outline, fontWeight = FontWeight.Bold)
         }
     }
 }

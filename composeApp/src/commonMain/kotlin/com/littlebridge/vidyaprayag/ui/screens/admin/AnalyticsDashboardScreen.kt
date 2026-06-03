@@ -255,7 +255,8 @@ private fun SectionTitle(title: String) {
 @Composable
 private fun InsightListItem(insight: InsightItem) {
     Surface(
-        onClick = { },
+        onClick = { Unit },
+        enabled = false,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         color = Color.White,
@@ -299,7 +300,8 @@ private fun InsightListItem(insight: InsightItem) {
 @Composable
 private fun DownloadReportButton() {
     Button(
-        onClick = { },
+        onClick = { Unit },
+        enabled = false,
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp),

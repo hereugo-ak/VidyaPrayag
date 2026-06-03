@@ -215,10 +215,12 @@ private fun SectionHeader(title: String) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        TextButton(onClick = { }) {
-            Text("Filter By Dept", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
-            Icon(Icons.Default.ExpandMore, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.secondary)
-        }
+        Text(
+            "Department-wise view",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 

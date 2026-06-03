@@ -27,7 +27,7 @@ data class ParentMessageState(
             "10:45 AM",
             false,
             1,
-            senderImageUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuC4bGKo5RDKEDVsqEANNGgLXgIlytdpqdrdA_0ZgHuCQGXpXdtFHxG3o7NqqVJ2omzhFKSILPKQ7zrevPEfbnZrtnqv9oMjaTvV6zQzlVckP-xwUNiRk1_cW8yHIK9-bnN1fvx4ZMaigbyh5AUwLsYzOfZ7xmkV15fr7Be-5nBa-7DKkZp5w5phY_k9KE40NjIFiULHjjEsVQfz7umnAyrGU_SsRtB7EeCeC8I0D_smfiUfWmSZSstZJ1NCShIzXAzOTFRIqS-JI5YQ"
+            senderImageUrl = null
         ),
         ParentMessageThread(
             "2",

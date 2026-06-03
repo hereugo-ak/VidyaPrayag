@@ -317,8 +317,8 @@ private fun RiskStudentItem(student: RiskStudent) {
                 }
             }
             Spacer(Modifier.width(8.dp))
-            IconButton(onClick = { }) {
-                Icon(Icons.AutoMirrored.Filled.Chat, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
+            Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                Icon(Icons.AutoMirrored.Filled.Chat, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             }
         }
     }

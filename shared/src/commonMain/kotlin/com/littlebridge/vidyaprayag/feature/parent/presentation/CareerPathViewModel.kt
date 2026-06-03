@@ -18,7 +18,7 @@ data class CareerPathState(
     val topMatch: CareerMatch = CareerMatch(
         title = "Aerospace Engineering",
         matchPercentage = 98,
-        imageUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuCRHBDXZqXjScvsWfe04wMOkXm0iLVFISpCreRVHsvmAdATV5-07X8DFkoQA3eq3_LQSVJwxq4Fhe55Iw5jMr74EN4JV3HOx20G2cr-38dGzZCxnzwNyC87XWd8BiFYNn5io4mPYa0xr6-ZQKxIIH_u8ZnAga7QnnlViM5ykSHGmq800q6fR4tIekTK-MTSyKmACFc3S4IP_vCIgYfxcteuqCEaA84-z5YTcEukwMXb77cS_Efnp4kDUJVM7ZU3Hm3OLckYvKZWioiP",
+        imageUrl = "https://picsum.photos/seed/vidyaprayag-career/640/360",
         industryGrowth = "Global Market",
         tags = listOf("STEM Focus", "Innovation", "High Growth")
     )

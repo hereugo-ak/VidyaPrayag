@@ -424,13 +424,13 @@ private fun SearchAndActions(onCompose: () -> Unit = {}) {
             }
         }
         
-        IconButton(
-            onClick = { },
+        Box(
             modifier = Modifier
                 .size(48.dp)
-                .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f), RoundedCornerShape(16.dp)),
+            contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.FilterList, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+            Icon(Icons.Default.FilterList, contentDescription = "Filter coming soon", tint = MaterialTheme.colorScheme.outline)
         }
 
         Button(

@@ -179,19 +179,20 @@ private fun GrowthInsightsCard() {
                 Text("Growth Insights", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
                 Text("Our AI analyzed 42,000 data points to optimize your curriculum timeline.", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
                 Button(
-                    onClick = { },
+                    onClick = { Unit },
+                    enabled = false,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Generate Audit", fontWeight = FontWeight.Bold)
+                    Text("Audit generation pending", fontWeight = FontWeight.Bold)
                 }
             }
-            AsyncImage(
-                model = "https://lh3.googleusercontent.com/aida/ADBb0ug5uSTvAE_12_BQv9mfA3RYnXO7WeFeeM3JBLcOlibkJdUGs26Q8C2oWHF5YR9_n87IIjcPEKsO37q7JFIlxZ48EafBzpxgDZ3s3q5WJDrSnF2RLeA6ouAojYLOIRljQEum_zAnLYsG16W4uFCWT_ASrvVMjX-VgSObU1uWc-OSH_EqmkqtYJ-HQqe_9tDhkqWK_s6Z5CLWv_2b1juizCY5fr_XaXVZOZM4I5S2lSCVnSEEwM32ywDXiQyB",
-                contentDescription = null,
-                modifier = Modifier.size(100.dp),
-                contentScale = ContentScale.Fit
-            )
+            Box(
+                modifier = Modifier.size(100.dp).clip(RoundedCornerShape(24.dp)).background(Color.White.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Insights, contentDescription = null, modifier = Modifier.size(44.dp), tint = Color.White)
+            }
         }
     }
 }
@@ -266,8 +267,8 @@ private fun LaggingPerformanceSection(alerts: List<LaggingAlert>) {
                             Text("${alert.delayPercentage}% Behind Schedule • Instructor: ${alert.instructor}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    IconButton(onClick = { }) {
-                        Icon(Icons.AutoMirrored.Filled.Chat, null, tint = MaterialTheme.colorScheme.outline)
+                    Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                        Icon(Icons.AutoMirrored.Filled.Chat, null, tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                     }
                 }
             }

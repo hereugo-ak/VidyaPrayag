@@ -354,10 +354,12 @@ private fun FeaturedAnnouncementCard(announcement: Announcement) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(announcement.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(16.dp))
-                    TextButton(onClick = { }, contentPadding = PaddingValues(0.dp)) {
-                        Text("Read detailed schedule", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
-                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
-                    }
+                    Text(
+                        "Full schedule details are shown in this announcement.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
             if (announcement.imageUrl != null) {
@@ -439,23 +441,30 @@ private fun AnnouncementCard(announcement: Announcement) {
                                 shape = CircleShape,
                                 border = BorderStroke(2.dp, MaterialTheme.colorScheme.primaryContainer)
                             ) {
-                                AsyncImage(
-                                    model = "https://lh3.googleusercontent.com/aida-public/AB6AXuAPyD-N0QL-3lo77FwVM1B_6s2MHKtvg_v6sMqcU0_9oU3oNjr1iaTIwMjPyPwfpi-pI9XubjK8ZsKinKVCQ5Sy2JNbDU_p4kxIjIx7uAVpPEhcZb05GAN7puasE6rddIxPB9mdQZSHDwxz3_bRiTgxVH09vpB_A_goOB-rJgYjPD1yS9YYoguSB1az6YQpdF-dPRlO76Tl0c747nLB0fh3E1RRcMVY-nbVL1nEUDyYk0-n2-FgxfLM0t80W5I9FgSeFUFM9fnqUMtO",
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop
-                                )
+                                Box(
+                                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.secondary),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = ('A' + it).toString(),
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
                             }
                         }
                     }
                 }
             } else if (announcement.category == "PTM") {
                 Button(
-                    onClick = { },
+                    onClick = { Unit },
+                    enabled = false,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Book Slot", fontWeight = FontWeight.Bold)
+                    Text("Book from PTM module", fontWeight = FontWeight.Bold)
                 }
             }
         }
