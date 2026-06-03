@@ -69,6 +69,7 @@ import com.littlebridge.vidyaprayag.feature.school.schoolAnalyticsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolDashboardRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRouting
 import com.littlebridge.vidyaprayag.feature.user.parentRouting
+import com.littlebridge.vidyaprayag.feature.user.parentMessagesRouting
 import com.littlebridge.vidyaprayag.feature.user.userDetailsRouting
 import com.littlebridge.vidyaprayag.feature.user.userProfileRouting
 import io.ktor.http.*
@@ -150,6 +151,7 @@ fun Application.module() {
         userDetailsRouting()
         userProfileRouting()
         parentRouting()
+        parentMessagesRouting()      // /api/v1/parent/messages[…] — parent-school harmony (report §9.2)
         onboardingRouting()
         announcementRouting()
         admissionRouting()
