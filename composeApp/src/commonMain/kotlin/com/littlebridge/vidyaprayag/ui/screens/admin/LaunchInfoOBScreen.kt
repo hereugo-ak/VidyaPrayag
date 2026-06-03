@@ -14,11 +14,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.presentation.AppModule
 import com.littlebridge.vidyaprayag.feature.admin.presentation.ComplianceDocument
 import com.littlebridge.vidyaprayag.feature.admin.presentation.LaunchInfoOBViewModel
@@ -34,13 +32,14 @@ fun LaunchInfoOBScreen() {
     val state by viewModel.state.collectAsState()
     val isSubmitting by viewModel.isSubmitting.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val infoMessage by viewModel.infoMessage.collectAsState()
     val navigator = LocalAppNavigator.current
 
     BaseScreen(
         onBackClick = { navigator.goBack() },
         bottomBar = {
             OnboardingBottomBar(
-                onSaveDraft = { /* Save draft */ },
+                onSaveDraft = { viewModel.saveDraft() },
                 onContinue = {
                     if (!isSubmitting) {
                         viewModel.submit {
@@ -72,7 +71,16 @@ fun LaunchInfoOBScreen() {
                 item {
                     OnboardingErrorBanner(
                         message = errorMessage!!,
-                        onDismiss = { viewModel.clearError() }
+                        onDismiss = { viewModel.clearMessages() }
+                    )
+                }
+            }
+
+            if (infoMessage != null) {
+                item {
+                    LaunchInfoBanner(
+                        message = infoMessage!!,
+                        onDismiss = { viewModel.clearMessages() }
                     )
                 }
             }
@@ -102,7 +110,10 @@ fun LaunchInfoOBScreen() {
             }
 
             items(state.documents) { doc ->
-                ComplianceDocumentItem(doc)
+                ComplianceDocumentItem(
+                    doc = doc,
+                    onUploadClick = { viewModel.markDocumentUploaded(doc.id) }
+                )
             }
 
             item {
@@ -122,6 +133,40 @@ fun LaunchInfoOBScreen() {
 
             item {
                 Spacer(modifier = Modifier.height(100.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun LaunchInfoBanner(message: String, onDismiss: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                Icons.Default.Info,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Text(
+                message,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            TextButton(onClick = onDismiss) {
+                Text(
+                    "DISMISS",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
             }
         }
     }
@@ -160,12 +205,20 @@ private fun InstitutionalIdentityCard(state: com.littlebridge.vidyaprayag.featur
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                AsyncImage(
-                    model = state.imageUrl,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
-                )
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.School,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(34.dp)
+                    )
+                }
                 Column {
                     Text(state.schoolName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
                     Text(state.licenseType, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -188,7 +241,7 @@ private fun SectionHeader(title: String, icon: androidx.compose.ui.graphics.vect
 }
 
 @Composable
-private fun ComplianceDocumentItem(doc: ComplianceDocument) {
+private fun ComplianceDocumentItem(doc: ComplianceDocument, onUploadClick: () -> Unit) {
     val isUploaded = doc.status == "Uploaded"
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -225,7 +278,7 @@ private fun ComplianceDocumentItem(doc: ComplianceDocument) {
                 Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
             } else {
                 Button(
-                    onClick = { },
+                    onClick = onUploadClick,
                     shape = RoundedCornerShape(8.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                     modifier = Modifier.height(32.dp)

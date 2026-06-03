@@ -16,15 +16,28 @@ sealed class NetworkResult<out T> {
     data object ConnectionError : NetworkResult<Nothing>()
 }
 
+fun redactedHeaders(headers: Headers): List<Pair<String, List<String>>> {
+    val sensitive = setOf(
+        HttpHeaders.Authorization.lowercase(),
+        HttpHeaders.Cookie.lowercase(),
+        HttpHeaders.SetCookie.lowercase(),
+        "x-api-key"
+    )
+    return headers.entries().map { (name, values) ->
+        if (name.lowercase() in sensitive) name to listOf("[REDACTED]") else name to values
+    }
+}
+
 suspend inline fun <reified T> safeApiCall(block: () -> HttpResponse): NetworkResult<T> {
     return try {
         val response = block()
         val request = response.call.request
         
-        // Log Request
+        // Log Request. Never print raw Authorization headers; Android Studio logs
+        // are frequently shared while debugging and bearer tokens must not leak.
         AppLogger.d("API_CALL", "--- START API CALL ---")
         AppLogger.d("API_CALL", "REQUEST: ${request.method.value} ${request.url}")
-        AppLogger.d("API_CALL", "REQUEST HEADERS: ${request.headers.entries()}")
+        AppLogger.d("API_CALL", "REQUEST HEADERS: ${redactedHeaders(request.headers)}")
         
         val requestBody = request.content
         if (requestBody is TextContent) {

@@ -92,7 +92,7 @@ fun AcademicCalendarScreen() {
             }
 
             item {
-                QuickUploadCard()
+                QuickUploadCard(onImportClick = { viewModel.syncSyllabus() })
             }
 
             item {
@@ -475,7 +475,7 @@ private fun SyllabusTargetItem(target: SyllabusTarget) {
 }
 
 @Composable
-private fun QuickUploadCard() {
+private fun QuickUploadCard(onImportClick: () -> Unit) {
     VidyaPrayagCard(
         modifier = Modifier.fillMaxWidth(),
         backgroundColor = MaterialTheme.colorScheme.primaryContainer
@@ -490,12 +490,12 @@ private fun QuickUploadCard() {
                     .height(120.dp)
                     .border(2.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
                     .clip(RoundedCornerShape(12.dp))
-                    .clickable { },
+                    .clickable { onImportClick() },
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.CloudUpload, null, tint = Color.White, modifier = Modifier.size(32.dp))
-                    Text("Drop files here", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                    Text("Sync calendar and syllabus", color = Color.White, style = MaterialTheme.typography.labelLarge)
                 }
             }
         }

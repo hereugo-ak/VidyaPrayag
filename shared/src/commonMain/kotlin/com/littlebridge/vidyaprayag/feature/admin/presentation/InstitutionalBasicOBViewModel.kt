@@ -126,9 +126,8 @@ class InstitutionalBasicOBViewModel(
                     // the one that issued it). Make the cause explicit instead of
                     // showing the raw server "Session expired" string.
                     _errorMessage.value = if (result.code == 401) {
-                        "Your session was rejected by the server. Please log out and " +
-                            "sign in again. (If you're testing against your laptop, " +
-                            "confirm the app is pointing at the same backend.)"
+                        preferenceRepository.clearSession()
+                        "Your session expired. Please sign in again before continuing onboarding."
                     } else {
                         result.message
                     }

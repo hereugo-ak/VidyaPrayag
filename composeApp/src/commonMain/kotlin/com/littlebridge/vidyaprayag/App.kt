@@ -79,19 +79,21 @@ fun App() {
             if (!authState.isLoaded) {
                 SplashScreen()
             } else {
-                val navController = rememberNavController()
-                val startDestination = when {
-                    authState.token.isNullOrBlank() -> Destination.Landing
-                    authState.role == "ADMIN" -> Destination.SchoolDashboard
-                    authState.role == "PARENT" -> Destination.ParentDashboard
-                    else -> Destination.Landing
-                }
+                key(authState.token, authState.role) {
+                    val navController = rememberNavController()
+                    val startDestination = when {
+                        authState.token.isNullOrBlank() -> Destination.Landing
+                        authState.role == "ADMIN" -> Destination.SchoolDashboard
+                        authState.role == "PARENT" -> Destination.ParentDashboard
+                        else -> Destination.Landing
+                    }
 
-                ProvideAppNavigator(navController) {
-                    NavGraph(
-                        navController = navController,
-                        startDestination = startDestination
-                    )
+                    ProvideAppNavigator(navController) {
+                        NavGraph(
+                            navController = navController,
+                            startDestination = startDestination
+                        )
+                    }
                 }
             }
         }

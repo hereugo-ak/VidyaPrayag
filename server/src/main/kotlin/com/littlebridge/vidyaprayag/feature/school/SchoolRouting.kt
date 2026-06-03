@@ -3,7 +3,7 @@
  * Module: feature.school
  *
  * Endpoints (Drawer Options in spec):
- *   GET /api/v1/school/analytics                                  (Coming Soon)
+ *   GET /api/v1/school/analytics                                  (endpoint index)
  *   GET /api/v1/school/calendar?date=&view_type=&standard=
  *   GET /api/v1/school/holidays?filter_type=weekly|monthly|yearly
  *   GET /api/v1/school/attendance/daily?type=student|faculty&grade=
@@ -20,7 +20,7 @@
  * Attendance: today's date by default; pass `?date=YYYY-MM-DD` for historical.
  *
  * Authorization:
- *   Every endpoint (except the public /analytics teaser) is guarded by
+ *   Every data endpoint is guarded by
  *   call.requireSchoolContext(): the caller must hold a school role and have a
  *   school, and every query is scoped to that resolved school_id.
  *
@@ -106,11 +106,11 @@ data class AttendanceResponse(
 fun Route.schoolRouting() {
     route("/api/v1/school") {
 
-        // ---- analytics (public placeholder) ----
+        // ---- analytics endpoint index ----
         get("/analytics") {
             call.ok(
-                AnalyticsResponse(isAvailable = false, expectedRelease = "Q3 2026"),
-                message = "Analytics feature is coming soon!"
+                AnalyticsResponse(isAvailable = true, expectedRelease = "Available now at /api/v1/school/analytics/overview"),
+                message = "Use /api/v1/school/analytics/overview, /class-performance, /teacher-performance, /student/{studentId}, /student-cohort or /syllabus-coverage."
             )
         }
 
