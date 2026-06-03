@@ -42,7 +42,8 @@ data class StudentAnalyticsState(
     val lowRiskCount: Int = 0,
     val atRiskStudents: List<RiskStudent> = emptyList(),
     val subjectEngagements: List<SubjectEngagement> = emptyList(),
-    val cohortComparison: List<Float> = emptyList(), // G9, G10, G11, G12
+    val cohortComparison: List<Float> = emptyList(), // per-grade averages
+    val cohortLabels: List<String> = emptyList(),     // grade labels matching cohortComparison
     val isLoading: Boolean = false,
     val errorMessage: String? = null
 )
@@ -93,6 +94,8 @@ class StudentAnalyticsViewModel(
             val engagements = (obj["subject_engagements"] as? JsonArray)?.mapNotNull { parseEngagement(it) } ?: emptyList()
             val cohort = (obj["cohort_comparison"] as? JsonArray)
                 ?.mapNotNull { it.jsonPrimitive.floatOrNull } ?: emptyList()
+            val cohortLabels = (obj["cohort_labels"] as? JsonArray)
+                ?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: emptyList()
 
             StudentAnalyticsState(
                 dailyVolatility    = volatility,
@@ -101,7 +104,8 @@ class StudentAnalyticsViewModel(
                 lowRiskCount       = risk?.get("low_count")?.jsonPrimitive?.intOrNull ?: 0,
                 atRiskStudents     = atRisk,
                 subjectEngagements = engagements,
-                cohortComparison   = cohort
+                cohortComparison   = cohort,
+                cohortLabels       = cohortLabels
             )
         } catch (e: Exception) {
             AppLogger.e("StudentAnalyticsVM", "parseCohort failed: ${e.message}")

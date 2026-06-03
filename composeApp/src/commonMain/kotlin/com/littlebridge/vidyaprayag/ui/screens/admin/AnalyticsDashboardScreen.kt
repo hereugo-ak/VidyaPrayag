@@ -55,6 +55,7 @@ fun AnalyticsDashboardScreen() {
             item {
                 GlobalPerformanceTrendCard(
                     trend = state.performanceTrend,
+                    labels = state.trendLabels,
                     growth = state.currentGrowth
                 )
             }
@@ -110,7 +111,7 @@ private fun AnalyticsHeader() {
 }
 
 @Composable
-private fun GlobalPerformanceTrendCard(trend: List<Float>, growth: String) {
+private fun GlobalPerformanceTrendCard(trend: List<Float>, labels: List<String>, growth: String) {
     VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
@@ -146,35 +147,50 @@ private fun GlobalPerformanceTrendCard(trend: List<Float>, growth: String) {
                 }
             }
 
-            // Mock Bar Chart
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(180.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.Bottom
-            ) {
-                trend.forEachIndexed { index, value ->
-                    val isActive = index == 3 // Mock Apr as active
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight(value)
-                                .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                                .background(if (isActive) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant)
-                        )
-                        Text(
-                            text = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun")[index],
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isActive) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline,
-                            fontSize = 10.sp
-                        )
+            // Bar chart driven by live API series + labels
+            if (trend.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(180.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No trend data available",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                val lastIndex = trend.lastIndex
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    trend.forEachIndexed { index, value ->
+                        // Highlight the most recent month (last bar)
+                        val isActive = index == lastIndex
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .fillMaxHeight(value.coerceIn(0f, 1f))
+                                    .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                                    .background(if (isActive) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant)
+                            )
+                            Text(
+                                text = labels.getOrNull(index) ?: "",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isActive) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline,
+                                fontSize = 10.sp
+                            )
+                        }
                     }
                 }
             }

@@ -47,6 +47,7 @@ data class AcademicMilestone(
 
 data class SyllabusCoverageState(
     val departmentStats: List<Float> = emptyList(),
+    val departmentLabels: List<String> = emptyList(),
     val departmentProgress: List<DepartmentProgress> = emptyList(),
     val alerts: List<LaggingAlert> = emptyList(),
     val milestones: List<AcademicMilestone> = emptyList(),
@@ -98,9 +99,19 @@ class SyllabusCoverageViewModel(
             val overall = obj["overall"] as? JsonObject
             val bySubject = (obj["by_subject"] as? JsonArray) ?: JsonArray(emptyList())
 
-            // departmentStats: just the % normalized to 0..1, in subject order.
-            val stats = bySubject.mapNotNull { it.jsonObject["percentage"]?.jsonPrimitive?.intOrNull }
-                .map { it.coerceIn(0, 100) / 100f }
+            // departmentStats + labels: keep them index-aligned by iterating the
+            // same source list once and only keeping entries that have both a
+            // percentage and a name.
+            val statPairs = bySubject.mapNotNull { el ->
+                runCatching {
+                    val o = el.jsonObject
+                    val pct = o["percentage"]?.jsonPrimitive?.intOrNull ?: return@runCatching null
+                    val name = o["name"]?.jsonPrimitive?.contentOrNull ?: return@runCatching null
+                    name to (pct.coerceIn(0, 100) / 100f)
+                }.getOrNull()
+            }
+            val stats = statPairs.map { it.second }
+            val statLabels = statPairs.map { it.first }
 
             // departmentProgress: 1:1 with by_subject, semantic trend / delay
             // derived from behind_by_days when no explicit `trend` field is set.
@@ -126,6 +137,7 @@ class SyllabusCoverageViewModel(
 
             SyllabusCoverageState(
                 departmentStats    = stats,
+                departmentLabels   = statLabels,
                 departmentProgress = progress,
                 alerts             = alerts,
                 milestones         = milestones,

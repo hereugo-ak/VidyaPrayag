@@ -55,7 +55,7 @@ fun SyllabusCoverageScreen() {
             }
 
             item {
-                IntelligenceGraphCard(state.departmentStats)
+                IntelligenceGraphCard(state.departmentStats, state.departmentLabels)
             }
 
             item {
@@ -99,7 +99,7 @@ private fun SyllabusHeader() {
 }
 
 @Composable
-private fun IntelligenceGraphCard(stats: List<Float>) {
+private fun IntelligenceGraphCard(stats: List<Float>, labels: List<String>) {
     VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
             Row(
@@ -119,32 +119,44 @@ private fun IntelligenceGraphCard(stats: List<Float>) {
                 }
             }
 
-            // Mock Graph
-            Row(
-                modifier = Modifier.fillMaxWidth().height(180.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.Bottom
-            ) {
-                val labels = listOf("Science", "Math", "Arts", "Languages", "History")
-                stats.forEachIndexed { index, value ->
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight(value)
-                                .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                                .background(MaterialTheme.colorScheme.secondary)
-                        )
-                        Text(
-                            text = labels[index],
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline,
-                            fontSize = 9.sp
-                        )
+            // Live graph driven by per-subject coverage + labels from the API.
+            if (stats.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(180.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No subject coverage data",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(180.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    stats.forEachIndexed { index, value ->
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .fillMaxHeight(value.coerceIn(0f, 1f))
+                                    .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                                    .background(MaterialTheme.colorScheme.secondary)
+                            )
+                            Text(
+                                text = labels.getOrNull(index) ?: "",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline,
+                                fontSize = 9.sp
+                            )
+                        }
                     }
                 }
             }
