@@ -432,6 +432,9 @@ object StudentsTable : UUIDTable("students", "id") {
 object ChildrenTable : UUIDTable("children", "id") {
     val parentId         = uuid("parent_id")                            // FK app_users.id
     val schoolId         = uuid("school_id").nullable()                 // FK schools.id (optional)
+    // Links a parent's child to the school's canonical students.student_code so
+    // STUDENT-scoped announcements can target exact students (report §5.6).
+    val studentCode      = text("student_code").nullable()
     val childName        = text("child_name")
     val dateOfBirth      = varchar("date_of_birth", 12).nullable()      // YYYY-MM-DD
     val gender           = varchar("gender", 16).nullable()             // MALE | FEMALE | OTHER

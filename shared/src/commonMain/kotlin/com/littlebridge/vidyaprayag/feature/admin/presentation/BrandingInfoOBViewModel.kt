@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.feature.admin.data.remote.MediaApi
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.ObPayloadKeys
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.ObStepType
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingSubmitRequest
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.PickedMedia
 import com.littlebridge.vidyaprayag.feature.admin.domain.repository.OnboardingRepository
 import com.littlebridge.vidyaprayag.util.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,7 +45,8 @@ data class BrandingInfoState(
  */
 class BrandingInfoOBViewModel(
     private val onboardingRepository: OnboardingRepository,
-    private val preferenceRepository: PreferenceRepository
+    private val preferenceRepository: PreferenceRepository,
+    private val mediaApi: MediaApi
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(BrandingInfoState())
@@ -54,6 +57,71 @@ class BrandingInfoOBViewModel(
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    /** Which media slot is currently uploading: "cover" | "logo" | null. */
+    private val _uploadingSlot = MutableStateFlow<String?>(null)
+    val uploadingSlot: StateFlow<String?> = _uploadingSlot.asStateFlow()
+
+    /**
+     * Upload a picked file as a real binary to Supabase Storage and, on
+     * success, store the returned public URL into the matching slot. This is
+     * what removes the "paste a URL"/"not connected" placeholders — the cover
+     * photo and logo are now genuinely uploaded by the user.
+     *
+     * @param slot "cover" or "logo"
+     * @param kind storage kind: "IMAGE" for cover, "LOGO" for logo
+     */
+    fun uploadMedia(slot: String, kind: String, picked: PickedMedia) {
+        if (_uploadingSlot.value != null) return
+        viewModelScope.launch {
+            _uploadingSlot.value = slot
+            _errorMessage.value = null
+
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _errorMessage.value = "You are not signed in. Please log in again."
+                _uploadingSlot.value = null
+                return@launch
+            }
+
+            when (
+                val result = mediaApi.uploadMedia(
+                    token = token,
+                    bytes = picked.bytes,
+                    fileName = picked.fileName,
+                    mimeType = picked.mimeType,
+                    kind = kind
+                )
+            ) {
+                is NetworkResult.Success -> {
+                    val url = result.data.data?.url
+                    if (url.isNullOrBlank()) {
+                        _errorMessage.value = "Upload succeeded but no URL was returned."
+                    } else {
+                        when (slot) {
+                            "cover" -> _state.value = _state.value.copy(coverImageUrl = url)
+                            "logo" -> _state.value = _state.value.copy(logoUrl = url)
+                        }
+                        AppLogger.d("OnboardingBranding", "Uploaded $slot → $url")
+                    }
+                    _uploadingSlot.value = null
+                }
+                is NetworkResult.Error -> {
+                    _errorMessage.value = if (result.code == 503) {
+                        "Media storage isn't configured on the server yet. " +
+                            "Set SUPABASE_URL and SUPABASE_SERVICE_KEY, then try again."
+                    } else {
+                        result.message
+                    }
+                    _uploadingSlot.value = null
+                }
+                is NetworkResult.ConnectionError -> {
+                    _errorMessage.value = "No internet connection. Please try again."
+                    _uploadingSlot.value = null
+                }
+            }
+        }
+    }
 
     // ---------- Form mutations (signatures unchanged) ----------
     fun updateCoverImage(url: String) {
@@ -106,9 +174,13 @@ class BrandingInfoOBViewModel(
             val current = _state.value
             val payload = JsonObject(
                 buildMap {
-                    // Logo URL is optional - only send if user provided one.
+                    // Logo URL is optional - only send if user uploaded one.
                     current.logoUrl?.takeIf { it.isNotBlank() }?.let {
                         put(ObPayloadKeys.LOGO_URL, JsonPrimitive(it.trim()))
+                    }
+                    // Cover image URL — real uploaded URL, persisted as a draft key.
+                    current.coverImageUrl?.takeIf { it.isNotBlank() }?.let {
+                        put(ObPayloadKeys.COVER_IMAGE_URL, JsonPrimitive(it.trim()))
                     }
                     put(ObPayloadKeys.BRAND_COLOR, JsonPrimitive(current.brandColorHex.trim()))
                 }

@@ -157,6 +157,12 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.MediaApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
 
     // Repositories
     single<SchoolRepository> { SchoolRepositoryImpl(get(), get()) }
@@ -224,7 +230,7 @@ val viewModelModule = module {
     factory { TrackProgressViewModel(get(), get()) }
     factory { SchoolDashboardViewModel(get(), get()) }
     factory { InstitutionalBasicOBViewModel(get(), get()) }
-    factory { BrandingInfoOBViewModel(get(), get()) }
+    factory { BrandingInfoOBViewModel(get(), get(), get()) }
     factory { AcademicInfoOBViewModel(get(), get()) }
     factory { LaunchInfoOBViewModel(get(), get()) }
     factory { InstitutionalProfileViewModel(get(), get()) }

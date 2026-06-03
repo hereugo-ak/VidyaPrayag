@@ -1008,15 +1008,34 @@ compiled, test-backed backend code on `backend-by-abuzar`. All changes compile
 
 ### Still requires team action / product decisions
 
-- **Media upload (§4.3 / §5.4):** still URL-only. Real file picker + Supabase
-  Storage bucket + signed-URL persistence needs storage credentials/bucket
-  provisioning that only the team can do; left documented intentionally.
 - **Client-side GPS capture (§4.4):** the backend now stores and serves lat/lng
   and exposes distance discovery; the Compose "use current location" permission +
   provider + reverse-geocoding still needs to be wired on the client to fill
   the `latitude`/`longitude` onboarding drafts.
-- **STUDENT-scope expansion:** currently falls back to grade match because no
-  reliable `children` ⇄ `students.student_code` link exists yet.
+
+---
+
+## 8d. Media upload + STUDENT-scope link (this pass)
+
+Continues `backend-by-abuzar`. Turns the media placeholders into **real binary
+uploads** and closes the STUDENT-scope gap.
+
+### Implemented
+
+| Item | Report ref | What was added |
+|---|---|---|
+| **Real media upload** | §4.3 / §5.4 | New `feature.media.SupabaseStorage` (dependency-free Ktor-client wrapper around the Supabase Storage REST API) + `MediaRouting`: `POST /api/v1/school/media/upload` (multipart `file` + `kind`) streams bytes to a school-scoped object path (`{schoolId}/{kind}/{uuid}.{ext}`) and returns a public URL; `DELETE /api/v1/school/media` removes the object + row. IMAGE/VIDEO uploads are recorded in `school_media` so storage metrics stay truthful. Boots fine without storage env (returns `503 STORAGE_NOT_CONFIGURED`, never crashes). |
+| **Client upload path** | §4.3 | Shared `MediaApi` (`submitFormWithBinaryData`) + cross-platform `rememberMediaPicker()` (`expect`/`actual`: real Android `GetContent` reader, real desktop `JFileChooser`, clean stubs for iOS/JS/Wasm). `BrandingInfoOBViewModel.uploadMedia()` uploads picked bytes and stores the returned **real URL**. |
+| **Placeholder removed** | §5.9 | `BrandingInfoOBScreen` no longer shows "Media upload not connected" — cover photo + logo are now tap-to-pick → upload → live preview, with an inline uploading spinner. Cover/logo URLs are real, user-uploaded, and persisted (`logo_url` to `schools.logo_url`, `cover_image_url` to onboarding drafts). |
+| **STUDENT-scope link** | §5.6 | `children.student_code` column links a parent's child to the school's canonical `students.student_code`. `resolveRecipientPhones()` STUDENT branch now targets exact students via `student_codes` (teacher-scope guarded), falling back to grade match only when no codes resolve. |
+
+### Manual setup required (no code can do this)
+
+- Run `docs/db/migration_002_segmentation_geo_assignments.sql` in Supabase
+  (adds the new announcement/geo/teacher-assignment/`student_code` columns).
+- Create a **public** Supabase Storage bucket named `school-media`.
+- Set Render env vars: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`
+  (service_role secret), and optionally `SUPABASE_BUCKET`. See `.env.example`.
 
 ---
 

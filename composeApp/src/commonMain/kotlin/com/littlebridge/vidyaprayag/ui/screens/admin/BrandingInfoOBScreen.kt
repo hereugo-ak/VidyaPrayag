@@ -22,6 +22,8 @@ import com.littlebridge.vidyaprayag.feature.admin.presentation.BrandingInfoOBVie
 import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
 import com.littlebridge.vidyaprayag.navigation.Destination
 import com.littlebridge.vidyaprayag.ui.components.*
+import com.littlebridge.vidyaprayag.ui.media.MediaPickType
+import com.littlebridge.vidyaprayag.ui.media.rememberMediaPicker
 import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,20 +33,19 @@ fun BrandingInfoOBScreen() {
     val state by viewModel.state.collectAsState()
     val isSubmitting by viewModel.isSubmitting.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val uploadingSlot by viewModel.uploadingSlot.collectAsState()
     val navigator = LocalAppNavigator.current
-    var mediaUploadNotice by remember { mutableStateOf<String?>(null) }
 
-    mediaUploadNotice?.let { message ->
-        AlertDialog(
-            onDismissRequest = { mediaUploadNotice = null },
-            confirmButton = {
-                TextButton(onClick = { mediaUploadNotice = null }) {
-                    Text("OK")
-                }
-            },
-            title = { Text("Media upload not connected") },
-            text = { Text(message) }
-        )
+    // Which slot the user is currently picking for, so the single picker
+    // callback knows where to route the result.
+    var pendingSlot by remember { mutableStateOf<String?>(null) }
+    val launchPicker = rememberMediaPicker { picked ->
+        val slot = pendingSlot
+        pendingSlot = null
+        if (picked != null && slot != null) {
+            val kind = if (slot == "logo") "LOGO" else "IMAGE"
+            viewModel.uploadMedia(slot = slot, kind = kind, picked = picked)
+        }
     }
 
     BaseScreen(
@@ -105,8 +106,12 @@ fun BrandingInfoOBScreen() {
             item {
                 CoverPhotoSection(
                     imageUrl = state.coverImageUrl,
+                    isUploading = uploadingSlot == "cover",
                     onUploadClick = {
-                        mediaUploadNotice = "Campus cover upload needs the backend storage endpoint and Android file picker. No placeholder URL was saved."
+                        if (uploadingSlot == null) {
+                            pendingSlot = "cover"
+                            launchPicker(MediaPickType.IMAGE)
+                        }
                     }
                 )
             }
@@ -114,8 +119,12 @@ fun BrandingInfoOBScreen() {
             item {
                 LogoSection(
                     logoUrl = state.logoUrl,
+                    isUploading = uploadingSlot == "logo",
                     onUploadClick = {
-                        mediaUploadNotice = "School logo upload needs the backend storage endpoint and Android file picker. No placeholder URL was saved."
+                        if (uploadingSlot == null) {
+                            pendingSlot = "logo"
+                            launchPicker(MediaPickType.IMAGE)
+                        }
                     }
                 )
             }
@@ -144,7 +153,7 @@ fun BrandingInfoOBScreen() {
 }
 
 @Composable
-private fun CoverPhotoSection(imageUrl: String?, onUploadClick: () -> Unit) {
+private fun CoverPhotoSection(imageUrl: String?, isUploading: Boolean, onUploadClick: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("CAMPUS COVER PHOTO", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
         Box(
@@ -154,7 +163,7 @@ private fun CoverPhotoSection(imageUrl: String?, onUploadClick: () -> Unit) {
                 .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
                 .border(2.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
-                .clickable { onUploadClick() },
+                .clickable(enabled = !isUploading) { onUploadClick() },
             contentAlignment = Alignment.Center
         ) {
             if (imageUrl != null) {
@@ -164,10 +173,16 @@ private fun CoverPhotoSection(imageUrl: String?, onUploadClick: () -> Unit) {
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
-            } else {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            }
+            when {
+                isUploading -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(32.dp))
+                    Spacer(Modifier.height(8.dp))
+                    Text("Uploading…", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
+                }
+                imageUrl == null -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(48.dp))
-                    Text("Connect Upload", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
+                    Text("Tap to upload", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
                 }
             }
         }
@@ -176,7 +191,7 @@ private fun CoverPhotoSection(imageUrl: String?, onUploadClick: () -> Unit) {
 }
 
 @Composable
-private fun LogoSection(logoUrl: String?, onUploadClick: () -> Unit) {
+private fun LogoSection(logoUrl: String?, isUploading: Boolean, onUploadClick: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("SCHOOL LOGO", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
         Box(
@@ -185,7 +200,7 @@ private fun LogoSection(logoUrl: String?, onUploadClick: () -> Unit) {
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
                 .border(2.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
-                .clickable { onUploadClick() },
+                .clickable(enabled = !isUploading) { onUploadClick() },
             contentAlignment = Alignment.Center
         ) {
             if (logoUrl != null) {
@@ -195,8 +210,10 @@ private fun LogoSection(logoUrl: String?, onUploadClick: () -> Unit) {
                     modifier = Modifier.fillMaxSize().padding(16.dp),
                     contentScale = ContentScale.Fit
                 )
-            } else {
-                Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(32.dp))
+            }
+            when {
+                isUploading -> CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
+                logoUrl == null -> Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(32.dp))
             }
         }
         Text("Circular or square format (Max 2MB)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -126,4 +126,5 @@ object ObPayloadKeys {
     // BRANDING step
     const val LOGO_URL = "logo_url"
     const val BRAND_COLOR = "brand_color"
+    const val COVER_IMAGE_URL = "cover_image_url"
 }

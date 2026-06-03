@@ -372,10 +372,9 @@ private fun org.jetbrains.exposed.sql.ResultRow.toDto(): AnnouncementDto {
  *                   when unavailable we fall back to class grade match).
  *  - SUBJECT     -> parents of children in any class where this subject is
  *                   taught (via teacher_subject_assignments).
- *  - STUDENT     -> parents linked to the listed student_codes (matched on the
- *                   child's name/grade is unreliable, so we currently expand by
- *                   children belonging to the school; explicit student mapping
- *                   is a follow-up once a child<->student_code link exists).
+ *  - STUDENT     -> parents of the children linked (children.student_code) to
+ *                   the listed students.student_code values; falls back to grade
+ *                   match only when no codes are supplied.
  *  - CUSTOM      -> explicit phone list in the filter, intersected with school.
  *
  * Teacher-authored broadcasts (authorRole startsWith "teacher") are constrained
@@ -415,6 +414,18 @@ private fun resolveRecipientPhones(
         return ChildrenTable.selectAll()
             .where { (ChildrenTable.schoolId eq schoolId) and (ChildrenTable.isActive eq true) }
             .filter { (it[ChildrenTable.currentGrade]?.trim()?.lowercase()) in wanted }
+            .map { it[ChildrenTable.parentId] }
+            .toSet()
+    }
+
+    // Parents of the children linked to the given students.student_code values
+    // (via the children.student_code link added in migration 002).
+    fun parentIdsForStudentCodes(codes: Collection<String>): Set<UUID> {
+        val wanted = codes.map { it.trim() }.filter { it.isNotBlank() }.toSet()
+        if (wanted.isEmpty()) return emptySet()
+        return ChildrenTable.selectAll()
+            .where { (ChildrenTable.schoolId eq schoolId) and (ChildrenTable.isActive eq true) }
+            .filter { it[ChildrenTable.studentCode]?.trim() in wanted }
             .map { it[ChildrenTable.parentId] }
             .toSet()
     }
@@ -476,10 +487,31 @@ private fun resolveRecipientPhones(
         }
 
         "STUDENT" -> {
-            // No reliable child<->student_code link yet; fall back to grade match
-            // when grades are supplied, else empty (documented follow-up).
-            val grades = strList("grades") + listOfNotNull(str("grade"))
-            phonesForParents(parentIdsForGrades(constrainToTeacher(grades)))
+            // Target exact students via children.student_code (migration 002).
+            // Accepts {"student_codes":[...]} or {"student_code":"..."}. Falls
+            // back to grade match only when no codes are supplied.
+            val codes = strList("student_codes") + listOfNotNull(str("student_code"))
+            if (codes.isNotEmpty()) {
+                val parentIds = parentIdsForStudentCodes(codes)
+                // Teacher scope guard: keep only students whose grade the teacher
+                // teaches (looked up from the matched children rows).
+                if (isTeacher) {
+                    val allowedParents = ChildrenTable.selectAll()
+                        .where { (ChildrenTable.schoolId eq schoolId) and (ChildrenTable.isActive eq true) }
+                        .filter {
+                            it[ChildrenTable.parentId] in parentIds &&
+                                (it[ChildrenTable.currentGrade]?.trim()?.lowercase() in teacherClasses)
+                        }
+                        .map { it[ChildrenTable.parentId] }
+                        .toSet()
+                    phonesForParents(allowedParents)
+                } else {
+                    phonesForParents(parentIds)
+                }
+            } else {
+                val grades = strList("grades") + listOfNotNull(str("grade"))
+                phonesForParents(parentIdsForGrades(constrainToTeacher(grades)))
+            }
         }
 
         else -> emptyList()
