@@ -20,6 +20,8 @@ import com.littlebridge.vidyaprayag.feature.admin.presentation.InstitutionalBasi
 import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
 import com.littlebridge.vidyaprayag.navigation.Destination
 import com.littlebridge.vidyaprayag.ui.components.*
+import com.littlebridge.vidyaprayag.ui.location.LocationResult
+import com.littlebridge.vidyaprayag.ui.location.rememberLocationProvider
 import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,6 +32,32 @@ fun InstitutionalBasicOBScreen() {
     val isSubmitting by viewModel.isSubmitting.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     val navigator = LocalAppNavigator.current
+
+    // "Use current location" → permission → GPS fix → reverse geocode → state.
+    var isLocating by remember { mutableStateOf(false) }
+    var locationNotice by remember { mutableStateOf<String?>(null) }
+    val captureLocation = rememberLocationProvider { result ->
+        isLocating = false
+        when (result) {
+            is LocationResult.Success -> {
+                val loc = result.location
+                viewModel.applyCapturedLocation(
+                    latitude = loc.latitude,
+                    longitude = loc.longitude,
+                    fullAddress = loc.fullAddress,
+                    city = loc.city,
+                    district = loc.district,
+                    state = loc.state,
+                    pincode = loc.pincode
+                )
+                locationNotice = "Location captured."
+            }
+            is LocationResult.PermissionDenied ->
+                locationNotice = "Location permission denied. You can type the address instead."
+            is LocationResult.Unavailable ->
+                locationNotice = result.reason
+        }
+    }
 
     BaseScreen(
         onBackClick = { navigator.goBack() },
@@ -96,7 +124,18 @@ fun InstitutionalBasicOBScreen() {
                     onEmailChange = viewModel::updateEmail,
                     contactNumber = state.contactNumber,
                     onContactChange = viewModel::updateContact,
-                    address = state.address
+                    address = state.address,
+                    onAddressChange = viewModel::updateAddress,
+                    hasCoordinates = state.latitude != null && state.longitude != null,
+                    latitude = state.latitude,
+                    longitude = state.longitude,
+                    isLocating = isLocating,
+                    locationNotice = locationNotice,
+                    onUseCurrentLocation = {
+                        locationNotice = null
+                        isLocating = true
+                        captureLocation()
+                    }
                 )
             }
 
@@ -121,7 +160,14 @@ private fun SchoolBasicsForm(
     onEmailChange: (String) -> Unit,
     contactNumber: String,
     onContactChange: (String) -> Unit,
-    address: String
+    address: String,
+    onAddressChange: (String) -> Unit,
+    hasCoordinates: Boolean,
+    latitude: Double?,
+    longitude: Double?,
+    isLocating: Boolean,
+    locationNotice: String?,
+    onUseCurrentLocation: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
         // School Name
@@ -190,13 +236,31 @@ private fun SchoolBasicsForm(
             }
         }
 
-        // Location Picker Placeholder
-        LocationPicker(address = address)
+        // Real location capture (replaces the old static map placeholder).
+        LocationPicker(
+            address = address,
+            onAddressChange = onAddressChange,
+            hasCoordinates = hasCoordinates,
+            latitude = latitude,
+            longitude = longitude,
+            isLocating = isLocating,
+            locationNotice = locationNotice,
+            onUseCurrentLocation = onUseCurrentLocation
+        )
     }
 }
 
 @Composable
-private fun LocationPicker(address: String) {
+private fun LocationPicker(
+    address: String,
+    onAddressChange: (String) -> Unit,
+    hasCoordinates: Boolean,
+    latitude: Double?,
+    longitude: Double?,
+    isLocating: Boolean,
+    locationNotice: String?,
+    onUseCurrentLocation: () -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -205,64 +269,89 @@ private fun LocationPicker(address: String) {
         ) {
             Text("School Location", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
             Text(
-                "Default Campus",
-                color = MaterialTheme.colorScheme.secondary,
+                if (hasCoordinates) "GPS set" else "Tap to set",
+                color = if (hasCoordinates) MaterialTheme.colorScheme.secondary
+                else MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.Bold,
                 fontSize = 12.sp
             )
         }
-        
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(180.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f))
+
+        // Real "Use current location" button → runtime permission → GPS fix →
+        // reverse geocode (report §11.2). Falls back gracefully if unavailable.
+        Button(
+            onClick = onUseCurrentLocation,
+            enabled = !isLocating,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
         ) {
-            // Local, deterministic map preview. The previous implementation loaded
-            // a temporary Google-hosted image that now returns HTTP 403 in Coil.
-            Icon(
-                Icons.Default.Map,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.22f),
-                modifier = Modifier
-                    .size(112.dp)
-                    .align(Alignment.Center)
-            )
-            repeat(4) { index ->
-                Box(
-                    modifier = Modifier
-                        .align(if (index % 2 == 0) Alignment.TopStart else Alignment.BottomEnd)
-                        .padding((16 + index * 18).dp)
-                        .size((42 + index * 10).dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.35f))
+            if (isLocating) {
+                CircularProgressIndicator(
+                    strokeWidth = 2.dp,
+                    color = Color.White,
+                    modifier = Modifier.size(18.dp)
                 )
+                Spacer(Modifier.width(10.dp))
+                Text("Locating…", fontWeight = FontWeight.Bold)
+            } else {
+                Icon(Icons.Default.MyLocation, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(if (hasCoordinates) "Update current location" else "Use current location", fontWeight = FontWeight.Bold)
             }
-            
+        }
+
+        if (hasCoordinates && latitude != null && longitude != null) {
             Surface(
-                modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
-                color = Color.White.copy(alpha = 0.9f),
-                shape = RoundedCornerShape(12.dp),
-                shadowElevation = 4.dp
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Row(
                     modifier = Modifier.padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Box(
-                        modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.secondaryContainer),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(16.dp))
-                    }
-                    Column {
-                        Text(address, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Text("Knowledge Hub, Sector 42", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    Icon(
+                        Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        "Lat ${latitude.format5()}, Lng ${longitude.format5()}",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }
+
+        // Editable address — pre-filled by reverse geocoding, still manually
+        // correctable so onboarding never blocks on an imperfect geocode.
+        OutlinedTextField(
+            value = address,
+            onValueChange = onAddressChange,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            label = { Text("Full Address") },
+            leadingIcon = { Icon(Icons.Default.Place, contentDescription = null) },
+            minLines = 2,
+            textStyle = MaterialTheme.typography.bodySmall
+        )
+
+        if (locationNotice != null) {
+            Text(
+                locationNotice,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
+}
+
+/** Trim a coordinate to 5 decimal places (~1.1 m) without platform String.format. */
+private fun Double.format5(): String {
+    val scaled = kotlin.math.round(this * 100000.0) / 100000.0
+    return scaled.toString()
 }

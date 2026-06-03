@@ -63,6 +63,38 @@ class InstitutionalBasicOBViewModel(
         _state.value = _state.value.copy(countryCode = code)
     }
 
+    /**
+     * Apply a real device location captured via "Use current location"
+     * (report §11.2). We update the displayed address from the reverse-geocoded
+     * line when available, and stash lat/lng + parsed parts for the BASIC
+     * submit payload so the backend can persist schools.latitude/longitude.
+     */
+    fun applyCapturedLocation(
+        latitude: Double,
+        longitude: Double,
+        fullAddress: String?,
+        city: String?,
+        district: String?,
+        state: String?,
+        pincode: String?
+    ) {
+        val current = _state.value
+        _state.value = current.copy(
+            latitude = latitude,
+            longitude = longitude,
+            address = fullAddress?.takeIf { it.isNotBlank() } ?: current.address,
+            city = city ?: current.city,
+            district = district ?: current.district,
+            state = state ?: current.state,
+            pincode = pincode ?: current.pincode
+        )
+    }
+
+    /** Manual address edit (used as a fallback when GPS is unavailable). */
+    fun updateAddress(address: String) {
+        _state.value = _state.value.copy(address = address)
+    }
+
     fun clearError() {
         _errorMessage.value = null
     }
@@ -101,6 +133,18 @@ class InstitutionalBasicOBViewModel(
                     // The screen currently shows the address as a static string; we
                     // still send whatever is in state so the backend has *something*.
                     put(ObPayloadKeys.FULL_ADDRESS, JsonPrimitive(current.address.trim()))
+                    // Geo from "Use current location" — only sent once captured so
+                    // we never overwrite a real fix with nulls (report §11.2).
+                    current.latitude?.let { put(ObPayloadKeys.LATITUDE, JsonPrimitive(it)) }
+                    current.longitude?.let { put(ObPayloadKeys.LONGITUDE, JsonPrimitive(it)) }
+                    current.city.takeIf { it.isNotBlank() }
+                        ?.let { put(ObPayloadKeys.CITY, JsonPrimitive(it.trim())) }
+                    current.district.takeIf { it.isNotBlank() }
+                        ?.let { put(ObPayloadKeys.DISTRICT, JsonPrimitive(it.trim())) }
+                    current.state.takeIf { it.isNotBlank() }
+                        ?.let { put(ObPayloadKeys.STATE, JsonPrimitive(it.trim())) }
+                    current.pincode.takeIf { it.isNotBlank() }
+                        ?.let { put(ObPayloadKeys.PINCODE, JsonPrimitive(it.trim())) }
                 }
             )
 

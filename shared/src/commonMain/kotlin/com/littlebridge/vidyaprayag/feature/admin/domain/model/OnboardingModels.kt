@@ -122,6 +122,9 @@ object ObPayloadKeys {
     const val STATE = "state"
     const val PINCODE = "pincode"
     const val FULL_ADDRESS = "full_address"
+    // Geo (server persists these on schools.latitude / schools.longitude).
+    const val LATITUDE = "latitude"
+    const val LONGITUDE = "longitude"
 
     // BRANDING step
     const val LOGO_URL = "logo_url"
