@@ -73,57 +73,67 @@ fun InstitutionalProfileScreen() {
                 verticalArrangement = Arrangement.spacedBy(32.dp)
             ) {
                 item {
-                    ProfileHeaderSection(
-                        isPublic = state.isPublic,
-                        onTogglePublic = viewModel::togglePublic
-                    )
+                    AnimatedEntrance(delayMillis = staggerDelay(0)) {
+                        ProfileHeaderSection(
+                            isPublic = state.isPublic,
+                            onTogglePublic = viewModel::togglePublic
+                        )
+                    }
                 }
 
                 item {
-                    PhilosophyForm(
-                        mission = state.missionStatement,
-                        onMissionChange = viewModel::updateMission,
-                        learningModel = state.learningModel,
-                        onModelChange = viewModel::updateLearningModel,
-                        language = state.primaryLanguage,
-                        onLanguageChange = viewModel::updateLanguage,
-                        isSaving = state.isSaving,
-                        onSave = viewModel::saveProfile
-                    )
+                    AnimatedEntrance(delayMillis = staggerDelay(1)) {
+                        PhilosophyForm(
+                            mission = state.missionStatement,
+                            onMissionChange = viewModel::updateMission,
+                            learningModel = state.learningModel,
+                            onModelChange = viewModel::updateLearningModel,
+                            language = state.primaryLanguage,
+                            onLanguageChange = viewModel::updateLanguage,
+                            isSaving = state.isSaving,
+                            onSave = viewModel::saveProfile
+                        )
+                    }
                 }
 
                 item {
-                    VirtualTourPreview(
-                        tourName = state.activeTourName.ifBlank { "No active tour" },
-                        previewImageUrl = state.galleryImages.firstOrNull()?.url,
-                        isUploading = state.isUploading,
-                        onAddTour = {
-                            pendingSlot = "tour"
-                            pickVideo(MediaPickType.VIDEO)
-                        }
-                    )
+                    AnimatedEntrance(delayMillis = staggerDelay(2)) {
+                        VirtualTourPreview(
+                            tourName = state.activeTourName.ifBlank { "No active tour" },
+                            previewImageUrl = state.galleryImages.firstOrNull()?.url,
+                            isUploading = state.isUploading,
+                            onAddTour = {
+                                pendingSlot = "tour"
+                                pickVideo(MediaPickType.VIDEO)
+                            }
+                        )
+                    }
                 }
 
                 item {
-                    GallerySection(
-                        images = state.galleryImages,
-                        storageUsage = state.storageUsage,
-                        storageUsedHuman = state.storageUsedHuman,
-                        totalStorageHuman = state.totalStorageHuman,
-                        isUploading = state.isUploading,
-                        onAddPhoto = {
-                            pendingSlot = "photo"
-                            pickPhoto(MediaPickType.IMAGE)
-                        },
-                        onRemovePhoto = { url ->
-                            val remaining = state.galleryImages.map { it.url }.filterNot { it == url }
-                            viewModel.saveGallery(remaining)
-                        }
-                    )
+                    AnimatedEntrance(delayMillis = staggerDelay(3)) {
+                        GallerySection(
+                            images = state.galleryImages,
+                            storageUsage = state.storageUsage,
+                            storageUsedHuman = state.storageUsedHuman,
+                            totalStorageHuman = state.totalStorageHuman,
+                            isUploading = state.isUploading,
+                            onAddPhoto = {
+                                pendingSlot = "photo"
+                                pickPhoto(MediaPickType.IMAGE)
+                            },
+                            onRemovePhoto = { url ->
+                                val remaining = state.galleryImages.map { it.url }.filterNot { it == url }
+                                viewModel.saveGallery(remaining)
+                            }
+                        )
+                    }
                 }
 
                 item {
-                    ShowcaseHealthCard(completion = state.profileCompletion)
+                    AnimatedEntrance(delayMillis = staggerDelay(4)) {
+                        ShowcaseHealthCard(completion = state.profileCompletion)
+                    }
                 }
 
                 item {
