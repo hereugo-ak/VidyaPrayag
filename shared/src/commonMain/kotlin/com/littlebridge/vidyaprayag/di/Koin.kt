@@ -233,7 +233,7 @@ val viewModelModule = module {
     factory { BrandingInfoOBViewModel(get(), get(), get()) }
     factory { AcademicInfoOBViewModel(get(), get()) }
     factory { LaunchInfoOBViewModel(get(), get()) }
-    factory { InstitutionalProfileViewModel(get(), get()) }
+    factory { InstitutionalProfileViewModel(get(), get(), get()) }
     factory { AdmissionCRMViewModel(get(), get()) }
     factory { SchoolAnnouncementsViewModel(get(), get()) }
     factory { MessagesViewModel(get(), get()) }
