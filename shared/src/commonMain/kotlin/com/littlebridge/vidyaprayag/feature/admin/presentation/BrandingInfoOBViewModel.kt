@@ -131,7 +131,12 @@ class BrandingInfoOBViewModel(
                 }
                 is NetworkResult.Error -> {
                     AppLogger.e("OnboardingBranding", "Submit failed: ${result.message} (code=${result.code})")
-                    _errorMessage.value = result.message
+                    _errorMessage.value = if (result.code == 401) {
+                        preferenceRepository.clearSession()
+                        "Your session expired. Please sign in again before continuing onboarding."
+                    } else {
+                        result.message
+                    }
                     _isSubmitting.value = false
                 }
                 is NetworkResult.ConnectionError -> {

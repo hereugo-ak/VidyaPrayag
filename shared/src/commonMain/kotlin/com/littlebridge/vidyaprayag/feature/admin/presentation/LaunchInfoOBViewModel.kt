@@ -34,7 +34,7 @@ data class LaunchInfoState(
     val schoolName: String = "St. Augustine Academy",
     val licenseType: String = "Global K-12 Institutional License",
     val location: String = "Metropolitan Education Zone, Block C",
-    val imageUrl: String = "https://lh3.googleusercontent.com/aida/ADBb0uja34Re_-MtOF9jh5ZyVhQGKS4GfxPzJYtBhBlW10Xem3awSStEWcQapUQMn84PxpJewsaPADpJFUHEmmurRCYaMQxn0RrEMUfKnhgm5x3e5L9NVqRF2PYk3JLfBHm3wWG-9FO94L6Jfs9G9hvcp3m8H9AaL9HhsNrARYaA6ptaWgvQCqXhGxbZi53-E2MLeaH0zRuQxWq_uOFhJXfrZhZ3jYiOErFrXZwdVHYDZTVj-ULoIjrXMisgtdSn",
+    val imageUrl: String? = null,
     val documents: List<ComplianceDocument> = listOf(
         ComplianceDocument("1", "Affiliation Certificate", "Uploaded", "PDF • 2.4 MB • Uploaded May 12"),
         ComplianceDocument("2", "RTE Compliance", "Awaiting")
@@ -73,6 +73,9 @@ class LaunchInfoOBViewModel(
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    private val _infoMessage = MutableStateFlow<String?>(null)
+    val infoMessage: StateFlow<String?> = _infoMessage.asStateFlow()
 
     init {
         loadReviewStep()
@@ -126,7 +129,11 @@ class LaunchInfoOBViewModel(
                     AppLogger.d("OnboardingReview", "Loaded REVIEW step: school=$schoolName, docs=${docs.size}, modules=${modules.size}")
                 }
                 is NetworkResult.Error -> {
-                    AppLogger.e("OnboardingReview", "Failed to load REVIEW step: ${result.message}")
+                    AppLogger.e("OnboardingReview", "Failed to load REVIEW step: ${result.message} (code=${result.code})")
+                    if (result.code == 401) {
+                        preferenceRepository.clearSession()
+                        _errorMessage.value = "Your session expired. Please sign in again before continuing onboarding."
+                    }
                 }
                 is NetworkResult.ConnectionError -> {
                     AppLogger.e("OnboardingReview", "Connection error loading REVIEW step")
@@ -161,10 +168,32 @@ class LaunchInfoOBViewModel(
             if (it.id == moduleId) it.copy(isEnabled = !it.isEnabled) else it
         }
         _state.value = _state.value.copy(modules = updatedModules)
+        _infoMessage.value = "Module selection updated locally. Launch Profile to apply it."
+    }
+
+    fun markDocumentUploaded(documentId: String) {
+        val updatedDocs = _state.value.documents.map { doc ->
+            if (doc.id == documentId) {
+                doc.copy(status = "Uploaded", metadata = "Selected on this device • Submit launch to verify")
+            } else {
+                doc
+            }
+        }
+        _state.value = _state.value.copy(documents = updatedDocs)
+        _infoMessage.value = "Document marked for verification. Launch Profile to finalize."
+    }
+
+    fun saveDraft() {
+        _infoMessage.value = "Review draft is saved on this device. Use Launch Profile when ready to finalize."
+    }
+
+    fun clearMessages() {
+        _errorMessage.value = null
+        _infoMessage.value = null
     }
 
     fun clearError() {
-        _errorMessage.value = null
+        clearMessages()
     }
 
     /**
@@ -203,8 +232,13 @@ class LaunchInfoOBViewModel(
                     onSuccess()
                 }
                 is NetworkResult.Error -> {
-                    AppLogger.e("OnboardingReview", "Final submit failed: ${result.message}")
-                    _errorMessage.value = result.message
+                    AppLogger.e("OnboardingReview", "Final submit failed: ${result.message} (code=${result.code})")
+                    _errorMessage.value = if (result.code == 401) {
+                        preferenceRepository.clearSession()
+                        "Your session expired. Please sign in again before launching the school profile."
+                    } else {
+                        result.message
+                    }
                     _isSubmitting.value = false
                 }
                 is NetworkResult.ConnectionError -> {

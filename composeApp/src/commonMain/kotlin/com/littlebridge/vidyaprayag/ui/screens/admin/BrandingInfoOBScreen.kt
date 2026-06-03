@@ -37,7 +37,9 @@ fun BrandingInfoOBScreen() {
         onBackClick = { navigator.goBack() },
         bottomBar = {
             OnboardingBottomBar(
-                onSaveDraft = { /* Save draft */ },
+                onSaveDraft = {
+                    if (!isSubmitting) viewModel.submit { }
+                },
                 onContinue = {
                     if (!isSubmitting) {
                         viewModel.submit {
@@ -89,14 +91,18 @@ fun BrandingInfoOBScreen() {
             item {
                 CoverPhotoSection(
                     imageUrl = state.coverImageUrl,
-                    onUploadClick = { /* Handle upload */ }
+                    onUploadClick = {
+                        viewModel.updateCoverImage("https://placehold.co/1920x820/0F172A/FFFFFF.png?text=VidyaPrayag+Campus")
+                    }
                 )
             }
 
             item {
                 LogoSection(
                     logoUrl = state.logoUrl,
-                    onUploadClick = { /* Handle upload */ }
+                    onUploadClick = {
+                        viewModel.updateLogo("https://placehold.co/512x512/2563EB/FFFFFF.png?text=VP")
+                    }
                 )
             }
 
@@ -147,7 +153,7 @@ private fun CoverPhotoSection(imageUrl: String?, onUploadClick: () -> Unit) {
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(48.dp))
-                    Text("Change Cover Image", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
+                    Text("Use Campus Cover", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
                 }
             }
         }
@@ -232,9 +238,13 @@ private fun VirtualTourSection(url: String, onUrlChange: (String) -> Unit) {
             )
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("Matterport", "Kuula", "YouTube VR").forEach { tag ->
+                listOf(
+                    "Matterport" to "https://my.matterport.com/show/?m=demo",
+                    "Kuula" to "https://kuula.co/share/demo",
+                    "YouTube VR" to "https://www.youtube.com/watch?v=demo"
+                ).forEach { (tag, sampleUrl) ->
                     SuggestionChip(
-                        onClick = { },
+                        onClick = { onUrlChange(sampleUrl) },
                         label = { Text(tag, fontSize = 10.sp) },
                         shape = CircleShape
                     )

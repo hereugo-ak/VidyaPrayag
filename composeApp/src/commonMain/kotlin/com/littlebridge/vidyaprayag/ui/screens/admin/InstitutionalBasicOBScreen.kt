@@ -3,6 +3,7 @@ package com.littlebridge.vidyaprayag.ui.screens.admin
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -15,7 +16,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.presentation.InstitutionalBasicOBViewModel
 import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
 import com.littlebridge.vidyaprayag.navigation.Destination
@@ -35,7 +35,9 @@ fun InstitutionalBasicOBScreen() {
         onBackClick = { navigator.goBack() },
         bottomBar = {
             OnboardingBottomBar(
-                onSaveDraft = { /* Save draft */ },
+                onSaveDraft = {
+                    if (!isSubmitting) viewModel.submit { }
+                },
                 onContinue = {
                     if (!isSubmitting) {
                         viewModel.submit {
@@ -203,11 +205,10 @@ private fun LocationPicker(address: String) {
         ) {
             Text("School Location", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
             Text(
-                "Use Current",
+                "Default Campus",
                 color = MaterialTheme.colorScheme.secondary,
                 fontWeight = FontWeight.Bold,
-                fontSize = 12.sp,
-                modifier = Modifier.clickable { }
+                fontSize = 12.sp
             )
         }
         
@@ -216,13 +217,28 @@ private fun LocationPicker(address: String) {
                 .fillMaxWidth()
                 .height(180.dp)
                 .clip(RoundedCornerShape(20.dp))
+                .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f))
         ) {
-            AsyncImage(
-                model = "https://lh3.googleusercontent.com/aida/ADBb0ujKS0F1JiULtLeeVDpTqgaNyFbwA67q0g2mU5kpdJ3STuxY-9WZXhkeDtjdHaEErpJQ2WGLrgQBMs8LG5ZxDw45A_TiYvX37WedwysCnF5r2iOJHOitbJg5S0uwgXuTeU1jGHtw6cEuOj-pNLPrdwJh92Cr8i2q0fXbSuAv0HWfUBbUGilE3F8PgjdfdfEe3SesTla-LxmAJWgi6JfGq4p3gTnHdmAkzetEsjjgZGiwHlacf8cCz-NRhWs",
+            // Local, deterministic map preview. The previous implementation loaded
+            // a temporary Google-hosted image that now returns HTTP 403 in Coil.
+            Icon(
+                Icons.Default.Map,
                 contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.22f),
+                modifier = Modifier
+                    .size(112.dp)
+                    .align(Alignment.Center)
             )
+            repeat(4) { index ->
+                Box(
+                    modifier = Modifier
+                        .align(if (index % 2 == 0) Alignment.TopStart else Alignment.BottomEnd)
+                        .padding((16 + index * 18).dp)
+                        .size((42 + index * 10).dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.35f))
+                )
+            }
             
             Surface(
                 modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),

@@ -40,7 +40,9 @@ fun AcademicInfoOBScreen() {
         onBackClick = { navigator.goBack() },
         bottomBar = {
             OnboardingBottomBar(
-                onSaveDraft = { /* Save draft */ },
+                onSaveDraft = {
+                    if (!isSubmitting) viewModel.submit { }
+                },
                 onContinue = {
                     if (!isSubmitting) {
                         viewModel.submit {

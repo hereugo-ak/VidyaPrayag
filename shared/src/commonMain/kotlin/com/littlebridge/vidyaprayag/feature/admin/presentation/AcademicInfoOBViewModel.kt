@@ -46,14 +46,14 @@ data class AcademicInfoState(
             Subject(
                 "1", "Mathematics",
                 "Dr. Arpita Sharma",
-                "https://lh3.googleusercontent.com/aida/ADBb0uja34Re_-MtOF9jh5ZyVhQGKS4GfxPzJYtBhBlW10Xem3awSStEWcQapUQMn84PxpJewsaPADpJFUHEmmurRCYaMQxn0RrEMUfKnhgm5x3e5L9NVqRF2PYk3JLfBHm3wWG-9FO94L6Jfs9G9hvcp3m8H9AaL9HhsNrARYaA6ptaWgvQCqXhGxbZi53-E2MLeaH0zRuQxWq_uOFhJXfrZhZ3jYiOErFrXZwdVHYDZTVj-ULoIjrXMisgtdSn",
+                null,
                 "functions"
             ),
             Subject("2", "Science", null, null, "science"),
             Subject(
                 "3", "History",
                 "Prof. Julian V.",
-                "https://lh3.googleusercontent.com/aida/ADBb0uiWZq-wW7_m3lnCFUGBlp8nNDYWY21_qf3JGIcMi0WAVHrgz3sKvAVEqHkh4GjXzxnbWzM4REDpGq0Obs8OTeRwFiZwYD2Td72VDGFa_AB4Gb5ovj3qVT23q4RIEIwUNiL206dYGFVg-00XLz1ZW9Snf_5oITRCj3wQLxRCx9Mklbb72D87jxf1Ocgjljni7TJj2JBTkDQXYj-6U9mmfMVIuGuIQ0s_oFjGSdyExIcf3jwNjwV46aONy6TZ",
+                null,
                 "history_edu"
             )
         )
@@ -129,8 +129,12 @@ class AcademicInfoOBViewModel(
                 }
                 is NetworkResult.Error -> {
                     AppLogger.e("OnboardingAcademic", "Failed to load ACADEMIC step: ${result.message}")
-                    // Don't surface this as a blocking error - the screen still works
-                    // with the hardcoded defaults.
+                    if (result.code == 401) {
+                        preferenceRepository.clearSession()
+                        _errorMessage.value = "Your session expired. Please sign in again before continuing onboarding."
+                    }
+                    // Non-auth errors are not surfaced as blocking errors - the screen
+                    // still works with the fallback class/subject list.
                 }
                 is NetworkResult.ConnectionError -> {
                     AppLogger.e("OnboardingAcademic", "Connection error loading ACADEMIC step")
@@ -173,6 +177,10 @@ class AcademicInfoOBViewModel(
             }
             is NetworkResult.Error -> {
                 AppLogger.e("OnboardingAcademic", "class-details failed: ${res.message}")
+                if (res.code == 401) {
+                    preferenceRepository.clearSession()
+                    _errorMessage.value = "Your session expired. Please sign in again before continuing onboarding."
+                }
             }
             is NetworkResult.ConnectionError -> {
                 AppLogger.e("OnboardingAcademic", "class-details connection error")
@@ -263,8 +271,13 @@ class AcademicInfoOBViewModel(
                     onSuccess()
                 }
                 is NetworkResult.Error -> {
-                    AppLogger.e("OnboardingAcademic", "Submit failed: ${result.message}")
-                    _errorMessage.value = result.message
+                    AppLogger.e("OnboardingAcademic", "Submit failed: ${result.message} (code=${result.code})")
+                    _errorMessage.value = if (result.code == 401) {
+                        preferenceRepository.clearSession()
+                        "Your session expired. Please sign in again before continuing onboarding."
+                    } else {
+                        result.message
+                    }
                     _isSubmitting.value = false
                 }
                 is NetworkResult.ConnectionError -> {
