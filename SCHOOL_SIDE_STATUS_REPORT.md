@@ -1,323 +1,466 @@
 # VidyaPrayag — School Side Status Report
 
 > **Branch analyzed:** `main`
-> **HEAD at audit time:** `0e33daf` plus local fixes applied in this working tree
+> **HEAD at audit time:** `0f4f865` (`Merge pull request #8 from hereugo-ak/fix/school-session-onboarding`)
 > **Audit date:** 2026-06-03
-> **Scope:** Entire **School/Admin** side — Compose UI (`composeApp`), shared client logic (`shared`), and Ktor backend (`server`).
-> **Purpose:** Show what is working, what is not working, current vs desired result, and every known connection/placeholder gap so the school side can be brought to production quality.
+> **Scope:** School/Admin side across Compose UI (`composeApp`), shared KMP client code (`shared`), Ktor backend (`server`), recent Android Studio logs/screenshots, and uploaded Supabase schema (`Vidyasetu schema.txt`).
+> **Purpose:** Capture every known school-side issue before the next fixing pass, including frontend glitches, backend/API mismatches, Supabase schema mismatches, Android dev-network confusion, and parent-school communication gaps.
 
 ---
 
-## 0. Immediate finding from attached screenshot/log
+## 0. Executive summary from the latest screenshots/logs
 
-### 0.1 401 on `POST /api/v1/onboarding/submit`
+The project **compiles**, but the latest screenshots prove the school side is still not production-complete. The biggest problems are not one single crash; they are a mix of **API contract mismatches**, **deployed-backend drift**, **missing Supabase tables**, **placeholder media/location workflows**, and **parent-school data not sharing the same source of truth**.
 
-The screenshot error is caused by this authenticated request returning 401:
+### P0 issues discovered in this audit
 
-- **Endpoint:** `POST https://vidyaprayag-1.onrender.com/api/v1/onboarding/submit`
-- **Server response:** `{"success":false,"message":"Session expired, please login again","errorCode":"UNAUTHORIZED"}`
-- **UI shown:** “Your session was rejected by the server…”
-
-**Current result:** The BASIC onboarding form stays on screen and shows a manual logout/re-login instruction. The debug logger also printed the raw Authorization header in Android Studio logs.
-
-**Root cause:** The JWT was rejected by the server. This happens when the token is expired, signed by a different backend/secret, or the app is pointed to a different backend than the one that issued the token. The app is currently calling Render (`vidyaprayag-1.onrender.com`).
-
-**Fix applied in this working tree:**
-
-1. `shared/.../core/network/NetworkResult.kt`
-   - Redacts sensitive headers (`Authorization`, cookies, API keys) before printing request headers.
-   - This prevents bearer-token leakage in future Android Studio logs.
-
-2. `shared/.../feature/admin/presentation/*OBViewModel.kt`
-   - On 401 during onboarding submit/load flows, clears the local session via `PreferenceRepository.clearSession()`.
-   - BASIC, BRANDING, ACADEMIC and REVIEW/LAUNCH now use the same sign-in-again behavior instead of leaving the user stranded with a rejected token.
-
-3. `composeApp/.../App.kt`
-   - NavHost is now keyed by auth token/role so clearing the token recreates navigation with `Destination.Landing`.
-   - This prevents the user being stranded on an authenticated screen after session invalidation.
-
-### 0.2 Coil HTTP 403 image failure
-
-The log also shows Coil failing to load a temporary Google-hosted `lh3.googleusercontent.com/aida/...` image with HTTP 403.
-
-**Affected screen:** `InstitutionalBasicOBScreen.kt` location/map preview.
-
-**Fix applied:** Replaced that remote image with a local deterministic Compose map preview, and removed additional onboarding review default `lh3.googleusercontent.com/aida/...` image usage so onboarding no longer depends on expiring external image URLs.
+| Priority | Area | Evidence | Current result | Required fix |
+|---|---|---|---|---|
+| P0 | Academic Calendar API contract | Screenshot: `Illegal input: Field 'working_days' is required... at $.data.summary`; code: client expects `working_days`, server sends `total_working_days` | Calendar shows an error and no usable data | Align DTO/response. Prefer server returning `working_days` and optionally `total_working_days` for backward compatibility, or client accepting `total_working_days`. |
+| P0 | Messages conversation endpoint | Screenshot: `Endpoint not found: /api/v1/school/messages/threads/{id}/messages` | Thread list can show, but opening Admin Desk conversation can fail | Ensure deployed backend includes `GET /api/v1/school/messages/threads/{id}/messages`; redeploy backend after `c81aebc`, and add this endpoint to API docs/Postman guide. |
+| P0 | Deployed backend / local backend drift | Build logs print: `devBaseUrl NOT set ... dev flavor will use https://vidyaprayag-1.onrender.com` | Phone may hit Render while developer expects laptop backend; token/server/schema may not match | Add `devBaseUrl=http://<laptop-LAN-ip>:8080` to local `local.properties`, rebuild app, and verify `/api/v1/config/app-status` from the phone browser. |
+| P0 | Supabase schema mismatch | Uploaded schema has no `faculty` or `holiday_list`; server uses both | Attendance faculty, teacher analytics, holidays, calendar summaries can fail on production Supabase if those tables are missing | Apply supplementary SQL / add `faculty` and `holiday_list` tables to production schema. |
+| P0 | Parent-school communication not harmonized | School announcements/messages use school routes; parent announcements/messages are static or separate | School can create announcements/messages that parents do not actually receive/read | Rewire parent announcements/messages/PTM/fees to the same school-scoped operational tables. |
 
 ---
 
-## 1. Status legend
+## 1. Recent commit review — last 10 commits
 
-| Status | Meaning |
-|---|---|
-| ✅ **Working** | UI → ViewModel → Repository/API → Server → DB is wired with real data or real mutation, with loading/error handling. |
-| 🟡 **Partial** | Core route works, but some UI controls are still no-op, CMS-seeded, cosmetic, or missing deeper production logic. |
-| 🔴 **Broken / Placeholder** | Feature is unreachable, not connected, returns placeholder-only data, or has a visible no-op. |
+| Commit | Summary | School-side impact | Audit note |
+|---|---|---|---|
+| `0f4f865` | Merge PR #8 | Brings school session/onboarding fixes to `main` | Current HEAD. |
+| `bfca368` | Fix school onboarding session handling | Redacts Authorization headers, clears session on onboarding 401, removes some expiring image usage | Good security/UX fix, but global session handling is still not complete. |
+| `0e33daf` | Merge PR #7 | Merges school/backend work | Baseline for newer school fixes. |
+| `03ede1b` | Replace placeholder analytics with real data-driven charts & aggregation | Improves analytics routes and UI | Still hybrid; some metrics remain CMS/template-derived. |
+| `3fa0be2` | Add detailed school-side status report | Created earlier report | This file is now updated with latest screenshot/schema findings. |
+| `c81aebc` | Wire conversation view end-to-end; diagnose dev backend/401 | Adds message conversation client/server route | Screenshot still shows endpoint not found, meaning deployed backend/device target likely does not contain this commit or route is not documented/tested. |
+| `da1fe3c` | Enforce school authorization + remove placeholders across school surface | Adds school scoping and many route implementations | Strong improvement, but some parent-facing surfaces remain disconnected. |
+| `6489ada` | Persist real academic structure + unify completion logic | Onboarding academic structure now persists | Core academic onboarding is more real. |
+| `90707b9` | Android build parser helper fix | Build hygiene | No product change. |
+| `18fabe6` | Merge PR #6 | Older backend merge | Historical. |
+
+Additional recent school-side commits in history also matter:
+
+- `aafe10e` — announcement filters + CRM report navigation.
+- `77a65b7` — academic calendar nav + dashboard support actions.
+- `48d16f2` — PTM scheduling dialog + enquiry status dropdown.
 
 ---
 
-## 2. Architecture and connection map
+## 2. Validation performed in this audit
+
+### 2.1 Backend compile
+
+Command run:
+
+```bash
+./gradlew :server:compileKotlin -Pserver-only=true --no-daemon
+```
+
+Result: **[Working] BUILD SUCCESSFUL**.
+
+### 2.2 Android/KMP compile
+
+The old report command `:shared:compileKotlinAndroid` is now invalid because Gradle reports it as ambiguous. Correct command run:
+
+```bash
+./gradlew :shared:compileDevDebugKotlinAndroid :composeApp:compileDevDebugKotlinAndroid --no-daemon
+```
+
+Result: **[Working] BUILD SUCCESSFUL**.
+
+Important non-blocking warnings observed:
+
+- `devBaseUrl NOT set ... dev flavor will use https://vidyaprayag-1.onrender.com`.
+- Kotlin/Native target/version warnings.
+- AGP deprecated API warnings.
+- Room schema export warning.
+- Compose icon/menu deprecation warnings.
+
+These warnings do not block compilation, but the `devBaseUrl` warning directly explains why the real phone may hit Render instead of the laptop backend.
+
+---
+
+## 3. Architecture and connection map
 
 The codebase is Kotlin Multiplatform, not Flutter:
 
 - `composeApp/` — Compose Multiplatform UI screens and navigation.
 - `shared/` — KMP ViewModels, repositories, DTOs, Ktor API clients, preferences, Koin DI.
-- `server/` — Ktor backend routes, DB access, auth, and school-scoped endpoints.
+- `server/` — Ktor backend routes, DB access, JWT auth, and school-scoped endpoints.
+- Supabase/Postgres schema is consumed via Exposed table mappings in `server/src/main/kotlin/.../db/Tables.kt`.
 
-### 2.1 School client-side route registration
+### 3.1 School client-side route registration
 
-All school/admin screens are registered in `composeApp/.../navigation/NavGraph.kt`:
+School/admin screens registered in `NavGraph.kt` include:
 
-- `SchoolDashboard`
-- `InstitutionalBasicOB`, `BrandingInfoOB`, `AcademicInfoOB`, `LaunchInfoOB`
-- `InstitutionalProfile`
-- `AdmissionCRMDashboard`
-- `SchoolAnnouncements`
-- `Messages`
-- `SchedulePTM`
-- `AcademicCalendar`
-- `DailyAttendance`
-- `LeaveRequests`
-- `Results`
-- `AnalyticsDashboard`
-- `StudentAnalytics`
-- `TeacherPerformance`
-- `ClassPerformance`
-- `SyllabusCoverage`
+- School dashboard.
+- Onboarding: Institutional Basics, Branding, Academic, Launch/Review.
+- Institutional profile.
+- Admission CRM.
+- School announcements.
+- Direct messages.
+- Schedule PTM.
+- Academic calendar.
+- Daily attendance.
+- Leave requests.
+- Results.
+- Analytics overview, student analytics, teacher performance, class performance, syllabus coverage.
 
-### 2.2 Backend endpoint inventory for school side
+### 3.2 Backend endpoint inventory for school side
 
-| Area | Backend route file | Endpoints |
+| Area | Backend route file | Endpoints/status |
 |---|---|---|
 | User details/dashboard state | `feature/user/UserDetailsRouting.kt` | `GET /api/v1/user/details` |
 | Onboarding | `feature/onboarding/OnboardingRouting.kt` | `GET /api/v1/onboarding/step`, `GET /api/v1/onboarding/academic/class-details`, `POST /api/v1/onboarding/submit` |
 | School dashboard | `feature/school/SchoolDashboardRouting.kt` | `GET /api/v1/school/dashboard` |
-| Calendar/holidays/attendance | `feature/school/SchoolRouting.kt` | `GET /api/v1/school/calendar`, `GET /api/v1/school/holidays`, `GET /api/v1/school/attendance/daily` |
-| Admissions | `feature/admissions/AdmissionRouting.kt` | `GET /api/v1/admissions/enquiries`, `GET /summary`, `PATCH /{id}/status` |
-| Announcements | `feature/announcements/AnnouncementRouting.kt` | `GET /api/v1/school/announcements/search`, `POST /sync-whatsapp` plus base announcement list/create handlers in the same route block |
-| Messages | `feature/school/MessagesRouting.kt` | `GET /threads`, `GET /threads/{id}/messages`, `POST /threads/{id}/read`, `POST /messages` |
+| Calendar/holidays/attendance | `feature/school/SchoolRouting.kt` | `GET /api/v1/school/calendar`, `/holidays`, `/attendance/daily` |
+| Admissions | `feature/admissions/AdmissionRouting.kt` | `GET /api/v1/admissions/enquiries`, `/summary`, `PATCH /{id}/status` |
+| Announcements | `feature/announcements/AnnouncementRouting.kt` | School list/search/create/sync are present |
+| Messages | `feature/school/MessagesRouting.kt` | Code has `GET /threads`, `GET /threads/{id}/messages`, `POST /threads/{id}/read`, `POST /messages`; deployed backend may lag |
 | Leave requests | `feature/school/LeaveRequestsRouting.kt` | `GET /api/v1/school/leave-requests`, `PATCH /{id}/status` |
-| PTM | `feature/school/PtmRouting.kt` | `GET /api/v1/school/ptm`, `POST /api/v1/school/ptm`, `PATCH /{id}/metrics`, `PUT /{id}/class-progress`, `POST /{id}/complete` |
-| Results | `feature/school/ResultsRouting.kt` | `GET /api/v1/school/results` and supporting result selectors in the same route |
-| Analytics | `feature/school/SchoolAnalyticsRouting.kt` | `GET /overview`, `/class-performance`, `/teacher-performance`, `/student/{studentId}`, `/syllabus-coverage`, `/student-cohort` |
-| Profile | `feature/user/UserProfileRouting.kt` | `GET /api/v1/user/profile`, `PUT /philosophy`, `PUT /tour-videos`, `PUT /gallery`, `PUT /visibility` |
+| PTM | `feature/school/PtmRouting.kt` | `GET/POST /api/v1/school/ptm`, metrics/progress/complete endpoints |
+| Results | `feature/school/ResultsRouting.kt` | `GET /api/v1/school/results` and selectors/upsert support |
+| Analytics | `feature/school/SchoolAnalyticsRouting.kt` | Overview/class/teacher/student/syllabus/cohort routes |
+| Profile | `feature/user/UserProfileRouting.kt` | Profile, philosophy, tour videos, gallery, visibility |
 
 ---
 
-## 3. Feature-by-feature status matrix
+## 4. Screenshot-by-screenshot findings
 
-| # | Feature | UI | Client connection | Server/DB connection | Status | Current vs desired |
-|---|---|---|---|---|---|---|
-| 1 | School onboarding — BASIC | `InstitutionalBasicOBScreen.kt` | `InstitutionalBasicOBViewModel` → `OnboardingRepository` → `OnboardingApi.submitStep` | `OnboardingRouting.post('/submit')` persists BASIC payload | ✅ Working after session fix | Current: saves real school basics when token valid. Desired: same, plus better form validation and editable address. |
-| 2 | School onboarding — BRANDING | `BrandingInfoOBScreen.kt` | ViewModel submits `logo_url` + `brand_color` | Backend stores branding payload | 🟡 Partial | Current: primary submit works; Save Draft submits current data; logo/cover controls now populate stable URLs instead of no-op; mission/vision/tour are UI-only unless backend schema accepts them later. Desired: persist all branding fields and replace URL helper with real storage upload. |
-| 3 | School onboarding — ACADEMIC | `AcademicInfoOBScreen.kt` | Loads classes + class details, submits academic structure | Backend creates/updates classes and subjects | ✅ Working | Current equals desired for core class/subject setup. |
-| 4 | School onboarding — LAUNCH/REVIEW | `LaunchInfoOBScreen.kt` | Loads review payload, final submit completes onboarding | Backend finalizes school and user school link | 🟡 Partial | Current: final launch works; Save Draft now gives explicit local-review feedback, upload button marks documents for verification instead of doing nothing, and default expiring image URL was removed. Desired: real document picker/storage/verification flow. |
-| 5 | School dashboard | `SchoolDashboardScreen.kt` | `SchoolDashboardViewModel` uses `/user/details` | User details includes onboarding details | ✅ Working | Current: correctly changes pre/post onboarding. Desired: add quick-action cards so drawer-only features are discoverable. |
-| 6 | Institutional profile | `InstitutionalProfileScreen.kt` | `UserProfileRepository` + API | `UserProfileRouting.kt` | ✅ Working | Current: save philosophy, gallery URLs, tour URLs, public visibility. Desired: replace URL-only media entry with file upload/storage. |
-| 7 | Admissions CRM | `AdmissionCRMDashboard.kt` | `AdmissionCRMViewModel` | `AdmissionRouting.kt` | ✅ Working | Current: list, summary, status mutation, PTM scheduling entry path. Desired: remove remaining secondary no-op and add richer filters/export. |
-| 8 | Announcements | `SchoolAnnouncementsScreen.kt` | `SchoolAnnouncementsViewModel` | `AnnouncementRouting.kt` | 🟡 Partial | Current: list/search/filter/create/sync wired. Some secondary controls remain no-op and participant avatars are cosmetic. Desired: every CTA wired or removed. |
-| 9 | Messages | `MessagesScreen.kt` | `MessagesViewModel` | `MessagesRouting.kt` | ✅ Core working / 🟡 one UI no-op | Current: threads, conversation, send, read-state work. Desired: header action button should be wired or removed. |
-| 10 | Academic calendar | `AcademicCalendarScreen.kt` | `AcademicCalendarViewModel` | `SchoolRouting.get('/calendar')` | ✅ Mostly working | Current: real month grid is computed from API events and visible month; sync/holiday filter work in-memory; bulk upload card now triggers the existing sync flow instead of a no-op. Desired: dedicated create/edit/import calendar events and first-class holidays UI. |
-| 11 | Daily attendance | `DailyAttendanceScreen.kt` | `DailyAttendanceViewModel` | `SchoolRouting.get('/attendance/daily')` | 🟡 Partial | Current: data loads for student/faculty and grade/date params. Date/see-all control remains no-op. Desired: date picker + paginated/all list + mutation if school marks attendance. |
-| 12 | Leave requests | `LeaveRequestsScreen.kt` | `LeaveRequestsViewModel` | `LeaveRequestsRouting.kt` | ✅ Working | Current: list + approve/reject scoped to school. Desired: optional detail screen/attachments. |
-| 13 | Results | `ResultsScreen.kt` | `ResultsViewModel` | `ResultsRouting.kt` | ✅ Working | Current: real test/class/subject selectors, distribution, trend, search. Desired: upload/edit result records if school staff need write access. |
-| 14 | Schedule PTM | `SchedulePTMScreen.kt` | `SchedulePTMViewModel` | `PtmRouting.kt` | 🟡 Partial | Current: list/create PTM works; several secondary buttons are no-op. Desired: wire metrics, class progress, complete-flow, detail/share actions. |
-| 15 | Analytics overview | `AnalyticsDashboardScreen.kt` | `AnalyticsDashboardViewModel` | `SchoolAnalyticsRouting.get('/overview')` | 🟡 Partial | Current: trend/growth now can be live attendance-based; cards/insights still CMS template with attendance patch. Desired: all cards/insights computed per school. |
-| 16 | Student analytics cohort | `StudentAnalyticsScreen.kt` | `StudentAnalyticsViewModel` | `/analytics/student-cohort` | 🟡 Partial | Current: live volatility and cohort comparison can be computed; risk buckets and at-risk list are still CMS/hybrid. Desired: full risk scoring from real attendance/results/engagement. |
-| 17 | Teacher performance | `TeacherPerformanceScreen.kt` | `TeacherPerformanceViewModel` | `/analytics/teacher-performance` | 🟡 Partial | Current: star faculty ranking is live from attendance/faculty; rest is CMS. Desired: teacher metrics from real PTM, attendance, results, feedback. |
-| 18 | Class performance | `ClassPerformanceScreen.kt` | `ClassPerformanceViewModel` | `/analytics/class-performance` | 🟡 Partial | Current: active students can be live; rest CMS. Desired: class averages, proficiency, median, risk list from real results/attendance. |
-| 19 | Syllabus coverage | `SyllabusCoverageScreen.kt` | `SyllabusCoverageViewModel` | `/analytics/syllabus-coverage` | 🟡 Partial | Current: subject coverage/overall can be overlaid from exam results; alerts/milestones still CMS. Desired: coverage based on actual syllabus plan and chapter completion records. |
+### 4.1 Direct Messaging — endpoint not found
+
+Screenshot shows a modal for **Admin Desk** with:
+
+```text
+Endpoint not found: /api/v1/school/messages/threads/{threadId}/messages
+```
+
+**Current code state:**
+
+- Client calls `GET api/v1/school/messages/threads/$threadId/messages` in `MessagesApi.kt`.
+- Server contains `get("/threads/{id}/messages")` inside `route("/api/v1/school/messages")` in `MessagesRouting.kt`.
+- `Application.kt` registers `messagesRouting()`.
+
+**Interpretation:** the code at HEAD contains the route, so the screenshot likely came from one of these states:
+
+1. The phone is hitting a deployed Render backend that does not include commit `c81aebc` or later.
+2. Android Studio dev build is pointed to Render because `local.properties` has no `devBaseUrl`.
+3. API guide/Postman spec omitted the conversation endpoint, so deployment/tests may not include it.
+
+**Required next fix:**
+
+- Redeploy backend after HEAD.
+- Add `GET /api/v1/school/messages/threads/{id}/messages` to `SCHOOL_API_GUIDE.md` and test chain.
+- Add a temporary app-status/version response that prints backend git SHA so phone screenshots can prove which backend is being hit.
+
+### 4.2 Academic Calendar — `working_days` deserialization failure
+
+Screenshot shows:
+
+```text
+Illegal input: Field 'working_days' is required for type CalendarSummaryDto, but it was missing at path: $.data.summary
+```
+
+**Current code mismatch:**
+
+- Client DTO: `CalendarSummaryDto(@SerialName("working_days") val workingDays: Int, ...)`.
+- Server DTO: `CalendarSummary(@SerialName("total_working_days") val totalWorkingDays: Int, ...)`.
+
+**Current result:** The endpoint may return data successfully, but the app fails to decode it, so the user sees the red error card and calendar empty state.
+
+**Required next fix:** Align server and client names. Recommended server response for compatibility:
+
+```json
+{
+  "working_days": 22,
+  "total_working_days": 22,
+  "public_holidays": 2,
+  "school_holidays": 1
+}
+```
+
+Then update client DTO or keep `working_days` as canonical.
+
+### 4.3 Institutional Profile — public toggle layout glitch
+
+Screenshot shows the **PUBLIC** toggle text clipped/stacked vertically as `P U B L I C`.
+
+**Current result:** Functionality may work, but UI is visibly broken on real phone width.
+
+**Required next fix:** Increase toggle chip width or redesign it as a normal row switch with label outside the switch container. Test on 360–393 dp width.
+
+### 4.4 Admission enquiries — empty/zero state
+
+Screenshot shows:
+
+- `0 Follow-ups`
+- `0 Converted`
+- `No enquiries yet`
+
+**Possible current result:** If the logged-in school has no `admission_enquiries` rows for its `school_id`, this is expected. If sample/enquiry data exists under a different `school_id`, this is a school-scoping/data-seeding mismatch.
+
+**Required next fix:** Verify the logged-in school admin's `app_users.school_id` equals the `admission_enquiries.school_id` rows being tested. Add seeded enquiries for the same school used by the school-admin login.
+
+### 4.5 Announcements — inappropriate/test content visible
+
+Screenshot shows live announcement content with abusive/profane test strings.
+
+**Current result:** The school announcements feature is connected enough to display DB-created rows, but test data/content moderation is not production-safe.
+
+**Required next fix:** Clean production/test seed rows and add input validation/moderation rules before announcements can be published/synced to WhatsApp/parent side.
+
+### 4.6 Onboarding welcome/dashboard
+
+Screenshot shows onboarding progress at `0%` and setup steps.
+
+**Current result:** This aligns with a school user whose onboarding is not complete. Earlier session-expired fix improves the 401 experience, but the user must still be hitting the same backend that issued the token.
+
+**Required next fix:** Finish global unauthorized handling and backend-target visibility.
 
 ---
 
-## 4. What is working now
+## 5. Supabase schema audit from uploaded `Vidyasetu schema.txt`
 
-### 4.1 Authentication and session basics
+Uploaded schema unique tables found: 28.
 
-- Auth uses JWT bearer tokens validated by Ktor auth (`SecurityModule.kt`).
-- Protected school endpoints are under `authenticate("jwt")`.
-- `requireSchoolContext()` is used across school routes to scope by real user/school instead of trusting only JWT role claims.
-- Local session is persisted through `PreferenceRepository`.
-- **Fix applied:** Onboarding 401 handling now clears local session across BASIC, BRANDING, ACADEMIC and REVIEW/LAUNCH, and app navigation resets to landing.
+### 5.1 Tables the server uses but the uploaded schema does not contain
 
-### 4.2 Onboarding core path
+| Missing table | Server usage | Impact if absent in production Supabase |
+|---|---|---|
+| `faculty` | `FacultyTable`; daily attendance faculty mode; teacher performance analytics | Faculty attendance and teacher analytics can fail with relation-not-found or always empty. |
+| `holiday_list` | `HolidayListTable`; `/api/v1/school/holidays`; calendar holiday summary | Holidays API and calendar holiday counts can fail or be empty. |
 
-The main school onboarding journey is functionally wired:
+### 5.2 Uploaded table that server does not use directly
 
-1. BASIC posts `school_name`, `board`, `contact_email`, `contact_phone`, `full_address`.
-2. BRANDING posts `logo_url` and `brand_color`.
-3. ACADEMIC loads active classes and class details, then posts real class/subject structure.
-4. REVIEW loads accumulated review data and final submit completes onboarding.
+| Uploaded table | Note |
+|---|---|
+| `users` | Server intentionally uses `app_users` for app auth/user records; this `users` table may be Supabase/Auth-related or legacy. It is not mapped in `Tables.kt`. |
 
-### 4.3 Dashboard and navigation
+### 5.3 Schema-source drift
 
-- Dashboard reads `/api/v1/user/details` and reflects onboarding state.
-- Drawer and bottom bar expose the main school modules.
-- All school feature screens are registered in NavGraph.
+There are at least three schema references:
 
-### 4.4 School operations
+1. Repo root `supabase_schema` — a larger v2.1 schema beginning with `school_directory` and many enums.
+2. Uploaded `Vidyasetu schema.txt` — operational table set used by the current Ktor backend, but missing `faculty` and `holiday_list`.
+3. `Tables.kt` comment says to run root `/supabase_schema` plus supplementary SQL.
 
-- Admissions enquiry list/status update is school-scoped.
-- Announcements search/filter/create/sync route exists.
-- Messages have real thread/message/read/send flow.
-- Leave requests support approve/reject.
-- Results screen uses real selectors and computed server values.
-- Calendar month grid is now real in the UI (not the older static week described in previous report revisions).
+**Risk:** Different developers/environments can have different table sets. This explains why features compile locally but fail against actual Supabase.
+
+**Required next fix:** Create one canonical SQL migration set for the Ktor backend and update docs so production Supabase includes exactly the tables mapped by `Tables.kt`.
 
 ---
 
-## 5. What is still not production-complete
+## 6. Feature-by-feature status matrix
 
-### 5.1 Remaining no-op controls
-
-Static scan after the fixes still finds these school-side no-op handlers:
-
-| File | Line approx | Control/gap | Desired action |
-|---|---:|---|---|
-| `AdmissionCRMDashboard.kt` | 222 | secondary `TextButton` | Wire to full enquiry list/detail/export or remove. |
-| `AnalyticsDashboardScreen.kt` | 258, 302 | analytics card/header actions | Navigate to drilldowns/export/report filters or remove. |
-| `DailyAttendanceScreen.kt` | 217 | `TextButton` | Open date picker or full attendance list. |
-| `MessagesScreen.kt` | 428 | action button | New message/search/filter action or remove. |
-| `SchedulePTMScreen.kt` | 237, 337, 402, 414 | several secondary buttons/icons | Wire to detail, reschedule, share, complete, metrics actions. |
-| `SchoolAnnouncementsScreen.kt` | 357, 453 | “see all”/secondary actions | Wire to full list/audience details or remove. |
-| `StudentAnalyticsScreen.kt` | 318 | icon button | Wire to export/filter/detail. |
-| `SyllabusCoverageScreen.kt` | 182, 269 | action button/icon | Wire to syllabus sync/export/detail. |
-| `TeacherPerformanceScreen.kt` | 350 | action button | Wire to teacher detail/export. |
-| `LaunchInfoOBScreen.kt` | — | Compliance upload is now locally actionable | Still needs real file picker/storage/verification API for production. |
-| `AcademicCalendarScreen.kt` | — | Bulk upload card now calls sync | Still needs real CSV/PDF import endpoint for production. |
-
-`placeholder = "..."` in text fields is normal hint text, not a bug.
-
-### 5.2 Analytics remains hybrid/CMS-driven
-
-The analytics server has improved from the older report, but it is still not fully real analytics.
-
-| Endpoint | Real/live today | Still CMS/template today | Desired result |
+| # | Feature | Current status | Current vs desired |
 |---|---|---|---|
-| `/analytics/overview` | Monthly attendance trend, trend labels, growth when attendance exists; first card attendance patch | Most card definitions and insight copy | All cards and insights computed from school data. |
-| `/analytics/class-performance` | `summary.active_students` live | Proficiency, median, trend, risk/subject sections | Compute from exam results + attendance. |
-| `/analytics/teacher-performance` | `star_faculty` from faculty + attendance | Most teacher KPIs/charts | Compute per teacher from attendance, PTM, result outcomes. |
-| `/analytics/student/{studentId}` | Student header, attendance, average, rank | Subjects, milestones, narrative | Compute subjects/milestones/narrative from real records. |
-| `/analytics/syllabus-coverage` | Subject coverage and overall can come from exam result proxy | Alerts/milestones; no real curriculum schedule | Add syllabus/chapter completion tables and compute coverage from them. |
-| `/analytics/student-cohort` | active low-risk count, volatility, cohort comparison | critical/medium risk buckets and at-risk list | Real risk model from attendance + result decline + engagement. |
-
-### 5.3 Server route naming issue
-
-`SchoolRouting.kt` previously had `GET /api/v1/school/analytics` returning a public “coming soon” response, while real analytics live under `/api/v1/school/analytics/*` in `SchoolAnalyticsRouting.kt`.
-
-**Fix applied:** The base endpoint now returns an endpoint-index style response pointing clients to `/overview`, `/class-performance`, `/teacher-performance`, `/student/{studentId}`, `/student-cohort`, and `/syllabus-coverage` instead of saying the feature is coming soon.
-
-**Desired:** In a later backend cleanup, either remove the base endpoint or make it return the authenticated overview directly.
-
-### 5.4 Media upload is not complete
-
-Several screens accept URLs rather than uploading files:
-
-- Branding logo/cover/tour.
-- Institutional profile gallery/tour videos.
-- Launch compliance document upload.
-
-**Desired:** Use a real upload path/storage provider and persist returned URLs.
-
-### 5.5 Address/location is still not real geolocation
-
-BASIC onboarding sends a default full address and shows a local map preview.
-
-**Current:** The old external map image issue is fixed, but this is not real geolocation.
-
-**Desired:** Editable address fields + optional device location permission + map picker/geocoding.
+| 1 | School onboarding — BASIC | [Partial] Mostly working | Saves basics when token/backend match. Still needs editable real address/location and global 401 handling. |
+| 2 | School onboarding — BRANDING | [Partial] Partial | Logo/cover actions are URL/stable placeholder based, not binary upload. Mission/vision fields are not fully persisted to backend schema. |
+| 3 | School onboarding — ACADEMIC | [Working] Core working | Class/subject setup is connected. Needs more validation and duplicate handling UX. |
+| 4 | School onboarding — LAUNCH/REVIEW | [Partial] Partial | Completion can work, but document upload is local UI state only, not real storage/verification. |
+| 5 | School dashboard | [Working] Core working | Dashboard reflects onboarding state. Needs backend target/version diagnostics and better discoverability. |
+| 6 | Institutional profile | [Partial] Partial | Philosophy/gallery/tour/visibility are wired by URL. UI toggle has real-phone layout glitch. No binary upload. |
+| 7 | Admissions CRM | [Partial] Partial | Summary/list/status are wired, but empty screenshot needs school-id seed verification. Some secondary controls remain no-op. |
+| 8 | Announcements | [Partial] Partial | School list/search/filter/create/sync wired. Parent side does not consume same rows yet. Test/profane data visible. |
+| 9 | Messages | [P0] Broken in latest screenshot / code mostly present | Thread list can show. Conversation route exists in HEAD but screenshot backend returns 404. Parent side messaging is static, so harmony is missing. |
+| 10 | Academic calendar | [P0] Runtime broken | DTO mismatch (`working_days` vs `total_working_days`) breaks decoding. Also depends on missing `holiday_list` in uploaded schema. |
+| 11 | Daily attendance | [Partial] Partial | Student/faculty data can load if schema and seed are correct. Faculty path depends on missing `faculty` table in uploaded schema. Date/see-all control remains no-op. |
+| 12 | Leave requests | [Working] Core working | List + approve/reject are school-scoped. Needs attachments/detail screen. |
+| 13 | Results | [Working] Core working | Selectors/search/results are wired. Needs upload/edit records if school staff need full write workflows. |
+| 14 | Schedule PTM | [Partial] Partial | Create/list works; metrics/progress/complete endpoints exist, but several UI buttons are still no-op. Parent PTM harmony still needs verification. |
+| 15 | Analytics overview | [Partial] Hybrid | More live than before, but some cards/insights are still CMS/template-derived. |
+| 16 | Student analytics cohort | [Partial] Hybrid | Some live computations, but risk model is incomplete. |
+| 17 | Teacher performance | [Partial] Hybrid / schema risk | Uses faculty/attendance concepts; uploaded schema lacks `faculty`. |
+| 18 | Class performance | [Partial] Hybrid | Needs deeper real aggregation from results/attendance. |
+| 19 | Syllabus coverage | [Partial] Hybrid | Coverage still partly inferred/proxy; needs real syllabus/chapter completion tables. |
+| 20 | Parent-school harmony | [P0] Not complete | Parent announcements/messages are not using the same operational school message/announcement tables. |
 
 ---
 
-## 6. Current vs desired result by major workflow
+## 7. Remaining visible no-op/incomplete controls
 
-### 6.1 School onboarding
+Static scan still finds these school/admin no-op handlers:
 
-- **Current:** Main flow works with a valid token. Expired/rejected token now clears session and returns app to login across onboarding steps. BASIC no longer loads a 403 remote map image, and REVIEW no longer uses an expiring default school image URL.
-- **Desired:** Add form validation, editable address/location, document upload, and persistence for all branding/review fields.
+| File | Line approx | Gap | Desired action |
+|---|---:|---|---|
+| `AdmissionCRMDashboard.kt` | 222 | Secondary `TextButton` | Wire to full enquiry list/detail/export or remove. |
+| `AnalyticsDashboardScreen.kt` | 258, 302 | Card/header actions | Navigate to drilldowns/export/report filters or remove. |
+| `DailyAttendanceScreen.kt` | 217 | `TextButton` | Open date picker or full attendance list. |
+| `MessagesScreen.kt` | 428 | Action button | New message/search/filter action or remove. |
+| `SchedulePTMScreen.kt` | 237, 337, 402, 414 | Several buttons/icons | Wire detail/reschedule/share/complete/metrics actions. |
+| `SchoolAnnouncementsScreen.kt` | 357, 453 | See-all/secondary actions | Wire full list/audience details or remove. |
+| `StudentAnalyticsScreen.kt` | 318 | Icon button | Wire export/filter/detail. |
+| `SyllabusCoverageScreen.kt` | 182, 269 | Action button/icon | Wire syllabus sync/export/detail. |
+| `TeacherPerformanceScreen.kt` | 350 | Action button | Wire teacher detail/export. |
 
-### 6.2 School daily operations
-
-- **Current:** Admissions, announcements, messages, leave requests, calendar, attendance, PTM, and results have real API routes and most primary flows are wired.
-- **Desired:** Remove remaining no-op secondary buttons and add detail/export/date-picker/media workflows.
-
-### 6.3 Analytics
-
-- **Current:** Hybrid. Some server values are real, but many cards/lists/insights remain seeded CMS rows.
-- **Desired:** No seeded metric should be presented as live. Every numeric card/chart/list must be either computed per school or clearly labelled as configured content.
-
-### 6.4 API/security logging
-
-- **Current after fix:** Authorization headers are redacted in client API logs.
-- **Desired:** Keep redaction; avoid logging request bodies containing sensitive PII in release builds.
+Normal `placeholder = "..."` text in input fields is not a bug.
 
 ---
 
-## 7. Prioritized fix plan
+## 8. Known issue register
 
-### P0 — Stop session and debug pain
+### 8.1 Images/media upload
 
-1. ✅ Redact Authorization headers in `NetworkResult.kt`.
-2. ✅ Clear session on BASIC onboarding 401 and reset navigation on token removal.
-3. 🔲 Apply the same unauthorized-session clearing pattern to every ViewModel/API flow, not only BASIC onboarding.
-4. 🔲 Add a single global session-expired handler so each screen does not implement 401 logic separately.
+**Status:** [P0] Not real upload yet.
 
-### P1 — Remove visible placeholders/no-ops
+Affected areas:
 
-1. Wire or remove the no-op handlers listed in §5.1.
-2. Replace Launch Upload with a real document picker/storage upload or hide it until supported.
-3. Remove or repurpose `GET /api/v1/school/analytics` “coming soon”.
+- Branding logo/cover.
+- Institutional profile gallery and tour videos.
+- Launch compliance documents.
+- Announcement images.
+- Student/result/avatar images if school staff need to add them.
 
-### P2 — Make analytics production-real
+Current backend accepts/persists URLs in several places, but no multipart/storage upload flow exists. `UserProfileRouting.kt` explicitly notes MVP storage estimates until binary uploads land.
 
-1. Replace CMS-only metrics with real aggregation queries.
-2. Add curriculum/syllabus completion data model so syllabus coverage is not inferred from exam scores.
-3. Implement risk scoring for student analytics.
-4. Add teacher KPI computation from faculty attendance, PTM, results, and feedback records.
+**Desired:** Supabase Storage or equivalent upload endpoint, file picker on Android, server-side validation, persisted public/signed URL, and deletion/replacement flow.
 
-### P3 — UX completeness
+### 8.2 Location/address
 
-1. Add school dashboard quick-action cards for Calendar, Attendance, Leave, Results, PTM, Analytics.
-2. Add full date picker to attendance/calendar screens.
-3. Add media/document upload across onboarding/profile.
-4. Add empty-state copy for every feature when a newly onboarded school has no data yet.
+**Status:** [P0] Not real geolocation.
+
+Current onboarding/profile uses address strings and local map preview. There is no real map picker, permission handling, geocoding, latitude/longitude persistence in the school table used by Ktor, or parent-side distance computation tied to selected school.
+
+**Desired:** Editable address fields + optional Android location permission + lat/lng columns + geocoding/map picker + parent distance display from same data.
+
+### 8.3 Session handling
+
+**Status:** [Partial] Improved but not global.
+
+Onboarding 401 behavior was improved in `bfca368`, but unauthorized handling should be centralized in the network layer/session manager so every school and parent screen behaves consistently.
+
+### 8.4 Backend target visibility
+
+**Status:** [P0] Missing.
+
+When a real phone is connected over WiFi, the app must clearly show/log which backend it is using. Current Gradle warning says dev fallback is Render unless `devBaseUrl` is set.
+
+**Desired:** Add debug-only backend banner/log containing base URL and backend git SHA/app-status version.
+
+### 8.5 Data quality/content moderation
+
+**Status:** [P0] Required before demo/production.
+
+Screenshots show inappropriate test content in messages/announcements. Production seed/test data must be cleaned, and user-generated school content needs validation/moderation.
 
 ---
 
-## 8. Validation checklist
+## 9. Parent-school harmony gaps
 
-Run these after pulling this working tree:
+The user specifically asked that school and parent side communicate properly. Current state is not there yet.
+
+### 9.1 Announcements
+
+- School side creates/reads `announcements` through school routes.
+- Parent route `GET /api/v1/parent/announcements` currently returns static/mock list in `ParentRouting.kt`.
+
+**Result:** A school announcement can appear on school side but not parent side.
+
+**Fix:** Parent announcements endpoint must query `AnnouncementsTable` scoped by the parent's child/school and return the same rows.
+
+### 9.2 Messages
+
+- School side uses `message_threads` and `messages` via `MessagesRouting.kt`.
+- Parent message screen uses `ParentMessageViewModel` static sample threads; no parent messages backend route was found.
+
+**Result:** Direct messaging is not a true parent-school conversation system yet.
+
+**Fix:** Add parent message API using the same `message_threads/messages` tables with participant modeling. The current `owner_user_id` model is too admin-inbox-centric for two-way parent-school conversations.
+
+### 9.3 PTM
+
+- School PTM routes exist.
+- Parent PTM state needs verification against same `ptm_events` and `ptm_class_progress` tables.
+
+**Fix:** Ensure parent PTM screen lists school-created PTMs for that child/class and can confirm/check in if required.
+
+### 9.4 Fees/results/attendance
+
+Some parent features are still static/CMS or separate. Long-term, parent side should read the same school-scoped operational tables for child-linked records.
+
+---
+
+## 10. Prioritized fix plan
+
+### P0 — Fix runtime blockers shown in screenshots
+
+1. Fix calendar DTO mismatch: `working_days` vs `total_working_days`.
+2. Verify/redeploy messages conversation endpoint and add it to docs/tests.
+3. Add `faculty` and `holiday_list` to canonical Supabase migration.
+4. Add debug backend target/version visibility.
+5. Set `devBaseUrl` locally when testing real phone against laptop backend.
+
+### P1 — Make parent-school communication real
+
+1. Parent announcements must read school `announcements` table.
+2. Parent messages must use backend + same message tables.
+3. PTM parent side must read school-created `ptm_events`.
+4. Verify school_id linkage: `app_users`, `children`, `students`, and parent-child-school relations.
+
+### P2 — Remove visible glitches/no-ops
+
+1. Fix Institutional Profile public toggle layout.
+2. Wire/remove all no-op handlers listed in §7.
+3. Clean test/profane seed data.
+4. Add empty-state copy that differentiates “no data yet” from API failure.
+
+### P3 — Real media/location workflows
+
+1. Add Supabase Storage upload endpoint(s).
+2. Add Android image/document picker.
+3. Add address/geolocation columns/workflow.
+4. Replace URL-only UI with real upload + preview + delete/replace.
+
+### P4 — Analytics productionization
+
+1. Remove CMS-only metrics or label as configured content.
+2. Add real syllabus/chapter completion model.
+3. Add student risk scoring from attendance/results/engagement.
+4. Compute teacher KPIs from faculty attendance, PTM, results, and feedback.
+
+---
+
+## 11. Updated validation checklist
+
+Run after next fixes:
 
 ```bash
-./gradlew :shared:compileKotlinAndroid :composeApp:compileDevDebugKotlinAndroid
-./gradlew :server:compileKotlin -Pserver-only=true
-./gradlew :composeApp:assembleDevDebug
+./gradlew :server:compileKotlin -Pserver-only=true --no-daemon
+./gradlew :shared:compileDevDebugKotlinAndroid :composeApp:compileDevDebugKotlinAndroid --no-daemon
+./gradlew :composeApp:assembleDevDebug --no-daemon
 ```
 
-Manual app checks:
+Manual phone/backend checks:
 
-1. Log in as a school admin against the same backend that the app points to.
-2. Complete BASIC onboarding with a fresh token: expect success and no 401 banner.
-3. Force an expired token: expect local session clear and return to landing/login.
-4. Check Android Studio logs: Authorization header must show `[REDACTED]`.
-5. Reopen BASIC onboarding: no Coil 403 should appear for the map image.
-6. Visit every drawer/bottom-bar school feature and verify no primary flow is blocked.
-7. Search for remaining no-ops:
+1. On laptop, start backend on `0.0.0.0:8080`.
+2. From phone browser, open `http://<laptop-LAN-ip>:8080/api/v1/config/app-status`.
+3. In Android Studio project `local.properties`, set:
 
-```bash
-rg -n "onClick\s*=\s*\{\s*\}|clickable\s*\{\s*\}|/\* Save draft \*/" composeApp/src/commonMain/kotlin/com/littlebridge/vidyaprayag/ui/screens/admin
+```properties
+devBaseUrl=http://<laptop-LAN-ip>:8080
 ```
+
+4. Rebuild/reinstall dev app.
+5. Login as school admin.
+6. Confirm app logs/base-url banner show laptop backend, not Render.
+7. Open Messages → Admin Desk → conversation; expect no 404.
+8. Open Academic Calendar; expect no `working_days` serialization error.
+9. Toggle Institutional Profile public/private; expect no clipped vertical label.
+10. Create announcement on school side; verify the same announcement appears on parent side after parent endpoint is rewired.
+11. Test image/document upload only after real storage endpoint exists; until then, treat URL/local marker UI as incomplete.
 
 ---
 
-## 9. Summary
+## 12. Bottom line
 
-The school side is **not just placeholder code**: onboarding, dashboard, profile, admissions, messages, leave requests, results, and much of calendar/attendance/PTM are genuinely connected. The main remaining production blockers are:
+The school side has real progress: onboarding, school dashboard, admissions, announcements, messages, leave requests, PTM, results, and analytics all have meaningful code and several real backend routes. However, the latest screenshots identify **active runtime blockers**:
 
-1. Session-expired handling needs to be global, not screen-specific.
-2. Several secondary UI buttons still do nothing.
-3. Analytics is still hybrid: some live overlays, many CMS-seeded values.
-4. Media/document upload is not a real file flow yet.
-5. Dashboard discoverability should improve for drawer-only tools.
+1. Calendar response/client field mismatch.
+2. Message conversation endpoint missing on the backend currently reached by the phone.
+3. Supabase table mismatch for `faculty` and `holiday_list`.
+4. Parent-side communication is not yet using the same school data.
+5. Media upload and location are still placeholder/URL/local workflows.
+6. Several UI controls remain no-op or visually broken.
 
-This file should be kept updated as each placeholder/no-op is removed.
+Next fixing pass should start with the P0 list above before polishing UI or adding new features.
