@@ -1039,6 +1039,30 @@ uploads** and closes the STUDENT-scope gap.
 
 ---
 
+## 8e. GPS capture + profile placeholder removal + premium motion + setup guide (this pass)
+
+Continues `backend-by-abuzar`. Closes the remaining "next pass" items from §8d:
+real client-side GPS, the last media placeholders, polished motion, and a single
+consolidated manual-setup checklist.
+
+### Implemented
+
+| Item | Report ref | What was added |
+|---|---|---|
+| **Client-side GPS capture** | §11.2 / §4.4 | New cross-platform `ui/location/LocationProvider` — `expect rememberLocationProvider()` + `DeviceLocation`/`LocationResult`. **Android actual is dependency-free** (platform `LocationManager` + `android.location.Geocoder`): runtime `ACCESS_FINE/COARSE_LOCATION` request, last-known→live-fix fallback, reverse geocoding into city/district/state/pincode/full_address. iOS/desktop/JS/Wasm: clean `Unavailable` stubs. `InstitutionalBasicOBScreen` now has a real **"Use current location"** button (replacing the static map placeholder); the BASIC submit payload carries `latitude/longitude` + parsed address parts (only when captured), persisted to `schools.latitude/longitude`. |
+| **Gallery / tour placeholder removal** | §5.9 | `InstitutionalProfileViewModel` injects `MediaApi`; `uploadGalleryPhoto()`/`uploadTourVideo()` POST **real binaries** (IMAGE/VIDEO) and persist the returned URL via existing endpoints. `InstitutionalProfileScreen` **removes** the "ADD PHOTO BY URL" / "Add Tour Video by URL" dialogs and wires the real device picker → upload, with in-button spinners and 503/connection messaging. No URL-paste placeholders remain anywhere in the school media flow. |
+| **Premium iOS animations** | §8c | New `ui/components/PremiumAnimations.kt` (dependency-free CMP): `Modifier.pressScale()`, `Modifier.tappableScale()`, `AnimatedEntrance {}` (staggered fade + slide-up), `Modifier.shimmerPlaceholder()`/`ShimmerBox`, `staggerDelay()`. Applied to `InstitutionalProfileScreen` (staggered cascade reveal) and `VidyaPrayagPrimaryButton` (spring press). Reusable across all screens. |
+| **Consolidated setup guide** | — | New `MANUAL_SETUP_GUIDE.md` — one checklist for every manual one-time step (migration, bucket, Supabase env, security env, OTP provider, Android location permission), plus a "what's already done in code" section. Answers the recurring `SUPABASE_BUCKET = school-media` question explicitly. |
+
+### Manual setup required
+
+All consolidated into `MANUAL_SETUP_GUIDE.md`. Summary: run `migration_002`,
+create public bucket `school-media`, set `SUPABASE_URL` / `SUPABASE_SERVICE_KEY`
+(service_role) / `SUPABASE_BUCKET=school-media` on Render, set `JWT_SECRET` /
+`OTP_PEPPER` / `OTP_ADMIN_TOKEN`, and wire ≥1 OTP provider.
+
+---
+
 ## 9. Bottom line
 
 The known screenshot issues are real, but the root causes are broader than the visible UI errors. The current merged code contains several intended fixes, yet the backend cannot currently compile, the tested phone build was pointed at stale Render, API logs expose secrets, legacy parent routes can shadow newer live routes, and major product requirements such as location, upload, subject/teacher assignment, and segmented broadcasts remain incomplete.
