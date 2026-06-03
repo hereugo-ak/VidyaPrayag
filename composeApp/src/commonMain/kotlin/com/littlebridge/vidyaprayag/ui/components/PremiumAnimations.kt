@@ -9,14 +9,21 @@
  * desktop, web and (future) iOS.
  *
  * Provided helpers:
- *   - Modifier.pressScale()        iOS-like spring press feedback for any tappable
- *   - AnimatedEntrance { }         staggered fade + slide-up on first composition
- *   - Modifier.shimmerPlaceholder()gradient shimmer for loading skeletons
- *   - rememberStaggerDelay(index)  convenience for list stagger timing
+ *   - Modifier.pressScale()         iOS-like spring press feedback for any tappable
+ *   - Modifier.tappableScale()      self-contained tap-with-spring + onClick
+ *   - AnimatedEntrance { }          staggered fade + slide-up on first composition
+ *   - AnimatedVisibilityFade { }    smooth cross-fade + expand for conditional UI
+ *   - Modifier.shimmerPlaceholder() gradient shimmer for loading skeletons
+ *   - Modifier.gentleFloat()        subtle perpetual hover for hero elements
+ *   - ShimmerBox                    ready-made skeleton row
+ *   - PulsingDot                    breathing live/status indicator
+ *   - staggerDelay(index)           convenience for list stagger timing
  */
 package com.littlebridge.vidyaprayag.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseInOutSine
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -26,25 +33,29 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -112,19 +123,18 @@ fun Modifier.tappableScale(
 /**
  * Wraps content with a one-shot fade + slide-up entrance (iOS "soft reveal").
  * [delayMillis] enables list staggering — pass `index * 60` for a cascade.
+ * A subtle scale-from-98% is layered in for a richer, more tactile reveal.
  */
 @Composable
 fun AnimatedEntrance(
     modifier: Modifier = Modifier,
     delayMillis: Int = 0,
     slideOffsetY: Float = 24f,
-    durationMillis: Int = 420,
+    durationMillis: Int = 440,
     content: @Composable () -> Unit
 ) {
-    var visible by remember { mutableStateOf(false) }
     val progress = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
-        visible = true
         progress.animateTo(
             targetValue = 1f,
             animationSpec = tween(
@@ -136,9 +146,39 @@ fun AnimatedEntrance(
     }
     Box(
         modifier = modifier.graphicsLayer {
-            alpha = progress.value
-            translationY = (1f - progress.value) * slideOffsetY
+            val p = progress.value
+            alpha = p
+            translationY = (1f - p) * slideOffsetY
+            // Gentle scale-in (0.98 → 1.0) for a soft, premium "settle".
+            val s = 0.98f + 0.02f * p
+            scaleX = s
+            scaleY = s
         }
+    ) {
+        content()
+    }
+}
+
+/**
+ * Smooth conditional reveal: fade + vertical expand in, fade + shrink out.
+ * Use for error banners, inline tips, expandable sections — anything that
+ * appears/disappears in response to state. Easier than hand-rolling
+ * AnimatedVisibility everywhere and keeps the motion language consistent.
+ */
+@Composable
+fun AnimatedVisibilityFade(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+    durationMillis: Int = 280,
+    content: @Composable () -> Unit
+) {
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = fadeIn(tween(durationMillis, easing = FastOutSlowInEasing)) +
+            expandVertically(tween(durationMillis, easing = FastOutSlowInEasing)),
+        exit = fadeOut(tween(durationMillis, easing = FastOutSlowInEasing)) +
+            shrinkVertically(tween(durationMillis, easing = FastOutSlowInEasing))
     ) {
         content()
     }
@@ -179,6 +219,28 @@ fun Modifier.shimmerPlaceholder(
 }
 
 /**
+ * Subtle perpetual vertical "float" for hero icons / illustrations. Gives an
+ * idle screen a living, premium feel without being distracting.
+ */
+@Composable
+fun Modifier.gentleFloat(
+    amplitude: Float = 6f,
+    durationMillis: Int = 2600
+): Modifier {
+    val transition = rememberInfiniteTransition(label = "float")
+    val offset by transition.animateFloat(
+        initialValue = -amplitude,
+        targetValue = amplitude,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = durationMillis, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "float-offset"
+    )
+    return this.graphicsLayer { translationY = offset }
+}
+
+/**
  * Convenience for staggered list entrances: returns a delay (ms) that grows
  * with [index] but is capped so long lists don't feel sluggish.
  */
@@ -196,5 +258,38 @@ fun ShimmerBox(
             .clip(RoundedCornerShape(cornerRadius))
             .background(Color(0xFFE6E8EB))
             .shimmerPlaceholder(cornerRadius = cornerRadius)
+    )
+}
+
+/**
+ * A gently breathing dot — perfect for "LIVE", "active", or unsaved-changes
+ * status indicators. Pulses opacity + scale on an infinite ease loop.
+ */
+@Composable
+fun PulsingDot(
+    modifier: Modifier = Modifier,
+    color: Color = Color(0xFF22C55E),
+    size: Dp = 10.dp
+) {
+    val transition = rememberInfiniteTransition(label = "pulse")
+    val pulse by transition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse-value"
+    )
+    Box(
+        modifier = modifier
+            .size(size)
+            .graphicsLayer {
+                alpha = pulse
+                scaleX = pulse
+                scaleY = pulse
+            }
+            .clip(CircleShape)
+            .background(color)
     )
 }
