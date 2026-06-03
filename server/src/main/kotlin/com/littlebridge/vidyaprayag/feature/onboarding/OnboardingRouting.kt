@@ -143,7 +143,11 @@ private val BASIC_FIELDS = listOf(
     Triple("district", "District", "line"),
     Triple("state", "State", "line"),
     Triple("pincode", "Pincode", "line"),
-    Triple("full_address", "Address", "multiline")
+    Triple("full_address", "Address", "multiline"),
+    // Geo coordinates captured by the client's "use current location" / map
+    // picker. Stored as plain strings in the draft, parsed to Double on commit.
+    Triple("latitude", "Latitude", "geo"),
+    Triple("longitude", "Longitude", "geo")
 )
 private val BRANDING_FIELDS = listOf(
     Triple("logo_url", "Logo", "image"),
@@ -205,6 +209,8 @@ private fun ensureSchoolForUser(uid: UUID): UUID {
         it[district] = basics["district"] ?: "Unknown"
         it[state] = basics["state"] ?: "Uttar Pradesh"
         it[pincode] = basics["pincode"]
+        it[latitude] = basics["latitude"]?.toDoubleOrNull()
+        it[longitude] = basics["longitude"]?.toDoubleOrNull()
         it[logoUrl] = branding["logo_url"]
         it[brandColor] = branding["brand_color"] ?: "#2563EB"
         it[isActive] = true
@@ -240,6 +246,8 @@ private fun syncSchoolBasics(schoolId: UUID, uid: UUID) {
         basics["district"]?.let { v -> it[district] = v }
         basics["state"]?.let { v -> it[state] = v }
         basics["pincode"]?.let { v -> it[pincode] = v }
+        basics["latitude"]?.toDoubleOrNull()?.let { v -> it[latitude] = v }
+        basics["longitude"]?.toDoubleOrNull()?.let { v -> it[longitude] = v }
         branding["logo_url"]?.let { v -> it[logoUrl] = v }
         branding["brand_color"]?.let { v -> it[brandColor] = v }
         it[updatedAt] = now

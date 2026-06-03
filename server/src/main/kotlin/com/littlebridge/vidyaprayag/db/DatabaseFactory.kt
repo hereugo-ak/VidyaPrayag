@@ -52,6 +52,7 @@ object DatabaseFactory {
         OnboardingDraftsTable,
         SchoolClassesTable,
         SchoolSubjectsTable,
+        TeacherSubjectAssignmentsTable,
         AnnouncementsTable,
         WhatsappLogsTable,
         AdmissionEnquiriesTable,

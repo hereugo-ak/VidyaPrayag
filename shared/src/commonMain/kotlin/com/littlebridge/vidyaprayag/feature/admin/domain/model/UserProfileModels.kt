@@ -65,3 +65,38 @@ data class VisibilityRequest(
 data class VisibilityResponse(
     @SerialName("public_profile") val publicProfile: Boolean
 )
+
+/**
+ * Response of POST /api/v1/school/media/upload — the REAL upload endpoint
+ * that turns "paste a URL" placeholders into genuine files in Supabase
+ * Storage. `url` is the public URL the client then stores in gallery /
+ * branding / profile flows.
+ */
+@Serializable
+data class MediaUploadResponse(
+    val url: String,
+    val kind: String,
+    @SerialName("size_bytes") val sizeBytes: Long = 0L
+)
+
+/** A picked file ready to upload: raw bytes + mime + suggested name. */
+data class PickedMedia(
+    val bytes: ByteArray,
+    val fileName: String,
+    val mimeType: String
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is PickedMedia) return false
+        return fileName == other.fileName &&
+            mimeType == other.mimeType &&
+            bytes.contentEquals(other.bytes)
+    }
+
+    override fun hashCode(): Int {
+        var result = bytes.contentHashCode()
+        result = 31 * result + fileName.hashCode()
+        result = 31 * result + mimeType.hashCode()
+        return result
+    }
+}

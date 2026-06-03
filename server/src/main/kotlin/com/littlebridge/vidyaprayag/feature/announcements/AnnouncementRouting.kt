@@ -37,7 +37,9 @@ import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.requireSchoolContext
 import com.littlebridge.vidyaprayag.db.AnnouncementsTable
 import com.littlebridge.vidyaprayag.db.AppUsersTable
+import com.littlebridge.vidyaprayag.db.ChildrenTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
+import com.littlebridge.vidyaprayag.db.TeacherSubjectAssignmentsTable
 import com.littlebridge.vidyaprayag.db.WhatsappLogsTable
 import io.ktor.http.*
 import io.ktor.server.auth.*
@@ -45,6 +47,12 @@ import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
@@ -65,7 +73,9 @@ data class AnnouncementDto(
     @SerialName("sub_title") val subTitle: String? = null,
     val description: String,
     @SerialName("event_image") val eventImage: String? = null,
-    val date: String
+    val date: String,
+    @SerialName("audience_type") val audienceType: String = "ALL_SCHOOL",
+    @SerialName("audience_filter") val audienceFilter: JsonElement? = null
 )
 
 @Serializable
@@ -79,7 +89,16 @@ data class CreateAnnouncementDto(
     val description: String,
     @SerialName("event_image") val eventImage: String? = null,
     val date: String,                              // YYYY-MM-DD
-    @SerialName("school_id") val schoolId: String? = null
+    @SerialName("school_id") val schoolId: String? = null,
+    // Broadcast segmentation. Defaults to ALL_SCHOOL when omitted so existing
+    // clients keep working. audienceFilter is the scope JSON (see Tables.kt).
+    @SerialName("audience_type") val audienceType: String? = null,
+    @SerialName("audience_filter") val audienceFilter: JsonElement? = null
+)
+
+/** Audience scopes a broadcast can target. */
+private val VALID_AUDIENCE_TYPES = setOf(
+    "ALL_SCHOOL", "CLASS", "SECTION", "SUBJECT", "STUDENT", "CUSTOM"
 )
 
 @Serializable
@@ -156,6 +175,26 @@ fun Route.announcementRouting() {
                 val uid = ctx.userId
                 val req = call.receive<CreateAnnouncementDto>()
                 val schoolId = effectiveSchoolId(ctx.schoolId, ctx.role, req.schoolId)
+
+                // Validate audience type (defaults to ALL_SCHOOL).
+                val audienceType = (req.audienceType ?: "ALL_SCHOOL").uppercase()
+                if (audienceType !in VALID_AUDIENCE_TYPES) {
+                    call.fail(
+                        "Invalid audience_type. Allowed: ${VALID_AUDIENCE_TYPES.joinToString()}",
+                        HttpStatusCode.BadRequest
+                    )
+                    return@post
+                }
+                // Non-ALL_SCHOOL broadcasts must carry a scope filter.
+                if (audienceType != "ALL_SCHOOL" && req.audienceFilter == null) {
+                    call.fail(
+                        "audience_filter is required when audience_type is $audienceType",
+                        HttpStatusCode.BadRequest
+                    )
+                    return@post
+                }
+                val filterText = req.audienceFilter?.toString()
+
                 val now = Instant.now()
                 val eventId = "EVT_" + UUID.randomUUID().toString().take(8).uppercase()
                 dbQuery {
@@ -168,6 +207,9 @@ fun Route.announcementRouting() {
                         it[description] = req.description
                         it[eventImage] = req.eventImage
                         it[date] = req.date
+                        it[AnnouncementsTable.audienceType] = audienceType
+                        it[audienceFilter] = filterText
+                        it[authorRole] = ctx.role
                         it[syncedToWa] = false
                         it[createdBy] = uid
                         it[createdAt] = now
@@ -175,7 +217,10 @@ fun Route.announcementRouting() {
                     }
                 }
                 call.created(
-                    AnnouncementDto(req.type, eventId, req.title, req.subTitle, req.description, req.eventImage, req.date),
+                    AnnouncementDto(
+                        req.type, eventId, req.title, req.subTitle, req.description,
+                        req.eventImage, req.date, audienceType, req.audienceFilter
+                    ),
                     message = "Announcement created"
                 )
             }
@@ -235,19 +280,31 @@ fun Route.announcementRouting() {
                 }
 
                 val queued = dbQuery {
-                    // Recipients: every ACTIVE parent user in this school with a phone.
-                    val parents = AppUsersTable.selectAll()
-                        .where {
-                            (AppUsersTable.schoolId eq schoolId) and
-                                (AppUsersTable.role eq "parent")
-                        }
-                        .mapNotNull { it[AppUsersTable.phone] }
-                        .filter { it.isNotBlank() }
-                        .distinct()
-
                     var inserted = 0
                     toSync.forEach { aid ->
-                        parents.forEach { phone ->
+                        // Resolve THIS announcement's audience and expand it to the
+                        // exact set of parent phone numbers that should receive it.
+                        val row = AnnouncementsTable.selectAll()
+                            .where {
+                                (AnnouncementsTable.schoolId eq schoolId) and
+                                    (AnnouncementsTable.eventId eq aid)
+                            }
+                            .firstOrNull()
+
+                        val audienceType = row?.get(AnnouncementsTable.audienceType) ?: "ALL_SCHOOL"
+                        val audienceFilter = row?.get(AnnouncementsTable.audienceFilter)
+                        val authorRole = row?.get(AnnouncementsTable.authorRole) ?: "school_admin"
+                        val authorId = row?.get(AnnouncementsTable.createdBy)
+
+                        val phones = resolveRecipientPhones(
+                            schoolId = schoolId,
+                            audienceType = audienceType,
+                            audienceFilter = audienceFilter,
+                            authorRole = authorRole,
+                            authorId = authorId
+                        )
+
+                        phones.forEach { phone ->
                             WhatsappLogsTable.insert {
                                 it[WhatsappLogsTable.schoolId] = schoolId
                                 it[announcementId] = aid
@@ -284,12 +341,179 @@ fun Route.announcementRouting() {
     }
 }
 
-private fun org.jetbrains.exposed.sql.ResultRow.toDto() = AnnouncementDto(
-    type = this[AnnouncementsTable.type],
-    eventId = this[AnnouncementsTable.eventId],
-    title = this[AnnouncementsTable.title],
-    subTitle = this[AnnouncementsTable.subTitle],
-    description = this[AnnouncementsTable.description],
-    eventImage = this[AnnouncementsTable.eventImage],
-    date = this[AnnouncementsTable.date]
-)
+private val lenientJson = Json { ignoreUnknownKeys = true; isLenient = true }
+
+private fun org.jetbrains.exposed.sql.ResultRow.toDto(): AnnouncementDto {
+    val filterText = this[AnnouncementsTable.audienceFilter]
+    val filter = filterText?.let { runCatching { lenientJson.parseToJsonElement(it) }.getOrNull() }
+    return AnnouncementDto(
+        type = this[AnnouncementsTable.type],
+        eventId = this[AnnouncementsTable.eventId],
+        title = this[AnnouncementsTable.title],
+        subTitle = this[AnnouncementsTable.subTitle],
+        description = this[AnnouncementsTable.description],
+        eventImage = this[AnnouncementsTable.eventImage],
+        date = this[AnnouncementsTable.date],
+        audienceType = this[AnnouncementsTable.audienceType],
+        audienceFilter = filter
+    )
+}
+
+/**
+ * Expand a broadcast's audience into the concrete set of parent phone numbers.
+ *
+ * MUST be called inside an active Exposed transaction (dbQuery).
+ *
+ * Rules:
+ *  - ALL_SCHOOL  -> every active parent in the school with a phone.
+ *  - CLASS       -> parents whose child's current_grade matches class_name.
+ *  - SECTION     -> CLASS scope further intersected with section (best-effort:
+ *                   children grade match; section data lives on students, so
+ *                   when unavailable we fall back to class grade match).
+ *  - SUBJECT     -> parents of children in any class where this subject is
+ *                   taught (via teacher_subject_assignments).
+ *  - STUDENT     -> parents of the children linked (children.student_code) to
+ *                   the listed students.student_code values; falls back to grade
+ *                   match only when no codes are supplied.
+ *  - CUSTOM      -> explicit phone list in the filter, intersected with school.
+ *
+ * Teacher-authored broadcasts (authorRole startsWith "teacher") are constrained
+ * to the classes/subjects that teacher is assigned to teach.
+ */
+private fun resolveRecipientPhones(
+    schoolId: UUID,
+    audienceType: String,
+    audienceFilter: String?,
+    authorRole: String,
+    authorId: UUID?
+): List<String> {
+    fun allSchoolParentPhones(): List<String> =
+        AppUsersTable.selectAll()
+            .where { (AppUsersTable.schoolId eq schoolId) and (AppUsersTable.role eq "parent") and (AppUsersTable.isActive eq true) }
+            .mapNotNull { it[AppUsersTable.phone] }
+            .filter { it.isNotBlank() }
+            .distinct()
+
+    fun phonesForParents(parentIds: Collection<UUID>): List<String> {
+        if (parentIds.isEmpty()) return emptyList()
+        // Use the project's portable OR-reduce instead of `inList` (kept
+        // consistent with ParentRouting's Exposed-version-safe approach).
+        val idFilter = parentIds.distinct()
+            .map { pid -> AppUsersTable.id eq pid }
+            .reduce { acc, op -> acc or op }
+        return AppUsersTable.selectAll()
+            .where { idFilter and (AppUsersTable.isActive eq true) }
+            .mapNotNull { it[AppUsersTable.phone] }
+            .filter { it.isNotBlank() }
+            .distinct()
+    }
+
+    fun parentIdsForGrades(grades: Collection<String>): Set<UUID> {
+        if (grades.isEmpty()) return emptySet()
+        val wanted = grades.map { it.trim().lowercase() }.toSet()
+        return ChildrenTable.selectAll()
+            .where { (ChildrenTable.schoolId eq schoolId) and (ChildrenTable.isActive eq true) }
+            .filter { (it[ChildrenTable.currentGrade]?.trim()?.lowercase()) in wanted }
+            .map { it[ChildrenTable.parentId] }
+            .toSet()
+    }
+
+    // Parents of the children linked to the given students.student_code values
+    // (via the children.student_code link added in migration 002).
+    fun parentIdsForStudentCodes(codes: Collection<String>): Set<UUID> {
+        val wanted = codes.map { it.trim() }.filter { it.isNotBlank() }.toSet()
+        if (wanted.isEmpty()) return emptySet()
+        return ChildrenTable.selectAll()
+            .where { (ChildrenTable.schoolId eq schoolId) and (ChildrenTable.isActive eq true) }
+            .filter { it[ChildrenTable.studentCode]?.trim() in wanted }
+            .map { it[ChildrenTable.parentId] }
+            .toSet()
+    }
+
+    val filter: JsonObject? = audienceFilter
+        ?.let { runCatching { lenientJson.parseToJsonElement(it) as? JsonObject }.getOrNull() }
+
+    fun str(key: String): String? = filter?.get(key)?.jsonPrimitive?.contentOrNull
+    fun strList(key: String): List<String> =
+        filter?.get(key)?.let { runCatching { it.jsonArray.mapNotNull { e -> e.jsonPrimitive.contentOrNull } }.getOrNull() }
+            ?: emptyList()
+
+    // Classes/subjects this teacher is allowed to broadcast to.
+    val teacherClasses: Set<String> by lazy {
+        if (authorId == null) emptySet()
+        else TeacherSubjectAssignmentsTable.selectAll()
+            .where { (TeacherSubjectAssignmentsTable.schoolId eq schoolId) and (TeacherSubjectAssignmentsTable.teacherId eq authorId) and (TeacherSubjectAssignmentsTable.isActive eq true) }
+            .map { it[TeacherSubjectAssignmentsTable.className].trim().lowercase() }
+            .toSet()
+    }
+    val isTeacher = authorRole.startsWith("teacher", ignoreCase = true)
+
+    fun constrainToTeacher(grades: Collection<String>): Set<String> =
+        if (!isTeacher) grades.toSet()
+        else grades.filter { it.trim().lowercase() in teacherClasses }.toSet()
+
+    return when (audienceType.uppercase()) {
+        "ALL_SCHOOL" -> {
+            // A teacher cannot blast the whole school; restrict to their classes.
+            if (isTeacher) phonesForParents(parentIdsForGrades(teacherClasses))
+            else allSchoolParentPhones()
+        }
+
+        "CLASS", "SECTION" -> {
+            val classes = buildList {
+                str("class_name")?.let { add(it) }
+                addAll(strList("class_names"))
+            }
+            phonesForParents(parentIdsForGrades(constrainToTeacher(classes)))
+        }
+
+        "SUBJECT" -> {
+            val subjects = buildList {
+                str("subject")?.let { add(it) }
+                addAll(strList("subjects"))
+            }.map { it.trim().lowercase() }.toSet()
+            if (subjects.isEmpty()) return emptyList()
+            val classesTeachingSubject = TeacherSubjectAssignmentsTable.selectAll()
+                .where { (TeacherSubjectAssignmentsTable.schoolId eq schoolId) and (TeacherSubjectAssignmentsTable.isActive eq true) }
+                .filter { it[TeacherSubjectAssignmentsTable.subject].trim().lowercase() in subjects }
+                .map { it[TeacherSubjectAssignmentsTable.className] }
+            phonesForParents(parentIdsForGrades(constrainToTeacher(classesTeachingSubject)))
+        }
+
+        "CUSTOM" -> {
+            val phones = strList("phones").map { it.trim() }.filter { it.isNotBlank() }.toSet()
+            if (phones.isEmpty()) return emptyList()
+            allSchoolParentPhones().filter { it in phones }
+        }
+
+        "STUDENT" -> {
+            // Target exact students via children.student_code (migration 002).
+            // Accepts {"student_codes":[...]} or {"student_code":"..."}. Falls
+            // back to grade match only when no codes are supplied.
+            val codes = strList("student_codes") + listOfNotNull(str("student_code"))
+            if (codes.isNotEmpty()) {
+                val parentIds = parentIdsForStudentCodes(codes)
+                // Teacher scope guard: keep only students whose grade the teacher
+                // teaches (looked up from the matched children rows).
+                if (isTeacher) {
+                    val allowedParents = ChildrenTable.selectAll()
+                        .where { (ChildrenTable.schoolId eq schoolId) and (ChildrenTable.isActive eq true) }
+                        .filter {
+                            it[ChildrenTable.parentId] in parentIds &&
+                                (it[ChildrenTable.currentGrade]?.trim()?.lowercase() in teacherClasses)
+                        }
+                        .map { it[ChildrenTable.parentId] }
+                        .toSet()
+                    phonesForParents(allowedParents)
+                } else {
+                    phonesForParents(parentIds)
+                }
+            } else {
+                val grades = strList("grades") + listOfNotNull(str("grade"))
+                phonesForParents(parentIdsForGrades(constrainToTeacher(grades)))
+            }
+        }
+
+        else -> emptyList()
+    }
+}

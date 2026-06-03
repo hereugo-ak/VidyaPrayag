@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.feature.admin.data.remote.MediaApi
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.GalleryRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.PhilosophyDetailsDto
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.PickedMedia
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.TourVideosRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.VisibilityRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.repository.UserProfileRepository
@@ -47,13 +49,17 @@ data class InstitutionalProfileState(
 
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
+    // True while a binary photo/video is uploading to Supabase Storage so the
+    // gallery/tour buttons can show a spinner instead of the old URL dialog.
+    val isUploading: Boolean = false,
     val errorMessage: String? = null,
     val infoMessage: String? = null
 )
 
 class InstitutionalProfileViewModel(
     private val userProfileRepository: UserProfileRepository,
-    private val preferenceRepository: PreferenceRepository
+    private val preferenceRepository: PreferenceRepository,
+    private val mediaApi: MediaApi
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(InstitutionalProfileState())
@@ -217,6 +223,114 @@ class InstitutionalProfileViewModel(
                     _state.value = _state.value.copy(
                         isSaving = false,
                         errorMessage = "Connection error. Check your internet."
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Upload a picked image as a REAL binary to Supabase Storage, then append
+     * the returned public URL to the gallery and persist it. This replaces the
+     * old "paste a URL" dialog — the admin now picks a file from their device.
+     */
+    fun uploadGalleryPhoto(picked: PickedMedia) {
+        if (_state.value.isUploading) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isUploading = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(
+                    isUploading = false,
+                    errorMessage = "You are not signed in. Please log in again."
+                )
+                return@launch
+            }
+            when (
+                val r = mediaApi.uploadMedia(
+                    token = token,
+                    bytes = picked.bytes,
+                    fileName = picked.fileName,
+                    mimeType = picked.mimeType,
+                    kind = "IMAGE"
+                )
+            ) {
+                is NetworkResult.Success -> {
+                    val url = r.data.data?.url
+                    _state.value = _state.value.copy(isUploading = false)
+                    if (url.isNullOrBlank()) {
+                        _state.value = _state.value.copy(errorMessage = "Upload succeeded but no URL was returned.")
+                    } else {
+                        // Persist the new gallery list (existing + uploaded url).
+                        saveGallery(_state.value.galleryImages.map { it.url } + url)
+                    }
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(
+                        isUploading = false,
+                        errorMessage = if (r.code == 503) {
+                            "Media storage isn't configured on the server yet. " +
+                                "Set SUPABASE_URL and SUPABASE_SERVICE_KEY, then try again."
+                        } else r.message
+                    )
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(
+                        isUploading = false,
+                        errorMessage = "No internet connection. Please try again."
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Upload a picked video as a REAL binary to Supabase Storage, then set it
+     * as the active virtual tour. Replaces the old "paste a video URL" dialog.
+     */
+    fun uploadTourVideo(picked: PickedMedia) {
+        if (_state.value.isUploading) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isUploading = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(
+                    isUploading = false,
+                    errorMessage = "You are not signed in. Please log in again."
+                )
+                return@launch
+            }
+            when (
+                val r = mediaApi.uploadMedia(
+                    token = token,
+                    bytes = picked.bytes,
+                    fileName = picked.fileName,
+                    mimeType = picked.mimeType,
+                    kind = "VIDEO"
+                )
+            ) {
+                is NetworkResult.Success -> {
+                    val url = r.data.data?.url
+                    _state.value = _state.value.copy(isUploading = false)
+                    if (url.isNullOrBlank()) {
+                        _state.value = _state.value.copy(errorMessage = "Upload succeeded but no URL was returned.")
+                    } else {
+                        saveTourVideos(listOf(url))
+                    }
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(
+                        isUploading = false,
+                        errorMessage = if (r.code == 503) {
+                            "Media storage isn't configured on the server yet. " +
+                                "Set SUPABASE_URL and SUPABASE_SERVICE_KEY, then try again."
+                        } else r.message
+                    )
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(
+                        isUploading = false,
+                        errorMessage = "No internet connection. Please try again."
                     )
                 }
             }

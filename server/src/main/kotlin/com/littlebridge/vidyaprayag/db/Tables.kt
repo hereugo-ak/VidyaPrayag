@@ -178,6 +178,11 @@ object SchoolsTable : UUIDTable("schools", "id") {
     val pincode        = text("pincode").nullable()
     val logoUrl        = text("logo_url").nullable()
     val brandColor     = text("brand_color").default("#2563EB")
+    // Geo coordinates persisted during onboarding / profile update so the
+    // parent side can discover onboarded schools by distance ("near me").
+    // Nullable because legacy rows / address-only onboarding may not have them.
+    val latitude       = double("latitude").nullable()
+    val longitude      = double("longitude").nullable()
     val isActive       = bool("is_active").default(true)
     val onboardedAt    = timestamp("onboarded_at").nullable()
     val createdAt      = timestamp("created_at")
@@ -216,8 +221,42 @@ object SchoolSubjectsTable : UUIDTable("school_subjects", "id") {
     val classId         = uuid("class_id")
     val subName         = text("sub_name")
     val subCode         = text("sub_code")
+    // Legacy free-text teacher name kept for backwards compatibility with rows
+    // written before the structured teacher_subject_assignments model existed.
     val teacherAssigned = text("teacher_assigned").nullable()
     val createdAt       = timestamp("created_at")
+}
+
+// =====================================================================
+// teacher_subject_assignments
+//   Structured replacement for the free-text `school_subjects.teacher_assigned`
+//   column. Defines WHO (faculty/user) teaches WHAT (subject) to WHICH
+//   class+section. This is the assignment graph that enables:
+//     • per-class subject pools (instead of one global subject array)
+//     • teacher broadcasts scoped to the classes/subjects they actually teach
+//     • audience expansion for segmented announcements
+//
+//   Uniqueness: one (school, class, section, subject, teacher) tuple is unique
+//   so re-saving an assignment updates rather than duplicates.
+// =====================================================================
+object TeacherSubjectAssignmentsTable : UUIDTable("teacher_subject_assignments", "id") {
+    val schoolId  = uuid("school_id")
+    val classId   = uuid("class_id").nullable()          // FK school_classes.id (optional pre-migration)
+    val className = text("class_name")                   // denormalised for fast reads / display
+    val section   = varchar("section", 8).default("A")
+    val subjectId = uuid("subject_id").nullable()        // FK school_subjects.id (optional)
+    val subject   = text("subject")                      // denormalised subject name
+    val teacherId = uuid("teacher_id").nullable()        // FK faculty.id / app_users.id
+    val teacherName = text("teacher_name").nullable()    // display fallback when no FK
+    val isActive  = bool("is_active").default(true)
+    val createdAt = timestamp("created_at")
+    val updatedAt = timestamp("updated_at")
+    init {
+        uniqueIndex(
+            "ux_tsa_unique",
+            schoolId, className, section, subject, teacherName
+        )
+    }
 }
 
 // =====================================================================
@@ -232,6 +271,16 @@ object AnnouncementsTable : UUIDTable("announcements", "id") {
     val description = text("description")
     val eventImage  = text("event_image").nullable()
     val date        = varchar("date", 12) // YYYY-MM-DD, mapped from PG DATE
+    // ---- Broadcast audience segmentation ----
+    // audienceType: ALL_SCHOOL | CLASS | SECTION | SUBJECT | STUDENT | CUSTOM
+    // audienceFilter: JSON describing the scope, e.g.
+    //   {"class_name":"Grade 5","section":"A"} or {"subject":"Maths"} or
+    //   {"student_codes":["S001","S002"]}. NULL/ALL_SCHOOL = everyone in school.
+    val audienceType   = varchar("audience_type", 16).default("ALL_SCHOOL")
+    val audienceFilter = text("audience_filter").nullable()
+    // The teacher/admin user that owns this broadcast. For teacher broadcasts the
+    // recipient expansion is constrained to the classes/subjects they teach.
+    val authorRole     = varchar("author_role", 16).default("school_admin")
     val syncedToWa  = bool("synced_to_wa").default(false)
     val createdBy   = uuid("created_by").nullable()
     val createdAt   = timestamp("created_at")
@@ -383,6 +432,9 @@ object StudentsTable : UUIDTable("students", "id") {
 object ChildrenTable : UUIDTable("children", "id") {
     val parentId         = uuid("parent_id")                            // FK app_users.id
     val schoolId         = uuid("school_id").nullable()                 // FK schools.id (optional)
+    // Links a parent's child to the school's canonical students.student_code so
+    // STUDENT-scoped announcements can target exact students (report §5.6).
+    val studentCode      = text("student_code").nullable()
     val childName        = text("child_name")
     val dateOfBirth      = varchar("date_of_birth", 12).nullable()      // YYYY-MM-DD
     val gender           = varchar("gender", 16).nullable()             // MALE | FEMALE | OTHER

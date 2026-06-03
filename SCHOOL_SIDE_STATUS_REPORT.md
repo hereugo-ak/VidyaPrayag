@@ -728,6 +728,341 @@ require schema/migration + product design, not a build fix:
 
 ---
 
+## 10. Render deployment — log analysis + complete environment-variable plan
+
+> Added after reviewing the post-deploy Render TRACE log and the Render
+> Environment screenshot. This section tells the team **exactly** which env
+> vars exist, which are missing, and what each one does.
+
+### 10.1 The Render log is NOT showing errors
+
+The pasted log is full of lines like:
+
+```text
+/api/v1/school [(authenticate jwt)], segment:2 -> FAILURE "Selector didn't match"
+```
+
+These are **normal Ktor `TRACE`-level routing diagnostics**, not failures. For every
+incoming request, Ktor walks the whole route tree; each route it tries and skips
+prints a `FAILURE "Selector didn't match"`, and the matching one prints `SUCCESS`.
+The log actually ends each request with:
+
+```text
+Matched routes: "" -> "api" -> "v1" -> "auth" -> "send-otp" -> "(method:POST)"
+Routing resolve result: SUCCESS @ /api/v1/auth/send-otp [(method:POST)]
+200 OK: POST - /api/v1/auth/send-otp in 1498ms
+```
+
+So `check-user`, `send-otp`, and `signup` all returned **200 OK**. The backend is
+healthy. The noise is caused by `logback.xml` shipping `<root level="trace">`.
+
+**Action (code):** change the root log level to `info` for production (ideally make
+it env-driven via `LOG_LEVEL`). TRACE in production wastes I/O and, combined with the
+old body logging, is exactly how secrets leaked before.
+
+### 10.2 Two real things the log reveals
+
+1. **Malformed identifier accepted.** The signup used `abuzarmohd1212gmail.com`
+   (missing `@`). The server picks phone-vs-email via `identifier.contains("@")`,
+   so a broken email was treated as a **phone number**, all SMS providers were
+   "not configured" → skipped, and it fell through to the console code. Fix:
+   validate email/phone format on the client AND in `AuthRouting`/`OtpService`
+   before sending an OTP.
+2. **OTP is running 100% on the console fallback.** Every provider logged
+   `reason='not configured', status='skipped'` (`fast2sms`, `msg91`, `twilio`,
+   `whatsapp_cloud`) and only `console` succeeded (`CODE: 286912`). This is the
+   #1 env gap: **no real OTP delivery provider is configured on Render.**
+
+### 10.3 Env vars currently set on Render (from the screenshot) — KEEP
+
+| Key | Status | Note |
+|---|---|---|
+| `AUTO_CREATE_TABLES=true` | OK | Creates Exposed tables on boot. Safe; can stay `true`. |
+| `DATABASE_URL=jdbc:postgresql://…supabase.com:6543/postgres?sslmode=require` | OK | Supabase **transaction pooler** (port 6543). Works. See note in 10.6. |
+| `DATABASE_USER=postgres.dumo1ojpk1zxkzzxdzss` | OK | Pooler username form is correct. |
+| `DATABASE_PASSWORD=********` | OK | Set. |
+
+### 10.4 MUST-ADD now (security + correctness)
+
+These are **required for production** and are currently missing on Render:
+
+| Key | Value to set | Why |
+|---|---|---|
+| `JWT_SECRET` | `openssl rand -hex 64` output | Without it the server uses an **insecure hardcoded dev secret** — anyone can forge tokens. **Highest priority.** |
+| `OTP_PEPPER` | `openssl rand -hex 32` output | Server-side pepper for OTP hashing. Missing = weaker OTP hashing + dev fallback value. |
+| `OTP_DEV_RETURN_CODE` | `false` | Currently defaults to `true`, which returns the **plain OTP in the API response** — must be off in prod. |
+| `OTP_ENABLE_CONSOLE_FALLBACK` | `false` (after a real provider is wired) | Stops printing OTP codes to Render logs. Keep `true` ONLY until a provider is configured. |
+| `OTP_ADMIN_TOKEN` | `openssl rand -hex 32` output | When blank, the `/api/v1/admin/otp/*` diagnostics group is unmounted. Set it to enable gated ops/health checks. |
+| `LOG_LEVEL` | `info` | Stop TRACE flooding (requires the small logback change in 10.1). |
+
+### 10.5 MUST-ADD: at least ONE real OTP provider
+
+Pick the cheapest path for your audience (India = Fast2SMS or MSG91; global =
+Twilio; free = email via SMTP or WhatsApp Cloud). Set ONLY the group you use — the
+dispatcher auto-skips any provider whose creds are unset.
+
+**Option A — Fast2SMS (India SMS, simplest):**
+
+| Key | Value |
+|---|---|
+| `FAST2SMS_API_KEY` | from fast2sms.com → Dev API |
+| `FAST2SMS_ROUTE` | `otp` (no DLT template needed) |
+
+**Option B — MSG91 (India, DLT flow):** `MSG91_AUTH_KEY`, `MSG91_FLOW_ID`,
+`MSG91_OTP_VAR_NAME=OTP`, `MSG91_SENDER_ID`.
+
+**Option C — Email OTP via SMTP (free, works anywhere):**
+
+| Key | Example |
+|---|---|
+| `SMTP_HOST` | `smtp.gmail.com` |
+| `SMTP_PORT` | `465` |
+| `SMTP_USERNAME` | your gmail address |
+| `SMTP_PASSWORD` | a Gmail **App Password** (not your login password) |
+| `SMTP_FROM` | `VidyaPrayag <noreply@yourdomain.com>` |
+| `SMTP_USE_SSL` | `true` |
+
+**Option D — WhatsApp Cloud (free up to 1000 conv/mo):** `WHATSAPP_ACCESS_TOKEN`,
+`WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_TEMPLATE_NAME`, `WHATSAPP_TEMPLATE_LANG`.
+
+Then set the delivery order, e.g. for SMS-first with email fallback:
+
+| Key | Value |
+|---|---|
+| `OTP_CHANNEL_ORDER` | `sms,email` (or `email` if you only set SMTP) |
+
+> Note: SMS providers only accept `identifierType == "phone"` and SMTP only accepts
+> `"email"`. So if a user signs up with an email, you MUST have an email provider
+> (SMTP) configured, otherwise it falls to console again.
+
+### 10.6 OPTIONAL / recommended
+
+| Key | Value | Why |
+|---|---|---|
+| `PORT` | leave **unset** | Render injects it automatically; the app reads it. Don't hardcode. |
+| `DB_POOL_SIZE` | `5` | Supabase pooler has connection limits; keep the Hikari pool small. |
+| `DEBUG_ERRORS` | `false` | Avoid leaking stack traces in API error responses. |
+| `APP_SEED_CMS` | `true` | Safe; only inserts missing CMS keys. |
+| `JWT_ACCESS_MINUTES` / `JWT_REFRESH_DAYS` | `60` / `30` | Defaults are fine. |
+| `OTP_EXPIRY_MINUTES` / `OTP_MAX_ATTEMPTS` / `OTP_MAX_RESENDS_PER_HOUR` | `10` / `5` / `5` | Defaults are fine. |
+
+**Supabase pooler caveat:** the current `DATABASE_URL` uses port **6543**
+(transaction pooler). For a long-lived JDBC server, Supabase's **session pooler
+(port 5432)** is more appropriate and avoids prepared-statement issues under the
+transaction pooler. If you see intermittent `prepared statement "S_x" already
+exists` errors, switch to the 5432 session-pooler string.
+
+### 10.7 Copy-paste checklist for Render → Environment
+
+```text
+# --- security (generate fresh values) ---
+JWT_SECRET=<openssl rand -hex 64>
+OTP_PEPPER=<openssl rand -hex 32>
+OTP_ADMIN_TOKEN=<openssl rand -hex 32>
+
+# --- production OTP hardening ---
+OTP_DEV_RETURN_CODE=false
+OTP_ENABLE_CONSOLE_FALLBACK=false          # only after a provider below is set
+OTP_CHANNEL_ORDER=sms,email                 # match the providers you configure
+
+# --- pick at least one provider group ---
+FAST2SMS_API_KEY=...
+FAST2SMS_ROUTE=otp
+# and/or
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_USERNAME=...
+SMTP_PASSWORD=...
+SMTP_FROM=VidyaPrayag <noreply@yourdomain.com>
+SMTP_USE_SSL=true
+
+# --- ops ---
+LOG_LEVEL=info
+DEBUG_ERRORS=false
+DB_POOL_SIZE=5
+
+# --- already set, keep ---
+# AUTO_CREATE_TABLES=true
+# DATABASE_URL / DATABASE_USER / DATABASE_PASSWORD
+```
+
+After saving, Render auto-redeploys. Then verify from the phone:
+`GET /api/v1/config/version` (confirm `git_sha`), then a real OTP send and check
+the provider in `otp_delivery_attempts` shows `status='sent'` for your provider
+(not `console`).
+
+---
+
+## 11. P1/P2 architecture — recommended solutions and build order
+
+These are intentionally **not** hotfixes; each needs a schema change + UI + a
+deliberate product decision. Recommended sequencing puts the lowest-risk,
+highest-reuse foundation first (storage), because upload, media, and audience
+segmentation all depend on it.
+
+### 11.1 Real media upload (logo / profile / gallery / docs)  — **do first**
+
+**Best option:** Supabase Storage (you already use Supabase for Postgres, so no new
+vendor, and it gives public/signed URLs out of the box).
+
+Plan:
+1. Create Storage buckets: `school-logos`, `school-gallery`, `profiles`, `docs`.
+2. Backend: add `POST /api/v1/uploads` (multipart) that
+   - validates content-type (`image/png|jpeg|webp`, `application/pdf`) and size (e.g. ≤5 MB),
+   - uploads bytes to Supabase Storage via the Storage REST API using the
+     service-role key (new env: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`),
+   - returns the public/signed URL.
+3. Persist returned URLs in the existing `school_media` / `school_philosophy`
+   tables instead of free-text URL fields.
+4. Client: add an Android file picker / `PickVisualMedia` + multipart upload; replace
+   the "paste a URL" boxes; show upload progress and a fallback image on error.
+5. Reject non-direct URLs (Google share links, `lh3.googleusercontent.com`) with a
+   clear message until upload exists. This directly kills the HTTP 403 / decode
+   failures seen in the logs.
+
+**Cheaper interim option:** keep URL entry but add a server-side reachability +
+content-type HEAD check before saving, and bundle local placeholder assets for
+fallback. Use only as a stop-gap.
+
+### 11.2 Current-location / GPS / geocoding + lat/lng persistence
+
+**Best option:** make `schools` the canonical directory and add geo columns
+(avoid maintaining two tables; the `supabase_schema.school_directory` geo fields
+are currently disconnected from the Ktor `schools` table).
+
+Plan:
+1. Schema: add `latitude DOUBLE`, `longitude DOUBLE`, `full_address`, `city`,
+   `district`, `state`, `pincode` to the Ktor `SchoolsTable`.
+2. Client onboarding: add a real "Use current location" button →
+   `ACCESS_FINE_LOCATION` runtime permission → fused location provider → reverse
+   geocode to address; allow manual map-pin/address fallback.
+3. Persist `{full_address, city, district, state, pincode, latitude, longitude}`
+   in the onboarding payload.
+4. Parent side: add `GET /api/v1/parent/schools/nearby?lat=&lng=&radiusKm=` that
+   sorts active schools by haversine distance (compute in SQL or in-memory), and
+   replace the hardcoded rating `4.5` with a real/derived value or hide it.
+
+### 11.3 Per-class subject pool + real teacher assignment
+
+**Best option:** introduce a proper assignment table; stop sending one global
+subject array to every class.
+
+Plan:
+1. Schema: `teacher_subject_assignments(id, school_id, faculty_id/user_id,
+   class_id, section, subject_id, created_at)` with FKs to `app_users`(faculty),
+   classes, and subjects. Replace `SchoolSubjectsTable.teacherAssigned` free text
+   with `faculty_id`.
+2. Backend onboarding: change `buildAcademicPayload()` so each class carries its
+   own subject set (no shared `subjectsArray`); accept per-class subject lists.
+3. Client: make the academic UI edit subjects **per class**, and select a teacher
+   from real faculty records instead of typing a name.
+4. This assignment graph is the prerequisite for teacher-scoped broadcasts (11.4).
+
+### 11.4 Broadcast audience segmentation
+
+**Best option:** add an audience model on announcements + a recipient-expansion
+service (depends on 11.3 for class/subject/teacher scoping).
+
+Plan:
+1. Schema: add to announcements `audience_type` enum
+   (`ALL_SCHOOL`,`CLASS`,`SECTION`,`SUBJECT`,`STUDENT`,`CUSTOM`) and an
+   `announcement_recipients` table storing the resolved recipient set (for audit +
+   delivery retry).
+2. Backend: a `RecipientResolver` that expands an audience into concrete
+   parents/students using children/class/subject/teacher-assignment data; gate
+   teacher broadcasts to the classes/subjects they actually teach.
+3. WhatsApp/notification sync should send to the **resolved** recipient set, not
+   "every active parent in the school".
+4. Client: add an audience picker in the create-announcement flow.
+
+### 11.5 Cross-cutting: tests to lock it all in (P2)
+
+- Contract tests for high-risk DTOs (`CalendarSummary`, messages, parent
+  announcements) so a future field rename can't silently break the client again.
+- A **route-inventory test** that fails the build on duplicate method+path
+  registrations (prevents the old mock-route shadowing problem from returning).
+
+### Recommended build order
+
+`11.1 storage/upload → 11.2 location → 11.3 subject/teacher model → 11.4 broadcast
+segmentation → 11.5 tests`. Storage and the teacher-assignment graph are
+foundations the other features reuse, so doing them first avoids rework.
+
+---
+
+## 8c. P1/P2 architecture implementation (this pass)
+
+This pass moved several previously **documentation-only** P1/P2 items into real,
+compiled, test-backed backend code on `backend-by-abuzar`. All changes compile
+(`:server:compileKotlin -Pserver-only=true`) and the server test suite is green
+(`:server:test`).
+
+### Implemented
+
+| Item | Report ref | What was added |
+|---|---|---|
+| Broadcast audience segmentation | §5.6 | `announcements.audience_type` + `audience_filter` + `author_role` columns. `POST /school/announcements` validates `audience_type` ∈ `{ALL_SCHOOL, CLASS, SECTION, SUBJECT, STUDENT, CUSTOM}` and requires a filter for non-ALL_SCHOOL. `sync-whatsapp` now expands recipients **per announcement** via `resolveRecipientPhones()` instead of blasting every parent. Teacher-authored broadcasts are constrained to the classes/subjects they teach. |
+| Teacher ⇄ class ⇄ subject model | §5.5 | New `teacher_subject_assignments` table + `TeacherAssignmentRouting` (`GET/POST/DELETE /api/v1/school/teacher-assignments`). Replaces free-text `teacher_assigned` with a structured, school-scoped assignment graph (upsert + soft delete). Confirmed onboarding already persists **per-class** subject arrays (not one global list) server-side. |
+| Geo discovery | §4.4 / §5.7 | `schools.latitude` / `schools.longitude` columns; onboarding BASIC step now persists `latitude`/`longitude` drafts (insert + sync paths). New `GET /api/v1/parent/schools/discover?lat=&lng=&radius_km=&city=&limit=` with Haversine distance sort (nearest-first), city fallback, and name fallback. |
+| Contract + inventory tests | §8 P2(4,5) | `CalendarContractTest` locks the `working_days`/`total_working_days` serialization (regression §4.2). `RouteInventoryTest` statically guards against re-introducing the `inList` import and legacy mock `/track-progress`/`/fees` routes, and asserts the live owners + new teacher-assignments route stay registered. Fixed a stale assertion in `ApplicationTest`. |
+
+### Still requires team action / product decisions
+
+- **Client-side GPS capture (§4.4):** the backend now stores and serves lat/lng
+  and exposes distance discovery; the Compose "use current location" permission +
+  provider + reverse-geocoding still needs to be wired on the client to fill
+  the `latitude`/`longitude` onboarding drafts.
+
+---
+
+## 8d. Media upload + STUDENT-scope link (this pass)
+
+Continues `backend-by-abuzar`. Turns the media placeholders into **real binary
+uploads** and closes the STUDENT-scope gap.
+
+### Implemented
+
+| Item | Report ref | What was added |
+|---|---|---|
+| **Real media upload** | §4.3 / §5.4 | New `feature.media.SupabaseStorage` (dependency-free Ktor-client wrapper around the Supabase Storage REST API) + `MediaRouting`: `POST /api/v1/school/media/upload` (multipart `file` + `kind`) streams bytes to a school-scoped object path (`{schoolId}/{kind}/{uuid}.{ext}`) and returns a public URL; `DELETE /api/v1/school/media` removes the object + row. IMAGE/VIDEO uploads are recorded in `school_media` so storage metrics stay truthful. Boots fine without storage env (returns `503 STORAGE_NOT_CONFIGURED`, never crashes). |
+| **Client upload path** | §4.3 | Shared `MediaApi` (`submitFormWithBinaryData`) + cross-platform `rememberMediaPicker()` (`expect`/`actual`: real Android `GetContent` reader, real desktop `JFileChooser`, clean stubs for iOS/JS/Wasm). `BrandingInfoOBViewModel.uploadMedia()` uploads picked bytes and stores the returned **real URL**. |
+| **Placeholder removed** | §5.9 | `BrandingInfoOBScreen` no longer shows "Media upload not connected" — cover photo + logo are now tap-to-pick → upload → live preview, with an inline uploading spinner. Cover/logo URLs are real, user-uploaded, and persisted (`logo_url` to `schools.logo_url`, `cover_image_url` to onboarding drafts). |
+| **STUDENT-scope link** | §5.6 | `children.student_code` column links a parent's child to the school's canonical `students.student_code`. `resolveRecipientPhones()` STUDENT branch now targets exact students via `student_codes` (teacher-scope guarded), falling back to grade match only when no codes resolve. |
+
+### Manual setup required (no code can do this)
+
+- Run `docs/db/migration_002_segmentation_geo_assignments.sql` in Supabase
+  (adds the new announcement/geo/teacher-assignment/`student_code` columns).
+- Create a **public** Supabase Storage bucket named `school-media`.
+- Set Render env vars: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`
+  (service_role secret), and optionally `SUPABASE_BUCKET`. See `.env.example`.
+
+---
+
+## 8e. GPS capture + profile placeholder removal + premium motion + setup guide (this pass)
+
+Continues `backend-by-abuzar`. Closes the remaining "next pass" items from §8d:
+real client-side GPS, the last media placeholders, polished motion, and a single
+consolidated manual-setup checklist.
+
+### Implemented
+
+| Item | Report ref | What was added |
+|---|---|---|
+| **Client-side GPS capture** | §11.2 / §4.4 | New cross-platform `ui/location/LocationProvider` — `expect rememberLocationProvider()` + `DeviceLocation`/`LocationResult`. **Android actual is dependency-free** (platform `LocationManager` + `android.location.Geocoder`): runtime `ACCESS_FINE/COARSE_LOCATION` request, last-known→live-fix fallback, reverse geocoding into city/district/state/pincode/full_address. iOS/desktop/JS/Wasm: clean `Unavailable` stubs. `InstitutionalBasicOBScreen` now has a real **"Use current location"** button (replacing the static map placeholder); the BASIC submit payload carries `latitude/longitude` + parsed address parts (only when captured), persisted to `schools.latitude/longitude`. |
+| **Gallery / tour placeholder removal** | §5.9 | `InstitutionalProfileViewModel` injects `MediaApi`; `uploadGalleryPhoto()`/`uploadTourVideo()` POST **real binaries** (IMAGE/VIDEO) and persist the returned URL via existing endpoints. `InstitutionalProfileScreen` **removes** the "ADD PHOTO BY URL" / "Add Tour Video by URL" dialogs and wires the real device picker → upload, with in-button spinners and 503/connection messaging. No URL-paste placeholders remain anywhere in the school media flow. |
+| **Premium iOS animations** | §8c | New `ui/components/PremiumAnimations.kt` (dependency-free CMP): `Modifier.pressScale()`, `Modifier.tappableScale()`, `AnimatedEntrance {}` (staggered fade + slide-up), `Modifier.shimmerPlaceholder()`/`ShimmerBox`, `staggerDelay()`. Applied to `InstitutionalProfileScreen` (staggered cascade reveal) and `VidyaPrayagPrimaryButton` (spring press). Reusable across all screens. |
+| **Consolidated setup guide** | — | New `MANUAL_SETUP_GUIDE.md` — one checklist for every manual one-time step (migration, bucket, Supabase env, security env, OTP provider, Android location permission), plus a "what's already done in code" section. Answers the recurring `SUPABASE_BUCKET = school-media` question explicitly. |
+
+### Manual setup required
+
+All consolidated into `MANUAL_SETUP_GUIDE.md`. Summary: run `migration_002`,
+create public bucket `school-media`, set `SUPABASE_URL` / `SUPABASE_SERVICE_KEY`
+(service_role) / `SUPABASE_BUCKET=school-media` on Render, set `JWT_SECRET` /
+`OTP_PEPPER` / `OTP_ADMIN_TOKEN`, and wire ≥1 OTP provider.
+
+---
+
 ## 9. Bottom line
 
 The known screenshot issues are real, but the root causes are broader than the visible UI errors. The current merged code contains several intended fixes, yet the backend cannot currently compile, the tested phone build was pointed at stale Render, API logs expose secrets, legacy parent routes can shadow newer live routes, and major product requirements such as location, upload, subject/teacher assignment, and segmented broadcasts remain incomplete.

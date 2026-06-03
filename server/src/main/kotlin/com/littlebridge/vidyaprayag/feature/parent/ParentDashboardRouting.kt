@@ -76,6 +76,36 @@ data class DashboardResponse(
     @SerialName("curation_logic") val curationLogic: String
 )
 
+@Serializable
+data class DiscoveredSchool(
+    val id: String,
+    val name: String,
+    val rating: Double,
+    val location: String,
+    val image: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    @SerialName("distance_km") val distanceKm: Double? = null
+)
+
+@Serializable
+data class SchoolDiscoveryResponse(
+    val schools: List<DiscoveredSchool>,
+    @SerialName("sorted_by") val sortedBy: String  // "distance" | "city" | "name"
+)
+
+/** Great-circle distance (km) between two lat/lng points (Haversine). */
+private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val r = 6371.0 // Earth radius km
+    val dLat = Math.toRadians(lat2 - lat1)
+    val dLon = Math.toRadians(lon2 - lon1)
+    val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return r * c
+}
+
 private fun timeOfDayGreeting(): String {
     val hour = LocalTime.now().hour
     return when {
@@ -198,6 +228,77 @@ fun Route.parentDashboardRouting() {
                 }
 
                 call.ok(payload, message = "Dashboard fetched successfully")
+            }
+
+            // ----- school discovery by location -----
+            // GET /api/v1/parent/schools/discover?lat=..&lng=..&radius_km=..&city=..&limit=..
+            //
+            // When lat/lng are supplied we compute Haversine distance to each
+            // active school that has coordinates, optionally filter to a radius,
+            // and sort nearest-first. Schools without coordinates are appended
+            // after geo-located ones (or filtered out when a radius is given).
+            // When lat/lng are absent we fall back to city match then name sort,
+            // matching the previous "active schools by city" behaviour but
+            // without the hard-coded 5-school cap.
+            get("/schools/discover") {
+                // Caller must at least be authenticated; any role can browse.
+                call.principalUserId() ?: run {
+                    call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
+                }
+                val q = call.request.queryParameters
+                val lat = q["lat"]?.toDoubleOrNull()
+                val lng = q["lng"]?.toDoubleOrNull()
+                val radiusKm = q["radius_km"]?.toDoubleOrNull()
+                val cityFilter = q["city"]?.takeIf { it.isNotBlank() }
+                val limit = (q["limit"]?.toIntOrNull() ?: 20).coerceIn(1, 100)
+
+                val (schools, sortedBy) = dbQuery {
+                    val rows = SchoolsTable.selectAll()
+                        .where { SchoolsTable.isActive eq true }
+                        .toList()
+
+                    val mapped = rows.map { row ->
+                        val sLat = row[SchoolsTable.latitude]
+                        val sLng = row[SchoolsTable.longitude]
+                        val dist = if (lat != null && lng != null && sLat != null && sLng != null)
+                            haversineKm(lat, lng, sLat, sLng) else null
+                        DiscoveredSchool(
+                            id = row[SchoolsTable.id].value.toString(),
+                            name = row[SchoolsTable.name],
+                            rating = 4.5, // operational rating column lives in supplementary schema
+                            location = row[SchoolsTable.city],
+                            image = row[SchoolsTable.logoUrl],
+                            latitude = sLat,
+                            longitude = sLng,
+                            distanceKm = dist?.let { kotlin.math.round(it * 100) / 100.0 }
+                        )
+                    }
+
+                    if (lat != null && lng != null) {
+                        // Geo mode: keep those within radius (if given), nearest first.
+                        val located = mapped.filter { it.distanceKm != null }
+                        val withinRadius = if (radiusKm != null)
+                            located.filter { it.distanceKm!! <= radiusKm } else located
+                        val result = withinRadius.sortedBy { it.distanceKm }
+                            .let { if (radiusKm == null) it + mapped.filter { s -> s.distanceKm == null } else it }
+                            .take(limit)
+                        result to "distance"
+                    } else if (cityFilter != null) {
+                        val result = mapped
+                            .filter { it.location.equals(cityFilter, ignoreCase = true) }
+                            .sortedBy { it.name }
+                            .take(limit)
+                        result to "city"
+                    } else {
+                        val result = mapped.sortedBy { it.name }.take(limit)
+                        result to "name"
+                    }
+                }
+
+                call.ok(
+                    SchoolDiscoveryResponse(schools = schools, sortedBy = sortedBy),
+                    message = "Discovered ${schools.size} school(s)"
+                )
             }
         }
     }

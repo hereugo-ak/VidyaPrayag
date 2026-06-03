@@ -22,6 +22,8 @@ import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.presentation.InstitutionalProfileViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.GalleryImage
 import com.littlebridge.vidyaprayag.ui.components.*
+import com.littlebridge.vidyaprayag.ui.media.MediaPickType
+import com.littlebridge.vidyaprayag.ui.media.rememberMediaPicker
 import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,10 +45,18 @@ fun InstitutionalProfileScreen() {
         }
     }
 
-    // Dialog state for adding a gallery photo / tour video by URL (binary upload
-    // is not wired yet; the backend accepts URL lists, so this is a real action).
-    var showAddPhoto by remember { mutableStateOf(false) }
-    var showAddTour by remember { mutableStateOf(false) }
+    // Real device file pickers → binary upload to Supabase Storage. The single
+    // picker callback routes the result by which "slot" the user tapped, so we
+    // reuse one launcher for both the gallery photo and the tour video.
+    var pendingSlot by remember { mutableStateOf<String?>(null) }
+    val pickPhoto = rememberMediaPicker { picked ->
+        pendingSlot = null
+        if (picked != null) viewModel.uploadGalleryPhoto(picked)
+    }
+    val pickVideo = rememberMediaPicker { picked ->
+        pendingSlot = null
+        if (picked != null) viewModel.uploadTourVideo(picked)
+    }
 
     BaseScreen(
         bottomBar = {
@@ -63,49 +73,67 @@ fun InstitutionalProfileScreen() {
                 verticalArrangement = Arrangement.spacedBy(32.dp)
             ) {
                 item {
-                    ProfileHeaderSection(
-                        isPublic = state.isPublic,
-                        onTogglePublic = viewModel::togglePublic
-                    )
+                    AnimatedEntrance(delayMillis = staggerDelay(0)) {
+                        ProfileHeaderSection(
+                            isPublic = state.isPublic,
+                            onTogglePublic = viewModel::togglePublic
+                        )
+                    }
                 }
 
                 item {
-                    PhilosophyForm(
-                        mission = state.missionStatement,
-                        onMissionChange = viewModel::updateMission,
-                        learningModel = state.learningModel,
-                        onModelChange = viewModel::updateLearningModel,
-                        language = state.primaryLanguage,
-                        onLanguageChange = viewModel::updateLanguage,
-                        isSaving = state.isSaving,
-                        onSave = viewModel::saveProfile
-                    )
+                    AnimatedEntrance(delayMillis = staggerDelay(1)) {
+                        PhilosophyForm(
+                            mission = state.missionStatement,
+                            onMissionChange = viewModel::updateMission,
+                            learningModel = state.learningModel,
+                            onModelChange = viewModel::updateLearningModel,
+                            language = state.primaryLanguage,
+                            onLanguageChange = viewModel::updateLanguage,
+                            isSaving = state.isSaving,
+                            onSave = viewModel::saveProfile
+                        )
+                    }
                 }
 
                 item {
-                    VirtualTourPreview(
-                        tourName = state.activeTourName.ifBlank { "No active tour" },
-                        previewImageUrl = state.galleryImages.firstOrNull()?.url,
-                        onAddTour = { showAddTour = true }
-                    )
+                    AnimatedEntrance(delayMillis = staggerDelay(2)) {
+                        VirtualTourPreview(
+                            tourName = state.activeTourName.ifBlank { "No active tour" },
+                            previewImageUrl = state.galleryImages.firstOrNull()?.url,
+                            isUploading = state.isUploading,
+                            onAddTour = {
+                                pendingSlot = "tour"
+                                pickVideo(MediaPickType.VIDEO)
+                            }
+                        )
+                    }
                 }
 
                 item {
-                    GallerySection(
-                        images = state.galleryImages,
-                        storageUsage = state.storageUsage,
-                        storageUsedHuman = state.storageUsedHuman,
-                        totalStorageHuman = state.totalStorageHuman,
-                        onAddPhoto = { showAddPhoto = true },
-                        onRemovePhoto = { url ->
-                            val remaining = state.galleryImages.map { it.url }.filterNot { it == url }
-                            viewModel.saveGallery(remaining)
-                        }
-                    )
+                    AnimatedEntrance(delayMillis = staggerDelay(3)) {
+                        GallerySection(
+                            images = state.galleryImages,
+                            storageUsage = state.storageUsage,
+                            storageUsedHuman = state.storageUsedHuman,
+                            totalStorageHuman = state.totalStorageHuman,
+                            isUploading = state.isUploading,
+                            onAddPhoto = {
+                                pendingSlot = "photo"
+                                pickPhoto(MediaPickType.IMAGE)
+                            },
+                            onRemovePhoto = { url ->
+                                val remaining = state.galleryImages.map { it.url }.filterNot { it == url }
+                                viewModel.saveGallery(remaining)
+                            }
+                        )
+                    }
                 }
 
                 item {
-                    ShowcaseHealthCard(completion = state.profileCompletion)
+                    AnimatedEntrance(delayMillis = staggerDelay(4)) {
+                        ShowcaseHealthCard(completion = state.profileCompletion)
+                    }
                 }
 
                 item {
@@ -124,63 +152,6 @@ fun InstitutionalProfileScreen() {
         }
     }
 
-    if (showAddPhoto) {
-        AddUrlDialog(
-            title = "Add Gallery Photo",
-            label = "Image URL",
-            onDismiss = { showAddPhoto = false },
-            onConfirm = { url ->
-                showAddPhoto = false
-                val updated = state.galleryImages.map { it.url } + url
-                viewModel.saveGallery(updated)
-            }
-        )
-    }
-
-    if (showAddTour) {
-        AddUrlDialog(
-            title = "Add Virtual Tour Video",
-            label = "Video URL",
-            onDismiss = { showAddTour = false },
-            onConfirm = { url ->
-                showAddTour = false
-                // Put the new tour at the front so it becomes the active tour.
-                viewModel.saveTourVideos(listOf(url))
-            }
-        )
-    }
-}
-
-@Composable
-private fun AddUrlDialog(
-    title: String,
-    label: String,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit
-) {
-    var text by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                label = { Text(label) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-        },
-        confirmButton = {
-            TextButton(
-                enabled = text.isNotBlank(),
-                onClick = { onConfirm(text.trim()) }
-            ) { Text("Add") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
 }
 
 @Composable
@@ -295,6 +266,7 @@ private fun PhilosophyForm(
 private fun VirtualTourPreview(
     tourName: String,
     previewImageUrl: String?,
+    isUploading: Boolean,
     onAddTour: () -> Unit
 ) {
     VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
@@ -354,13 +326,20 @@ private fun VirtualTourPreview(
             Row(modifier = Modifier.padding(24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(
                     onClick = onAddTour,
+                    enabled = !isUploading,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(2.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
-                    Icon(Icons.Default.AddCircle, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("ADD TOUR VIDEO", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    if (isUploading) {
+                        CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("UPLOADING…", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    } else {
+                        Icon(Icons.Default.AddCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("UPLOAD TOUR VIDEO", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -373,6 +352,7 @@ private fun GallerySection(
     storageUsage: Float,
     storageUsedHuman: String,
     totalStorageHuman: String,
+    isUploading: Boolean,
     onAddPhoto: () -> Unit,
     onRemovePhoto: (String) -> Unit
 ) {
@@ -458,13 +438,20 @@ private fun GallerySection(
 
             OutlinedButton(
                 onClick = onAddPhoto,
+                enabled = !isUploading,
                 modifier = Modifier.fillMaxWidth().height(80.dp),
                 shape = RoundedCornerShape(16.dp),
                 border = BorderStroke(2.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
-                    Text("ADD PHOTO BY URL", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    if (isUploading) {
+                        CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("UPLOADING…", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    } else {
+                        Icon(Icons.Default.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                        Text("UPLOAD PHOTO", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
 
