@@ -8,6 +8,29 @@
 
 ---
 
+## 0a. Fixes applied on `backend-by-abuzar` (this fixing pass)
+
+> These were implemented after the audit below and committed to
+> `backend-by-abuzar` (the working/testing branch).
+
+| Report ref | Issue | Fix shipped |
+|---|---|---|
+| §4.2, §10 P0#1 | Calendar `working_days` vs `total_working_days` | Server `CalendarSummary` now emits **both** `working_days` (canonical) and `total_working_days` (alias). Client `CalendarSummaryDto` made resilient with field defaults + `effectiveWorkingDays` fallback. Decode no longer crashes. |
+| §4.1, §8.4, §10 P0#2/#4/#5 | Messages 404 + backend-target drift | Confirmed route exists at HEAD (deployment drift was the cause). Added `GET /api/v1/config/version` (git SHA/build time), baked build identity into the server JAR, added an in-app **DEV backend banner** (green=laptop / red=Render), and `local.properties.example` + SERVER_QUICKSTART §5.1 to set `devBaseUrl`. |
+| §5, §10 P0#3 | Missing `faculty` + `holiday_list` tables; schema drift | Added canonical `docs/db/` (vidyasetu_schema.sql + migration_001 creating both tables + README documenting the single source of truth). |
+| §9.1, §10 P1#1 | Parent announcements were static/mock | Parent `GET /api/v1/parent/announcements` now reads the **same** `AnnouncementsTable` the school writes, scoped to the parent's children's schools; WhatsApp flag from shared `app_config`. |
+| §9.2, §10 P1#2 | Parent messages had no backend / static | Added `parentMessagesRouting()` — `GET/POST /api/v1/parent/messages[…]` reusing the same `message_threads`/`messages` tables as the school inbox. |
+| §4.3, §10 P2#1 | Institutional Profile `P U B L I C` clipped | Header `Row` rebuilt with `weight(1f, fill=false)` title + `Spacer` + `maxLines=1`/`softWrap=false` on the toggle label. |
+| §4.3 (phone UI) | Long names clipping/overflowing on narrow phones | Audited the admin screens with `SpaceBetween` rows. Hardened `ClassPerformanceScreen`, `MessagesScreen` (thread row), `DailyAttendanceScreen` (attendee row), `AdmissionCRMDashboard` (student/parent name), `TeacherPerformanceScreen` (star + accountability name), and `StudentAnalyticsScreen` (risk student + subject engagement name) with `weight(1f)` content rows, `weight(1f, fill=false)` name columns, `maxLines=1`/`TextOverflow.Ellipsis`, and trailing `Spacer`s so trailing controls never get pushed off-screen on small devices. |
+| §4.1 (docs) | Conversation endpoint undocumented | Added `GET /threads/{id}/messages` to `SCHOOL_API_GUIDE.md` (table + curl chain). |
+
+> Note: the build targets JVM 21; full Gradle compile/`assembleDevDebug`
+> verification must be run on a JDK-21 machine (see §11 checklist). Remaining
+> P2 no-op controls (§7), real media upload (§8.1) and geolocation (§8.2) are
+> still open and tracked below.
+
+---
+
 ## 0. Executive summary from the latest screenshots/logs
 
 The project **compiles**, but the latest screenshots prove the school side is still not production-complete. The biggest problems are not one single crash; they are a mix of **API contract mismatches**, **deployed-backend drift**, **missing Supabase tables**, **placeholder media/location workflows**, and **parent-school data not sharing the same source of truth**.

@@ -512,24 +512,36 @@ private fun MessageThreadItem(thread: MessageThread, onClick: () -> Unit) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // weight(1f) + ellipsis so a long sender name/role never
+                    // pushes the timestamp off-screen on narrow phones.
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         Text(
                             thread.senderName,
                             style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = if (unread) FontWeight.ExtraBold else FontWeight.Bold
+                            fontWeight = if (unread) FontWeight.ExtraBold else FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             thread.senderRole,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.outline,
-                            fontSize = 10.sp
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         thread.time,
                         style = MaterialTheme.typography.labelSmall,
                         color = if (unread) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline,
-                        fontWeight = if (unread) FontWeight.Bold else FontWeight.Normal
+                        fontWeight = if (unread) FontWeight.Bold else FontWeight.Normal,
+                        maxLines = 1
                     )
                 }
                 Text(

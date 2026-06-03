@@ -121,6 +121,37 @@ Ktor: Hello, JVM! — VidyaPrayag API v1 is live
 
 If you see that line, the server is healthy. Time to switch to Postman.
 
+### 5.1 Connect a REAL PHONE to your laptop backend (same WiFi)
+
+If you are testing the Android dev build on a physical phone and seeing errors
+like `Endpoint not found: /api/v1/school/messages/threads/{id}/messages` or the
+calendar `working_days` error, the phone is almost certainly hitting the stale
+**Render** backend instead of your laptop. Fix it like this:
+
+1. Find your laptop's LAN IP:
+   - Windows: `ipconfig` → IPv4 Address (e.g. `192.168.1.9`)
+   - macOS/Linux: `ipconfig getifaddr en0` or `hostname -I`
+2. Copy `local.properties.example` → `local.properties` and set:
+   ```properties
+   devBaseUrl=http://192.168.1.9:8080
+   ```
+3. Rebuild/reinstall the **dev** flavor app.
+4. On the phone, look at the small banner at the top of the app:
+   - **Green** `DEV → http://192.168.1.9:8080` = good, hitting your laptop.
+   - **Red** `DEV → https://vidyaprayag-1.onrender.com ⚠ set devBaseUrl` = still
+     on Render; `devBaseUrl` wasn't picked up (rebuild after editing).
+5. Prove it from the phone browser — open:
+   ```
+   http://192.168.1.9:8080/api/v1/config/version
+   ```
+   The returned `git_sha` must match your laptop `git rev-parse --short HEAD`.
+   If the page won't load at all, your laptop firewall is blocking port 8080 on
+   the LAN — allow it (Windows Defender Firewall → inbound rule for 8080).
+
+> The server already binds `0.0.0.0:8080`, so once the firewall allows it and
+> `devBaseUrl` is set, the phone reaches the laptop and both the messages
+> conversation endpoint and the fixed calendar response work as expected.
+
 ---
 
 ## 6. Test all APIs in Postman (locally installed)
@@ -160,6 +191,7 @@ Open these requests in the collection and click **Send** for each:
 |---|---|---|
 | 1 | `GET {{baseUrl}}/api/v1/content/landing` | `200` with `success: true` and the marketing copy |
 | 2 | `GET {{baseUrl}}/api/v1/config/app-status` | `200` with `version_check` payload |
+| 2b | `GET {{baseUrl}}/api/v1/config/version` | `200` with `git_sha`/`build_time`/`requested_host` — use this to confirm WHICH backend answered |
 | 3 | `POST {{baseUrl}}/api/v1/auth/check-user` body `{"identifier":"{{phone}}"}` | `200` with `exists: true` |
 | 4 | `POST {{baseUrl}}/api/v1/auth/send-otp` body `{"phone":"{{phone}}"}` | `200`, `Use 123456 in dev.` |
 
