@@ -990,6 +990,36 @@ foundations the other features reuse, so doing them first avoids rework.
 
 ---
 
+## 8c. P1/P2 architecture implementation (this pass)
+
+This pass moved several previously **documentation-only** P1/P2 items into real,
+compiled, test-backed backend code on `backend-by-abuzar`. All changes compile
+(`:server:compileKotlin -Pserver-only=true`) and the server test suite is green
+(`:server:test`).
+
+### Implemented
+
+| Item | Report ref | What was added |
+|---|---|---|
+| Broadcast audience segmentation | §5.6 | `announcements.audience_type` + `audience_filter` + `author_role` columns. `POST /school/announcements` validates `audience_type` ∈ `{ALL_SCHOOL, CLASS, SECTION, SUBJECT, STUDENT, CUSTOM}` and requires a filter for non-ALL_SCHOOL. `sync-whatsapp` now expands recipients **per announcement** via `resolveRecipientPhones()` instead of blasting every parent. Teacher-authored broadcasts are constrained to the classes/subjects they teach. |
+| Teacher ⇄ class ⇄ subject model | §5.5 | New `teacher_subject_assignments` table + `TeacherAssignmentRouting` (`GET/POST/DELETE /api/v1/school/teacher-assignments`). Replaces free-text `teacher_assigned` with a structured, school-scoped assignment graph (upsert + soft delete). Confirmed onboarding already persists **per-class** subject arrays (not one global list) server-side. |
+| Geo discovery | §4.4 / §5.7 | `schools.latitude` / `schools.longitude` columns; onboarding BASIC step now persists `latitude`/`longitude` drafts (insert + sync paths). New `GET /api/v1/parent/schools/discover?lat=&lng=&radius_km=&city=&limit=` with Haversine distance sort (nearest-first), city fallback, and name fallback. |
+| Contract + inventory tests | §8 P2(4,5) | `CalendarContractTest` locks the `working_days`/`total_working_days` serialization (regression §4.2). `RouteInventoryTest` statically guards against re-introducing the `inList` import and legacy mock `/track-progress`/`/fees` routes, and asserts the live owners + new teacher-assignments route stay registered. Fixed a stale assertion in `ApplicationTest`. |
+
+### Still requires team action / product decisions
+
+- **Media upload (§4.3 / §5.4):** still URL-only. Real file picker + Supabase
+  Storage bucket + signed-URL persistence needs storage credentials/bucket
+  provisioning that only the team can do; left documented intentionally.
+- **Client-side GPS capture (§4.4):** the backend now stores and serves lat/lng
+  and exposes distance discovery; the Compose "use current location" permission +
+  provider + reverse-geocoding still needs to be wired on the client to fill
+  the `latitude`/`longitude` onboarding drafts.
+- **STUDENT-scope expansion:** currently falls back to grade match because no
+  reliable `children` ⇄ `students.student_code` link exists yet.
+
+---
+
 ## 9. Bottom line
 
 The known screenshot issues are real, but the root causes are broader than the visible UI errors. The current merged code contains several intended fixes, yet the backend cannot currently compile, the tested phone build was pointed at stale Render, API logs expose secrets, legacy parent routes can shadow newer live routes, and major product requirements such as location, upload, subject/teacher assignment, and segmented broadcasts remain incomplete.

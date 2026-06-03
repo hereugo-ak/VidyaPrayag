@@ -15,6 +15,7 @@ class ApplicationTest {
         }
         val response = client.get("/")
         assertEquals(HttpStatusCode.OK, response.status)
-        assertEquals("Ktor: ${Greeting().greet()}", response.bodyAsText())
+        // Root route appends a liveness suffix; assert it stays in sync.
+        assertEquals("Ktor: ${Greeting().greet()} — VidyaPrayag API v1 is live", response.bodyAsText())
     }
 }

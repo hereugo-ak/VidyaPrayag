@@ -35,6 +35,7 @@
  *   - ptmRouting()                        — /api/v1/school/ptm
  *   - messagesRouting()                   — /api/v1/school/messages[…]
  *   - resultsRouting()                    — /api/v1/school/results
+ *   - teacherAssignmentRouting()          — /api/v1/school/teacher-assignments[…]
  *
  * On boot:
  *   DatabaseFactory.init() creates/migrates all tables and seeds CMS + demo data.
@@ -68,6 +69,7 @@ import com.littlebridge.vidyaprayag.feature.school.resultsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolAnalyticsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolDashboardRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRouting
+import com.littlebridge.vidyaprayag.feature.school.teacherAssignmentRouting
 import com.littlebridge.vidyaprayag.feature.user.parentRouting
 import com.littlebridge.vidyaprayag.feature.user.parentMessagesRouting
 import com.littlebridge.vidyaprayag.feature.user.userDetailsRouting
@@ -170,5 +172,6 @@ fun Application.module() {
         ptmRouting()                 // /api/v1/school/ptm
         messagesRouting()            // /api/v1/school/messages[…]
         resultsRouting()             // /api/v1/school/results
+        teacherAssignmentRouting()   // /api/v1/school/teacher-assignments[…] — structured teacher⇄class⇄subject model (report §5.5)
     }
 }
