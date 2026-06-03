@@ -16,7 +16,23 @@ plugins {
 // clone), we fall back to "unknown" instead of failing the build.
 // ---------------------------------------------------------------------------
 val gitSha: String = run {
-    runCatching {
+    // 1) Prefer CI/PaaS-provided commit SHAs. On Render the build container is
+    //    often a shallow checkout WITHOUT a usable `.git`, so `git rev-parse`
+    //    silently returns "unknown" and /api/v1/config/version becomes useless
+    //    for the very deploy-drift verification the report demands. Render
+    //    always exports RENDER_GIT_COMMIT; GitHub Actions exports GITHUB_SHA.
+    val envSha = sequenceOf(
+        "RENDER_GIT_COMMIT",
+        "GIT_COMMIT",
+        "GITHUB_SHA",
+        "SOURCE_COMMIT",
+        "VIDYAPRAYAG_GIT_SHA"
+    ).mapNotNull { System.getenv(it)?.trim()?.takeIf { sha -> sha.isNotBlank() } }
+        .firstOrNull()
+        ?.take(12)
+
+    // 2) Fall back to a local `git` call (works for laptop builds).
+    envSha ?: runCatching {
         val proc = ProcessBuilder("git", "rev-parse", "--short", "HEAD")
             .directory(rootDir)
             .redirectErrorStream(true)

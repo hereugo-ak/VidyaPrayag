@@ -653,6 +653,81 @@ Fix direction:
 
 ---
 
+## 8b. Re-verification + deploy-hardening (this pass)
+
+This pass re-audited the merged code (`main` @ `b951fc3`, PR #10) and **independently
+re-validated every P0 fix by compiling**, then closed the one remaining gap that
+made the verification endpoint unreliable on Render.
+
+### What was re-verified (already fixed in code, now proven by compile)
+
+| Item | File | Verified state |
+|---|---|---|
+| `inList` compile blocker | `feature/user/ParentRouting.kt` | Replaced with an Exposed `or`-reduce over `schoolIds`. No `inList` import remains. |
+| Legacy duplicate parent routes | `feature/user/ParentRouting.kt` | Mock `/track-progress` and `/fees` handlers removed; only `parent/scholarships` + DB-backed `parent/announcements` remain. Live owners are `TrackProgressRouting.kt` / `ParentFeesRouting.kt`. |
+| Secret leakage in logs | `core/network/NetworkResult.kt` | `redactedBodyText()` + `redactedHeaders()` strip password/otp/code/token/refresh_token/authorization/cookie/api_key. Request/response bodies are sanitized before logging. |
+| Calendar `working_days` DTO | client `CalendarModels.kt` / server `SchoolRouting.kt` | Client decodes both `working_days` and `total_working_days` with defaults; server emits **both** fields. No deserialization crash possible. |
+| Message thread route | server `MessagesRouting.kt` + `ParentMessagesRouting.kt` | `GET /threads/{id}/messages` and `POST /threads/{id}/read` exist and are registered in `Application.kt`. |
+| Version/status verification endpoints | `feature/config/VersionRouting.kt`, `AppStatusRouting.kt` | `GET /api/v1/config/version` and `GET /api/v1/config/app-status` exist and are registered. |
+
+Compile validation run this pass (both **BUILD SUCCESSFUL**):
+
+```bash
+./gradlew :server:compileKotlin -Pserver-only=true --no-daemon
+./gradlew :shared:compileDevDebugKotlinAndroid :composeApp:compileDevDebugKotlinAndroid --no-daemon
+./gradlew :server:installDist -Pserver-only=true --no-daemon   # exactly what Render runs
+```
+
+### New deploy-hardening applied this pass
+
+The root cause of the original screenshot failures was **deploy drift** — the phone
+hit a stale Render backend. `/api/v1/config/version` is the tool to detect that,
+but it only works if the deployed build actually knows its own commit SHA.
+
+1. **`server/build.gradle.kts` — robust git SHA resolution.** On Render the build
+   container is frequently a shallow checkout with no usable `.git`, so the old
+   `git rev-parse` returned `"unknown"` and the verification endpoint was useless.
+   It now prefers CI/PaaS commit env vars first:
+   `RENDER_GIT_COMMIT` → `GIT_COMMIT` → `GITHUB_SHA` → `SOURCE_COMMIT` →
+   `VIDYAPRAYAG_GIT_SHA`, then falls back to local `git`, then `"unknown"`.
+   Verified: with `RENDER_GIT_COMMIT=abc123def456789` the install start script
+   bakes in `vidyaprayag.git.sha=abc123def456`; without it, the laptop SHA
+   (`b951fc3`) is used.
+2. **Added `.dockerignore`.** Keeps the Render build context small/reproducible
+   (excludes `build/`, `.gradle`, mobile modules, secrets, runtime DB/logs, `.git`).
+   Safe because the Dockerfile always builds with `-Pserver-only=true`, so
+   `:composeApp`/`:shared` are never configured in the container.
+
+### Manual actions still required by the team (cannot be automated here)
+
+These need a person with Render/credentials access:
+
+1. **Redeploy Render from this commit** (PR on `backend-by-abuzar`). The fixed
+   code is worthless until the live backend is rebuilt from it.
+2. **Set Render env vars:** real OTP provider creds, `OTP_DEV_RETURN_CODE=false`,
+   explicit console-fallback policy, and `OTP_ADMIN_TOKEN`. See `.env.example`.
+3. **After deploy, from the phone browser hit** `GET /api/v1/config/version`
+   and confirm `git_sha` matches the deployed commit (not "unknown", not the old SHA).
+4. **Rotate** any password/JWT that appeared in previously shared Android logs
+   (the leak is fixed going forward, but already-shared logs remain compromised).
+5. **Rebuild/reinstall the APK** from current client and confirm `devBaseUrl`
+   points at the intended backend (see commit `31d3c2e` note about Render default).
+6. **Retest the screenshot paths** once redeployed: Messages → thread modal;
+   Academic Calendar → This Month; Profile → Add Gallery Photo (valid + invalid URL).
+
+### Still-open architecture work (P1/P2 — needs product decisions, not a hotfix)
+
+These are tracked but intentionally **not** changed in this pass because they
+require schema/migration + product design, not a build fix:
+
+- Real media upload (file picker + storage backend) instead of URL-only entry.
+- Current-location/GPS/geocoding + lat/lng persistence and parent distance discovery.
+- Per-class subject pools + a real `teacher_subject_assignments` table.
+- Broadcast audience segmentation (`ALL_SCHOOL/CLASS/SECTION/SUBJECT/STUDENT/CUSTOM`).
+- Contract tests for high-risk DTOs + a route-inventory test for duplicate paths.
+
+---
+
 ## 9. Bottom line
 
 The known screenshot issues are real, but the root causes are broader than the visible UI errors. The current merged code contains several intended fixes, yet the backend cannot currently compile, the tested phone build was pointed at stale Render, API logs expose secrets, legacy parent routes can shadow newer live routes, and major product requirements such as location, upload, subject/teacher assignment, and segmented broadcasts remain incomplete.
