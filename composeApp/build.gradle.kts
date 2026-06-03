@@ -72,6 +72,9 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.activity.compose)
+            // Provides ContextCompat for runtime location-permission checks
+            // (real "use current location" in school onboarding, report §11.2).
+            implementation(libs.androidx.core.ktx)
             implementation(libs.koin.android)
             implementation(libs.koin.androidx.compose)
         }
