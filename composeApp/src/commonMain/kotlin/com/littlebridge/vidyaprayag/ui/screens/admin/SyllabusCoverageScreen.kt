@@ -1,5 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.screens.admin
 
+import com.littlebridge.vidyaprayag.ui.theme.StatusColors
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,7 +24,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.presentation.DepartmentProgress
 import com.littlebridge.vidyaprayag.feature.admin.presentation.LaggingAlert
 import com.littlebridge.vidyaprayag.feature.admin.presentation.AcademicMilestone
@@ -168,7 +169,7 @@ private fun IntelligenceGraphCard(stats: List<Float>, labels: List<String>) {
 private fun GrowthInsightsCard() {
     VidyaPrayagCard(
         modifier = Modifier.fillMaxWidth(),
-        backgroundColor = Color(0xFF1A2B48) // Deep Navy
+        backgroundColor = MaterialTheme.colorScheme.primaryContainer
     ) {
         Row(
             modifier = Modifier.padding(24.dp),
@@ -178,14 +179,7 @@ private fun GrowthInsightsCard() {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Growth Insights", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
                 Text("Our AI analyzed 42,000 data points to optimize your curriculum timeline.", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
-                Button(
-                    onClick = { Unit },
-                    enabled = false,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Audit generation pending", fontWeight = FontWeight.Bold)
-                }
+                ComingSoonPill(label = "Audit generation — coming soon", onLight = true)
             }
             Box(
                 modifier = Modifier.size(100.dp).clip(RoundedCornerShape(24.dp)).background(Color.White.copy(alpha = 0.12f)),
@@ -214,7 +208,7 @@ private fun ProgressRingsRow(progressList: List<DepartmentProgress>) {
                         CircularProgressIndicator(
                             progress = { dept.progress },
                             modifier = Modifier.fillMaxSize(),
-                            color = if (dept.isDelayed) Color(0xFFF59E0B) else MaterialTheme.colorScheme.secondary,
+                            color = if (dept.isDelayed) StatusColors.warning else MaterialTheme.colorScheme.secondary,
                             strokeWidth = 8.dp,
                             trackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
@@ -222,12 +216,12 @@ private fun ProgressRingsRow(progressList: List<DepartmentProgress>) {
                             "${(dept.progress * 100).toInt()}%",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = if (dept.isDelayed) Color(0xFFF59E0B) else MaterialTheme.colorScheme.secondary
+                            color = if (dept.isDelayed) StatusColors.warning else MaterialTheme.colorScheme.secondary
                         )
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(dept.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                        Text(dept.trend, style = MaterialTheme.typography.labelSmall, color = if (dept.isDelayed) Color(0xFFF59E0B) else MaterialTheme.colorScheme.secondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Text(dept.trend, style = MaterialTheme.typography.labelSmall, color = if (dept.isDelayed) StatusColors.warning else MaterialTheme.colorScheme.secondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -257,10 +251,10 @@ private fun LaggingPerformanceSection(alerts: List<LaggingAlert>) {
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Box(
-                            modifier = Modifier.size(48.dp).clip(CircleShape).background(if (alert.isCritical) Color(0xFFFFEBEE) else Color(0xFFFFF8E1)),
+                            modifier = Modifier.size(48.dp).clip(CircleShape).background(if (alert.isCritical) StatusColors.criticalSoft else StatusColors.warningSoft),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(alert.className.filter { it.isDigit() || it.isLetter() }.take(3), fontWeight = FontWeight.Bold, color = if (alert.isCritical) Color.Red else Color(0xFFF59E0B))
+                            Text(alert.className.filter { it.isDigit() || it.isLetter() }.take(3), fontWeight = FontWeight.Bold, color = if (alert.isCritical) Color.Red else StatusColors.warning)
                         }
                         Column {
                             Text("${alert.subject} - ${alert.className}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
@@ -280,7 +274,7 @@ private fun LaggingPerformanceSection(alerts: List<LaggingAlert>) {
 private fun MilestonesSection(milestones: List<AcademicMilestone>) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(Icons.Default.EventNote, null, tint = MaterialTheme.colorScheme.secondary)
+            Icon(Icons.AutoMirrored.Filled.EventNote, null, tint = MaterialTheme.colorScheme.secondary)
             Text("Upcoming Academic Milestones", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         }
 

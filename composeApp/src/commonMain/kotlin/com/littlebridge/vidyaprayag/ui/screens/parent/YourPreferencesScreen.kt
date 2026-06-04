@@ -20,7 +20,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.parent.presentation.YourPreferencesViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.SchoolPreference
 import com.littlebridge.vidyaprayag.navigation.Destination
@@ -102,8 +101,8 @@ private fun PreferencesVisualHeader() {
             .height(240.dp)
             .clip(RoundedCornerShape(24.dp))
     ) {
-        AsyncImage(
-            model = "https://lh3.googleusercontent.com/aida-public/AB6AXuDMIkyUDbX7QFkC-rwx3eM_56KaUhU_ZwKV1jPb72pQyR1g7TujUPSwCj8289Jz9wv45mRSyRUFtfMut8AEgVLSn6NHiD3G4XT_fOL_W4sokE-cWQAcr0YGB-q-khWVQzA0kkgwmDVQIJiNd5UuJWWpOzBPPiNr-G-O7XVAsmlK0Nx9lkHVRaLvtE-juszJfhCX7BupWPXo46G63K68rYLyA35opfvn38KCjVbosI_Ro9VoEsa0xi0MjsIMitvpKfSKKBYcqJD1eiLr",
+        NetworkImage(
+            model = null,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop

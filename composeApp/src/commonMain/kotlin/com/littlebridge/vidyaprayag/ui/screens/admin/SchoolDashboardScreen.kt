@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,7 +24,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingStep
 import com.littlebridge.vidyaprayag.feature.admin.presentation.DashboardOnboardingStatus
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolDashboardViewModel
@@ -72,41 +72,49 @@ fun SchoolDashboardScreen() {
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
                 item {
-                    if (onboardingStatus == DashboardOnboardingStatus.COMPLETED) {
-                        CampusLiveHeroCard(adminName = adminName)
-                    } else {
-                        OnboardingHeroCard(
-                            adminName = adminName,
-                            progress = progress,
-                            statusLabel = onboardingStatus.shortLabel(),
-                            isPrimaryActionLoading = isLoading,
-                            primaryActionText = if (progress > 0f && progress < 1f) "Continue Onboarding" else "Start Onboarding",
-                            onPrimaryAction = onContinueOnboarding
+                    AnimatedEntrance(delayMillis = 0) {
+                        if (onboardingStatus == DashboardOnboardingStatus.COMPLETED) {
+                            CampusLiveHeroCard(adminName = adminName)
+                        } else {
+                            OnboardingHeroCard(
+                                adminName = adminName,
+                                progress = progress,
+                                statusLabel = onboardingStatus.shortLabel(),
+                                isPrimaryActionLoading = isLoading,
+                                primaryActionText = if (progress > 0f && progress < 1f) "Continue Onboarding" else "Start Onboarding",
+                                onPrimaryAction = onContinueOnboarding
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    AnimatedEntrance(delayMillis = 80) {
+                        SetupStepsHeader(stepCount = steps.size)
+                    }
+                }
+
+                itemsIndexed(steps) { index, step ->
+                    AnimatedEntrance(delayMillis = staggerDelay(index + 2)) {
+                        OnboardingStepItem(
+                            step = step,
+                            clickable = onboardingStatus != DashboardOnboardingStatus.COMPLETED && step.isEnabled,
+                            onClick = {
+                                navigator.navigateTo(step.serverKey.toOnboardingDestination())
+                            }
                         )
                     }
                 }
 
                 item {
-                    SetupStepsHeader(stepCount = steps.size)
-                }
-
-                items(steps) { step ->
-                    OnboardingStepItem(
-                        step = step,
-                        clickable = onboardingStatus != DashboardOnboardingStatus.COMPLETED && step.isEnabled,
-                        onClick = {
-                            navigator.navigateTo(step.serverKey.toOnboardingDestination())
-                        }
-                    )
-                }
-
-                item {
-                    SupportSection(
-                        onChatClick = { navigator.navigateTo(Destination.Messages) },
-                        onWatchVideoClick = {
-                            navigator.navigateTo(Destination.InstitutionalProfile)
-                        }
-                    )
+                    AnimatedEntrance(delayMillis = 200) {
+                        SupportSection(
+                            onChatClick = { navigator.navigateTo(Destination.Messages) },
+                            onWatchVideoClick = {
+                                navigator.navigateTo(Destination.InstitutionalProfile)
+                            }
+                        )
+                    }
                 }
 
                 item {
@@ -215,21 +223,22 @@ private fun OnboardingHeroCard(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            Button(
+            PremiumButton(
+                text = primaryActionText,
                 onClick = onPrimaryAction,
                 enabled = !isPrimaryActionLoading,
+                loading = isPrimaryActionLoading,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                ),
-                shape = CircleShape,
-                contentPadding = PaddingValues(vertical = 16.dp)
-            ) {
-                Text(primaryActionText, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Spacer(modifier = Modifier.width(8.dp))
-                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
-            }
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                icon = {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            )
         }
     }
 }
@@ -366,7 +375,7 @@ private fun OnboardingStepItem(
                 contentAlignment = Alignment.Center
             ) {
                 if (step.iconUrl != null) {
-                    AsyncImage(
+                    NetworkImage(
                         model = step.iconUrl,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize().padding(8.dp),

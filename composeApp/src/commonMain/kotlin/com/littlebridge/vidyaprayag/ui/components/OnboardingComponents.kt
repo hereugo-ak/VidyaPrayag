@@ -124,10 +124,18 @@ fun OnboardingTextField(
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text(placeholder) },
             trailingIcon = if (trailingIcon != null) { { Icon(trailingIcon, contentDescription = null) } } else null,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(16.dp),
             singleLine = singleLine,
             minLines = minLines,
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = keyboardType)
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = keyboardType),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.secondary,
+                focusedLabelColor = MaterialTheme.colorScheme.secondary,
+                cursorColor = MaterialTheme.colorScheme.secondary,
+                focusedContainerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.08f),
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+            )
         )
     }
 }
@@ -157,33 +165,37 @@ fun OnboardingBottomBar(
     onContinue: () -> Unit,
     continueText: String = "Continue"
 ) {
+    // Premium glassy footer. Delegates to the shared PremiumButton system so the
+    // onboarding CTAs match every other button in the app — no second button
+    // style doing the same job.
     Surface(
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
-        tonalElevation = 8.dp,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+        tonalElevation = 10.dp,
+        shadowElevation = 12.dp,
         modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            OutlinedButton(
+            PremiumOutlineButton(
+                text = "Save Draft",
                 onClick = onSaveDraft,
-                modifier = Modifier.weight(1f).height(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary)
-            ) {
-                Text("Save Draft", color = MaterialTheme.colorScheme.secondary)
-            }
-            Button(
+                modifier = Modifier.weight(1f)
+            )
+            PremiumButton(
+                text = continueText,
                 onClick = onContinue,
-                modifier = Modifier.weight(2f).height(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-            ) {
-                Text(continueText)
-                Spacer(modifier = Modifier.width(8.dp))
-                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
-            }
+                modifier = Modifier.weight(2f),
+                icon = {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            )
         }
     }
 }

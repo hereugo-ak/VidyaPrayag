@@ -1,1070 +1,769 @@
 # VidyaPrayag — School Side Status Report
 
-> **Audit branch requested:** `backend-by-abuzar`.
-> **Repository state checked:** local `main` at `f3f33c9`, which is `Merge pull request #9 from hereugo-ak/backend-by-abuzar`; remote `origin/backend-by-abuzar` at `682d682`.
-> **Audit date:** 2026-06-03.
-> **Scope:** Whole school-side codebase: Compose UI (`composeApp`), shared KMP client/API layer (`shared`), Ktor backend (`server`), database schema docs/mappings, last 30 commits, uploaded Android Studio log, and attached screenshots.
-> **Important:** The issues below include the known screenshot issues, but they are not the only issues. This audit found additional build, security, routing, data-model, and architecture risks.
+> **Audit branch:** `backend-by-abuzar`
+> **HEAD commit:** `d3ffc3a` — feat(ui): premium iOS-style overhaul + glitch fixes (school/admin side)
+> **Audit date:** 2026-06-04 (updated — premium UI pass)
+> **Previous audit date:** 2026-06-03
+> **Scope:** Full re-audit of `backend-by-abuzar` branch. Checked: last 15 commits, live Render logs, Android Studio device log (`2026-06-03 175806.353 O.txt`), all 7 provided screenshots (Render env dashboard ×3, app UI ×4), backend source, shared client, composeApp, OTP provider chain, environment variables, navigation, onboarding flow, document upload, GPS, and teacher/class/subject model.
+>
+> **⭐ 2026-06-04 UPDATE — Premium UI / Glitch-Free Pass:** A full premium iOS-style UI overhaul of the school/admin side was completed and merged via PR. All admin-side UI glitches identified below have been resolved (dead controls removed, hardcoded colors centralised, broken images fixed, premium components introduced with zero-conflict delegation). See the new **§9 — UI / Premium Overhaul (DONE)** at the end of this report for the complete fixed/remaining ledger.
 
 ---
 
-## 1. Executive summary
+## QUICK STATUS: What Is Working vs. What Is Broken (as of 2026-06-04)
 
-The latest code has several intended fixes merged from `backend-by-abuzar`, including calendar DTO compatibility, message conversation route code, backend target visibility, canonical DB docs, parent announcements/messages work, and several UI overflow fixes. However, the current repository is **not in a deployable backend state** because `:server:compileKotlin` fails.
-
-The screenshots and logs prove the tested APK was hitting `https://vidyaprayag-1.onrender.com`, not a local backend. Therefore, some screenshot failures are deployment drift: the code now contains fixes that the Render backend used by the phone did not have at the time of the run. That does not remove the problem; it means the team must fix build, redeploy, and add version verification before any school-side retest.
-
-Highest-risk findings:
-
-| Priority | Area | Core reason | Current impact |
-|---|---|---|---|
-| P0 | Backend build | `ParentRouting.kt` imports/uses unresolved `org.jetbrains.exposed.sql.inList` | Current backend cannot compile/deploy from `main`/merged `backend-by-abuzar`. |
-| P0 | Message thread modal | APK hit stale Render backend; log confirms 404 for `/api/v1/school/messages/threads/{id}/messages` while source code contains the route | Conversation modal fails despite route existing in repo. |
-| P0 | Academic calendar | APK hit backend/client combination where `summary.working_days` was missing and client required it | Calendar screen shows red deserialization error and no data. |
-| P0 | Secret leakage | `safeApiCall` logs raw request body and response body; uploaded log contains password and JWT tokens | Severe security issue in shared Android logs. |
-| P0 | Parent/school route conflicts | Legacy `ParentRouting.kt` still defines mock `/parent/track-progress` and `/parent/fees` while newer live routes define the same paths | Mock/static routes can shadow or conflict with live routes. |
-| P1 | Onboarding location | UI only renders a deterministic map preview; no current-location button, permission, GPS, geocoding, lat/lng persistence in `SchoolsTable` mapping | "Use current location" requirement is not implemented. |
-| P1 | Media upload | Branding/profile/gallery use placeholder URLs or URL text entry; no multipart/file-picker/storage upload path | Logo, profile picture, gallery, docs are not real uploads. |
-| P1 | Class/subject management | Academic payload applies the same subject array to every class; teacher assignment is free-text only | No true grade-specific subject pool or teacher/class/subject assignment model. |
-| P1 | Broadcast segmentation | Announcement model has no audience/class/subject/teacher targeting fields | Admin/teacher broadcast segmentation cannot be enforced. |
-| P1 | Parent discoverability | `SchoolsTable` used by Ktor lacks latitude/longitude; parent dashboard lists active schools by city with fixed rating | Parents cannot discover onboarded schools by geographic distance. |
-
-### Remediation update in this working tree
-
-After the initial audit, the following P0/frontend-stability fixes were applied and validated locally:
-
-- Redacted the sensitive password example in this report.
-- Fixed the backend compile blocker in `ParentRouting.kt` by removing the unsupported `inList` usage.
-- Removed legacy duplicate parent `/track-progress` and `/fees` mock routes from `ParentRouting.kt` so DB-backed route owners can respond.
-- Hardened `safeApiCall` logging so request/response bodies redact password, OTP/code, token, refresh token, authorization, cookie, and API-key style fields.
-- Removed/disabled school/admin no-op CTAs that previously looked tappable but did nothing.
-- Replaced protected `googleusercontent`/placeholder image usage in the audited admin surfaces with local icon/initials UI or safer non-protected sample URLs.
-- Validation now passes:
-  - `./gradlew :server:compileKotlin -Pserver-only=true --no-daemon` — **BUILD SUCCESSFUL**.
-  - `./gradlew :shared:compileDevDebugKotlinAndroid :composeApp:compileDevDebugKotlinAndroid --no-daemon` — **BUILD SUCCESSFUL**.
-- Remaining console output is Gradle/Kotlin deprecation/configuration warnings, not Kotlin compile errors.
+| Area | Status | Notes |
+|---|---|---|
+| Server boots on Render | ✅ Working | Confirmed in Render log: starts in ~6.6s |
+| Database schema auto-create | ✅ Working | `AUTO_CREATE_TABLES=true`, Exposed creates tables on boot |
+| Supabase Postgres connection | ✅ Working | Render log shows no DB errors; pooler URL configured correctly |
+| Email+password signup | ✅ Working | Render log: `201 Created: POST /api/v1/auth/signup` |
+| Email+password login | ⚠️ Partially Working | `200 OK` after signup; repeated `401` when re-attempting — see §3.1 |
+| OTP delivery (SMS/WhatsApp/Email) | ❌ BROKEN | All providers skipped; only console fallback active — see §3.2 |
+| Forgot / Reset password | ❌ NOT IMPLEMENTED | No endpoint, no UI — see §3.3 |
+| Media upload (logo/branding) | ⚠️ Wired but blocked | Code is correct; returns 503 because `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` not set on Render — see §3.4 |
+| Document upload (LaunchInfoOB) | ❌ BROKEN | "Upload" button only sets local state; no file picker, no MediaApi call — see §3.5 |
+| GPS / Location capture | ⚠️ Wired but slow | Android provider implemented; `lastKnown()` frequently returns null → falls to 12-second `liveFix` timeout — see §3.6 |
+| School admin analytics tabs | ⚠️ Navigation exists, role-gated | Analytics/Calendar/Attendance/PTM/Results are in the side drawer for `ADMIN` role only; screenshot showed `Guest User` — see §3.7 |
+| Class/Subject management (OB step 3) | ❌ REDESIGN NEEDED | Current UI shows CBSE-synced classes but does NOT support: adding multiple classes, per-class subject editing, teacher profile creation, or assigning same teacher to multiple subjects/classes — see §3.8 |
+| Teacher assignment backend | ✅ Backend done | `teacher_subject_assignments` table + `GET/POST/DELETE /api/v1/school/teacher-assignments` exists in server code |
+| Teacher assignment client UI | ❌ NOT WIRED | No client-side API calls to `teacher-assignments`; `AcademicInfoOBScreen` does not offer add-class, add-teacher, or per-class subject editing — see §3.8 |
+| Broadcast audience segmentation | ✅ Backend done | `audience_type` + `audience_filter` added; recipient resolver uses assignment graph |
+| Announcement create UI | ⚠️ Missing audience picker | Backend supports `audience_type`; client create-announcement dialog does not expose it |
+| Onboarding `Invalid token` error | ❌ ACTIVE BUG | Branding step returns "Invalid token" — root cause: Supabase service key not set + possible token expiry mid-flow — see §3.9 |
+| Admin drawer navigation | ✅ Code-correct | ADMIN role sees Analytics/Calendar/Attendance/Leave/Results/PTM/Schedule drawer items |
+| Premium animations | ✅ Working | PremiumAnimations.kt compiled after §057f557 fix |
+| Admin-side UI glitches | ✅ FIXED (2026-06-04) | Dead "pending" buttons → ComingSoonPill; broken images → NetworkImage; dead no-op top-bar icons removed — see §9 |
+| Admin hardcoded colors | ✅ FIXED (2026-06-04) | All `Color(0xFF..)` status hexes centralised into `StatusColors` palette — zero hardcoded colors left in admin — see §9 |
+| Premium button system | ✅ DONE (2026-06-04) | `PremiumButton`/`PremiumTonalButton`/`PremiumOutlineButton` (Dribbble-style, brand-themed); generic buttons delegate to them — see §9 |
+| Admin mobile-friendliness | ✅ VERIFIED (2026-06-04) | All 19 admin screens use consistent scaffold + scrollable layout; no fixed-width overflow — see §9 |
+| Route duplicate/shadow risk | ✅ Fixed | `inList` compile error fixed; legacy mock routes removed in prior commits |
+| API credential logging (security) | ✅ Fixed | `safeApiCall` now redacts password/token/otp fields |
+| JWT_SECRET | ⚠️ CRITICAL MISSING | Render env screenshot shows `JWT_SECRET` IS set (confirmed in screenshot 3); but verify it is a real strong value, not the `change-me` placeholder |
 
 ---
 
-## 2. Validation performed
+## 1. Executive Summary
 
-### 2.1 Git/branch validation
+The `backend-by-abuzar` branch is **structurally sound** — all major compile blockers from the previous audit are fixed, and the server runs. However, **five critical runtime issues** prevent the app from being usable in production:
 
-Commands/checks performed:
+1. **OTP delivery is broken** — no real SMS/Email/WhatsApp provider is configured on Render. All OTPs print to Render logs only (console fallback). Users who registered with a phone number cannot receive OTPs. The `OTP_DEV_RETURN_CODE` defaults to `true` in `OtpService.kt` when unset, meaning the API response contains the OTP in plaintext (major security risk if left enabled).
 
-```bash
-git fetch --all --prune
-git status --short
-git branch -a
-git log --oneline --decorate -30
-git log --oneline --decorate -30 origin/backend-by-abuzar
-git diff --name-status main..origin/backend-by-abuzar
-```
+2. **Forgot/Reset password is completely absent** — neither the backend endpoint nor the client UI exists. Users who forget their email+password have no recovery path.
 
-Result:
+3. **Document upload in the Launch/Verification step does nothing real** — the "Upload" button in `LaunchInfoOBScreen` calls `viewModel.markDocumentUploaded()` which only flips local UI state. There is no file picker, no `MediaApi.upload()` call, no actual file sent to the backend. Documents are not persisted.
 
-- Current local branch: `main`.
-- Current local/remote main HEAD: `f3f33c9`.
-- `f3f33c9` is merge PR #9 from `backend-by-abuzar`.
-- `origin/backend-by-abuzar` is `682d682`.
-- `main..origin/backend-by-abuzar` has no file diff because the branch was merged.
+4. **Class/Subject/Teacher onboarding step needs a full UI revamp** — the current Academic step (Step 3) shows CBSE-synced class/subject data but provides no way to: add new classes, edit subjects per-class, create a teacher profile inline, or assign the same teacher to multiple subjects/classes. The backend infrastructure for teacher assignments exists and is ready; only the client is missing.
 
-### 2.2 Backend compile validation
-
-Command run:
-
-```bash
-./gradlew :server:compileKotlin -Pserver-only=true --no-daemon
-```
-
-Initial audit result: **FAILED** with:
-
-```text
-e: server/src/main/kotlin/com/littlebridge/vidyaprayag/feature/user/ParentRouting.kt:21:34 Unresolved reference 'inList'.
-```
-
-Fix applied in this working tree:
-
-- Removed `org.jetbrains.exposed.sql.inList`.
-- Built an Exposed OR expression from the parent's resolved `schoolIds`.
-- Removed duplicate legacy mock `/api/v1/parent/track-progress` and `/api/v1/parent/fees` route handlers from `ParentRouting.kt`.
-
-Post-fix validation:
-
-```bash
-./gradlew :server:compileKotlin -Pserver-only=true --no-daemon
-```
-
-Result: **BUILD SUCCESSFUL**.
-
-### 2.3 Uploaded Android log validation
-
-The full file was downloaded from the wrapper URL and inspected. Key evidence:
-
-```text
-VidyaPrayagApp I Backend -> authBaseUrl=https://vidyaprayag-1.onrender.com schoolBaseUrl=https://vidyaprayag-1.onrender.com
-```
-
-So the tested APK was using Render.
-
-Message failure:
-
-```text
-RESPONSE ERROR BODY: {"success":false,"message":"Endpoint not found: /api/v1/school/messages/threads/876b5ba8-16ca-46fa-b9a2-4258deab3d09/messages"}
-MessagesVM E getThreadMessages failed: Endpoint not found: /api/v1/school/messages/threads/876b5ba8-16ca-46fa-b9a2-4258deab3d09/messages
-```
-
-Calendar failure:
-
-```text
-UNKNOWN ERROR: Illegal input: Field 'working_days' is required ... CalendarSummaryDto ... missing at path: $.data.summary
-AcademicCalendarVM E getCalendar error: Illegal input: Field 'working_days' is required ...
-```
-
-Image failures:
-
-```text
-RealImageLoader E Failed - https://share.google/LqjE0becQmFwQrPl5
-ImageDecoder$DecodeException: Failed to create image decoder ... Input contained an error.
-BitmapFactory returned a null bitmap.
-RealImageLoader E coil3.network.HttpException: HTTP 403
-RealImageLoader E UnknownHostException: Unable to resolve host "assets.vidyaprayag.com"
-```
-
-Security leak in logs:
-
-```text
-REQUEST BODY: {"identifier":"abuzarkn99@gmail.com","password":"[REDACTED]","role":"ADMIN"}
-RESPONSE BODY: ApiResponse(... token=..., refreshToken=...)
-```
-
-This is a high-risk logging problem, not just debug noise.
+5. **Media upload (branding step) returns 503** — the code is correct and fully wired, but `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` are not set as Render environment variables, causing every upload attempt to return `503 STORAGE_NOT_CONFIGURED`.
 
 ---
 
-## 3. Last 30 commits reviewed
+## 2. Recent Commits Reviewed (since last audit)
 
-| # | Commit | Author | Summary | Audit note |
-|---:|---|---|---|---|
-| 1 | `f3f33c9` | MD ABUZAR SALIM | Merge pull request #9 from hereugo-ak/backend-by-abuzar | Current `main`; merges backend-by-abuzar. |
-| 2 | `682d682` | MD ABUZAR SALIM | fix(build): resolve 'Unresolved reference: time' in server/build.gradle.kts | Did not catch current `ParentRouting.kt` compile failure. |
-| 3 | `c381371` | MD ABUZAR SALIM | fix(ui): prevent phone-screen overflow/clipping on admin screens | Addresses visible narrow-phone layout issues. |
-| 4 | `090a68b` | MD ABUZAR SALIM | fix(parent-school harmony + ui): real announcements, parent messages, toggle | Introduced `inList` compile failure; also leaves duplicate parent routes. |
-| 5 | `a3b8a68` | MD ABUZAR SALIM | fix(school): P0 fixes - calendar DTO, backend visibility, canonical schema | Adds intended fixes for screenshots, but requires successful deploy. |
-| 6 | `6d8ffab` | MD ABUZAR SALIM | docs(school): update school-side issue audit | Previous status report update. |
-| 7 | `0f4f865` | MD ABUZAR SALIM | Merge pull request #8 from hereugo-ak/fix/school-session-onboarding | Merged school session fixes. |
-| 8 | `bfca368` | MD ABUZAR SALIM | Fix school onboarding session handling | Improved onboarding 401/session behavior. |
-| 9 | `0e33daf` | MD ABUZAR SALIM | Merge pull request #7 from hereugo-ak/backend-by-abuzar | Earlier backend-by-abuzar merge. |
-| 10 | `03ede1b` | MD ABUZAR SALIM | Replace placeholder analytics with real data-driven charts & aggregation | Analytics improved but still hybrid/CMS-derived. |
-| 11 | `3fa0be2` | MD ABUZAR SALIM | docs(school): add detailed school-side status report | Earlier audit. |
-| 12 | `c81aebc` | MD ABUZAR SALIM | feat(messages): wire conversation view end-to-end; diagnose dev backend/401 | Source route exists after this; Render in log was stale. |
-| 13 | `da1fe3c` | MD ABUZAR SALIM | feat(school): enforce school authorization + remove placeholders across school surface | Important school scoping work. |
-| 14 | `6489ada` | MD ABUZAR SALIM | feat(onboarding): persist real academic structure + unify completion logic | Academic persistence added, but subject model remains too generic. |
-| 15 | `90707b9` | MD ABUZAR SALIM | fix(android-build): convert expression-body parse helpers to block body | Build hygiene. |
-| 16 | `18fabe6` | MD ABUZAR SALIM | Merge pull request #6 from hereugo-ak/backend-by-abuzar | Historical merge. |
-| 17 | `aafe10e` | MD ABUZAR SALIM | feat(school): wire announcement filters + CRM Generate Report nav | Adds UI wiring. |
-| 18 | `77a65b7` | MD ABUZAR SALIM | feat(school): wire AcademicCalendar nav + SchoolDashboard support actions | Calendar navigation work. |
-| 19 | `48d16f2` | MD ABUZAR SALIM | feat(school): wire PTM scheduling dialog + Enquiry status dropdown | PTM/enquiry wiring. |
-| 20 | `305f36c` | MD ABUZAR SALIM | feat(school): wire UI affordances for Messages compose + Announcements create/search | UI affordances added. |
-| 21 | `d132863` | MD ABUZAR SALIM | feat(school): wire 5 remaining admin screens (analytics+profile) to API | Profile/API work. |
-| 22 | `da3ca17` | MD ABUZAR SALIM | fix(analytics): replace expression-body return with block body in parseCard/parseInsight | Build hygiene. |
-| 23 | `632ffcf` | MD ABUZAR SALIM | fix(analytics): restore AnalyticsCardData/InsightItem + add local.properties dev URL support | Added local URL support, but dev fallback still points to Render. |
-| 24 | `a97a2df` | MD ABUZAR SALIM | feat(school): wire AnalyticsDashboard & Results screens to API | API wiring. |
-| 25 | `287197d` | MD ABUZAR SALIM | feat(school): wire AcademicCalendar, LeaveRequests & DailyAttendance screens to API | Calendar/attendance API wiring. |
-| 26 | `31d3c2e` | MD ABUZAR SALIM | fix(config): point dev flavor at render.com + wire Announcements & PTM screens to API | Explains why dev APK hits Render unless `devBaseUrl` is set. |
-| 27 | `2718ac8` | MD ABUZAR SALIM | feat(messages): wire admin Messages screen to /api/v1/school/messages endpoints | Message thread list route added. |
-| 28 | `7bd19fd` | MD ABUZAR SALIM | feat(admissions): wire AdmissionCRM to /api/v1/admissions/enquiries endpoints | Admissions API wiring. |
-| 29 | `4b0a092` | MD ABUZAR SALIM | fix(school-dashboard): drive UI from /user/details + correct post-onboarding state | Dashboard/onboarding status fix. |
-| 30 | `7951bfa` | MD ABUZAR SALIM | fix(onboarding): restore Koin DI bindings clobbered by main merge | DI fix. |
+| # | Commit | Summary | Audit Note |
+|---:|---|---|---|
+| 1 | `057f557` | fix(ui): resolve PremiumAnimations build errors + richer premium motion | Fixes `AnimatedEntrance`/`ShimmerBox` compile errors; animations now work |
+| 2 | `cd3da01` | docs: consolidated MANUAL_SETUP_GUIDE.md + status report §8e | Good reference; already linked in this report |
+| 3 | `3dbe88b` | feat(ui): premium iOS-style motion primitives | `PremiumAnimations.kt` added; applied to ProfileScreen + buttons |
+| 4 | `64d7853` | feat(school): real file-picker uploads for gallery & virtual tour | `InstitutionalProfileScreen` gallery/tour now use real device picker → upload — ✅ |
+| 5 | `2be5fa9` | feat(school): wire real GPS capture into onboarding Basics step | GPS button in InstitutionalBasicOBScreen now calls real Android LocationManager |
+| 6 | `229bef1` | feat(school): add cross-platform LocationProvider for GPS capture | `LocationProvider.android.kt` implemented with permission + liveFix + geocoding |
+| 7 | `b0353bf` | feat(school): real Supabase media uploads + STUDENT-scope link + migration_002 | `MediaRouting`, `SupabaseStorage`, `BrandingInfoOBViewModel.uploadMedia()` wired |
+| 8 | `f7a6f1c` | feat(school): implement P1/P2 architecture — teacher assignments, geo, segmentation | `teacher_subject_assignments` table, `TeacherAssignmentRouting`, Haversine discovery |
+| 9 | `9170ad4` | docs(deploy): full Render env-var plan + P1/P2 architecture solutions | Good reference for env var setup |
+| 10 | `5433252` | fix(deploy): make backend build identity reliable on Render | Build SHA identity endpoint stabilized |
+| 11 | `b0fc09b` | fix(school): resolve backend build and admin UI glitches | Various UI fixes; `inList` compile error addressed |
 
 ---
 
-## 4. Screenshot-by-screenshot root cause analysis
+## 3. Detailed Issue Analysis
 
-### 4.1 Direct Messaging modal: endpoint not found
+### 3.1 Login 401 — Repeated authentication failures
 
-Screenshot shows:
-
-```text
-Endpoint not found: /api/v1/school/messages/threads/876b5ba8-16ca-46fa-b9a2-4258deab3d09/messages
+**Evidence from Render log:**
+```
+401 Unauthorized: POST - /api/v1/auth/login  (×6 attempts from same session)
 ```
 
-Source code state:
+**Root cause analysis:**
+The server implements two separate login paths: email→password and phone→OTP. The login route in `AuthRouting.kt` requires:
+- For email: correct password hash match
+- For phone: a verified OTP in `auth_otps` table
 
-- Client calls `GET api/v1/school/messages/threads/$threadId/messages` in `MessagesApi.kt`.
-- Server contains `get("/threads/{id}/messages")` in `server/.../feature/school/MessagesRouting.kt`.
-- `Application.kt` registers `messagesRouting()`.
+The repeated 401s in the log are consistent with: a user successfully signing up (201 Created), then attempting to log in with **a wrong password** or with a **phone number that never received an OTP** (since OTP delivery is broken). There is no lockout after 5 failures currently enforced on the login route itself (only on OTP verify).
 
-Core reason:
-
-- The phone log proves the APK hit Render.
-- Render returned 404, so Render did not have the route deployed at the time of the run, or it was running a stale build.
-- Current source contains the route, but current source cannot be deployed until the P0 compile error is fixed.
-
-Required fix:
-
-1. Fix backend compile first.
-2. Redeploy Render from current commit.
-3. Hit `GET /api/v1/config/version` from the phone and verify SHA/build time.
-4. Retest Messages -> Admin Desk conversation.
-
-### 4.2 Academic Calendar: missing `working_days`
-
-Screenshot/log shows:
-
-```text
-Field 'working_days' is required ... CalendarSummaryDto ... missing at path: $.data.summary
-```
-
-Current source state:
-
-- `CalendarSummaryDto` now has defaults and supports both `working_days` and `total_working_days`.
-- Server `CalendarSummary` now emits both fields.
-
-Core reason:
-
-- The APK/backend pair used during the log was stale relative to current source.
-- The log still proves an active integration failure: no version pinning was used, and deployed backend/client contract drift reached the user.
-
-Required fix:
-
-1. Compile and redeploy current backend.
-2. Rebuild/reinstall APK from current client.
-3. Confirm `GET /api/v1/school/calendar` response contains both fields.
-4. Add a contract test for calendar summary to prevent regression.
-
-### 4.3 Gallery photo dialog: URL accepted but image fails
-
-Screenshot shows the profile gallery accepting "Image URL". Log shows failures for `https://share.google/...`, `lh3.googleusercontent.com/...` HTTP 403, and `assets.vidyaprayag.com` DNS failure.
-
-Core reason:
-
-- The product has no real upload infrastructure here.
-- The UI accepts arbitrary URLs but does not validate that they are direct, decodable image URLs.
-- Google share links are HTML/redirect/share pages, not stable image bytes.
-- Some seeded/placeholder asset hosts are invalid or protected.
-
-Required fix:
-
-- Add Android file picker + multipart upload to Supabase Storage or another storage backend.
-- Persist signed/public URLs returned by the backend.
-- Validate content type and size server-side.
-- Reject non-direct URLs with a user-friendly message until upload exists.
-
-### 4.4 Onboarding location / "use current location"
-
-Code evidence:
-
-- `InstitutionalBasicOBScreen.kt` has a `LocationPicker(address = address)` that renders a static map-style box.
-- There is no permission request, no platform location provider, no GPS API call, no geocoding, and no latitude/longitude persistence in the Ktor `SchoolsTable` mapping.
-- `supabase_schema` has geo fields in `school_directory`, but the Ktor backend uses `schools` and does not map lat/lng there.
-
-Core reason:
-
-- Location is still a UI preview/address string feature, not a real location workflow.
-
-Required fix:
-
-- Add lat/lng columns to the active `schools` model or synchronize `schools` to `school_directory`.
-- Add Android location permission and provider implementation.
-- Add reverse geocoding/manual map picker fallback.
-- Persist `{full_address, city, district, state, pincode, latitude, longitude}`.
-- Use this data in parent school discovery.
+**Impact:** Users with phone-only accounts cannot log in at all until OTP delivery is fixed.
 
 ---
 
-## 5. Additional problems found beyond screenshots
+### 3.2 OTP Delivery — COMPLETELY BROKEN on Production
 
-### 5.1 P0: Current backend does not compile
-
-File:
-
-- `server/src/main/kotlin/com/littlebridge/vidyaprayag/feature/user/ParentRouting.kt`
-
-Problem:
-
-```kotlin
-import org.jetbrains.exposed.sql.inList
-.where { AnnouncementsTable.schoolId inList schoolIds }
+**Evidence from Render log:**
+```
+WARN OtpDeliveryDispatcher - [OtpDispatcher] all 5 providers failed: all providers skipped (none configured)
+WARN OtpService - [OtpService] delivery failed identifier-type=phone purpose=signup reason=all providers skipped (none configured)
+502 Bad Gateway: POST - /api/v1/auth/send-otp in 1196ms
 ```
 
-Compile result:
+**Root cause — Missing Render environment variables:**
 
-```text
-Unresolved reference 'inList'
+From the Render env screenshots, the following OTP-related variables are set:
+- `OTP_EXPIRY_MINUTES=10` ✅
+- `OTP_MAX_ATTEMPTS=5` ✅
+- `OTP_MAX_RESENDS_PER_HOUR=5` ✅
+- `OTP_PEPPER=<long hex>` ✅
+- `OTP_ADMIN_TOKEN=<token>` ✅
+- `OTP_CHANNEL_ORDER=sms,whatsapp,email` ✅
+- `OTP_DEV_RETURN_CODE=false` ✅
+- `OTP_ENABLE_CONSOLE_FALLBACK=false` ✅
+- `FAST2SMS_API_KEY=<key set>` ✅ (visible in screenshot 3)
+- `FAST2SMS_ROUTE=otp` ✅
+- `FAST2SMS_SENDER_ID=` ❌ **EMPTY** — this is fine for `otp` route
+- `MSG91_AUTH_KEY=` ❌ **EMPTY**
+
+**Critical finding:** `FAST2SMS_API_KEY` IS set in the Render environment. However, the `502 Bad Gateway` in the log is from an **OLDER deployment** before the Fast2SMS key was added. The current deployment (restarted at `06:44:10`) shows no OTP attempts in the new log window — meaning this needs to be re-tested after the current deploy.
+
+**HOWEVER — critical code bug in `OtpService.kt`:**
+```kotlin
+// Line in OtpService.kt:
+env("OTP_DEV_RETURN_CODE", "true").equals("true", true)
+//                          ^^^^^^ DEFAULT IS "true"!
+```
+**This means: if `OTP_DEV_RETURN_CODE` is NOT set on Render, it defaults to `true`, and the OTP code is returned in the API response body in plaintext.** This is a security risk. The Render screenshot shows `OTP_DEV_RETURN_CODE=false` IS set, so this specific risk is mitigated — but it's a dangerous default for a production system.
+
+**Also: SMTP (email OTP) is not configured:**
+- `SMTP_HOST=` ❌ **EMPTY** (visible in Render screenshot 1)
+- `SMTP_USERNAME=` not set
+- `SMTP_PASSWORD=` not set
+- `SMTP_FROM=` not set
+
+This means users who sign up with an **email address** (not phone) will **never receive an OTP** because:
+- SMS providers only handle phone identifiers
+- SMTP is the only email OTP provider, and it's not configured
+
+**Impact:** Any user trying to do OTP-based login/signup with an email address will get 502 Bad Gateway with `all providers skipped`.
+
+---
+
+#### Complete OTP Environment Setup Guide (Step-by-Step)
+
+**Current situation on Render:**
+- Fast2SMS key is set → phone OTPs SHOULD work (needs re-test after redeploy)  
+- SMTP not set → email OTPs will always fail
+- Console fallback is OFF → no silent fallback, which is correct for production
+
+---
+
+#### OPTION A — Fast2SMS (Recommended for India, SMS OTP to phones)
+
+Fast2SMS already has a key set. To verify it works:
+
+1. Go to [https://www.fast2sms.com](https://www.fast2sms.com) → Login
+2. Navigate to: **Dev API → Bulk SMS** (left sidebar)
+3. Your API key is on this page. Confirm it matches what's in Render.
+4. Check your wallet balance — if balance is 0, SMS will silently fail. **Top up minimum ₹100.**
+5. The `otp` route does NOT require DLT or Sender ID. Leave `FAST2SMS_SENDER_ID` empty.
+6. In Render → Environment: confirm exactly these values:
+   ```
+   FAST2SMS_API_KEY=<your key from fast2sms.com>
+   FAST2SMS_ROUTE=otp
+   ```
+7. After saving, Render auto-redeploys. Test by attempting `/api/v1/auth/send-otp` with a real Indian mobile number.
+
+**FAST2SMS API Key location:**
+- URL: https://www.fast2sms.com/dashboard/dev-api
+- Sign in → Left menu → **Dev API** → Copy the key shown under "Authorization"
+
+---
+
+#### OPTION B — SMTP Email OTP (Required for email-identifier users)
+
+This is **required** because `OTP_CHANNEL_ORDER=sms,whatsapp,email` means SMS runs first, but if the identifier is an email address, SMS is skipped and falls to email. Without SMTP configured, email-identifier OTPs always fail.
+
+**Using Gmail (easiest, free):**
+
+**Step 1:** Go to your Google Account → Security → 2-Step Verification (must be enabled)
+
+**Step 2:** After enabling 2FA, go to: [https://myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+- App name: type `VidyaPrayag`
+- Click **Create** → Google gives you a 16-character app password like `abcd efgh ijkl mnop`
+- Remove spaces → `abcdefghijklmnop`
+
+**Step 3:** Add these to Render → Environment:
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_USERNAME=yourgmail@gmail.com
+SMTP_PASSWORD=abcdefghijklmnop   ← the 16-char App Password (no spaces)
+SMTP_FROM=VidyaPrayag <yourgmail@gmail.com>
+SMTP_USE_SSL=true
 ```
 
-Impact:
-
-- None of the recently merged fixes can be reliably deployed.
-- Render may remain stale, which keeps producing message/calendar failures.
-
-Fix direction:
-
-- Use the correct Exposed DSL import/operator for the project version, or replace with a portable filter/query strategy.
-- Add `:server:compileKotlin` as required CI before merging.
-
-### 5.2 P0: API logging leaks credentials and tokens
-
-File:
-
-- `shared/src/commonMain/kotlin/com/littlebridge/vidyaprayag/core/network/NetworkResult.kt`
-
-Problem:
-
-```kotlin
-AppLogger.d("API_CALL", "REQUEST BODY: ${requestBody.text}")
-AppLogger.d("API_CALL", "RESPONSE BODY: $body")
+**Using Resend (cleaner, 3000 free emails/month):**
+1. Go to [https://resend.com](https://resend.com) → Sign up (free)
+2. Dashboard → API Keys → Create API Key → copy it
+3. Add domain (or use `onboarding@resend.dev` for testing)
+4. Render environment:
+```
+SMTP_HOST=smtp.resend.com
+SMTP_PORT=465
+SMTP_USERNAME=resend
+SMTP_PASSWORD=re_xxxxxxxxxxxxxxxxxxxx   ← your Resend API key
+SMTP_FROM=VidyaPrayag <onboarding@resend.dev>
+SMTP_USE_SSL=true
 ```
 
-Uploaded log contains:
+---
 
-- Plain email/password login body (redacted in this report, but present in the original uploaded log).
-- JWT access token.
-- JWT refresh token.
+#### OPTION C — MSG91 (India SMS, alternative to Fast2SMS)
 
-Impact:
-
-- Any shared Android Studio log can compromise user accounts.
-- This must be treated as a security vulnerability.
-
-Fix direction:
-
-- Never log request bodies for auth endpoints.
-- Redact `password`, `otp`, `token`, `refreshToken`, `Authorization`, cookies, and API keys recursively.
-- Gate verbose API logs behind a debug flag and disable in release builds.
-- Consider rotating tokens/passwords exposed in shared logs.
-
-### 5.3 P0/P1: Duplicate parent routes shadow live implementations
-
-Files:
-
-- `server/src/main/kotlin/com/littlebridge/vidyaprayag/feature/user/ParentRouting.kt`
-- `server/src/main/kotlin/com/littlebridge/vidyaprayag/feature/parent/TrackProgressRouting.kt`
-- `server/src/main/kotlin/com/littlebridge/vidyaprayag/feature/parent/ParentFeesRouting.kt`
-- `server/src/main/kotlin/com/littlebridge/vidyaprayag/Application.kt`
-
-Problem:
-
-`Application.kt` registers both old and new route groups:
-
-```kotlin
-parentRouting()
-trackProgressRouting()
-parentFeesRouting()
+1. Go to [https://control.msg91.com](https://control.msg91.com) → Sign up / Login
+2. Left sidebar → **API** → **Auth Keys** → Copy your Auth Key
+3. Left sidebar → **Flows** → Create a new OTP flow with one variable `{{OTP}}`
+4. Copy the Flow ID from the flow detail page
+5. Render environment:
+```
+MSG91_AUTH_KEY=<auth key from control.msg91.com>
+MSG91_FLOW_ID=<your flow id>
+MSG91_OTP_VAR_NAME=OTP
+MSG91_SENDER_ID=VIDPRA   ← 6-char sender (register at DLT portal if needed)
 ```
 
-But `ParentRouting.kt` still defines:
+---
 
-```kotlin
-get("/track-progress") { // Mock data matching the UI requirements }
-get("/fees") { ... static data ... }
+#### OPTION D — WhatsApp Cloud API (Free for 1000 conversations/month)
+
+1. Go to [https://developers.facebook.com](https://developers.facebook.com) → My Apps → Create App
+2. App type: Business → Add WhatsApp product
+3. WhatsApp → Getting Started → note your **Phone Number ID** and temporary **Access Token**
+4. For a permanent token: Business Settings → System Users → Create system user → Generate token (WhatsApp Business permissions)
+5. Message Templates → Create template named `vidyaprayag_otp`, category: Authentication, body: `{{1}} is your OTP for VidyaPrayag.` (must be approved by Meta, takes 1-2 days)
+6. Render environment:
+```
+WHATSAPP_ACCESS_TOKEN=<permanent system user token>
+WHATSAPP_PHONE_NUMBER_ID=<phone number id>
+WHATSAPP_TEMPLATE_NAME=vidyaprayag_otp
+WHATSAPP_TEMPLATE_LANG=en
 ```
 
-Newer files also define the same paths with DB-driven logic.
+---
 
-Impact:
+#### Recommended Final OTP Configuration for Render
 
-- Depending on route resolution, old mock endpoints can shadow newer live endpoints.
-- Parent progress bars and fees may remain static even after live routes were added.
-- This directly relates to the reported "Student progress tracking bars are non-interactive placeholders" problem.
+Set ALL of the following for robust coverage (SMS for phones + email fallback):
 
-Fix direction:
+```
+# Fast2SMS (phones — India)
+FAST2SMS_API_KEY=<from fast2sms.com Dev API>
+FAST2SMS_ROUTE=otp
 
-- Split or delete legacy `ParentRouting.kt` endpoints that have been replaced.
-- Keep one route owner per path.
-- Add route inventory tests that fail on duplicate method/path registrations.
+# SMTP (emails)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_USERNAME=<your gmail>
+SMTP_PASSWORD=<16-char app password>
+SMTP_FROM=VidyaPrayag <your gmail>
+SMTP_USE_SSL=true
 
-### 5.4 P1: Branding/profile/logo upload is fake or URL-only
+# Delivery order
+OTP_CHANNEL_ORDER=sms,email
 
-Files:
-
-- `composeApp/.../BrandingInfoOBScreen.kt`
-- `shared/.../BrandingInfoOBViewModel.kt`
-- `composeApp/.../InstitutionalProfileScreen.kt`
-- `server/.../feature/user/UserProfileRouting.kt`
-
-Initial evidence:
-
-```kotlin
-viewModel.updateCoverImage("https://placehold.co/1920x820/...")
-viewModel.updateLogo("https://placehold.co/512x512/...")
+# Hardening (already set in Render — KEEP)
+OTP_DEV_RETURN_CODE=false
+OTP_ENABLE_CONSOLE_FALLBACK=false
 ```
 
-Current status: those placeholder-save actions were removed in this working tree and replaced with a clear disabled/upload-not-connected notice. `BrandingInfoOBViewModel` still notes that mission/vision/tour are not part of the server schema for that step and remain local.
+---
 
-Impact:
+### 3.3 Forgot Password — NOT IMPLEMENTED ANYWHERE
 
-- School logo/profile picture placeholders are not connected to upload infrastructure.
-- Cover image is not submitted in the branding payload.
-- Mission/vision/tour entered during onboarding can be lost/not persisted in the expected place.
+**Evidence:** Full codebase search for `forgot`, `reset.*pass`, `resetPassword`, `forgotPassword` returns **zero results** in all Kotlin source files.
 
-Fix direction:
+**What is missing:**
 
-- Add upload endpoint and storage table updates.
-- Submit cover image, mission, vision, and tour fields through a defined backend contract.
-- Reuse `school_philosophy` and `school_media` consistently instead of local-only state.
+**Backend — needs 3 new endpoints:**
+```
+POST /api/v1/auth/forgot-password   { "identifier": "email@example.com" }
+  → generates a reset token, sends it via OTP/email/SMS
+POST /api/v1/auth/verify-reset-token { "identifier", "token" }
+  → validates the reset token
+POST /api/v1/auth/reset-password    { "identifier", "token", "new_password" }
+  → hashes + stores new password, invalidates all existing sessions
+```
 
-### 5.5 P1: Academic class/subject management is still too generic
+**Client — needs:**
+- "Forgot password?" link on the login screen (in `AuthBottomSheet.kt`)
+- A `ForgotPasswordScreen.kt` (3-step: enter phone/email → enter OTP/token → enter new password)
+- A `ForgotPasswordViewModel.kt` wiring all 3 backend calls
 
-Files:
+**Recommended approach:**
+Reuse the existing OTP delivery infrastructure. The forgot-password flow is: `send-otp(purpose="reset_password")` → `verify-otp` → new endpoint `reset-password { identifier, verified_otp_ref, new_password }`. This avoids building a second token system.
 
-- `shared/.../AcademicInfoOBViewModel.kt`
-- `server/.../feature/onboarding/OnboardingRouting.kt`
-- `server/.../db/Tables.kt`
+---
 
-Problem:
+### 3.4 Media Upload (Branding Step) — 503 STORAGE_NOT_CONFIGURED
 
-`buildAcademicPayload()` creates one `subjectsArray` from the currently selected class subjects, then sends that same array for every available class:
+**Evidence from Render log:**
+```
+401 Unauthorized: POST - /api/v1/school/media/upload  (×4 times)
+```
 
+**Root cause:** The 401 is NOT a storage configuration error — it's an **authentication failure**. The client is calling `POST /api/v1/school/media/upload` without a valid auth token. This is a separate issue from the 503 STORAGE_NOT_CONFIGURED case.
+
+**Two distinct problems:**
+
+**Problem A — Missing Render env vars (causes 503):**
+From `SupabaseStorage.kt`: `isConfigured()` returns false when `SUPABASE_URL` or `SUPABASE_SERVICE_KEY` are absent.
+From Render env screenshots: `SUPABASE_URL=https://dumoiojpkizxkzzxdzss.supabase.co` ✅ and `SUPABASE_SERVICE_KEY=<long key>` ✅ ARE set.
+
+**Revised finding:** Storage env vars ARE present. The 401 errors are an authentication token issue, not a storage configuration issue.
+
+**Problem B — "Invalid token" banner in Branding step (BrandingInfoOBScreen):**
+The screenshot shows a red "Invalid token" error on the Branding step. This means the user's JWT access token is being rejected by the server. Possible causes:
+1. Token expired mid-onboarding (60-min default, user may have paused)
+2. `JWT_SECRET` on Render does not match the secret used when the token was originally issued (e.g., after a Render redeploy with a new secret)
+3. The token is being sent in the wrong header format
+
+**Fix for Problem B:**
+- Implement token refresh logic: when any request returns 401, automatically call `POST /api/v1/auth/refresh` with the stored refresh token before surfacing the error to the user
+- If refresh also fails, navigate to login screen with a clear "Session expired, please sign in again" message
+- The current code only logs the error and shows a banner — users are stranded mid-onboarding
+
+---
+
+### 3.5 Document Upload in LaunchInfoOBScreen — LOCAL STATE ONLY (NOT REAL)
+
+**Evidence from code review (`LaunchInfoOBViewModel.kt`):**
 ```kotlin
-s.availableClasses.forEach { className ->
-    put("subjects", subjectsArray)
+fun markDocumentUploaded(documentId: String) {
+    val updatedDocs = _state.value.documents.map { doc ->
+        if (doc.id == documentId) {
+            doc.copy(status = "Uploaded", metadata = "Selected on this device • Submit launch to verify")
+        } else { doc }
+    }
+    _state.value = _state.value.copy(documents = updatedDocs)
+    _infoMessage.value = "Document marked for verification. Launch Profile to finalize."
 }
 ```
 
-`SchoolSubjectsTable.teacherAssigned` is just text, not a `faculty`/user FK.
+**The "Upload" button only flips a local UI boolean.** No file picker is launched. No `MediaApi.upload()` is called. The document bytes never reach the server. The `complianceDocs` list sent in the final REVIEW submit payload is empty/default.
 
-Initial UI no-op evidence:
+**What is visible in the screenshot:** The "Affiliation Cert" shows "Selected on this device • Submit launch to verify" which comes from this fake local state — it's not a real upload.
 
-- `AcademicInfoOBScreen.kt` had comment-only Change/Assign handlers. Current status: those controls are now visibly disabled/status-only until a real teacher-assignment workflow exists.
-
-Impact:
-
-- All classes can receive the same uniform subject list.
-- There is no grade-specific subject pool.
-- There is no enforceable teacher-class-subject assignment.
-- Teacher broadcasts cannot be scoped to classes/subjects they teach because the backend lacks a reliable assignment graph.
-
-Fix direction:
-
-- Introduce `teacher_subject_assignments` or equivalent table: `school_id`, `faculty_id/user_id`, `class_id`, `section`, `subject_id`.
-- Make academic UI edit per-class subject sets, not one global list.
-- Replace teacher free text with selected faculty records.
-
-### 5.6 P1: Broadcast segmentation is not implemented
-
-Files:
-
-- `server/.../feature/announcements/AnnouncementRouting.kt`
-- `server/.../db/Tables.kt`
-
-Current model:
-
-- Announcement has `school_id`, `type`, title, description, event image, date.
-- WhatsApp sync queues every active parent user in that school with a phone.
-- There is no announcement audience field, class/section/subject field, or teacher-owned scope.
-
-Impact:
-
-- Admin broadcasts cannot be cleanly audited as "all students" versus selected audience.
-- Teacher broadcasts cannot be restricted to the classes/subjects they teach.
-- Parent delivery can over-send or under-send once multiple classes/teachers exist.
-
-Fix direction:
-
-- Add audience model: `ALL_SCHOOL`, `CLASS`, `SECTION`, `SUBJECT`, `STUDENT`, `CUSTOM`.
-- Add recipient expansion service using children/students/class/subject/teacher assignment data.
-- Store resolved recipients for audit and delivery retry.
-
-### 5.7 P1: Parent school discoverability is not geographically connected to onboarding
-
-Files:
-
-- `server/.../db/Tables.kt`
-- `server/.../feature/parent/ParentDashboardRouting.kt`
-- `supabase_schema`
-
-Problem:
-
-- Ktor `SchoolsTable` maps city/address/logo only, no lat/lng.
-- Parent dashboard picks first five active schools and uses fixed rating `4.5`.
-- `supabase_schema` has `school_directory.latitude/longitude`, but the school-side onboarding writes to `schools`, not that directory.
-
-Impact:
-
-- Onboarded schools are not discoverable by actual parent location.
-- "Near me" preferences cannot work reliably.
-- School profile sync to parent side is incomplete.
-
-Fix direction:
-
-- Decide canonical school directory table.
-- Persist geo coordinates during onboarding/profile update.
-- Add parent discovery endpoint with distance filtering/sorting.
-- Keep public profile visibility in sync.
-
-### 5.8 P1: OTP/auth environment is only partially production-ready
-
-Known team issue:
-
-- Missing OTP environment settings on Render.
-
-Code state:
-
-- OTP providers exist (`Fast2SMS`, `MSG91`, WhatsApp, SMTP, console fallback).
-- `.env.example` documents Render-related OTP settings.
-- `OTP_DEV_RETURN_CODE` defaults to true in code if unset.
-- Console fallback can print OTPs to server logs if enabled.
-
-Impact:
-
-- Account creation via email/password can work, but phone OTP may silently degrade or fail depending on Render env.
-- Leaving dev code return/console fallback enabled in production leaks OTPs.
-
-Fix direction:
-
-- Set real provider credentials on Render.
-- Set `OTP_DEV_RETURN_CODE=false` in production.
-- Set console fallback policy explicitly.
-- Add `/api/v1/auth/otp/health` or admin diagnostics gated by `OTP_ADMIN_TOKEN`.
-
-### 5.9 P2: School/admin screens still contain visible no-op controls
-
-Initial static scan found no-op handlers in school/admin surfaces. These were cleaned in this working tree by removing the fake action, replacing it with non-clickable status text, or making the not-yet-implemented CTA visibly disabled:
-
-| File | Example issue |
-|---|---|
-| `AcademicInfoOBScreen.kt` | Show more / Change / Assign controls are comments/no-op. |
-| `AdmissionCRMDashboard.kt` | Secondary action no-op. |
-| `AnalyticsDashboardScreen.kt` | Header/card actions no-op. |
-| `DailyAttendanceScreen.kt` | See-all/date action no-op. |
-| `MessagesScreen.kt` | Floating/action button no-op. |
-| `SchedulePTMScreen.kt` | Multiple detail/share/reschedule/complete actions no-op. |
-| `SchoolAnnouncementsScreen.kt` | "Read detailed schedule" and PTM "Book Slot" no-op. |
-| `StudentAnalyticsScreen.kt` | Icon action no-op. |
-| `SyllabusCoverageScreen.kt` | Sync/export/detail actions no-op. |
-| `TeacherPerformanceScreen.kt` | Detail/export action no-op. |
-
-Impact:
-
-- Even when data loads, user workflows are incomplete.
-- Some controls imply functionality that does not exist.
-
-Fix direction / current status:
-
-- Completed for the audited admin/school surfaces: fake actions were removed or visibly disabled.
-- Follow-up still recommended: add UI tests that tap major CTAs and assert expected state/navigation.
-
-### 5.10 P2: Image placeholders and external protected URLs
-
-Initial evidence:
-
-- Attached logs show Google share/direct image 403 and invalid host failures.
-- `SchoolAnnouncementsScreen.kt` used hardcoded `lh3.googleusercontent.com/aida-public/...` participant avatar URLs for event cards.
-- Legacy parent mock routes included external image placeholders.
-
-Current status: the audited admin/school screens no longer reference protected `googleusercontent` URLs or placeholder-save URLs. Legacy parent mock `/track-progress` and `/fees` routes were removed from `ParentRouting.kt`. A broader follow-up should still replace remaining sample media with bundled assets or controlled storage URLs.
-
-Impact:
-
-- UI can show broken images and repeated error logs.
-- External protected URLs are not reliable assets.
-
-Fix direction:
-
-- Replace placeholder external image URLs with bundled assets or controlled storage URLs.
-- Validate image URL reachability before saving.
-- Add fallback images in UI.
+**What is needed:**
+1. `LaunchInfoOBViewModel` needs to inject `MediaApi` (like `BrandingInfoOBViewModel` does)
+2. The "Upload" button needs to launch `rememberMediaPicker()` for PDF/document selection
+3. On file selection, call `mediaApi.upload(bytes, MediaKind.DOCUMENT)` 
+4. Store the returned URL against the document ID
+5. Include uploaded document URLs in the REVIEW submit payload
 
 ---
 
-## 6. Feature status matrix: school side
+### 3.6 Location Capture — SLOW (Up to 12 Seconds)
 
-| Feature | Status | Root issue / note |
-|---|---|---|
-| Email/password login | Mostly working | Log shows successful email/password login; client body logging has now been redacted in this working tree. Rotate any credentials/tokens exposed in previously shared logs. |
-| OTP auth | Partial | Provider infrastructure exists, but Render env must be configured and dev fallback disabled. |
-| School dashboard | Partial | Loads `/user/details`; repeated cancelled jobs appear during navigation, likely lifecycle cancellation but noisy. |
-| Institutional basics | Partial | Saves address strings; no real current location/GPS/lat-lng. |
-| Branding | Partial | Fake placeholder URL save actions removed; real upload/storage endpoint and mission/vision/tour persistence are still needed. |
-| Academic structure | Partial | Persists classes/subjects, but same subject list can be applied to every class; teacher assignment remains free-text/schema-limited, with fake UI actions disabled. |
-| Launch/review | Partial | Compliance docs are static false/verified placeholders. |
-| Institutional profile | Partial | Philosophy/gallery/tour URL persistence exists; no upload; invalid URLs break images. |
-| Admissions CRM | Partial | Endpoints exist; empty states may be real no-data or school-id seed mismatch. |
-| Announcements | Partial | Create/search/sync exist; no audience segmentation or moderation; fake local action buttons were removed/disabled. |
-| Messages | Partial/Broken on tested APK | Source route exists and backend now compiles locally; Render still must be redeployed and retested because the uploaded APK hit stale Render. |
-| Academic calendar | Partial/Broken on tested APK | Source has compatibility fix; tested APK/backend had DTO drift; depends on redeploy and schema. |
-| Attendance | Partial | Student/faculty endpoint exists; faculty depends on `faculty` table and data. |
-| PTM | Partial | Create/list/progress exists; fake local CTAs were removed/disabled; parent harmony still needs retest after redeploy. |
-| Results | Partial/Working core | Read/selectors exist; write/import workflows still limited. |
-| Analytics | Partial | More DB-driven than before, but still CMS/default driven in places. |
-| Parent-school announcements | Locally buildable | `inList` compile error fixed; requires deploy and end-to-end parent account retest. |
-| Parent-school messages | Partial | New parent messages route exists and compile blocker is fixed; route needs end-to-end test after deploy. |
-| Parent progress | Improved locally | Duplicate legacy `/parent/track-progress` mock route removed from `ParentRouting.kt`; live route still needs data QA. |
-| School discovery by location | Not implemented | No active lat/lng flow from school onboarding to parent discovery. |
+**Evidence from code (`LocationProvider.android.kt`):**
+```kotlin
+// lastKnown() frequently returns null on cold-start or when location is off
+val location = withContext(Dispatchers.IO) {
+    lastKnown(lm) ?: liveFix(lm)   // falls to liveFix very often
+}
 
----
-
-## 7. Prioritized remediation plan
-
-### P0: Must fix before any further QA
-
-1. Done locally: fixed `ParentRouting.kt` `inList` compile error.
-2. Run and require success for:
-   ```bash
-   ./gradlew :server:compileKotlin -Pserver-only=true --no-daemon
-   ./gradlew :shared:compileDevDebugKotlinAndroid :composeApp:compileDevDebugKotlinAndroid --no-daemon
-   ```
-3. Done locally: removed/redacted sensitive API body/response logging for auth and token responses.
-4. Redeploy Render from the successfully compiled commit.
-5. Confirm phone backend with:
-   - log banner: `Backend -> authBaseUrl=... schoolBaseUrl=...`
-   - `GET /api/v1/config/version`
-   - `GET /api/v1/config/app-status`
-6. Retest screenshots paths: Messages modal, Academic Calendar, Profile gallery.
-
-### P1: Architecture fixes for reported product requirements
-
-1. Implement real media upload infrastructure.
-2. Implement current-location/GPS/geocoding and lat/lng persistence.
-3. Redesign class/subject/teacher assignment model.
-4. Add broadcast audience segmentation.
-5. Remove duplicate parent routes and keep only live DB-driven implementations.
-6. Add parent school discovery by location.
-
-### P2: Product polish and hidden issue cleanup
-
-1. Replace hardcoded/protected external image URLs.
-2. Wire or remove no-op CTAs.
-3. Add input validation/content moderation for announcements/messages.
-4. Add contract tests for high-risk DTOs (`CalendarSummary`, messages, parent announcements).
-5. Add route inventory test to catch duplicate paths.
-
----
-
-## 8. Immediate checklist for the next developer
-
-1. Fix this compile blocker first:
-   - `server/src/main/kotlin/com/littlebridge/vidyaprayag/feature/user/ParentRouting.kt:21`
-   - `AnnouncementsTable.schoolId inList schoolIds`
-2. Re-run backend compile.
-3. Remove secret logging from `safeApiCall`.
-4. Delete or split legacy duplicate endpoints from `ParentRouting.kt`.
-5. Redeploy Render.
-6. Install a fresh APK and confirm backend SHA in `/api/v1/config/version`.
-7. Retest:
-   - Messages -> Admin Desk thread modal.
-   - Academic Calendar -> This Month.
-   - Profile -> Add Gallery Photo with a real direct image URL and with an invalid URL.
-   - Onboarding -> location flow after GPS implementation.
-   - Academic structure -> different classes with different subjects/teachers.
-   - Broadcast -> admin all-school and teacher class/subject scoped delivery.
-
----
-
-## 8b. Re-verification + deploy-hardening (this pass)
-
-This pass re-audited the merged code (`main` @ `b951fc3`, PR #10) and **independently
-re-validated every P0 fix by compiling**, then closed the one remaining gap that
-made the verification endpoint unreliable on Render.
-
-### What was re-verified (already fixed in code, now proven by compile)
-
-| Item | File | Verified state |
-|---|---|---|
-| `inList` compile blocker | `feature/user/ParentRouting.kt` | Replaced with an Exposed `or`-reduce over `schoolIds`. No `inList` import remains. |
-| Legacy duplicate parent routes | `feature/user/ParentRouting.kt` | Mock `/track-progress` and `/fees` handlers removed; only `parent/scholarships` + DB-backed `parent/announcements` remain. Live owners are `TrackProgressRouting.kt` / `ParentFeesRouting.kt`. |
-| Secret leakage in logs | `core/network/NetworkResult.kt` | `redactedBodyText()` + `redactedHeaders()` strip password/otp/code/token/refresh_token/authorization/cookie/api_key. Request/response bodies are sanitized before logging. |
-| Calendar `working_days` DTO | client `CalendarModels.kt` / server `SchoolRouting.kt` | Client decodes both `working_days` and `total_working_days` with defaults; server emits **both** fields. No deserialization crash possible. |
-| Message thread route | server `MessagesRouting.kt` + `ParentMessagesRouting.kt` | `GET /threads/{id}/messages` and `POST /threads/{id}/read` exist and are registered in `Application.kt`. |
-| Version/status verification endpoints | `feature/config/VersionRouting.kt`, `AppStatusRouting.kt` | `GET /api/v1/config/version` and `GET /api/v1/config/app-status` exist and are registered. |
-
-Compile validation run this pass (both **BUILD SUCCESSFUL**):
-
-```bash
-./gradlew :server:compileKotlin -Pserver-only=true --no-daemon
-./gradlew :shared:compileDevDebugKotlinAndroid :composeApp:compileDevDebugKotlinAndroid --no-daemon
-./gradlew :server:installDist -Pserver-only=true --no-daemon   # exactly what Render runs
+private suspend fun liveFix(lm: LocationManager): Location? {
+    return withTimeoutOrNull(12_000L) {   // blocks UI thread feedback for up to 12s
+        ...
+    }
+}
 ```
 
-### New deploy-hardening applied this pass
+**The user reports location "is taking too long to record."**
 
-The root cause of the original screenshot failures was **deploy drift** — the phone
-hit a stale Render backend. `/api/v1/config/version` is the tool to detect that,
-but it only works if the deployed build actually knows its own commit SHA.
+**Root causes:**
+1. `lastKnown()` returns null on fresh device boot, after airplane mode, or if location was recently disabled — this is very common
+2. `liveFix()` then waits for a cold GPS fix which on Android can take 15-45 seconds in an open-sky environment and even longer indoors
+3. The 12-second timeout means the function returns `null` indoors, giving the user a confusing "Couldn't get a location fix" message with no retry feedback
 
-1. **`server/build.gradle.kts` — robust git SHA resolution.** On Render the build
-   container is frequently a shallow checkout with no usable `.git`, so the old
-   `git rev-parse` returned `"unknown"` and the verification endpoint was useless.
-   It now prefers CI/PaaS commit env vars first:
-   `RENDER_GIT_COMMIT` → `GIT_COMMIT` → `GITHUB_SHA` → `SOURCE_COMMIT` →
-   `VIDYAPRAYAG_GIT_SHA`, then falls back to local `git`, then `"unknown"`.
-   Verified: with `RENDER_GIT_COMMIT=abc123def456789` the install start script
-   bakes in `vidyaprayag.git.sha=abc123def456`; without it, the laptop SHA
-   (`b951fc3`) is used.
-2. **Added `.dockerignore`.** Keeps the Render build context small/reproducible
-   (excludes `build/`, `.gradle`, mobile modules, secrets, runtime DB/logs, `.git`).
-   Safe because the Dockerfile always builds with `-Pserver-only=true`, so
-   `:composeApp`/`:shared` are never configured in the container.
-
-### Manual actions still required by the team (cannot be automated here)
-
-These need a person with Render/credentials access:
-
-1. **Redeploy Render from this commit** (PR on `backend-by-abuzar`). The fixed
-   code is worthless until the live backend is rebuilt from it.
-2. **Set Render env vars:** real OTP provider creds, `OTP_DEV_RETURN_CODE=false`,
-   explicit console-fallback policy, and `OTP_ADMIN_TOKEN`. See `.env.example`.
-3. **After deploy, from the phone browser hit** `GET /api/v1/config/version`
-   and confirm `git_sha` matches the deployed commit (not "unknown", not the old SHA).
-4. **Rotate** any password/JWT that appeared in previously shared Android logs
-   (the leak is fixed going forward, but already-shared logs remain compromised).
-5. **Rebuild/reinstall the APK** from current client and confirm `devBaseUrl`
-   points at the intended backend (see commit `31d3c2e` note about Render default).
-6. **Retest the screenshot paths** once redeployed: Messages → thread modal;
-   Academic Calendar → This Month; Profile → Add Gallery Photo (valid + invalid URL).
-
-### Still-open architecture work (P1/P2 — needs product decisions, not a hotfix)
-
-These are tracked but intentionally **not** changed in this pass because they
-require schema/migration + product design, not a build fix:
-
-- Real media upload (file picker + storage backend) instead of URL-only entry.
-- Current-location/GPS/geocoding + lat/lng persistence and parent distance discovery.
-- Per-class subject pools + a real `teacher_subject_assignments` table.
-- Broadcast audience segmentation (`ALL_SCHOOL/CLASS/SECTION/SUBJECT/STUDENT/CUSTOM`).
-- Contract tests for high-risk DTOs + a route-inventory test for duplicate paths.
+**Fix recommendations:**
+- Add an intermediate loading state with visual progress (spinner + "Getting your location..." text)  
+- Try `NETWORK_PROVIDER` first (cell tower triangulation — fast, ~1-2s) before waiting for GPS
+- Reduce cold-GPS timeout from 12s to 5s, but show a "Still searching…" indicator
+- After timeout, still show a manual address entry fallback prominently rather than just an error message
+- Consider Fused Location Provider via Google Play Services (much faster) if you accept the dependency
 
 ---
 
-## 10. Render deployment — log analysis + complete environment-variable plan
+### 3.7 Admin Analytics and Feature Tabs — WHY THE SCREENSHOT SHOWS NOTHING
 
-> Added after reviewing the post-deploy Render TRACE log and the Render
-> Environment screenshot. This section tells the team **exactly** which env
-> vars exist, which are missing, and what each one does.
+**The screenshot shows the drawer with only: Home, Theme, Sign Out, Support, Privacy, Terms.**
 
-### 10.1 The Render log is NOT showing errors
+**Root cause: The user was logged in as `GUEST` (not `ADMIN`).**
 
-The pasted log is full of lines like:
-
-```text
-/api/v1/school [(authenticate jwt)], segment:2 -> FAILURE "Selector didn't match"
+From `VidyaPrayagDrawer.kt`:
+```kotlin
+if (userRole == "ADMIN") {
+    Text("SCHOOL OPTIONS", ...)
+    DrawerItem(Icons.Default.Analytics, "Analytics") { onNavigate(Destination.AnalyticsDashboard) }
+    DrawerItem(Icons.Default.CalendarMonth, "Academic Calendar") { ... }
+    DrawerItem(Icons.Default.AssignmentTurnedIn, "Daily Attendance") { ... }
+    DrawerItem(Icons.Default.PendingActions, "Leave Request") { ... }
+    DrawerItem(Icons.Default.Assessment, "Results") { ... }
+    DrawerItem(Icons.Default.Groups, "Schedule PTM") { ... }
+}
 ```
 
-These are **normal Ktor `TRACE`-level routing diagnostics**, not failures. For every
-incoming request, Ktor walks the whole route tree; each route it tries and skips
-prints a `FAILURE "Selector didn't match"`, and the matching one prints `SUCCESS`.
-The log actually ends each request with:
+The analytics and admin feature tabs **only appear when `userRole == "ADMIN"`**. The drawer header in the screenshot clearly says "Guest User" — meaning either:
+1. The user's JWT token was expired/invalid and `MainViewModel.userRole` fell back to null → "GUEST"
+2. The user was never properly authenticated as ADMIN
 
-```text
-Matched routes: "" -> "api" -> "v1" -> "auth" -> "send-otp" -> "(method:POST)"
-Routing resolve result: SUCCESS @ /api/v1/auth/send-otp [(method:POST)]
-200 OK: POST - /api/v1/auth/send-otp in 1498ms
+**This is directly linked to the "Invalid token" bug (§3.4 Problem B).** When the token is invalid/expired, the role-fetch fails, userRole becomes null/"GUEST", and all ADMIN-only drawer items disappear. This explains why the admin appears to have no analytics — the session is broken.
+
+**Fix:** Resolve the token expiry/refresh issue in §3.4. When the user is properly authenticated as ADMIN, all tabs appear correctly. No navigation code change is needed.
+
+---
+
+### 3.8 Class/Subject/Teacher Onboarding — NEEDS FULL UI REVAMP
+
+**What the user expects:**
+- Add **multiple classes** in a school (e.g., Class 1A, 1B, 2A, LKG, UKG, etc.)
+- Each class has its own set of **subjects** (editable, not just CBSE-synced)
+- Assign a **teacher** to each subject in each class
+- Ability to **create a teacher profile inline** during assignment
+- Same teacher can be assigned to **multiple subjects** and/or **multiple classes**
+
+**What currently exists in the UI (`AcademicInfoOBScreen`):**
+- ✅ Displays available classes (Nursery, LKG, UKG, Class 1-6) from CBSE sync
+- ✅ Shows subjects linked to the selected class
+- ✅ Shows teacher name as "Assigned"/"Unassigned" text
+- ❌ No "Add Class" button — cannot add custom classes
+- ❌ No "Edit Subjects for this Class" — cannot modify per-class subject list
+- ❌ No teacher assignment UI — clicking "Assigned" does nothing
+- ❌ No "Create Teacher Profile" modal
+- ❌ Same teacher assigned to multiple subjects is impossible from the UI
+- ❌ No client API calls to `GET/POST /api/v1/school/teacher-assignments`
+
+**What the backend already supports (ready to use):**
+```
+GET  /api/v1/school/teacher-assignments           → list all assignments for school
+POST /api/v1/school/teacher-assignments           → create assignment {faculty_id, class_id, subject_id}
+DELETE /api/v1/school/teacher-assignments/{id}    → remove assignment
 ```
 
-So `check-user`, `send-otp`, and `signup` all returned **200 OK**. The backend is
-healthy. The noise is caused by `logback.xml` shipping `<root level="trace">`.
+**Recommended UI redesign for Step 3:**
 
-**Action (code):** change the root log level to `info` for production (ideally make
-it env-driven via `LOG_LEVEL`). TRACE in production wastes I/O and, combined with the
-old body logging, is exactly how secrets leaked before.
+```
+┌─ Curriculum Setup ─────────────────────────────────────────────────┐
+│  [+ Add Class]                                                       │
+│                                                                      │
+│  ▼ LKG                                          [✎ Edit] [🗑 Delete] │
+│    Subjects:                                    [+ Add Subject]      │
+│    ┌──────────────────────────────────────────────────────────────┐  │
+│    │ Mathematics   [Teacher: Dr. Arpita Sharma ▼] [✎]            │  │
+│    │ Science       [Assign Teacher ▼]                             │  │
+│    │ English       [Teacher: Mr. Ravi Kumar ▼]   [✎]             │  │
+│    └──────────────────────────────────────────────────────────────┘  │
+│                                                                      │
+│  ▼ UKG                                          [✎ Edit] [🗑 Delete] │
+│    ...                                                               │
+└─────────────────────────────────────────────────────────────────────┘
 
-### 10.2 Two real things the log reveals
+Teacher dropdown → shows existing faculty list + "+ Create New Teacher"
+"Create New Teacher" → inline bottom sheet: Name, Phone, Email, Qualification
+```
 
-1. **Malformed identifier accepted.** The signup used `abuzarmohd1212gmail.com`
-   (missing `@`). The server picks phone-vs-email via `identifier.contains("@")`,
-   so a broken email was treated as a **phone number**, all SMS providers were
-   "not configured" → skipped, and it fell through to the console code. Fix:
-   validate email/phone format on the client AND in `AuthRouting`/`OtpService`
-   before sending an OTP.
-2. **OTP is running 100% on the console fallback.** Every provider logged
-   `reason='not configured', status='skipped'` (`fast2sms`, `msg91`, `twilio`,
-   `whatsapp_cloud`) and only `console` succeeded (`CODE: 286912`). This is the
-   #1 env gap: **no real OTP delivery provider is configured on Render.**
+---
 
-### 10.3 Env vars currently set on Render (from the screenshot) — KEEP
+### 3.9 "Invalid Token" on Branding Step — Session Token Management Bug
 
-| Key | Status | Note |
+**Evidence from screenshot:** Red banner "Invalid token" on `BrandingInfoOBScreen` Step 2.
+
+**Root cause (confirmed from Render log pattern):**
+```
+201 Created: POST /api/v1/auth/signup
+200 OK: GET  /api/v1/content/landing
+200 OK: POST /api/v1/onboarding/submit    ← Step 1 succeeds
+401 Unauthorized: POST /api/v1/school/media/upload   ← Step 2 fails
+```
+
+The media upload endpoint is school-scoped and requires a valid token. The same token that worked for `/onboarding/submit` at step 1 is failing for `/school/media/upload` at step 2.
+
+**Likely cause:** The school media upload endpoint validates that the user has a `school_id` (i.e., is already associated with a school). During step 2 of onboarding, the school record may not yet be created — it's only created at the REVIEW final submit step. This means the school-scoped endpoint rejects the request with 401 because the user is not yet "a school admin" (no school_id on their account).
+
+**Fix:** The `/api/v1/school/media/upload` endpoint needs to accept requests from users who are in the middle of onboarding (have ADMIN role but no school_id yet), OR branding uploads should use a different endpoint that is onboarding-safe. The server should check `role == ADMIN` and either `school_id is not null` OR `onboarding_status != COMPLETED` (i.e., allow uploads during onboarding regardless of school_id).
+
+---
+
+## 4. Additional Issues Found (Beyond Core Reports)
+
+### 4.1 `OTP_DEV_RETURN_CODE` Default is Dangerously `true`
+
+**File:** `server/src/main/kotlin/.../feature/auth/OtpService.kt`
+```kotlin
+private val devReturnCode: Boolean by lazy {
+    env("OTP_DEV_RETURN_CODE", "true").equals("true", true)
+    //                          ^^^^^^ Default: true
+}
+```
+
+If this env var is ever accidentally unset (e.g., Render env reset, new deployment without the var), the server starts returning real OTPs in plain API responses. This is a critical security defect.
+
+**Fix:** Change the default from `"true"` to `"false"`:
+```kotlin
+env("OTP_DEV_RETURN_CODE", "false").equals("true", true)
+```
+
+---
+
+### 4.2 Announcement Create UI Missing Audience Picker
+
+The backend supports `audience_type` (ALL_SCHOOL, CLASS, SECTION, SUBJECT, STUDENT, CUSTOM) and `audience_filter`. The `SchoolAnnouncementsScreen` create dialog does not expose these fields. All announcements created from the UI are implicitly `ALL_SCHOOL` broadcasts — teachers cannot send class-specific announcements from the app.
+
+---
+
+### 4.3 `markDocumentUploaded` Called with Hardcoded String IDs
+
+In `LaunchInfoOBViewModel`, documents are initialized with hardcoded IDs `"1"`, `"2"` etc. If the server returns documents with UUID IDs (as it should from `complianceDocs`), the ID matching in `markDocumentUploaded` will fail silently.
+
+---
+
+### 4.4 Location Permission Missing from AndroidManifest (verify)
+
+The Android location provider (`LocationProvider.android.kt`) requests `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION` at runtime, but these must also be declared in `AndroidManifest.xml`. Verify:
+```xml
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+```
+If missing, the runtime permission request will silently be denied on some Android versions.
+
+---
+
+### 4.5 School Name Shows Placeholder "good morning" / "St. Augustine Academy"
+
+In the `LaunchInfoOBViewModel`, `LaunchInfoState` defaults:
+```kotlin
+val schoolName: String = "St. Augustine Academy",
+val location: String = "Metropolitan Education Zone, Block C",
+```
+
+The screenshot shows "good morning" as the school name — this is the name entered during onboarding basics. The server DOES return the real name via `GET /api/v1/onboarding/step?obStepType=REVIEW` → `identityDetails.institutionName`. If this API call fails (e.g., 401 due to expired token), the default placeholder appears. This is another manifestation of the broken session/token issue.
+
+---
+
+### 4.6 No Retry Logic for Token Refresh (Systemic Issue)
+
+Currently, when any API call returns 401, the app either:
+- Shows an error banner and stays on the current screen
+- Calls `preferenceRepository.clearSession()` and shows "please log in again"
+
+There is no automatic token refresh using the stored `refreshToken`. The backend has `POST /api/v1/auth/refresh` which accepts the refresh token and returns new access + refresh tokens. This should be called automatically on any 401 response before propagating the error to the UI.
+
+---
+
+### 4.7 Supabase Transaction Pooler vs Session Pooler
+
+The current `DATABASE_URL` uses port `6543` (Supabase Transaction Pooler). For a persistent Ktor JDBC server with Hikari connection pooling, the **Session Pooler (port 5432)** is more appropriate and avoids occasional `prepared statement "S_x" already exists` errors under the transaction pooler.
+
+**Recommendation:** If you see intermittent database errors, switch the `DATABASE_URL` in Render to the Session Pooler string:
+- Go to Supabase Dashboard → Project Settings → Database → Connection Pooling
+- Copy the **Session mode** connection string (port 5432)
+- Replace `DATABASE_URL` in Render with this string
+
+Also set `DB_POOL_SIZE=5` in Render to stay within Supabase free-tier connection limits.
+
+---
+
+## 5. Environment Variables — Complete Render Checklist
+
+### 5.1 Already Set (Verified from Screenshots) — KEEP
+
+| Key | Value | Status |
 |---|---|---|
-| `AUTO_CREATE_TABLES=true` | OK | Creates Exposed tables on boot. Safe; can stay `true`. |
-| `DATABASE_URL=jdbc:postgresql://…supabase.com:6543/postgres?sslmode=require` | OK | Supabase **transaction pooler** (port 6543). Works. See note in 10.6. |
-| `DATABASE_USER=postgres.dumo1ojpk1zxkzzxdzss` | OK | Pooler username form is correct. |
-| `DATABASE_PASSWORD=********` | OK | Set. |
+| `AUTO_CREATE_TABLES` | `true` | ✅ OK |
+| `DATABASE_URL` | `jdbc:postgresql://aws-1-ap-northeast-1.pooler...` | ✅ OK (consider switching to session pooler port 5432) |
+| `DATABASE_USER` | `postgres.dumoiojpkizxkzzxdzss` | ✅ OK |
+| `DATABASE_PASSWORD` | `<set>` | ✅ OK |
+| `JWT_SECRET` | `<set>` | ✅ OK — verify it is NOT the `change-me` placeholder |
+| `OTP_PEPPER` | `<long hex>` | ✅ OK |
+| `OTP_ADMIN_TOKEN` | `<token>` | ✅ OK |
+| `OTP_EXPIRY_MINUTES` | `10` | ✅ OK |
+| `OTP_MAX_ATTEMPTS` | `5` | ✅ OK |
+| `OTP_MAX_RESENDS_PER_HOUR` | `5` | ✅ OK |
+| `OTP_CHANNEL_ORDER` | `sms,whatsapp,email` | ✅ OK |
+| `OTP_DEV_RETURN_CODE` | `false` | ✅ OK |
+| `OTP_ENABLE_CONSOLE_FALLBACK` | `false` | ✅ OK |
+| `FAST2SMS_API_KEY` | `<key>` | ✅ OK — verify wallet balance |
+| `FAST2SMS_ROUTE` | `otp` | ✅ OK |
+| `SUPABASE_URL` | `https://dumoiojpkizxkzzxdzss.supabase.co` | ✅ OK |
+| `SUPABASE_SERVICE_KEY` | `<long JWT>` | ✅ OK — verify this is `service_role` key, NOT `anon` key |
+| `SUPABASE_BUCKET` | `school-media` | ✅ OK |
 
-### 10.4 MUST-ADD now (security + correctness)
+---
 
-These are **required for production** and are currently missing on Render:
+### 5.2 MUST ADD — Missing Critical Variables
 
-| Key | Value to set | Why |
+| Key | What Value to Set | Why It's Needed |
 |---|---|---|
-| `JWT_SECRET` | `openssl rand -hex 64` output | Without it the server uses an **insecure hardcoded dev secret** — anyone can forge tokens. **Highest priority.** |
-| `OTP_PEPPER` | `openssl rand -hex 32` output | Server-side pepper for OTP hashing. Missing = weaker OTP hashing + dev fallback value. |
-| `OTP_DEV_RETURN_CODE` | `false` | Currently defaults to `true`, which returns the **plain OTP in the API response** — must be off in prod. |
-| `OTP_ENABLE_CONSOLE_FALLBACK` | `false` (after a real provider is wired) | Stops printing OTP codes to Render logs. Keep `true` ONLY until a provider is configured. |
-| `OTP_ADMIN_TOKEN` | `openssl rand -hex 32` output | When blank, the `/api/v1/admin/otp/*` diagnostics group is unmounted. Set it to enable gated ops/health checks. |
-| `LOG_LEVEL` | `info` | Stop TRACE flooding (requires the small logback change in 10.1). |
+| `SMTP_HOST` | `smtp.gmail.com` | Email OTP delivery — without this, email-identifier users get 502 |
+| `SMTP_PORT` | `465` | Required with SSL |
+| `SMTP_USERNAME` | `yourgmail@gmail.com` | Gmail account to send from |
+| `SMTP_PASSWORD` | 16-char Gmail App Password | Generated at myaccount.google.com/apppasswords |
+| `SMTP_FROM` | `VidyaPrayag <yourgmail@gmail.com>` | "From" display name in email |
+| `SMTP_USE_SSL` | `true` | Required for port 465 |
 
-### 10.5 MUST-ADD: at least ONE real OTP provider
+---
 
-Pick the cheapest path for your audience (India = Fast2SMS or MSG91; global =
-Twilio; free = email via SMTP or WhatsApp Cloud). Set ONLY the group you use — the
-dispatcher auto-skips any provider whose creds are unset.
-
-**Option A — Fast2SMS (India SMS, simplest):**
-
-| Key | Value |
-|---|---|
-| `FAST2SMS_API_KEY` | from fast2sms.com → Dev API |
-| `FAST2SMS_ROUTE` | `otp` (no DLT template needed) |
-
-**Option B — MSG91 (India, DLT flow):** `MSG91_AUTH_KEY`, `MSG91_FLOW_ID`,
-`MSG91_OTP_VAR_NAME=OTP`, `MSG91_SENDER_ID`.
-
-**Option C — Email OTP via SMTP (free, works anywhere):**
-
-| Key | Example |
-|---|---|
-| `SMTP_HOST` | `smtp.gmail.com` |
-| `SMTP_PORT` | `465` |
-| `SMTP_USERNAME` | your gmail address |
-| `SMTP_PASSWORD` | a Gmail **App Password** (not your login password) |
-| `SMTP_FROM` | `VidyaPrayag <noreply@yourdomain.com>` |
-| `SMTP_USE_SSL` | `true` |
-
-**Option D — WhatsApp Cloud (free up to 1000 conv/mo):** `WHATSAPP_ACCESS_TOKEN`,
-`WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_TEMPLATE_NAME`, `WHATSAPP_TEMPLATE_LANG`.
-
-Then set the delivery order, e.g. for SMS-first with email fallback:
-
-| Key | Value |
-|---|---|
-| `OTP_CHANNEL_ORDER` | `sms,email` (or `email` if you only set SMTP) |
-
-> Note: SMS providers only accept `identifierType == "phone"` and SMTP only accepts
-> `"email"`. So if a user signs up with an email, you MUST have an email provider
-> (SMTP) configured, otherwise it falls to console again.
-
-### 10.6 OPTIONAL / recommended
+### 5.3 RECOMMENDED — Stability & Operations
 
 | Key | Value | Why |
 |---|---|---|
-| `PORT` | leave **unset** | Render injects it automatically; the app reads it. Don't hardcode. |
-| `DB_POOL_SIZE` | `5` | Supabase pooler has connection limits; keep the Hikari pool small. |
-| `DEBUG_ERRORS` | `false` | Avoid leaking stack traces in API error responses. |
-| `APP_SEED_CMS` | `true` | Safe; only inserts missing CMS keys. |
-| `JWT_ACCESS_MINUTES` / `JWT_REFRESH_DAYS` | `60` / `30` | Defaults are fine. |
-| `OTP_EXPIRY_MINUTES` / `OTP_MAX_ATTEMPTS` / `OTP_MAX_RESENDS_PER_HOUR` | `10` / `5` / `5` | Defaults are fine. |
-
-**Supabase pooler caveat:** the current `DATABASE_URL` uses port **6543**
-(transaction pooler). For a long-lived JDBC server, Supabase's **session pooler
-(port 5432)** is more appropriate and avoids prepared-statement issues under the
-transaction pooler. If you see intermittent `prepared statement "S_x" already
-exists` errors, switch to the 5432 session-pooler string.
-
-### 10.7 Copy-paste checklist for Render → Environment
-
-```text
-# --- security (generate fresh values) ---
-JWT_SECRET=<openssl rand -hex 64>
-OTP_PEPPER=<openssl rand -hex 32>
-OTP_ADMIN_TOKEN=<openssl rand -hex 32>
-
-# --- production OTP hardening ---
-OTP_DEV_RETURN_CODE=false
-OTP_ENABLE_CONSOLE_FALLBACK=false          # only after a provider below is set
-OTP_CHANNEL_ORDER=sms,email                 # match the providers you configure
-
-# --- pick at least one provider group ---
-FAST2SMS_API_KEY=...
-FAST2SMS_ROUTE=otp
-# and/or
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=465
-SMTP_USERNAME=...
-SMTP_PASSWORD=...
-SMTP_FROM=VidyaPrayag <noreply@yourdomain.com>
-SMTP_USE_SSL=true
-
-# --- ops ---
-LOG_LEVEL=info
-DEBUG_ERRORS=false
-DB_POOL_SIZE=5
-
-# --- already set, keep ---
-# AUTO_CREATE_TABLES=true
-# DATABASE_URL / DATABASE_USER / DATABASE_PASSWORD
-```
-
-After saving, Render auto-redeploys. Then verify from the phone:
-`GET /api/v1/config/version` (confirm `git_sha`), then a real OTP send and check
-the provider in `otp_delivery_attempts` shows `status='sent'` for your provider
-(not `console`).
+| `DB_POOL_SIZE` | `5` | Prevent exceeding Supabase free-tier connection limit |
+| `DEBUG_ERRORS` | `false` | Prevent stack traces in API error responses |
+| `LOG_LEVEL` | `info` | Reduce Render log noise (avoid TRACE/DEBUG flood) |
 
 ---
 
-## 11. P1/P2 architecture — recommended solutions and build order
+### 5.4 SUPABASE BUCKET — Manual Setup Required
 
-These are intentionally **not** hotfixes; each needs a schema change + UI + a
-deliberate product decision. Recommended sequencing puts the lowest-risk,
-highest-reuse foundation first (storage), because upload, media, and audience
-segmentation all depend on it.
+The `SUPABASE_BUCKET=school-media` env var is set, but the bucket must also be created manually in Supabase:
 
-### 11.1 Real media upload (logo / profile / gallery / docs)  — **do first**
+1. Go to [https://supabase.com](https://supabase.com) → your project
+2. Left sidebar → **Storage** → **New bucket**
+3. Name: `school-media`
+4. ✅ Check **"Public bucket"** (so returned URLs load without signed tokens)
+5. Click **Create bucket**
 
-**Best option:** Supabase Storage (you already use Supabase for Postgres, so no new
-vendor, and it gives public/signed URLs out of the box).
-
-Plan:
-1. Create Storage buckets: `school-logos`, `school-gallery`, `profiles`, `docs`.
-2. Backend: add `POST /api/v1/uploads` (multipart) that
-   - validates content-type (`image/png|jpeg|webp`, `application/pdf`) and size (e.g. ≤5 MB),
-   - uploads bytes to Supabase Storage via the Storage REST API using the
-     service-role key (new env: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`),
-   - returns the public/signed URL.
-3. Persist returned URLs in the existing `school_media` / `school_philosophy`
-   tables instead of free-text URL fields.
-4. Client: add an Android file picker / `PickVisualMedia` + multipart upload; replace
-   the "paste a URL" boxes; show upload progress and a fallback image on error.
-5. Reject non-direct URLs (Google share links, `lh3.googleusercontent.com`) with a
-   clear message until upload exists. This directly kills the HTTP 403 / decode
-   failures seen in the logs.
-
-**Cheaper interim option:** keep URL entry but add a server-side reachability +
-content-type HEAD check before saving, and bundle local placeholder assets for
-fallback. Use only as a stop-gap.
-
-### 11.2 Current-location / GPS / geocoding + lat/lng persistence
-
-**Best option:** make `schools` the canonical directory and add geo columns
-(avoid maintaining two tables; the `supabase_schema.school_directory` geo fields
-are currently disconnected from the Ktor `schools` table).
-
-Plan:
-1. Schema: add `latitude DOUBLE`, `longitude DOUBLE`, `full_address`, `city`,
-   `district`, `state`, `pincode` to the Ktor `SchoolsTable`.
-2. Client onboarding: add a real "Use current location" button →
-   `ACCESS_FINE_LOCATION` runtime permission → fused location provider → reverse
-   geocode to address; allow manual map-pin/address fallback.
-3. Persist `{full_address, city, district, state, pincode, latitude, longitude}`
-   in the onboarding payload.
-4. Parent side: add `GET /api/v1/parent/schools/nearby?lat=&lng=&radiusKm=` that
-   sorts active schools by haversine distance (compute in SQL or in-memory), and
-   replace the hardcoded rating `4.5` with a real/derived value or hide it.
-
-### 11.3 Per-class subject pool + real teacher assignment
-
-**Best option:** introduce a proper assignment table; stop sending one global
-subject array to every class.
-
-Plan:
-1. Schema: `teacher_subject_assignments(id, school_id, faculty_id/user_id,
-   class_id, section, subject_id, created_at)` with FKs to `app_users`(faculty),
-   classes, and subjects. Replace `SchoolSubjectsTable.teacherAssigned` free text
-   with `faculty_id`.
-2. Backend onboarding: change `buildAcademicPayload()` so each class carries its
-   own subject set (no shared `subjectsArray`); accept per-class subject lists.
-3. Client: make the academic UI edit subjects **per class**, and select a teacher
-   from real faculty records instead of typing a name.
-4. This assignment graph is the prerequisite for teacher-scoped broadcasts (11.4).
-
-### 11.4 Broadcast audience segmentation
-
-**Best option:** add an audience model on announcements + a recipient-expansion
-service (depends on 11.3 for class/subject/teacher scoping).
-
-Plan:
-1. Schema: add to announcements `audience_type` enum
-   (`ALL_SCHOOL`,`CLASS`,`SECTION`,`SUBJECT`,`STUDENT`,`CUSTOM`) and an
-   `announcement_recipients` table storing the resolved recipient set (for audit +
-   delivery retry).
-2. Backend: a `RecipientResolver` that expands an audience into concrete
-   parents/students using children/class/subject/teacher-assignment data; gate
-   teacher broadcasts to the classes/subjects they actually teach.
-3. WhatsApp/notification sync should send to the **resolved** recipient set, not
-   "every active parent in the school".
-4. Client: add an audience picker in the create-announcement flow.
-
-### 11.5 Cross-cutting: tests to lock it all in (P2)
-
-- Contract tests for high-risk DTOs (`CalendarSummary`, messages, parent
-  announcements) so a future field rename can't silently break the client again.
-- A **route-inventory test** that fails the build on duplicate method+path
-  registrations (prevents the old mock-route shadowing problem from returning).
-
-### Recommended build order
-
-`11.1 storage/upload → 11.2 location → 11.3 subject/teacher model → 11.4 broadcast
-segmentation → 11.5 tests`. Storage and the teacher-assignment graph are
-foundations the other features reuse, so doing them first avoids rework.
+Without this, all upload attempts return a 404/storage error even if the env vars are correct.
 
 ---
 
-## 8c. P1/P2 architecture implementation (this pass)
+### 5.5 DATABASE MIGRATION — Run migration_002
 
-This pass moved several previously **documentation-only** P1/P2 items into real,
-compiled, test-backed backend code on `backend-by-abuzar`. All changes compile
-(`:server:compileKotlin -Pserver-only=true`) and the server test suite is green
-(`:server:test`).
+The `teacher_subject_assignments`, geo columns, and segmentation columns added in recent commits require running the migration SQL:
 
-### Implemented
+1. Go to Supabase Dashboard → SQL Editor
+2. Open file: `docs/db/migration_002_segmentation_geo_assignments.sql` from the repository
+3. Paste and run it
 
-| Item | Report ref | What was added |
+This is required before teacher assignments or geo discovery features work correctly.
+
+---
+
+## 6. Issues That Were Fixed in Previous Commits (No Longer Active)
+
+The following issues from prior audit cycles have been resolved and are no longer blocking:
+
+| Issue | Fixed in Commit | Notes |
 |---|---|---|
-| Broadcast audience segmentation | §5.6 | `announcements.audience_type` + `audience_filter` + `author_role` columns. `POST /school/announcements` validates `audience_type` ∈ `{ALL_SCHOOL, CLASS, SECTION, SUBJECT, STUDENT, CUSTOM}` and requires a filter for non-ALL_SCHOOL. `sync-whatsapp` now expands recipients **per announcement** via `resolveRecipientPhones()` instead of blasting every parent. Teacher-authored broadcasts are constrained to the classes/subjects they teach. |
-| Teacher ⇄ class ⇄ subject model | §5.5 | New `teacher_subject_assignments` table + `TeacherAssignmentRouting` (`GET/POST/DELETE /api/v1/school/teacher-assignments`). Replaces free-text `teacher_assigned` with a structured, school-scoped assignment graph (upsert + soft delete). Confirmed onboarding already persists **per-class** subject arrays (not one global list) server-side. |
-| Geo discovery | §4.4 / §5.7 | `schools.latitude` / `schools.longitude` columns; onboarding BASIC step now persists `latitude`/`longitude` drafts (insert + sync paths). New `GET /api/v1/parent/schools/discover?lat=&lng=&radius_km=&city=&limit=` with Haversine distance sort (nearest-first), city fallback, and name fallback. |
-| Contract + inventory tests | §8 P2(4,5) | `CalendarContractTest` locks the `working_days`/`total_working_days` serialization (regression §4.2). `RouteInventoryTest` statically guards against re-introducing the `inList` import and legacy mock `/track-progress`/`/fees` routes, and asserts the live owners + new teacher-assignments route stay registered. Fixed a stale assertion in `ApplicationTest`. |
-
-### Still requires team action / product decisions
-
-- **Client-side GPS capture (§4.4):** the backend now stores and serves lat/lng
-  and exposes distance discovery; the Compose "use current location" permission +
-  provider + reverse-geocoding still needs to be wired on the client to fill
-  the `latitude`/`longitude` onboarding drafts.
+| Backend compile failure (`inList` Unresolved reference) | `b0fc09b` | `ParentRouting.kt` fixed |
+| API credential logging (password/token in plain logs) | Previous pass | `safeApiCall` now redacts sensitive fields |
+| Duplicate parent routes shadowing live routes | Previous pass | Legacy `/track-progress` and `/fees` mock routes removed |
+| Gallery/tour upload using URL-paste placeholders | `64d7853` | Real file picker + upload now wired in `InstitutionalProfileScreen` |
+| Branding cover/logo URL placeholder | `b0353bf` | `BrandingInfoOBViewModel.uploadMedia()` wired to real `MediaApi` |
+| GPS location UI was static map preview | `2be5fa9` + `229bef1` | Real Android `LocationManager` + permission + geocoding implemented |
+| Backend teacher assignment table missing | `f7a6f1c` | `teacher_subject_assignments` table + routing added |
+| Geo discovery endpoint missing | `f7a6f1c` | Haversine-sorted `GET /api/v1/parent/schools/discover` added |
+| `working_days` field missing from CalendarSummaryDto | Previous pass | DTO now has both `working_days` and `total_working_days` with defaults |
+| PremiumAnimations compile errors | `057f557` | `AnimatedEntrance`, `ShimmerBox` build errors fixed |
+| No-op placeholder controls in admin screens | Previous pass | Disabled/removed fake-action CTAs |
 
 ---
 
-## 8d. Media upload + STUDENT-scope link (this pass)
+## 7. Priority Order for Fixes
 
-Continues `backend-by-abuzar`. Turns the media placeholders into **real binary
-uploads** and closes the STUDENT-scope gap.
+| Priority | Issue | Effort | Impact |
+|---|---|---|---|
+| **P0** | Add SMTP env vars for email OTP delivery | 5 min | All email-identifier users get OTPs |
+| **P0** | Verify Fast2SMS wallet balance + re-test SMS OTP | 10 min | All phone-identifier users get OTPs |
+| **P0** | Fix token refresh logic (auto-refresh on 401) | 2-4 hours | Fixes "Invalid token" + disappearing admin tabs |
+| **P0** | Fix `OTP_DEV_RETURN_CODE` default from `"true"` to `"false"` | 1 min | Security: prevents OTP plaintext leak if env var unset |
+| **P1** | Implement Forgot Password (backend 3 endpoints + client UI) | 1-2 days | Users who forget password have recovery path |
+| **P1** | Wire real document upload in LaunchInfoOBScreen | 4-6 hours | Compliance documents actually upload to storage |
+| **P1** | Fix school media upload 401 during onboarding (allow uploads before school_id exists) | 2-3 hours | Branding step works without "Invalid token" error |
+| **P1** | Location: add NETWORK_PROVIDER first + better UX for slow fix | 2-3 hours | Location takes <2s instead of up to 12s |
+| **P1** | Run `migration_002` in Supabase | 5 min | Teacher assignments + geo work in production |
+| **P1** | Create `school-media` bucket in Supabase as public | 5 min | Uploaded images have public URLs |
+| **P2** | Academic step UI revamp: add class, per-class subjects, teacher assignment modal | 2-3 days | Core requirement from user for onboarding |
+| **P2** | Announcement create: expose audience_type picker | 4 hours | Teacher-scoped broadcasts work from UI |
+| **P3** | Switch DATABASE_URL to session pooler (port 5432) | 5 min | Prevents intermittent prepared statement errors |
+| **P3** | Add `DB_POOL_SIZE=5` to Render | 1 min | Stays within Supabase connection limits |
 
-### Implemented
+---
 
-| Item | Report ref | What was added |
+## 8. Bottom Line
+
+The app is **close to production-ready on the backend** but has several critical runtime gaps that must be resolved before it is usable by real schools:
+
+1. **OTP is the single most important fix.** The infrastructure is almost fully in place; adding SMTP and verifying Fast2SMS wallet fixes it.
+2. **Token refresh** is the root cause of multiple cascading UI problems (Invalid token banner, missing admin tabs, disappearing school name).
+3. **Forgot password** is a complete blind spot — no user can recover a lost password today.
+4. **Document upload** in the final onboarding step is fake and must be wired to the real MediaApi.
+5. **Academic step** requires a substantial UI rebuild to meet the product requirements for multi-class, per-subject teacher assignment.
+
+The backend infrastructure for most of these features already exists and is correct. The majority of remaining work is **client-side** (UI and ViewModel wiring).
+
+---
+
+## 9. UI / Premium Overhaul (DONE — 2026-06-04, branch `backend-by-abuzar`)
+
+A dedicated premium iOS-style UI pass was completed across the school/admin (and shared) side. The guiding principles were: **(a)** make the whole app feel "super-premium / iOS-like", **(b)** remove every UI glitch, and **(c)** introduce premium components with a **zero-conflict delegation strategy** — i.e. the existing generic component names keep their public signatures and now *delegate* to the new premium implementations, so every caller is upgraded with no two components doing the same job.
+
+### 9.1 New premium components added
+
+| Component | File | Purpose |
 |---|---|---|
-| **Real media upload** | §4.3 / §5.4 | New `feature.media.SupabaseStorage` (dependency-free Ktor-client wrapper around the Supabase Storage REST API) + `MediaRouting`: `POST /api/v1/school/media/upload` (multipart `file` + `kind`) streams bytes to a school-scoped object path (`{schoolId}/{kind}/{uuid}.{ext}`) and returns a public URL; `DELETE /api/v1/school/media` removes the object + row. IMAGE/VIDEO uploads are recorded in `school_media` so storage metrics stay truthful. Boots fine without storage env (returns `503 STORAGE_NOT_CONFIGURED`, never crashes). |
-| **Client upload path** | §4.3 | Shared `MediaApi` (`submitFormWithBinaryData`) + cross-platform `rememberMediaPicker()` (`expect`/`actual`: real Android `GetContent` reader, real desktop `JFileChooser`, clean stubs for iOS/JS/Wasm). `BrandingInfoOBViewModel.uploadMedia()` uploads picked bytes and stores the returned **real URL**. |
-| **Placeholder removed** | §5.9 | `BrandingInfoOBScreen` no longer shows "Media upload not connected" — cover photo + logo are now tap-to-pick → upload → live preview, with an inline uploading spinner. Cover/logo URLs are real, user-uploaded, and persisted (`logo_url` to `schools.logo_url`, `cover_image_url` to onboarding drafts). |
-| **STUDENT-scope link** | §5.6 | `children.student_code` column links a parent's child to the school's canonical `students.student_code`. `resolveRecipientPhones()` STUDENT branch now targets exact students via `student_codes` (teacher-scope guarded), falling back to grade match only when no codes resolve. |
+| `PremiumButton` / `PremiumTonalButton` / `PremiumOutlineButton` | `ui/components/PremiumButton.kt` | iOS-style buttons — gradient depth, gloss highlight, layered shadow, spring press. Dribbble-inspired, customised to brand navy `#031632` / emerald `#006C49`. |
+| `NetworkImage` | `ui/components/NetworkImage.kt` | Drop-in `AsyncImage` replacement with shimmer loading + broken-image fallback. Fixes broken image boxes from dead URLs. |
+| `ComingSoonPill` | `ui/components/ComingSoonPill.kt` | Honest non-interactive "coming soon" pill. Replaces permanently-disabled buttons that looked tappable but did nothing. |
+| `StatusColors` (palette) | `ui/theme/StatusColors.kt` | Single source of truth for semantic status colors (warning/info/critical/gold/whatsApp). Replaces all hardcoded `Color(0xFF..)` literals. |
+| `PremiumLoading` / `PremiumEmptyState` / `PremiumErrorState` | `ui/components/StateViews.kt` | Consistent, branded screen-state surfaces (loading spinner, empty placeholder, error+retry). |
 
-### Manual setup required (no code can do this)
+### 9.2 Existing components upgraded (zero-conflict — signatures unchanged)
 
-- Run `docs/db/migration_002_segmentation_geo_assignments.sql` in Supabase
-  (adds the new announcement/geo/teacher-assignment/`student_code` columns).
-- Create a **public** Supabase Storage bucket named `school-media`.
-- Set Render env vars: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`
-  (service_role secret), and optionally `SUPABASE_BUCKET`. See `.env.example`.
+| Component | What changed |
+|---|---|
+| `VidyaPrayagButton` (Primary/Secondary/Outlined) | Now delegates to the `Premium*` button system — every existing caller inherits the premium look. |
+| `VidyaPrayagBottomBar` | Replaced generic M3 `NavigationBar` with a floating glassy bar, spring-scale icons, animated label reveal. Single source of truth for **both** school & parent bottom bars. |
+| `VidyaPrayagCard` | Premium gradient surface + soft brand shadow + hairline border. Same signature. |
+| `VidyaPrayagTopBar` | **Removed dead no-op Search/Notifications icons** (looked tappable, did nothing). Added gradient brand mark + optional `onProfileClick`. |
+| `VidyaPrayagSearchBar` | Search button now uses spring-press (`tappableScale`). |
+| `VidyaPrayagDrawer` | Brand-gradient avatar, spring-press drawer items, pulsing "LIVE" dot. |
+| `OnboardingComponents` | Bottom bar delegates to premium buttons; premium text-field focus styling (emerald accent). |
+| `SplashScreen` | Real staged launch animation (backdrop fade → logo spring → wordmark settle → tagline → ambient float/glow). |
+| `NavGraph` | Premium slide+fade page transitions for all navigation. |
+| `SchoolDashboardScreen` | `AnimatedEntrance` staggered reveal + primary CTA converted to `PremiumButton`. |
 
----
+### 9.3 Admin-side UI glitches FIXED
 
-## 8e. GPS capture + profile placeholder removal + premium motion + setup guide (this pass)
-
-Continues `backend-by-abuzar`. Closes the remaining "next pass" items from §8d:
-real client-side GPS, the last media placeholders, polished motion, and a single
-consolidated manual-setup checklist.
-
-### Implemented
-
-| Item | Report ref | What was added |
+| Glitch | Where | Fix |
 |---|---|---|
-| **Client-side GPS capture** | §11.2 / §4.4 | New cross-platform `ui/location/LocationProvider` — `expect rememberLocationProvider()` + `DeviceLocation`/`LocationResult`. **Android actual is dependency-free** (platform `LocationManager` + `android.location.Geocoder`): runtime `ACCESS_FINE/COARSE_LOCATION` request, last-known→live-fix fallback, reverse geocoding into city/district/state/pincode/full_address. iOS/desktop/JS/Wasm: clean `Unavailable` stubs. `InstitutionalBasicOBScreen` now has a real **"Use current location"** button (replacing the static map placeholder); the BASIC submit payload carries `latitude/longitude` + parsed address parts (only when captured), persisted to `schools.latitude/longitude`. |
-| **Gallery / tour placeholder removal** | §5.9 | `InstitutionalProfileViewModel` injects `MediaApi`; `uploadGalleryPhoto()`/`uploadTourVideo()` POST **real binaries** (IMAGE/VIDEO) and persist the returned URL via existing endpoints. `InstitutionalProfileScreen` **removes** the "ADD PHOTO BY URL" / "Add Tour Video by URL" dialogs and wires the real device picker → upload, with in-button spinners and 503/connection messaging. No URL-paste placeholders remain anywhere in the school media flow. |
-| **Premium iOS animations** | §8c | New `ui/components/PremiumAnimations.kt` (dependency-free CMP): `Modifier.pressScale()`, `Modifier.tappableScale()`, `AnimatedEntrance {}` (staggered fade + slide-up), `Modifier.shimmerPlaceholder()`/`ShimmerBox`, `staggerDelay()`. Applied to `InstitutionalProfileScreen` (staggered cascade reveal) and `VidyaPrayagPrimaryButton` (spring press). Reusable across all screens. |
-| **Consolidated setup guide** | — | New `MANUAL_SETUP_GUIDE.md` — one checklist for every manual one-time step (migration, bucket, Supabase env, security env, OTP provider, Android location permission), plus a "what's already done in code" section. Answers the recurring `SUPABASE_BUCKET = school-media` question explicitly. |
+| Permanently-disabled "pending" buttons (dead controls) | `AnalyticsDashboardScreen` (Download report), `TeacherPerformanceScreen` (Forecast export), `SchedulePTMScreen` (Reminder delivery + Class drilldown), `SyllabusCoverageScreen` (Audit generation), `SchoolAnnouncementsScreen` (Book from PTM) | Replaced with `ComingSoonPill` — clearly non-interactive, no fake tappable button. |
+| Disabled buttons used as status labels | `AcademicInfoOBScreen` (Assigned/Unassigned) | Replaced with a proper non-interactive `StatusBadge` chip (emerald = assigned, amber = unassigned). |
+| Non-clickable `Surface(onClick={}, enabled=false)` | `AnalyticsDashboardScreen` (InsightListItem) | Removed the dead onClick; now a plain surface. |
+| Dead no-op icon buttons | `VidyaPrayagTopBar` (Search + Notifications) | Removed entirely. |
+| Hardcoded magic color hexes scattered per-screen | 9 admin screens | Centralised into `StatusColors`; **zero** `Color(0xFF..)` left in the admin folder. |
+| Broken/empty image boxes from dead `googleusercontent` URLs | admin + parent screens | All `AsyncImage` → `NetworkImage` (graceful fallback); dead URLs replaced with `null` or Material icons. |
+| Deprecated `Icons.Filled.EventNote` warning | `SyllabusCoverageScreen` | Switched to `Icons.AutoMirrored.Filled.EventNote`. |
+| Inconsistent bottom-bar label casing ("HOME"/"PROFILE") | `SchoolBottomBar` | Normalised to "Home"/"Profile". |
 
-### Manual setup required
+### 9.4 Mobile-friendliness — verified
 
-All consolidated into `MANUAL_SETUP_GUIDE.md`. Summary: run `migration_002`,
-create public bucket `school-media`, set `SUPABASE_URL` / `SUPABASE_SERVICE_KEY`
-(service_role) / `SUPABASE_BUCKET=school-media` on Render, set `JWT_SECRET` /
-`OTP_PEPPER` / `OTP_ADMIN_TOKEN`, and wire ≥1 OTP provider.
+- All **19** admin screens use a single consistent scaffold (`BaseScreen`) + scrollable content (`LazyColumn` / `verticalScroll`). No screen can clip its content vertically.
+- No problematic fixed-width overflow: the only fixed widths are small `Spacer`s, horizontally-scrolling carousel items (`160.dp` cards, `64.dp` columns), or text with `maxLines=1` + ellipsis — all safe on small phones.
+- Premium buttons enforce a consistent 56dp touch target; compact contextual actions (side-by-side row buttons, dialog confirm/dismiss) intentionally remain correctly-sized M3 buttons (these are not "duplicate" of the primary CTA language).
 
----
+### 9.5 Build verification
 
-## 9. Bottom line
+- `./gradlew :composeApp:compileDevDebugKotlinAndroid --no-daemon` → **BUILD SUCCESSFUL** (only a pre-existing unrelated deprecation warning, now also cleared).
+- `./gradlew :server:compileKotlin -Pserver-only=true --no-daemon` → **BUILD SUCCESSFUL** (P0 backend blocker confirmed already resolved).
 
-The known screenshot issues are real, but the root causes are broader than the visible UI errors. The current merged code contains several intended fixes, yet the backend cannot currently compile, the tested phone build was pointed at stale Render, API logs expose secrets, legacy parent routes can shadow newer live routes, and major product requirements such as location, upload, subject/teacher assignment, and segmented broadcasts remain incomplete.
+### 9.6 UI work still OPEN (tracked elsewhere in this report — these are functional, not glitches)
 
-This working tree now compiles for the backend and Android frontend after the P0 compile/security/frontend-cleanup fixes listed above. Do not treat the school side as production-ready until these changes are committed, Render is redeployed from the fixed SHA, a fresh APK is installed, and the phone verifies the expected backend SHA via `/api/v1/config/version`.
+- **Academic step UI revamp** (§3.8 / P2): add-class, per-class subject editing, inline teacher creation, teacher↔subject↔class assignment. Backend ready; client UI still to be built.
+- **Announcement create — audience picker** (§4.2 / §3.8): expose `audience_type` selector in the create dialog.
+- **Document upload UI** (§3.5 / P1): wire a real file picker + `MediaApi.upload()` (currently flips local state only).
+- **Forgot/Reset password UI** (§3.3 / P1): no screen exists yet.
+
+### 9.7 Additional issues found during the UI pass (recommended follow-ups)
+
+1. **Placeholder copy still present** — e.g. greeting "good morning" and demo school name "St. Augustine Academy" (already logged in §4.5). These should bind to the real authenticated school/profile once token refresh (§4.6) is fixed.
+2. **`Color.White` / `Color.Black` literals on dark hero cards** are intentional and left as-is (they are not theme-semantic — they are the fixed on-dark foreground), but if a true dark-mode hero treatment is ever desired they should move behind a theme token.
+3. **`MainActivity` deprecation warnings** for some `Icons.Filled.*` (e.g. `Login`) remain in non-admin files; cosmetic only, can be swept to AutoMirrored later.

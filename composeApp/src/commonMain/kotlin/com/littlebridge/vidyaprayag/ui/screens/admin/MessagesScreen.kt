@@ -21,7 +21,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.MessageThread
 import com.littlebridge.vidyaprayag.feature.admin.presentation.ConversationState
 import com.littlebridge.vidyaprayag.feature.admin.presentation.MessagesViewModel
@@ -472,7 +471,7 @@ private fun MessageThreadItem(thread: MessageThread, onClick: () -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 if (thread.senderImageUrl != null) {
-                    AsyncImage(
+                    NetworkImage(
                         model = thread.senderImageUrl,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),

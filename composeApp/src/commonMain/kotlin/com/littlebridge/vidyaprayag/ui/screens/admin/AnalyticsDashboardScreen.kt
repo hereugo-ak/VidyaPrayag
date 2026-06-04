@@ -20,7 +20,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.presentation.AnalyticsDashboardViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.AnalyticsCardData
 import com.littlebridge.vidyaprayag.feature.admin.presentation.InsightItem
@@ -216,7 +215,7 @@ private fun AnalyticsDataCard(card: AnalyticsCardData, onClick: () -> Unit) {
                         .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.05f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    AsyncImage(
+                    NetworkImage(
                         model = card.iconUrl,
                         contentDescription = null,
                         modifier = Modifier.size(32.dp),
@@ -255,11 +254,9 @@ private fun SectionTitle(title: String) {
 @Composable
 private fun InsightListItem(insight: InsightItem) {
     Surface(
-        onClick = { Unit },
-        enabled = false,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Row(
@@ -299,17 +296,12 @@ private fun InsightListItem(insight: InsightItem) {
 
 @Composable
 private fun DownloadReportButton() {
-    Button(
-        onClick = { Unit },
-        enabled = false,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+    // Report export isn't wired yet — show an honest "coming soon" pill instead
+    // of a permanently-disabled button that looks tappable but does nothing.
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center
     ) {
-        Icon(Icons.Default.Download, null)
-        Spacer(modifier = Modifier.width(8.dp))
-        Text("Download Full Report", fontWeight = FontWeight.Bold)
+        ComingSoonPill(label = "Full report export — coming soon")
     }
 }

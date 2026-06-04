@@ -1,5 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.screens.admin
 
+import com.littlebridge.vidyaprayag.ui.theme.StatusColors
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,7 +21,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.presentation.ResultsViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentResult
 import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
@@ -87,10 +88,7 @@ fun ResultsScreen() {
 
                     when {
                         state.isLoading -> {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().height(160.dp),
-                                contentAlignment = Alignment.Center
-                            ) { CircularProgressIndicator() }
+                            PremiumLoading(caption = "Loading results…")
                         }
                         state.errorMessage != null -> {
                             ErrorRetryBlock(
@@ -302,8 +300,8 @@ private fun PerformanceSummarySection(state: com.littlebridge.vidyaprayag.featur
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SummaryStatRow("Exceeding", "$exceeding Students", MaterialTheme.colorScheme.secondary)
-                    SummaryStatRow("Meeting", "$meeting Students", Color(0xFF60A5FA))
-                    SummaryStatRow("Below", "$below Students", Color(0xFFFBBF24))
+                    SummaryStatRow("Meeting", "$meeting Students", StatusColors.infoLight)
+                    SummaryStatRow("Below", "$below Students", StatusColors.gold)
                 }
 
                 // Real distribution chart: bar heights are proportional to the
@@ -314,8 +312,8 @@ private fun PerformanceSummarySection(state: com.littlebridge.vidyaprayag.featur
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     DistributionBar("Exc", exceeding, maxCount, MaterialTheme.colorScheme.secondary)
-                    DistributionBar("Meet", meeting, maxCount, Color(0xFF60A5FA))
-                    DistributionBar("Below", below, maxCount, Color(0xFFFBBF24))
+                    DistributionBar("Meet", meeting, maxCount, StatusColors.infoLight)
+                    DistributionBar("Below", below, maxCount, StatusColors.gold)
                 }
             }
         }
@@ -434,7 +432,7 @@ private fun StudentResultRow(student: StudentResult) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
-                AsyncImage(
+                NetworkImage(
                     model = student.imageUrl,
                     contentDescription = null,
                     modifier = Modifier.size(44.dp).clip(CircleShape),
@@ -468,7 +466,7 @@ private fun StudentResultRow(student: StudentResult) {
             Surface(
                 color = when (student.status) {
                     "Exceeding" -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
-                    "Meeting" -> Color(0xFF60A5FA).copy(alpha = 0.1f)
+                    "Meeting" -> StatusColors.infoLight.copy(alpha = 0.1f)
                     else -> MaterialTheme.colorScheme.surfaceVariant
                 },
                 shape = RoundedCornerShape(6.dp)
@@ -481,7 +479,7 @@ private fun StudentResultRow(student: StudentResult) {
                     fontSize = 8.sp,
                     color = when (student.status) {
                         "Exceeding" -> MaterialTheme.colorScheme.secondary
-                        "Meeting" -> Color(0xFF2563EB)
+                        "Meeting" -> StatusColors.infoStrong
                         else -> MaterialTheme.colorScheme.outline
                     }
                 )
@@ -503,36 +501,23 @@ private fun ResultsFooter(shown: Int, total: Int) {
 
 @Composable
 private fun EmptyStudentsBlock(hasAny: Boolean) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(140.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(Icons.Default.SearchOff, null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(32.dp))
-            Text(
-                if (hasAny) "No students match your search." else "No results published for this selection yet.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
+    // Delegates to the shared premium empty state for a consistent look.
+    PremiumEmptyState(
+        title = if (hasAny) "No matches found" else "No results yet",
+        subtitle = if (hasAny) "No students match your search."
+                   else "No results published for this selection yet.",
+        icon = Icons.Default.SearchOff
+    )
 }
 
 @Composable
 private fun ErrorRetryBlock(message: String, onRetry: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Icon(Icons.Default.ErrorOutline, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(40.dp))
-        Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-        Button(onClick = onRetry) { Text("Retry") }
-    }
+    // Delegates to the shared premium error state (premium Retry button).
+    PremiumErrorState(
+        message = message,
+        onRetry = onRetry,
+        icon = Icons.Default.ErrorOutline
+    )
 }
 
 @Composable

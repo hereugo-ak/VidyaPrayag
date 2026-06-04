@@ -19,7 +19,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.ui.components.*
 import com.littlebridge.vidyaprayag.feature.schools.domain.model.School
 import org.koin.compose.viewmodel.koinViewModel
@@ -153,7 +152,7 @@ private fun SchoolCard(
         modifier = Modifier.width(240.dp).clickable { onClick() }
     ) {
         Column {
-            AsyncImage(
+            NetworkImage(
                 model = school.imageUrl,
                 contentDescription = null,
                 modifier = Modifier.fillMaxWidth().height(120.dp),
@@ -199,7 +198,7 @@ private fun HeroSection(
         
         Spacer(modifier = Modifier.height(24.dp))
         
-        AsyncImage(
+        NetworkImage(
             model = "https://dumoiojpkizxkzzxdzss.supabase.co/storage/v1/object/sign/vidya-prayag/vp_home_offerings_grid.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9kMWZmYzY2Ni04YTcwLTRmMmItODE3OC00YzBlZGM0YjA2ODIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ2aWR5YS1wcmF5YWcvdnBfaG9tZV9vZmZlcmluZ3NfZ3JpZC5qcGciLCJpYXQiOjE3Nzk0ODE5NjMsImV4cCI6MTgxMTAxNzk2M30.-Em4Jf6nhaAwvAC7whJ0tph3ZntAQN7tHRmFBR8hA5I",
             contentDescription = null,
             modifier = Modifier
@@ -355,7 +354,7 @@ private fun MoatShowcaseSection(
 private fun MoatCard(title: String, description: String, imageUrl: String) {
     VidyaPrayagCard(modifier = Modifier.width(300.dp)) {
         Column(modifier = Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            AsyncImage(
+            NetworkImage(
                 model = imageUrl,
                 contentDescription = null,
                 modifier = Modifier.size(120.dp).clip(RoundedCornerShape(16.dp))
@@ -436,8 +435,8 @@ private fun FinalCtaSection(onJoinClick: () -> Unit) {
             .clip(RoundedCornerShape(48.dp))
             .height(400.dp)
     ) {
-        AsyncImage(
-            model = "https://lh3.googleusercontent.com/aida/ADBb0uiTft_c1_2MWVAWhm4Gox-ivfML7QYXvMPpzM8A9tXfKXepAlvpYOWI2PW4VYKTMkkxqyoJvdNqB_4RkM_bitptyKAQevv2M2RXO5AkhEYqdSpODppC4zbkBa67wQV-Y2fnTzxu9mFzmzDLt6cgO_iL9rwKHMDkPBbg2q4V0KQlw2tQvst-vE4izvr5-pNPojgtX1uNI3kXK6qvzGMLXCIgav2X-mKVofJBiwU-XpuR9deYAwIaZiNHEVvn",
+        NetworkImage(
+            model = null,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,

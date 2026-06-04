@@ -1,7 +1,6 @@
 package com.littlebridge.vidyaprayag.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -61,7 +60,7 @@ fun VidyaPrayagSearchBar(
                         .size(56.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(MaterialTheme.colorScheme.secondary)
-                        .clickable { onSearchClick() },
+                        .tappableScale(onClick = onSearchClick),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Default.Search, contentDescription = null, tint = Color.White)

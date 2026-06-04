@@ -1,5 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.screens.admin
 
+import com.littlebridge.vidyaprayag.ui.theme.StatusColors
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,7 +22,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.presentation.RiskStudent
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentAnalyticsViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SubjectEngagement
@@ -198,11 +199,11 @@ private fun VolatilityIndexCard(trend: List<Float>) {
 private fun CorrelationInsightsCard() {
     VidyaPrayagCard(
         modifier = Modifier.fillMaxWidth(),
-        backgroundColor = Color(0xFF0F172A) // Dark Navy
+        backgroundColor = MaterialTheme.colorScheme.primary
     ) {
         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.Default.Psychology, null, tint = Color(0xFFFBBF24))
+                Icon(Icons.Default.Psychology, null, tint = StatusColors.gold)
                 Text("Correlation Insights", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
             }
             
@@ -210,7 +211,7 @@ private fun CorrelationInsightsCard() {
                 InsightBox(
                     label = "Attendance vs. Performance",
                     value = "Students with <85% attendance show a 15.4% drop in Math mastery.",
-                    color = Color(0xFFFACC15)
+                    color = StatusColors.goldBright
                 )
                 InsightBox(
                     label = "Social Factor",
@@ -261,7 +262,7 @@ private fun PEWSSection(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     RiskIndicator("Critical Risk", critical, 0.08f, MaterialTheme.colorScheme.error)
-                    RiskIndicator("Medium Risk", medium, 0.28f, Color(0xFFF59E0B))
+                    RiskIndicator("Medium Risk", medium, 0.28f, StatusColors.warning)
                     RiskIndicator("Low/No Risk", low, 0.64f, MaterialTheme.colorScheme.secondary)
                 }
                 
@@ -305,7 +306,7 @@ private fun RiskStudentItem(student: RiskStudent) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
-                AsyncImage(
+                NetworkImage(
                     model = student.imageUrl,
                     contentDescription = null,
                     modifier = Modifier.size(36.dp).clip(CircleShape),
@@ -313,7 +314,7 @@ private fun RiskStudentItem(student: RiskStudent) {
                 )
                 Column(modifier = Modifier.weight(1f, fill = false)) {
                     Text(student.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("Retention Risk: ${student.retentionRisk}%", style = MaterialTheme.typography.labelSmall, color = if (student.riskLevel == "Critical") MaterialTheme.colorScheme.error else Color(0xFFF59E0B), fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("Retention Risk: ${student.retentionRisk}%", style = MaterialTheme.typography.labelSmall, color = if (student.riskLevel == "Critical") MaterialTheme.colorScheme.error else StatusColors.warning, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             Spacer(Modifier.width(8.dp))
@@ -344,7 +345,7 @@ private fun SubjectEngagementCard(engagements: List<SubjectEngagement>) {
                         LinearProgressIndicator(
                             progress = { engagement.percentage },
                             modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
-                            color = if (engagement.percentage < 0.8f) Color(0xFFF59E0B) else MaterialTheme.colorScheme.secondary,
+                            color = if (engagement.percentage < 0.8f) StatusColors.warning else MaterialTheme.colorScheme.secondary,
                             trackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     }

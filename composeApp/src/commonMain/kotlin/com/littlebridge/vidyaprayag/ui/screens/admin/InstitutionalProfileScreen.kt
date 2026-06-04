@@ -18,7 +18,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.presentation.InstitutionalProfileViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.GalleryImage
 import com.littlebridge.vidyaprayag.ui.components.*
@@ -292,7 +291,7 @@ private fun VirtualTourPreview(
                 contentAlignment = Alignment.Center
             ) {
                 if (previewImageUrl != null) {
-                    AsyncImage(
+                    NetworkImage(
                         model = previewImageUrl,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
@@ -403,7 +402,7 @@ private fun GallerySection(
                                         .clip(RoundedCornerShape(16.dp))
                                         .background(Color.Gray)
                                 ) {
-                                    AsyncImage(
+                                    NetworkImage(
                                         model = img.url,
                                         contentDescription = null,
                                         modifier = Modifier.fillMaxSize(),

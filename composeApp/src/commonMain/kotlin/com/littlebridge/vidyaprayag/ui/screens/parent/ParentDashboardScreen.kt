@@ -21,7 +21,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.domain.util.UiState
 import com.littlebridge.vidyaprayag.feature.schools.domain.model.School
 import com.littlebridge.vidyaprayag.navigation.Destination
@@ -203,7 +202,7 @@ private fun ComparisonShortlistSection(
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
                     Row(modifier = Modifier.padding(end = 8.dp)) {
                         selectedSchools.forEachIndexed { index, school ->
-                            AsyncImage(
+                            NetworkImage(
                                 model = school.imageUrl,
                                 contentDescription = null,
                                 modifier = Modifier
@@ -246,7 +245,7 @@ private fun SchoolDashboardCard(
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Box(modifier = Modifier.fillMaxWidth().height(180.dp)) {
-                AsyncImage(
+                NetworkImage(
                     model = school.imageUrl,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
@@ -378,8 +377,8 @@ private fun ExpertHelpCard() {
             .height(240.dp)
             .clip(RoundedCornerShape(24.dp))
     ) {
-        AsyncImage(
-            model = "https://lh3.googleusercontent.com/aida-public/AB6AXuCBHe2vycVVnMdCIUqKbSVKXJCgHJqLSQWptX7CqqU-xa0o9tu1eawmSjBExpDNB7zqndQBE0Zl3CvROj-CUqWGkSyYJPjXl4sL6MPvcGoCIY-_1jRuyU1-TbAbNGD64MLEhJ0lRuDP4QZwd2F9vO32pnLyYtwPBXAnWr84GxbLFDI__r3Zkzs4c9b7Ri_-t8fvpojKOlmmHj-UoeLuN_1_w9dv6OEHkfJ6444_G5Q4jVSjt3YpCd1sFdiV-4habdFt6PTBQ28nk8gS",
+        NetworkImage(
+            model = null,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
