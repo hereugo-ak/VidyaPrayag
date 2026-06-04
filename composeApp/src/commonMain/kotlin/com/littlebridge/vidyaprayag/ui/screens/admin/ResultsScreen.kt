@@ -88,10 +88,7 @@ fun ResultsScreen() {
 
                     when {
                         state.isLoading -> {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().height(160.dp),
-                                contentAlignment = Alignment.Center
-                            ) { CircularProgressIndicator() }
+                            PremiumLoading(caption = "Loading results…")
                         }
                         state.errorMessage != null -> {
                             ErrorRetryBlock(
@@ -504,36 +501,23 @@ private fun ResultsFooter(shown: Int, total: Int) {
 
 @Composable
 private fun EmptyStudentsBlock(hasAny: Boolean) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(140.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(Icons.Default.SearchOff, null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(32.dp))
-            Text(
-                if (hasAny) "No students match your search." else "No results published for this selection yet.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
+    // Delegates to the shared premium empty state for a consistent look.
+    PremiumEmptyState(
+        title = if (hasAny) "No matches found" else "No results yet",
+        subtitle = if (hasAny) "No students match your search."
+                   else "No results published for this selection yet.",
+        icon = Icons.Default.SearchOff
+    )
 }
 
 @Composable
 private fun ErrorRetryBlock(message: String, onRetry: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Icon(Icons.Default.ErrorOutline, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(40.dp))
-        Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-        Button(onClick = onRetry) { Text("Retry") }
-    }
+    // Delegates to the shared premium error state (premium Retry button).
+    PremiumErrorState(
+        message = message,
+        onRetry = onRetry,
+        icon = Icons.Default.ErrorOutline
+    )
 }
 
 @Composable

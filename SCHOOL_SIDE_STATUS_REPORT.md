@@ -1,10 +1,12 @@
 # VidyaPrayag — School Side Status Report
 
 > **Audit branch:** `backend-by-abuzar`
-> **HEAD commit:** `057f557` — fix(ui): resolve PremiumAnimations build errors + richer premium motion
-> **Audit date:** 2026-06-04
+> **HEAD commit:** `d3ffc3a` — feat(ui): premium iOS-style overhaul + glitch fixes (school/admin side)
+> **Audit date:** 2026-06-04 (updated — premium UI pass)
 > **Previous audit date:** 2026-06-03
 > **Scope:** Full re-audit of `backend-by-abuzar` branch. Checked: last 15 commits, live Render logs, Android Studio device log (`2026-06-03 175806.353 O.txt`), all 7 provided screenshots (Render env dashboard ×3, app UI ×4), backend source, shared client, composeApp, OTP provider chain, environment variables, navigation, onboarding flow, document upload, GPS, and teacher/class/subject model.
+>
+> **⭐ 2026-06-04 UPDATE — Premium UI / Glitch-Free Pass:** A full premium iOS-style UI overhaul of the school/admin side was completed and merged via PR. All admin-side UI glitches identified below have been resolved (dead controls removed, hardcoded colors centralised, broken images fixed, premium components introduced with zero-conflict delegation). See the new **§9 — UI / Premium Overhaul (DONE)** at the end of this report for the complete fixed/remaining ledger.
 
 ---
 
@@ -31,6 +33,10 @@
 | Onboarding `Invalid token` error | ❌ ACTIVE BUG | Branding step returns "Invalid token" — root cause: Supabase service key not set + possible token expiry mid-flow — see §3.9 |
 | Admin drawer navigation | ✅ Code-correct | ADMIN role sees Analytics/Calendar/Attendance/Leave/Results/PTM/Schedule drawer items |
 | Premium animations | ✅ Working | PremiumAnimations.kt compiled after §057f557 fix |
+| Admin-side UI glitches | ✅ FIXED (2026-06-04) | Dead "pending" buttons → ComingSoonPill; broken images → NetworkImage; dead no-op top-bar icons removed — see §9 |
+| Admin hardcoded colors | ✅ FIXED (2026-06-04) | All `Color(0xFF..)` status hexes centralised into `StatusColors` palette — zero hardcoded colors left in admin — see §9 |
+| Premium button system | ✅ DONE (2026-06-04) | `PremiumButton`/`PremiumTonalButton`/`PremiumOutlineButton` (Dribbble-style, brand-themed); generic buttons delegate to them — see §9 |
+| Admin mobile-friendliness | ✅ VERIFIED (2026-06-04) | All 19 admin screens use consistent scaffold + scrollable layout; no fixed-width overflow — see §9 |
 | Route duplicate/shadow risk | ✅ Fixed | `inList` compile error fixed; legacy mock routes removed in prior commits |
 | API credential logging (security) | ✅ Fixed | `safeApiCall` now redacts password/token/otp fields |
 | JWT_SECRET | ⚠️ CRITICAL MISSING | Render env screenshot shows `JWT_SECRET` IS set (confirmed in screenshot 3); but verify it is a real strong value, not the `change-me` placeholder |
@@ -693,3 +699,71 @@ The app is **close to production-ready on the backend** but has several critical
 5. **Academic step** requires a substantial UI rebuild to meet the product requirements for multi-class, per-subject teacher assignment.
 
 The backend infrastructure for most of these features already exists and is correct. The majority of remaining work is **client-side** (UI and ViewModel wiring).
+
+---
+
+## 9. UI / Premium Overhaul (DONE — 2026-06-04, branch `backend-by-abuzar`)
+
+A dedicated premium iOS-style UI pass was completed across the school/admin (and shared) side. The guiding principles were: **(a)** make the whole app feel "super-premium / iOS-like", **(b)** remove every UI glitch, and **(c)** introduce premium components with a **zero-conflict delegation strategy** — i.e. the existing generic component names keep their public signatures and now *delegate* to the new premium implementations, so every caller is upgraded with no two components doing the same job.
+
+### 9.1 New premium components added
+
+| Component | File | Purpose |
+|---|---|---|
+| `PremiumButton` / `PremiumTonalButton` / `PremiumOutlineButton` | `ui/components/PremiumButton.kt` | iOS-style buttons — gradient depth, gloss highlight, layered shadow, spring press. Dribbble-inspired, customised to brand navy `#031632` / emerald `#006C49`. |
+| `NetworkImage` | `ui/components/NetworkImage.kt` | Drop-in `AsyncImage` replacement with shimmer loading + broken-image fallback. Fixes broken image boxes from dead URLs. |
+| `ComingSoonPill` | `ui/components/ComingSoonPill.kt` | Honest non-interactive "coming soon" pill. Replaces permanently-disabled buttons that looked tappable but did nothing. |
+| `StatusColors` (palette) | `ui/theme/StatusColors.kt` | Single source of truth for semantic status colors (warning/info/critical/gold/whatsApp). Replaces all hardcoded `Color(0xFF..)` literals. |
+| `PremiumLoading` / `PremiumEmptyState` / `PremiumErrorState` | `ui/components/StateViews.kt` | Consistent, branded screen-state surfaces (loading spinner, empty placeholder, error+retry). |
+
+### 9.2 Existing components upgraded (zero-conflict — signatures unchanged)
+
+| Component | What changed |
+|---|---|
+| `VidyaPrayagButton` (Primary/Secondary/Outlined) | Now delegates to the `Premium*` button system — every existing caller inherits the premium look. |
+| `VidyaPrayagBottomBar` | Replaced generic M3 `NavigationBar` with a floating glassy bar, spring-scale icons, animated label reveal. Single source of truth for **both** school & parent bottom bars. |
+| `VidyaPrayagCard` | Premium gradient surface + soft brand shadow + hairline border. Same signature. |
+| `VidyaPrayagTopBar` | **Removed dead no-op Search/Notifications icons** (looked tappable, did nothing). Added gradient brand mark + optional `onProfileClick`. |
+| `VidyaPrayagSearchBar` | Search button now uses spring-press (`tappableScale`). |
+| `VidyaPrayagDrawer` | Brand-gradient avatar, spring-press drawer items, pulsing "LIVE" dot. |
+| `OnboardingComponents` | Bottom bar delegates to premium buttons; premium text-field focus styling (emerald accent). |
+| `SplashScreen` | Real staged launch animation (backdrop fade → logo spring → wordmark settle → tagline → ambient float/glow). |
+| `NavGraph` | Premium slide+fade page transitions for all navigation. |
+| `SchoolDashboardScreen` | `AnimatedEntrance` staggered reveal + primary CTA converted to `PremiumButton`. |
+
+### 9.3 Admin-side UI glitches FIXED
+
+| Glitch | Where | Fix |
+|---|---|---|
+| Permanently-disabled "pending" buttons (dead controls) | `AnalyticsDashboardScreen` (Download report), `TeacherPerformanceScreen` (Forecast export), `SchedulePTMScreen` (Reminder delivery + Class drilldown), `SyllabusCoverageScreen` (Audit generation), `SchoolAnnouncementsScreen` (Book from PTM) | Replaced with `ComingSoonPill` — clearly non-interactive, no fake tappable button. |
+| Disabled buttons used as status labels | `AcademicInfoOBScreen` (Assigned/Unassigned) | Replaced with a proper non-interactive `StatusBadge` chip (emerald = assigned, amber = unassigned). |
+| Non-clickable `Surface(onClick={}, enabled=false)` | `AnalyticsDashboardScreen` (InsightListItem) | Removed the dead onClick; now a plain surface. |
+| Dead no-op icon buttons | `VidyaPrayagTopBar` (Search + Notifications) | Removed entirely. |
+| Hardcoded magic color hexes scattered per-screen | 9 admin screens | Centralised into `StatusColors`; **zero** `Color(0xFF..)` left in the admin folder. |
+| Broken/empty image boxes from dead `googleusercontent` URLs | admin + parent screens | All `AsyncImage` → `NetworkImage` (graceful fallback); dead URLs replaced with `null` or Material icons. |
+| Deprecated `Icons.Filled.EventNote` warning | `SyllabusCoverageScreen` | Switched to `Icons.AutoMirrored.Filled.EventNote`. |
+| Inconsistent bottom-bar label casing ("HOME"/"PROFILE") | `SchoolBottomBar` | Normalised to "Home"/"Profile". |
+
+### 9.4 Mobile-friendliness — verified
+
+- All **19** admin screens use a single consistent scaffold (`BaseScreen`) + scrollable content (`LazyColumn` / `verticalScroll`). No screen can clip its content vertically.
+- No problematic fixed-width overflow: the only fixed widths are small `Spacer`s, horizontally-scrolling carousel items (`160.dp` cards, `64.dp` columns), or text with `maxLines=1` + ellipsis — all safe on small phones.
+- Premium buttons enforce a consistent 56dp touch target; compact contextual actions (side-by-side row buttons, dialog confirm/dismiss) intentionally remain correctly-sized M3 buttons (these are not "duplicate" of the primary CTA language).
+
+### 9.5 Build verification
+
+- `./gradlew :composeApp:compileDevDebugKotlinAndroid --no-daemon` → **BUILD SUCCESSFUL** (only a pre-existing unrelated deprecation warning, now also cleared).
+- `./gradlew :server:compileKotlin -Pserver-only=true --no-daemon` → **BUILD SUCCESSFUL** (P0 backend blocker confirmed already resolved).
+
+### 9.6 UI work still OPEN (tracked elsewhere in this report — these are functional, not glitches)
+
+- **Academic step UI revamp** (§3.8 / P2): add-class, per-class subject editing, inline teacher creation, teacher↔subject↔class assignment. Backend ready; client UI still to be built.
+- **Announcement create — audience picker** (§4.2 / §3.8): expose `audience_type` selector in the create dialog.
+- **Document upload UI** (§3.5 / P1): wire a real file picker + `MediaApi.upload()` (currently flips local state only).
+- **Forgot/Reset password UI** (§3.3 / P1): no screen exists yet.
+
+### 9.7 Additional issues found during the UI pass (recommended follow-ups)
+
+1. **Placeholder copy still present** — e.g. greeting "good morning" and demo school name "St. Augustine Academy" (already logged in §4.5). These should bind to the real authenticated school/profile once token refresh (§4.6) is fixed.
+2. **`Color.White` / `Color.Black` literals on dark hero cards** are intentional and left as-is (they are not theme-semantic — they are the fixed on-dark foreground), but if a true dark-mode hero treatment is ever desired they should move behind a theme token.
+3. **`MainActivity` deprecation warnings** for some `Icons.Filled.*` (e.g. `Login`) remain in non-admin files; cosmetic only, can be swept to AutoMirrored later.
