@@ -1,62 +1,48 @@
 package com.littlebridge.vidyaprayag.ui.components
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
+
+/*
+ * These three names are used across the whole app. They now delegate to the
+ * premium iOS-style button system (PremiumButton.kt) so every screen gets the
+ * same depth/gradient/spring treatment with zero per-screen changes and no
+ * duplicated button styles competing with each other.
+ */
 
 @Composable
 fun VidyaPrayagPrimaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    loading: Boolean = false
 ) {
-    // iOS-style spring press feedback (report §8c "premium iOS animations").
-    val interactionSource = remember { MutableInteractionSource() }
-    Button(
+    PremiumButton(
+        text = text,
         onClick = onClick,
-        modifier = modifier.height(56.dp).pressScale(interactionSource),
+        modifier = modifier.fillMaxWidth(),
         enabled = enabled,
-        shape = RoundedCornerShape(16.dp),
-        interactionSource = interactionSource,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
-        )
-    ) {
-        Text(text)
-    }
+        loading = loading
+    )
 }
 
 @Composable
 fun VidyaPrayagSecondaryButton(
     text: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
-    Button(
+    PremiumTonalButton(
+        text = text,
         onClick = onClick,
-        modifier = modifier.height(56.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.secondary,
-            contentColor = MaterialTheme.colorScheme.onSecondary
-        )
-    ) {
-        Text(text)
-    }
+        modifier = modifier.fillMaxWidth(),
+        enabled = enabled
+    )
 }
 
 @Composable
@@ -67,12 +53,11 @@ fun VidyaPrayagOutlinedButton(
     borderColor: Color = MaterialTheme.colorScheme.primary,
     contentColor: Color = MaterialTheme.colorScheme.primary
 ) {
-    OutlinedButton(
+    PremiumOutlineButton(
+        text = text,
         onClick = onClick,
-        modifier = modifier.height(56.dp),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, borderColor)
-    ) {
-        Text(text, color = contentColor)
-    }
+        modifier = modifier.fillMaxWidth(),
+        borderColor = borderColor,
+        contentColor = contentColor
+    )
 }

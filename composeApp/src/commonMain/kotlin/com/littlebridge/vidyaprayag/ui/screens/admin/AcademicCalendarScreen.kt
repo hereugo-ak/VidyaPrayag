@@ -1,5 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.screens.admin
 
+import com.littlebridge.vidyaprayag.ui.theme.StatusColors
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -515,7 +517,7 @@ private fun StatsGrid(workingDays: Int, holidays: Int, conflicts: Int) {
             label = "Public & School Holidays",
             value = holidays.toString(),
             icon = Icons.Default.BeachAccess,
-            color = Color(0xFFE11D48) // Rose
+            color = StatusColors.critical // Rose
         )
         StatRow(
             label = "Syllabus Conflicts Detected",

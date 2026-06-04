@@ -1,5 +1,11 @@
 package com.littlebridge.vidyaprayag.navigation
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -123,9 +129,26 @@ fun NavGraph(
     navController: NavHostController,
     startDestination: Destination = Destination.Landing
 ) {
+    // Premium, top-tier page motion: incoming screens slide in from the right
+    // while fading, outgoing screens drift left + fade. Back navigation mirrors
+    // it. Applied once here, so every screen inherits the same smooth language.
+    val motion = tween<Float>(durationMillis = 340, easing = FastOutSlowInEasing)
+    val slideMotion = tween<androidx.compose.ui.unit.IntOffset>(durationMillis = 340, easing = FastOutSlowInEasing)
     NavHost(
         navController = navController,
-        startDestination = startDestination
+        startDestination = startDestination,
+        enterTransition = {
+            slideInHorizontally(slideMotion) { it / 6 } + fadeIn(motion)
+        },
+        exitTransition = {
+            slideOutHorizontally(slideMotion) { -it / 8 } + fadeOut(motion)
+        },
+        popEnterTransition = {
+            slideInHorizontally(slideMotion) { -it / 6 } + fadeIn(motion)
+        },
+        popExitTransition = {
+            slideOutHorizontally(slideMotion) { it / 8 } + fadeOut(motion)
+        }
     ) {
         composable<Destination.Landing> {
             CommonLandingScreen()

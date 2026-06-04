@@ -23,7 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.parent.presentation.*
 import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
 import com.littlebridge.vidyaprayag.ui.components.*
@@ -220,7 +219,7 @@ private fun TeacherAndSlotsSection(
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
             Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                AsyncImage(
+                NetworkImage(
                     model = imageUrl,
                     contentDescription = null,
                     modifier = Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)),

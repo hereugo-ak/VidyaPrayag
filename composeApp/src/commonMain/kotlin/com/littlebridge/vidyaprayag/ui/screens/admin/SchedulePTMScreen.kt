@@ -1,5 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.screens.admin
 
+import com.littlebridge.vidyaprayag.ui.theme.StatusColors
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -331,19 +333,14 @@ private fun LiveCommunicationCard(invites: Int, receipts: Int) {
 
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 CommStatRow(label = "Invites Delivered", value = "$invites%", icon = Icons.Default.CheckCircle, iconColor = MaterialTheme.colorScheme.secondary)
-                CommStatRow(label = "Read Receipts", value = "$receipts%", icon = Icons.Default.Visibility, iconColor = Color(0xFF3B82F6))
+                CommStatRow(label = "Read Receipts", value = "$receipts%", icon = Icons.Default.Visibility, iconColor = StatusColors.info)
             }
 
-            Button(
-                onClick = { Unit },
-                enabled = false,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
             ) {
-                Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Reminder delivery pending", fontWeight = FontWeight.Bold)
+                ComingSoonPill(label = "Reminder delivery — coming soon")
             }
         }
     }
@@ -415,16 +412,11 @@ private fun ClassProgressSection(progressList: List<ClassPTMProgress>) {
             }
         }
 
-        OutlinedButton(
-            onClick = { Unit },
-            enabled = false,
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(2.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center
         ) {
-            Icon(Icons.Default.Groups, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.outline)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Class drilldown pending", color = MaterialTheme.colorScheme.outline, fontWeight = FontWeight.Bold)
+            ComingSoonPill(label = "Class drilldown — coming soon")
         }
     }
 }
@@ -454,14 +446,14 @@ private fun ClassProgressCard(progress: ClassPTMProgress) {
                     Text("Class Teacher", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("${progress.metCount}/${progress.totalCount}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = if (progress.progress > 0.8f) MaterialTheme.colorScheme.secondary else Color(0xFFF59E0B))
+                    Text("${progress.metCount}/${progress.totalCount}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = if (progress.progress > 0.8f) MaterialTheme.colorScheme.secondary else StatusColors.warning)
                     Text("MET", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.outline)
                 }
             }
             LinearProgressIndicator(
                 progress = { progress.progress },
                 modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
-                color = if (progress.progress > 0.8f) MaterialTheme.colorScheme.secondary else Color(0xFFF59E0B),
+                color = if (progress.progress > 0.8f) MaterialTheme.colorScheme.secondary else StatusColors.warning,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
         }

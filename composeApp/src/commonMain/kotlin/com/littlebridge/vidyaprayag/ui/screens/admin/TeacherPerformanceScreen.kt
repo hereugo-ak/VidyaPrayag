@@ -1,5 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.screens.admin
 
+import com.littlebridge.vidyaprayag.ui.theme.StatusColors
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,7 +24,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.presentation.FacultyAccountability
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StarTeacher
 import com.littlebridge.vidyaprayag.feature.admin.presentation.TeacherPerformanceViewModel
@@ -217,7 +218,7 @@ private fun StarFacultyItem(teacher: StarTeacher) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.weight(1f)) {
                 Box {
-                    AsyncImage(
+                    NetworkImage(
                         model = teacher.imageUrl,
                         contentDescription = null,
                         modifier = Modifier.size(48.dp).clip(CircleShape).border(2.dp, MaterialTheme.colorScheme.secondary, CircleShape),
@@ -261,7 +262,7 @@ private fun AccountabilityRow(faculty: FacultyAccountability) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1.2f)) {
-                Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(if (faculty.riskCorrelation == "High Risk") Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(if (faculty.riskCorrelation == "High Risk") StatusColors.criticalSoft else MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
                     Text(faculty.initials, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = if (faculty.riskCorrelation == "High Risk") Color.Red else MaterialTheme.colorScheme.primary)
                 }
                 Column(modifier = Modifier.weight(1f, fill = false)) {
@@ -284,7 +285,7 @@ private fun AccountabilityRow(faculty: FacultyAccountability) {
                 color = when(faculty.riskCorrelation) {
                     "Stable" -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
                     "High Risk" -> Color.Red.copy(alpha = 0.1f)
-                    else -> Color(0xFFF59E0B).copy(alpha = 0.1f)
+                    else -> StatusColors.warning.copy(alpha = 0.1f)
                 },
                 shape = RoundedCornerShape(6.dp)
             ) {
@@ -297,7 +298,7 @@ private fun AccountabilityRow(faculty: FacultyAccountability) {
                     color = when(faculty.riskCorrelation) {
                         "Stable" -> MaterialTheme.colorScheme.secondary
                         "High Risk" -> Color.Red
-                        else -> Color(0xFFCA8A04)
+                        else -> StatusColors.warningStrong
                     }
                 )
             }
@@ -320,7 +321,7 @@ private fun DepartmentEfficiencyCard(efficiencies: List<com.littlebridge.vidyapr
                         LinearProgressIndicator(
                             progress = { dept.percentage / 100f },
                             modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
-                            color = if (dept.percentage < 85) Color(0xFFF59E0B) else MaterialTheme.colorScheme.secondary,
+                            color = if (dept.percentage < 85) StatusColors.warning else MaterialTheme.colorScheme.secondary,
                             trackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     }
@@ -347,15 +348,7 @@ private fun PerformanceForecastingCard() {
                 ForecastBox(label = "RISK", value = "Low", subValue = "98% Confidence", modifier = Modifier.weight(1f))
             }
             
-            Button(
-                onClick = { Unit },
-                enabled = false,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Forecast export pending", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            }
+            ComingSoonPill(label = "Forecast export — coming soon", onLight = true)
         }
     }
 }

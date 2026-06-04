@@ -20,7 +20,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.parent.presentation.*
 import com.littlebridge.vidyaprayag.ui.components.*
 import org.koin.compose.viewmodel.koinViewModel
@@ -258,7 +257,7 @@ private fun PlayBasedSection(indicators: List<PlayIndicator>) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        AsyncImage(
+                        NetworkImage(
                             model = indicator.imageUrl,
                             contentDescription = null,
                             modifier = Modifier.size(48.dp).clip(CircleShape),

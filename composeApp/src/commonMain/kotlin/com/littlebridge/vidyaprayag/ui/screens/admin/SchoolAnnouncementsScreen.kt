@@ -1,5 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.screens.admin
 
+import com.littlebridge.vidyaprayag.ui.theme.StatusColors
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,7 +22,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.presentation.Announcement
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolAnnouncementsViewModel
 import com.littlebridge.vidyaprayag.ui.components.*
@@ -255,7 +256,7 @@ private fun AnnouncementsHeader(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, tint = Color(0xFF25D366))
+                    Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, tint = StatusColors.whatsApp)
                     Text("Sync to WhatsApp", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                 }
                 Switch(
@@ -363,7 +364,7 @@ private fun FeaturedAnnouncementCard(announcement: Announcement) {
                 }
             }
             if (announcement.imageUrl != null) {
-                AsyncImage(
+                NetworkImage(
                     model = announcement.imageUrl,
                     contentDescription = null,
                     modifier = Modifier.fillMaxWidth().height(200.dp).padding(horizontal = 24.dp, vertical = 0.dp).clip(RoundedCornerShape(16.dp)),
@@ -457,14 +458,11 @@ private fun AnnouncementCard(announcement: Announcement) {
                     }
                 }
             } else if (announcement.category == "PTM") {
-                Button(
-                    onClick = { Unit },
-                    enabled = false,
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                    shape = RoundedCornerShape(12.dp)
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    Text("Book from PTM module", fontWeight = FontWeight.Bold)
+                    ComingSoonPill(label = "Book from PTM module — coming soon")
                 }
             }
         }

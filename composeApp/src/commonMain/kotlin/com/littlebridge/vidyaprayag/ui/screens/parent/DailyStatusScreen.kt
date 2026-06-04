@@ -22,7 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
+import com.littlebridge.vidyaprayag.ui.components.NetworkImage
 import com.littlebridge.vidyaprayag.feature.parent.presentation.*
 import com.littlebridge.vidyaprayag.ui.components.*
 import org.koin.compose.viewmodel.koinViewModel
@@ -257,8 +257,8 @@ private fun UpcomingTestsCard(tests: List<UpcomingTest>) {
 private fun AcademicStreakCard(days: Int, message: String) {
     VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            AsyncImage(
-                model = "https://lh3.googleusercontent.com/aida-public/AB6AXuAQo5BbD22M012e3KJEsA9U5v3uU3-3Ljh1fA4Sgqoe67MSMtI4saP2kcVuhNGtR0uKYhezuu57pkD19ubNsFFrJD1wLB874IUF_zIad7bG3lbHvXBzIjE6zUkmePWnC1eQ-UN2BERCSYxx8TB8djI_NVIJAk6O6nlz432GXjNoFPMsOa7LoRhmUMIB6yaA3tdHTIW9LTiFDMrRScjvdfCQlTbrmx2mXw3T9aebj4RQygZaOsrA0JYx7TBgEbfcF43U9NQTA75yfJUe",
+            NetworkImage(
+                model = null,
                 contentDescription = null,
                 modifier = Modifier.size(80.dp).clip(RoundedCornerShape(16.dp)),
                 contentScale = ContentScale.Crop

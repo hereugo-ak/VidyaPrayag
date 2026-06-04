@@ -1,5 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.screens.admin
 
+import com.littlebridge.vidyaprayag.ui.theme.StatusColors
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,7 +21,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.presentation.ResultsViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentResult
 import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
@@ -302,8 +303,8 @@ private fun PerformanceSummarySection(state: com.littlebridge.vidyaprayag.featur
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SummaryStatRow("Exceeding", "$exceeding Students", MaterialTheme.colorScheme.secondary)
-                    SummaryStatRow("Meeting", "$meeting Students", Color(0xFF60A5FA))
-                    SummaryStatRow("Below", "$below Students", Color(0xFFFBBF24))
+                    SummaryStatRow("Meeting", "$meeting Students", StatusColors.infoLight)
+                    SummaryStatRow("Below", "$below Students", StatusColors.gold)
                 }
 
                 // Real distribution chart: bar heights are proportional to the
@@ -314,8 +315,8 @@ private fun PerformanceSummarySection(state: com.littlebridge.vidyaprayag.featur
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     DistributionBar("Exc", exceeding, maxCount, MaterialTheme.colorScheme.secondary)
-                    DistributionBar("Meet", meeting, maxCount, Color(0xFF60A5FA))
-                    DistributionBar("Below", below, maxCount, Color(0xFFFBBF24))
+                    DistributionBar("Meet", meeting, maxCount, StatusColors.infoLight)
+                    DistributionBar("Below", below, maxCount, StatusColors.gold)
                 }
             }
         }
@@ -434,7 +435,7 @@ private fun StudentResultRow(student: StudentResult) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
-                AsyncImage(
+                NetworkImage(
                     model = student.imageUrl,
                     contentDescription = null,
                     modifier = Modifier.size(44.dp).clip(CircleShape),
@@ -468,7 +469,7 @@ private fun StudentResultRow(student: StudentResult) {
             Surface(
                 color = when (student.status) {
                     "Exceeding" -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
-                    "Meeting" -> Color(0xFF60A5FA).copy(alpha = 0.1f)
+                    "Meeting" -> StatusColors.infoLight.copy(alpha = 0.1f)
                     else -> MaterialTheme.colorScheme.surfaceVariant
                 },
                 shape = RoundedCornerShape(6.dp)
@@ -481,7 +482,7 @@ private fun StudentResultRow(student: StudentResult) {
                     fontSize = 8.sp,
                     color = when (student.status) {
                         "Exceeding" -> MaterialTheme.colorScheme.secondary
-                        "Meeting" -> Color(0xFF2563EB)
+                        "Meeting" -> StatusColors.infoStrong
                         else -> MaterialTheme.colorScheme.outline
                     }
                 )

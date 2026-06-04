@@ -20,7 +20,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.presentation.LeaveRequestItem
 import com.littlebridge.vidyaprayag.feature.admin.presentation.LeaveRequestsViewModel
 import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
@@ -238,7 +237,7 @@ private fun LeaveRequestCard(
         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    AsyncImage(
+                    NetworkImage(
                         model = request.imageUrl,
                         contentDescription = null,
                         modifier = Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)),

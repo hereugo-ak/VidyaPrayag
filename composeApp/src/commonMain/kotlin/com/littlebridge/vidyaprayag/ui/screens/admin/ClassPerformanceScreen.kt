@@ -1,5 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.screens.admin
 
+import com.littlebridge.vidyaprayag.ui.theme.StatusColors
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -164,9 +166,9 @@ private fun SubjectComparisonCard(matrix: List<SubjectMatrixItem>) {
                 matrix.forEach { item ->
                     val isRisk = item.percentage < 60
                     Surface(
-                        color = if (isRisk) Color(0xFFFEF2F2) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        color = if (isRisk) StatusColors.criticalSurface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
                         shape = RoundedCornerShape(12.dp),
-                        border = if (isRisk) BorderStroke(1.dp, Color(0xFFFEE2E2)) else null
+                        border = if (isRisk) BorderStroke(1.dp, StatusColors.criticalBorder) else null
                     ) {
                         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             Text(item.name, modifier = Modifier.width(100.dp), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -208,7 +210,7 @@ private fun PEWSAlertCard(critical: Int, moderate: Int) {
             
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 RiskRow("Critical Risk", "$critical Students", MaterialTheme.colorScheme.error)
-                RiskRow("Moderate Risk", "$moderate Students", Color(0xFFF59E0B))
+                RiskRow("Moderate Risk", "$moderate Students", StatusColors.warning)
             }
         }
     }

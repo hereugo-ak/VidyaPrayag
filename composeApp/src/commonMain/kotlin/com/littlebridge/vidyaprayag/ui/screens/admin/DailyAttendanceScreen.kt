@@ -1,5 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.screens.admin
 
+import com.littlebridge.vidyaprayag.ui.theme.StatusColors
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -261,7 +263,7 @@ private fun AttendeeItem(attendee: Attendee) {
                                 when(attendee.status) {
                                     AttendanceStatus.PRESENT -> MaterialTheme.colorScheme.secondary
                                     AttendanceStatus.ABSENT -> MaterialTheme.colorScheme.error
-                                    AttendanceStatus.LATE -> Color(0xFFFACC15) // Amber
+                                    AttendanceStatus.LATE -> StatusColors.goldBright // Amber
                                 }
                             )
                             .border(1.5.dp, Color.White, CircleShape)
@@ -278,7 +280,7 @@ private fun AttendeeItem(attendee: Attendee) {
                 color = when(attendee.status) {
                     AttendanceStatus.PRESENT -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
                     AttendanceStatus.ABSENT -> MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
-                    AttendanceStatus.LATE -> Color(0xFFFACC15).copy(alpha = 0.1f)
+                    AttendanceStatus.LATE -> StatusColors.goldBright.copy(alpha = 0.1f)
                 },
                 shape = RoundedCornerShape(10.dp)
             ) {
@@ -294,7 +296,7 @@ private fun AttendeeItem(attendee: Attendee) {
                     color = when(attendee.status) {
                         AttendanceStatus.PRESENT -> MaterialTheme.colorScheme.secondary
                         AttendanceStatus.ABSENT -> MaterialTheme.colorScheme.error
-                        AttendanceStatus.LATE -> Color(0xFFCA8A04) // Darker amber
+                        AttendanceStatus.LATE -> StatusColors.warningStrong // Darker amber
                     }
                 )
             }

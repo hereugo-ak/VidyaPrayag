@@ -17,7 +17,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.presentation.BrandingInfoOBViewModel
 import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
 import com.littlebridge.vidyaprayag.navigation.Destination
@@ -167,7 +166,7 @@ private fun CoverPhotoSection(imageUrl: String?, isUploading: Boolean, onUploadC
             contentAlignment = Alignment.Center
         ) {
             if (imageUrl != null) {
-                AsyncImage(
+                NetworkImage(
                     model = imageUrl,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
@@ -204,7 +203,7 @@ private fun LogoSection(logoUrl: String?, isUploading: Boolean, onUploadClick: (
             contentAlignment = Alignment.Center
         ) {
             if (logoUrl != null) {
-                AsyncImage(
+                NetworkImage(
                     model = logoUrl,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize().padding(16.dp),
