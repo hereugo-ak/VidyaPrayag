@@ -143,7 +143,16 @@ Built in small batches (~3 files); each batch → commit + push + PR update + th
 | `ui/v2/screens/teacher/TeacherProfileScreenV2.kt` | `TeacherProfileViewModel` | Identity card, subject/class chips (`FlowRow`), contact rows, sign-out. |
 
 - [x] `ui/v2/teacher/` (part 1) — Home / MyClasses / Profile bound to teacher VMs.
-- [ ] `ui/v2/teacher/` (part 2) — Update sub-tabs: Attendance·Marks·Syllabus·Homework.
+
+### Batch 3B-2 — teacher Update sub-tabs (Attendance / Marks / Syllabus) ✅
+| File | VM bound | Contents |
+|---|---|---|
+| `ui/v2/screens/teacher/TeacherAttendanceScreenV2.kt` | `TeacherAttendanceViewModel` | `load(classId,date)`; per-student P/A/L `VTag` toggles, "Mark all present", live present/absent/late tallies, immutable submit. |
+| `ui/v2/screens/teacher/TeacherMarksScreenV2.kt` | `TeacherMarksViewModel` | `load(classId,examId)`; per-student `VInput` score (VM clamps 0..maxMarks), entered/total counter, submit (enabled when ≥1 entered). |
+| `ui/v2/screens/teacher/TeacherSyllabusScreenV2.kt` | `TeacherSyllabusViewModel` | `load(classId,subject)`; `VProgressRing` coverage + unit list with optimistic `toggleUnit` (disabled while `updatingUnitId`). |
+
+- [x] `ui/v2/teacher/` (part 2a) — Attendance · Marks · Syllabus.
+- [ ] `ui/v2/teacher/` (part 2b) — Homework (create + list).
 - [ ] `ui/v2/parent/` — Parent dashboard, fees, attendance, marks, announcements, notifications.
 - [ ] `ui/v2/school/` (admin) — School dashboard + admin verticals.
 - [ ] `ui/v2/discovery/` — Discovery schools.
