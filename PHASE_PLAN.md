@@ -187,8 +187,15 @@ Built in small batches (~3 files); each batch → commit + push + PR update + th
 
 - [x] `ui/v2/school/` (admin) part 1 — Home / Comms.
 - [x] `ui/v2/discovery/` — Discovery school list (SRI/reviews/compare = G11 COMING SOON).
-- [ ] `ui/v2/school/` (admin) part 2 — People / Records / Settings + 5-tab portal shell.
-- [ ] `ui/v2/discovery/` — Discovery schools.
+
+### Batch 3D-2 — admin People / Records ✅
+| File | VM bound | Contents |
+|---|---|---|
+| `ui/v2/screens/school/SchoolPeopleScreenV2.kt` | `StudentAnalyticsViewModel` | Retention-risk counts (Critical/Medium/Low cards), at-risk student list (`VAvatar` + risk badge), subject-engagement `VProgressBar`s. Teacher roster = G1 `VComingSoon`. |
+| `ui/v2/screens/school/SchoolRecordsScreenV2.kt` | `SyllabusCoverageViewModel` | Overall coverage % + bar, per-department progress, lagging alerts (`VStatusDot` + delay badge), academic-milestone rows. Attendance/marks (G3/G4) not fabricated. |
+
+- [x] `ui/v2/school/` (admin) part 2a — People / Records.
+- [ ] `ui/v2/school/` (admin) part 2b — Settings + 5-tab portal shell.
 - [ ] `ui/v2/navigation/NavGraphV2.kt` — new `Destination` set incl. TEACHER start destination.
 - [ ] **Swap `App.kt`** to drive `ui/v2/` (`VTheme` + `NavGraphV2`); add the TEACHER role branch in start-destination logic.
 - [ ] **Run the real Gradle build** (the deferred Phase 1 item) — must pass before deletion.
