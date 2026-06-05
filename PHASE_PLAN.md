@@ -160,8 +160,16 @@ Built in small batches (~3 files); each batch → commit + push + PR update + th
 | `ui/v2/screens/teacher/TeacherPortalV2.kt` | — (shell) | 4-tab `VBottomNav` (Home·Update·Classes·Profile) + inner `VTopTabs` for the Update sub-tabs; each leaf is a `*ScreenV2` that `koinViewModel()`s its own VM. |
 
 - [x] `ui/v2/teacher/` — **complete** (Home / Classes / Profile / Update[Attendance·Marks·Syllabus·Homework] + portal shell). 8 files, all bound to the 7 teacher VMs.
-- [ ] `ui/v2/parent/` — Parent dashboard, fees, academics, activity.
-- [ ] `ui/v2/parent/` — Parent dashboard, fees, attendance, marks, announcements, notifications.
+
+### Batch 3C-1 — parent Home / Fees / Academics ✅
+| File | VM bound | Contents |
+|---|---|---|
+| `ui/v2/screens/parent/ParentHomeScreenV2.kt` | `ParentDashboardViewModel` | Child hero (`userDetails` → name/photo), today's-glance status strip, quick actions, shortlisted-schools list (`schools`+`shortlist`, Discovery cross-link). |
+| `ui/v2/screens/parent/ParentFeesScreenV2.kt` | `FeeViewModel` | Outstanding/collected summary + collection `VProgressBar`, overdue counter, fee-announcements feed; all monetary strings pre-formatted by the VM. |
+| `ui/v2/screens/parent/ParentAcademicsScreenV2.kt` | `TrackProgressViewModel` | Journey hero (`VProgressRing` + level), achievement badges (`FlowRow`), per-competency `VProgressBar`s, emotional-intelligence meters. |
+
+- [x] `ui/v2/parent/` (part 1) — Home / Fees / Academics bound to parent VMs.
+- [ ] `ui/v2/parent/` (part 2) — Activity (announcements) + 4-tab parent portal shell.
 - [ ] `ui/v2/school/` (admin) — School dashboard + admin verticals.
 - [ ] `ui/v2/discovery/` — Discovery schools.
 - [ ] `ui/v2/navigation/NavGraphV2.kt` — new `Destination` set incl. TEACHER start destination.
