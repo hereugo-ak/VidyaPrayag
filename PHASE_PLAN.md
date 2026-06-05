@@ -134,8 +134,17 @@ Built in small batches (~3 files); each batch → commit + push + PR update + th
 | `ui/v2/screens/auth/LoginScreenV2.kt` | Portal selector + identifier/password/OTP, **re-bound 1:1 to existing `AuthViewModel`**. Teacher portal shown as disabled "COMING SOON" chip until backend teacher-auth ships (G1) — never wires a missing route. |
 
 - [x] `ui/v2/auth/` — Welcome + Login (portal selector, phone/email→OTP/password) bound to `AuthViewModel`.
+
+### Batch 3B-1 — teacher Home / Classes / Profile ✅
+| File | VM bound | Contents |
+|---|---|---|
+| `ui/v2/screens/teacher/TeacherHomeScreenV2.kt` | `TeacherHomeViewModel` | Today's glance (4 stat cards) + period timeline + task list; empty states via `VEmptyState`. |
+| `ui/v2/screens/teacher/TeacherClassesScreenV2.kt` | `TeacherClassesViewModel` | Assigned-class cards: subject/headcount, syllabus + attendance `VProgressBar`, class-teacher badge, tap → `onOpenClass(id)`. |
+| `ui/v2/screens/teacher/TeacherProfileScreenV2.kt` | `TeacherProfileViewModel` | Identity card, subject/class chips (`FlowRow`), contact rows, sign-out. |
+
+- [x] `ui/v2/teacher/` (part 1) — Home / MyClasses / Profile bound to teacher VMs.
+- [ ] `ui/v2/teacher/` (part 2) — Update sub-tabs: Attendance·Marks·Syllabus·Homework.
 - [ ] `ui/v2/parent/` — Parent dashboard, fees, attendance, marks, announcements, notifications.
-- [ ] `ui/v2/teacher/` — Home / Update (Attendance·Marks·Syllabus·Homework sub-tabs) / MyClasses / Profile (from `Teacher.tsx`).
 - [ ] `ui/v2/school/` (admin) — School dashboard + admin verticals.
 - [ ] `ui/v2/discovery/` — Discovery schools.
 - [ ] `ui/v2/navigation/NavGraphV2.kt` — new `Destination` set incl. TEACHER start destination.
