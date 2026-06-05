@@ -7,6 +7,26 @@
 
 ---
 
+## 📊 Executive status — done so far vs. what's left
+
+> Snapshot maintained at the end of every batch. Master plan: `UI screens/VIDYASETU_MASTER_REBUILD_DOC.md`.
+
+**✅ DONE**
+- **Master doc** `VIDYASETU_MASTER_REBUILD_DOC.md` authored (Steps 1–6 + 9 ground truth; decision locked: keep `shared/`, rebuild `composeApp/ui` in parallel `ui/v2/`, add `feature/teacher`, stay Compose MP).
+- **Phase 1 — Design system** (`ui/v2/theme/` + `ui/v2/components/`): 4 theme token files + 12 component files (~30 `V*` composables: cards, buttons, inputs, badges, avatar, logo, progress, icons, navigation, structure, charts). Tokens lifted verbatim from `theme.css`.
+- **Phase 2 — Teacher data layer** (`shared/feature/teacher/`): models + Ktor API + repository + **all 7 ViewModels** (Home, Classes, Attendance, Marks, Syllabus, Homework, Profile), now **registered in `di/Koin.kt`**. Mirrors the parent/admin clean-architecture pattern. `shared/` otherwise untouched.
+
+**🔄 IN PROGRESS / NEXT**
+- **Phase 3 — Screens + entrypoint swap**: compose `ui/v2/screens/{auth,parent,teacher,school,discovery}` from Phase-1 primitives, re-binding to existing `shared/` ViewModels; new portal-aware nav graph (Admin 5-tab, Teacher 4-tab, Parent 4-tab, Discovery); flip `App.kt` to `ui/v2` + add TEACHER start-destination; then delete old `ui/`.
+
+**⏳ LATER**
+- **Phase 4 — Polish**: bundle Plus Jakarta Sans + DM Mono, night-tone QA, per-target smoke (android/jvm/wasmJs).
+- **Backend pass (deferred)**: Ktor `feature/teacher` routes + schema migrations (master doc Step 7, gaps G1–G10). Until live, ❌-route screens render `VComingSoon` — never fake data.
+
+**🚧 BUILD CONSTRAINT (carried):** sandbox RAM (~985 MB) OOMs a full Compose-MPP Gradle build at *configuration*. Phases verified by rigorous static type-review against the repo's already-compiling API surface; **a real `:composeApp` compile on a ≥8 GB host is owed before the Phase 3 entrypoint swap** (tracked in Phase 1/3).
+
+---
+
 ## Guiding rules (unchanged across all phases)
 
 1. **`shared/` is untouchable.** All APIs, repos, ViewModels and Koin DI stay exactly as-is. Phase 2 only *adds* a teacher vertical; it never rewrites existing wiring.
@@ -69,11 +89,11 @@ The Genspark sandbox has **~985 MB total RAM (~330 MB free)**. The project's `gr
 
 ---
 
-## PHASE 2 — Teacher vertical in `shared/` (🔄 in progress)
+## PHASE 2 — Teacher vertical in `shared/` ✅ (data layer complete)
 
 **Goal:** Add the entirely-missing teacher domain (gap **G1** in the master doc) to the data layer, mirroring the existing parent/admin verticals. **No UI yet.**
 
-### Delivered so far (Batch 2a — committed)
+### Delivered (Batches 2a → 2c — committed)
 All under `shared/src/commonMain/kotlin/com/littlebridge/vidyaprayag/feature/teacher/`:
 
 | File | Layer | Contents |
@@ -85,15 +105,19 @@ All under `shared/src/commonMain/kotlin/com/littlebridge/vidyaprayag/feature/tea
 | `presentation/TeacherHomeViewModel.kt` | presentation | Home dashboard VM — state + StateFlow, `init{load()}`, `getUserToken().first()`, `when(NetworkResult)`, `toUi()` mappers. |
 | `presentation/TeacherClassesViewModel.kt` | presentation | My-classes list VM. |
 | `presentation/TeacherAttendanceViewModel.kt` | presentation | Roster load (classId+date) + local status edits + `submit()` → `submitAttendance`. Derived present/absent/late counts. |
+| `presentation/TeacherMarksViewModel.kt` | presentation | `load(classId,examId)`; local mark edits clamped to `[0,maxMarks]`; `submit()` filters null marks → `submitMarks`; derived `enteredCount`/`allEntered`. |
+| `presentation/TeacherSyllabusViewModel.kt` | presentation | `load(classId,subject)`; optimistic `toggleUnit()` → `updateSyllabus` with revert-on-failure + progress recompute. |
+| `presentation/TeacherHomeworkViewModel.kt` | presentation | `init{load()}`, `create()` then reload; one-shot `createSuccess` flag + `consumeCreateSuccess()`. |
+| `presentation/TeacherProfileViewModel.kt` | presentation | `init{load()}` → `getProfile`; maps `TeacherProfileData` → `TeacherProfile` UI model (subjects/classes/photo/email/phone). |
 
-### Remaining in Phase 2
-- [ ] `presentation/TeacherMarksViewModel.kt` — `getMarks(classId,examId)`, local mark edits (clamped 0..maxMarks), `submit()` → `submitMarks`.
-- [ ] `presentation/TeacherSyllabusViewModel.kt` — `getSyllabus(classId,subject)`, toggle unit → `updateSyllabus`.
-- [ ] `presentation/TeacherHomeworkViewModel.kt` — `getHomework`, `createHomework`.
-- [ ] `presentation/TeacherProfileViewModel.kt` — `getProfile`.
-- [ ] Register `TeacherApi` + `TeacherRepository` + 7 VM factories in `di/Koin.kt` (additive only).
-- [ ] Backend (Ktor) teacher routes — author/document the matching `server/.../feature/teacher` endpoints (master doc G1; the legacy plan wrongly assumed FastAPI — this is **Ktor**).
-- [ ] `MainViewModel` already role-agnostic (`AuthState{role,token,isLoaded}`) — no change needed; the `TEACHER` branch is added in `App.kt` start-destination logic in Phase 3.
+### Phase 2 status
+- [x] `domain/model/TeacherModels.kt`, `data/remote/TeacherApi.kt`, `domain/repository/TeacherRepository.kt`, `data/repository/TeacherRepositoryImpl.kt`.
+- [x] All **7** teacher ViewModels authored (Home, Classes, Attendance, Marks, Syllabus, Homework, Profile) — all follow the `StateFlow` + `init{load()}` + `getUserToken().first()` + `when(NetworkResult)` + `toUi()` pattern, constructor `(TeacherRepository, PreferenceRepository)`.
+- [x] **Registered in `di/Koin.kt`** (additive only): `TeacherApi` `single`, `TeacherRepository` binding, and 7 VM `factory{}` entries. `PreferenceRepository` confirmed provided by every `platformModule()`.
+- [x] `MainViewModel` already role-agnostic (`AuthState{role,token,isLoaded}`) — no change needed; the `TEACHER` start-destination branch is added in `App.kt` in Phase 3.
+
+### Remaining in Phase 2 (deferred to a backend pass — not blocking UI)
+- [ ] Backend (Ktor) teacher routes — author the matching `server/.../feature/teacher` endpoints (master doc G1; the legacy plan wrongly assumed FastAPI — this is **Ktor**) + schema migrations (`teachers`, `teacher_assignments`, `attendance`, `assessments`+`marks`, `syllabus_log`, `homework`). Until live, teacher screens render `VComingSoon`/empty per the hard UI rule.
 
 ---
 
@@ -119,8 +143,8 @@ All under `shared/src/commonMain/kotlin/com/littlebridge/vidyaprayag/feature/tea
 
 ---
 
-## Quick reference — what changed in THIS batch
-- **Added:** 12 files under `ui/v2/components/` (all `V*` primitives, nav, structure, charts, icons).
-- **Verified:** 4 theme files (`ui/v2/theme/`).
-- **Added:** this `PHASE_PLAN.md`.
-- **Untouched:** `shared/`, old `ui/`, `App.kt`, `NavGraph.kt`, `build.gradle.kts`, `gradle.properties`.
+## Quick reference — what changed in THIS batch (Phase 2 completion)
+- **Added:** `shared/feature/teacher/presentation/TeacherProfileViewModel.kt` (7th and final teacher VM).
+- **Edited:** `shared/di/Koin.kt` — registered `TeacherApi` (`single`), `TeacherRepository` binding, and all 7 teacher VM factories. **Additive only**; no existing wiring touched.
+- **Updated:** this `PHASE_PLAN.md` — Phase 2 marked ✅ (data layer complete), executive status block added.
+- **Untouched:** old `ui/`, `App.kt`, `NavGraph.kt`, `build.gradle.kts`, `gradle.properties`, every existing API/repo/VM.

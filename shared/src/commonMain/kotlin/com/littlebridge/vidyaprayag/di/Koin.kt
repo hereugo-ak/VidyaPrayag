@@ -163,6 +163,13 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    // Teacher vertical (master doc G1)
+    single {
+        com.littlebridge.vidyaprayag.feature.teacher.data.remote.TeacherApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
 
     // Repositories
     single<SchoolRepository> { SchoolRepositoryImpl(get(), get()) }
@@ -208,6 +215,9 @@ val commonModule = module {
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.UserProfileRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.UserProfileRepositoryImpl(get())
     }
+    single<com.littlebridge.vidyaprayag.feature.teacher.domain.repository.TeacherRepository> {
+        com.littlebridge.vidyaprayag.feature.teacher.data.repository.TeacherRepositoryImpl(get())
+    }
 
     // UseCases
     factory { GetSchoolsUseCase(get()) }
@@ -249,6 +259,14 @@ val viewModelModule = module {
     factory { ResultsViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.content.presentation.LandingViewModel(get()) }
     factory { com.littlebridge.vidyaprayag.feature.auth.presentation.AuthViewModel(get()) }
+    // Teacher vertical (master doc G1) — 7 VMs, all (TeacherRepository, PreferenceRepository)
+    factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherHomeViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClassesViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherAttendanceViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherMarksViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherSyllabusViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherHomeworkViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherProfileViewModel(get(), get()) }
 }
 
 fun initKoin(
