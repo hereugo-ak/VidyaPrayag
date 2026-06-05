@@ -69,15 +69,31 @@ The Genspark sandbox has **~985 MB total RAM (~330 MB free)**. The project's `gr
 
 ---
 
-## PHASE 2 — Teacher vertical in `shared/` (next batch)
+## PHASE 2 — Teacher vertical in `shared/` (🔄 in progress)
 
-**Goal:** Add the entirely-missing teacher domain to the data layer, mirroring the existing parent/admin verticals. **No UI yet.**
+**Goal:** Add the entirely-missing teacher domain (gap **G1** in the master doc) to the data layer, mirroring the existing parent/admin verticals. **No UI yet.**
 
-- [ ] `shared/.../feature/teacher/` — `TeacherRepository` (+ Ktor route calls), DTOs for: my-classes, period timetable, attendance marking, marks entry, syllabus progress, homework.
-- [ ] Teacher ViewModels: `TeacherHomeViewModel`, `TeacherClassesViewModel`, `TeacherAttendanceViewModel`, `TeacherMarksViewModel`, `TeacherSyllabusViewModel`, `TeacherHomeworkViewModel`, `TeacherProfileViewModel`.
-- [ ] Register all teacher VMs in `di/Koin.kt` `viewModelModule` as `factory { … }` (additive only).
-- [ ] Backend (Ktor) teacher routes — author/confirm the matching server endpoints (the legacy plan wrongly assumed FastAPI; this is **Ktor**).
-- [ ] Extend `MainViewModel` auth role handling to recognize `TEACHER` (additive; ADMIN/PARENT untouched).
+### Delivered so far (Batch 2a — committed)
+All under `shared/src/commonMain/kotlin/com/littlebridge/vidyaprayag/feature/teacher/`:
+
+| File | Layer | Contents |
+|---|---|---|
+| `domain/model/TeacherModels.kt` | domain | All teacher DTOs — home glance + today's periods/tasks, my-classes, attendance roster + submit, marks entry + submit, syllabus units + update, homework list + create, profile. `@Serializable`/`@SerialName` snake_case; read envelopes `{success,data}`; writes → `ApiResponse<Unit>`. |
+| `data/remote/TeacherApi.kt` | data | Ktor client — 7 reads (`home`,`classes`,`attendance`,`marks`,`syllabus`,`homework`,`profile`) + 4 writes (`submitAttendance`,`submitMarks`,`updateSyllabus`,`createHomework`). Bearer auth, `safeApiCall`, routes `api/v1/teacher/*`. |
+| `domain/repository/TeacherRepository.kt` | domain | Interface — 7 read + 4 write suspend fns. |
+| `data/repository/TeacherRepositoryImpl.kt` | data | Delegates to `TeacherApi`. |
+| `presentation/TeacherHomeViewModel.kt` | presentation | Home dashboard VM — state + StateFlow, `init{load()}`, `getUserToken().first()`, `when(NetworkResult)`, `toUi()` mappers. |
+| `presentation/TeacherClassesViewModel.kt` | presentation | My-classes list VM. |
+| `presentation/TeacherAttendanceViewModel.kt` | presentation | Roster load (classId+date) + local status edits + `submit()` → `submitAttendance`. Derived present/absent/late counts. |
+
+### Remaining in Phase 2
+- [ ] `presentation/TeacherMarksViewModel.kt` — `getMarks(classId,examId)`, local mark edits (clamped 0..maxMarks), `submit()` → `submitMarks`.
+- [ ] `presentation/TeacherSyllabusViewModel.kt` — `getSyllabus(classId,subject)`, toggle unit → `updateSyllabus`.
+- [ ] `presentation/TeacherHomeworkViewModel.kt` — `getHomework`, `createHomework`.
+- [ ] `presentation/TeacherProfileViewModel.kt` — `getProfile`.
+- [ ] Register `TeacherApi` + `TeacherRepository` + 7 VM factories in `di/Koin.kt` (additive only).
+- [ ] Backend (Ktor) teacher routes — author/document the matching `server/.../feature/teacher` endpoints (master doc G1; the legacy plan wrongly assumed FastAPI — this is **Ktor**).
+- [ ] `MainViewModel` already role-agnostic (`AuthState{role,token,isLoaded}`) — no change needed; the `TEACHER` branch is added in `App.kt` start-destination logic in Phase 3.
 
 ---
 
