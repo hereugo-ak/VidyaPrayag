@@ -177,7 +177,17 @@ Built in small batches (~3 files); each batch → commit + push + PR update + th
 | `ui/v2/screens/parent/ParentPortalV2.kt` | — (shell) | 4-tab `VBottomNav` (Home·Academics·Fees·Activity); each leaf `koinViewModel()`s its own VM; `tone = Light` (lavender) via host `VTheme`. |
 
 - [x] `ui/v2/parent/` — **complete** (Home / Academics / Fees / Activity + portal shell). 5 files, bound to `ParentDashboard`/`Fee`/`TrackProgress`/`ParentAnnouncement` VMs.
-- [ ] `ui/v2/school/` (admin) — School dashboard + admin verticals.
+
+### Batch 3D-1 — admin Home / Comms + Discovery ✅
+| File | VM bound | Contents |
+|---|---|---|
+| `ui/v2/screens/school/SchoolHomeScreenV2.kt` | `SchoolDashboardViewModel` + `AnalyticsDashboardViewModel` | Setup-progress `VProgressBar` + onboarding step list (status dot/badge), analytics cards grid, performance `VSparkline`. |
+| `ui/v2/screens/school/SchoolCommsScreenV2.kt` | `SchoolAnnouncementsViewModel` | Announcement list + category filter chips (`setCategoryFilter`); messaging/PTM (G7/G8) left for `VComingSoon`. |
+| `ui/v2/screens/discovery/DiscoveryScreenV2.kt` | `ParentDashboardViewModel` (wraps `GetSchoolsUseCase`) | School marketplace: search + board filter, school cards (verified/SRI badges), shortlist toggle (max-3 enforced in VM), `onOpenSchool` hook. |
+
+- [x] `ui/v2/school/` (admin) part 1 — Home / Comms.
+- [x] `ui/v2/discovery/` — Discovery school list (SRI/reviews/compare = G11 COMING SOON).
+- [ ] `ui/v2/school/` (admin) part 2 — People / Records / Settings + 5-tab portal shell.
 - [ ] `ui/v2/discovery/` — Discovery schools.
 - [ ] `ui/v2/navigation/NavGraphV2.kt` — new `Destination` set incl. TEACHER start destination.
 - [ ] **Swap `App.kt`** to drive `ui/v2/` (`VTheme` + `NavGraphV2`); add the TEACHER role branch in start-destination logic.
