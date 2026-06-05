@@ -152,7 +152,15 @@ Built in small batches (~3 files); each batch → commit + push + PR update + th
 | `ui/v2/screens/teacher/TeacherSyllabusScreenV2.kt` | `TeacherSyllabusViewModel` | `load(classId,subject)`; `VProgressRing` coverage + unit list with optimistic `toggleUnit` (disabled while `updatingUnitId`). |
 
 - [x] `ui/v2/teacher/` (part 2a) — Attendance · Marks · Syllabus.
-- [ ] `ui/v2/teacher/` (part 2b) — Homework (create + list).
+
+### Batch 3B-3 — teacher Homework + portal shell ✅ (Teacher portal complete)
+| File | VM bound | Contents |
+|---|---|---|
+| `ui/v2/screens/teacher/TeacherHomeworkScreenV2.kt` | `TeacherHomeworkViewModel` | "Assign new" composer (class/title/desc/due) → `create()`; one-shot `createSuccess` clears the form; assigned-list cards with submission-ratio `VProgressBar`. |
+| `ui/v2/screens/teacher/TeacherPortalV2.kt` | — (shell) | 4-tab `VBottomNav` (Home·Update·Classes·Profile) + inner `VTopTabs` for the Update sub-tabs; each leaf is a `*ScreenV2` that `koinViewModel()`s its own VM. |
+
+- [x] `ui/v2/teacher/` — **complete** (Home / Classes / Profile / Update[Attendance·Marks·Syllabus·Homework] + portal shell). 8 files, all bound to the 7 teacher VMs.
+- [ ] `ui/v2/parent/` — Parent dashboard, fees, academics, activity.
 - [ ] `ui/v2/parent/` — Parent dashboard, fees, attendance, marks, announcements, notifications.
 - [ ] `ui/v2/school/` (admin) — School dashboard + admin verticals.
 - [ ] `ui/v2/discovery/` — Discovery schools.
