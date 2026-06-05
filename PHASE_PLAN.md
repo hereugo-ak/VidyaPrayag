@@ -195,7 +195,17 @@ Built in small batches (~3 files); each batch → commit + push + PR update + th
 | `ui/v2/screens/school/SchoolRecordsScreenV2.kt` | `SyllabusCoverageViewModel` | Overall coverage % + bar, per-department progress, lagging alerts (`VStatusDot` + delay badge), academic-milestone rows. Attendance/marks (G3/G4) not fabricated. |
 
 - [x] `ui/v2/school/` (admin) part 2a — People / Records.
-- [ ] `ui/v2/school/` (admin) part 2b — Settings + 5-tab portal shell.
+
+### Batch 3D-3 — admin Settings + 5-tab portal shell ✅ (Admin portal complete)
+| File | VM bound | Contents |
+|---|---|---|
+| `ui/v2/screens/school/SchoolSettingsScreenV2.kt` | `InstitutionalProfileViewModel` | Identity card, public-listing `Switch` (`togglePublic`), profile-completion + storage `VProgressBar`s, sign-out (`VButton` Destructive). |
+| `ui/v2/screens/school/SchoolPortalV2.kt` | — (shell) | 5-tab `VBottomNav` (Home·People·Records·Comms·Settings); each leaf `koinViewModel()`s its own VM; `tone = Warm` via host `VTheme`. |
+
+- [x] `ui/v2/school/` (admin) — **complete** (Home / People / Records / Comms / Settings + 5-tab shell). 6 files, bound to `SchoolDashboard`/`Analytics`/`StudentAnalytics`/`SyllabusCoverage`/`SchoolAnnouncements`/`InstitutionalProfile` VMs.
+- [x] `ui/v2/discovery/` — Discovery school list (SRI/reviews/compare = G11 COMING SOON).
+
+### Phase 3E — NavGraphV2 + entrypoint swap (next)
 - [ ] `ui/v2/navigation/NavGraphV2.kt` — new `Destination` set incl. TEACHER start destination.
 - [ ] **Swap `App.kt`** to drive `ui/v2/` (`VTheme` + `NavGraphV2`); add the TEACHER role branch in start-destination logic.
 - [ ] **Run the real Gradle build** (the deferred Phase 1 item) — must pass before deletion.
