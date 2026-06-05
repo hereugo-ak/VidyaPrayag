@@ -205,8 +205,15 @@ Built in small batches (~3 files); each batch → commit + push + PR update + th
 - [x] `ui/v2/school/` (admin) — **complete** (Home / People / Records / Comms / Settings + 5-tab shell). 6 files, bound to `SchoolDashboard`/`Analytics`/`StudentAnalytics`/`SyllabusCoverage`/`SchoolAnnouncements`/`InstitutionalProfile` VMs.
 - [x] `ui/v2/discovery/` — Discovery school list (SRI/reviews/compare = G11 COMING SOON).
 
-### Phase 3E — NavGraphV2 + entrypoint swap (next)
-- [ ] `ui/v2/navigation/NavGraphV2.kt` — new `Destination` set incl. TEACHER start destination.
+### Phase 3E — NavGraphV2 + entrypoint swap (in progress)
+
+#### Batch 3E-1 — portal-aware NavGraphV2 ✅
+| File | Contents |
+|---|---|
+| `ui/v2/navigation/NavGraphV2.kt` | Role-driven root (Compose translation of `App.tsx`'s screen graph). Picks portal by `authState.role` and applies the right `VPortalTone` — PARENT/Discovery = `Light`, TEACHER/ADMIN = `Warm`. Unauth flow = Welcome → Login → Discovery (browse-first) via `AnimatedContent`. Each portal owns its own tabbed nav (`*PortalV2`); on auth success the host `MainViewModel.authState` flips and the graph recomposes into the role portal. |
+
+- [x] `ui/v2/navigation/NavGraphV2.kt` — portal-aware root (TEACHER branch included; no flat 35-route graph).
+- [ ] **Swap `App.kt`** to drive `ui/v2/` (`VTheme` via `NavGraphV2`); wire `MainViewModel.authState` (incl. TEACHER role) + `logout()`.
 - [ ] **Swap `App.kt`** to drive `ui/v2/` (`VTheme` + `NavGraphV2`); add the TEACHER role branch in start-destination logic.
 - [ ] **Run the real Gradle build** (the deferred Phase 1 item) — must pass before deletion.
 - [ ] **Delete old `ui/`** once parity confirmed and build is green.
