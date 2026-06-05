@@ -121,11 +121,19 @@ All under `shared/src/commonMain/kotlin/com/littlebridge/vidyaprayag/feature/tea
 
 ---
 
-## PHASE 3 — Portal screens in `ui/v2/` + entrypoint swap
+## PHASE 3 — Portal screens in `ui/v2/` + entrypoint swap (🔄 in progress)
 
 **Goal:** Compose the actual screens from Phase 1 primitives, per portal, then flip the app over.
+Built in small batches (~3 files); each batch → commit + push + PR update + this ledger refreshed.
 
-- [ ] `ui/v2/auth/` — Landing + AuthBottomSheet (phone/OTP, multi-provider) using `VInput`/`VButton`.
+### Batch 3A — auth + shared scaffolding ✅
+| File | Contents |
+|---|---|
+| `ui/v2/screens/Shared.kt` | `collectAsStateV2()` (terse `StateFlow` collector), `VSectionHeader`, `VPortalHeader` (avatar + name + subtitle) — shared screen vocabulary. |
+| `ui/v2/screens/auth/WelcomeScreenV2.kt` | Splash/welcome from `Auth.tsx → Splash`: teal hero (logo + wordmark + tagline) + lifted lavender CTA sheet (Get started / I already have an account). Pure `V*` composition. |
+| `ui/v2/screens/auth/LoginScreenV2.kt` | Portal selector + identifier/password/OTP, **re-bound 1:1 to existing `AuthViewModel`**. Teacher portal shown as disabled "COMING SOON" chip until backend teacher-auth ships (G1) — never wires a missing route. |
+
+- [x] `ui/v2/auth/` — Welcome + Login (portal selector, phone/email→OTP/password) bound to `AuthViewModel`.
 - [ ] `ui/v2/parent/` — Parent dashboard, fees, attendance, marks, announcements, notifications.
 - [ ] `ui/v2/teacher/` — Home / Update (Attendance·Marks·Syllabus·Homework sub-tabs) / MyClasses / Profile (from `Teacher.tsx`).
 - [ ] `ui/v2/school/` (admin) — School dashboard + admin verticals.
