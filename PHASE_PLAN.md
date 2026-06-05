@@ -169,7 +169,14 @@ Built in small batches (~3 files); each batch → commit + push + PR update + th
 | `ui/v2/screens/parent/ParentAcademicsScreenV2.kt` | `TrackProgressViewModel` | Journey hero (`VProgressRing` + level), achievement badges (`FlowRow`), per-competency `VProgressBar`s, emotional-intelligence meters. |
 
 - [x] `ui/v2/parent/` (part 1) — Home / Fees / Academics bound to parent VMs.
-- [ ] `ui/v2/parent/` (part 2) — Activity (announcements) + 4-tab parent portal shell.
+
+### Batch 3C-2 — parent Activity + portal shell ✅ (Parent portal complete)
+| File | VM bound | Contents |
+|---|---|---|
+| `ui/v2/screens/parent/ParentActivityScreenV2.kt` | `ParentAnnouncementViewModel` | School-announcements feed (featured-first), category badges, WhatsApp-sync `Switch` (`toggleWhatsAppSync`). Messaging (G7) intentionally not wired. |
+| `ui/v2/screens/parent/ParentPortalV2.kt` | — (shell) | 4-tab `VBottomNav` (Home·Academics·Fees·Activity); each leaf `koinViewModel()`s its own VM; `tone = Light` (lavender) via host `VTheme`. |
+
+- [x] `ui/v2/parent/` — **complete** (Home / Academics / Fees / Activity + portal shell). 5 files, bound to `ParentDashboard`/`Fee`/`TrackProgress`/`ParentAnnouncement` VMs.
 - [ ] `ui/v2/school/` (admin) — School dashboard + admin verticals.
 - [ ] `ui/v2/discovery/` — Discovery schools.
 - [ ] `ui/v2/navigation/NavGraphV2.kt` — new `Destination` set incl. TEACHER start destination.
