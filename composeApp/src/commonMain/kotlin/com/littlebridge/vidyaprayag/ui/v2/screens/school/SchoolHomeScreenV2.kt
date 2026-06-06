@@ -92,7 +92,8 @@ fun SchoolHomeScreenV2(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(VIcons.Bell, contentDescription = "Notifications", tint = c.ink, modifier = Modifier.size(18.dp))
-                    Box(Modifier.align(Alignment.TopEnd).padding(8.dp).size(6.dp).clip(CircleShape).background(c.dangerInk))
+                    // §7.1#14 React unread dot = var(--danger) (soft #FFADA8), not the dark danger-ink (Admin.tsx:65).
+                    Box(Modifier.align(Alignment.TopEnd).padding(8.dp).size(6.dp).clip(CircleShape).background(c.danger))
                 }
                 Box(Modifier.clickable { onExit() }) { VAvatar(name = "Admin Office", size = 36.dp) }
             }
@@ -125,10 +126,14 @@ fun SchoolHomeScreenV2(
             MockV2.classAttendanceGrid.chunked(3).forEach { rowCells ->
                 Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     rowCells.forEach { (cls, pct) ->
+                        // §7.1#6 React exact literals (Admin.tsx:92-93):
+                        //   ≥80 bg rgba(200,222,255,0.30) / fg #0a3a76 (DEEP blue, not light #7FB0FF)
+                        //   60–79 bg rgba(255,212,163,0.45) / fg #7a3f00
+                        //   <60   bg rgba(255,173,168,0.45) / fg #7a1c18
                         val (bg, fg) = when {
-                            pct >= 80 -> Color(0xFFC8DEFF).copy(alpha = 0.30f) to Color(0xFF7FB0FF)
-                            pct >= 60 -> c.warning.copy(alpha = 0.45f) to c.warningInk
-                            else -> c.danger.copy(alpha = 0.45f) to c.dangerInk
+                            pct >= 80 -> Color(0xFFC8DEFF).copy(alpha = 0.30f) to Color(0xFF0A3A76)
+                            pct >= 60 -> c.warning.copy(alpha = 0.45f) to Color(0xFF7A3F00)
+                            else -> c.danger.copy(alpha = 0.45f) to Color(0xFF7A1C18)
                         }
                         Column(
                             Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(bg).padding(12.dp),
@@ -146,7 +151,8 @@ fun SchoolHomeScreenV2(
         VCard {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Syllabus coverage", style = VTheme.type.h3.colored(c.ink))
-                Text("Full report", style = VTheme.type.caption.colored(c.teal))
+                // §7.1 React var(--arctic) → in .warm scope = #006a60 (teal-deep) (Admin.tsx:108).
+                Text("Full report", style = VTheme.type.caption.colored(c.tealDeep))
             }
             Spacer(Modifier.height(12.dp))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -212,9 +218,11 @@ fun SchoolHomeScreenV2(
         // ── PEWS — early-warning radar ───────────────────────────────────────────
         Column {
             Text("Early-warning radar", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
+            // §7.1#11 React passes preview={<PEWSPreview/>} (Admin.tsx:168) — wire the rich mockup.
             VComingSoon(
                 title = "PEWS — Predictive Early Warning",
                 description = "Combines attendance, marks, fee status and behavioural signals to surface at-risk students before exam season.",
+                preview = { PewsPreview() },
             )
         }
 
@@ -283,8 +291,10 @@ private fun GlanceCard(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.clickable { onCta() },
         ) {
-            Text(cta, style = VTheme.type.caption.colored(c.teal).copy(fontWeight = FontWeight.SemiBold))
-            Icon(VIcons.ChevronRight, contentDescription = null, tint = c.teal, modifier = Modifier.size(14.dp))
+            // §7.1#3 React GlanceCard CTA: "{cta} <ChevronRight size={14}/>" with var(--arctic)
+            // (= teal-deep in .warm). The chevron IS present in Admin.tsx:210 (keep it). (Admin.tsx:210)
+            Text(cta, style = VTheme.type.caption.colored(c.tealDeep).copy(fontWeight = FontWeight.SemiBold))
+            Icon(VIcons.ChevronRight, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(14.dp))
         }
     }
 }
