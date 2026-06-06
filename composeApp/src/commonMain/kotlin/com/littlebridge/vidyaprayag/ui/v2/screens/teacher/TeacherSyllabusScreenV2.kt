@@ -20,6 +20,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
@@ -74,9 +78,17 @@ fun TeacherSyllabusScreenV2(
             VLabel("Parent notification preview")
             Spacer(Modifier.height(8.dp))
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(c.ink.copy(alpha = 0.06f)).padding(12.dp)) {
+                // Faithful to React: fontSize:13 prose (→ body/ink) with the chapter title bolded
+                // ("…covered <b>Trigonometric Identities</b> in Mathematics today…").
                 Text(
-                    "Class 10-A covered Trigonometric Identities in Mathematics today. Homework: Exercise 8.3, Q 4–14.",
-                    style = VTheme.type.caption.colored(c.ink2),
+                    text = buildAnnotatedString {
+                        append("Class 10-A covered ")
+                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                            append("Trigonometric Identities")
+                        }
+                        append(" in Mathematics today. Homework: Exercise 8.3, Q 4–14.")
+                    },
+                    style = VTheme.type.body.colored(c.ink),
                 )
             }
         }
