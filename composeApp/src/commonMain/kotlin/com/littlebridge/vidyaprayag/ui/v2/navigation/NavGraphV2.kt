@@ -82,6 +82,8 @@ private fun UnauthFlow(modifier: Modifier = Modifier) {
                 // New families browse the marketplace first, then link their child from there.
                 onGetStarted = { route = AuthRoute.Discovery },
                 onHaveAccount = { route = AuthRoute.Login },
+                // Welcome mirrors React `Splash`, which has only two CTAs — the school-setup wizard
+                // is reached from the Login "Register Now" path, not a third Welcome button.
                 onRegisterSchool = { route = AuthRoute.SchoolOnboarding },
             )
             AuthRoute.Login -> LoginScreenV2(
