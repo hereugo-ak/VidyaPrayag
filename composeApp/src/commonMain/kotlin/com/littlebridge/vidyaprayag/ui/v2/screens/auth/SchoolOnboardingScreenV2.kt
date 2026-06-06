@@ -1,12 +1,15 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.auth
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,10 +33,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
@@ -42,6 +55,7 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
+import com.littlebridge.vidyaprayag.ui.v2.components.VDivider
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VInput
 import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
@@ -71,7 +85,7 @@ fun SchoolOnboardingScreenV2(
     modifier: Modifier = Modifier,
     onBack: () -> Unit = {},
 ) {
-    VTheme(tone = VPortalTone.Night) {
+    VTheme(tone = VPortalTone.Warm) {
         val c = VTheme.colors
         val d = VTheme.dimens
         val titles = listOf("School identity", "Academic year", "Classes & sections", "Subjects", "Teachers", "Students")
@@ -118,7 +132,7 @@ fun SchoolOnboardingScreenV2(
             // ── Header + step indicator ─────────────────────────────────────────────
             Column(Modifier.fillMaxWidth().padding(horizontal = d.lg, vertical = d.md)) {
                 Spacer(Modifier.height(d.sm))
-                Text("ONBOARDING", style = VTheme.type.label.colored(c.ink3))
+                Text("ONBOARDING", style = VTheme.type.labelStrong.colored(c.ink3))
                 Spacer(Modifier.height(d.sm))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(d.xs)) {
                     repeat(6) { i ->
@@ -127,7 +141,7 @@ fun SchoolOnboardingScreenV2(
                                 .weight(1f)
                                 .height(4.dp)
                                 .clip(CircleShape)
-                                .background(if (i < step) c.tealDeep else c.cream),
+                                .background(if (i < step) c.teal else c.ink.copy(alpha = 0.08f)),
                         )
                     }
                 }
@@ -155,25 +169,29 @@ fun SchoolOnboardingScreenV2(
                 Spacer(Modifier.height(d.sm))
             }
 
-            // ── Footer nav ──────────────────────────────────────────────────────────
+            // ── Footer nav (top hairline border, like React borderTop --border-dark-1) ──
+            VDivider()
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = d.lg, vertical = d.md),
                 horizontalArrangement = Arrangement.spacedBy(d.sm),
             ) {
-                VButton(
-                    text = "Back",
-                    onClick = { if (step == 1) onBack() else step-- },
-                    variant = VButtonVariant.Ghost,
-                    tone = VButtonTone.Navy,
-                )
+                if (step > 1) {
+                    VButton(
+                        text = "Back",
+                        onClick = { step-- },
+                        variant = VButtonVariant.Ghost,
+                        tone = VButtonTone.Navy,
+                    )
+                }
                 VButton(
                     text = if (step < 6) "Continue" else "Finish setup",
                     onClick = { step++ },
                     full = true,
                     size = VButtonSize.Lg,
                     tone = if (step == 6) VButtonTone.Teal else VButtonTone.Navy,
-                    soft = false,
-                    leading = { Icon(VIcons.ArrowRight, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    stateful = step == 6,
+                    successLabel = "Setting up",
+                    trailing = { Icon(VIcons.ArrowRight, contentDescription = null, modifier = Modifier.size(16.dp)) },
                 )
             }
         }
@@ -198,13 +216,13 @@ private fun IdentityStep() {
     VInput(shortName, { shortName = it }, label = "Short name", placeholder = "SVM", modifier = Modifier.fillMaxWidth())
     VInput(affiliation, { affiliation = it }, label = "Affiliation number", placeholder = "UP/CBSE/2021/4421", modifier = Modifier.fillMaxWidth())
 
-    Text("BOARD", style = VTheme.type.label.colored(c.ink3))
+    Text("BOARD", style = VTheme.type.labelStrong.colored(c.ink3))
     FlowRow(horizontalArrangement = Arrangement.spacedBy(d.sm), verticalArrangement = Arrangement.spacedBy(d.sm)) {
         listOf("CBSE", "ICSE", "UP State", "Other").forEach { b ->
             VTag(text = b, active = board == b, onClick = { board = b })
         }
     }
-    Text("SCHOOL TYPE", style = VTheme.type.label.colored(c.ink3))
+    Text("SCHOOL TYPE", style = VTheme.type.labelStrong.colored(c.ink3))
     FlowRow(horizontalArrangement = Arrangement.spacedBy(d.sm), verticalArrangement = Arrangement.spacedBy(d.sm)) {
         listOf("Government", "Private Aided", "Private Unaided", "Central").forEach { t ->
             VTag(text = t, active = type == t, onClick = { type = t })
@@ -227,7 +245,7 @@ private fun AcademicYearStep() {
     var endTime by remember { mutableStateOf("") }
     var periods by remember { mutableStateOf("") }
 
-    Text("CURRENT ACADEMIC YEAR", style = VTheme.type.label.colored(c.ink3))
+    Text("CURRENT ACADEMIC YEAR", style = VTheme.type.labelStrong.colored(c.ink3))
     Row(horizontalArrangement = Arrangement.spacedBy(d.sm)) {
         listOf("2025-26", "2026-27").forEach { y -> VTag(text = y, active = year == y, onClick = { year = y }) }
     }
@@ -235,7 +253,7 @@ private fun AcademicYearStep() {
         VInput(starts, { starts = it }, label = "Year starts", placeholder = "01 Apr 2025", modifier = Modifier.weight(1f))
         VInput(ends, { ends = it }, label = "Year ends", placeholder = "31 Mar 2026", modifier = Modifier.weight(1f))
     }
-    Text("WORKING DAYS", style = VTheme.type.label.colored(c.ink3))
+    Text("WORKING DAYS", style = VTheme.type.labelStrong.colored(c.ink3))
     Row(horizontalArrangement = Arrangement.spacedBy(d.sm)) {
         VTag(text = "Mon–Fri", active = workingDays == "Mon–Fri", onClick = { workingDays = "Mon–Fri" })
         VTag(text = "Mon–Sat", active = workingDays == "Mon–Sat", onClick = { workingDays = "Mon–Sat" })
@@ -256,7 +274,7 @@ private fun ClassesStep(classesBuilt: MutableList<OBClass>) {
     var newClassName by remember { mutableStateOf("") }
 
     VCard(modifier = Modifier.fillMaxWidth()) {
-        Text("TIP", style = VTheme.type.label.colored(c.ink3))
+        Text("TIP", style = VTheme.type.labelStrong.colored(c.ink3))
         Text(
             "Pick the sections your school actually runs. Subjects and teachers in the next steps will only show these classes.",
             style = VTheme.type.caption.colored(c.ink2),
@@ -281,7 +299,7 @@ private fun ClassesStep(classesBuilt: MutableList<OBClass>) {
         }
     }
     VCard(modifier = Modifier.fillMaxWidth()) {
-        Text("ADD CLASS MANUALLY", style = VTheme.type.label.colored(c.ink3))
+        Text("ADD CLASS MANUALLY", style = VTheme.type.labelStrong.colored(c.ink3))
         Spacer(Modifier.height(d.sm))
         Row(horizontalArrangement = Arrangement.spacedBy(d.sm), verticalAlignment = Alignment.CenterVertically) {
             VInput(newClassName, { newClassName = it }, placeholder = "e.g. Class 11, Nursery, KG", modifier = Modifier.weight(1f))
@@ -295,7 +313,6 @@ private fun ClassesStep(classesBuilt: MutableList<OBClass>) {
                 },
                 tone = VButtonTone.Teal,
                 size = VButtonSize.Sm,
-                soft = false,
                 enabled = newClassName.isNotBlank(),
             )
         }
@@ -318,7 +335,7 @@ private fun SubjectsStep(subjects: MutableList<OBSubject>, classCodes: List<Stri
     VCard(modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
-                Text("SUBJECTS OFFERED", style = VTheme.type.label.colored(c.ink3))
+                Text("SUBJECTS OFFERED", style = VTheme.type.labelStrong.colored(c.ink3))
                 Text("Tap a subject's class chips to set where it's taught.", style = VTheme.type.caption.colored(c.ink3), modifier = Modifier.padding(top = 2.dp))
             }
             Text(
@@ -367,7 +384,7 @@ private fun TeachersStep(teachers: MutableList<OBTeacher>, subjects: List<OBSubj
     VCard(modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
-                Text("TEACHER COVERAGE", style = VTheme.type.label.colored(c.ink3))
+                Text("TEACHER COVERAGE", style = VTheme.type.labelStrong.colored(c.ink3))
                 Text("$coveredCount of ${allSlots.size} subject × class slots assigned", style = VTheme.type.caption.colored(c.ink3), modifier = Modifier.padding(top = 2.dp))
             }
             Text(
@@ -395,27 +412,77 @@ private fun TeachersStep(teachers: MutableList<OBTeacher>, subjects: List<OBSubj
                 VBadge(text = "${t.assignments.size} slots", tone = if (t.assignments.isNotEmpty()) VBadgeTone.Arctic else VBadgeTone.Neutral)
             }
             Spacer(Modifier.height(d.sm))
-            // Assignment chips per subject row
-            subjects.filter { it.classes.isNotEmpty() }.forEach { s ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(s.name, style = VTheme.type.caption.colored(c.ink), modifier = Modifier.width(96.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(d.xs), verticalArrangement = Arrangement.spacedBy(d.xs)) {
+            // ── Assignment matrix — bordered header grid (110px + repeat(N,1fr)) ──
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .border(1.dp, c.shadowTint.copy(alpha = 0.08f), RoundedCornerShape(10.dp)),
+            ) {
+                // header row — cream bg, uppercase labels
+                Row(Modifier.fillMaxWidth().background(c.cream), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "SUBJECT",
+                        style = VTheme.type.labelStrong.colored(c.ink3).copy(fontSize = 10.sp, letterSpacing = 0.05.em),
+                        modifier = Modifier.width(110.dp).padding(horizontal = 10.dp, vertical = 8.dp),
+                    )
+                    classCodes.forEach { cc ->
+                        Text(
+                            cc,
+                            style = VTheme.type.dataSm.colored(c.ink3).copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.weight(1f).padding(horizontal = 4.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+                // subject rows
+                subjects.filter { it.classes.isNotEmpty() }.forEachIndexed { rowI, s ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .then(if (rowI > 0) Modifier.border(0.dp, Color.Transparent) else Modifier),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(s.name, style = VTheme.type.caption.colored(c.ink).copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.width(110.dp).padding(horizontal = 10.dp, vertical = 8.dp))
                         classCodes.forEach { cc ->
                             val inSubject = s.classes.contains(cc)
                             val mine = t.assignments.any { it.first == s.name && it.second == cc }
                             val takenByOther = !mine && teachers.any { other -> other.id != t.id && other.assignments.any { it.first == s.name && it.second == cc } }
-                            if (inSubject) {
+                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                                 MatrixCell(
-                                    label = if (mine) "✓" else if (takenByOther) "—" else "+",
+                                    label = if (!inSubject) "" else if (mine) "✓" else if (takenByOther) "—" else "+",
+                                    inSubject = inSubject,
                                     mine = mine,
                                     takenByOther = takenByOther,
-                                    enabled = !takenByOther,
+                                    enabled = inSubject && !takenByOther,
                                     onClick = {
                                         if (mine) t.assignments.removeAll { it.first == s.name && it.second == cc }
-                                        else if (!takenByOther) t.assignments.add(s.name to cc)
+                                        else if (inSubject && !takenByOther) t.assignments.add(s.name to cc)
                                     },
                                 )
                             }
+                        }
+                    }
+                    if (rowI < subjects.count { it.classes.isNotEmpty() } - 1) {
+                        VDivider(color = c.shadowTint.copy(alpha = 0.05f))
+                    }
+                }
+            }
+            // assignment chip summary row (font-mono, teal pill SUBJ·class)
+            if (t.assignments.isNotEmpty()) {
+                Spacer(Modifier.height(d.sm))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(d.xs), verticalArrangement = Arrangement.spacedBy(d.xs)) {
+                    t.assignments.forEach { a ->
+                        Box(
+                            Modifier
+                                .clip(CircleShape)
+                                .background(c.teal.copy(alpha = 0.15f))
+                                .padding(horizontal = 8.dp, vertical = 2.dp),
+                        ) {
+                            Text(
+                                "${a.first.take(4)}·${a.second}",
+                                style = VTheme.type.dataSm.colored(c.tealDeep).copy(fontWeight = FontWeight.SemiBold, fontSize = 11.sp),
+                            )
                         }
                     }
                 }
@@ -428,15 +495,16 @@ private fun TeachersStep(teachers: MutableList<OBTeacher>, subjects: List<OBSubj
         onClick = {},
         full = true,
         tone = VButtonTone.Sand,
-        soft = false,
         leading = { Icon(VIcons.Upload, contentDescription = null, modifier = Modifier.size(14.dp)) },
     )
 }
 
 @Composable
-private fun MatrixCell(label: String, mine: Boolean, takenByOther: Boolean, enabled: Boolean, onClick: () -> Unit) {
+private fun MatrixCell(label: String, inSubject: Boolean, mine: Boolean, takenByOther: Boolean, enabled: Boolean, onClick: () -> Unit) {
     val c = VTheme.colors
+    val available = inSubject && !mine && !takenByOther
     val bg = when {
+        !inSubject -> Color.Transparent
         mine -> c.tealDeep
         takenByOther -> c.cream
         else -> c.teal.copy(alpha = 0.10f)
@@ -446,15 +514,24 @@ private fun MatrixCell(label: String, mine: Boolean, takenByOther: Boolean, enab
         takenByOther -> c.ink3
         else -> c.tealDeep
     }
+    var cell = Modifier
+        .padding(4.dp)
+        .height(32.dp)
+        .fillMaxWidth()
+        .clip(RoundedCornerShape(6.dp))
+        .background(bg)
+    if (available) {
+        // 1px dashed available border rgba(0,106,96,0.35)
+        cell = cell.dashedBorder(c.tealDeep.copy(alpha = 0.35f), strokeWidth = 1.dp, cornerRadius = 6.dp)
+    }
+    if (enabled) cell = cell.clickableNoRipple(onClick)
     Box(
-        Modifier
-            .size(width = 30.dp, height = 30.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .background(bg)
-            .then(if (enabled) Modifier.clickableNoRipple(onClick) else Modifier),
+        cell.then(if (!inSubject) Modifier.alpha(0.25f) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, style = VTheme.type.caption.colored(fg))
+        if (label.isNotEmpty()) {
+            Text(label, style = VTheme.type.caption.colored(fg).copy(fontWeight = FontWeight.Bold, fontSize = 11.sp))
+        }
     }
 }
 
@@ -507,54 +584,87 @@ private fun CompletionScreen(onComplete: () -> Unit) {
             .background(c.background)
             .verticalScroll(rememberScrollState()),
     ) {
-        // Teal hero
-        Column(
+        // Teal hero — vertical gradient #3cb9a9 → #2a8f80 + radial white glow
+        Box(
             Modifier
                 .fillMaxWidth()
-                .background(c.teal)
-                .padding(horizontal = d.lg, vertical = 56.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .background(
+                    Brush.verticalGradient(listOf(c.teal, Color(0xFF2A8F80))),
+                )
+                .drawBehind {
+                    // radial glow circle at 50% 30%, white@30%, fade to transparent ~55%
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color.White.copy(alpha = 0.30f), Color.Transparent),
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.5f, size.height * 0.30f),
+                            radius = size.maxDimension * 0.55f,
+                        ),
+                        radius = size.maxDimension * 0.55f,
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.5f, size.height * 0.30f),
+                    )
+                },
         ) {
-            Box(
+            Column(
                 Modifier
-                    .size(96.dp)
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(Color.White.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center,
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, top = 64.dp, bottom = 56.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Icon(VIcons.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(44.dp))
+                Box(
+                    Modifier
+                        .size(96.dp)
+                        .clip(RoundedCornerShape(26.dp))
+                        .background(Color.White.copy(alpha = 0.18f))
+                        .border(1.dp, Color.White.copy(alpha = 0.30f), RoundedCornerShape(26.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(VIcons.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(44.dp))
+                }
+                Spacer(Modifier.height(28.dp))
+                Text(
+                    "You're all set",
+                    style = VTheme.type.h1.colored(Color.White).copy(fontSize = 30.sp, letterSpacing = (-0.02).em),
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text("Saraswati Vidya Mandir is live on VidyaSetu.", style = VTheme.type.body.colored(Color.White.copy(alpha = 0.88f)), textAlign = TextAlign.Center)
             }
-            Spacer(Modifier.height(d.lg))
-            Text("You're all set", style = VTheme.type.h1.colored(Color.White), textAlign = TextAlign.Center)
-            Text("Saraswati Vidya Mandir is live on VidyaSetu.", style = VTheme.type.body.colored(Color.White.copy(alpha = 0.88f)), textAlign = TextAlign.Center)
         }
 
         // Body
         Column(Modifier.fillMaxWidth().padding(d.lg), verticalArrangement = Arrangement.spacedBy(d.md)) {
             VCard(modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    listOf("6" to "Classes", "8" to "Teachers", "180" to "Students", "156" to "Parents").forEach { (n, l) ->
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
+                    val cells = listOf("6" to "Classes", "8" to "Teachers", "180" to "Students", "156" to "Parents")
+                    cells.forEachIndexed { i, (n, l) ->
                         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(n, style = VTheme.type.dataLg.colored(c.navy))
-                            Text(l.uppercase(), style = VTheme.type.label.colored(c.ink3))
+                            Text(n, style = VTheme.type.dataLg.colored(c.navy).copy(fontSize = 22.sp, fontWeight = FontWeight.Bold, lineHeight = 22.sp))
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                l.uppercase(),
+                                style = VTheme.type.labelStrong.colored(c.ink3).copy(fontSize = 10.sp, letterSpacing = 0.06.em),
+                            )
+                        }
+                        if (i < cells.size - 1) {
+                            Box(Modifier.width(1.dp).fillMaxHeight().background(c.shadowTint.copy(alpha = 0.06f)))
                         }
                     }
                 }
             }
 
-            Text("GET STARTED", style = VTheme.type.label.colored(c.ink3))
+            Text("GET STARTED", style = VTheme.type.labelStrong.colored(c.ink3))
             listOf(
                 Triple(VIcons.Mail, "Email teachers their credentials", "8 invites · sent in one tap"),
                 Triple(VIcons.Upload, "Download parent invite pack", "Personalised PDF · 156 parents"),
-                Triple(VIcons.Lock, "Review attendance permissions", "Class teachers only by default"),
+                Triple(VIcons.ShieldCheck, "Review attendance permissions", "Class teachers only by default"),
             ).forEach { (icon, title, sub) ->
                 VCard(modifier = Modifier.fillMaxWidth(), onClick = {}) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
-                            Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(c.teal.copy(alpha = 0.16f)),
+                            Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFDCF2EF)),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(icon, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(16.dp))
+                            Icon(icon, contentDescription = null, tint = Color(0xFF006A60), modifier = Modifier.size(16.dp))
                         }
                         Spacer(Modifier.width(d.md))
                         Column(Modifier.weight(1f)) {
@@ -573,8 +683,7 @@ private fun CompletionScreen(onComplete: () -> Unit) {
                 full = true,
                 size = VButtonSize.Lg,
                 tone = VButtonTone.Teal,
-                soft = false,
-                leading = { Icon(VIcons.ArrowRight, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                trailing = { Icon(VIcons.ArrowRight, contentDescription = null, modifier = Modifier.size(16.dp)) },
             )
             Text(
                 "You can edit any of this later in Settings.",
@@ -606,3 +715,18 @@ private class OBTeacher(
 /** Tiny clickable helper. */
 private fun Modifier.clickableNoRipple(onClick: () -> Unit): Modifier =
     this.clickable(onClick = onClick)
+
+/** 1px dashed rounded border (the React `border: 1px dashed` available-cell style). */
+private fun Modifier.dashedBorder(color: Color, strokeWidth: androidx.compose.ui.unit.Dp, cornerRadius: androidx.compose.ui.unit.Dp): Modifier =
+    this.drawBehind {
+        val sw = strokeWidth.toPx()
+        val r = cornerRadius.toPx()
+        val dash = PathEffect.dashPathEffect(floatArrayOf(sw * 3f, sw * 3f), 0f)
+        drawRoundRect(
+            color = color,
+            topLeft = androidx.compose.ui.geometry.Offset(sw / 2f, sw / 2f),
+            size = Size(size.width - sw, size.height - sw),
+            cornerRadius = CornerRadius(r, r),
+            style = Stroke(width = sw, pathEffect = dash),
+        )
+    }
