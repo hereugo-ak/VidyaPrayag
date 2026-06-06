@@ -289,12 +289,14 @@ ledger refreshed.
 4. **No fabrication.** Where a datum genuinely has no source yet (e.g. period timetable), the response
    is an honest empty list, never random data — matching the design's hard UI rule.
 
-### Batch 5A — schema (tables + registration + SQL migration)
+### Batch 5A — schema (tables + registration + SQL migration) ✅
 | File | Change |
 |---|---|
-| `db/Tables.kt` | + `TeacherSyllabusUnitsTable`, `TeacherHomeworkTable`, `TeacherHomeworkSubmissionsTable`, `TeacherPeriodsTable` (timetable, optional/empty-safe). Marks reuse `ExamResultsTable`; attendance reuses `AttendanceRecordsTable`. |
-| `db/DatabaseFactory.kt` | register the new tables in `allTables`. |
-| `docs/backend/sql/02_teacher_schema.sql` | idempotent `CREATE TABLE IF NOT EXISTS` DDL for the new tables + back-fill DDL for the drifted ones. |
+| `db/Tables.kt` | + `AssessmentsTable`, `AssessmentMarksTable`, `SyllabusUnitsTable`, `HomeworkTable`, `HomeworkSubmissionsTable`, `TeacherPeriodsTable`. **Design refinement vs. the original plan:** marks are *normalized* into `assessments` (with a numeric `max_marks` denominator + an `exam_id` to satisfy `SubmitMarksRequest.examId`) → `assessment_marks`, rather than overloading the string-scored, school-admin `ExamResultsTable` (master doc G4 "normalized vs. freeform"). Attendance still reuses `AttendanceRecordsTable` (`type='student'`, `marked_by`=teacher) — no new table needed. |
+| `db/DatabaseFactory.kt` | registered all 6 new tables in `allTables` (SQLite auto-create + Postgres `AUTO_CREATE_TABLES`). |
+| `docs/backend/sql/02_teacher_schema.sql` | idempotent `CREATE TABLE IF NOT EXISTS` DDL for the 6 tables (FKs, indexes, unique constraints) + a documented SECTION 99 pointer recording the pre-existing SQL-doc drift (exam_results/ptm/messages/etc. live only in `Tables.kt`). |
+
+- [x] 5A — schema. Verified by isolated `kotlinc` compile of the real `server/` sources (see build note); Exposed DSL identical to already-compiling tables in the same file.
 
 ### Batch 5B — teacher context guard + reads (home / classes / profile)
 | File | Change |

@@ -72,7 +72,14 @@ object DatabaseFactory {
         PtmClassProgressTable,
         MessageThreadsTable,
         MessagesTable,
-        ExamResultsTable
+        ExamResultsTable,
+        // Teacher vertical (master doc Step 7 / gap G1)
+        AssessmentsTable,
+        AssessmentMarksTable,
+        SyllabusUnitsTable,
+        HomeworkTable,
+        HomeworkSubmissionsTable,
+        TeacherPeriodsTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */
