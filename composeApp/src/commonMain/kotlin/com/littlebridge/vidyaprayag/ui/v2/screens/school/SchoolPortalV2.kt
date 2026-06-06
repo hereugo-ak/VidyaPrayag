@@ -14,6 +14,8 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VNavItem
 import com.littlebridge.vidyaprayag.ui.v2.components.VScreenScaffold
 import com.littlebridge.vidyaprayag.ui.v2.screens.discovery.AcademicCalendarScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.notifications.NotificationsScreenV2
+import com.littlebridge.vidyaprayag.ui.v2.theme.VPortalTone
+import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 
 /** Full-screen overlays the admin portal can push above its tab content. */
 private enum class SchoolOverlay { None, Notifications, Calendar }
@@ -33,45 +35,49 @@ fun SchoolPortalV2(
     onLogout: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    var tab by remember { mutableStateOf("home") }
-    var overlay by remember { mutableStateOf(SchoolOverlay.None) }
+    // The admin portal is the deep-black "night" surface in the design (Admin.tsx renders `dark`).
+    VTheme(tone = VPortalTone.Night) {
+        var tab by remember { mutableStateOf("home") }
+        var overlay by remember { mutableStateOf(SchoolOverlay.None) }
 
-    when (overlay) {
-        SchoolOverlay.Notifications -> {
-            NotificationsScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
-            return
+        when (overlay) {
+            SchoolOverlay.Notifications -> {
+                NotificationsScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
+                return@VTheme
+            }
+            SchoolOverlay.Calendar -> {
+                AcademicCalendarScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
+                return@VTheme
+            }
+            SchoolOverlay.None -> Unit
         }
-        SchoolOverlay.Calendar -> {
-            AcademicCalendarScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
-            return
-        }
-        SchoolOverlay.None -> Unit
-    }
 
-    val items = listOf(
-        VNavItem("home", "Home", VIcons.Home),
-        VNavItem("people", "People", VIcons.Users),
-        VNavItem("records", "Records", VIcons.Bookmark),
-        VNavItem("comms", "Comms", VIcons.Megaphone),
-        VNavItem("settings", "Settings", VIcons.Settings),
-    )
+        val items = listOf(
+            VNavItem("home", "Home", VIcons.Home),
+            VNavItem("people", "People", VIcons.Users),
+            VNavItem("records", "Records", VIcons.Bookmark),
+            VNavItem("comms", "Comms", VIcons.Megaphone, badge = 2),
+            VNavItem("settings", "Settings", VIcons.Settings),
+        )
 
-    VScreenScaffold(
-        modifier = modifier,
-        bottomBar = {
-            VBottomNav(items = items, selected = tab, onSelect = { tab = it })
-        },
-    ) { _ ->
-        Box(Modifier.fillMaxSize()) {
-            when (tab) {
-                "home" -> SchoolHomeScreenV2(
-                    onOpenNotifications = { overlay = SchoolOverlay.Notifications },
-                    onOpenCalendar = { overlay = SchoolOverlay.Calendar },
-                )
-                "people" -> SchoolPeopleScreenV2()
-                "records" -> SchoolRecordsScreenV2()
-                "comms" -> SchoolCommsScreenV2()
-                "settings" -> SchoolSettingsScreenV2(onLogout = onLogout)
+        VScreenScaffold(
+            modifier = modifier,
+            bottomBar = {
+                VBottomNav(items = items, selected = tab, onSelect = { tab = it })
+            },
+        ) { _ ->
+            Box(Modifier.fillMaxSize()) {
+                when (tab) {
+                    "home" -> SchoolHomeScreenV2(
+                        onOpenNotifications = { overlay = SchoolOverlay.Notifications },
+                        onOpenCalendar = { overlay = SchoolOverlay.Calendar },
+                        onExit = onLogout,
+                    )
+                    "people" -> SchoolPeopleScreenV2()
+                    "records" -> SchoolRecordsScreenV2()
+                    "comms" -> SchoolCommsScreenV2()
+                    "settings" -> SchoolSettingsScreenV2(onLogout = onLogout)
+                }
             }
         }
     }

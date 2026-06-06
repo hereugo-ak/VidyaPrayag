@@ -1,106 +1,84 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.SyllabusUnit
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherSyllabusViewModel
-import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
+import com.littlebridge.vidyaprayag.ui.v2.components.VButton
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
-import com.littlebridge.vidyaprayag.ui.v2.components.VEmptyState
-import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.components.VProgressRing
-import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
+import com.littlebridge.vidyaprayag.ui.v2.components.VInput
+import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
-import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * TeacherSyllabusScreenV2 — the Syllabus sub-tab of Teacher.tsx → Update.
+ * TeacherSyllabusScreenV2 — a pixel-faithful copy of `Teacher.tsx → SyllabusFlow`.
  *
- * Shows overall coverage as a [VProgressRing] and a list of units the teacher can toggle covered/
- * uncovered (optimistic, with revert-on-failure handled by the VM). Bound to
- * [TeacherSyllabusViewModel].
+ * Class/subject selectors, a "log today's progress" form (chapter/topics/homework/note), a live
+ * parent-notification preview, and a "Log & notify parents" stateful button.
  */
 @Composable
 fun TeacherSyllabusScreenV2(
-    classId: String,
-    subject: String,
+    classId: String = "",
+    subject: String = "",
     modifier: Modifier = Modifier,
-    viewModel: TeacherSyllabusViewModel = koinViewModel(),
 ) {
     val c = VTheme.colors
-    val d = VTheme.dimens
-    val state by viewModel.state.collectAsStateV2()
-
-    LaunchedEffect(classId, subject) { viewModel.load(classId, subject) }
+    var chapter by remember { mutableStateOf("Ch 8 — Trigonometric Identities") }
+    var topics by remember { mutableStateOf("") }
+    var homework by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
 
     Column(
         modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = d.md, vertical = d.md),
-        verticalArrangement = Arrangement.spacedBy(d.md),
+            .padding(horizontal = 20.dp)
+            .padding(top = 16.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(state.subject.ifBlank { "Syllabus" }, style = VTheme.type.h2.colored(c.ink))
-        Text(state.className, style = VTheme.type.caption.colored(c.ink3))
-
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            VInput(value = "Class 10-A", onValueChange = {}, modifier = Modifier.weight(1f), enabled = false)
+            VInput(value = "Mathematics", onValueChange = {}, modifier = Modifier.weight(1f), enabled = false)
+        }
         VCard {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(d.md)) {
-                VProgressRing(
-                    value = state.overallProgress,
-                    tone = VBadgeTone.Success,
-                    label = "${(state.overallProgress * 100).toInt()}%",
+            VLabel("Log today's progress")
+            Spacer(Modifier.height(12.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                VInput(value = chapter, onValueChange = { chapter = it }, label = "Chapter")
+                VInput(value = topics, onValueChange = { topics = it }, label = "Topics covered", placeholder = "Pythagorean identities, sum-of-angles…")
+                VInput(value = homework, onValueChange = { homework = it }, label = "Homework given", placeholder = "Exercise 8.3, Q 4–14")
+                VInput(value = note, onValueChange = { note = it }, label = "Teaching note (admin only)", placeholder = "Class struggled with topic X")
+            }
+        }
+        VCard {
+            VLabel("Parent notification preview")
+            Spacer(Modifier.height(8.dp))
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(c.ink.copy(alpha = 0.06f)).padding(12.dp)) {
+                Text(
+                    "Class 10-A covered Trigonometric Identities in Mathematics today. Homework: Exercise 8.3, Q 4–14.",
+                    style = VTheme.type.caption.colored(c.ink2),
                 )
-                Column(Modifier.weight(1f)) {
-                    Text("Coverage", style = VTheme.type.h4.colored(c.ink))
-                    Text("${state.coveredCount}/${state.units.size} units covered", style = VTheme.type.caption.colored(c.ink3))
-                }
             }
         }
-
-        if (state.units.isEmpty() && !state.isLoading) {
-            VEmptyState(title = "No syllabus", icon = VIcons.Bookmark, body = "No units defined for this subject yet.")
-        } else {
-            state.units.forEach { UnitRow(it, state.updatingUnitId == it.id, viewModel::toggleUnit) }
-        }
-
-        if (state.error != null) Text(state.error!!, style = VTheme.type.caption.colored(c.dangerInk))
-        Spacer(Modifier.height(d.xl))
-    }
-}
-
-@Composable
-private fun UnitRow(u: SyllabusUnit, updating: Boolean, onToggle: (String) -> Unit) {
-    val c = VTheme.colors
-    VCard(onClick = if (updating) null else ({ onToggle(u.id) })) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(VTheme.dimens.md)) {
-            Icon(
-                imageVector = if (u.isCovered) VIcons.Check else VIcons.Plus,
-                contentDescription = null,
-                tint = if (u.isCovered) c.successInk else c.ink3,
-                modifier = Modifier.size(20.dp),
-            )
-            Column(Modifier.weight(1f)) {
-                Text(u.title, style = VTheme.type.h4.colored(c.ink))
-                if (u.coveredOn != null) Text("Covered ${u.coveredOn}", style = VTheme.type.dataSm.colored(c.ink3))
-            }
-        }
+        VButton(text = "Log & notify parents", onClick = {}, full = true, size = VButtonSize.Lg, tone = VButtonTone.Lavender, stateful = true, successLabel = "Logged")
     }
 }

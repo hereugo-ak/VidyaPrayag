@@ -1,6 +1,8 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.school
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,109 +10,74 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Switch
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import com.littlebridge.vidyaprayag.feature.admin.presentation.InstitutionalProfileViewModel
-import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
-import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
-import com.littlebridge.vidyaprayag.ui.v2.components.VDivider
-import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
-import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
-import com.littlebridge.vidyaprayag.ui.v2.screens.VSectionHeader
-import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
+import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
-import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * SchoolSettingsScreenV2 — admin "Settings" tab, translated from Admin.tsx → Settings.
+ * SchoolSettingsScreenV2 — a pixel-faithful copy of `Admin.tsx → SettingsScreen`.
  *
- * Institutional-profile summary (identity, public-listing toggle, profile-completion + storage
- * meters) and a sign-out action surfaced to the host. Bound 1:1 to the existing
- * [InstitutionalProfileViewModel] (auto-loads in `init`). The full onboarding wizard is reached via
- * dedicated routes (Phase 3E navigation) — Settings keeps the at-a-glance summary per the design.
+ * A stack of icon + title + subtitle setting rows, ending with a log-out button.
  */
 @Composable
 fun SchoolSettingsScreenV2(
     onLogout: () -> Unit = {},
     modifier: Modifier = Modifier,
-    viewModel: InstitutionalProfileViewModel = koinViewModel(),
 ) {
     val c = VTheme.colors
-    val d = VTheme.dimens
-    val state by viewModel.state.collectAsStateV2()
+
+    val rows = listOf(
+        SettingRow(VIcons.GraduationCap, "School profile", "Logo, address, contact info"),
+        SettingRow(VIcons.Calendar, "Academic year", "Currently 2025-26 • 173 days left"),
+        SettingRow(VIcons.Bookmark, "Classes & subjects", "6 classes • 42 subjects"),
+        SettingRow(VIcons.Users, "Teacher management", "8 teachers • download credentials"),
+        SettingRow(VIcons.Wallet, "Fee structure", "Edit heads & amounts for next cycle"),
+        SettingRow(VIcons.Bell, "Notifications", "Channels & quiet hours"),
+        SettingRow(VIcons.Settings, "Data export", "CSV / PDF / UDISE (Coming Soon)"),
+        SettingRow(VIcons.Settings, "Account", "Admin email & password"),
+    )
 
     Column(
         modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = d.md, vertical = d.md),
-        verticalArrangement = Arrangement.spacedBy(d.md),
+            .padding(horizontal = 20.dp)
+            .padding(top = 24.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Settings", style = VTheme.type.h2.colored(c.ink))
-
-        // Identity
-        VCard {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(d.md)) {
-                VAvatar(name = state.schoolName.ifBlank { "School" }, src = state.profileImageUrl.ifBlank { null }, size = 56.dp, ring = true)
-                Column(Modifier.weight(1f)) {
-                    Text(state.schoolName.ifBlank { "—" }, style = VTheme.type.h3.colored(c.ink))
-                    if (state.location.isNotBlank()) {
-                        Text(state.location, style = VTheme.type.caption.colored(c.ink3))
+        Text("Settings", style = VTheme.type.h1.colored(c.ink))
+        rows.forEach { row ->
+            VCard {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(c.ink.copy(alpha = 0.06f)), contentAlignment = Alignment.Center) {
+                        Icon(row.icon, contentDescription = null, tint = c.ink, modifier = Modifier.size(18.dp))
                     }
-                    if (state.licenseType.isNotBlank()) {
-                        Text(state.licenseType, style = VTheme.type.dataSm.colored(c.tealDeep))
+                    Column(Modifier.weight(1f)) {
+                        Text(row.title, style = VTheme.type.bodyStrong.colored(c.ink))
+                        Text(row.sub, style = VTheme.type.caption.colored(c.ink2))
                     }
+                    Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(16.dp))
                 }
             }
         }
-
-        // Public listing toggle
-        VCard {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(d.md)) {
-                Column(Modifier.weight(1f)) {
-                    Text("Public listing", style = VTheme.type.h4.colored(c.ink))
-                    Text("Show this school in Discovery", style = VTheme.type.caption.colored(c.ink3))
-                }
-                Switch(checked = state.isPublic, onCheckedChange = { viewModel.togglePublic(it) })
-            }
-        }
-
-        // Profile completion + storage
-        VSectionHeader("PROFILE HEALTH")
-        VCard {
-            VLabel("PROFILE COMPLETION ${state.profileCompletion}%")
-            VProgressBar(value = state.profileCompletion.toFloat().coerceIn(0f, 100f), tone = VBadgeTone.Success)
-            Spacer(Modifier.height(d.sm))
-            VDivider()
-            Spacer(Modifier.height(d.sm))
-            VLabel("STORAGE ${state.storageUsedHuman} / ${state.totalStorageHuman}")
-            VProgressBar(value = state.storageUsage.coerceIn(0f, 1f) * 100f, tone = VBadgeTone.Arctic)
-        }
-
-        if (state.errorMessage != null) {
-            Text(state.errorMessage!!, style = VTheme.type.caption.colored(c.dangerInk))
-        }
-
-        Spacer(Modifier.height(d.sm))
-        VButton(
-            text = "Sign out",
-            onClick = onLogout,
-            variant = VButtonVariant.Destructive,
-            tone = VButtonTone.Rose,
-            full = true,
-        )
-        Spacer(Modifier.height(d.xl))
+        Spacer(Modifier.height(8.dp))
+        VButton(text = "Log out", onClick = onLogout, full = true, variant = VButtonVariant.Ghost)
     }
 }
+
+private data class SettingRow(val icon: ImageVector, val title: String, val sub: String)

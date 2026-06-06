@@ -2,6 +2,7 @@ package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,153 +13,140 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherHomeViewModel
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherPeriod
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherTask
-import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
-import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
+import androidx.compose.ui.unit.sp
+import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
-import com.littlebridge.vidyaprayag.ui.v2.components.VEmptyState
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.components.VStatusDot
-import com.littlebridge.vidyaprayag.ui.v2.screens.VPortalHeader
-import com.littlebridge.vidyaprayag.ui.v2.screens.VSectionHeader
-import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
+import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
+import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
-import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * TeacherHomeScreenV2 — teacher "Home" tab, translated from Teacher.tsx → Home.
+ * TeacherHomeScreenV2 — a pixel-faithful copy of `Teacher.tsx → TeacherHome` (dark / night).
  *
- * Today's glance (classes / pending attendance / pending marks / homework due), the period
- * timeline, and the task list. Bound to the existing [TeacherHomeViewModel].
+ * Greeting header (bell + avatar) · "Today's tasks" colour-coded cards · "Today's periods"
+ * horizontal scroller (Period 3 highlighted) · recent-activity list. From [MockV2].
  */
 @Composable
 fun TeacherHomeScreenV2(
     modifier: Modifier = Modifier,
-    viewModel: TeacherHomeViewModel = koinViewModel(),
     onOpenNotifications: () -> Unit = {},
     onOpenCalendar: () -> Unit = {},
+    onExit: () -> Unit = {},
 ) {
     val c = VTheme.colors
-    val d = VTheme.dimens
-    val state by viewModel.state.collectAsStateV2()
+    val me = MockV2.teachers[1] // Mrs. Priya Iyer
 
     Column(
         modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = d.md, vertical = d.md),
-        verticalArrangement = Arrangement.spacedBy(d.md),
+            .padding(horizontal = 20.dp)
+            .padding(top = 24.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        VPortalHeader(
-            name = state.teacherName,
-            subtitle = state.schoolName.ifBlank { "Today" },
-            trailing = {
-                Row(horizontalArrangement = Arrangement.spacedBy(d.sm)) {
-                    TeacherHeaderIcon(VIcons.Calendar, "Academic calendar", onClick = onOpenCalendar)
-                    TeacherHeaderIcon(VIcons.Bell, "Notifications", onClick = onOpenNotifications)
+        // ── Header ──────────────────────────────────────────────────────────
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column {
+                VLabel("Good morning")
+                Text("Priya", style = VTheme.type.h1.colored(c.ink), modifier = Modifier.padding(top = 4.dp))
+                Text("Friday, 5 June 2026", style = VTheme.type.caption.colored(c.ink2))
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape).background(c.ink.copy(alpha = 0.06f)).clickable { onOpenNotifications() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(VIcons.Bell, contentDescription = "Notifications", tint = c.ink, modifier = Modifier.size(18.dp))
                 }
-            },
-        )
-
-        // Stat glance
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(d.sm)) {
-            StatCard("Classes", state.classesToday, Modifier.weight(1f))
-            StatCard("Attendance", state.pendingAttendance, Modifier.weight(1f))
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(d.sm)) {
-            StatCard("Marks due", state.pendingMarks, Modifier.weight(1f))
-            StatCard("Homework", state.homeworkDue, Modifier.weight(1f))
+                Box(Modifier.clickable { onExit() }) { VAvatar(name = me.name, size = 40.dp) }
+            }
         }
 
-        VSectionHeader("TODAY'S PERIODS")
-        if (state.periods.isEmpty() && !state.isLoading) {
-            VEmptyState(title = "No periods today", icon = VIcons.Calendar, body = "Enjoy the lighter day.")
-        } else {
-            state.periods.forEach { PeriodRow(it) }
+        // ── Today's tasks ────────────────────────────────────────────────────
+        Column {
+            Text("Today's tasks", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                TaskCard(c.successInk, "Class 10-A attendance", "Marked at 9:12 AM • 28 / 32 present", "View details", VIcons.Check)
+                TaskCard(c.warningInk, "Syllabus update pending", "You haven't logged Period 2 — Mathematics", "Update now", VIcons.Bell)
+                TaskCard(c.teal, "Class 10-A Unit Test 2", "Marks not entered yet • 23 students", "Enter marks", VIcons.Check)
+                TaskCard(c.ink3, "4 students haven't submitted yesterday's HW", "Mathematics – Algebra worksheet", "View", VIcons.Calendar, onCalendar = onOpenCalendar)
+            }
         }
 
-        VSectionHeader("TASKS")
-        if (state.tasks.isEmpty() && !state.isLoading) {
-            VEmptyState(title = "All caught up", icon = VIcons.Check, body = "No pending tasks.")
-        } else {
-            state.tasks.forEach { TaskRow(it) }
+        // ── Today's periods ──────────────────────────────────────────────────
+        Column {
+            Text("Today's periods", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MockV2.timetableToday.forEachIndexed { i, p ->
+                    val active = i == 2
+                    Column(
+                        Modifier
+                            .widthIn(min = 150.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (active) c.teal else c.ink.copy(alpha = 0.06f))
+                            .padding(12.dp),
+                    ) {
+                        Text("PERIOD ${p.period}", style = VTheme.type.label.colored(if (active) Color(0xFF080808) else c.ink3))
+                        Text(p.subject, style = VTheme.type.bodyStrong.colored(if (active) Color(0xFF080808) else c.ink), modifier = Modifier.padding(top = 4.dp))
+                        Text("${p.time} • ${p.klass}", style = VTheme.type.dataSm.colored(if (active) Color(0xFF080808).copy(alpha = 0.8f) else c.ink2).copy(fontSize = 11.sp))
+                    }
+                }
+            }
         }
 
-        if (state.error != null) {
-            Text(state.error!!, style = VTheme.type.caption.colored(c.dangerInk))
+        // ── Recent activity ──────────────────────────────────────────────────
+        Column {
+            Text("Recent activity", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
+            VCard {
+                val rows = listOf(
+                    "Marked Class 9-A attendance" to "9:12 AM",
+                    "Entered Class 10-A Math UT2 marks" to "Yesterday 3:40 PM",
+                    "Updated Class 9-A syllabus — Ch 4" to "Yesterday 11:20 AM",
+                    "Assigned homework — Class 10-A" to "Wed 4:10 PM",
+                )
+                rows.forEachIndexed { i, (what, whenAt) ->
+                    if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(c.border1))
+                    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(what, style = VTheme.type.body.colored(c.ink), modifier = Modifier.weight(1f))
+                        Text(whenAt, style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = TextUnit.Unspecified))
+                    }
+                }
+            }
         }
-        Spacer(Modifier.height(d.xl))
     }
 }
 
 @Composable
-private fun TeacherHeaderIcon(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    contentDescription: String,
-    onClick: () -> Unit,
-) {
-    val c = VTheme.colors
-    Box(
-        Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(c.cream)
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(icon, contentDescription = contentDescription, tint = c.ink, modifier = Modifier.size(20.dp))
-    }
-}
-
-@Composable
-private fun StatCard(label: String, value: Int, modifier: Modifier = Modifier) {
-    val c = VTheme.colors
-    VCard(modifier = modifier) {
-        Text(value.toString(), style = VTheme.type.dataLg.colored(c.tealDeep))
-        Text(label, style = VTheme.type.label.colored(c.ink3))
-    }
-}
-
-@Composable
-private fun PeriodRow(p: TeacherPeriod) {
+private fun TaskCard(tone: Color, title: String, sub: String, cta: String, icon: ImageVector, onCalendar: () -> Unit = {}) {
     val c = VTheme.colors
     VCard {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(VTheme.dimens.md)) {
-            VStatusDot(color = if (p.status == "done") c.successInk else c.teal)
-            Column(Modifier.weight(1f)) {
-                Text("${p.className} · ${p.subject}", style = VTheme.type.h4.colored(c.ink))
-                Text("${p.time} · ${p.room}", style = VTheme.type.caption.colored(c.ink3))
+        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(36.dp).clip(CircleShape).background(tone), contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = Color(0xFF080808), modifier = Modifier.size(18.dp))
             }
-            VBadge(text = p.status.uppercase(), tone = if (p.status == "done") VBadgeTone.Success else VBadgeTone.Arctic)
-        }
-    }
-}
-
-@Composable
-private fun TaskRow(t: TeacherTask) {
-    val c = VTheme.colors
-    VCard {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(VTheme.dimens.md)) {
-            VStatusDot(color = if (t.isDone) c.successInk else c.warningInk)
             Column(Modifier.weight(1f)) {
-                Text(t.title, style = VTheme.type.h4.colored(c.ink))
-                Text("${t.subtitle} · ${t.className}", style = VTheme.type.caption.colored(c.ink3))
+                Text(title, style = VTheme.type.bodyStrong.colored(c.ink))
+                Text(sub, style = VTheme.type.caption.colored(c.ink2))
             }
-            VBadge(text = t.type.uppercase(), tone = VBadgeTone.Neutral)
+            Text(cta, style = VTheme.type.caption.colored(c.teal).copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.clickable { onCalendar() })
         }
     }
 }

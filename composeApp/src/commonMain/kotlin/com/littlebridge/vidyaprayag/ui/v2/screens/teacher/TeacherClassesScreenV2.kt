@@ -1,6 +1,8 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,84 +11,118 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClass
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClassesViewModel
-import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
-import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
+import androidx.compose.ui.unit.sp
+import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
+import com.littlebridge.vidyaprayag.ui.v2.components.VBackHeader
+import com.littlebridge.vidyaprayag.ui.v2.components.VButton
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
-import com.littlebridge.vidyaprayag.ui.v2.components.VEmptyState
-import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
-import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
-import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
+import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
-import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * TeacherClassesScreenV2 — teacher "My Classes" tab, translated from Teacher.tsx → MyClasses.
+ * TeacherClassesScreenV2 — a pixel-faithful copy of `Teacher.tsx → MyClasses` + `ClassDetail`.
  *
- * Each assigned class card shows subject, headcount, syllabus progress and average attendance,
- * with a class-teacher badge. Bound to the existing [TeacherClassesViewModel]. Tapping a card
- * surfaces the class id to the host (navigation handled in Phase 3E).
+ * A 2-column grid of class cards (students + today %), tapping one opens a back-headered class
+ * detail (3-stat header + message button + roster). From [MockV2].
  */
 @Composable
 fun TeacherClassesScreenV2(
     onOpenClass: (String) -> Unit = {},
     modifier: Modifier = Modifier,
-    viewModel: TeacherClassesViewModel = koinViewModel(),
 ) {
     val c = VTheme.colors
-    val d = VTheme.dimens
-    val state by viewModel.state.collectAsStateV2()
+    val me = MockV2.teachers[1]
+    var detail by remember { mutableStateOf<String?>(null) }
+
+    detail?.let { id ->
+        ClassDetail(id = id, onBack = { detail = null }, modifier = modifier)
+        return
+    }
 
     Column(
         modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = d.md, vertical = d.md),
-        verticalArrangement = Arrangement.spacedBy(d.md),
+            .padding(horizontal = 20.dp)
+            .padding(top = 24.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("My Classes", style = VTheme.type.h2.colored(c.ink))
-
-        if (state.classes.isEmpty() && !state.isLoading) {
-            VEmptyState(
-                title = "No assigned classes",
-                icon = VIcons.School,
-                body = "Your school admin hasn't assigned classes to you yet.",
-            )
-        } else {
-            state.classes.forEach { ClassCard(it, onOpenClass) }
+        Text("My Classes", style = VTheme.type.h1.colored(c.ink))
+        me.classes.chunked(2).forEach { rowCls ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                rowCls.forEach { cls ->
+                    VCard(modifier = Modifier.weight(1f), onClick = { detail = cls; onOpenClass(cls) }) {
+                        Text(MockV2.classDisplay(cls), style = VTheme.type.h3.colored(c.ink).copy(fontSize = 18.sp, fontWeight = FontWeight.Bold))
+                        Text("Mathematics", style = VTheme.type.caption.colored(c.ink2))
+                        Spacer(Modifier.height(12.dp))
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column {
+                                Text("32", style = VTheme.type.data.colored(c.ink).copy(fontSize = 18.sp))
+                                Text("Students", style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = TextUnit.Unspecified, fontSize = 10.sp))
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("92%", style = VTheme.type.data.colored(c.teal).copy(fontSize = 18.sp))
+                                Text("Today", style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = TextUnit.Unspecified, fontSize = 10.sp))
+                            }
+                        }
+                    }
+                }
+                if (rowCls.size == 1) Spacer(Modifier.weight(1f))
+            }
         }
-
-        if (state.error != null) {
-            Text(state.error!!, style = VTheme.type.caption.colored(c.dangerInk))
-        }
-        Spacer(Modifier.height(d.xl))
     }
 }
 
 @Composable
-private fun ClassCard(cls: TeacherClass, onOpen: (String) -> Unit) {
+private fun ClassDetail(id: String, onBack: () -> Unit, modifier: Modifier) {
     val c = VTheme.colors
-    VCard(onClick = { onOpen(cls.id) }) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(VTheme.dimens.sm)) {
-            Text(cls.className, style = VTheme.type.h3.colored(c.ink), modifier = Modifier.weight(1f))
-            if (cls.isClassTeacher) VBadge(text = "CLASS TEACHER", tone = VBadgeTone.Arctic)
+    Column(modifier.fillMaxSize()) {
+        VBackHeader(title = "Class ${MockV2.classDisplay(id)}", onBack = onBack)
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MiniStat("32", "Students", Modifier.weight(1f))
+                MiniStat("92%", "Today", Modifier.weight(1f))
+                MiniStat("74", "UT2 avg", Modifier.weight(1f))
+            }
+            VButton(text = "Message class parents", onClick = {}, full = true, variant = VButtonVariant.Secondary)
+            VCard {
+                MockV2.students.filter { it.klass == id }.forEachIndexed { i, s ->
+                    if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(c.border1))
+                    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        VAvatar(name = s.name, size = 32.dp)
+                        Column(Modifier.weight(1f)) {
+                            Text(s.name, style = VTheme.type.bodyStrong.colored(c.ink))
+                            Text("Roll ${s.roll}", style = VTheme.type.dataSm.colored(c.ink3))
+                        }
+                        Text("${s.attendance}%", style = VTheme.type.data.colored(c.ink))
+                    }
+                }
+            }
         }
-        Text("${cls.subject} · ${cls.studentCount} students", style = VTheme.type.caption.colored(c.ink3))
-        Spacer(Modifier.height(VTheme.dimens.sm))
-        VLabel("SYLLABUS ${(cls.syllabusProgress * 100).toInt()}%")
-        VProgressBar(value = cls.syllabusProgress, tone = VBadgeTone.Success)
-        Spacer(Modifier.height(VTheme.dimens.xs))
-        VLabel("AVG ATTENDANCE ${(cls.avgAttendance * 100).toInt()}%")
-        VProgressBar(value = cls.avgAttendance, tone = VBadgeTone.Arctic)
+    }
+}
+
+@Composable
+private fun MiniStat(value: String, label: String, modifier: Modifier = Modifier) {
+    val c = VTheme.colors
+    Column(modifier.clip(RoundedCornerShape(10.dp)).background(c.ink.copy(alpha = 0.06f)).padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, style = VTheme.type.data.colored(c.ink).copy(fontSize = 18.sp))
+        Text(label, style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = TextUnit.Unspecified, fontSize = 10.sp))
     }
 }

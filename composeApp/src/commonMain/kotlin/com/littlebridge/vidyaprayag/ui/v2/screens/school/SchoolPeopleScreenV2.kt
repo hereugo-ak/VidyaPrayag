@@ -1,120 +1,459 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.school
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.littlebridge.vidyaprayag.feature.admin.presentation.RiskStudent
-import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentAnalyticsViewModel
-import com.littlebridge.vidyaprayag.feature.admin.presentation.SubjectEngagement
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
+import com.littlebridge.vidyaprayag.ui.v2.components.VBackHeader
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
+import com.littlebridge.vidyaprayag.ui.v2.components.VButton
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
-import com.littlebridge.vidyaprayag.ui.v2.components.VEmptyState
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
+import com.littlebridge.vidyaprayag.ui.v2.components.VInput
 import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
 import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
-import com.littlebridge.vidyaprayag.ui.v2.screens.VSectionHeader
-import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
+import com.littlebridge.vidyaprayag.ui.v2.components.VStatusDot
+import com.littlebridge.vidyaprayag.ui.v2.components.VTag
+import com.littlebridge.vidyaprayag.ui.v2.components.VTopTabs
+import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
-import org.koin.compose.viewmodel.koinViewModel
+
+/** Which People sub-view is currently shown. */
+private sealed class PeopleView {
+    data object List : PeopleView()
+    data class Student(val id: String) : PeopleView()
+    data class Teacher(val id: String) : PeopleView()
+}
 
 /**
- * SchoolPeopleScreenV2 — admin "People" tab, translated from Admin.tsx → People.
+ * SchoolPeopleScreenV2 — a pixel-faithful copy of `Admin.tsx → People` plus StudentDetail / TeacherDetail.
  *
- * Cohort risk overview (critical/medium/low counts), at-risk student list, and subject-engagement
- * meters. Bound 1:1 to the existing [StudentAnalyticsViewModel] (auto-loads in `init`). The teacher-
- * roster half of People depends on the teacher backend (gap G1) and stays a `VComingSoon` until then.
+ * Students/Teachers tab toggle, search + filter chips, and tappable rows opening a back-headered
+ * detail screen (student: Overview/Attendance/Marks/Fees/Notes · teacher: Profile/Activity/Classes).
  */
 @Composable
-fun SchoolPeopleScreenV2(
-    modifier: Modifier = Modifier,
-    viewModel: StudentAnalyticsViewModel = koinViewModel(),
+fun SchoolPeopleScreenV2(modifier: Modifier = Modifier) {
+    var view by remember { mutableStateOf<PeopleView>(PeopleView.List) }
+
+    when (val v = view) {
+        is PeopleView.List -> PeopleList(
+            modifier = modifier,
+            onOpenStudent = { view = PeopleView.Student(it) },
+            onOpenTeacher = { view = PeopleView.Teacher(it) },
+        )
+        is PeopleView.Student -> StudentDetail(id = v.id, onBack = { view = PeopleView.List }, modifier = modifier)
+        is PeopleView.Teacher -> TeacherDetail(id = v.id, onBack = { view = PeopleView.List }, modifier = modifier)
+    }
+}
+
+@Composable
+private fun PeopleList(
+    modifier: Modifier,
+    onOpenStudent: (String) -> Unit,
+    onOpenTeacher: (String) -> Unit,
 ) {
     val c = VTheme.colors
-    val d = VTheme.dimens
-    val state by viewModel.state.collectAsStateV2()
+    var tab by remember { mutableStateOf("Students") }
+    var query by remember { mutableStateOf("") }
 
     Column(
         modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = d.md, vertical = d.md),
-        verticalArrangement = Arrangement.spacedBy(d.md),
+            .padding(horizontal = 20.dp)
+            .padding(top = 24.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        VSectionHeader("RETENTION RISK")
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(d.sm)) {
-            RiskCard("Critical", state.criticalRiskCount, VBadgeTone.Danger, Modifier.weight(1f))
-            RiskCard("Medium", state.mediumRiskCount, VBadgeTone.Warning, Modifier.weight(1f))
-            RiskCard("Low", state.lowRiskCount, VBadgeTone.Success, Modifier.weight(1f))
-        }
+        Text("People", style = VTheme.type.h1.colored(c.ink))
+        VTopTabs(tabs = listOf("Students", "Teachers"), selected = tab, onSelect = { tab = it })
 
-        VSectionHeader("AT-RISK STUDENTS")
-        if (state.atRiskStudents.isEmpty() && !state.isLoading) {
-            VEmptyState(title = "No students at risk", icon = VIcons.Users, body = "Everyone is on track.")
-        } else {
-            state.atRiskStudents.forEach { RiskStudentRow(it) }
-        }
-
-        if (state.subjectEngagements.isNotEmpty()) {
-            VSectionHeader("SUBJECT ENGAGEMENT")
-            VCard {
-                state.subjectEngagements.forEach { EngagementRow(it) }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            VInput(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = "Search ${tab.lowercase()}",
+                leadingIcon = VIcons.Search,
+                modifier = Modifier.weight(1f),
+            )
+            Box(
+                Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)).background(c.ink.copy(alpha = 0.06f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(VIcons.Menu, contentDescription = "Filter", tint = c.ink, modifier = Modifier.size(18.dp))
             }
         }
 
-        if (state.errorMessage != null) {
-            Text(state.errorMessage!!, style = VTheme.type.caption.colored(c.dangerInk))
+        val filters = if (tab == "Students") listOf("All classes", "Class 10-A", "Class 9-A", "Status") else listOf("All subjects", "Active 7d", "Inactive")
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            filters.forEachIndexed { i, f -> VTag(text = f, active = i == 0) }
         }
-        Spacer(Modifier.height(d.xl))
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (tab == "Students") {
+                MockV2.students.forEach { s ->
+                    VCard(onClick = { onOpenStudent(s.id) }) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            VAvatar(name = s.name, size = 42.dp)
+                            Column(Modifier.weight(1f)) {
+                                Text(s.name, style = VTheme.type.bodyStrong.colored(c.ink))
+                                Text("Roll ${s.roll} • ${s.klass}", style = VTheme.type.dataSm.colored(c.ink2))
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    VStatusDot(color = pewsColor(s.pews))
+                                    Text("${s.attendance}%", style = VTheme.type.dataSm.colored(c.ink))
+                                }
+                                Text("Attendance", style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = TextUnit.Unspecified, fontSize = 10.sp))
+                            }
+                        }
+                    }
+                }
+            } else {
+                MockV2.teachers.forEach { t ->
+                    VCard(onClick = { onOpenTeacher(t.id) }) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            VAvatar(name = t.name, size = 42.dp)
+                            Column(Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text(t.name, style = VTheme.type.bodyStrong.colored(c.ink))
+                                    VStatusDot(color = if (t.active) c.successInk else c.warningInk)
+                                }
+                                Text("${t.subjects.joinToString(" • ")} · ${t.classes.size} classes", style = VTheme.type.caption.colored(c.ink2))
+                            }
+                            Text(t.lastActive, style = VTheme.type.caption.colored(c.ink3))
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
+// ── Student detail ───────────────────────────────────────────────────────────
 @Composable
-private fun RiskCard(label: String, count: Int, tone: VBadgeTone, modifier: Modifier = Modifier) {
+private fun StudentDetail(id: String, onBack: () -> Unit, modifier: Modifier) {
+    val c = VTheme.colors
+    val s = MockV2.students.find { it.id == id } ?: MockV2.students[0]
+    var tab by remember { mutableStateOf("Overview") }
+
+    Column(modifier.fillMaxSize()) {
+        VBackHeader(title = "Student", onBack = onBack)
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            Column(Modifier.padding(horizontal = 20.dp).padding(top = 20.dp, bottom = 16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    VAvatar(name = s.name, size = 64.dp)
+                    Column {
+                        Text(s.name, style = VTheme.type.h2.colored(c.ink))
+                        Text("Class ${MockV2.classDisplay(s.klass)} • Roll ${s.roll}", style = VTheme.type.caption.colored(c.ink2))
+                        Text("Adm SVM-2024-${100 + (s.roll.toIntOrNull() ?: 0)}", style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = TextUnit.Unspecified))
+                    }
+                }
+                Spacer(Modifier.height(20.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatTile("Attendance", "${s.attendance}%", Modifier.weight(1f))
+                    StatTile("Last marks", "${s.lastMarks}%", Modifier.weight(1f))
+                    StatTile("Dues", if (s.fees > 0) "₹${s.fees}" else "₹0", Modifier.weight(1f), if (s.fees > 0) c.dangerInk else c.successInk)
+                }
+            }
+            VTopTabs(tabs = listOf("Overview", "Attendance", "Marks", "Fees", "Notes"), selected = tab, onSelect = { tab = it })
+            Column(Modifier.padding(horizontal = 20.dp).padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                when (tab) {
+                    "Overview" -> {
+                        VCard {
+                            VLabel("Parent")
+                            Spacer(Modifier.height(8.dp))
+                            Text(s.parentName, style = VTheme.type.bodyStrong.colored(c.ink))
+                            Text(s.parentMobile, style = VTheme.type.dataSm.colored(c.ink2))
+                            Spacer(Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                VBadge(text = "Verified", tone = VBadgeTone.Success)
+                                VBadge(text = "WhatsApp opt-in", tone = VBadgeTone.Arctic)
+                            }
+                        }
+                        VCard {
+                            VLabel("Personal")
+                            Spacer(Modifier.height(8.dp))
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                FieldCell("DOB", s.dob, Modifier.weight(1f))
+                                FieldCell("Gender", if (s.gender == "M") "Male" else "Female", Modifier.weight(1f))
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                FieldCell("Blood group", "—", Modifier.weight(1f))
+                                FieldCell("Admission yr", "2024", Modifier.weight(1f))
+                            }
+                        }
+                    }
+                    "Attendance" -> AttendanceHeatV2()
+                    "Marks" -> VCard {
+                        listOf("Mathematics" to 74, "Science" to 88, "English" to 81, "Hindi" to 76).forEachIndexed { i, (sub, m) ->
+                            if (i > 0) { Spacer(Modifier.height(12.dp)); androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().height(1.dp).background(c.border1)); Spacer(Modifier.height(12.dp)) }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(sub, style = VTheme.type.bodyStrong.colored(c.ink))
+                                Text("$m%", style = VTheme.type.dataSm.colored(c.ink))
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            VProgressBar(value = m.toFloat())
+                        }
+                    }
+                    "Fees" -> {
+                        VCard {
+                            VLabel("Outstanding")
+                            Text("₹ ${formatCommas(s.fees)}", style = VTheme.type.dataLg.colored(if (s.fees > 0) c.dangerInk else c.successInk).copy(fontSize = 28.sp), modifier = Modifier.padding(top = 4.dp))
+                            Spacer(Modifier.height(12.dp))
+                            VButton(text = "Send reminder", onClick = {}, variant = VButtonVariant.Secondary, full = true)
+                        }
+                        MockV2.feeHistory.forEach { FeeRowCard(it) }
+                    }
+                    "Notes" -> VCard {
+                        VLabel("Internal note — Admin only")
+                        Text(
+                            if (s.fees > 0) "Parent requested fee deferment until 25 Jun. Approved verbally."
+                            else "Excellent academic performance. Consider for science olympiad.",
+                            style = VTheme.type.caption.colored(c.ink2), modifier = Modifier.padding(top = 8.dp),
+                        )
+                        Text("Logged by Principal A. Verma • 4 Jun 2026", style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = TextUnit.Unspecified), modifier = Modifier.padding(top = 12.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Teacher detail ───────────────────────────────────────────────────────────
+@Composable
+private fun TeacherDetail(id: String, onBack: () -> Unit, modifier: Modifier) {
+    val c = VTheme.colors
+    val t = MockV2.teachers.find { it.id == id } ?: MockV2.teachers[0]
+    var tab by remember { mutableStateOf("Profile") }
+
+    Column(modifier.fillMaxSize()) {
+        VBackHeader(title = "Teacher", onBack = onBack)
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                VAvatar(name = t.name, size = 64.dp)
+                Column {
+                    Text(t.name, style = VTheme.type.h2.colored(c.ink))
+                    Text(t.username, style = VTheme.type.dataSm.colored(c.ink2))
+                    Spacer(Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        t.subjects.forEach { VBadge(text = it, tone = VBadgeTone.Arctic) }
+                    }
+                }
+            }
+            VTopTabs(tabs = listOf("Profile", "Activity", "Classes"), selected = tab, onSelect = { tab = it })
+            when (tab) {
+                "Profile" -> VCard {
+                    FieldCell("Mobile", "+91 98XXX 12121")
+                    Spacer(Modifier.height(12.dp)); FieldCell("Employee ID", "EMP-0${t.id.drop(1)}")
+                    Spacer(Modifier.height(12.dp)); FieldCell("Joined", "14 Apr 2022")
+                    Spacer(Modifier.height(12.dp)); FieldCell("Class teacher of", "10-A")
+                    Spacer(Modifier.height(16.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        VButton(text = "Reset credentials", onClick = {}, variant = VButtonVariant.Secondary, size = VButtonSize.Sm)
+                        VButton(text = "Deactivate", onClick = {}, variant = VButtonVariant.Destructive, size = VButtonSize.Sm)
+                    }
+                }
+                "Activity" -> {
+                    VCard {
+                        VLabel("Update frequency — last 30 days")
+                        Spacer(Modifier.height(12.dp))
+                        (0 until 30).chunked(15).forEach { rowIdx ->
+                            Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                rowIdx.forEach { i ->
+                                    val v = (i * 7) % 4
+                                    val bg = when (v) {
+                                        0 -> c.ink.copy(alpha = 0.06f)
+                                        1 -> Color(0xFFC8DEFF).copy(alpha = 0.20f)
+                                        2 -> Color(0xFFC8DEFF).copy(alpha = 0.45f)
+                                        else -> c.teal
+                                    }
+                                    Box(Modifier.weight(1f).aspectRatio(1f).clip(RoundedCornerShape(3.dp)).background(bg))
+                                }
+                            }
+                        }
+                    }
+                    VCard {
+                        VLabel("Recent updates")
+                        Spacer(Modifier.height(12.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            (1..5).forEach { i ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(VIcons.Bookmark, contentDescription = null, tint = c.ink3, modifier = Modifier.size(14.dp).padding(top = 2.dp))
+                                    Column {
+                                        Text("Updated Class 10-A Chemistry — Ch. 6 Periodic Table", style = VTheme.type.caption.colored(c.ink))
+                                        Text("${i}d ago", style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = TextUnit.Unspecified))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "Classes" -> {
+                    t.classes.chunked(2).forEach { rowCls ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            rowCls.forEach { cls ->
+                                VCard(modifier = Modifier.weight(1f)) {
+                                    Text(cls, style = VTheme.type.bodyStrong.colored(c.ink))
+                                    Text("${32 + (cls.first().code % 6)} students", style = VTheme.type.caption.colored(c.ink2))
+                                }
+                            }
+                            if (rowCls.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Shared helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * AttendanceHeatV2 — a calendar-style 30-day attendance heatmap, copied from `Admin.tsx →
+ * AttendanceHeat`. Used by both the admin student-detail and (privately) the parent academics tab.
+ */
+@Composable
+fun AttendanceHeatV2(modifier: Modifier = Modifier) {
     val c = VTheme.colors
     VCard(modifier = modifier) {
-        Text(count.toString(), style = VTheme.type.dataLg.colored(c.ink))
-        VBadge(text = label.uppercase(), tone = tone)
-    }
-}
-
-@Composable
-private fun RiskStudentRow(s: RiskStudent) {
-    val c = VTheme.colors
-    val tone = when (s.riskLevel) {
-        "Critical" -> VBadgeTone.Danger
-        "Medium" -> VBadgeTone.Warning
-        else -> VBadgeTone.Success
-    }
-    VCard {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(VTheme.dimens.md)) {
-            VAvatar(name = s.name, src = s.imageUrl.ifBlank { null })
-            Column(Modifier.weight(1f)) {
-                Text(s.name, style = VTheme.type.h4.colored(c.ink))
-                Text("Retention risk ${s.retentionRisk}% · ${s.masteryTrend}", style = VTheme.type.caption.colored(c.ink3))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            VLabel("June 2026")
+            Text("91%", style = VTheme.type.dataSm.colored(c.ink))
+        }
+        Spacer(Modifier.height(12.dp))
+        // weekday header
+        Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("S", "M", "T", "W", "T", "F", "S").forEach {
+                Text(it, style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = TextUnit.Unspecified, fontSize = 10.sp), modifier = Modifier.weight(1f))
             }
-            VBadge(text = s.riskLevel.uppercase(), tone = tone)
+        }
+        MockV2.attendanceMonth.chunked(7).forEach { week ->
+            Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                week.forEach { day ->
+                    val fill = when (day.status) {
+                        MockV2.DayStatus.Present -> c.teal
+                        MockV2.DayStatus.Absent -> c.dangerInk
+                        MockV2.DayStatus.Late -> c.warningInk
+                        MockV2.DayStatus.Holiday -> c.ink.copy(alpha = 0.06f)
+                        MockV2.DayStatus.Future -> Color.Transparent
+                    }
+                    val faded = day.status == MockV2.DayStatus.Future || day.status == MockV2.DayStatus.Holiday
+                    Box(
+                        Modifier.weight(1f).aspectRatio(1f).clip(CircleShape).background(fill),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(day.day.toString(), style = VTheme.type.dataSm.colored(if (faded) c.ink3 else Color.White).copy(fontSize = 11.sp))
+                    }
+                }
+                repeat(7 - week.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            HeatLegend(21, "Present"); HeatLegend(2, "Absent"); HeatLegend(1, "Late"); HeatLegend(4, "Holiday")
         }
     }
 }
 
 @Composable
-private fun EngagementRow(e: SubjectEngagement) {
-    VLabel(e.name)
-    VProgressBar(value = e.percentage.coerceIn(0f, 100f), tone = VBadgeTone.Arctic)
-    Spacer(Modifier.height(VTheme.dimens.sm))
+private fun HeatLegend(n: Int, label: String) {
+    val c = VTheme.colors
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(n.toString(), style = VTheme.type.data.colored(c.ink).copy(fontSize = 16.sp))
+        Text(label, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 10.sp))
+    }
+}
+
+@Composable
+private fun pewsColor(p: MockV2.Pews): Color = when (p) {
+    MockV2.Pews.Ok -> VTheme.colors.successInk
+    MockV2.Pews.Warn -> VTheme.colors.warningInk
+    MockV2.Pews.Risk -> VTheme.colors.dangerInk
+}
+
+@Composable
+private fun StatTile(label: String, value: String, modifier: Modifier = Modifier, tone: Color? = null) {
+    val c = VTheme.colors
+    Column(modifier.clip(RoundedCornerShape(12.dp)).background(c.ink.copy(alpha = 0.06f)).padding(12.dp)) {
+        Text(label.uppercase(), style = VTheme.type.label.colored(c.ink3).copy(fontSize = 10.sp))
+        Text(value, style = VTheme.type.data.colored(tone ?: c.ink).copy(fontSize = 16.sp, fontWeight = FontWeight.Medium), modifier = Modifier.padding(top = 4.dp))
+    }
+}
+
+@Composable
+private fun FieldCell(label: String, value: String, modifier: Modifier = Modifier) {
+    val c = VTheme.colors
+    Column(modifier) {
+        Text(label.uppercase(), style = VTheme.type.label.colored(c.ink3).copy(fontSize = 10.sp))
+        Text(value, style = VTheme.type.body.colored(c.ink), modifier = Modifier.padding(top = 2.dp))
+    }
+}
+
+@Composable
+internal fun FeeRowCard(f: MockV2.FeePayment) {
+    val c = VTheme.colors
+    VCard {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column {
+                Text(f.head, style = VTheme.type.bodyStrong.colored(c.ink))
+                Text("${f.date} • ${f.receipt}", style = VTheme.type.dataSm.colored(c.ink2))
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("₹ ${formatCommas(f.amount)}", style = VTheme.type.data.colored(c.ink))
+                Text("Receipt", style = VTheme.type.caption.colored(c.teal))
+            }
+        }
+    }
+}
+
+/** Indian-style thousands grouping for currency display. */
+internal fun formatCommas(n: Int): String {
+    val s = n.toString()
+    if (s.length <= 3) return s
+    val head = s.dropLast(3)
+    val tail = s.takeLast(3)
+    val grouped = StringBuilder()
+    var count = 0
+    for (i in head.indices.reversed()) {
+        grouped.append(head[i])
+        count++
+        if (count == 2 && i != 0) { grouped.append(','); count = 0 }
+    }
+    return grouped.reverse().toString() + "," + tail
 }

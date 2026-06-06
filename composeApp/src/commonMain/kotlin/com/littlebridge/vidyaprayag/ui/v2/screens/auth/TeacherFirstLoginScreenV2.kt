@@ -1,13 +1,16 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.auth
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -15,11 +18,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
+import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VInput
+import com.littlebridge.vidyaprayag.ui.v2.theme.VPortalTone
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 
@@ -39,8 +45,8 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 fun TeacherFirstLoginScreenV2(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
-    teacherName: String? = null,
-) {
+    teacherName: String? = "Mr. Vikram",
+) = VTheme(tone = VPortalTone.Night) {
     var current by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
@@ -49,7 +55,8 @@ fun TeacherFirstLoginScreenV2(
     Column(
         modifier
             .fillMaxSize()
-            .padding(horizontal = VTheme.dimens.lg)
+            .background(VTheme.colors.background)
+            .padding(horizontal = 24.dp)
             .verticalScroll(rememberScrollState()),
     ) {
         Spacer(Modifier.height(VTheme.dimens.xxl))
@@ -88,6 +95,7 @@ fun TeacherFirstLoginScreenV2(
             size = VButtonSize.Lg,
             tone = VButtonTone.Teal,
             soft = false,
+            leading = { Icon(VIcons.ArrowRight, contentDescription = null, modifier = Modifier.size(16.dp)) },
         )
         Spacer(Modifier.height(VTheme.dimens.md))
         VButton(

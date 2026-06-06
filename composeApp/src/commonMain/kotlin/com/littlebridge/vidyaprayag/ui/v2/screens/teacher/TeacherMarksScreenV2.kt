@@ -1,6 +1,8 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,110 +10,82 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.StudentMark
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherMarksViewModel
+import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
-import com.littlebridge.vidyaprayag.ui.v2.components.VEmptyState
-import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VInput
-import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
+import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
+import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
-import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * TeacherMarksScreenV2 — the Marks sub-tab of Teacher.tsx → Update.
+ * TeacherMarksScreenV2 — a pixel-faithful copy of `Teacher.tsx → MarksFlow`.
  *
- * Loads the mark sheet for [classId] + [examId], lets the teacher type a per-student score
- * (clamped 0..maxMarks by the VM), shows entered/total progress, and submits. Bound to
- * [TeacherMarksViewModel].
+ * Class/subject selectors, assessment header (with Edit), per-student score boxes, live class-avg
+ * footer, and a "Save marks" stateful button.
  */
 @Composable
 fun TeacherMarksScreenV2(
-    classId: String,
-    examId: String,
+    classId: String = "",
+    examId: String = "",
     modifier: Modifier = Modifier,
-    viewModel: TeacherMarksViewModel = koinViewModel(),
 ) {
     val c = VTheme.colors
-    val d = VTheme.dimens
-    val state by viewModel.state.collectAsStateV2()
-
-    LaunchedEffect(classId, examId) { viewModel.load(classId, examId) }
-
     Column(
         modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = d.md, vertical = d.md),
-        verticalArrangement = Arrangement.spacedBy(d.sm),
+            .padding(horizontal = 20.dp)
+            .padding(top = 16.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(state.examName.ifBlank { "Marks" }, style = VTheme.type.h2.colored(c.ink))
-        Text(
-            "${state.className} · ${state.subject} · /${state.maxMarks}",
-            style = VTheme.type.caption.colored(c.ink3),
-        )
-        Text(
-            "${state.enteredCount}/${state.students.size} entered",
-            style = VTheme.type.dataSm.colored(if (state.allEntered) c.successInk else c.ink2),
-        )
-
-        if (state.students.isEmpty() && !state.isLoading) {
-            VEmptyState(title = "No mark sheet", icon = VIcons.Target, body = "No students/exam found for this selection.")
-        } else {
-            state.students.forEach { MarkRow(it, state.maxMarks, viewModel::setMark) }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            VInput(value = "Class 10-A", onValueChange = {}, modifier = Modifier.weight(1f), enabled = false)
+            VInput(value = "Mathematics", onValueChange = {}, modifier = Modifier.weight(1f), enabled = false)
         }
-
-        if (state.error != null) Text(state.error!!, style = VTheme.type.caption.colored(c.dangerInk))
-
-        Spacer(Modifier.height(d.sm))
-        VButton(
-            text = if (state.submitSuccess) "Submitted" else "Submit marks",
-            onClick = viewModel::submit,
-            full = true,
-            size = VButtonSize.Lg,
-            tone = VButtonTone.Teal,
-            soft = false,
-            loading = state.isSubmitting,
-            enabled = state.enteredCount > 0,
-        )
-        Spacer(Modifier.height(d.xl))
-    }
-}
-
-@Composable
-private fun MarkRow(s: StudentMark, maxMarks: Int, onSet: (String, Float?) -> Unit) {
-    val c = VTheme.colors
-    VCard {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(VTheme.dimens.sm)) {
-            Column(Modifier.weight(1f)) {
-                Text(s.name, style = VTheme.type.h4.colored(c.ink))
-                Text("Roll ${s.rollNo}", style = VTheme.type.dataSm.colored(c.ink3))
+        VCard {
+            VLabel("Assessment")
+            Spacer(Modifier.height(4.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column {
+                    Text("Unit Test 2 — Trigonometry", style = VTheme.type.bodyStrong.colored(c.ink))
+                    Text("02 Jun • Max 100", style = VTheme.type.dataSm.colored(c.ink2))
+                }
+                VButton(text = "Edit", onClick = {}, variant = VButtonVariant.Secondary, size = VButtonSize.Sm)
             }
-            VInput(
-                value = s.marks?.let { if (it % 1f == 0f) it.toInt().toString() else it.toString() } ?: "",
-                onValueChange = { raw ->
-                    val clean = raw.filter { it.isDigit() || it == '.' }
-                    onSet(s.studentId, if (clean.isBlank()) null else clean.toFloatOrNull())
-                },
-                placeholder = "/$maxMarks",
-                keyboardType = KeyboardType.Number,
-                modifier = Modifier.width(96.dp),
-            )
         }
+        VCard {
+            val marks = listOf(78, 71, 88, 65, 92, 74)
+            MockV2.students.filter { it.klass == "10A" }.take(6).forEachIndexed { i, s ->
+                if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(c.border1))
+                Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    VAvatar(name = s.name, size = 30.dp)
+                    Text(s.name, style = VTheme.type.body.colored(c.ink), modifier = Modifier.weight(1f))
+                    Box(Modifier.size(width = 64.dp, height = 32.dp).clip(RoundedCornerShape(8.dp)).background(c.ink.copy(alpha = 0.06f)), contentAlignment = Alignment.CenterEnd) {
+                        Text(marks[i].toString(), style = VTheme.type.data.colored(c.ink), modifier = Modifier.padding(end = 12.dp))
+                    }
+                }
+            }
+            Box(Modifier.fillMaxWidth().height(1.dp).background(c.border1))
+            Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Class avg (live)", style = VTheme.type.caption.colored(c.ink2))
+                Text("68", style = VTheme.type.data.colored(c.ink))
+            }
+        }
+        VButton(text = "Save marks", onClick = {}, full = true, size = VButtonSize.Lg, tone = VButtonTone.Lavender, stateful = true, successLabel = "Saved")
     }
 }

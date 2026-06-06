@@ -15,6 +15,8 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VScreenScaffold
 import com.littlebridge.vidyaprayag.ui.v2.components.VTopTabs
 import com.littlebridge.vidyaprayag.ui.v2.screens.discovery.AcademicCalendarScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.notifications.NotificationsScreenV2
+import com.littlebridge.vidyaprayag.ui.v2.theme.VPortalTone
+import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 
 /** Full-screen overlays the teacher portal can push above its tab content. */
 private enum class TeacherOverlay { None, Notifications, Calendar }
@@ -35,57 +37,61 @@ fun TeacherPortalV2(
     onLogout: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    var tab by remember { mutableStateOf("home") }
-    var updateSub by remember { mutableStateOf("Attendance") }
-    var overlay by remember { mutableStateOf(TeacherOverlay.None) }
+    // The teacher portal is the deep-black "night" surface in the design (Teacher.tsx renders `dark`).
+    VTheme(tone = VPortalTone.Night) {
+        var tab by remember { mutableStateOf("home") }
+        var updateSub by remember { mutableStateOf("Attendance") }
+        var overlay by remember { mutableStateOf(TeacherOverlay.None) }
 
-    when (overlay) {
-        TeacherOverlay.Notifications -> {
-            NotificationsScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
-            return
-        }
-        TeacherOverlay.Calendar -> {
-            AcademicCalendarScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
-            return
-        }
-        TeacherOverlay.None -> Unit
-    }
-
-    val items = listOf(
-        VNavItem("home", "Home", VIcons.Home),
-        VNavItem("update", "Update", VIcons.Check),
-        VNavItem("classes", "Classes", VIcons.School),
-        VNavItem("profile", "Profile", VIcons.User),
-    )
-
-    VScreenScaffold(
-        modifier = modifier,
-        topBar = {
-            if (tab == "update") {
-                VTopTabs(
-                    tabs = listOf("Attendance", "Marks", "Syllabus", "Homework"),
-                    selected = updateSub,
-                    onSelect = { updateSub = it },
-                )
+        when (overlay) {
+            TeacherOverlay.Notifications -> {
+                NotificationsScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
+                return@VTheme
             }
-        },
-        bottomBar = {
-            VBottomNav(items = items, selected = tab, onSelect = { tab = it })
-        },
-    ) { _ ->
-        Box(Modifier.fillMaxSize()) {
-            when (tab) {
-                "home" -> TeacherHomeScreenV2(
-                    onOpenNotifications = { overlay = TeacherOverlay.Notifications },
-                    onOpenCalendar = { overlay = TeacherOverlay.Calendar },
-                )
-                "classes" -> TeacherClassesScreenV2()
-                "profile" -> TeacherProfileScreenV2(onLogout = onLogout)
-                "update" -> when (updateSub) {
-                    "Attendance" -> TeacherAttendanceScreenV2(classId = "", date = "")
-                    "Marks" -> TeacherMarksScreenV2(classId = "", examId = "")
-                    "Syllabus" -> TeacherSyllabusScreenV2(classId = "", subject = "")
-                    "Homework" -> TeacherHomeworkScreenV2()
+            TeacherOverlay.Calendar -> {
+                AcademicCalendarScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
+                return@VTheme
+            }
+            TeacherOverlay.None -> Unit
+        }
+
+        val items = listOf(
+            VNavItem("home", "Home", VIcons.Home),
+            VNavItem("update", "Update", VIcons.Check, badge = 1),
+            VNavItem("classes", "My Classes", VIcons.School),
+            VNavItem("profile", "Profile", VIcons.User),
+        )
+
+        VScreenScaffold(
+            modifier = modifier,
+            topBar = {
+                if (tab == "update") {
+                    VTopTabs(
+                        tabs = listOf("Attendance", "Marks", "Syllabus", "Homework"),
+                        selected = updateSub,
+                        onSelect = { updateSub = it },
+                    )
+                }
+            },
+            bottomBar = {
+                VBottomNav(items = items, selected = tab, onSelect = { tab = it })
+            },
+        ) { _ ->
+            Box(Modifier.fillMaxSize()) {
+                when (tab) {
+                    "home" -> TeacherHomeScreenV2(
+                        onOpenNotifications = { overlay = TeacherOverlay.Notifications },
+                        onOpenCalendar = { overlay = TeacherOverlay.Calendar },
+                        onExit = onLogout,
+                    )
+                    "classes" -> TeacherClassesScreenV2()
+                    "profile" -> TeacherProfileScreenV2(onLogout = onLogout)
+                    "update" -> when (updateSub) {
+                        "Attendance" -> TeacherAttendanceScreenV2(classId = "", date = "")
+                        "Marks" -> TeacherMarksScreenV2(classId = "", examId = "")
+                        "Syllabus" -> TeacherSyllabusScreenV2(classId = "", subject = "")
+                        "Homework" -> TeacherHomeworkScreenV2()
+                    }
                 }
             }
         }

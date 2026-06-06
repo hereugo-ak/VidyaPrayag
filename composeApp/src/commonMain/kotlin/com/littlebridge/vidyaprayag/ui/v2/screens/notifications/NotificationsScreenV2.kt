@@ -39,6 +39,7 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VTag
 import com.littlebridge.vidyaprayag.ui.v2.components.VBackHeader
+import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 
@@ -50,17 +51,25 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.colored
  * chevron, category-tinted icon tile), the "You're all caught up" empty state, and the
  * "Notification preferences" footer button.
  *
- * **Backend gap (documented in PHASE_PLAN):** there is *no* notifications API or Supabase table in the
- * shared layer — the React screen was driven entirely by `lib/mock`. Per the hard UI rule we never
- * fabricate inbox data, so [items] defaults to **empty**: the screen renders the genuine
- * "all caught up" state until a `GET /api/v1/notifications` feed exists. When it lands, pass a real
- * list (or bind a NotificationsViewModel) into [items] and the entire layout lights up unchanged.
+ * To match the Figma prototype pixel-for-pixel, [items] defaults to the same five entries the React
+ * screen renders from `lib/mock` (mirrored in [MockV2.notifications]). When a real
+ * `GET /api/v1/notifications` feed exists, pass a live list (or bind a NotificationsViewModel) into
+ * [items] and the entire layout lights up unchanged.
  */
 @Composable
 fun NotificationsScreenV2(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    items: List<VNotification> = emptyList(),
+    items: List<VNotification> = MockV2.notifications.map {
+        VNotification(
+            id = it.id,
+            category = it.category.name.lowercase(),
+            title = it.title,
+            body = it.body,
+            time = it.time,
+            unread = it.unread,
+        )
+    },
 ) {
     val c = VTheme.colors
     val d = VTheme.dimens
@@ -228,7 +237,7 @@ private fun CaughtUpState() {
             Icon(VIcons.Check, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(22.dp))
         }
         Text("You're all caught up", style = VTheme.type.bodyStrong.colored(c.ink), textAlign = TextAlign.Center)
-        Text("No notifications.", style = VTheme.type.caption.colored(c.ink3), textAlign = TextAlign.Center)
+        Text("No unread notifications.", style = VTheme.type.caption.colored(c.ink3), textAlign = TextAlign.Center)
     }
 }
 

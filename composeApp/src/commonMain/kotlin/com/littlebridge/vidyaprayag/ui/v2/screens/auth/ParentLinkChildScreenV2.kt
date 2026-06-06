@@ -4,189 +4,222 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import com.littlebridge.vidyaprayag.feature.parent.presentation.ChildBasicInfoViewModel
-import com.littlebridge.vidyaprayag.feature.parent.presentation.YourPreferencesViewModel
+import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
+import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
+import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
+import com.littlebridge.vidyaprayag.ui.v2.components.VCard
+import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VInput
 import com.littlebridge.vidyaprayag.ui.v2.components.VTag
-import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
+import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
-import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * ParentLinkChildScreenV2 — the 3-step "link your child" wizard, translated from
- * `Auth.tsx → ParentLinkChild`.
+ * ParentLinkChildScreenV2 — pixel-faithful Compose copy of `Auth.tsx → ParentLinkChild`.
  *
- *  1. About you / child  → [ChildBasicInfoViewModel] (name, grade, interests)
- *  2. Preferences        → [YourPreferencesViewModel] (what matters to this family)
- *  3. Review & finish    → local confirmation
+ * The 3-step "link your child" wizard the Figma prototype renders:
+ *   1. **Tell us about you** — full name + preferred language tags.
+ *   2. **Find your child's school** — search field + a "Match" school result card.
+ *   3. **Link your child** — roll/admission field + the resolved-child preview card
+ *      (driven by [MockV2.childForParent], exactly as the React mock does).
  *
- * **Backend gap (documented in PHASE_PLAN):** there is *no* parent→child link API or Supabase
- * schema yet — these ViewModels are local-state only and have no `submit()`. So this wizard collects
- * the family's input but does **not** persist it; the final step simply calls [onDone] to route into
- * the Parent portal. Per the hard UI rule we render only real (locally-held) state and never fake a
- * server "match". When the link endpoint lands, wire a `submit { onDone() }` into step 3.
+ * The bottom CTA advances steps and finally calls [onDone] to open the dashboard.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ParentLinkChildScreenV2(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
     onBack: () -> Unit = {},
 ) {
-    var step by remember { mutableIntStateOf(0) }
+    val c = VTheme.colors
+    val d = VTheme.dimens
     val total = 3
 
-    val childVm: ChildBasicInfoViewModel = koinViewModel()
-    val prefsVm: YourPreferencesViewModel = koinViewModel()
-    val child by childVm.state.collectAsStateV2()
-    val prefs by prefsVm.state.collectAsStateV2()
+    var step by remember { mutableIntStateOf(1) }
+    var fullName by remember { mutableStateOf("") }
+    var language by remember { mutableStateOf("English") }
+    var schoolQuery by remember { mutableStateOf("") }
+    var rollNo by remember { mutableStateOf("") }
+
+    val child = MockV2.childForParent
 
     Column(
         modifier
             .fillMaxSize()
-            .padding(horizontal = VTheme.dimens.lg)
+            .background(c.background)
+            .padding(horizontal = 24.dp)
             .verticalScroll(rememberScrollState()),
     ) {
-        Spacer(Modifier.height(VTheme.dimens.xl))
-        Text("Step ${step + 1} of $total", style = VTheme.type.label.colored(VTheme.colors.ink3))
-        Spacer(Modifier.height(VTheme.dimens.sm))
+        Spacer(Modifier.height(40.dp))
+        Text("STEP $step OF $total", style = VTheme.type.label.colored(c.ink3))
+        Spacer(Modifier.height(d.sm))
         StepBars(current = step, total = total)
-        Spacer(Modifier.height(VTheme.dimens.lg))
 
         when (step) {
-            0 -> {
-                Text("Tell us about your child", style = VTheme.type.h2.colored(VTheme.colors.ink))
+            1 -> {
+                Spacer(Modifier.height(d.lg))
+                Text("Tell us about you", style = VTheme.type.h1.colored(c.ink))
                 Text(
                     "So your child's school knows who to send updates to.",
-                    style = VTheme.type.body.colored(VTheme.colors.ink2),
-                    modifier = Modifier.padding(top = VTheme.dimens.xs),
+                    style = VTheme.type.body.colored(c.ink2),
                 )
-                Spacer(Modifier.height(VTheme.dimens.lg))
-                VInput(child.name, childVm::updateName, label = "Child's full name", placeholder = "e.g. Riya Sharma", modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(VTheme.dimens.md))
-                VInput(child.grade, childVm::updateGrade, label = "Grade / class", placeholder = "e.g. Class 10", modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(VTheme.dimens.md))
-                VInput(child.dob, childVm::updateDob, label = "Date of birth", placeholder = "DD/MM/YYYY", modifier = Modifier.fillMaxWidth())
-
-                Spacer(Modifier.height(VTheme.dimens.md))
-                Text("Interests", style = VTheme.type.label.colored(VTheme.colors.ink3))
-                Spacer(Modifier.height(VTheme.dimens.sm))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(VTheme.dimens.sm)) {
-                    child.availableInterests.forEach { interest ->
-                        VTag(
-                            text = interest,
-                            active = child.selectedInterests.contains(interest),
-                            onClick = { childVm.toggleInterest(interest) },
-                        )
-                    }
+                Spacer(Modifier.height(d.lg))
+                VInput(
+                    value = fullName,
+                    onValueChange = { fullName = it },
+                    label = "Your full name",
+                    placeholder = "e.g. Sneha Sharma",
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(d.md))
+                Text("PREFERRED LANGUAGE", style = VTheme.type.label.colored(c.ink3))
+                Spacer(Modifier.height(d.sm))
+                Row(horizontalArrangement = Arrangement.spacedBy(d.sm)) {
+                    VTag(text = "English", active = language == "English", onClick = { language = "English" })
+                    VTag(text = "हिन्दी", active = language == "हिन्दी", onClick = { language = "हिन्दी" })
                 }
             }
 
-            1 -> {
-                Text("What matters to you?", style = VTheme.type.h2.colored(VTheme.colors.ink))
+            2 -> {
+                Spacer(Modifier.height(d.lg))
+                Text("Find your child's school", style = VTheme.type.h1.colored(c.ink))
                 Text(
-                    "We'll highlight schools that fit your family.",
-                    style = VTheme.type.body.colored(VTheme.colors.ink2),
-                    modifier = Modifier.padding(top = VTheme.dimens.xs),
+                    "Type the school name. We'll match it against schools using VidyaSetu.",
+                    style = VTheme.type.body.colored(c.ink2),
                 )
-                Spacer(Modifier.height(VTheme.dimens.lg))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(VTheme.dimens.sm)) {
-                    prefs.availablePreferences.forEach { pref ->
-                        VTag(
-                            text = pref.title,
-                            active = prefs.selectedPreferences.contains(pref.id),
-                            onClick = { prefsVm.togglePreference(pref.id) },
-                        )
+                Spacer(Modifier.height(d.lg))
+                VInput(
+                    value = schoolQuery,
+                    onValueChange = { schoolQuery = it },
+                    placeholder = "Search by school name",
+                    leadingIcon = VIcons.Search,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(d.sm))
+                VCard(modifier = Modifier.fillMaxWidth()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(c.teal.copy(alpha = 0.16f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(VIcons.GraduationCap, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(Modifier.width(d.md))
+                        Column(Modifier.weight(1f)) {
+                            Text(MockV2.school.name, style = VTheme.type.bodyStrong.colored(c.ink))
+                            Text("Lucknow • CBSE • 0.6 km", style = VTheme.type.caption.colored(c.ink2))
+                        }
+                        VBadge(text = "Match", tone = VBadgeTone.Arctic)
                     }
                 }
             }
 
             else -> {
-                Text("Review & finish", style = VTheme.type.h2.colored(VTheme.colors.ink))
+                Spacer(Modifier.height(d.lg))
+                Text("Link your child", style = VTheme.type.h1.colored(c.ink))
                 Text(
-                    "Confirm the details before opening your dashboard.",
-                    style = VTheme.type.body.colored(VTheme.colors.ink2),
-                    modifier = Modifier.padding(top = VTheme.dimens.xs),
+                    "Enter the roll or admission number assigned by the school.",
+                    style = VTheme.type.body.colored(c.ink2),
                 )
-                Spacer(Modifier.height(VTheme.dimens.lg))
-                ReviewRow("Child", child.name.ifBlank { "—" })
-                ReviewRow("Grade", child.grade.ifBlank { "—" })
-                ReviewRow("Interests", child.selectedInterests.joinToString(", ").ifBlank { "—" })
-                ReviewRow(
-                    "Priorities",
-                    prefs.availablePreferences
-                        .filter { prefs.selectedPreferences.contains(it.id) }
-                        .joinToString(", ") { it.title }
-                        .ifBlank { "—" },
+                Spacer(Modifier.height(d.lg))
+                VInput(
+                    value = rollNo,
+                    onValueChange = { rollNo = it },
+                    label = "Roll / admission number",
+                    placeholder = "e.g. 02",
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(d.md))
+                VCard(modifier = Modifier.fillMaxWidth()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        VAvatar(name = child.name, size = 48.dp)
+                        Spacer(Modifier.width(d.md))
+                        Column(Modifier.weight(1f)) {
+                            Text(child.name, style = VTheme.type.bodyStrong.colored(c.ink))
+                            Text(
+                                "Class ${MockV2.classDisplay(child.klass)} • Roll ${child.roll}",
+                                style = VTheme.type.caption.colored(c.ink2),
+                            )
+                        }
+                        Icon(VIcons.Check, contentDescription = null, tint = c.successInk, modifier = Modifier.size(18.dp))
+                    }
+                }
+                Spacer(Modifier.height(d.md))
+                Text(
+                    "+ Add another child",
+                    style = VTheme.type.caption.colored(c.tealDeep),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = d.xs),
                 )
             }
         }
 
-        Spacer(Modifier.height(VTheme.dimens.xl))
+        Spacer(Modifier.height(d.xl))
         VButton(
-            text = if (step < total - 1) "Continue" else "Finish & open dashboard",
-            onClick = { if (step < total - 1) step++ else onDone() },
+            text = if (step < total) "Continue" else "Finish & open dashboard",
+            onClick = { if (step < total) step++ else onDone() },
             full = true,
             size = VButtonSize.Lg,
             tone = VButtonTone.Teal,
             soft = false,
+            leading = { Icon(VIcons.ArrowRight, contentDescription = null, modifier = Modifier.size(16.dp)) },
         )
-        Spacer(Modifier.height(VTheme.dimens.md))
+        Spacer(Modifier.height(d.sm))
         VButton(
-            text = if (step == 0) "Cancel" else "Back",
-            onClick = { if (step == 0) onBack() else step-- },
+            text = if (step == 1) "Cancel" else "Back",
+            onClick = { if (step == 1) onBack() else step-- },
             full = true,
             variant = VButtonVariant.Ghost,
             tone = VButtonTone.Navy,
         )
-        Spacer(Modifier.height(VTheme.dimens.xl))
+        Spacer(Modifier.height(d.xl))
     }
 }
 
 @Composable
 private fun StepBars(current: Int, total: Int) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(VTheme.dimens.xs)) {
+    val c = VTheme.colors
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(d6())) {
         repeat(total) { i ->
             Box(
                 Modifier
                     .weight(1f)
-                    .height(6.dp)
+                    .height(4.dp)
                     .clip(CircleShape)
-                    .background(if (i <= current) VTheme.colors.tealDeep else VTheme.colors.border2),
+                    .background(if (i + 1 <= current) c.tealDeep else c.border2),
             )
         }
     }
 }
 
-@Composable
-private fun ReviewRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = VTheme.dimens.xs)) {
-        Text(label, style = VTheme.type.caption.colored(VTheme.colors.ink3), modifier = Modifier.weight(1f))
-        Text(value, style = VTheme.type.bodyStrong.colored(VTheme.colors.ink), modifier = Modifier.weight(2f))
-    }
-}
+private fun d6() = 6.dp
