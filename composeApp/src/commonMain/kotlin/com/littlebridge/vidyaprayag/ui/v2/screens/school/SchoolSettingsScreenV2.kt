@@ -5,10 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -22,8 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import com.littlebridge.vidyaprayag.ui.v2.components.VButton
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
+import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
@@ -41,6 +37,8 @@ fun SchoolSettingsScreenV2(
 ) {
     val c = VTheme.colors
 
+    // Exactly the 8 rows in Admin.tsx → SettingsScreen (no standalone log-out button exists there).
+    // The Account row carries the logout affordance so we keep parity without adding a non-React control.
     val rows = listOf(
         SettingRow(VIcons.GraduationCap, "School profile", "Logo, address, contact info"),
         SettingRow(VIcons.Calendar, "Academic year", "Currently 2025-26 • 173 days left"),
@@ -49,7 +47,7 @@ fun SchoolSettingsScreenV2(
         SettingRow(VIcons.Wallet, "Fee structure", "Edit heads & amounts for next cycle"),
         SettingRow(VIcons.Bell, "Notifications", "Channels & quiet hours"),
         SettingRow(VIcons.Download, "Data export", "CSV / PDF / UDISE (Coming Soon)"),
-        SettingRow(VIcons.Settings, "Account", "Admin email & password"),
+        SettingRow(VIcons.Settings, "Account", "Admin email & password", onClick = onLogout),
     )
 
     Column(
@@ -62,22 +60,27 @@ fun SchoolSettingsScreenV2(
     ) {
         Text("Settings", style = VTheme.type.h1.colored(c.ink))
         rows.forEach { row ->
-            VCard {
+            VCard(onClick = row.onClick) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(c.ink.copy(alpha = 0.06f)), contentAlignment = Alignment.Center) {
                         Icon(row.icon, contentDescription = null, tint = c.ink, modifier = Modifier.size(18.dp))
                     }
                     Column(Modifier.weight(1f)) {
                         Text(row.title, style = VTheme.type.bodyStrong.colored(c.ink))
-                        Text(row.sub, style = VTheme.type.caption.colored(c.ink2))
+                        // React sub: 11px, text-dark-2.
+                        Text(row.sub, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp))
                     }
-                    Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(16.dp))
+                    // React: ChevronRight size 16, opacity-50 on the default foreground.
+                    Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
                 }
             }
         }
-        Spacer(Modifier.height(8.dp))
-        VButton(text = "Log out", onClick = onLogout, full = true, variant = VButtonVariant.Ghost)
     }
 }
 
-private data class SettingRow(val icon: ImageVector, val title: String, val sub: String)
+private data class SettingRow(
+    val icon: ImageVector,
+    val title: String,
+    val sub: String,
+    val onClick: (() -> Unit)? = null,
+)

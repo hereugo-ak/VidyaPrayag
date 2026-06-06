@@ -1,6 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.school
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,7 +42,6 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VInput
 import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
-import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
 import com.littlebridge.vidyaprayag.ui.v2.components.VTopTabs
 import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
@@ -105,9 +105,10 @@ private fun RecordsAttendance() {
                     Text("Roll ${s.roll}", style = VTheme.type.dataSm.colored(c.ink3))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    PALButton("P", s.today == MockV2.Presence.Present, c.successInk)
-                    PALButton("A", s.today == MockV2.Presence.Absent, c.dangerInk)
-                    PALButton("L", s.today == MockV2.Presence.Late, c.warningInk)
+                    // React PAL fills use the pastel --success/--danger/--warning (not *Ink).
+                    PALButton("P", s.today == MockV2.Presence.Present, c.success)
+                    PALButton("A", s.today == MockV2.Presence.Absent, c.danger)
+                    PALButton("L", s.today == MockV2.Presence.Late, c.warning)
                 }
             }
         }
@@ -122,7 +123,8 @@ private fun PALButton(letter: String, active: Boolean, tone: Color) {
         Modifier.size(36.dp).clip(CircleShape).background(if (active) tone else c.ink.copy(alpha = 0.06f)),
         contentAlignment = Alignment.Center,
     ) {
-        Text(letter, style = VTheme.type.label.colored(if (active) Color.White else c.ink3).copy(letterSpacing = TextUnit.Unspecified, fontWeight = FontWeight.Bold))
+        // Active PAL text is var(--void) (near-white background token), idle is text-dark-3.
+        Text(letter, style = VTheme.type.label.colored(if (active) c.background else c.ink3).copy(letterSpacing = TextUnit.Unspecified, fontWeight = FontWeight.Bold))
     }
 }
 
@@ -159,8 +161,13 @@ private fun RecordsMarks() {
 @Composable
 private fun MarkBox(value: String) {
     val c = VTheme.colors
+    // React: w-20 (80px), rounded-md (6px), 1px border-dark-2, right-aligned mono, px-3.
     Box(
-        Modifier.size(width = 64.dp, height = 32.dp).clip(RoundedCornerShape(8.dp)).background(c.ink.copy(alpha = 0.06f)),
+        Modifier
+            .size(width = 80.dp, height = 32.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(c.ink.copy(alpha = 0.06f))
+            .border(1.dp, c.border2, RoundedCornerShape(6.dp)),
         contentAlignment = Alignment.CenterEnd,
     ) {
         Text(value, style = VTheme.type.data.colored(c.ink), modifier = Modifier.padding(end = 12.dp))

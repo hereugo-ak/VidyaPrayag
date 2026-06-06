@@ -1,5 +1,6 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.school
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -20,8 +22,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
+import com.littlebridge.vidyaprayag.ui.v2.components.VBackHeader
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
@@ -47,6 +52,13 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 fun SchoolCommsScreenV2(modifier: Modifier = Modifier) {
     val c = VTheme.colors
     var tab by remember { mutableStateOf("Announcements") }
+    var openAnnouncement by remember { mutableStateOf<String?>(null) }
+
+    // React `Comms` opens `AnnouncementDetail` on card tap; we mirror that with a leaf overlay.
+    openAnnouncement?.let { id ->
+        AnnouncementDetailV2(id = id, onBack = { openAnnouncement = null }, modifier = modifier)
+        return
+    }
 
     Column(
         modifier
@@ -63,9 +75,10 @@ fun SchoolCommsScreenV2(modifier: Modifier = Modifier) {
                 "Announcements" -> {
                     VButton(text = "Compose announcement", onClick = {}, full = true, size = VButtonSize.Lg, tone = VButtonTone.Teal, leading = { Icon(VIcons.Plus, null, modifier = Modifier.size(16.dp)) })
                     MockV2.announcements.forEach { a ->
-                        VCard(onClick = {}) {
+                        VCard(onClick = { openAnnouncement = a.id }) {
                             Text(a.title, style = VTheme.type.bodyStrong.colored(c.ink))
-                            Text("${a.recipients} • ${a.date}", style = VTheme.type.caption.colored(c.ink2))
+                            // React: subtitle has marginTop 2 below the title.
+                            Text("${a.recipients} • ${a.date}", style = VTheme.type.caption.colored(c.ink2), modifier = Modifier.padding(top = 2.dp))
                             Spacer(Modifier.height(8.dp))
                             VBadge(text = "Opens ${a.opens}", tone = VBadgeTone.Arctic)
                         }
@@ -119,5 +132,58 @@ fun SchoolCommsScreenV2(modifier: Modifier = Modifier) {
                 }
             }
         }
+    }
+}
+
+/**
+ * AnnouncementDetailV2 — `Admin.tsx → AnnouncementDetail` (exported). Title, meta, recipient +
+ * channel badges, body copy, and (Admin context = React `dark`) the 3-up Delivery stat card.
+ */
+@Composable
+private fun AnnouncementDetailV2(id: String, onBack: () -> Unit, modifier: Modifier = Modifier) {
+    val c = VTheme.colors
+    val a = MockV2.announcements.find { it.id == id } ?: MockV2.announcements[0]
+    // React splits opens "opened / sent" — index 0 = opened, index 1 = sent.
+    val parts = a.opens.split(" / ")
+    val opened = parts.getOrElse(0) { a.opens }
+    val sent = parts.getOrElse(1) { a.opens }
+
+    Column(modifier.fillMaxSize()) {
+        VBackHeader(title = "Announcement", onBack = onBack)
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(vertical = 20.dp),
+        ) {
+            Text(a.title, style = VTheme.type.h2.colored(c.ink))
+            Text("${a.date} • Posted by School Administration", style = VTheme.type.caption.colored(c.ink2), modifier = Modifier.padding(top = 4.dp))
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                VBadge(text = a.recipients, tone = VBadgeTone.Arctic)
+                VBadge(text = "App + WhatsApp", tone = VBadgeTone.Success)
+            }
+            // React body: 14px, line-height 1.6 → 22.4sp.
+            Text(a.body, style = VTheme.type.body.colored(c.ink2).copy(lineHeight = 22.4.sp), modifier = Modifier.padding(top = 16.dp))
+            Spacer(Modifier.height(16.dp))
+            VCard {
+                VLabel("Delivery")
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DeliveryStat("Sent", sent, Modifier.weight(1f))
+                    DeliveryStat("Opened", opened, Modifier.weight(1f))
+                    DeliveryStat("Replied", "9", Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeliveryStat(label: String, value: String, modifier: Modifier = Modifier) {
+    val c = VTheme.colors
+    // Mirrors Admin.tsx `Stat`: tile bg ink@6%, 10px label, 16px mono value.
+    Column(
+        modifier.clip(RoundedCornerShape(12.dp)).background(c.ink.copy(alpha = 0.06f)).padding(12.dp),
+    ) {
+        Text(label.uppercase(), style = VTheme.type.label.colored(c.ink3).copy(fontSize = 10.sp))
+        Text(value, style = VTheme.type.data.colored(c.ink).copy(fontSize = 16.sp), modifier = Modifier.padding(top = 4.dp))
     }
 }
