@@ -140,15 +140,137 @@ depth vs. the design still warrants a per-route audit, but they are not "missing
 
 - [x] Phase 1 — design system (`a5713a5`)
 - [x] Phase 2 — `shared/feature/teacher` data + 7 VMs + Koin (`3bea961`…`d420ab5`)
-- [x] Phase 3 — `ui/v2` screens + portal shells + `NavGraphV2` authored (`2a4bb7f`…`784570a`) — ⚠️ not yet wired live
+- [x] Phase 3 — `ui/v2` screens + portal shells + `NavGraphV2` authored (`2a4bb7f`…`784570a`)
+- [x] **Step 8 / Phase 3E-2 — `App.kt` → `NavGraphV2`, old `ui/` DELETED in full** (`c8ae0db`) — UI cutover live
+- [x] **`VInput.kt` missing `shapeMd` import fixed** (Android `compileDevDebugKotlinAndroid` error)
 - [x] Phase 5A — teacher schema (`6553df2`) — ⚠️ `supabase_schema` parity owed
 - [x] Phase 5B-5D — teacher backend (11 routes, scoped) (`59470ec`)
 - [x] Android build break fixed (`cc5c151`)
-- [ ] Verify Android build green on dev machine
+- [ ] Verify Android build green on dev machine (in progress — fixing compile errors as they surface)
 - [ ] `supabase_schema` parity + teacher backend smoke
-- [ ] **Step 8** — `App.kt` → `NavGraphV2` (+ TEACHER branch), delete old `ui/`, rename `ui/v2`→`ui`
+- [ ] Rename `ui/v2`→`ui` (cosmetic, after build is green)
 - [ ] Flip master-doc teacher statuses; refresh stale §3/§5 tables
 - [ ] Full `:composeApp` + `:server` Gradle build green (≥8 GB host)
+
+---
+
+## Phase 3 batch ledger (detail)
+
+**Goal:** Compose the actual screens from Phase 1 primitives, per portal, then flip the app over.
+Built in small batches (~3 files); each batch → commit + push + PR update + this ledger refreshed.
+
+### Batch 3A — auth + shared scaffolding ✅
+| File | Contents |
+|---|---|
+| `ui/v2/screens/Shared.kt` | `collectAsStateV2()` (terse `StateFlow` collector), `VSectionHeader`, `VPortalHeader` (avatar + name + subtitle) — shared screen vocabulary. |
+| `ui/v2/screens/auth/WelcomeScreenV2.kt` | Splash/welcome from `Auth.tsx → Splash`: teal hero (logo + wordmark + tagline) + lifted lavender CTA sheet (Get started / I already have an account). Pure `V*` composition. |
+| `ui/v2/screens/auth/LoginScreenV2.kt` | Portal selector + identifier/password/OTP, **re-bound 1:1 to existing `AuthViewModel`**. Teacher portal shown as disabled "COMING SOON" chip until backend teacher-auth ships (G1) — never wires a missing route. |
+
+- [x] `ui/v2/auth/` — Welcome + Login (portal selector, phone/email→OTP/password) bound to `AuthViewModel`.
+
+### Batch 3B-1 — teacher Home / Classes / Profile ✅
+| File | VM bound | Contents |
+|---|---|---|
+| `ui/v2/screens/teacher/TeacherHomeScreenV2.kt` | `TeacherHomeViewModel` | Today's glance (4 stat cards) + period timeline + task list; empty states via `VEmptyState`. |
+| `ui/v2/screens/teacher/TeacherClassesScreenV2.kt` | `TeacherClassesViewModel` | Assigned-class cards: subject/headcount, syllabus + attendance `VProgressBar`, class-teacher badge, tap → `onOpenClass(id)`. |
+| `ui/v2/screens/teacher/TeacherProfileScreenV2.kt` | `TeacherProfileViewModel` | Identity card, subject/class chips (`FlowRow`), contact rows, sign-out. |
+
+- [x] `ui/v2/teacher/` (part 1) — Home / MyClasses / Profile bound to teacher VMs.
+
+### Batch 3B-2 — teacher Update sub-tabs (Attendance / Marks / Syllabus) ✅
+| File | VM bound | Contents |
+|---|---|---|
+| `ui/v2/screens/teacher/TeacherAttendanceScreenV2.kt` | `TeacherAttendanceViewModel` | `load(classId,date)`; per-student P/A/L `VTag` toggles, "Mark all present", live present/absent/late tallies, immutable submit. |
+| `ui/v2/screens/teacher/TeacherMarksScreenV2.kt` | `TeacherMarksViewModel` | `load(classId,examId)`; per-student `VInput` score (VM clamps 0..maxMarks), entered/total counter, submit (enabled when ≥1 entered). |
+| `ui/v2/screens/teacher/TeacherSyllabusScreenV2.kt` | `TeacherSyllabusViewModel` | `load(classId,subject)`; `VProgressRing` coverage + unit list with optimistic `toggleUnit` (disabled while `updatingUnitId`). |
+
+- [x] `ui/v2/teacher/` (part 2a) — Attendance · Marks · Syllabus.
+
+### Batch 3B-3 — teacher Homework + portal shell ✅ (Teacher portal complete)
+| File | VM bound | Contents |
+|---|---|---|
+| `ui/v2/screens/teacher/TeacherHomeworkScreenV2.kt` | `TeacherHomeworkViewModel` | "Assign new" composer (class/title/desc/due) → `create()`; one-shot `createSuccess` clears the form; assigned-list cards with submission-ratio `VProgressBar`. |
+| `ui/v2/screens/teacher/TeacherPortalV2.kt` | — (shell) | 4-tab `VBottomNav` (Home·Update·Classes·Profile) + inner `VTopTabs` for the Update sub-tabs; each leaf is a `*ScreenV2` that `koinViewModel()`s its own VM. |
+
+- [x] `ui/v2/teacher/` — **complete** (Home / Classes / Profile / Update[Attendance·Marks·Syllabus·Homework] + portal shell). 8 files, all bound to the 7 teacher VMs.
+
+### Batch 3C-1 — parent Home / Fees / Academics ✅
+| File | VM bound | Contents |
+|---|---|---|
+| `ui/v2/screens/parent/ParentHomeScreenV2.kt` | `ParentDashboardViewModel` | Child hero (`userDetails` → name/photo), today's-glance status strip, quick actions, shortlisted-schools list (`schools`+`shortlist`, Discovery cross-link). |
+| `ui/v2/screens/parent/ParentFeesScreenV2.kt` | `FeeViewModel` | Outstanding/collected summary + collection `VProgressBar`, overdue counter, fee-announcements feed; all monetary strings pre-formatted by the VM. |
+| `ui/v2/screens/parent/ParentAcademicsScreenV2.kt` | `TrackProgressViewModel` | Journey hero (`VProgressRing` + level), achievement badges (`FlowRow`), per-competency `VProgressBar`s, emotional-intelligence meters. |
+
+- [x] `ui/v2/parent/` (part 1) — Home / Fees / Academics bound to parent VMs.
+
+### Batch 3C-2 — parent Activity + portal shell ✅ (Parent portal complete)
+| File | VM bound | Contents |
+|---|---|---|
+| `ui/v2/screens/parent/ParentActivityScreenV2.kt` | `ParentAnnouncementViewModel` | School-announcements feed (featured-first), category badges, WhatsApp-sync `Switch` (`toggleWhatsAppSync`). Messaging (G7) intentionally not wired. |
+| `ui/v2/screens/parent/ParentPortalV2.kt` | — (shell) | 4-tab `VBottomNav` (Home·Academics·Fees·Activity); each leaf `koinViewModel()`s its own VM; `tone = Light` (lavender) via host `VTheme`. |
+
+- [x] `ui/v2/parent/` — **complete** (Home / Academics / Fees / Activity + portal shell). 5 files, bound to `ParentDashboard`/`Fee`/`TrackProgress`/`ParentAnnouncement` VMs.
+
+### Batch 3D-1 — admin Home / Comms + Discovery ✅
+| File | VM bound | Contents |
+|---|---|---|
+| `ui/v2/screens/school/SchoolHomeScreenV2.kt` | `SchoolDashboardViewModel` + `AnalyticsDashboardViewModel` | Setup-progress `VProgressBar` + onboarding step list (status dot/badge), analytics cards grid, performance `VSparkline`. |
+| `ui/v2/screens/school/SchoolCommsScreenV2.kt` | `SchoolAnnouncementsViewModel` | Announcement list + category filter chips (`setCategoryFilter`); messaging/PTM (G7/G8) left for `VComingSoon`. |
+| `ui/v2/screens/discovery/DiscoveryScreenV2.kt` | `ParentDashboardViewModel` (wraps `GetSchoolsUseCase`) | School marketplace: search + board filter, school cards (verified/SRI badges), shortlist toggle (max-3 enforced in VM), `onOpenSchool` hook. |
+
+- [x] `ui/v2/school/` (admin) part 1 — Home / Comms.
+- [x] `ui/v2/discovery/` — Discovery school list (SRI/reviews/compare = G11 COMING SOON).
+
+### Batch 3D-2 — admin People / Records ✅
+| File | VM bound | Contents |
+|---|---|---|
+| `ui/v2/screens/school/SchoolPeopleScreenV2.kt` | `StudentAnalyticsViewModel` | Retention-risk counts (Critical/Medium/Low cards), at-risk student list (`VAvatar` + risk badge), subject-engagement `VProgressBar`s. Teacher roster = G1 `VComingSoon`. |
+| `ui/v2/screens/school/SchoolRecordsScreenV2.kt` | `SyllabusCoverageViewModel` | Overall coverage % + bar, per-department progress, lagging alerts (`VStatusDot` + delay badge), academic-milestone rows. Attendance/marks (G3/G4) not fabricated. |
+
+- [x] `ui/v2/school/` (admin) part 2a — People / Records.
+
+### Batch 3D-3 — admin Settings + 5-tab portal shell ✅ (Admin portal complete)
+| File | VM bound | Contents |
+|---|---|---|
+| `ui/v2/screens/school/SchoolSettingsScreenV2.kt` | `InstitutionalProfileViewModel` | Identity card, public-listing `Switch` (`togglePublic`), profile-completion + storage `VProgressBar`s, sign-out (`VButton` Destructive). |
+| `ui/v2/screens/school/SchoolPortalV2.kt` | — (shell) | 5-tab `VBottomNav` (Home·People·Records·Comms·Settings); each leaf `koinViewModel()`s its own VM; `tone = Warm` via host `VTheme`. |
+
+- [x] `ui/v2/school/` (admin) — **complete** (Home / People / Records / Comms / Settings + 5-tab shell). 6 files, bound to `SchoolDashboard`/`Analytics`/`StudentAnalytics`/`SyllabusCoverage`/`SchoolAnnouncements`/`InstitutionalProfile` VMs.
+- [x] `ui/v2/discovery/` — Discovery school list (SRI/reviews/compare = G11 COMING SOON).
+
+### Phase 3E — NavGraphV2 + entrypoint swap (in progress)
+
+#### Batch 3E-1 — portal-aware NavGraphV2 ✅
+| File | Contents |
+|---|---|
+| `ui/v2/navigation/NavGraphV2.kt` | Role-driven root (Compose translation of `App.tsx`'s screen graph). Picks portal by `authState.role` and applies the right `VPortalTone` — PARENT/Discovery = `Light`, TEACHER/ADMIN = `Warm`. Unauth flow = Welcome → Login → Discovery (browse-first) via `AnimatedContent`. Each portal owns its own tabbed nav (`*PortalV2`); on auth success the host `MainViewModel.authState` flips and the graph recomposes into the role portal. |
+
+- [x] `ui/v2/navigation/NavGraphV2.kt` — portal-aware root (TEACHER branch included; no flat 35-route graph).
+
+#### Batch 3E-2 — entrypoint swap + total deletion of the old UI ✅ (this batch)
+| Change | Detail |
+|---|---|
+| **`App.kt` rewritten** | Now drives `ui/v2/` **exclusively**. `KoinContext` → `MainViewModel` → Coil loader → while `!authState.isLoaded` a minimal lavender `VTheme(Light)` + `CircularProgressIndicator` splash, else `NavGraphV2(role = authState.role, isAuthenticated = !token.isNullOrBlank(), onLogout = { viewModel.logout() })`. The TEACHER role is handled inside `NavGraphV2` (`role.uppercase()` switch), so no separate start-destination branch is needed. The dev backend banner is preserved. **All imports of the old `ui.theme`/`ui.screens`/`navigation` removed.** |
+| **Old `ui/` deleted in full** | Removed `ui/{theme,components,auth,screens,location,media}` from `commonMain` — every old `VidyaPrayag*` component, `VidyaPrayagTheme`, `MidnightColors`, all 17 admin + 14 parent screens, `SplashScreen`, `CommonLandingScreen`, `AuthBottomSheet`, the `expect` `LocationProvider`/`MediaPicker`/`PlatformAppearance`. Only `ui/v2/` and `App.kt` remain in `commonMain`. |
+| **Old `navigation/` deleted** | `navigation/NavGraph.kt` (35-destination `NavHost`) + `AppNavigator.kt` (`ProvideAppNavigator`/`LocalAppNavigator`) removed — superseded by `NavGraphV2`. |
+| **Platform actuals deleted** | The `actual` `LocationProvider`/`MediaPicker`/`PlatformAppearance` under `androidMain`/`iosMain`/`jsMain`/`jvmMain`/`wasmJsMain` removed (their only consumers were the deleted old screens; `ui/v2` uses none of them). Every platform entrypoint (`MainActivity`, jvm/web `main`, `MainViewController`) only calls `App()` — untouched. |
+
+**Static verification (real Gradle build still owed — see constraint):**
+- Every `App.kt` `ui/v2` import target exists (`NavGraphV2`, `VTheme`, `VColors`, `VPortalTone`, `vColorsFor`); `MainViewModel.authState`/`logout()` confirmed present.
+- `NavGraphV2` → portal/screen function signatures match 1:1 (`onLogout`, `modifier`, `onAuthSuccess`, `onGetStarted`/`onHaveAccount`, `onOpenSchool`).
+- **All 18 ViewModels** resolved by `koinViewModel()` across `ui/v2` are registered in `shared/di/Koin.kt` (Auth, Parent×4, School×6, Teacher×7).
+- Repo-wide grep: **0 remaining code references** to any deleted symbol/package.
+
+- [x] **`App.kt` swapped** to `ui/v2` via `NavGraphV2` (TEACHER role handled in the graph) + `logout()` wired.
+- [x] **Old `ui/` + `navigation/` + platform actuals deleted** — `commonMain` now holds only `App.kt` + `ui/v2/`.
+- [x] **Android compile fix:** `VInput.kt` was missing `import …ui.v2.theme.shapeMd` (the `shape*` helpers are top-level extensions on `VDimens`, so they must be imported into the `components` package). Resolved the `Unresolved reference 'shapeMd'` from `:composeApp:compileDevDebugKotlinAndroid`.
+- [ ] **Run the real Gradle build** on a ≥8 GB host / dev machine (sandbox OOM-starves at config). This is the last gate before the next deploy.
+
+## PHASE 4 — Polish
+
+- [ ] Bundle Plus Jakarta Sans + DM Mono into `composeResources`; swap `defaultVTypography()` font families (single construction-site change, no call-site churn).
+- [ ] Night-tone QA pass across all screens.
+- [ ] Per-target smoke (android + jvm desktop + wasmJs).
 
 ---
 

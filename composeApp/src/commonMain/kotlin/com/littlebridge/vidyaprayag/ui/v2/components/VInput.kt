@@ -33,6 +33,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import com.littlebridge.vidyaprayag.ui.v2.theme.shapeMd
 
 /**
  * VInput — a single-line text field with the design's focus treatment: surface lifts cream→card,

@@ -2,9 +2,10 @@ package com.littlebridge.vidyaprayag
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,8 +15,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.littlebridge.vidyaprayag.util.Config
-import androidx.navigation.compose.rememberNavController
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.compose.setSingletonImageLoaderFactory
@@ -23,30 +22,42 @@ import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.crossfade
-import com.littlebridge.vidyaprayag.navigation.Destination
-import com.littlebridge.vidyaprayag.navigation.NavGraph
-import com.littlebridge.vidyaprayag.navigation.ProvideAppNavigator
 import com.littlebridge.vidyaprayag.presentation.MainViewModel
-import com.littlebridge.vidyaprayag.ui.screens.SplashScreen
-import com.littlebridge.vidyaprayag.ui.theme.AppTheme
-import com.littlebridge.vidyaprayag.ui.theme.VidyaPrayagTheme
+import com.littlebridge.vidyaprayag.ui.v2.navigation.NavGraphV2
+import com.littlebridge.vidyaprayag.ui.v2.theme.VColors
+import com.littlebridge.vidyaprayag.ui.v2.theme.VPortalTone
+import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
+import com.littlebridge.vidyaprayag.ui.v2.theme.vColorsFor
+import com.littlebridge.vidyaprayag.util.Config
 import io.ktor.client.*
 import okio.FileSystem
 import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.annotation.KoinExperimentalAPI
 
-import org.koin.compose.viewmodel.koinViewModel
-
+/**
+ * Application entrypoint — drives the **`ui/v2`** design-system UI exclusively.
+ *
+ * The legacy `ui/` (theme/components/auth/screens) and the old 35-destination
+ * `navigation/NavGraph.kt` have been removed; navigation is now role-driven through
+ * [NavGraphV2], which selects the correct portal (`SchoolPortalV2` / `TeacherPortalV2` /
+ * `ParentPortalV2`) and applies the matching [VPortalTone].
+ *
+ * Flow:
+ *  - `KoinContext` → [MainViewModel] (auth state).
+ *  - Install the Coil image loader (Ktor fetcher + Supabase token-stripping cache mapper).
+ *  - While auth is still loading → a minimal lavender splash with a spinner.
+ *  - Once loaded → [NavGraphV2] with `role` + `isAuthenticated` + `onLogout`.
+ */
 @OptIn(KoinExperimentalAPI::class, coil3.annotation.ExperimentalCoilApi::class)
 @Composable
 @Preview
 fun App() {
     KoinContext {
         val viewModel: MainViewModel = koinViewModel()
-        val themeName by viewModel.themeName.collectAsState()
         val authState by viewModel.authState.collectAsState()
-        
+
         val httpClient = koinInject<HttpClient>()
         val platform = koinInject<Platform>()
 
@@ -82,53 +93,45 @@ fun App() {
                 .build()
         }
 
-        val appTheme = try { AppTheme.valueOf(themeName) } catch(e: Exception) { AppTheme.LIGHT }
+        // Resolve the colors for a lavender (Light) splash before the portal tone is known.
+        val splashColors: VColors = vColorsFor(VPortalTone.Light)
 
-        VidyaPrayagTheme(
-            initialTheme = appTheme,
-            onThemeChange = { viewModel.setTheme(it.name) }
-        ) {
-            Box(modifier = Modifier.fillMaxWidth()) {
-                if (!authState.isLoaded) {
-                    SplashScreen()
-                } else {
-                    key(authState.token, authState.role) {
-                        val navController = rememberNavController()
-                        val startDestination = when {
-                            authState.token.isNullOrBlank() -> Destination.Landing
-                            authState.role == "ADMIN" -> Destination.SchoolDashboard
-                            authState.role == "PARENT" -> Destination.ParentDashboard
-                            else -> Destination.Landing
-                        }
-
-                        ProvideAppNavigator(navController) {
-                            NavGraph(
-                                navController = navController,
-                                startDestination = startDestination
-                            )
-                        }
+        Box(modifier = Modifier.fillMaxSize().background(splashColors.background)) {
+            if (!authState.isLoaded) {
+                // Minimal loading state until auth/role have been read from preferences.
+                VTheme(tone = VPortalTone.Light) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = splashColors.teal)
                     }
                 }
+            } else {
+                val isAuthenticated = !authState.token.isNullOrBlank()
+                NavGraphV2(
+                    role = authState.role,
+                    isAuthenticated = isAuthenticated,
+                    onLogout = { viewModel.logout() },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
 
-                // Debug-only backend banner (SCHOOL_SIDE_STATUS_REPORT §8.4).
-                // Shows the exact base URL the dev app is using so a phone
-                // screenshot proves laptop-vs-Render at a glance. Red = still
-                // pointing at Render (devBaseUrl not set), green = laptop/LAN.
-                if (Config.isDev) {
-                    val isRender = Config.schoolBaseUrl.contains("onrender.com")
-                    Text(
-                        text = "DEV → ${Config.schoolBaseUrl}" +
-                            if (isRender) "  ⚠ set devBaseUrl" else "",
-                        color = Color.White,
-                        fontSize = 9.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .fillMaxWidth()
-                            .background(if (isRender) Color(0xFFD32F2F) else Color(0xFF2E7D32))
-                            .padding(horizontal = 8.dp, vertical = 2.dp)
-                    )
-                }
+            // Debug-only backend banner (SCHOOL_SIDE_STATUS_REPORT §8.4).
+            // Shows the exact base URL the dev app is using so a phone
+            // screenshot proves laptop-vs-Render at a glance. Red = still
+            // pointing at Render (devBaseUrl not set), green = laptop/LAN.
+            if (Config.isDev) {
+                val isRender = Config.schoolBaseUrl.contains("onrender.com")
+                Text(
+                    text = "DEV → ${Config.schoolBaseUrl}" +
+                        if (isRender) "  ⚠ set devBaseUrl" else "",
+                    color = Color.White,
+                    fontSize = 9.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .background(if (isRender) Color(0xFFD32F2F) else Color(0xFF2E7D32))
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                )
             }
         }
     }
