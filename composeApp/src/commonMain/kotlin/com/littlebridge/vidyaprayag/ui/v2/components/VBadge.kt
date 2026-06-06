@@ -13,11 +13,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 import com.littlebridge.vidyaprayag.ui.v2.theme.shapeSm
+
+// VTag active palette is fixed in the design (`primitives.tsx`): bg #dcf2ef, fg #006a60,
+// border rgba(0,106,96,0.18) — independent of the night/warm tone remap. §2#6 / §13.10.
+private val TagActiveBg = Color(0xFFDCF2EF)
+private val TagActiveFg = Color(0xFF006A60)
+private val TagActiveBorder = Color(0x2E006A60) // rgba(0,106,96,0.18)
 
 /** Semantic tones for [VBadge]. Mirrors primitives.tsx `VBadge` tone union. */
 enum class VBadgeTone { Arctic, Success, Warning, Danger, Neutral }
@@ -42,7 +51,11 @@ fun VBadge(
     }
     Text(
         text = text,
-        style = VTheme.type.label.colored(fg).copy(letterSpacing = VTheme.type.caption.letterSpacing),
+        // React VBadge: 11 / 600 / 0.04em — NOT uppercase, NOT 0.08em tracking. §matrix.
+        style = VTheme.type.label.colored(fg).copy(
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.04.em,
+        ),
         modifier = modifier
             .clip(RoundedCornerShape(999.dp))
             .background(bg)
@@ -63,9 +76,10 @@ fun VTag(
     contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
 ) {
     val c = VTheme.colors
-    val bg = if (active) c.teal.copy(alpha = 0.14f) else c.cream
-    val fg = if (active) c.tealDeep else c.ink2
-    val borderColor = if (active) c.tealDeep.copy(alpha = 0.18f) else c.border1
+    // §2#6 / §matrix: active bg is the fixed #dcf2ef, fg #006a60, border rgba(0,106,96,.18).
+    val bg = if (active) TagActiveBg else c.cream
+    val fg = if (active) TagActiveFg else c.ink2
+    val borderColor = if (active) TagActiveBorder else c.shadowTint.copy(alpha = 0.04f)
 
     var mod = modifier
         .clip(VTheme.dimens.shapeSm)

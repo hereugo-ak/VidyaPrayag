@@ -71,7 +71,11 @@ fun VTopTabs(
                 ) {
                     Text(
                         text = tab,
-                        style = VTheme.type.caption.colored(color).copy(fontWeight = FontWeight.SemiBold),
+                        // React VTopTabs: 13 / 600 (not caption's 12). §matrix.
+                        style = VTheme.type.dataSm.colored(color).copy(
+                            fontFamily = VTheme.type.uiFamily,
+                            fontWeight = FontWeight.SemiBold,
+                        ),
                         modifier = Modifier.padding(vertical = 12.dp),
                     )
                     Box(
@@ -147,7 +151,8 @@ fun VBottomNav(
                                     .align(Alignment.TopEnd)
                                     .padding(start = 10.dp)
                                     .clip(CircleShape)
-                                    .background(c.dangerInk)
+                                    // §matrix: bottom-nav badge is #c14a44 (rose), not dangerInk #b3261e.
+                                    .background(Color(0xFFC14A44))
                                     .padding(horizontal = 5.dp, vertical = 1.dp),
                             ) {
                                 Text(

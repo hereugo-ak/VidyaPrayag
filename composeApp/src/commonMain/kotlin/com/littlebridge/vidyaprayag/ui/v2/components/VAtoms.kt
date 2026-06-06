@@ -25,7 +25,7 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 @Composable
 fun VDivider(
     modifier: Modifier = Modifier,
-    color: Color = VTheme.colors.border1,
+    color: Color = VTheme.colors.hairline,
 ) {
     Box(
         modifier
@@ -47,7 +47,8 @@ fun VLabel(
 ) {
     Text(
         text = text.uppercase(),
-        style = VTheme.type.label.colored(color),
+        // §0.4: the React `Label` component is 11/700/0.10em uppercase ink-3 → labelStrong.
+        style = VTheme.type.labelStrong.colored(color),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier,

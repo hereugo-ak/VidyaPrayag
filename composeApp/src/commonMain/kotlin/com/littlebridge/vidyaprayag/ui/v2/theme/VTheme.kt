@@ -22,7 +22,7 @@ import androidx.compose.ui.text.TextStyle
 fun VTheme(
     tone: VPortalTone = VPortalTone.Light,
     colors: VColors = vColorsFor(tone),
-    typography: VTypography = defaultVTypography(),
+    typography: VTypography = vidyaSetuTypography(),
     dimens: VDimens = DefaultVDimens,
     content: @Composable () -> Unit,
 ) {

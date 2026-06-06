@@ -35,8 +35,10 @@ fun SchoolPortalV2(
     onLogout: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    // The admin portal is the deep-black "night" surface in the design (Admin.tsx renders `dark`).
-    VTheme(tone = VPortalTone.Night) {
+    // UI_FIDELITY_AUDIT §0.5: Admin.tsx renders under `PhoneFrame dark`, but legacy `dark` == the
+    // `.warm` scope, which is a WARM-LIGHT theme (lavender bg, dark ink, white cards) — NOT black.
+    // So the admin portal must be Warm, never Night.
+    VTheme(tone = VPortalTone.Warm) {
         var tab by remember { mutableStateOf("home") }
         var overlay by remember { mutableStateOf(SchoolOverlay.None) }
 

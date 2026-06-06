@@ -113,6 +113,7 @@ fun VButton(
     successLabel: String = "Done",
     successDurationMs: Long = 1400L,
     leading: (@Composable () -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     val c = VTheme.colors
     val pal = tonePalette(tone)
@@ -192,6 +193,7 @@ fun VButton(
                     VButtonPhase.Idle -> {
                         leading?.invoke()
                         Text(text, style = VTheme.type.h4.colored(skin.fg).copy(fontWeight = FontWeight.SemiBold))
+                        trailing?.invoke()
                     }
                     VButtonPhase.Loading -> {
                         val transition = rememberInfiniteTransition(label = "spin")

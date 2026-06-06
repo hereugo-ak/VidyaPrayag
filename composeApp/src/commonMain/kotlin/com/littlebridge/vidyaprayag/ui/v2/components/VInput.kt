@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.KeyboardType
@@ -33,7 +34,10 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
-import com.littlebridge.vidyaprayag.ui.v2.theme.shapeMd
+import com.littlebridge.vidyaprayag.ui.v2.theme.shapeInput
+
+// React VInput focus glow uses #3cd1be (brighter than --teal) @ 15% — §13.6 / matrix.
+private val FocusGlow = Color(0xFF3CD1BE)
 
 /**
  * VInput — a single-line text field with the design's focus treatment: surface lifts cream→card,
@@ -60,26 +64,28 @@ fun VInput(
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
 
-    val borderColor by animateColorAsState(if (focused) c.tealDeep else c.border1, tween(180), label = "border")
+    val borderColor by animateColorAsState(if (focused) c.tealDeep else c.hairline, tween(180), label = "border")
     val bg by animateColorAsState(if (focused) c.card else c.cream, tween(180), label = "bg")
     val glow by animateDpAsState(if (focused) 4.dp else 0.dp, tween(180), label = "glow")
     val iconTint by animateColorAsState(if (focused) c.tealDeep else c.ink3, tween(180), label = "iconTint")
 
-    val shape = VTheme.dimens.shapeMd
+    // §matrix: VInput radius is 12 (React `rounded-[12px]`), not the 10 legacy md.
+    val shape = VTheme.dimens.shapeInput
 
     Column(modifier) {
         if (label != null) {
             Text(
                 text = label,
-                style = VTheme.type.caption.colored(c.ink2),
+                // §0.4: VInput label is 12/600/none/ink-2 (inputLabel), not caption (12/500).
+                style = VTheme.type.inputLabel.colored(c.ink2),
                 modifier = Modifier.padding(bottom = 8.dp),
             )
         }
         Box(
             Modifier
                 .fillMaxWidth()
-                // teal glow ring (drawn as an outer translucent border)
-                .border(BorderStroke(glow, c.teal.copy(alpha = if (focused) 0.15f else 0f)), shape)
+                // teal glow ring: #3cd1be @ 15% (§13.6) drawn as an outer translucent border
+                .border(BorderStroke(glow, FocusGlow.copy(alpha = if (focused) 0.15f else 0f)), shape)
                 .padding(glow)
                 .clip(shape)
                 .background(bg)

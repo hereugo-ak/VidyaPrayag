@@ -33,6 +33,8 @@ data class VColors(
     val card: Color,         // elevated card surface
     val border1: Color,      // subtle border
     val border2: Color,      // stronger border
+    val hairline: Color,     // navy@6% (#26234d) — every 1px border/divider per §13.9
+    val shadowTint: Color,   // navy (#26234d) base for the tinted elevation system (§13.1)
 
     // ── Semantic (data states ONLY — never branding) ─────────────────────────
     val success: Color,
@@ -73,6 +75,8 @@ private object Raw {
     val cardLight = Color(0xFFFFFFFF)
     val border1Light = Color(0x0F080808) // rgba(8,8,8,.06)
     val border2Light = Color(0x1A080808) // rgba(8,8,8,.10)
+    val hairlineLight = Color(0x0F26234D) // rgba(38,35,77,.06) — navy-tinted hairline (§13.9)
+    val shadowNavy = Color(0xFF26234D)    // navy base for tinted elevation (§13.1)
 
     // Semantic fills + inks (shared light)
     val success = Color(0xFFA8E6CF)
@@ -118,6 +122,8 @@ val LightVColors = VColors(
     card = Raw.cardLight,
     border1 = Raw.border1Light,
     border2 = Raw.border2Light,
+    hairline = Raw.hairlineLight,
+    shadowTint = Raw.shadowNavy,
     success = Raw.success,
     successInk = Raw.successInk,
     warning = Raw.warning,
@@ -144,6 +150,8 @@ val NightVColors = VColors(
     card = Raw.nightCard,
     border1 = Raw.nightBorder1,
     border2 = Raw.nightBorder2,
+    hairline = Raw.nightBorder1,
+    shadowTint = Color(0xFF000000),
     success = Raw.success,
     successInk = Raw.nightSuccessInk,
     warning = Raw.warning,

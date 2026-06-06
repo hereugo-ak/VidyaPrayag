@@ -13,12 +13,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.littlebridge.vidyaprayag.ui.v2.theme.VElevationLevel
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
-import com.littlebridge.vidyaprayag.ui.v2.theme.shapeLg
+import com.littlebridge.vidyaprayag.ui.v2.theme.shapeCard
+import com.littlebridge.vidyaprayag.ui.v2.theme.vElevation
 
 /**
  * VCard — the universal elevated surface.
@@ -31,7 +32,7 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.shapeLg
 fun VCard(
     modifier: Modifier = Modifier,
     padding: Dp = VTheme.dimens.md,
-    shape: RoundedCornerShape = VTheme.dimens.shapeLg,
+    shape: RoundedCornerShape = VTheme.dimens.shapeCard,
     background: Color = VTheme.colors.card,
     border: Boolean = true,
     elevated: Boolean = true,
@@ -41,13 +42,10 @@ fun VCard(
     val colors = VTheme.colors
     var base = modifier
 
-    if (elevated && !colors.isNight) {
-        base = base.shadow(
-            elevation = 10.dp,
-            shape = shape,
-            ambientColor = Color(0x14000000),
-            spotColor = Color(0x14000000),
-        )
+    // §0.3 / §13.1: resting cards use the navy-tinted hairline shadow (--shadow-light-1),
+    // not Material's heavy 10dp grey/black elevation.
+    if (elevated) {
+        base = base.vElevation(VElevationLevel.Card, radius = VTheme.dimens.radiusCard)
     }
 
     base = base
@@ -55,7 +53,7 @@ fun VCard(
         .background(background)
 
     if (border) {
-        base = base.border(BorderStroke(1.dp, colors.border1), shape)
+        base = base.border(BorderStroke(1.dp, colors.hairline), shape)
     }
 
     if (onClick != null) {

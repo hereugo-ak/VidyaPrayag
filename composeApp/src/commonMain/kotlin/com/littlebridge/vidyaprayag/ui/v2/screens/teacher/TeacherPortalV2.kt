@@ -37,8 +37,10 @@ fun TeacherPortalV2(
     onLogout: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    // The teacher portal is the deep-black "night" surface in the design (Teacher.tsx renders `dark`).
-    VTheme(tone = VPortalTone.Night) {
+    // UI_FIDELITY_AUDIT §0.5: Teacher.tsx renders under `PhoneFrame dark`, but legacy `dark` == the
+    // `.warm` scope, which is a WARM-LIGHT theme (lavender bg, dark ink, white cards) — NOT black.
+    // So the teacher portal must be Warm, never Night.
+    VTheme(tone = VPortalTone.Warm) {
         var tab by remember { mutableStateOf("home") }
         var updateSub by remember { mutableStateOf("Attendance") }
         var overlay by remember { mutableStateOf(TeacherOverlay.None) }
