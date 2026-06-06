@@ -25,6 +25,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
@@ -88,7 +89,8 @@ fun TeacherSyllabusScreenV2(
                         }
                         append(" in Mathematics today. Homework: Exercise 8.3, Q 4–14.")
                     },
-                    style = VTheme.type.body.colored(c.ink),
+                    // §6.2 React preview box is fontSize 13 (Teacher.tsx:224)
+                    style = VTheme.type.body.colored(c.ink).copy(fontSize = 13.sp),
                 )
             }
         }

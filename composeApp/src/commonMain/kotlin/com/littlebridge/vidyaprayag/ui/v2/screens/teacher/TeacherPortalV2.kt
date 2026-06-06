@@ -1,13 +1,19 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.ui.v2.components.VBottomNav
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VNavItem
@@ -57,10 +63,11 @@ fun TeacherPortalV2(
             TeacherOverlay.None -> Unit
         }
 
+        // §0.6 React nav glyphs (Teacher.tsx:8-13): Home, ListChecks (Update), Users (My Classes), User.
         val items = listOf(
             VNavItem("home", "Home", VIcons.Home),
-            VNavItem("update", "Update", VIcons.Check, badge = 1),
-            VNavItem("classes", "My Classes", VIcons.School),
+            VNavItem("update", "Update", VIcons.ListChecks, badge = 1),
+            VNavItem("classes", "My Classes", VIcons.Users),
             VNavItem("profile", "Profile", VIcons.User),
         )
 
@@ -68,11 +75,20 @@ fun TeacherPortalV2(
             modifier = modifier,
             topBar = {
                 if (tab == "update") {
-                    VTopTabs(
-                        tabs = listOf("Attendance", "Marks", "Syllabus", "Homework"),
-                        selected = updateSub,
-                        onSelect = { updateSub = it },
-                    )
+                    // §6.2 React Update() renders an <h1 className="mb-4">Update</h1> above the tabs
+                    // (Teacher.tsx:113-115). pt-6 (24) / px-5 (20) / mb-4 (16).
+                    Column(Modifier.fillMaxWidth().background(VTheme.colors.card)) {
+                        Text(
+                            "Update",
+                            style = VTheme.type.h1.copy(color = VTheme.colors.ink),
+                            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 16.dp),
+                        )
+                        VTopTabs(
+                            tabs = listOf("Attendance", "Marks", "Syllabus", "Homework"),
+                            selected = updateSub,
+                            onSelect = { updateSub = it },
+                        )
+                    }
                 }
             },
             bottomBar = {

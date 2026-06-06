@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
@@ -49,7 +50,8 @@ fun TeacherHomeworkScreenV2(modifier: Modifier = Modifier) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(Modifier.weight(1f)) {
                     Text("Algebra worksheet", style = VTheme.type.bodyStrong.colored(c.ink))
-                    Text("Mathematics • Class 10-A • Due 6 Jun", style = VTheme.type.caption.colored(c.ink2))
+                    // §6.2 React subline fontSize 11 / text-dark-2 (Teacher.tsx:240)
+                    Text("Mathematics • Class 10-A • Due 6 Jun", style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp))
                 }
                 VBadge(text = "28 / 32 submitted", tone = VBadgeTone.Warning)
             }
@@ -60,7 +62,8 @@ fun TeacherHomeworkScreenV2(modifier: Modifier = Modifier) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(Modifier.weight(1f)) {
                     Text("Reading — Ch 4 The Postmaster", style = VTheme.type.bodyStrong.colored(c.ink))
-                    Text("English • Class 9-A • Due 7 Jun", style = VTheme.type.caption.colored(c.ink2))
+                    // §6.2 React subline fontSize 11 / text-dark-2 (Teacher.tsx:250)
+                    Text("English • Class 9-A • Due 7 Jun", style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp))
                 }
                 VBadge(text = "Just assigned", tone = VBadgeTone.Arctic)
             }
