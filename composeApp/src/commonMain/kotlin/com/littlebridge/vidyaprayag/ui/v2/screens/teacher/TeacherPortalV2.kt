@@ -13,6 +13,11 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VNavItem
 import com.littlebridge.vidyaprayag.ui.v2.components.VScreenScaffold
 import com.littlebridge.vidyaprayag.ui.v2.components.VTopTabs
+import com.littlebridge.vidyaprayag.ui.v2.screens.discovery.AcademicCalendarScreenV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.notifications.NotificationsScreenV2
+
+/** Full-screen overlays the teacher portal can push above its tab content. */
+private enum class TeacherOverlay { None, Notifications, Calendar }
 
 /**
  * TeacherPortalV2 — the 4-tab teacher shell, translated from Teacher.tsx.
@@ -22,6 +27,7 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VTopTabs
  * corresponding `*ScreenV2`, which `koinViewModel()`s its own VM. The portal is `tone = Warm`
  * (set by the host `VTheme`).
  *
+ * Notifications and AcademicCalendar (from the `App.tsx` graph) are pushed as full-screen overlays.
  * Class/exam/subject ids are stubbed locally for now; Phase 3E wires real selection + navigation.
  */
 @Composable
@@ -31,6 +37,19 @@ fun TeacherPortalV2(
 ) {
     var tab by remember { mutableStateOf("home") }
     var updateSub by remember { mutableStateOf("Attendance") }
+    var overlay by remember { mutableStateOf(TeacherOverlay.None) }
+
+    when (overlay) {
+        TeacherOverlay.Notifications -> {
+            NotificationsScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
+            return
+        }
+        TeacherOverlay.Calendar -> {
+            AcademicCalendarScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
+            return
+        }
+        TeacherOverlay.None -> Unit
+    }
 
     val items = listOf(
         VNavItem("home", "Home", VIcons.Home),
@@ -56,7 +75,10 @@ fun TeacherPortalV2(
     ) { _ ->
         Box(Modifier.fillMaxSize()) {
             when (tab) {
-                "home" -> TeacherHomeScreenV2()
+                "home" -> TeacherHomeScreenV2(
+                    onOpenNotifications = { overlay = TeacherOverlay.Notifications },
+                    onOpenCalendar = { overlay = TeacherOverlay.Calendar },
+                )
                 "classes" -> TeacherClassesScreenV2()
                 "profile" -> TeacherProfileScreenV2(onLogout = onLogout)
                 "update" -> when (updateSub) {

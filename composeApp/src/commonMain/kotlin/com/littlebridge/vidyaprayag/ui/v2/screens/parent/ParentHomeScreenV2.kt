@@ -1,5 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.parent
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,8 +17,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.domain.util.UiState
@@ -49,6 +53,8 @@ import org.koin.compose.viewmodel.koinViewModel
 fun ParentHomeScreenV2(
     modifier: Modifier = Modifier,
     viewModel: ParentDashboardViewModel = koinViewModel(),
+    onOpenNotifications: () -> Unit = {},
+    onOpenCalendar: () -> Unit = {},
 ) {
     val c = VTheme.colors
     val d = VTheme.dimens
@@ -65,7 +71,23 @@ fun ParentHomeScreenV2(
             .padding(horizontal = d.md, vertical = d.md),
         verticalArrangement = Arrangement.spacedBy(d.md),
     ) {
-        VPortalHeader(name = name, subtitle = "Welcome back", photoUrl = photo)
+        VPortalHeader(
+            name = name,
+            subtitle = "Welcome back",
+            photoUrl = photo,
+            trailing = {
+                Box(
+                    Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(c.cream)
+                        .clickable { onOpenNotifications() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    androidx.compose.material3.Icon(VIcons.Bell, contentDescription = "Notifications", tint = c.ink, modifier = Modifier.size(20.dp))
+                }
+            },
+        )
 
         // Today's glance strip
         VCard {
@@ -84,9 +106,9 @@ fun ParentHomeScreenV2(
 
         VSectionHeader("QUICK ACTIONS")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(d.sm)) {
-            QuickAction("Academics", VIcons.School, Modifier.weight(1f))
+            QuickAction("Calendar", VIcons.Calendar, Modifier.weight(1f), onClick = onOpenCalendar)
+            QuickAction("Notifications", VIcons.Bell, Modifier.weight(1f), onClick = onOpenNotifications)
             QuickAction("Fees", VIcons.Wallet, Modifier.weight(1f))
-            QuickAction("Activity", VIcons.Bell, Modifier.weight(1f))
         }
 
         // Shortlisted schools (Discovery cross-link)
@@ -100,9 +122,14 @@ fun ParentHomeScreenV2(
 }
 
 @Composable
-private fun QuickAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
+private fun QuickAction(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
     val c = VTheme.colors
-    VCard(modifier = modifier) {
+    VCard(modifier = modifier, onClick = onClick) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(VTheme.dimens.xs)) {
             androidx.compose.material3.Icon(icon, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(22.dp))
             Text(label, style = VTheme.type.caption.colored(c.ink2))

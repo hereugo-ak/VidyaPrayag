@@ -1,6 +1,9 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.school
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,13 +11,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingStep
 import com.littlebridge.vidyaprayag.feature.admin.presentation.AnalyticsCardData
@@ -23,6 +30,7 @@ import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolDashboardVi
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
+import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
 import com.littlebridge.vidyaprayag.ui.v2.components.VSparkline
 import com.littlebridge.vidyaprayag.ui.v2.components.VStatusDot
@@ -46,6 +54,8 @@ fun SchoolHomeScreenV2(
     modifier: Modifier = Modifier,
     dashboardVm: SchoolDashboardViewModel = koinViewModel(),
     analyticsVm: AnalyticsDashboardViewModel = koinViewModel(),
+    onOpenNotifications: () -> Unit = {},
+    onOpenCalendar: () -> Unit = {},
 ) {
     val c = VTheme.colors
     val d = VTheme.dimens
@@ -61,7 +71,16 @@ fun SchoolHomeScreenV2(
             .padding(horizontal = d.md, vertical = d.md),
         verticalArrangement = Arrangement.spacedBy(d.md),
     ) {
-        VPortalHeader(name = adminName, subtitle = "School admin")
+        VPortalHeader(
+            name = adminName,
+            subtitle = "School admin",
+            trailing = {
+                Row(horizontalArrangement = Arrangement.spacedBy(d.sm)) {
+                    HeaderIconButton(VIcons.Calendar, "Academic calendar", onClick = onOpenCalendar)
+                    HeaderIconButton(VIcons.Bell, "Notifications", onClick = onOpenNotifications)
+                }
+            },
+        )
 
         // Onboarding progress
         VCard {
@@ -102,6 +121,25 @@ fun SchoolHomeScreenV2(
             Text(it, style = VTheme.type.caption.colored(c.dangerInk))
         }
         Spacer(Modifier.height(d.xl))
+    }
+}
+
+@Composable
+private fun HeaderIconButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    val c = VTheme.colors
+    Box(
+        Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(c.cream)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = contentDescription, tint = c.ink, modifier = Modifier.size(20.dp))
     }
 }
 
