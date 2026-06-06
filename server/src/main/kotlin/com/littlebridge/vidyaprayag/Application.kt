@@ -37,6 +37,7 @@
  *   - resultsRouting()                    — /api/v1/school/results
  *   - teacherAssignmentRouting()          — /api/v1/school/teacher-assignments[…]
  *   - mediaRouting()                      — /api/v1/school/media/upload[…] (binary → Supabase Storage)
+ *   - teacherRouting()                    — /api/v1/teacher/{home,classes,profile,attendance,marks,syllabus,homework}
  *
  * On boot:
  *   DatabaseFactory.init() creates/migrates all tables and seeds CMS + demo data.
@@ -72,6 +73,7 @@ import com.littlebridge.vidyaprayag.feature.school.schoolAnalyticsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolDashboardRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRouting
 import com.littlebridge.vidyaprayag.feature.school.teacherAssignmentRouting
+import com.littlebridge.vidyaprayag.feature.teacher.teacherRouting
 import com.littlebridge.vidyaprayag.feature.user.parentRouting
 import com.littlebridge.vidyaprayag.feature.user.parentMessagesRouting
 import com.littlebridge.vidyaprayag.feature.user.userDetailsRouting
@@ -176,5 +178,8 @@ fun Application.module() {
         resultsRouting()             // /api/v1/school/results
         teacherAssignmentRouting()   // /api/v1/school/teacher-assignments[…] — structured teacher⇄class⇄subject model (report §5.5)
         mediaRouting()               // /api/v1/school/media/upload[…] — REAL binary uploads → Supabase Storage (kills URL placeholders)
+
+        // Teacher vertical (master rebuild doc Step 7 / gap G1)
+        teacherRouting()             // /api/v1/teacher/{home,classes,profile,attendance,marks,syllabus,homework}
     }
 }

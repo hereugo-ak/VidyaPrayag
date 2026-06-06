@@ -298,24 +298,38 @@ ledger refreshed.
 
 - [x] 5A — schema. Verified by isolated `kotlinc` compile of the real `server/` sources (see build note); Exposed DSL identical to already-compiling tables in the same file.
 
-### Batch 5B — teacher context guard + reads (home / classes / profile)
+### Batch 5B — teacher context guard + reads (home / classes / profile) ✅
 | File | Change |
 |---|---|
-| `core/TeacherAccess.kt` | `TeacherContext(userId, schoolId, name)` + `requireTeacherContext()` (401/403/404 envelopes) + assignment-scope helpers. |
-| `feature/teacher/TeacherRouting.kt` (part 1) | `GET home`, `GET classes`, `GET profile`. |
+| `core/TeacherAccess.kt` | `TeacherContext(userId, schoolId, role, fullName)` + `requireTeacherContext()` (401/403/404 envelopes), `teacherAssignmentsFor(ctx)` and `requireOwnedAssignment(ctx, classId)` (400/403/404). Mirrors `core/SchoolAccess.kt`; reads role from DB (not JWT) so changes take effect immediately. **Gap G1 enforced:** every class-scoped call resolves the client `class_id` back to a `teacher_subject_assignments` row, asserts it is in the caller's school AND assigned to the caller (by `teacher_id` or `teacher_name` fallback), else 403. `school_admin`/`admin` may stand in for any teacher. |
+| `feature/teacher/TeacherRouting.kt` (part 1) | `GET home` (school name, today's periods from optional timetable, pending-attendance/marks/homework counts, task cards — honest empty when no data), `GET classes` (per-assignment student_count + syllabus_progress + avg_attendance), `GET profile` (subjects+classes derived from assignments). Server-side DTOs mirror `shared/.../TeacherModels.kt` `@SerialName` field-for-field. |
 
-### Batch 5C — attendance + marks (read + write, scoped, immutable-aware)
-- `feature/teacher/TeacherRouting.kt` (part 2): `GET/POST attendance` (→ `attendance_records`),
-  `GET/POST marks` (→ `exam_results`), with live present/absent/late + entered counts.
+### Batch 5C — attendance + marks (read + write, scoped) ✅
+- `feature/teacher/TeacherRoutingTasks.kt`: `GET/POST attendance` → `attendance_records` (`type='student'`, `grade='Class-Section'`, `marked_by`=teacher; upsert per student; status validated to present|absent|late). `GET/POST marks` → `assessments` + `assessment_marks` (numeric `max_marks` denominator + `exam_id`; scores clamped to `[0, maxMarks]`; roster pre-filled from current scores; denormalised student name on insert).
 
-### Batch 5D — syllabus log + homework + wire-up
-- `feature/teacher/TeacherRouting.kt` (part 3): `GET/PATCH syllabus`, `GET/POST homework`.
-- `Application.kt`: mount `teacherRouting()`.
+### Batch 5D — syllabus log + homework + wire-up ✅
+- `feature/teacher/TeacherRoutingTasks.kt`: `GET/PATCH syllabus` → `syllabus_units` (overall progress = covered/total; PATCH toggles `is_covered` + stamps `covered_on`/`covered_by`, re-checks class+subject ownership). `GET/POST homework` → `homework` (+ `homework_submissions` for the submitted/total ratio).
+- `Application.kt`: imported + mounted `teacherRouting()` in the authenticated `routing { }` block after `mediaRouting()`; updated the route-manifest doc header.
 
 ### Batch 5E — seed + boot + smoke
 - Optional dev seed for a demo teacher + assignments (idempotent, dev-only) and a SQLite boot +
   curl smoke of all 11 routes; flip master doc §3 / §5.4 teacher rows ❌ → ✅.
 
+### Batch 5E — seed + boot + smoke (remaining)
+- Optional dev seed for a demo teacher + assignments (idempotent, dev-only) and a SQLite boot +
+  curl smoke of all 11 routes; flip master doc §3 / §5.4 teacher rows ❌ → ✅.
+
 ### Phase 5 status
-- [ ] 5A schema · [ ] 5B guard+reads · [ ] 5C attendance+marks · [ ] 5D syllabus+homework+wire ·
+- [x] 5A schema · [x] 5B guard+reads · [x] 5C attendance+marks · [x] 5D syllabus+homework+wire ·
       [ ] 5E seed+smoke · [ ] master-doc status flip.
+
+### Build verification (Phase 5B–5D)
+Full Gradle `:server` OOMs the 985 MB sandbox at plugin-classpath resolution. Instead the **entire**
+`server/` source set (55 `.kt` files incl. the 3 new teacher files) was type-checked with the cached
+`kotlin-compiler-embeddable 2.2.10` invoked directly (`-Xmx700m`, JDK 21) against a hand-assembled
+classpath of the cached ktor/exposed/serialization/etc. jars + the `-Xplugin` serialization compiler
+plugin. Result: **0 errors in any `feature/teacher/*` or `core/TeacherAccess.kt` file.** The only 2
+residuals were `cannot access class 'Configuration'` in the *pre-existing, untouched* `Application.kt`
+and `OtpHttpClient.kt` — a missing-transitive-jar artefact of the hand-built harness (the parent
+`ktor-serialization-kotlinx` jar), not a code defect; Gradle resolves it transitively. A real
+`:server` compile on a ≥8 GB host is still owed before any production cutover (tracked below).

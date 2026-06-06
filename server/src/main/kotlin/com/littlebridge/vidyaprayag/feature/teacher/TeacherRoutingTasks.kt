@@ -1,0 +1,551 @@
+/*
+ * File: TeacherRoutingTasks.kt
+ * Module: feature.teacher
+ *
+ * The teacher TASK surface — attendance, marks, syllabus and homework — split
+ * out of TeacherRouting.kt for readability. Mounted as child routes of
+ * `/api/v1/teacher` by TeacherRouting.teacherRouting() via teacherTaskRoutes().
+ *
+ * Every handler:
+ *   - resolves a trusted TeacherContext (401/403/404 on failure)
+ *   - for class-scoped calls, resolves the client class_id to an OwnedAssignment
+ *     (400/403/404) so a teacher can only touch their own classes (gap G1)
+ *   - reads/writes via dbQuery and replies with the canonical envelope.
+ *
+ * Storage:
+ *   attendance → attendance_records (type=student, grade="Class-Section")
+ *   marks      → assessments + assessment_marks (numeric max_marks + exam id, G4)
+ *   syllabus   → syllabus_units
+ *   homework   → homework + homework_submissions
+ *
+ * No fabricated data: empty rosters / unit lists are returned honestly.
+ */
+package com.littlebridge.vidyaprayag.feature.teacher
+
+import com.littlebridge.vidyaprayag.core.created
+import com.littlebridge.vidyaprayag.core.fail
+import com.littlebridge.vidyaprayag.core.ok
+import com.littlebridge.vidyaprayag.core.okMessage
+import com.littlebridge.vidyaprayag.core.requireOwnedAssignment
+import com.littlebridge.vidyaprayag.core.requireTeacherContext
+import com.littlebridge.vidyaprayag.core.teacherAssignmentsFor
+import com.littlebridge.vidyaprayag.db.AssessmentMarksTable
+import com.littlebridge.vidyaprayag.db.AssessmentsTable
+import com.littlebridge.vidyaprayag.db.AttendanceRecordsTable
+import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
+import com.littlebridge.vidyaprayag.db.HomeworkSubmissionsTable
+import com.littlebridge.vidyaprayag.db.HomeworkTable
+import com.littlebridge.vidyaprayag.db.StudentsTable
+import com.littlebridge.vidyaprayag.db.SyllabusUnitsTable
+import io.ktor.http.*
+import io.ktor.server.application.*
+import io.ktor.server.request.*
+import io.ktor.server.routing.*
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.update
+import java.time.Instant
+import java.util.UUID
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DTOs — mirror shared/.../teacher/domain/model/TeacherModels.kt field-for-field.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class AttendanceEntryDto(
+    @SerialName("student_id") val studentId: String,
+    val name: String,
+    @SerialName("roll_no") val rollNo: String = "",
+    val status: String = "present",
+)
+
+@Serializable
+data class TeacherAttendanceData(
+    @SerialName("class_name") val className: String,
+    val date: String,
+    val students: List<AttendanceEntryDto> = emptyList(),
+)
+
+@Serializable
+data class AttendanceMarkDto(
+    @SerialName("student_id") val studentId: String,
+    val status: String,
+)
+
+@Serializable
+data class SubmitAttendanceRequest(
+    @SerialName("class_id") val classId: String,
+    val date: String,
+    val entries: List<AttendanceMarkDto> = emptyList(),
+)
+
+@Serializable
+data class MarksEntryDto(
+    @SerialName("student_id") val studentId: String,
+    val name: String,
+    @SerialName("roll_no") val rollNo: String = "",
+    val marks: Float? = null,
+)
+
+@Serializable
+data class TeacherMarksData(
+    @SerialName("class_name") val className: String,
+    val subject: String,
+    @SerialName("exam_name") val examName: String,
+    @SerialName("max_marks") val maxMarks: Int,
+    val students: List<MarksEntryDto> = emptyList(),
+)
+
+@Serializable
+data class MarkScoreDto(
+    @SerialName("student_id") val studentId: String,
+    val marks: Float,
+)
+
+@Serializable
+data class SubmitMarksRequest(
+    @SerialName("class_id") val classId: String,
+    @SerialName("exam_id") val examId: String,
+    val entries: List<MarkScoreDto> = emptyList(),
+)
+
+@Serializable
+data class SyllabusUnitDto(
+    val id: String,
+    val title: String,
+    @SerialName("is_covered") val isCovered: Boolean = false,
+    @SerialName("covered_on") val coveredOn: String? = null,
+)
+
+@Serializable
+data class TeacherSyllabusData(
+    @SerialName("class_name") val className: String,
+    val subject: String,
+    @SerialName("overall_progress") val overallProgress: Float = 0f,
+    val units: List<SyllabusUnitDto> = emptyList(),
+)
+
+@Serializable
+data class UpdateSyllabusRequest(
+    @SerialName("unit_id") val unitId: String,
+    @SerialName("is_covered") val isCovered: Boolean,
+)
+
+@Serializable
+data class HomeworkDto(
+    val id: String,
+    val title: String,
+    val description: String = "",
+    @SerialName("class_name") val className: String,
+    val subject: String,
+    @SerialName("due_date") val dueDate: String,
+    @SerialName("submitted_count") val submittedCount: Int = 0,
+    @SerialName("total_count") val totalCount: Int = 0,
+)
+
+@Serializable
+data class TeacherHomeworkData(
+    val items: List<HomeworkDto> = emptyList(),
+)
+
+@Serializable
+data class CreateHomeworkRequest(
+    @SerialName("class_id") val classId: String,
+    val title: String,
+    val description: String = "",
+    @SerialName("due_date") val dueDate: String,
+)
+
+private val VALID_ATTENDANCE = setOf("present", "absent", "late")
+
+/** Mounts the attendance/marks/syllabus/homework child routes under /api/v1/teacher. */
+fun Route.teacherTaskRoutes() {
+
+    // ── Attendance ──────────────────────────────────────────────────────────
+    route("/attendance") {
+        // GET ?class_id=&date= → roster pre-filled with the day's status.
+        get {
+            val ctx = call.requireTeacherContext() ?: return@get
+            val classId = call.request.queryParameters["class_id"]
+            val date = call.request.queryParameters["date"]?.takeIf { it.isNotBlank() } ?: todayIso()
+            val asg = call.requireOwnedAssignment(ctx, classId) ?: return@get
+            val grade = "${asg.className}-${asg.section}"
+
+            val data = dbQuery {
+                val students = StudentsTable.selectAll().where {
+                    (StudentsTable.schoolId eq ctx.schoolId) and
+                        (StudentsTable.className eq asg.className) and
+                        (StudentsTable.section eq asg.section) and
+                        (StudentsTable.isActive eq true)
+                }.orderBy(StudentsTable.rollNumber, SortOrder.ASC).toList()
+
+                val marked = AttendanceRecordsTable.selectAll().where {
+                    (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
+                        (AttendanceRecordsTable.date eq date) and
+                        (AttendanceRecordsTable.type eq "student") and
+                        (AttendanceRecordsTable.grade eq grade)
+                }.associate { it[AttendanceRecordsTable.personId] to it[AttendanceRecordsTable.status] }
+
+                students.map { s ->
+                    val code = s[StudentsTable.studentCode]
+                    AttendanceEntryDto(
+                        studentId = code,
+                        name = s[StudentsTable.fullName],
+                        rollNo = s[StudentsTable.rollNumber],
+                        status = marked[code] ?: "present",
+                    )
+                }
+            }
+            call.ok(
+                TeacherAttendanceData(className = grade, date = date, students = data),
+                message = "Attendance roster loaded",
+            )
+        }
+
+        // POST → upsert one attendance_records row per entry for the day.
+        post {
+            val ctx = call.requireTeacherContext() ?: return@post
+            val req = call.receive<SubmitAttendanceRequest>()
+            val asg = call.requireOwnedAssignment(ctx, req.classId) ?: return@post
+            val grade = "${asg.className}-${asg.section}"
+            val date = req.date.takeIf { it.isNotBlank() } ?: todayIso()
+
+            val bad = req.entries.firstOrNull { it.status.lowercase() !in VALID_ATTENDANCE }
+            if (bad != null) {
+                call.fail("Invalid status '${bad.status}' (expected present|absent|late)", HttpStatusCode.BadRequest)
+                return@post
+            }
+
+            val now = Instant.now()
+            dbQuery {
+                for (e in req.entries) {
+                    val status = e.status.lowercase()
+                    val existing = AttendanceRecordsTable.selectAll().where {
+                        (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
+                            (AttendanceRecordsTable.date eq date) and
+                            (AttendanceRecordsTable.type eq "student") and
+                            (AttendanceRecordsTable.personId eq e.studentId)
+                    }.firstOrNull()
+                    if (existing != null) {
+                        AttendanceRecordsTable.update({
+                            (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
+                                (AttendanceRecordsTable.date eq date) and
+                                (AttendanceRecordsTable.type eq "student") and
+                                (AttendanceRecordsTable.personId eq e.studentId)
+                        }) {
+                            it[AttendanceRecordsTable.status] = status
+                            it[AttendanceRecordsTable.grade] = grade
+                            it[markedBy] = ctx.userId
+                        }
+                    } else {
+                        AttendanceRecordsTable.insert {
+                            it[id] = UUID.randomUUID()
+                            it[schoolId] = ctx.schoolId
+                            it[AttendanceRecordsTable.date] = date
+                            it[type] = "student"
+                            it[personId] = e.studentId
+                            it[AttendanceRecordsTable.grade] = grade
+                            it[AttendanceRecordsTable.status] = status
+                            it[markedBy] = ctx.userId
+                            it[createdAt] = now
+                        }
+                    }
+                }
+            }
+            call.okMessage("Attendance saved for ${req.entries.size} student(s)")
+        }
+    }
+
+    // ── Marks ─────────────────────────────────────────────────────────────────
+    route("/marks") {
+        // GET ?class_id=&exam_id= → assessment roster with current scores.
+        get {
+            val ctx = call.requireTeacherContext() ?: return@get
+            val classId = call.request.queryParameters["class_id"]
+            val examId = call.request.queryParameters["exam_id"]
+            val asg = call.requireOwnedAssignment(ctx, classId) ?: return@get
+            val grade = "${asg.className}-${asg.section}"
+
+            val assessmentId = examId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            if (assessmentId == null) {
+                call.fail("A valid exam_id is required", HttpStatusCode.BadRequest, "BAD_EXAM_ID")
+                return@get
+            }
+
+            val assessment = dbQuery {
+                AssessmentsTable.selectAll().where {
+                    (AssessmentsTable.id eq assessmentId) and
+                        (AssessmentsTable.schoolId eq ctx.schoolId)
+                }.singleOrNull()
+            }
+            if (assessment == null) {
+                call.fail("Exam not found in your school", HttpStatusCode.NotFound, "EXAM_NOT_FOUND")
+                return@get
+            }
+
+            val data = dbQuery {
+                val existing = AssessmentMarksTable.selectAll().where {
+                    AssessmentMarksTable.assessmentId eq assessmentId
+                }.associateBy { it[AssessmentMarksTable.studentId] }
+
+                val students = StudentsTable.selectAll().where {
+                    (StudentsTable.schoolId eq ctx.schoolId) and
+                        (StudentsTable.className eq asg.className) and
+                        (StudentsTable.section eq asg.section) and
+                        (StudentsTable.isActive eq true)
+                }.orderBy(StudentsTable.rollNumber, SortOrder.ASC).toList()
+
+                students.map { s ->
+                    val code = s[StudentsTable.studentCode]
+                    MarksEntryDto(
+                        studentId = code,
+                        name = s[StudentsTable.fullName],
+                        rollNo = s[StudentsTable.rollNumber],
+                        marks = existing[code]?.get(AssessmentMarksTable.marks)?.toFloat(),
+                    )
+                }
+            }
+            call.ok(
+                TeacherMarksData(
+                    className = grade,
+                    subject = assessment[AssessmentsTable.subject],
+                    examName = assessment[AssessmentsTable.name],
+                    maxMarks = assessment[AssessmentsTable.maxMarks],
+                    students = data,
+                ),
+                message = "Marks roster loaded",
+            )
+        }
+
+        // POST → upsert one assessment_marks row per entry, clamped to maxMarks.
+        post {
+            val ctx = call.requireTeacherContext() ?: return@post
+            val req = call.receive<SubmitMarksRequest>()
+            val asg = call.requireOwnedAssignment(ctx, req.classId) ?: return@post
+
+            val assessmentId = runCatching { UUID.fromString(req.examId) }.getOrNull()
+            if (assessmentId == null) {
+                call.fail("A valid exam_id is required", HttpStatusCode.BadRequest, "BAD_EXAM_ID")
+                return@post
+            }
+
+            val assessment = dbQuery {
+                AssessmentsTable.selectAll().where {
+                    (AssessmentsTable.id eq assessmentId) and
+                        (AssessmentsTable.schoolId eq ctx.schoolId)
+                }.singleOrNull()
+            }
+            if (assessment == null) {
+                call.fail("Exam not found in your school", HttpStatusCode.NotFound, "EXAM_NOT_FOUND")
+                return@post
+            }
+            val maxMarks = assessment[AssessmentsTable.maxMarks].toDouble()
+
+            // Map student_code → display name for denormalised storage.
+            val names = dbQuery {
+                StudentsTable.selectAll().where {
+                    (StudentsTable.schoolId eq ctx.schoolId) and
+                        (StudentsTable.className eq asg.className) and
+                        (StudentsTable.section eq asg.section)
+                }.associate { it[StudentsTable.studentCode] to it[StudentsTable.fullName] }
+            }
+
+            val now = Instant.now()
+            dbQuery {
+                for (e in req.entries) {
+                    val clamped = e.marks.toDouble().coerceIn(0.0, maxMarks)
+                    val existing = AssessmentMarksTable.selectAll().where {
+                        (AssessmentMarksTable.assessmentId eq assessmentId) and
+                            (AssessmentMarksTable.studentId eq e.studentId)
+                    }.firstOrNull()
+                    if (existing != null) {
+                        AssessmentMarksTable.update({
+                            (AssessmentMarksTable.assessmentId eq assessmentId) and
+                                (AssessmentMarksTable.studentId eq e.studentId)
+                        }) {
+                            it[marks] = clamped
+                            it[enteredBy] = ctx.userId
+                            it[updatedAt] = now
+                        }
+                    } else {
+                        AssessmentMarksTable.insert {
+                            it[id] = UUID.randomUUID()
+                            it[AssessmentMarksTable.assessmentId] = assessmentId
+                            it[studentId] = e.studentId
+                            it[studentName] = names[e.studentId] ?: e.studentId
+                            it[marks] = clamped
+                            it[enteredBy] = ctx.userId
+                            it[createdAt] = now
+                            it[updatedAt] = now
+                        }
+                    }
+                }
+            }
+            call.okMessage("Marks saved for ${req.entries.size} student(s)")
+        }
+    }
+
+    // ── Syllabus ────────────────────────────────────────────────────────────
+    route("/syllabus") {
+        // GET ?class_id=&subject= → unit list + overall progress.
+        get {
+            val ctx = call.requireTeacherContext() ?: return@get
+            val classId = call.request.queryParameters["class_id"]
+            val asg = call.requireOwnedAssignment(ctx, classId) ?: return@get
+            // subject param defaults to the assignment's own subject.
+            val subject = call.request.queryParameters["subject"]?.takeIf { it.isNotBlank() } ?: asg.subject
+            val grade = "${asg.className}-${asg.section}"
+
+            val units = dbQuery {
+                SyllabusUnitsTable.selectAll().where {
+                    (SyllabusUnitsTable.schoolId eq ctx.schoolId) and
+                        (SyllabusUnitsTable.className eq asg.className) and
+                        (SyllabusUnitsTable.section eq asg.section) and
+                        (SyllabusUnitsTable.subject eq subject)
+                }.orderBy(SyllabusUnitsTable.position, SortOrder.ASC).toList()
+            }
+            val dtos = units.map { u ->
+                SyllabusUnitDto(
+                    id = u[SyllabusUnitsTable.id].value.toString(),
+                    title = u[SyllabusUnitsTable.title],
+                    isCovered = u[SyllabusUnitsTable.isCovered],
+                    coveredOn = u[SyllabusUnitsTable.coveredOn],
+                )
+            }
+            val progress = if (dtos.isEmpty()) 0f else dtos.count { it.isCovered }.toFloat() / dtos.size.toFloat()
+            call.ok(
+                TeacherSyllabusData(className = grade, subject = subject, overallProgress = progress, units = dtos),
+                message = "Syllabus loaded",
+            )
+        }
+
+        // PATCH → toggle one unit's covered flag (scoped via its assignment).
+        patch {
+            val ctx = call.requireTeacherContext() ?: return@patch
+            val req = call.receive<UpdateSyllabusRequest>()
+            val unitId = runCatching { UUID.fromString(req.unitId) }.getOrNull()
+            if (unitId == null) {
+                call.fail("A valid unit_id is required", HttpStatusCode.BadRequest, "BAD_UNIT_ID")
+                return@patch
+            }
+
+            val unit = dbQuery {
+                SyllabusUnitsTable.selectAll().where {
+                    (SyllabusUnitsTable.id eq unitId) and
+                        (SyllabusUnitsTable.schoolId eq ctx.schoolId)
+                }.singleOrNull()
+            }
+            if (unit == null) {
+                call.fail("Syllabus unit not found in your school", HttpStatusCode.NotFound, "UNIT_NOT_FOUND")
+                return@patch
+            }
+
+            // Authz: the teacher must be assigned to this unit's class+subject.
+            val owns = teacherAssignmentsFor(ctx).any {
+                it.className == unit[SyllabusUnitsTable.className] &&
+                    it.section == unit[SyllabusUnitsTable.section] &&
+                    it.subject == unit[SyllabusUnitsTable.subject]
+            } || ctx.role == "school_admin" || ctx.role == "admin"
+            if (!owns) {
+                call.fail("You are not assigned to this class/subject", HttpStatusCode.Forbidden, "NOT_ASSIGNED")
+                return@patch
+            }
+
+            dbQuery {
+                SyllabusUnitsTable.update({ SyllabusUnitsTable.id eq unitId }) {
+                    it[isCovered] = req.isCovered
+                    it[coveredOn] = if (req.isCovered) todayIso() else null
+                    it[coveredBy] = if (req.isCovered) ctx.userId else null
+                    it[updatedAt] = Instant.now()
+                }
+            }
+            call.okMessage(if (req.isCovered) "Unit marked covered" else "Unit marked not covered")
+        }
+    }
+
+    // ── Homework ──────────────────────────────────────────────────────────────
+    route("/homework") {
+        // GET → all active homework authored by this teacher, with submit ratios.
+        get {
+            val ctx = call.requireTeacherContext() ?: return@get
+            val privileged = ctx.role == "school_admin" || ctx.role == "admin"
+
+            val rows = dbQuery {
+                if (privileged) {
+                    HomeworkTable.selectAll().where {
+                        (HomeworkTable.schoolId eq ctx.schoolId) and (HomeworkTable.isActive eq true)
+                    }.orderBy(HomeworkTable.dueDate, SortOrder.DESC).toList()
+                } else {
+                    HomeworkTable.selectAll().where {
+                        (HomeworkTable.schoolId eq ctx.schoolId) and
+                            (HomeworkTable.teacherId eq ctx.userId) and
+                            (HomeworkTable.isActive eq true)
+                    }.orderBy(HomeworkTable.dueDate, SortOrder.DESC).toList()
+                }
+            }
+
+            val items = rows.map { hw ->
+                val hwId = hw[HomeworkTable.id].value
+                val className = hw[HomeworkTable.className]
+                val section = hw[HomeworkTable.section]
+                val submitted = dbQuery {
+                    HomeworkSubmissionsTable.selectAll().where {
+                        HomeworkSubmissionsTable.homeworkId eq hwId
+                    }.count().toInt()
+                }
+                val total = studentCountFor(ctx.schoolId, className, section)
+                HomeworkDto(
+                    id = hwId.toString(),
+                    title = hw[HomeworkTable.title],
+                    description = hw[HomeworkTable.description],
+                    className = "$className-$section",
+                    subject = hw[HomeworkTable.subject],
+                    dueDate = hw[HomeworkTable.dueDate],
+                    submittedCount = submitted,
+                    totalCount = total,
+                )
+            }
+            call.ok(TeacherHomeworkData(items), message = "Homework loaded")
+        }
+
+        // POST → create a homework row for one of the teacher's classes.
+        post {
+            val ctx = call.requireTeacherContext() ?: return@post
+            val req = call.receive<CreateHomeworkRequest>()
+            val asg = call.requireOwnedAssignment(ctx, req.classId) ?: return@post
+            if (req.title.isBlank()) {
+                call.fail("title is required", HttpStatusCode.BadRequest)
+                return@post
+            }
+            if (req.dueDate.isBlank()) {
+                call.fail("due_date is required", HttpStatusCode.BadRequest)
+                return@post
+            }
+
+            val now = Instant.now()
+            val newId = UUID.randomUUID()
+            dbQuery {
+                HomeworkTable.insert {
+                    it[id] = newId
+                    it[schoolId] = ctx.schoolId
+                    it[teacherId] = ctx.userId
+                    it[className] = asg.className
+                    it[section] = asg.section
+                    it[subject] = asg.subject
+                    it[title] = req.title
+                    it[description] = req.description
+                    it[dueDate] = req.dueDate
+                    it[isActive] = true
+                    it[createdAt] = now
+                    it[updatedAt] = now
+                }
+            }
+            call.created(mapOf("id" to newId.toString()), message = "Homework created")
+        }
+    }
+}
