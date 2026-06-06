@@ -159,7 +159,8 @@ fun WelcomeScreenV2(
                     )
                 }
                 .background(c.background, RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                .padding(horizontal = 24.dp, top = 40.dp, bottom = 32.dp),
+                .padding(horizontal = 24.dp)
+                .padding(top = 40.dp, bottom = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // ── social-proof avatar strip ──

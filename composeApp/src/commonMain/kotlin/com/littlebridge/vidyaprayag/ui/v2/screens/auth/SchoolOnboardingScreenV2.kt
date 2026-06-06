@@ -607,7 +607,8 @@ private fun CompletionScreen(onComplete: () -> Unit) {
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, top = 64.dp, bottom = 56.dp),
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 64.dp, bottom = 56.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Box(
