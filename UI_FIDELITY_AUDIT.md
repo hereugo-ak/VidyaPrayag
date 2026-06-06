@@ -9,7 +9,13 @@
 > **Audit method:** Line-by-line code comparison of React `.tsx` vs Compose `.kt`, cross-referenced
 > with the 6 build screenshots the user provided (Welcome, School Onboarding, Parent Portal — each
 > Compose-current vs Figma).
-> **Status legend:** 🔴 critical (breaks the premium feel) · 🟠 major · 🟡 minor/polish
+> **Status legend:** 🔴 critical (breaks the premium feel) · 🟠 major · 🟡 minor/polish · 💎 premium-craft (same design, elevated execution)
+>
+> **Revision 2 (deep pass):** adds §0.5 (Teacher + School portals wrongly forced to Night/black —
+> a defect as severe as the Onboarding one), expanded per-screen tables for Teacher (§6) and School
+> (§7) with exact color/glyph/text-color diffs, the full §13 **Premium Craft** playbook (elevation
+> system, motion choreography, optical alignment, pressed/hover states, gradient & glow recipes,
+> text rendering), and §14 a component-by-component conformance matrix.
 
 ---
 
@@ -54,6 +60,42 @@ These four defects explain ~80% of the "premature / 90% same" gap the user sees.
 - **Fix:** Add `radiusCard = 16.dp` token; change `VCard` shape to 16dp; replace the 10dp Material
   shadow with a custom soft shadow (low elevation ~2dp + very low alpha, or a layered
   `drawBehind`/`Modifier.shadow` tuned to `0 1px 3px @5%`).
+
+### 0.5 🔴🔴 Teacher AND School portals are forced to Night (black) — should be warm-LIGHT
+- **The code contradicts itself.** `NavGraphV2.toneFor()` (lines 116–120) correctly maps:
+  - `ADMIN → VPortalTone.Warm`, `TEACHER → VPortalTone.Warm`, unauth/parent → `Light`.
+- **But** `SchoolPortalV2.kt:39` and `TeacherPortalV2.kt:41` each open with
+  `VTheme(tone = VPortalTone.Night) { … }`, **overriding** the nav graph's correct Warm tone with
+  pure deep-black `#050505`.
+- **React truth:** `AdminApp` and `TeacherApp` render under `PhoneFrame dark className="dark"` —
+  and as established in §2.1, `dark`/`.warm` is a **LIGHT** theme (lavender bg, dark ink, white
+  cards). The admin/teacher dashboards in Figma are **warm-light**, not black.
+- **Impact:** **Every Teacher screen (Home, Update, Attendance, Marks, Syllabus, Homework, Classes,
+  Profile, ClassDetail) and every School screen (Home, People, Records, Comms, Settings, all
+  detail screens) renders on a black canvas** instead of the warm-light Figma surface. This is the
+  same class of defect as the Onboarding one (§2.1) but affects ~20 screens. The Night palette also
+  remaps `teal → #3cd1be`, `navy → near-white`, inks → inverted, so EVERY color is wrong on these
+  screens, not just the background.
+- **Fix:** Delete the `VTheme(tone = VPortalTone.Night)` wrapper in `SchoolPortalV2` and
+  `TeacherPortalV2` (let the nav graph's `Warm` flow through), OR change them to
+  `VPortalTone.Warm`. Then verify the per-screen hardcoded `Color(0xFF080808)` text-on-teal and
+  `c.ink.copy(alpha=0.06f)` fills read correctly on the light surface.
+- **Caveat:** `VPortalTone.Warm` currently aliases to `LightVColors` (`vColorsFor`:
+  `Light, Warm → LightVColors`). React's `.warm` scope additionally remaps `--arctic → #006a60`
+  (teal-deep) and `--void → #fcf8ff`. If any screen reads `--void`/`--arctic` semantics, build a
+  dedicated `WarmVColors` rather than reusing `LightVColors` verbatim.
+
+### 0.6 🟠 Icon set: lucide-specific glyphs replaced with wrong Material icons
+- React uses **lucide-react** glyphs with specific semantics. Compose substitutes Material icons
+  that don't match, e.g.:
+  - Teacher tasks: warning row should be **`AlertCircle`** (⊘), 4th row **`Clock`** — Compose uses
+    `Bell` and `Calendar` (`TeacherHomeScreenV2` lines 88, 90). Wrong meaning + wrong shape.
+  - School pending-actions should be **`AlertCircle`** — Compose uses `Bell`
+    (`SchoolHomeScreenV2` line 228).
+  - Onboarding "Import roster" / Students drop should be **`Upload`** — Compose uses `Plus`/`Share`.
+- **Fix:** Audit `VIcons` against every lucide import in the React files; add the missing glyphs
+  (AlertCircle, Clock, Upload, ClipboardList, Megaphone, ListChecks, GraduationCap, etc.) and use
+  the correct one per call site. Lucide is 2px stroke, rounded caps — match stroke weight/caps.
 
 ### 0.4 🟠 `Label` / `caption` semantics don't match React per-context
 - **React** has TWO distinct small-text styles that Compose collapses:
@@ -186,47 +228,98 @@ These four defects explain ~80% of the "premature / 90% same" gap the user sees.
 
 ---
 
-## 6. 🟠 Teacher Portal  —  `teacher/*`  ⇄  `Teacher.tsx`
+## 6. 🔴 Teacher Portal  —  `teacher/*`  ⇄  `Teacher.tsx`
 
-All teacher screens render in React under `PhoneFrame dark` = **warm/light** theme. Verify none are
-forced to `VPortalTone.Night`.
+**First and foremost:** `TeacherPortalV2.kt:41` forces `VPortalTone.Night` → every teacher screen
+is **black**. React renders warm-LIGHT (§0.5). Fix that before anything below matters.
 
-| Screen | Compose | Key checks vs `Teacher.tsx` |
-|--------|---------|------------------------------|
-| **TeacherHome** | `TeacherHomeScreenV2.kt` | greeting header, today's classes list, quick actions grid, "needs attention" cards — verify light theme + card radius/shadow + label weights |
-| **Update hub** (Attendance/Marks/Syllabus/Homework) | `TeacherAttendance/Marks/Syllabus/HomeworkScreenV2.kt` | the 4 sub-flows; Syllabus preview text fixed in `b4e16f5` ✓ |
-| **Syllabus** | `TeacherSyllabusScreenV2.kt` | parent-notification preview now `body/ink` + bold chapter ✓; verify the rest (chapter list, progress) matches `Teacher.tsx → SyllabusFlow` lines 206–231 |
-| **MyClasses** | `TeacherClassesScreenV2.kt` | class cards + ClassDetail drill-in |
-| **Profile** | `TeacherProfileScreenV2.kt` | avatar, stats, settings rows |
-| **Portal shell** | `TeacherPortalV2.kt` | bottom nav (home/update/classes/profile), tab switching, overlays |
+### 6.1 TeacherHome (`TeacherHomeScreenV2.kt` ⇄ `Teacher.tsx → TeacherHome`)
+| # | Element | React | Compose (current) | Sev |
+|---|---------|-------|--------------------|-----|
+| 1 | **Theme** | warm-light | Night/black | 🔴 |
+| 2 | **TaskCard icon circle** | bg = **soft fill** token: success `#A8E6CF`, warning `#FFD4A3`, arctic `#3cb9a9`, neutral `rgba(245,245,243,0.15)`; icon `#080808` | uses **ink** variants: `successInk #1f7a4d`, `warningInk`, `teal`, `ink3` → circles are **dark/muddy**, not the pastel chips Figma shows | 🔴 |
+| 3 | **TaskCard icons** | Check / **AlertCircle** / ListChecks / **Clock** | Check / **Bell** / Check / **Calendar** — 3 of 4 wrong glyphs | 🟠 |
+| 4 | **TaskCard CTA** | 12px arctic (`--arctic`) weight 600, right-aligned text button | `caption`/`c.teal` SemiBold ✓ (but teal in Night = `#3cd1be`) | 🟡 |
+| 5 | **Period chips (active)** | active (i==2) bg `--arctic`, text **`--void`** → in `.warm` `--void` = `#fcf8ff` (**near-white**!); inactive bg `rgba(245,245,243,0.06)`, text `--cloud` | active text **hardcoded `#080808` (black)** on the teal chip — should be near-white per `.warm` | 🟠 |
+| 6 | **Period chip label** | `Label dark={i!==2}` — active uses non-dark label | `label` token; check active label color = void/near-white | 🟡 |
+| 7 | **Period chip min-width** | `min-w-[150px]`, p-3 (12), radius 12 | `widthIn(min=150)` ✓, padding 12 ✓ | ✓ |
+| 8 | **Recent activity rows** | first row no top border; `borderTop --border-dark-1` between; what 13px, when 11px `text-dark-3` | divider between rows ✓; "when" uses `label` token (tracking cleared) ✓ | 🟡 |
+| 9 | **Section spacing** | `space-y-5` (20px) between sections, header `pt-6` | `spacedBy(20)` ✓, top 24 (React pt-6=24) ✓ | ✓ |
+| 10 | **Card radius/shadow** | 16px + hairline | 14dp + 10dp shadow (0.3) | 🟠 |
 
-**Common teacher diffs (apply globally):** card radius 14→16, heavy shadow, font, `Label` weight
-600→700/0.10em, any `leading`-icon buttons that should be **trailing** in React.
+### 6.2 Update hub — AttendanceFlow / MarksFlow / SyllabusFlow / HomeworkFlow
+| # | Element | React | Compose | Sev |
+|---|---------|-------|---------|-----|
+| 1 | **VTopTabs** | Attendance/Marks/Syllabus/Homework; active teal-deep + 2.5px underline | verify underline indicator + active color on light | 🟠 |
+| 2 | **Attendance P/A/L pills** | 3 round pills per student; selected → tone fill (success/danger/warning) + `--void` text; unselected `rgba(245,245,243,0.06)` + text-dark-3; shows only **first letter** (P/A/L) | verify pill group, single-letter, selected fill = soft tone (not ink) | 🟠 |
+| 3 | **Attendance sticky footer** | `sticky bottom-2` VCard: "28 marked • 4 remaining" + VProgressBar + `tone=lavender stateful` Submit→"Submitted" | verify sticky positioning + lavender stateful button + progress | 🟠 |
+| 4 | **Marks inline input** | `<input w-20 rounded-md font-mono text-right>` `rgba(245,245,243,0.06)` bg, border-dark-2; live "Class avg 68" footer row | verify compact mono right-aligned field + live-avg row | 🟠 |
+| 5 | **Marks/Syllabus/Homework save** | full lg `tone=lavender stateful` (Saved/Logged) | verify lavender + stateful labels | 🟡 |
+| 6 | **Syllabus preview box** | `rgba(245,245,243,0.06)` bg, 10px radius, 13px, **bold** chapter inline | **FIXED `b4e16f5`** (body/ink + bold span) ✓ — but verify the wrapper box bg/radius (10px, faint fill) | 🟡 |
+| 7 | **Homework "Assign new"** | full lg lavender + **Plus** leading | verify Plus icon + lavender | 🟡 |
+
+### 6.3 MyClasses / ClassDetail / Profile
+| # | Element | React | Compose | Sev |
+|---|---------|-------|---------|-----|
+| 1 | **MyClasses grid** | 2-col cards: class "10-A" 18/700, "Mathematics" 11, then Students count `font-mono 18` + "92% Today" arctic | verify 2-col, mono numbers, arctic % | 🟠 |
+| 2 | **ClassDetail header** | `VBackHeader` "Class 10 - A" + Edit3 action | verify back header + edit icon | 🟡 |
+| 3 | **ClassDetail stats** | 3-col tiles `rgba(245,245,243,0.06)` 10px radius, mono 18 + 10px label | verify 3 tiles | 🟡 |
+| 4 | **ClassDetail roster** | per-student row: avatar32 + name13/600 + "Roll N" mono11 + attendance% mono13; top borders | verify roster rows | 🟡 |
+| 5 | **Profile** | centered avatar **88**, name h2, username mono12, subject VBadges; then 4 settings VCards w/ ChevronRight; ghost "Log out" | verify avatar 88, centered, badge row, settings list, ghost logout | 🟠 |
 
 ---
 
-## 7. 🟠 School (Admin) Portal  —  `school/*`  ⇄  `Admin.tsx`
+## 7. 🔴 School (Admin) Portal  —  `school/*`  ⇄  `Admin.tsx`
 
-React `AdminApp` renders under `PhoneFrame dark` = **warm/light**. Verify SchoolPortalV2 is NOT Night.
+**First:** `SchoolPortalV2.kt:39` forces `VPortalTone.Night` → all School screens **black**. React is
+warm-LIGHT (§0.5). Fix first.
 
-| Screen | Compose | Key checks vs `Admin.tsx` |
-|--------|---------|------------------------------|
-| **AdminHome** | `SchoolHomeScreenV2.kt` | `GlanceCard`s (KPI tiles), SRI/PEWS preview mockups (`mockups.tsx`), announcements |
-| **People** | `SchoolPeopleScreenV2.kt` | student/teacher lists → StudentDetail / TeacherDetail drill-ins |
-| **Records** | `SchoolRecordsScreenV2.kt` | Attendance heatmap (`AttendanceHeat`), Marks, Syllabus, Fee, Docs tabs |
-| **Comms** | `SchoolCommsScreenV2.kt` | announcement composer + AnnouncementDetail |
-| **Settings** | `SchoolSettingsScreenV2.kt` | settings rows/toggles |
-| **Portal shell** | `SchoolPortalV2.kt` | 5-tab bottom nav (home/people/records/comms/settings) |
+### 7.1 AdminHome (`SchoolHomeScreenV2.kt` ⇄ `Admin.tsx → AdminHome`)
+| # | Element | React | Compose (current) | Sev |
+|---|---------|-------|--------------------|-----|
+| 1 | **Theme** | warm-light | Night/black | 🔴 |
+| 2 | **School chip icon** | `--arctic` circle + GraduationCap `#080808` | `c.teal` circle (Night `#3cd1be`) + `#080808` icon | 🟠 |
+| 3 | **GlanceCard CTA** | plain text link (e.g. "View details") — **NO chevron** | adds a **ChevronRight** to every CTA — extra element not in design | 🟠 |
+| 4 | **GlanceCard chips** | small rounded chips `rgba(245,245,243,0.06)` | `c.ink.copy(0.06f)` ✓ | 🟡 |
+| 5 | **GlanceCard ring** | `VProgressRing` 56/stroke-ish | `VProgressRing(56, stroke 6)` ✓ | ✓ |
+| 6 | **Attendance grid colors** | ≥80 → bg `rgba(200,222,255,0.30)` + text **`#0a3a76`** (deep blue); 60–79 → peach `rgba(255,212,163,0.45)`/`#7a3f00`; <60 → rose `rgba(255,173,168,0.45)`/`#7a1c18` | ≥80 text = **`#7FB0FF` (light blue)** — should be **`#0a3a76`** (deep); others use warning/dangerInk (close) | 🟠 |
+| 7 | **Grid number** | `font-mono 18/500` | `dataLg` 18sp ✓ | 🟡 |
+| 8 | **Syllabus coverage** | rows: class 13 + `font-mono 12` %; `VProgressBar tone=warning if <70` | matches ✓; bar tone ✓ | ✓ |
+| 9 | **Subject performance** | header "78%" `font-mono 18/600` + VSparkline 84×28; `VBars` (last bar teal-deep + value label, others `rgba(60,185,169,0.45)`); legend Week/Today | structurally ✓ — verify VBars last-bar highlight + value label | 🟡 |
+| 10 | **Teacher activity** | avatar32 + "**who** what" (who bold inline) + when 11 text-dark-3 | ✓ (Row with bold who) | ✓ |
+| 11 | **PEWS preview** | `VComingSoon` **with `preview={<PEWSPreview/>}`** → full risk-band grid + at-risk rows + dashed suggestion box | Compose `VComingSoon` called **without preview** → the entire rich PEWS mockup is **MISSING** | 🟠 |
+| 12 | **Pending actions icon** | **AlertCircle** `--warning-ink` | **Bell** `warningInk` — wrong glyph | 🟠 |
+| 13 | **Pending action button** | `size=sm variant=secondary` | ✓ | ✓ |
+| 14 | **Bell unread dot** | `--danger #FFADA8` (soft) | `c.dangerInk #b3261e` (ink) — should be soft danger | 🟡 |
 
-**Mockup-specific (`mockups.tsx`) checks:**
-- **SRIPreview:** `font-mono 32/600 navy` score + "/10" 16px ink-3; 6 weighted bars (label 116px,
-  track `--cream` h-1.5, fill `teal-deep`, value 28px right); "+0.3 YoY" success pill.
-- **PEWSPreview:** risk-band 3-tile grid (Low/Watch/High with exact bg/fg hex pairs), highest-priority
-  rows (score chip color by threshold >70/>55), dashed "SUGGESTED INTERVENTION" box
-  (`rgba(60,185,169,0.10)` + `1px dashed rgba(0,106,96,0.3)`).
-- **AIReportCardPreview:** navy narrative box, 2-col grade tiles (grade 20/800 navy + mono score),
-  3 strength/focus/tip rows with exact tinted bgs.
-- **Verify** these previews exist in Compose and match the exact hexes/weights, or are flagged TODO.
+### 7.2 People / StudentDetail / TeacherDetail (`SchoolPeopleScreenV2.kt`)
+- React: search bar + filter, segmented student/teacher lists, rows with avatar + name + meta +
+  status dot/badge → drill into StudentDetail (profile hero, attendance ring, marks history,
+  fee status, AttendanceHeat) / TeacherDetail (subjects, classes, coverage).
+- **Verify:** list row anatomy, status dots, the **AttendanceHeat** calendar-heatmap component
+  (color-scaled cells), detail-screen heros. Flag any missing sub-views.
+
+### 7.3 Records (`SchoolRecordsScreenV2.kt`)
+- React: `VTopTabs` Attendance / Marks / Syllabus / Fee / Docs. Attendance shows `AttendanceHeat`
+  grid; Fee shows breakdown + history; Docs list.
+- **Verify:** all 5 tabs present, AttendanceHeat color scale, fee VBars/breakdown.
+
+### 7.4 Comms / AnnouncementDetail (`SchoolCommsScreenV2.kt`)
+- React: announcement composer (audience tags, message field, Send), inbox list, AnnouncementDetail
+  (title, body, audience, read receipts).
+- **Verify:** composer + list + detail; "Comms" tab has badge **2**.
+
+### 7.5 Settings (`SchoolSettingsScreenV2.kt`)
+- React: settings rows/sections (school profile, academic year, permissions, integrations), toggles.
+- **Verify:** grouped rows, toggle styling, ChevronRight affordances.
+
+**PEWS / mockups (`mockups.tsx`) — exact specs for §7.1#11:**
+- **PEWSPreview:** risk-band card (`--cream` bg, "RISK BAND • TODAY" 11/700/0.08em + "180 students
+  scored" 10); 3-tile grid Low/Watch/High with **exact** bg/fg: `#A8E6CF/#155e3a`,
+  `#FFD4A3/#7a3f00`, `#FFADA8/#7a1c18`, number `font-mono 18/600`; "HIGHEST PRIORITY" rows with
+  score chip color by threshold (>70 rose, >55 peach, else `#FFE7B0`); dashed "SUGGESTED
+  INTERVENTION" box `rgba(60,185,169,0.10)` + `1px dashed rgba(0,106,96,0.3)` + Sparkles icon.
+- **Compose must implement these previews** (currently `VComingSoon` has no `preview` slot wired).
 
 ---
 
@@ -310,6 +403,170 @@ React `DiscoveryApp` is **light** (`PhoneFrame`, no dark).
 6. **VButton** default `soft=true` + add `trailing` icon slot; audit all call sites.
 7. Polish per-screen items in §3–§9.
 8. Animations (§1.11, §2.16) + cross-platform insets (§11).
+
+**Premium-craft layer (do alongside, per §13 — the "100% feel"):**
+9. **§13.1** Create `VElevation {card,raised,modal}` from the 3 `--shadow-light-*` tokens; replace flat
+   10dp on every card. *(navy-tinted 2-layer shadows = instant "premium")*
+10. **§13.2** Create `VMotion` spring tokens + `fadeUp(delay)`; wire the Splash/Login/Onboarding entrance
+    ladders. **§13.3/§13.5** Add `Modifier.pressScale()` everywhere + VButton idle→loading→success.
+11. **§13.4** Port the full 8-tone `tonePalette` (filled + soft + inset bevel) into VButton.
+12. **§13.8/§13.9** Font features (ss01/ss02/tnum) + negative tracking + `hairline = navy@6%` borders.
+13. **§13.6/§13.7** Shimmer sweep (web/desktop) + hero gradients/glow/clouds/halo.
+
+---
+
+## 13. 💎 PREMIUM-CRAFT PLAYBOOK (same design pattern, elevated execution)
+
+> These are NOT "new" designs — every value below is lifted verbatim from the React blueprint
+> (`primitives.tsx`, `theme.css`, `Auth.tsx`). They are the details that separate the current
+> "premature 90%" look from the "premium 100%" feel. Implement them as **tokens**, never hardcode.
+
+### 13.1 💎 Elevation system — 3-tier shadow tokens (currently collapsed to one flat 10dp)
+React defines **three** named elevation tokens in `theme.css`; Compose uses a single hard `elevation 10dp`.
+| Token | Light value (`theme.css:41-43`) | Use |
+|-------|----------------------------------|-----|
+| `--shadow-light-1` | `0 1px 3px rgba(38,35,77,.05), 0 1px 2px rgba(38,35,77,.03)` | resting cards (`VCard`) |
+| `--shadow-light-2` | `0 8px 24px rgba(38,35,77,.08)` | raised sheets, popovers, active rows |
+| `--shadow-light-3` | `0 16px 40px rgba(38,35,77,.14)` | modals, bottom sheets, dialogs |
+- **Craft point:** real shadows are **navy-tinted (`#26234d`), never pure black**, and use a
+  **two-layer** stack (tight contact + soft ambient). Compose's grey/black single-layer elevation reads
+  cheap. Add `VElevation { card, raised, modal }` → map to `Modifier.shadow(spread, color=navy@α)` via a
+  custom `drawBehind` (Compose `shadow()` can't tint, so draw two blurred rounded rects).
+- **iOS parity:** Compose `Modifier.shadow` renders on iOS via Skia — the tinted two-layer draw must be
+  the **same** custom modifier so both platforms match (no `elevation` dp which behaves differently).
+
+### 13.2 💎 Motion choreography — staggered entrance ladders (currently: nothing)
+The Splash/Onboarding/Login screens orchestrate a **timed reveal ladder** (`Auth.tsx`). Compose renders
+everything at once. Exact constants to port into an `enterStagger(index)` helper:
+| Element | initial → animate | transition (verbatim) |
+|---------|-------------------|------------------------|
+| Logo halo (Splash) | `scale .82, opacity 0, y 10` → `1,1,0` | `spring(stiffness 240, damping 22)` |
+| Halo pulse ring | `opacity 0` → `[0,.6,0]` | `2.4s, repeat ∞, easeInOut, delay .6` |
+| Logo path-draw | `pathLength 0→1` | `0.9s, delay .25` then `0.5s, delay .85` |
+| Wordmark | `opacity 0, y 12` → `1,0` | `delay 1.0, 0.5s` |
+| Bottom sheet | `y 80, opacity 0` → `0,1` | `spring(stiffness 220, damping 28, delay 1.45)` |
+| Sheet children | `opacity 0, y 8/12` → `1,0` | `delay 1.6 / 1.7 / 1.85` ladder, 0.4-0.45s |
+| Login card | `y 40, opacity 0` → `0,1` | `spring(stiffness 260, damping 30, delay 0.1)` |
+| Onboarding success tick | `scale 0, rotate -30` → `1,0` | `spring(stiffness 300, delay 0.4)` |
+| Step content rows | `opacity 0, y 10/12` → `1,0` | `delay 0.5/0.65/0.75/0.9` |
+| Coverage bar fill | `width 0→%` | `0.5s easeOut` |
+- **Compose mapping:** `AnimatedVisibility` + `animateFloatAsState` won't reproduce springs well; use
+  `Animatable` with `spring(dampingRatio, stiffness)` (convert: stiffness 240/damping 22 ≈
+  `Spring.StiffnessMediumLow` w/ `DampingRatioLowBouncy`; but **port the literal numbers** via
+  `spring(stiffness = 240f, dampingRatio = damping/(2*sqrt(stiffness)))`). Drive a single
+  `LaunchedEffect` clock so the delay ladder is exact.
+- **Define `VMotion` tokens:** `springSoft = spring(stiffness 240, damping 22)`,
+  `springSheet = spring(stiffness 220, damping 28)`, `springSnappy = spring(stiffness 300)`,
+  `fadeUp(delayMs)` = `fadeIn()+slideInVertically`. Nothing hardcoded per-screen.
+
+### 13.3 💎 Pressed / hover micro-interactions (currently: static)
+`primitives.tsx` + `Auth.tsx` press feedback — all missing in Compose:
+| Component | React feedback | Compose target |
+|-----------|----------------|----------------|
+| `VButton` | `hover:opacity-95 active:scale-[0.98]` | `clickable` + `animateFloatAsState` scale→.98 on press; iOS+Android both via `interactionSource` |
+| Splash CTA | `whileHover y:-1`, `whileTap scale .98, y 0` + `box-shadow 200ms` lift | press → scale .98; resting→raised shadow swap (§13.1) |
+| `VTag` | `hover:scale-[1.02] active:scale-[0.98]` | press scale .98 |
+| `VTopTabs` | `transition-colors` underline slide | animate the 2.5px indicator x/width with `animateDpAsState` |
+- **Craft point:** every tappable surface must visibly *give* on press (scale .98 + shadow drop).
+  Build one `Modifier.pressScale()` and apply everywhere → consistent, premium tactility on both platforms.
+
+### 13.4 💎 VButton tone palette + dual-shadow recipe (currently: flat fills)
+`primitives.tsx:69-118` defines **8 tones** each with a precise filled + soft shadow pair. Compose only
+has navy/teal flats. Port the full `tonePalette` as a Compose map:
+- **Filled:** `boxShadow: 0 6px 14px -4px {shadow}, 0 2px 4px -2px {shadow}` (tone-tinted, 2-layer).
+- **Soft:** `bg {soft}, fg {softFg}, border 1px {softBorder}, boxShadow 0 8px 20px -8px {softShadow},
+  inset 0 1px 0 rgba(255,255,255,.55)` — note the **inner top highlight** (glassy bevel) that gives the
+  soft buttons their premium "pill" look. Compose must draw the inset highlight (top `1px` white@55%).
+- **Tones (bg / fg / soft / softFg):** navy `#26234d`·`#d8d2f1`/`#26234d`; teal `--teal-deep`·`#b9e6df`/`#005048`;
+  sky `#3b78e7`·`#cddcff`/`#1a3f99`; peach `#e08a3c`·`#fad0a8`/`#7a3f0a`; lavender `#7a6cf0`·`#d6cdff`/`#3527a8`;
+  sand `#a88b5c`·`#e8d8b6`/`#5a4626`; rose `#c14a6a`·`#f6cad6`/`#6e1730`; mint `#2f9b7a`·`#bce5d2`/`#0e4d36`.
+- **Destructive:** `bg #b3261e, fg #fff, shadow 0 6px 14px -4px rgba(179,38,30,.30)`.
+
+### 13.5 💎 VButton multi-state machine (idle → loading → success) (currently: single state)
+`primitives.tsx:157-172` — the button **morphs**: idle label → spinner (rotate 360 ∞, 0.9s linear) →
+success check (`spring stiffness 400, scale .7→1, 0.22s`), each cross-fading
+(`opacity/​y ±6, 0.18s`). This is the single biggest "premium" tell on form submits (Login, Onboarding,
+Marks save). Implement as a `VButtonState { Idle, Loading, Success }` with `AnimatedContent` +
+`Crossfade`; spinner via `rememberInfiniteTransition`.
+
+### 13.6 💎 Shimmer sweep on filled primaries (currently: none)
+`primitives.tsx:149-151` + `Auth.tsx:134-136`: filled buttons have a diagonal light sweep
+`linear-gradient(90deg, transparent, rgba(255,255,255,0.32), transparent)` translating `-120% → 220%`
+over `900ms easeInOut` on hover. **Web/Desktop only** (hover); on touch, trigger once on press-release.
+Draw via `Brush.linearGradient` animated offset masked to the button shape.
+
+### 13.7 💎 Gradient & glow recipes (hero surfaces) (currently: flat teal)
+- **Notifications hero:** `linear-gradient(135deg, --navy → #3b3870)` + radial blob top-right
+  `radial-gradient(circle, rgba(60,185,169,0.45), transparent)` + bell chip `rgba(255,255,255,.14)` w/
+  `backdrop-blur`. Compose: `Brush.linearGradient` + a second `Brush.radialGradient` overlay; blur chip via
+  `Modifier.blur` behind a translucent fill.
+- **Splash/Login hero glow:** `radial-gradient(circle at 50% 30%, rgba(255,255,255,0.25), transparent 55%)`
+  at `opacity .30` over the teal field — currently a flat teal block in Compose.
+- **Logo halo:** `boxShadow 0 0 0 12px rgba(255,255,255,0.10)` pulsing ring (§13.2).
+- **Decorative clouds:** two faint SVG cloud glyphs (`opacity .25/.30`) top-left & bottom-right of the hero —
+  port as vector `Canvas` paths; they're part of the brand warmth and are missing.
+
+### 13.8 💎 Text rendering craft (the "premature" smell beyond the font swap)
+Beyond bundling Plus Jakarta Sans / DM Mono (§0.1), the **OpenType + metric details**:
+- **`ss01`/`ss02` stylistic sets** are enabled globally on the UI font — gives the single-story `a`/`g`.
+  Compose: `FontFeatureSetting("ss01","ss02")` on the `FontFamily` (verify Skia honors on iOS).
+- **`tnum` (tabular figures)** on all DM Mono data so numbers don't jitter in animated counters/tables.
+  Compose: `fontFeatureSettings = "tnum"` on every numeric/mono `TextStyle`.
+- **Negative tracking on display** (`h1 letter-spacing -0.02em`, logo `-0.02em`) — present in CSS, dropped
+  in Compose. Add to `display`/`h1` token (`letterSpacing = (-0.02).em`).
+- **Optical line-height:** React `h1` is `line-height 1.05`; large headings in Compose inherit looser
+  defaults → feels airy/unfinished. Pin `lineHeight` per display token.
+
+### 13.9 💎 Optical alignment & spacing rhythm
+- **Icon-in-circle optical centering:** lucide glyphs are drawn on a 24-grid; when placed in a 40/44px
+  circle they need the **container** centered, not the glyph baseline. Verify `Alignment.Center` + equal
+  padding; several Compose chips look 1px high.
+- **8pt rhythm with half-steps:** React uses `py-3.5` (14px), `py-2.5` (10px), `gap-1.5` (6px) — i.e.
+  **half-steps** matter. Ensure `VDimens` exposes 6/10/14 (not just 4/8/12/16) so buttons/inputs match
+  exactly (`VButton` md = `px-4 py-2.5` = 16/10).
+- **Hairline borders:** every card/divider is `1px solid rgba(38,35,77,0.06)` (navy@6%), not grey. Define
+  `VColors.hairline = navy@6%` and use it for all 1px borders/dividers (bottom nav top border, tab row,
+  top app bar) — currently grey lines read cheap.
+
+### 13.10 💎 Component finish details (small, high-impact)
+- **`VBottomNav` top shadow:** `0 -4px 20px rgba(38,35,77,0.04)` (upward, navy-tinted) — gives the nav a
+  floating feel. Compose likely has no top shadow. Draw an upward soft shadow.
+- **`VInput` focus glow:** `0 0 0 4px rgba(60,209,190,0.15)` (#3cd1be, brighter than `--teal`) + icon color
+  animates ink-3 → teal-deep over `200ms`. Animate both.
+- **`VTag` active:** `border 1px rgba(0,106,96,0.18)` + `boxShadow 0 2px 6px -2px rgba(0,106,96,0.18)`.
+- **`VProgress` / bars:** fills animate (`width 0→% , 0.5s easeOut`) — never appear pre-filled.
+- **`VComingSoon`** ● PREVIEW pill: `font-mono 11/700, teal-deep, 0.06em` + the **preview slot** must
+  render the real mockup (SRI/PEWS/AIReportCard), not be empty.
+
+---
+
+## 14. 🔍 COMPONENT CONFORMANCE MATRIX (one row per V* primitive)
+
+Legend: ✅ faithful · ⚠️ partial / needs token · 🔴 wrong / missing. "Action" = exact fix.
+
+| Component | Radius | Shadow / elevation | Colors / tones | Motion | States | Verdict | Action |
+|-----------|--------|--------------------|----------------|--------|--------|---------|--------|
+| **VCard** | 🔴 14→**16** | 🔴 flat 10dp → **2-layer navy-tint `--shadow-light-1`** | ✅ white + hairline (once `hairline` token added) | n/a | n/a | ⚠️ | radius 16; custom tinted 2-layer shadow (§13.1) |
+| **VButton** (filled) | ✅ sm10/md12/lg12 | 🔴 flat → **2-layer tone-tinted** (§13.4) | 🔴 only navy/teal → **8-tone palette** | 🔴 none → shimmer (§13.6) + press-scale | 🔴 single → **idle/loading/success** (§13.5) | 🔴 | port `tonePalette`, dual shadow, state machine, shimmer |
+| **VButton** (soft) | ✅ | 🔴 → `0 8px 20px -8px {softShadow}` **+ inset top highlight** | 🔴 call sites pass `soft=false` → **default soft=true** | 🔴 press-scale | as above | 🔴 | default soft=true; inset bevel; per-tone soft colors |
+| **VInput** | 🔴 10→**12** | n/a | ⚠️ focus glow `c.teal` → **#3cd1be@15%** | 🔴 icon color 200ms tween + focus ring | ⚠️ focus only | ⚠️ | radius 12; glow #3cd1be; animate icon color; `inputLabel` 12/600 |
+| **VBadge** | ✅ pill | n/a | ✅ tones faithful | n/a | n/a | ✅ | confirm 11/600/0.04em |
+| **VTag** | ✅ 6 | 🔴 active shadow missing | 🔴 active bg `teal@14%` → **`#dcf2ef`**, border `rgba(0,106,96,.18)` | 🔴 hover/press scale | active/idle | ⚠️ | exact active bg/border/shadow; press-scale |
+| **VLabel** | n/a | n/a | n/a — weight/tracking | n/a | n/a | 🔴 | 11/**700**/**0.10em** (add `labelStrong`); current 600/0.08em |
+| **VAvatar** | ✅ | n/a | ✅ palette + initials #080808 | n/a | n/a | ✅ | — |
+| **VDonut** | n/a | n/a | ✅ segments + center slot | ✅ animated reveal | n/a | ✅ | — |
+| **VSparkline** | n/a | n/a | ⚠️ verify **gradient area fill** stop 0.28→0 + end dot | ✅ path-draw | n/a | ⚠️ | confirm gradient fill + end dot, not plain stroke |
+| **VBars** | n/a | n/a | ⚠️ last bar teal-deep, others `teal@45%` | ✅ height grow | n/a | ⚠️ | confirm last-bar accent + value label |
+| **VProgressRing** | n/a | n/a | ✅ | ✅ | n/a | ✅ | confirm sizes |
+| **VBottomNav** | pill | 🔴 **top shadow `0 -4px 20px navy@4%`** missing | ⚠️ badge `dangerInk #b3261e` → **#c14a44** | 🔴 active color tween | active/idle | ⚠️ | top shadow; badge #c14a44; hairline top border |
+| **VTopTabs** | n/a | n/a | ✅ active teal-deep | 🔴 **2.5px underline should slide** | active/idle | ⚠️ | animate indicator x/width |
+| **VTopBar** | n/a | n/a | ✅ white + hairline | n/a | n/a | ✅ | confirm `navy@6%` border |
+| **VComingSoon** | n/a | n/a | ⚠️ ● PREVIEW pill mono 11/700 teal-deep | n/a | 🔴 **preview slot empty** | 🔴 | wire SRI/PEWS/AIReportCard preview mockups |
+| **VTheme / tones** | n/a | n/a | 🔴 **Teacher+School forced Night**; Onboarding Night | n/a | n/a | 🔴 | Warm (light) for admin/teacher; remove Night wrappers (§0.5, §2.1) |
+| **VType** | n/a | n/a | 🔴 **no Plus Jakarta Sans / DM Mono**; no ss01/ss02/tnum; no neg tracking | n/a | n/a | 🔴 | bundle fonts; add features + tracking + line-heights (§0.1, §13.8) |
+| **VElevation** | — | 🔴 **token set does not exist** | — | — | — | 🔴 | create `{card, raised, modal}` from `--shadow-light-1/2/3` (§13.1) |
+| **VMotion** | — | — | — | 🔴 **token set does not exist** | — | 🔴 | create `springSoft/Sheet/Snappy`, `fadeUp(delay)` (§13.2) |
+| **pressScale modifier** | — | — | — | 🔴 **does not exist** | — | 🔴 | one `Modifier.pressScale()` for all tappables (§13.3) |
 
 ---
 
