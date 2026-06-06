@@ -7,6 +7,33 @@
 
 ---
 
+## 🔬 Reality check — full re-audit on 2026-06-06 (post-`784570a`)
+
+> A fresh, file-by-file audit of the `backend-by-abuzar` branch against the master doc was run before resuming work. This corrects/extends the executive snapshot below with what is **actually on disk** (not just what prior ledger entries claimed), and re-points the remaining work at the one genuinely-missing pillar: **Step 7 — the backend teacher vertical (gap G1)**.
+
+**What the audit confirmed is real and on disk**
+- **Frontend phases 1 → 3E-1 are present as described.** `composeApp/.../ui/v2/` has all 4 theme files, 12 component files, and 22 screen/nav files (auth ×2, teacher ×8, parent ×5, school ×6, discovery ×1, `Shared.kt`, `NavGraphV2.kt`). Verified by `find`.
+- **`shared/feature/teacher/` data layer is present** — models + Ktor `TeacherApi` (the exact route contract below) + repository + impl + **7 ViewModels**, registered in `di/Koin.kt`.
+- **The backend has grown FAR beyond what the master doc's §3 table documented.** Beyond auth/onboarding/parent/content, the server now ships: `school/{SchoolDashboard,SchoolAnalytics,LeaveRequests,Ptm,Messages,Results,TeacherAssignment}Routing.kt`, `parent/{ParentDashboard,ParentFees,ParentOnboarding,TrackProgress}Routing.kt`, `user/ParentMessagesRouting.kt`, `media/{MediaRouting,SupabaseStorage}.kt`, `config/VersionRouting.kt`, `content/SupportRouting.kt`. `Tables.kt` defines **28 Exposed tables** incl. `faculty`, `students`, `school_classes`, `school_subjects`, `teacher_subject_assignments`, `attendance_records`, `exam_results`, `announcements` (table, not just a route), `ptm_events`, `message_threads/messages`, `children`, `fee_records`. A clean `core/SchoolAccess.kt` (`requireSchoolContext()`) centralises school-scoped authz.
+
+**The one true gap left (master doc Step 7 / §9 / G1): the TEACHER backend.**
+- `server/.../feature/` has **no `teacher/` package**. The frontend `shared/feature/teacher/data/remote/TeacherApi.kt` calls **11 routes that do not exist yet**:
+  - `GET  /api/v1/teacher/home`
+  - `GET  /api/v1/teacher/classes`
+  - `GET  /api/v1/teacher/attendance?class_id&date`  ·  `POST /api/v1/teacher/attendance`
+  - `GET  /api/v1/teacher/marks?class_id&exam_id`     ·  `POST /api/v1/teacher/marks`
+  - `GET  /api/v1/teacher/syllabus?class_id&subject`  ·  `PATCH /api/v1/teacher/syllabus`
+  - `GET  /api/v1/teacher/homework`                   ·  `POST /api/v1/teacher/homework`
+  - `GET  /api/v1/teacher/profile`
+- Auth already supports `role = "teacher"` end-to-end (`JwtConfig.issueToken`, `AuthRouting.roleNormalised`), so teacher login needs **no new auth route** — it reuses `/api/v1/auth/login`. What's missing is (a) the teacher data tables the design assumes, (b) a teacher-scoped context guard mirroring `requireSchoolContext()`, and (c) the 11 routes above — all scoped to the teacher's `teacher_subject_assignments`.
+- **Supporting gap discovered:** the SQL migration docs (`docs/backend/sql/01_supplementary_schema.sql`, `docs/db/migration_00*.sql`) are **behind `Tables.kt`** (no DDL for `exam_results`, `ptm_*`, `message_*`, `teacher_subject_assignments`, `children`, `fee_records`). New teacher tables will ship **with** their migration SQL so prod stays in sync — and a back-fill migration for the drifted tables is added too.
+
+**Build-verification status (updated):** JDK 21 has been installed in the sandbox and a **real `:server:compileKotlin -Pserver-only=true` Gradle build is being run** to compile-verify the backend work (the server module is far lighter than the Compose-MPP client). The Compose `:composeApp` build remains owed on a ≥8 GB host as before.
+
+**Re-scoped remaining work (this session):** drive **Phase 5 — backend teacher vertical** to LIVE in build-verified batches (schema → context guard + reads → attendance/marks → syllabus/homework → wire-up + seed + smoke), flipping the master doc §5.4 / §3 teacher rows from ❌ to ✅ as each lands. The frontend `App.kt` entrypoint swap (Phase 3E-2) and `ui/` deletion stay gated on the Compose build and are tracked under Phase 3E.
+
+---
+
 ## 📊 Executive status — done so far vs. what's left
 
 > Snapshot maintained at the end of every batch. Master plan: `UI screens/VIDYASETU_MASTER_REBUILD_DOC.md`.
@@ -231,3 +258,62 @@ Built in small batches (~3 files); each batch → commit + push + PR update + th
 - **Edited:** `shared/di/Koin.kt` — registered `TeacherApi` (`single`), `TeacherRepository` binding, and all 7 teacher VM factories. **Additive only**; no existing wiring touched.
 - **Updated:** this `PHASE_PLAN.md` — Phase 2 marked ✅ (data layer complete), executive status block added.
 - **Untouched:** old `ui/`, `App.kt`, `NavGraph.kt`, `build.gradle.kts`, `gradle.properties`, every existing API/repo/VM.
+
+---
+
+## PHASE 5 — Backend teacher vertical (master doc Step 7 / §9 / gap G1) 🔄
+
+**Goal:** Build the missing `server/.../feature/teacher/*` Ktor routes + their tables so the
+`shared/feature/teacher` ViewModels stop pointing at 404s. Every endpoint is JWT-guarded and scoped to
+the teacher's `teacher_subject_assignments` (school isolation + teacher-class isolation per master doc
+§6 G1 scope rule). Built in build-verified batches; after each batch → commit + push + PR update + this
+ledger refreshed.
+
+**Contract being satisfied** (from `shared/.../teacher/data/remote/TeacherApi.kt`, the authority):
+`GET home|classes|attendance|marks|syllabus|homework|profile`, `POST attendance|marks|homework`,
+`PATCH syllabus`, all under `api/v1/teacher/`. Read envelopes are `{success,data}`; writes return
+`ApiResponse<Unit>` (`{success,message}`).
+
+**Guiding rules (Phase 5):**
+1. **Reuse, don't reinvent.** Mirror `core/SchoolAccess.kt` for a `TeacherContext` guard; reuse
+   `ok/created/fail`, `dbQuery`, the upsert idiom from `ResultsRouting.kt`, and the existing
+   `teacher_subject_assignments`, `students`, `school_classes`, `attendance_records`, `exam_results`
+   tables wherever they already model the data.
+2. **New tables ship with migration SQL.** Every new Exposed table is added to `Tables.kt`,
+   registered in `DatabaseFactory.allTables`, **and** written into a new
+   `docs/backend/sql/02_teacher_schema.sql` so Postgres/Supabase stays in sync (the existing SQL docs
+   had already drifted; a back-fill note is included).
+3. **Scope or 403.** A teacher may only read/write classes+subjects present in their own
+   `teacher_subject_assignments` rows (matched by `teacher_id` = JWT sub, with `teacher_name` fallback
+   for legacy rows). Cross-school / cross-class access is rejected.
+4. **No fabrication.** Where a datum genuinely has no source yet (e.g. period timetable), the response
+   is an honest empty list, never random data — matching the design's hard UI rule.
+
+### Batch 5A — schema (tables + registration + SQL migration)
+| File | Change |
+|---|---|
+| `db/Tables.kt` | + `TeacherSyllabusUnitsTable`, `TeacherHomeworkTable`, `TeacherHomeworkSubmissionsTable`, `TeacherPeriodsTable` (timetable, optional/empty-safe). Marks reuse `ExamResultsTable`; attendance reuses `AttendanceRecordsTable`. |
+| `db/DatabaseFactory.kt` | register the new tables in `allTables`. |
+| `docs/backend/sql/02_teacher_schema.sql` | idempotent `CREATE TABLE IF NOT EXISTS` DDL for the new tables + back-fill DDL for the drifted ones. |
+
+### Batch 5B — teacher context guard + reads (home / classes / profile)
+| File | Change |
+|---|---|
+| `core/TeacherAccess.kt` | `TeacherContext(userId, schoolId, name)` + `requireTeacherContext()` (401/403/404 envelopes) + assignment-scope helpers. |
+| `feature/teacher/TeacherRouting.kt` (part 1) | `GET home`, `GET classes`, `GET profile`. |
+
+### Batch 5C — attendance + marks (read + write, scoped, immutable-aware)
+- `feature/teacher/TeacherRouting.kt` (part 2): `GET/POST attendance` (→ `attendance_records`),
+  `GET/POST marks` (→ `exam_results`), with live present/absent/late + entered counts.
+
+### Batch 5D — syllabus log + homework + wire-up
+- `feature/teacher/TeacherRouting.kt` (part 3): `GET/PATCH syllabus`, `GET/POST homework`.
+- `Application.kt`: mount `teacherRouting()`.
+
+### Batch 5E — seed + boot + smoke
+- Optional dev seed for a demo teacher + assignments (idempotent, dev-only) and a SQLite boot +
+  curl smoke of all 11 routes; flip master doc §3 / §5.4 teacher rows ❌ → ✅.
+
+### Phase 5 status
+- [ ] 5A schema · [ ] 5B guard+reads · [ ] 5C attendance+marks · [ ] 5D syllabus+homework+wire ·
+      [ ] 5E seed+smoke · [ ] master-doc status flip.
