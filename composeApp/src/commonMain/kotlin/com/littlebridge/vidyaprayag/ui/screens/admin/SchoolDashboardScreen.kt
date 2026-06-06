@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,8 +24,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingStep
+import com.littlebridge.vidyaprayag.feature.admin.presentation.DashboardOnboardingStatus
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolDashboardViewModel
 import com.littlebridge.vidyaprayag.navigation.Destination
 import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
@@ -36,7 +37,21 @@ fun SchoolDashboardScreen() {
     val viewModel: SchoolDashboardViewModel = koinViewModel()
     val steps by viewModel.steps.collectAsState()
     val progress by viewModel.progress.collectAsState()
+    val onboardingStatus by viewModel.onboardingStatus.collectAsState()
+    val adminName by viewModel.adminName.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
     val navigator = LocalAppNavigator.current
+
+    // Re-fetch when the user lands on the dashboard (e.g. after finishing
+    // the onboarding flow, the previous "/user/details" is stale).
+    LaunchedEffect(Unit) { viewModel.refresh() }
+
+    val onContinueOnboarding: () -> Unit = {
+        val target = viewModel.firstPendingStep()?.serverKey
+            ?.let { it.toOnboardingDestination() }
+            ?: Destination.InstitutionalBasicOB
+        navigator.navigateTo(target)
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Orb Glows
@@ -57,22 +72,49 @@ fun SchoolDashboardScreen() {
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
                 item {
-                    WelcomeHeroCard(
-                        progress = progress,
-                        onStartOnboarding = { navigator.navigateTo(Destination.InstitutionalBasicOB) }
-                    )
+                    AnimatedEntrance(delayMillis = 0) {
+                        if (onboardingStatus == DashboardOnboardingStatus.COMPLETED) {
+                            CampusLiveHeroCard(adminName = adminName)
+                        } else {
+                            OnboardingHeroCard(
+                                adminName = adminName,
+                                progress = progress,
+                                statusLabel = onboardingStatus.shortLabel(),
+                                isPrimaryActionLoading = isLoading,
+                                primaryActionText = if (progress > 0f && progress < 1f) "Continue Onboarding" else "Start Onboarding",
+                                onPrimaryAction = onContinueOnboarding
+                            )
+                        }
+                    }
                 }
 
                 item {
-                    SetupStepsHeader(stepCount = steps.size)
+                    AnimatedEntrance(delayMillis = 80) {
+                        SetupStepsHeader(stepCount = steps.size)
+                    }
                 }
 
-                items(steps) { step ->
-                    OnboardingStepItem(step = step)
+                itemsIndexed(steps) { index, step ->
+                    AnimatedEntrance(delayMillis = staggerDelay(index + 2)) {
+                        OnboardingStepItem(
+                            step = step,
+                            clickable = onboardingStatus != DashboardOnboardingStatus.COMPLETED && step.isEnabled,
+                            onClick = {
+                                navigator.navigateTo(step.serverKey.toOnboardingDestination())
+                            }
+                        )
+                    }
                 }
 
                 item {
-                    SupportSection()
+                    AnimatedEntrance(delayMillis = 200) {
+                        SupportSection(
+                            onChatClick = { navigator.navigateTo(Destination.Messages) },
+                            onWatchVideoClick = {
+                                navigator.navigateTo(Destination.InstitutionalProfile)
+                            }
+                        )
+                    }
                 }
 
                 item {
@@ -81,6 +123,21 @@ fun SchoolDashboardScreen() {
             }
         }
     }
+}
+
+private fun String.toOnboardingDestination(): Destination = when (uppercase()) {
+    OnboardingStep.SERVER_KEY_BASIC -> Destination.InstitutionalBasicOB
+    OnboardingStep.SERVER_KEY_BRANDING -> Destination.BrandingInfoOB
+    OnboardingStep.SERVER_KEY_ACADEMIC -> Destination.AcademicInfoOB
+    OnboardingStep.SERVER_KEY_REVIEW -> Destination.LaunchInfoOB
+    else -> Destination.InstitutionalBasicOB
+}
+
+private fun DashboardOnboardingStatus.shortLabel(): String = when (this) {
+    DashboardOnboardingStatus.NOT_STARTED -> "Pending"
+    DashboardOnboardingStatus.IN_PROGRESS -> "In Progress"
+    DashboardOnboardingStatus.COMPLETED -> "Live"
+    DashboardOnboardingStatus.UNKNOWN -> "Pending"
 }
 
 @Composable
@@ -100,8 +157,19 @@ private fun OrbGlow(modifier: Modifier = Modifier) {
     )
 }
 
+/**
+ * Hero card for the IN_PROGRESS / NOT_STARTED states: shows real progress and
+ * a Start/Continue Onboarding CTA that jumps to the first non-completed step.
+ */
 @Composable
-private fun WelcomeHeroCard(progress: Float, onStartOnboarding: () -> Unit) {
+private fun OnboardingHeroCard(
+    adminName: String,
+    progress: Float,
+    statusLabel: String,
+    isPrimaryActionLoading: Boolean,
+    primaryActionText: String,
+    onPrimaryAction: () -> Unit
+) {
     VidyaPrayagCard(
         modifier = Modifier.fillMaxWidth(),
         backgroundColor = MaterialTheme.colorScheme.primaryContainer,
@@ -109,7 +177,7 @@ private fun WelcomeHeroCard(progress: Float, onStartOnboarding: () -> Unit) {
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
             Text(
-                "Welcome, Admin",
+                "Welcome, $adminName",
                 style = MaterialTheme.typography.headlineLarge,
                 color = Color.White,
                 fontWeight = FontWeight.Bold
@@ -134,7 +202,7 @@ private fun WelcomeHeroCard(progress: Float, onStartOnboarding: () -> Unit) {
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    "Pending",
+                    statusLabel,
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White.copy(alpha = 0.4f),
                     fontWeight = FontWeight.Bold
@@ -144,7 +212,7 @@ private fun WelcomeHeroCard(progress: Float, onStartOnboarding: () -> Unit) {
             Spacer(modifier = Modifier.height(8.dp))
 
             LinearProgressIndicator(
-                progress = { progress },
+                progress = { progress.coerceIn(0f, 1f) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp)
@@ -155,20 +223,102 @@ private fun WelcomeHeroCard(progress: Float, onStartOnboarding: () -> Unit) {
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            Button(
-                onClick = onStartOnboarding,
+            PremiumButton(
+                text = primaryActionText,
+                onClick = onPrimaryAction,
+                enabled = !isPrimaryActionLoading,
+                loading = isPrimaryActionLoading,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                ),
-                shape = CircleShape,
-                contentPadding = PaddingValues(vertical = 16.dp)
-            ) {
-                Text("Start Onboarding", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Spacer(modifier = Modifier.width(8.dp))
-                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                icon = {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            )
+        }
+    }
+}
+
+/**
+ * Hero card for the COMPLETED state: confirms the campus is live and points
+ * the admin at the next thing they'd actually want to do.
+ */
+@Composable
+private fun CampusLiveHeroCard(adminName: String) {
+    VidyaPrayagCard(
+        modifier = Modifier.fillMaxWidth(),
+        backgroundColor = MaterialTheme.colorScheme.primaryContainer,
+        elevation = 8
+    ) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondaryContainer,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    "Welcome back, $adminName",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                "Your campus is live on Vidya Prayag. All four onboarding steps are complete — manage admissions, announcements and academics from the menu below.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.75f)
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "100% Onboarding Complete",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    "Live",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            LinearProgressIndicator(
+                progress = { 1f },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(CircleShape),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                trackColor = Color.White.copy(alpha = 0.1f),
+            )
         }
     }
 }
@@ -202,9 +352,15 @@ private fun SetupStepsHeader(stepCount: Int) {
 }
 
 @Composable
-private fun OnboardingStepItem(step: OnboardingStep) {
+private fun OnboardingStepItem(
+    step: OnboardingStep,
+    clickable: Boolean,
+    onClick: () -> Unit
+) {
     VidyaPrayagCard(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (clickable) Modifier.clickable { onClick() } else Modifier)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -219,7 +375,7 @@ private fun OnboardingStepItem(step: OnboardingStep) {
                 contentAlignment = Alignment.Center
             ) {
                 if (step.iconUrl != null) {
-                    AsyncImage(
+                    NetworkImage(
                         model = step.iconUrl,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize().padding(8.dp),
@@ -227,10 +383,10 @@ private fun OnboardingStepItem(step: OnboardingStep) {
                     )
                 } else {
                     Icon(
-                        imageVector = Icons.Default.RocketLaunch,
+                        imageVector = step.serverKey.toMaterialIcon(),
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                        modifier = Modifier.size(32.dp)
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }
@@ -249,6 +405,49 @@ private fun OnboardingStepItem(step: OnboardingStep) {
                 )
             }
 
+            // Trailing status indicator
+            StepStatusIndicator(step.status)
+        }
+    }
+}
+
+@Composable
+private fun StepStatusIndicator(status: String) {
+    when (status.uppercase()) {
+        OnboardingStep.STATUS_COMPLETED -> {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = "Completed",
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+        OnboardingStep.STATUS_LOCKED -> {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Lock,
+                    contentDescription = "Locked",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
+        else -> {
+            // PENDING / unknown — hollow circle
             Box(
                 modifier = Modifier
                     .size(24.dp)
@@ -258,11 +457,26 @@ private fun OnboardingStepItem(step: OnboardingStep) {
     }
 }
 
+private fun String.toMaterialIcon() = when (uppercase()) {
+    OnboardingStep.SERVER_KEY_BASIC -> Icons.Default.School
+    OnboardingStep.SERVER_KEY_BRANDING -> Icons.Default.Palette
+    OnboardingStep.SERVER_KEY_ACADEMIC -> Icons.Default.HistoryEdu
+    OnboardingStep.SERVER_KEY_REVIEW -> Icons.Default.RocketLaunch
+    else -> Icons.Default.RocketLaunch
+}
+
 @Composable
-private fun SupportSection() {
+private fun SupportSection(
+    onChatClick: () -> Unit,
+    onWatchVideoClick: () -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Whole card is tappable so "anywhere in the support row" → chat,
+        // not just the small "CHAT" pill. Matches industrial-app convention.
         VidyaPrayagCard(
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onChatClick() }
         ) {
             Row(
                 modifier = Modifier.padding(16.dp),
@@ -290,7 +504,7 @@ private fun SupportSection() {
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        "Available 24/7 for institutions",
+                        "Open the messages inbox to reach support",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
@@ -301,13 +515,13 @@ private fun SupportSection() {
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 1.sp,
-                    modifier = Modifier.clickable { }
+                    modifier = Modifier.clickable { onChatClick() }
                 )
             }
         }
 
         OutlinedButton(
-            onClick = {},
+            onClick = onWatchVideoClick,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),

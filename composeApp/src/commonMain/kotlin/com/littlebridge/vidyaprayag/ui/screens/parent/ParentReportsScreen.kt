@@ -22,7 +22,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.parent.presentation.*
 import com.littlebridge.vidyaprayag.ui.components.*
 import org.koin.compose.viewmodel.koinViewModel
@@ -111,11 +110,12 @@ private fun ReportsHeader() {
 private fun AiLearningStoryCard(name: String, narrative: String) {
     VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(20.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            AsyncImage(
-                model = "https://lh3.googleusercontent.com/aida/ADBb0uiesddkmz2baGSxcsg_BUUQovOZXC_zhPHmTq2vtyOmjrPQKM95tIg8DHWPW5RBfoqtbyKsu9PIpUtlo555txEJKypL9ms57Q94s5bbnrp4k_haix4SXySTXglHaenpFXK_0RZLNdChNAuFC86RXM2Q38DqkavsDnZn-jXUkeODh9WX1fX30P1ULfAEiRXg20XFK5t4tj6ZGnCFUbU68MvEyUGUhcDnkcJ8RgaPBSbeuKhfN1Od9jv0ZFmW",
-                contentDescription = null,
-                modifier = Modifier.size(64.dp)
-            )
+            Box(
+                modifier = Modifier.size(64.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.AutoStories, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
+            }
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Surface(color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f), shape = CircleShape) {
@@ -166,11 +166,7 @@ private fun GlobalRankCard(rank: Int, total: Int) {
                 modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
-                AsyncImage(
-                    model = "https://lh3.googleusercontent.com/aida/ADBb0uicrmIvnR_ImEFcEJvW71nMnAc1cD9gIggNKIk3Fdipz8V4xE_zfI2Zww2SPer1jYQJvsQZyBUE3UmMlLp1KpaH7sS3bTU3cWYbO4DVFgqPrN4vXTYGJS7G_dxBzbw6VzI2m-LbUDJG3X_6JH0qZh-36OZfZL4hVpyfCWpiLzDo4qTDldnLlqGpCI7arcKc4c8Xd18YOK8bzLTCqmuXWfLirJQpiulb2IgiZv05gE5HUe6KylH0PLqpV0wU",
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp)
-                )
+                Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
             }
             Column {
                 Text("GLOBAL SUBJECT RANK", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Black)

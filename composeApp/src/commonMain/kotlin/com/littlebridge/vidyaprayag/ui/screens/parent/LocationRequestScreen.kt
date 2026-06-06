@@ -20,7 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
+import com.littlebridge.vidyaprayag.ui.components.NetworkImage
 import com.littlebridge.vidyaprayag.feature.parent.presentation.LocationFeature
 import com.littlebridge.vidyaprayag.feature.parent.presentation.LocationRequestViewModel
 import com.littlebridge.vidyaprayag.navigation.Destination
@@ -110,8 +110,8 @@ private fun LocationIllustration() {
         contentAlignment = Alignment.Center
     ) {
         // Mock Map Background
-        AsyncImage(
-            model = "https://lh3.googleusercontent.com/aida-public/AB6AXuDFd-V1de3D_oZJnjeO0kUZ0sQDp_7njnHINNZ-aBynWYBkllxCKxu9iiI-RN5K9m2mkLBtOItx8ER8KjJh420Rr-uyEjzi_Wd8nHiCoFT8A11xUN0zC7z9hWS1JiQSwv4yz2GRi2OaeOfTkez_vujHWIzlqjo_ToHq7TSLoAUm5P3MPXYru510WO7wZMkUouljp9nCRpYCll0yXKAU1T8a_EsHWKnnbqgV4YXKy8SSw0lunoOw8_C9qvaV5t-_RTLzBNViyyieXGcX",
+        NetworkImage(
+            model = null,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,

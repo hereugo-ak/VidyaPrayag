@@ -22,7 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
+import com.littlebridge.vidyaprayag.ui.components.NetworkImage
 import com.littlebridge.vidyaprayag.feature.parent.presentation.CareerMatch
 import com.littlebridge.vidyaprayag.feature.parent.presentation.CareerPathViewModel
 import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
@@ -147,7 +147,7 @@ private fun CareerMatchCard(match: CareerMatch) {
     ) {
         Column {
             Box(modifier = Modifier.height(200.dp).fillMaxWidth()) {
-                AsyncImage(
+                NetworkImage(
                     model = match.imageUrl,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),

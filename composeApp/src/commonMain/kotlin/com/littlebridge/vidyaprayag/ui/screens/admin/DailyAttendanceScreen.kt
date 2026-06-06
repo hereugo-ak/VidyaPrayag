@@ -1,5 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.screens.admin
 
+import com.littlebridge.vidyaprayag.ui.theme.StatusColors
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.feature.admin.presentation.Attendee
@@ -214,10 +217,12 @@ private fun SectionHeader(title: String) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        TextButton(onClick = { }) {
-            Text("Filter By Dept", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
-            Icon(Icons.Default.ExpandMore, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.secondary)
-        }
+        Text(
+            "Department-wise view",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
@@ -234,7 +239,13 @@ private fun AttendeeItem(attendee: Attendee) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            // weight(1f) so a long name shrinks instead of shoving the status
+            // badge off-screen on narrow phones.
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 Box(
                     modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
@@ -252,23 +263,24 @@ private fun AttendeeItem(attendee: Attendee) {
                                 when(attendee.status) {
                                     AttendanceStatus.PRESENT -> MaterialTheme.colorScheme.secondary
                                     AttendanceStatus.ABSENT -> MaterialTheme.colorScheme.error
-                                    AttendanceStatus.LATE -> Color(0xFFFACC15) // Amber
+                                    AttendanceStatus.LATE -> StatusColors.goldBright // Amber
                                 }
                             )
                             .border(1.5.dp, Color.White, CircleShape)
                     )
                 }
-                Column {
-                    Text(attendee.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                    Text("ID: #2024-00${attendee.id}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, letterSpacing = 1.sp)
+                Column(modifier = Modifier.weight(1f, fill = false)) {
+                    Text(attendee.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("ID: #2024-00${attendee.id}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, letterSpacing = 1.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
+            Spacer(modifier = Modifier.width(8.dp))
             
             Surface(
                 color = when(attendee.status) {
                     AttendanceStatus.PRESENT -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
                     AttendanceStatus.ABSENT -> MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
-                    AttendanceStatus.LATE -> Color(0xFFFACC15).copy(alpha = 0.1f)
+                    AttendanceStatus.LATE -> StatusColors.goldBright.copy(alpha = 0.1f)
                 },
                 shape = RoundedCornerShape(10.dp)
             ) {
@@ -284,7 +296,7 @@ private fun AttendeeItem(attendee: Attendee) {
                     color = when(attendee.status) {
                         AttendanceStatus.PRESENT -> MaterialTheme.colorScheme.secondary
                         AttendanceStatus.ABSENT -> MaterialTheme.colorScheme.error
-                        AttendanceStatus.LATE -> Color(0xFFCA8A04) // Darker amber
+                        AttendanceStatus.LATE -> StatusColors.warningStrong // Darker amber
                     }
                 )
             }

@@ -26,7 +26,7 @@ data class ParentSchedulePTMState(
     val ptmWindowDays: List<Int> = listOf(6, 12),
     val teacherName: String = "Dr. Sarah Henderson",
     val teacherSubject: String = "Advanced Mathematics • Grade 10-A",
-    val teacherImageUrl: String = "https://lh3.googleusercontent.com/aida-public/AB6AXuA9ovXHkp7pMxJJl22f7fZy3tNdf5J5w36mJD5Tl-F0TXhnQ6I-FRbkTkFDu5iUp4zsRapf3mTuaiGWhFjPZ8FNVxRmNk6cxgdmZZXs3lUeLOLrdrkypser3od5vej76hIdSwN3LfpvBQ8OSL0EqjBl7d16AvoecEbLvO5TduBawveJLoVZNYHzNG1cwyWuFiX5CjX-qfWV2kRn15qWVYib6Zm7_OR3LGkZH5ZMQHDkF6OgBbtM6j1LMai9MineP9ZmY3fRCUV1NGyZ",
+    val teacherImageUrl: String = "https://picsum.photos/seed/vidyaprayag-teacher/160/160",
     val slots: List<PTMTimeSlot> = listOf(
         PTMTimeSlot("10:00 AM"),
         PTMTimeSlot("10:15 AM", isSelected = true),

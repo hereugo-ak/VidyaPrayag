@@ -20,7 +20,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.presentation.LeaveRequestItem
 import com.littlebridge.vidyaprayag.feature.admin.presentation.LeaveRequestsViewModel
 import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
@@ -179,15 +178,22 @@ private fun SummaryCard(rate: Int, count: Int) {
 @Composable
 private fun SystemTipCard() {
     VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
-        Box(modifier = Modifier.fillMaxWidth().height(160.dp)) {
-            AsyncImage(
-                model = "https://lh3.googleusercontent.com/aida-public/AB6AXuBxigxjLFYK-cRf_YkjxkN4xzNRome6q7QHSG-zjRl6iTub7jqR-u1BfvaGRc06rNzhrehx1ulzvIS8x-jCk_PBkmYN6_iWNQV3lDLUvYRtpBwG-K_nGI4ZpXS4Gh5DPYth4MlHY6N3vH447BwynGibjA3cBlImeX6rV03A51vxYFnaPA9pJKfD2SJ3iBUoeEV2a0jtkPw0FigS4Pr0-FjyXWn1pwcq6Z9GRgOsjO7C0GHM_j732VQw_Cbupopukvo7lBDgMypD5hOF",
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(160.dp)
+                .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.08f))
+        ) {
+            Icon(
+                Icons.Default.AutoAwesome,
                 contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-                alpha = 0.3f
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(24.dp)
+                    .size(64.dp),
+                tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.25f)
             )
-            
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -231,7 +237,7 @@ private fun LeaveRequestCard(
         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    AsyncImage(
+                    NetworkImage(
                         model = request.imageUrl,
                         contentDescription = null,
                         modifier = Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)),

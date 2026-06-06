@@ -1,5 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.screens.admin
 
+import com.littlebridge.vidyaprayag.ui.theme.StatusColors
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,9 +21,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.presentation.FacultyAccountability
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StarTeacher
 import com.littlebridge.vidyaprayag.feature.admin.presentation.TeacherPerformanceViewModel
@@ -105,12 +107,12 @@ private fun FacultyHealthHeader(compliance: String, trend: String) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                AsyncImage(
-                    model = "https://lh3.googleusercontent.com/aida/ADBb0uh6bmjgNB9R7rHkxFN9BAClzfBhfnkjVE0zLcy9Hoj06m6sDsFs2-XAOFwOYPYSudOEj0TwCaZgd6Qs9GjVvbBPIQovFw_xoUPtJ6-iStpw2G33aeFjRb8Pk4ZjqRZMPlfMcrg04-Sr83Dme580oa_3WpNDVDLJUVrCjCBQ_GQHowOqwoeMxEsMW1ogJyPeQ1GCHYU34dL7slNnrZs0o0SyZqAOpkLMwavAIfu-jfZXkhr9Mw0CRzOY7pl6",
-                    contentDescription = null,
-                    modifier = Modifier.size(80.dp),
-                    contentScale = ContentScale.Fit
-                )
+                Box(
+                    modifier = Modifier.size(80.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Groups, contentDescription = null, modifier = Modifier.size(38.dp), tint = MaterialTheme.colorScheme.secondary)
+                }
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Institutional Faculty Health", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Text("Real-time oversight of teacher engagement and accountability metrics.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -158,20 +160,33 @@ private fun UpdateFrequencyCard(trend: List<Float>) {
                 }
             }
 
-            // Mock Chart
-            Row(
-                modifier = Modifier.fillMaxWidth().height(160.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.Bottom
-            ) {
-                trend.forEach { value ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight(value)
-                            .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                            .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f))
+            // Live chart driven by the weekly faculty log series from the API.
+            if (trend.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(160.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No update-frequency data",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(160.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    trend.forEach { value ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(value.coerceIn(0f, 1f))
+                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                                .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f))
+                        )
+                    }
                 }
             }
         }
@@ -201,9 +216,9 @@ private fun StarFacultyItem(teacher: StarTeacher) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.weight(1f)) {
                 Box {
-                    AsyncImage(
+                    NetworkImage(
                         model = teacher.imageUrl,
                         contentDescription = null,
                         modifier = Modifier.size(48.dp).clip(CircleShape).border(2.dp, MaterialTheme.colorScheme.secondary, CircleShape),
@@ -217,9 +232,9 @@ private fun StarFacultyItem(teacher: StarTeacher) {
                         Text("#${teacher.rank}", modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Black)
                     }
                 }
-                Column {
-                    Text(teacher.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                    Text(teacher.department.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                Column(modifier = Modifier.weight(1f, fill = false)) {
+                    Text(teacher.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(teacher.department.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, fontSize = 9.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             Column(horizontalAlignment = Alignment.End) {
@@ -247,12 +262,12 @@ private fun AccountabilityRow(faculty: FacultyAccountability) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1.2f)) {
-                Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(if (faculty.riskCorrelation == "High Risk") Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(if (faculty.riskCorrelation == "High Risk") StatusColors.criticalSoft else MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
                     Text(faculty.initials, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = if (faculty.riskCorrelation == "High Risk") Color.Red else MaterialTheme.colorScheme.primary)
                 }
-                Column {
-                    Text(faculty.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                    Text(faculty.department, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, fontSize = 9.sp)
+                Column(modifier = Modifier.weight(1f, fill = false)) {
+                    Text(faculty.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(faculty.department, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
 
@@ -270,7 +285,7 @@ private fun AccountabilityRow(faculty: FacultyAccountability) {
                 color = when(faculty.riskCorrelation) {
                     "Stable" -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
                     "High Risk" -> Color.Red.copy(alpha = 0.1f)
-                    else -> Color(0xFFF59E0B).copy(alpha = 0.1f)
+                    else -> StatusColors.warning.copy(alpha = 0.1f)
                 },
                 shape = RoundedCornerShape(6.dp)
             ) {
@@ -283,7 +298,7 @@ private fun AccountabilityRow(faculty: FacultyAccountability) {
                     color = when(faculty.riskCorrelation) {
                         "Stable" -> MaterialTheme.colorScheme.secondary
                         "High Risk" -> Color.Red
-                        else -> Color(0xFFCA8A04)
+                        else -> StatusColors.warningStrong
                     }
                 )
             }
@@ -306,7 +321,7 @@ private fun DepartmentEfficiencyCard(efficiencies: List<com.littlebridge.vidyapr
                         LinearProgressIndicator(
                             progress = { dept.percentage / 100f },
                             modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
-                            color = if (dept.percentage < 85) Color(0xFFF59E0B) else MaterialTheme.colorScheme.secondary,
+                            color = if (dept.percentage < 85) StatusColors.warning else MaterialTheme.colorScheme.secondary,
                             trackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     }
@@ -333,14 +348,7 @@ private fun PerformanceForecastingCard() {
                 ForecastBox(label = "RISK", value = "Low", subValue = "98% Confidence", modifier = Modifier.weight(1f))
             }
             
-            Button(
-                onClick = { },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Download Forecast", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            }
+            ComingSoonPill(label = "Forecast export — coming soon", onLight = true)
         }
     }
 }

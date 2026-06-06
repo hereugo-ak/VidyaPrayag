@@ -21,8 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
-import com.littlebridge.vidyaprayag.feature.admin.presentation.MessageThread
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.MessageThread
+import com.littlebridge.vidyaprayag.feature.admin.presentation.ConversationState
 import com.littlebridge.vidyaprayag.feature.admin.presentation.MessagesViewModel
 import com.littlebridge.vidyaprayag.ui.components.*
 import org.koin.compose.viewmodel.koinViewModel
@@ -32,6 +32,13 @@ import org.koin.compose.viewmodel.koinViewModel
 fun MessagesScreen() {
     val viewModel: MessagesViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+    val conversation by viewModel.conversation.collectAsState()
+    var showCompose by remember { mutableStateOf(false) }
+
+    // Re-sync on screen entry, matching SchoolDashboard / AdmissionCRM.
+    LaunchedEffect(Unit) { viewModel.refresh() }
 
     BaseScreen(
         bottomBar = {
@@ -47,36 +54,284 @@ fun MessagesScreen() {
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             item {
-                MessagesHeader()
+                MessagesHeader(isLoading = isLoading, onRefresh = { viewModel.refresh() })
+            }
+
+            errorMessage?.let { msg ->
+                item {
+                    MessagesErrorBanner(message = msg, onDismiss = { viewModel.clearError() })
+                }
             }
 
             item {
-                SearchAndActions()
+                SearchAndActions(onCompose = { showCompose = true })
             }
 
-            items(state.threads) { thread ->
-                MessageThreadItem(
-                    thread = thread,
-                    onClick = { viewModel.markAsRead(thread.id) }
-                )
+            if (state.threads.isEmpty() && !isLoading) {
+                item { EmptyMessagesCard() }
+            } else {
+                items(state.threads, key = { it.id }) { thread ->
+                    MessageThreadItem(
+                        thread = thread,
+                        onClick = { viewModel.openConversation(thread.id) }
+                    )
+                }
             }
 
             item {
                 Spacer(modifier = Modifier.height(100.dp))
             }
         }
+
+        if (showCompose) {
+            ComposeMessageDialog(
+                isSending = state.isSending,
+                onDismiss = { showCompose = false },
+                onSend = { body ->
+                    viewModel.sendMessage(body = body, onSent = { showCompose = false })
+                }
+            )
+        }
+
+        if (conversation.threadId != null) {
+            ConversationDialog(
+                conversation = conversation,
+                onDismiss = { viewModel.closeConversation() },
+                onSend = { body -> viewModel.sendReply(body) },
+                onDismissError = { viewModel.clearConversationError() }
+            )
+        }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MessagesHeader() {
+private fun ConversationDialog(
+    conversation: ConversationState,
+    onDismiss: () -> Unit,
+    onSend: (String) -> Unit,
+    onDismissError: () -> Unit
+) {
+    var reply by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = { if (!conversation.isSending) onDismiss() },
+        title = {
+            Text(
+                conversation.senderName.ifBlank { "Conversation" },
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                when {
+                    conversation.isLoading -> {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(28.dp),
+                                strokeWidth = 2.dp
+                            )
+                        }
+                    }
+                    conversation.messages.isEmpty() -> {
+                        Text(
+                            "No messages in this conversation yet.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    else -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 320.dp)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            conversation.messages.forEach { msg ->
+                                MessageBubble(
+                                    body = msg.body,
+                                    time = msg.time,
+                                    isMine = msg.isMine
+                                )
+                            }
+                        }
+                    }
+                }
+
+                conversation.error?.let { err ->
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                err,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            TextButton(onClick = onDismissError) { Text("OK") }
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = reply,
+                    onValueChange = { reply = it },
+                    label = { Text("Reply") },
+                    minLines = 2,
+                    maxLines = 5,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !conversation.isSending
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = !conversation.isSending && reply.isNotBlank(),
+                onClick = {
+                    onSend(reply.trim())
+                    reply = ""
+                }
+            ) {
+                if (conversation.isSending) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("Send")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !conversation.isSending) { Text("Close") }
+        }
+    )
+}
+
+@Composable
+private fun MessageBubble(body: String, time: String, isMine: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start
+    ) {
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = if (isMine) {
+                MaterialTheme.colorScheme.secondary
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            },
+            modifier = Modifier.widthIn(max = 260.dp)
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Text(
+                    body,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (isMine) Color.White else MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    time,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isMine) {
+                        Color.White.copy(alpha = 0.8f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.align(Alignment.End)
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ComposeMessageDialog(
+    isSending: Boolean,
+    onDismiss: () -> Unit,
+    onSend: (String) -> Unit
+) {
+    var body by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = { if (!isSending) onDismiss() },
+        title = { Text("New message", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Sends a broadcast message to the school inbox. Replies create a new thread.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = body,
+                    onValueChange = { body = it },
+                    label = { Text("Message") },
+                    minLines = 4,
+                    maxLines = 8,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isSending
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = !isSending && body.isNotBlank(),
+                onClick = { onSend(body.trim()) }
+            ) {
+                if (isSending) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("Send")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isSending) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun MessagesHeader(isLoading: Boolean, onRefresh: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            "Direct Messaging",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Direct Messaging",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            } else {
+                IconButton(onClick = onRefresh) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                }
+            }
+        }
         Text(
             "Communicate with staff and departments",
             style = MaterialTheme.typography.bodyMedium,
@@ -86,7 +341,68 @@ private fun MessagesHeader() {
 }
 
 @Composable
-private fun SearchAndActions() {
+private fun MessagesErrorBanner(message: String, onDismiss: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.errorContainer,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                Icons.Default.ErrorOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer
+            )
+            Text(
+                message,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            TextButton(onClick = onDismiss) {
+                Text("DISMISS", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyMessagesCard() {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                Icons.Default.Inbox,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                "No messages yet",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                "Conversations from staff and departments will appear here.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun SearchAndActions(onCompose: () -> Unit = {}) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -107,17 +423,17 @@ private fun SearchAndActions() {
             }
         }
         
-        IconButton(
-            onClick = { },
+        Box(
             modifier = Modifier
                 .size(48.dp)
-                .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f), RoundedCornerShape(16.dp)),
+            contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.FilterList, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+            Icon(Icons.Default.FilterList, contentDescription = "Filter coming soon", tint = MaterialTheme.colorScheme.outline)
         }
 
         Button(
-            onClick = { },
+            onClick = onCompose,
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.height(48.dp),
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
@@ -155,7 +471,7 @@ private fun MessageThreadItem(thread: MessageThread, onClick: () -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 if (thread.senderImageUrl != null) {
-                    AsyncImage(
+                    NetworkImage(
                         model = thread.senderImageUrl,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
@@ -195,24 +511,36 @@ private fun MessageThreadItem(thread: MessageThread, onClick: () -> Unit) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // weight(1f) + ellipsis so a long sender name/role never
+                    // pushes the timestamp off-screen on narrow phones.
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         Text(
                             thread.senderName,
                             style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = if (unread) FontWeight.ExtraBold else FontWeight.Bold
+                            fontWeight = if (unread) FontWeight.ExtraBold else FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             thread.senderRole,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.outline,
-                            fontSize = 10.sp
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         thread.time,
                         style = MaterialTheme.typography.labelSmall,
                         color = if (unread) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline,
-                        fontWeight = if (unread) FontWeight.Bold else FontWeight.Normal
+                        fontWeight = if (unread) FontWeight.Bold else FontWeight.Normal,
+                        maxLines = 1
                     )
                 }
                 Text(

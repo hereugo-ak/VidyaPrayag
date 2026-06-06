@@ -1,10 +1,27 @@
 package com.littlebridge.vidyaprayag.feature.user
 
 import com.littlebridge.vidyaprayag.core.ok
+import com.littlebridge.vidyaprayag.core.principalUserUuid
+import com.littlebridge.vidyaprayag.db.AnnouncementsTable
+import com.littlebridge.vidyaprayag.db.AppConfigTable
+import com.littlebridge.vidyaprayag.db.ChildrenTable
+import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
+import io.ktor.http.*
 import io.ktor.server.auth.*
+import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.or
+import org.jetbrains.exposed.sql.selectAll
+
+private val lenientJson = Json { ignoreUnknownKeys = true; isLenient = true }
 
 @Serializable
 data class AchievementBadgeDto(
@@ -120,64 +137,6 @@ data class ParentAnnouncementsDataDto(
 fun Route.parentRouting() {
     authenticate("jwt") {
         route("/api/v1/parent") {
-            get("/track-progress") {
-                // Mock data matching the UI requirements
-                val data = TrackProgressDataDto(
-                    childName = "Aarav",
-                    overallProgress = 0.75f,
-                    currentLevel = 4,
-                    journeyDescription = "Developmental milestones on track for Term 2",
-                    badges = listOf(
-                        AchievementBadgeDto("Social Star", "workspace_premium", false, listOf(0xFFB6C7EB, 0xFF006C49)),
-                        AchievementBadgeDto("Book Worm", "auto_stories", false, listOf(0xFFCBDBF5, 0xFF8293B5)),
-                        AchievementBadgeDto("Fast Learner", "rocket_launch", false, listOf(0xFF4EDE93, 0xFF006C49)),
-                        AchievementBadgeDto("Upcoming", "lock", true, listOf(0xFFE5EEFF, 0xFFE5EEFF))
-                    ),
-                    academicCompetencies = listOf(
-                        AcademicCompetencyDto("Literacy", "translate", 0.85f),
-                        AcademicCompetencyDto("Numeracy", "calculate", 0.70f)
-                    ),
-                    emotionalIntelligence = mapOf(
-                        "Empathy" to 0.8f,
-                        "Resilience" to 0.7f,
-                        "Social" to 0.9f,
-                        "Control" to 0.6f,
-                        "Focus" to 0.75f,
-                        "Sharing" to 0.85f
-                    ),
-                    playIndicators = listOf(
-                        PlayIndicatorDto(
-                            "Creative Expression", 
-                            "Uses diverse materials to represent ideas", 
-                            "https://lh3.googleusercontent.com/aida-public/AB6AXuBJ0iy3QHsYrDK9vkmt05wDdmHmpgT8gBlcip2cJxtHhEZh8aRcsRMENEot_fma9PHySR3i7uOBCkzywjgrnyRweoIcsAippP8X0A0wqcgX-r5pfZvIL5UF_FG0Q8N_eb8FdFdPyQ48xEiykqbtT-Uh3PpA4KeOf2vv6fzHKyIidF-Y8ldvErlwE50_WVwRhhK7TMiQuKDOR9LRFN7cqu9v5ygC0nl9_0IMd4GuMkFoiDefldCGJStlfH48L5RIjTUZfLrJ-EITce_3",
-                            true
-                        ),
-                        PlayIndicatorDto(
-                            "Physical Agility", 
-                            "Gross motor coordination milestones met", 
-                            "https://lh3.googleusercontent.com/aida-public/AB6AXuC97aj-fXdWa8AknQylLrGHeKwdSE_wY776abXdGOHdPIyP7yGiA7uw8V8vXdYXudLVG-Sue3-oPaD7YeCkrMA9jLvA3cdnafmRz6kPJvG_QVv4_dfdXDGRVqTHRWTUUWzMrT85G_aJBx6fHQZtEKSfDOmAa0a22EmEhL6IIg4RHLERutQdBs7iO_oYDZ1Wy51bMcNXHZJ3S40pbvg_jqq0dvcBXWMeCetnJLVXn4PysxPN1MpyqE5i5yz6EgvotyPLPGpJ8xKgwtlv",
-                            true
-                        )
-                    )
-                )
-                call.ok(data, message = "Track progress data fetched")
-            }
-
-            get("/fees") {
-                val data = FeeDataDto(
-                    totalCollected = "$428,500",
-                    collectionProgress = 0.85f,
-                    outstandingFees = "$72,120",
-                    overdueCount = 145,
-                    announcements = listOf(
-                        FeeAnnouncementDto("1", "Annual Sports Day Schedule", "2h ago", "Detailed itinerary released.", "94%", "24", "Campaign"),
-                        FeeAnnouncementDto("2", "Weather Alert: Early Closure", "5h ago", "Campus closing at 2:00 PM.", "98%", "812", "Emergency"),
-                        FeeAnnouncementDto("3", "Fee Submission Deadline", "Yesterday", "Final reminder for Q3 fees.", "62%", "3", "Payment")
-                    )
-                )
-                call.ok(data, message = "Fees data fetched")
-            }
-
             get("/scholarships") {
                 val data = ScholarshipsDataDto(
                     scholarships = listOf(
@@ -197,15 +156,68 @@ fun Route.parentRouting() {
                 call.ok(data, message = "Scholarships data fetched")
             }
 
+            // -------- ANNOUNCEMENTS (parent-school harmony, report §9.1) --------
+            // Parents now read the SAME announcements rows the school side
+            // creates (AnnouncementsTable), scoped to the schools their children
+            // are enrolled in. This replaces the old static/mock list so a
+            // school announcement actually reaches the parent.
             get("/announcements") {
-                val data = ParentAnnouncementsDataDto(
-                    announcements = listOf(
-                        ParentAnnouncementDto("1", "Annual Sports Day 2024", "Join us for athletic excellence.", "Oct 24, 2023", "Events", true, "https://lh3.googleusercontent.com/aida-public/AB6AXuBJ0iy3QHsYrDK9vkmt05wDdmHmpgT8gBlcip2cJxtHhEZh8aRcsRMENEot_fma9PHySR3i7uOBCkzywjgrnyRweoIcsAippP8X0A0wqcgX-r5pfZvIL5UF_FG0Q8N_eb8FdFdPyQ48xEiykqbtT-Uh3PpA4KeOf2vv6fzHKyIidF-Y8ldvErlwE50_WVwRhhK7TMiQuKDOR9LRFN7cqu9v5ygC0nl9_0IMd4GuMkFoiDefldCGJStlfH48L5RIjTUZfLrJ-EITce_3"),
-                        ParentAnnouncementDto("2", "Mid-Term PTM", "Schedule your progress discussion slot.", "Oct 28, 2023", "PTM"),
-                        ParentAnnouncementDto("3", "Winter Vacation Notice", "School closed Dec 20 - Jan 5.", "Dec 15, 2023", "Holidays")
-                    ),
-                    isWhatsAppSyncEnabled = true
-                )
+                val uid = call.principalUserUuid() ?: run {
+                    call.respond(HttpStatusCode.Unauthorized); return@get
+                }
+
+                val data = dbQuery {
+                    // 1) Resolve the schools this parent's active children belong to.
+                    val schoolIds = ChildrenTable.selectAll()
+                        .where {
+                            (ChildrenTable.parentId eq uid) and (ChildrenTable.isActive eq true)
+                        }
+                        .mapNotNull { it[ChildrenTable.schoolId] }
+                        .distinct()
+
+                    // 2) Pull announcements for those schools, newest first.
+                    val rows = if (schoolIds.isEmpty()) {
+                        emptyList()
+                    } else {
+                        val schoolFilter = schoolIds
+                            .map { schoolId -> AnnouncementsTable.schoolId eq schoolId }
+                            .reduce { acc, op -> acc or op }
+
+                        AnnouncementsTable.selectAll()
+                            .where { schoolFilter }
+                            .orderBy(AnnouncementsTable.createdAt, SortOrder.DESC)
+                            .map { row ->
+                                ParentAnnouncementDto(
+                                    id = row[AnnouncementsTable.id].value.toString(),
+                                    title = row[AnnouncementsTable.title],
+                                    description = row[AnnouncementsTable.description],
+                                    date = row[AnnouncementsTable.date],
+                                    category = row[AnnouncementsTable.type],
+                                    // "Special" announcements are surfaced as featured.
+                                    isFeatured = row[AnnouncementsTable.type]
+                                        .equals("Special", ignoreCase = true),
+                                    imageUrl = row[AnnouncementsTable.eventImage]
+                                )
+                            }
+                    }
+
+                    // 3) WhatsApp sync flag from the same app_config the school uses.
+                    val flagsRaw = AppConfigTable.selectAll()
+                        .where { AppConfigTable.key eq "flags" }
+                        .singleOrNull()?.get(AppConfigTable.value)
+                    val waEnabled = runCatching {
+                        flagsRaw
+                            ?.let { lenientJson.parseToJsonElement(it).jsonObject }
+                            ?.get("is_whatsapp_sync_enabled")
+                            ?.jsonPrimitive?.content
+                            ?.toBooleanStrictOrNull()
+                    }.getOrNull() ?: false
+
+                    ParentAnnouncementsDataDto(
+                        announcements = rows,
+                        isWhatsAppSyncEnabled = waEnabled
+                    )
+                }
                 call.ok(data, message = "Announcements data fetched")
             }
         }

@@ -2,6 +2,7 @@ package com.littlebridge.vidyaprayag.ui.screens.admin
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import com.littlebridge.vidyaprayag.ui.theme.StatusColors
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -19,7 +20,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.presentation.AcademicInfoOBViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.Subject
 import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
@@ -32,14 +32,25 @@ import org.koin.compose.viewmodel.koinViewModel
 fun AcademicInfoOBScreen() {
     val viewModel: AcademicInfoOBViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
+    val isSubmitting by viewModel.isSubmitting.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
     val navigator = LocalAppNavigator.current
 
     BaseScreen(
         onBackClick = { navigator.goBack() },
         bottomBar = {
             OnboardingBottomBar(
-                onSaveDraft = { /* Save draft */ },
-                onContinue = { navigator.navigateTo(Destination.LaunchInfoOB) }
+                onSaveDraft = {
+                    if (!isSubmitting) viewModel.submit { }
+                },
+                onContinue = {
+                    if (!isSubmitting) {
+                        viewModel.submit {
+                            navigator.navigateTo(Destination.LaunchInfoOB)
+                        }
+                    }
+                },
+                continueText = if (isSubmitting) "Saving..." else "Continue"
             )
         }
     ) { paddingValues, scrollModifier ->
@@ -53,6 +64,15 @@ fun AcademicInfoOBScreen() {
         ) {
             item {
                 StepProgressHeader(currentStep = 3, totalSteps = 4, currentLabel = "Academic Setup")
+            }
+
+            if (errorMessage != null) {
+                item {
+                    OnboardingErrorBanner(
+                        message = errorMessage!!,
+                        onDismiss = { viewModel.clearError() }
+                    )
+                }
             }
 
             item {
@@ -164,13 +184,13 @@ private fun ClassSelectionSection(
             }
         }
         
-        TextButton(
-            onClick = { /* Show more */ },
-            modifier = Modifier.align(Alignment.CenterHorizontally)
-        ) {
-            Text("Show More Classes", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
-            Icon(Icons.Default.ExpandMore, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
-        }
+        Text(
+            text = "Showing ${availableClasses.size} configured classes",
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
@@ -218,7 +238,7 @@ private fun SubjectCard(subject: Subject) {
                 val teacherName = subject.teacherName
                 if (teacherName != null) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AsyncImage(
+                        NetworkImage(
                             model = subject.teacherImageUrl,
                             contentDescription = null,
                             modifier = Modifier.size(20.dp).clip(CircleShape),
@@ -234,27 +254,47 @@ private fun SubjectCard(subject: Subject) {
                 }
             }
 
+            // Non-interactive status badges (these communicate state, they are
+            // not actions — so they must not look like tappable buttons).
             if (subject.teacherName != null) {
-                OutlinedButton(
-                    onClick = { /* Change */ },
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                    modifier = Modifier.height(32.dp)
-                ) {
-                    Text("Change", style = MaterialTheme.typography.labelSmall)
-                }
+                StatusBadge(text = "Assigned", assigned = true)
             } else {
-                Button(
-                    onClick = { /* Assign */ },
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                    modifier = Modifier.height(32.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Text("Assign", style = MaterialTheme.typography.labelSmall)
-                }
+                StatusBadge(text = "Unassigned", assigned = false)
             }
         }
+    }
+}
+
+/**
+ * Small non-interactive status chip used to show a subject's assignment state.
+ * Emerald-tinted when assigned, amber-tinted when still unassigned. It is NOT a
+ * button — it carries no onClick and never looks pressable.
+ */
+@Composable
+private fun StatusBadge(text: String, assigned: Boolean) {
+    val accent = if (assigned) MaterialTheme.colorScheme.secondary else StatusColors.warning
+    Row(
+        modifier = Modifier
+            .height(32.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(accent.copy(alpha = 0.12f))
+            .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(accent)
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = accent,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 

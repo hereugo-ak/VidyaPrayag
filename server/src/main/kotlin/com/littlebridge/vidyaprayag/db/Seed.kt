@@ -155,6 +155,304 @@ object CmsSeed {
                     }
                 }
             }
+
+            // -------------------------------------------------------------
+            // Parent ecosystem CMS defaults (parent_api_spec.artifact.md).
+            //
+            // All UI strings, statistics, and configurations for the Parent
+            // module are backend-driven. The keys below match what the
+            // routes in feature.parent / feature.content.SupportRouting
+            // look up at runtime; defaults are used as fallbacks if a key
+            // is ever missing in production.
+            //
+            // Idempotent: inserted only when the key does not already exist.
+            // -------------------------------------------------------------
+            val parentDefaults = mapOf(
+                // Onboarding Step 1
+                "parent_onboarding_step1_screen_config" to """
+                    {
+                      "header_title": "Let's build a profile for your child.",
+                      "header_subtitle": "We use this information to curate the best learning path.",
+                      "progress_label": "Step 1 of 3",
+                      "progress_value": 0.33
+                    }
+                """.trimIndent(),
+                "parent_available_grades" to """["Grade 1","Grade 2","Grade 3","Nursery","KG"]""",
+                "parent_available_interests" to """["Music","Art","STEM","Sports","Languages"]""",
+                "parent_onboarding_footer_text" to "\"Your data is encrypted and secure.\"",
+
+                // Onboarding Step 2
+                "parent_available_boards" to """["CBSE","ICSE","IB","State Board"]""",
+                "parent_available_focus_areas" to """
+                    [
+                      {"id":"acad","title":"Academics","icon":"school"},
+                      {"id":"sports","title":"Sports","icon":"sports_soccer"}
+                    ]
+                """.trimIndent(),
+                "parent_budget_config" to """
+                    {
+                      "min_value": 0,
+                      "max_value": 10000,
+                      "default_range": [2000, 5000],
+                      "currency_symbol": "$"
+                    }
+                """.trimIndent(),
+
+                // Dashboard
+                "parent_dashboard_curation_logic" to "\"Curation aligned with NEP 2020 developmental milestones.\"",
+                "parent_dashboard_info_alerts" to """
+                    [
+                      {"id":"ptm_upcoming","title":"Upcoming PTM","value":"Nov 25","type":"INFO"}
+                    ]
+                """.trimIndent(),
+
+                // Track Progress
+                "parent_track_journey_description" to "\"On track for next grade transition\"",
+                "parent_track_academic_label" to "\"NEP ALIGNED\"",
+                "parent_track_badges" to """
+                    [
+                      {"title":"Social Star","icon":"workspace_premium","is_locked":false,"colors":["#B6C7EB","#006C49"]},
+                      {"title":"Math Whiz","icon":"calculate","is_locked":true,"colors":["#FFD580","#B26A00"]}
+                    ]
+                """.trimIndent(),
+                "parent_track_academic_competencies" to """
+                    [
+                      {"title":"Literacy","progress":0.85,"icon":"translate"},
+                      {"title":"Numeracy","progress":0.78,"icon":"calculate"},
+                      {"title":"Creativity","progress":0.72,"icon":"palette"}
+                    ]
+                """.trimIndent(),
+                "parent_track_ei_description" to "\"Significant growth in Social Interaction this month.\"",
+                "parent_track_ei_metrics" to """{"Empathy":0.8,"Resilience":0.7,"Social":0.9}""",
+                "parent_track_play_discovery" to """
+                    [
+                      {"title":"Agility","description":"Gross motor met","status":"MET"},
+                      {"title":"Curiosity","description":"Exploration in progress","status":"IN_PROGRESS"}
+                    ]
+                """.trimIndent(),
+
+                // Fees CMS
+                "parent_fees_announcements" to """
+                    [
+                      {"id":"f1","title":"Deadline","time":"2h ago","desc":"Submit Q3 fees.","type":"Payment"}
+                    ]
+                """.trimIndent(),
+
+                // Support / Drawer
+                "parent_support_config" to """
+                    {
+                      "support_contact": "+91-9876543210",
+                      "categories": ["TECHNICAL","ACADEMIC","ADMISSIONS","FEES"],
+                      "help_center_url": "https://vidyaprayag.com/help"
+                    }
+                """.trimIndent()
+            )
+
+            val existingCfg2 = AppConfigTable
+                .selectAll()
+                .map { it[AppConfigTable.key] }
+                .toSet()
+            parentDefaults.forEach { (k, v) ->
+                if (k !in existingCfg2) {
+                    AppConfigTable.insert {
+                        it[key] = k
+                        it[value] = v
+                        it[updatedAt] = Instant.now()
+                    }
+                }
+            }
+
+            // -------------------------------------------------------------
+            // School ecosystem CMS defaults (school_api_spec.artifact.md).
+            //
+            // Same philosophy as the parent ecosystem block: every UI string,
+            // statistic, and reference list is backend-driven and idempotently
+            // seeded.  Operators can edit any of these rows in Supabase →
+            // app_config without redeploying the backend.
+            // -------------------------------------------------------------
+            val schoolDefaults = mapOf(
+                // ---------------- School Dashboard (home) ----------------
+                "school_dashboard_welcome" to """
+                    {
+                      "title": "Welcome, Admin",
+                      "subtitle": "Your institutional setup is ready to begin. Let's build your digital campus.",
+                      "cta_label": "Start Onboarding"
+                    }
+                """.trimIndent(),
+                "school_dashboard_steps" to """
+                    [
+                      {"id":1,"title":"Institutional Basics","description":"School name, location, and IDs.","icon_url":"https://assets.vidyaprayag.com/icons/ic_basics.png"},
+                      {"id":2,"title":"Branding & Identity","description":"Upload logos and color themes.","icon_url":"https://assets.vidyaprayag.com/icons/ic_branding.png"},
+                      {"id":3,"title":"Academic Setup","description":"Classes, subjects, and teachers.","icon_url":"https://assets.vidyaprayag.com/icons/ic_academic.png"},
+                      {"id":4,"title":"Final Launch","description":"Verify and go live.","icon_url":null}
+                    ]
+                """.trimIndent(),
+                "school_dashboard_support" to """
+                    {
+                      "title": "Need help? Chat with an expert",
+                      "subtitle": "Available 24/7 for institutions",
+                      "action_label": "CHAT",
+                      "video_label": "Watch Onboarding Video",
+                      "video_url": "https://vidyaprayag.com/onboarding/intro.mp4"
+                    }
+                """.trimIndent(),
+
+                // ---------------- Analytics Overview ---------------------
+                "school_analytics_overview" to """
+                    {
+                      "performance_trend": [0.4, 0.55, 0.48, 0.85, 0.65, 0.75],
+                      "current_growth": "+4.2%"
+                    }
+                """.trimIndent(),
+                "school_analytics_cards_template" to """
+                    [
+                      {"title":"Student Tracking","value":"94%","sub_value":"Avg Attendance","icon_url":"https://assets.vidyaprayag.com/icons/ic_attendance.png","trend":null},
+                      {"title":"Syllabus Coverage","value":"78%","sub_value":"Logged Progress","icon_url":"https://assets.vidyaprayag.com/icons/ic_syllabus.png","trend":null},
+                      {"title":"Teacher Accountability","value":"4.8","sub_value":"Avg Rating","icon_url":"https://assets.vidyaprayag.com/icons/ic_teacher.png","trend":null},
+                      {"title":"Class Performance","value":"82%","sub_value":"Proficiency","icon_url":"https://assets.vidyaprayag.com/icons/ic_class.png","trend":null}
+                    ]
+                """.trimIndent(),
+                "school_analytics_insights" to """
+                    [
+                      {"title":"Attendance Peak","description":"Class 10-A reached 99% attendance","icon_name":"trending_up","icon_color":"#10B981"},
+                      {"title":"Syllabus Alert","description":"Mathematics Grade 8 is 5% behind","icon_name":"warning","icon_color":"#F59E0B"},
+                      {"title":"Top Performer","description":"Dr. Jenkins: 5.0 Engagement Rating","icon_name":"stars","icon_color":"#8B5CF6"}
+                    ]
+                """.trimIndent(),
+
+                // ---------------- Class Performance ----------------------
+                "school_class_performance" to """
+                    {
+                      "grade_distribution": [
+                        {"grade":"F","percentage":12,"value":0.20},
+                        {"grade":"D","percentage":21,"value":0.35},
+                        {"grade":"C","percentage":32,"value":0.55},
+                        {"grade":"B","percentage":48,"value":0.85},
+                        {"grade":"A","percentage":38,"value":0.65}
+                      ],
+                      "summary": {"avg_proficiency":"78.4%","active_students":428,"median_grade":"B+"},
+                      "subject_matrix": [
+                        {"name":"Mathematics","percentage":82,"trend":"up"},
+                        {"name":"Science","percentage":76,"trend":"flat"},
+                        {"name":"Literature","percentage":54,"trend":"down"},
+                        {"name":"History","percentage":68,"trend":"up"}
+                      ],
+                      "risk": {"critical_count":12,"moderate_count":28,"proficiency_target_reach":75},
+                      "top_performer": {"name":"Elena Rodriguez","details":"GPA: 3.98 • Grade 11-B"},
+                      "recent_progress": [
+                        {"name":"Jordan Davis","initials":"JD","math":"92%","science":"88%","literature":"85%","attendance":"98%","status":"EXCELLING"},
+                        {"name":"Sarah Miller","initials":"SM","math":"58%","science":"62%","literature":"78%","attendance":"74%","status":"PEWS ALERT"},
+                        {"name":"Thomas Kim","initials":"TK","math":"74%","science":"81%","literature":"79%","attendance":"92%","status":"CONSISTENT"}
+                      ]
+                    }
+                """.trimIndent(),
+
+                // ---------------- Student Analytics Cohort ---------------
+                // Cohort-level view consumed by StudentAnalyticsScreen.
+                // The per-student template is `school_student_analytics_template`
+                // (above); this blob is the school-wide rollup.
+                "school_student_analytics_cohort" to """
+                    {
+                      "daily_volatility": [0.92,0.88,0.94,0.91,0.98,0.89,0.95,0.93,0.90,0.64,0.85,0.89,0.91],
+                      "risk": {"critical_count":12,"medium_count":45,"low_count":782},
+                      "at_risk_students": [
+                        {"id":"1","name":"Julian Henderson","image_url":"","retention_risk":89,"mastery_trend":"-15% (1wk)","risk_level":"Critical"},
+                        {"id":"2","name":"Marcus Sterling","image_url":"","retention_risk":62,"mastery_trend":"-8% (1wk)","risk_level":"Medium"}
+                      ],
+                      "subject_engagements": [
+                        {"name":"Advanced Mathematics","percentage":0.942},
+                        {"name":"Physical Sciences","percentage":0.76,"status":"Risk Level High"},
+                        {"name":"Computer Programming","percentage":0.918}
+                      ],
+                      "cohort_comparison": [0.85,0.92,0.98,0.78]
+                    }
+                """.trimIndent(),
+
+                // ---------------- Teacher Performance --------------------
+                "school_teacher_performance" to """
+                    {
+                      "aggregate_compliance": "94.2%",
+                      "compliance_trend": "+2.4% from last month",
+                      "syllabus_update_trend": [0.4, 0.6, 0.5, 0.85, 0.7, 1.0, 0.5, 0.75],
+                      "accountability_matrix": [
+                        {"id":"1","name":"James Miller","department":"Chemistry Dept.","compliance_score":92,"avg_update_delay":"1.2 Days","student_avg_mark":"84.5%","risk_correlation":"Stable","initials":"JM"},
+                        {"id":"2","name":"Bradley Thompson","department":"Literature Dept.","compliance_score":68,"avg_update_delay":"5.8 Days","student_avg_mark":"71.2%","risk_correlation":"High Risk","initials":"BT"},
+                        {"id":"3","name":"Linda Wright","department":"Sociology Dept.","compliance_score":81,"avg_update_delay":"2.5 Days","student_avg_mark":"78.0%","risk_correlation":"Watching","initials":"LW"}
+                      ],
+                      "dept_efficiencies": [
+                        {"name":"Science & Technology","percentage":96},
+                        {"name":"Humanities","percentage":84},
+                        {"name":"Physical Education","percentage":92}
+                      ]
+                    }
+                """.trimIndent(),
+
+                // ---------------- Student Analytics ---------------------
+                "school_student_analytics_template" to """
+                    {
+                      "kpi": {"attendance":"92%","average":"78.4%","rank":7},
+                      "subjects": [
+                        {"name":"Mathematics","score":92,"trend":"up"},
+                        {"name":"Science","score":85,"trend":"up"},
+                        {"name":"Literature","score":74,"trend":"flat"}
+                      ],
+                      "milestones": [
+                        {"title":"Quarter 3 honors list","date":"2025-09-01","is_unlocked":true},
+                        {"title":"Top 5 in Math","date":"2025-11-15","is_unlocked":false}
+                      ]
+                    }
+                """.trimIndent(),
+                "school_student_analytics_narrative" to "\"Strong rebound in numeracy this quarter; literacy steady.\"",
+
+                // ---------------- Syllabus Coverage ----------------------
+                "school_syllabus_coverage" to """
+                    {
+                      "overall": {"percentage":78,"trend":"+2.1%"},
+                      "by_subject": [
+                        {"name":"Science Dept","percentage":75,"behind_by_days":0,"trend":"+5% from last week"},
+                        {"name":"Mathematics","percentage":90,"behind_by_days":0,"trend":"On Target"},
+                        {"name":"Humanities","percentage":42,"behind_by_days":7,"trend":"Delayed Entry"},
+                        {"name":"Fine Arts","percentage":60,"behind_by_days":0,"trend":"Steady Growth"}
+                      ],
+                      "by_class": [
+                        {"class":"Grade 10-A","percentage":88},
+                        {"class":"Grade 10-B","percentage":72},
+                        {"class":"Grade 9-A","percentage":81}
+                      ],
+                      "alerts": [
+                        {"id":"1","subject":"Chemistry","class_name":"Grade 10-B","delay_percentage":14,"instructor":"Dr. Miller","is_critical":true},
+                        {"id":"2","subject":"World History","class_name":"Grade 8-C","delay_percentage":8,"instructor":"Sarah J.","is_critical":false}
+                      ],
+                      "milestones": [
+                        {"id":"1","month":"Oct","day":"12","title":"Mid-Term Syllabus Verification","description":"Department heads to submit progress audits for Q2.","is_verified":true},
+                        {"id":"2","month":"Oct","day":"28","title":"Practical Assessment Window","description":"Science labs opening for senior grade assessments.","is_verified":false}
+                      ]
+                    }
+                """.trimIndent(),
+
+                // ---------------- Results filter metadata ----------------
+                "school_results_filters" to """
+                    {
+                      "available_tests": ["Unit Test I","Unit Test II","Mid Term","Final"],
+                      "available_classes": ["Grade 10-A","Grade 10-B","Grade 11-A","Grade 11-B"],
+                      "available_subjects": ["Mathematics","Science","Literature","History","Chemistry","Physics"]
+                    }
+                """.trimIndent()
+            )
+
+            val existingCfg3 = AppConfigTable
+                .selectAll()
+                .map { it[AppConfigTable.key] }
+                .toSet()
+            schoolDefaults.forEach { (k, v) ->
+                if (k !in existingCfg3) {
+                    AppConfigTable.insert {
+                        it[key] = k
+                        it[value] = v
+                        it[updatedAt] = Instant.now()
+                    }
+                }
+            }
         }
     }
 }

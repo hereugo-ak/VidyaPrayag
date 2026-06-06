@@ -17,11 +17,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.presentation.BrandingInfoOBViewModel
 import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
 import com.littlebridge.vidyaprayag.navigation.Destination
 import com.littlebridge.vidyaprayag.ui.components.*
+import com.littlebridge.vidyaprayag.ui.media.MediaPickType
+import com.littlebridge.vidyaprayag.ui.media.rememberMediaPicker
 import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,14 +30,38 @@ import org.koin.compose.viewmodel.koinViewModel
 fun BrandingInfoOBScreen() {
     val viewModel: BrandingInfoOBViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
+    val isSubmitting by viewModel.isSubmitting.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+    val uploadingSlot by viewModel.uploadingSlot.collectAsState()
     val navigator = LocalAppNavigator.current
+
+    // Which slot the user is currently picking for, so the single picker
+    // callback knows where to route the result.
+    var pendingSlot by remember { mutableStateOf<String?>(null) }
+    val launchPicker = rememberMediaPicker { picked ->
+        val slot = pendingSlot
+        pendingSlot = null
+        if (picked != null && slot != null) {
+            val kind = if (slot == "logo") "LOGO" else "IMAGE"
+            viewModel.uploadMedia(slot = slot, kind = kind, picked = picked)
+        }
+    }
 
     BaseScreen(
         onBackClick = { navigator.goBack() },
         bottomBar = {
             OnboardingBottomBar(
-                onSaveDraft = { /* Save draft */ },
-                onContinue = { navigator.navigateTo(Destination.AcademicInfoOB) }
+                onSaveDraft = {
+                    if (!isSubmitting) viewModel.submit { }
+                },
+                onContinue = {
+                    if (!isSubmitting) {
+                        viewModel.submit {
+                            navigator.navigateTo(Destination.AcademicInfoOB)
+                        }
+                    }
+                },
+                continueText = if (isSubmitting) "Saving..." else "Continue"
             )
         }
     ) { paddingValues, scrollModifier ->
@@ -50,6 +75,15 @@ fun BrandingInfoOBScreen() {
         ) {
             item {
                 StepProgressHeader(currentStep = 2, totalSteps = 4, currentLabel = "Branding")
+            }
+
+            if (errorMessage != null) {
+                item {
+                    OnboardingErrorBanner(
+                        message = errorMessage!!,
+                        onDismiss = { viewModel.clearError() }
+                    )
+                }
             }
 
             item {
@@ -71,14 +105,26 @@ fun BrandingInfoOBScreen() {
             item {
                 CoverPhotoSection(
                     imageUrl = state.coverImageUrl,
-                    onUploadClick = { /* Handle upload */ }
+                    isUploading = uploadingSlot == "cover",
+                    onUploadClick = {
+                        if (uploadingSlot == null) {
+                            pendingSlot = "cover"
+                            launchPicker(MediaPickType.IMAGE)
+                        }
+                    }
                 )
             }
 
             item {
                 LogoSection(
                     logoUrl = state.logoUrl,
-                    onUploadClick = { /* Handle upload */ }
+                    isUploading = uploadingSlot == "logo",
+                    onUploadClick = {
+                        if (uploadingSlot == null) {
+                            pendingSlot = "logo"
+                            launchPicker(MediaPickType.IMAGE)
+                        }
+                    }
                 )
             }
 
@@ -106,7 +152,7 @@ fun BrandingInfoOBScreen() {
 }
 
 @Composable
-private fun CoverPhotoSection(imageUrl: String?, onUploadClick: () -> Unit) {
+private fun CoverPhotoSection(imageUrl: String?, isUploading: Boolean, onUploadClick: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("CAMPUS COVER PHOTO", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
         Box(
@@ -116,20 +162,26 @@ private fun CoverPhotoSection(imageUrl: String?, onUploadClick: () -> Unit) {
                 .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
                 .border(2.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
-                .clickable { onUploadClick() },
+                .clickable(enabled = !isUploading) { onUploadClick() },
             contentAlignment = Alignment.Center
         ) {
             if (imageUrl != null) {
-                AsyncImage(
+                NetworkImage(
                     model = imageUrl,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
-            } else {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            }
+            when {
+                isUploading -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(32.dp))
+                    Spacer(Modifier.height(8.dp))
+                    Text("Uploading…", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
+                }
+                imageUrl == null -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(48.dp))
-                    Text("Change Cover Image", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
+                    Text("Tap to upload", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
                 }
             }
         }
@@ -138,7 +190,7 @@ private fun CoverPhotoSection(imageUrl: String?, onUploadClick: () -> Unit) {
 }
 
 @Composable
-private fun LogoSection(logoUrl: String?, onUploadClick: () -> Unit) {
+private fun LogoSection(logoUrl: String?, isUploading: Boolean, onUploadClick: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("SCHOOL LOGO", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
         Box(
@@ -147,18 +199,20 @@ private fun LogoSection(logoUrl: String?, onUploadClick: () -> Unit) {
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
                 .border(2.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
-                .clickable { onUploadClick() },
+                .clickable(enabled = !isUploading) { onUploadClick() },
             contentAlignment = Alignment.Center
         ) {
             if (logoUrl != null) {
-                AsyncImage(
+                NetworkImage(
                     model = logoUrl,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize().padding(16.dp),
                     contentScale = ContentScale.Fit
                 )
-            } else {
-                Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(32.dp))
+            }
+            when {
+                isUploading -> CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
+                logoUrl == null -> Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(32.dp))
             }
         }
         Text("Circular or square format (Max 2MB)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -214,9 +268,13 @@ private fun VirtualTourSection(url: String, onUrlChange: (String) -> Unit) {
             )
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("Matterport", "Kuula", "YouTube VR").forEach { tag ->
+                listOf(
+                    "Matterport" to "https://my.matterport.com/show/?m=demo",
+                    "Kuula" to "https://kuula.co/share/demo",
+                    "YouTube VR" to "https://www.youtube.com/watch?v=demo"
+                ).forEach { (tag, sampleUrl) ->
                     SuggestionChip(
-                        onClick = { },
+                        onClick = { onUrlChange(sampleUrl) },
                         label = { Text(tag, fontSize = 10.sp) },
                         shape = CircleShape
                     )

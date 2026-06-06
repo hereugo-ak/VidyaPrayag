@@ -1,5 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.screens.admin
 
+import com.littlebridge.vidyaprayag.ui.theme.StatusColors
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -34,6 +36,9 @@ fun SchedulePTMScreen() {
     val viewModel: SchedulePTMViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
     val navigator = LocalAppNavigator.current
+    var showScheduleDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) { viewModel.loadPtm() }
 
     BaseScreen(
         onBackClick = { navigator.goBack() },
@@ -48,7 +53,26 @@ fun SchedulePTMScreen() {
             verticalArrangement = Arrangement.spacedBy(32.dp)
         ) {
             item {
-                PrimaryActionSection()
+                PrimaryActionSection(onClick = { showScheduleDialog = true })
+            }
+
+            state.errorMessage?.let { msg ->
+                item {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.errorContainer
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(msg, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.weight(1f))
+                            TextButton(onClick = { viewModel.clearMessages() }) { Text("Dismiss") }
+                        }
+                    }
+                }
             }
 
             item {
@@ -89,17 +113,92 @@ fun SchedulePTMScreen() {
                 Spacer(modifier = Modifier.height(100.dp))
             }
         }
+
+        if (showScheduleDialog) {
+            SchedulePtmDialog(
+                isCreating = state.isCreating,
+                onDismiss = { showScheduleDialog = false },
+                onCreate = { title, date, slot ->
+                    viewModel.createPtm(
+                        title = title,
+                        date = date,
+                        slot = slot,
+                        onCreated = { showScheduleDialog = false }
+                    )
+                }
+            )
+        }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PrimaryActionSection() {
+private fun SchedulePtmDialog(
+    isCreating: Boolean,
+    onDismiss: () -> Unit,
+    onCreate: (title: String, date: String, slot: String) -> Unit
+) {
+    var title by remember { mutableStateOf("") }
+    var date by remember { mutableStateOf("") }
+    var slot by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = { if (!isCreating) onDismiss() },
+        title = { Text("Schedule PTM", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title (e.g. Q3 Parent-Teacher Meet)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isCreating
+                )
+                OutlinedTextField(
+                    value = date,
+                    onValueChange = { date = it },
+                    label = { Text("Date (YYYY-MM-DD)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isCreating
+                )
+                OutlinedTextField(
+                    value = slot,
+                    onValueChange = { slot = it },
+                    label = { Text("Slot (e.g. 10:00 AM - 12:00 PM)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isCreating
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = !isCreating && title.isNotBlank() && date.isNotBlank() && slot.isNotBlank(),
+                onClick = { onCreate(title.trim(), date.trim(), slot.trim()) }
+            ) {
+                if (isCreating) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("Schedule")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isCreating) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun PrimaryActionSection(onClick: () -> Unit = {}) {
     VidyaPrayagCard(
         modifier = Modifier.fillMaxWidth(),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f))
     ) {
         Row(
-            modifier = Modifier.clickable { }.padding(20.dp),
+            modifier = Modifier.clickable(onClick = onClick).padding(20.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -137,11 +236,12 @@ private fun ActiveEventSection(title: String, date: String, slot: String) {
                 Box(modifier = Modifier.size(10.dp).alpha(alpha).clip(CircleShape).background(MaterialTheme.colorScheme.secondary))
                 Text("Active Event", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
-            TextButton(onClick = { }) {
-                Icon(Icons.Default.Settings, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.secondary)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Manage", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
-            }
+            Text(
+                "Managed from event setup",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium
+            )
         }
 
         VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
@@ -233,18 +333,14 @@ private fun LiveCommunicationCard(invites: Int, receipts: Int) {
 
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 CommStatRow(label = "Invites Delivered", value = "$invites%", icon = Icons.Default.CheckCircle, iconColor = MaterialTheme.colorScheme.secondary)
-                CommStatRow(label = "Read Receipts", value = "$receipts%", icon = Icons.Default.Visibility, iconColor = Color(0xFF3B82F6))
+                CommStatRow(label = "Read Receipts", value = "$receipts%", icon = Icons.Default.Visibility, iconColor = StatusColors.info)
             }
 
-            Button(
-                onClick = { },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
             ) {
-                Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Send Last-Hour Reminder", fontWeight = FontWeight.Bold)
+                ComingSoonPill(label = "Reminder delivery — coming soon")
             }
         }
     }
@@ -302,8 +398,11 @@ private fun ClassProgressSection(progressList: List<ClassPTMProgress>) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("Live Progress by Class", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            IconButton(onClick = {}, modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))) {
-                Icon(Icons.Default.FilterList, null, modifier = Modifier.size(20.dp))
+            Box(
+                modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.FilterList, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.outline)
             }
         }
 
@@ -313,15 +412,11 @@ private fun ClassProgressSection(progressList: List<ClassPTMProgress>) {
             }
         }
 
-        OutlinedButton(
-            onClick = { },
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(2.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center
         ) {
-            Icon(Icons.Default.Groups, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.outline)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("View All 42 Classes", color = MaterialTheme.colorScheme.outline, fontWeight = FontWeight.Bold)
+            ComingSoonPill(label = "Class drilldown — coming soon")
         }
     }
 }
@@ -351,14 +446,14 @@ private fun ClassProgressCard(progress: ClassPTMProgress) {
                     Text("Class Teacher", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("${progress.metCount}/${progress.totalCount}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = if (progress.progress > 0.8f) MaterialTheme.colorScheme.secondary else Color(0xFFF59E0B))
+                    Text("${progress.metCount}/${progress.totalCount}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = if (progress.progress > 0.8f) MaterialTheme.colorScheme.secondary else StatusColors.warning)
                     Text("MET", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.outline)
                 }
             }
             LinearProgressIndicator(
                 progress = { progress.progress },
                 modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
-                color = if (progress.progress > 0.8f) MaterialTheme.colorScheme.secondary else Color(0xFFF59E0B),
+                color = if (progress.progress > 0.8f) MaterialTheme.colorScheme.secondary else StatusColors.warning,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
         }

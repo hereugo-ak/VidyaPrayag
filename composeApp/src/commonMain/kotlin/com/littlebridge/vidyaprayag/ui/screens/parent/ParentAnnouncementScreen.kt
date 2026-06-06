@@ -19,7 +19,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentAnnouncement
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentAnnouncementViewModel
 import com.littlebridge.vidyaprayag.ui.components.*
@@ -188,7 +187,7 @@ private fun FeaturedAnnouncementCard(announcement: ParentAnnouncement) {
                 }
             }
             if (announcement.imageUrl != null) {
-                AsyncImage(
+                NetworkImage(
                     model = announcement.imageUrl,
                     contentDescription = null,
                     modifier = Modifier.fillMaxWidth().height(200.dp).padding(horizontal = 24.dp).clip(RoundedCornerShape(16.dp)),

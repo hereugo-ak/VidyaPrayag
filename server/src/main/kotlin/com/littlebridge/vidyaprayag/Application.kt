@@ -18,12 +18,26 @@
  *   - landingRouting()                    — /api/v1/content/landing
  *   - appStatusRouting()                  — /api/v1/config/app-status
  *   - authRouting()                       — /api/v1/auth/... (+ legacy /auth/...)
+ *   - supportRouting()                    — /api/v1/content/support
  *   - userDetailsRouting()                — /api/v1/user/details
  *   - userProfileRouting()                — /api/v1/user/profile[…]
  *   - onboardingRouting()                 — /api/v1/onboarding/...
  *   - announcementRouting()               — /api/v1/school/announcements[…]
  *   - admissionRouting()                  — /api/v1/admissions/enquiries[…]
  *   - schoolRouting()                     — /api/v1/school/{analytics,calendar,holidays,attendance/daily}
+ *   - parentOnboardingRouting()           — /api/v1/parent/onboarding/{metadata, child-info, preference-options}
+ *   - parentDashboardRouting()            — /api/v1/parent/dashboard
+ *   - trackProgressRouting()              — /api/v1/parent/track-progress
+ *   - parentFeesRouting()                 — /api/v1/parent/fees
+ *   - schoolDashboardRouting()            — /api/v1/school/dashboard
+ *   - schoolAnalyticsRouting()            — /api/v1/school/analytics/{overview,class-performance,teacher-performance,student/{id},syllabus-coverage}
+ *   - leaveRequestsRouting()              — /api/v1/school/leave-requests[…]
+ *   - ptmRouting()                        — /api/v1/school/ptm
+ *   - messagesRouting()                   — /api/v1/school/messages[…]
+ *   - resultsRouting()                    — /api/v1/school/results
+ *   - teacherAssignmentRouting()          — /api/v1/school/teacher-assignments[…]
+ *   - mediaRouting()                      — /api/v1/school/media/upload[…] (binary → Supabase Storage)
+ *   - teacherRouting()                    — /api/v1/teacher/{home,classes,profile,attendance,marks,syllabus,homework}
  *
  * On boot:
  *   DatabaseFactory.init() creates/migrates all tables and seeds CMS + demo data.
@@ -42,10 +56,26 @@ import com.littlebridge.vidyaprayag.feature.announcements.announcementRouting
 import com.littlebridge.vidyaprayag.feature.auth.authRouting
 import com.littlebridge.vidyaprayag.feature.auth.otpAdminRouting
 import com.littlebridge.vidyaprayag.feature.config.appStatusRouting
+import com.littlebridge.vidyaprayag.feature.config.versionRouting
 import com.littlebridge.vidyaprayag.feature.content.landingRouting
+import com.littlebridge.vidyaprayag.feature.content.supportRouting
+import com.littlebridge.vidyaprayag.feature.media.mediaRouting
 import com.littlebridge.vidyaprayag.feature.onboarding.onboardingRouting
+import com.littlebridge.vidyaprayag.feature.parent.parentDashboardRouting
+import com.littlebridge.vidyaprayag.feature.parent.parentFeesRouting
+import com.littlebridge.vidyaprayag.feature.parent.parentOnboardingRouting
+import com.littlebridge.vidyaprayag.feature.parent.trackProgressRouting
+import com.littlebridge.vidyaprayag.feature.school.leaveRequestsRouting
+import com.littlebridge.vidyaprayag.feature.school.messagesRouting
+import com.littlebridge.vidyaprayag.feature.school.ptmRouting
+import com.littlebridge.vidyaprayag.feature.school.resultsRouting
+import com.littlebridge.vidyaprayag.feature.school.schoolAnalyticsRouting
+import com.littlebridge.vidyaprayag.feature.school.schoolDashboardRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRouting
+import com.littlebridge.vidyaprayag.feature.school.teacherAssignmentRouting
+import com.littlebridge.vidyaprayag.feature.teacher.teacherRouting
 import com.littlebridge.vidyaprayag.feature.user.parentRouting
+import com.littlebridge.vidyaprayag.feature.user.parentMessagesRouting
 import com.littlebridge.vidyaprayag.feature.user.userDetailsRouting
 import com.littlebridge.vidyaprayag.feature.user.userProfileRouting
 import io.ktor.http.*
@@ -54,6 +84,7 @@ import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.server.plugins.autohead.*
 import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
@@ -89,6 +120,8 @@ fun Application.module() {
 
     install(CallLogging)
 
+    install(AutoHeadResponse)
+
     install(ContentNegotiation) {
         json(Json {
             ignoreUnknownKeys = true
@@ -110,7 +143,9 @@ fun Application.module() {
         // Public
         landingRouting()
         appStatusRouting()
+        versionRouting()             // /api/v1/config/version — backend-target visibility
         authRouting()
+        supportRouting()
 
         // Ops-only — entire route group is unmounted (404) unless
         // OTP_ADMIN_TOKEN env var is set. See feature/auth/OtpAdminRouting.kt.
@@ -122,9 +157,29 @@ fun Application.module() {
         userDetailsRouting()
         userProfileRouting()
         parentRouting()
+        parentMessagesRouting()      // /api/v1/parent/messages[…] — parent-school harmony (report §9.2)
         onboardingRouting()
         announcementRouting()
         admissionRouting()
         schoolRouting()
+
+        // Parent ecosystem (parent_api_spec.artifact.md)
+        parentOnboardingRouting()    // /api/v1/parent/onboarding/{metadata, child-info, preference-options}
+        parentDashboardRouting()     // /api/v1/parent/dashboard
+        trackProgressRouting()       // /api/v1/parent/track-progress
+        parentFeesRouting()          // /api/v1/parent/fees
+
+        // School ecosystem (school_api_spec.artifact.md)
+        schoolDashboardRouting()     // /api/v1/school/dashboard
+        schoolAnalyticsRouting()     // /api/v1/school/analytics/{overview,class-performance,teacher-performance,student/{id},syllabus-coverage}
+        leaveRequestsRouting()       // /api/v1/school/leave-requests[…]
+        ptmRouting()                 // /api/v1/school/ptm
+        messagesRouting()            // /api/v1/school/messages[…]
+        resultsRouting()             // /api/v1/school/results
+        teacherAssignmentRouting()   // /api/v1/school/teacher-assignments[…] — structured teacher⇄class⇄subject model (report §5.5)
+        mediaRouting()               // /api/v1/school/media/upload[…] — REAL binary uploads → Supabase Storage (kills URL placeholders)
+
+        // Teacher vertical (master rebuild doc Step 7 / gap G1)
+        teacherRouting()             // /api/v1/teacher/{home,classes,profile,attendance,marks,syllabus,homework}
     }
 }

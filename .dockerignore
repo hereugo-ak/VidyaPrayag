@@ -1,0 +1,41 @@
+# Keep the Docker build context small and reproducible.
+# The server reads RENDER_GIT_COMMIT (see server/build.gradle.kts) for build
+# identity, so we don't need to ship .git into the build container.
+
+# Build outputs / caches
+**/build/
+.gradle/
+.kotlin/
+**/.cxx/
+**/.externalNativeBuild/
+
+# IDE / tooling
+.idea/
+*.iml
+captures/
+
+# Mobile/Compose modules are NOT needed for the server-only Docker build.
+composeApp/
+iosApp/
+kotlin-js-store/
+
+# Local + secret config
+local.properties
+.env
+.env.*
+!.env.example
+
+# Runtime DB + logs
+data.db
+data.db-journal
+server/data.db
+server/data.db-journal
+server_*.log
+server_*.txt
+
+# VCS metadata (commit SHA is provided via RENDER_GIT_COMMIT)
+.git/
+.gitignore
+
+# Node
+node_modules/

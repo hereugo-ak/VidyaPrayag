@@ -1,8 +1,20 @@
 package com.littlebridge.vidyaprayag
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.littlebridge.vidyaprayag.util.Config
 import androidx.navigation.compose.rememberNavController
 import coil3.ImageLoader
 import coil3.PlatformContext
@@ -76,21 +88,45 @@ fun App() {
             initialTheme = appTheme,
             onThemeChange = { viewModel.setTheme(it.name) }
         ) {
-            if (!authState.isLoaded) {
-                SplashScreen()
-            } else {
-                val navController = rememberNavController()
-                val startDestination = when {
-                    authState.token.isNullOrBlank() -> Destination.Landing
-                    authState.role == "ADMIN" -> Destination.SchoolDashboard
-                    authState.role == "PARENT" -> Destination.ParentDashboard
-                    else -> Destination.Landing
+            Box(modifier = Modifier.fillMaxWidth()) {
+                if (!authState.isLoaded) {
+                    SplashScreen()
+                } else {
+                    key(authState.token, authState.role) {
+                        val navController = rememberNavController()
+                        val startDestination = when {
+                            authState.token.isNullOrBlank() -> Destination.Landing
+                            authState.role == "ADMIN" -> Destination.SchoolDashboard
+                            authState.role == "PARENT" -> Destination.ParentDashboard
+                            else -> Destination.Landing
+                        }
+
+                        ProvideAppNavigator(navController) {
+                            NavGraph(
+                                navController = navController,
+                                startDestination = startDestination
+                            )
+                        }
+                    }
                 }
 
-                ProvideAppNavigator(navController) {
-                    NavGraph(
-                        navController = navController,
-                        startDestination = startDestination
+                // Debug-only backend banner (SCHOOL_SIDE_STATUS_REPORT §8.4).
+                // Shows the exact base URL the dev app is using so a phone
+                // screenshot proves laptop-vs-Render at a glance. Red = still
+                // pointing at Render (devBaseUrl not set), green = laptop/LAN.
+                if (Config.isDev) {
+                    val isRender = Config.schoolBaseUrl.contains("onrender.com")
+                    Text(
+                        text = "DEV → ${Config.schoolBaseUrl}" +
+                            if (isRender) "  ⚠ set devBaseUrl" else "",
+                        color = Color.White,
+                        fontSize = 9.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            .background(if (isRender) Color(0xFFD32F2F) else Color(0xFF2E7D32))
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
                     )
                 }
             }

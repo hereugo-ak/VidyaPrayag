@@ -16,19 +16,58 @@ sealed class NetworkResult<out T> {
     data object ConnectionError : NetworkResult<Nothing>()
 }
 
+fun redactedHeaders(headers: Headers): List<Pair<String, List<String>>> {
+    val sensitive = setOf(
+        HttpHeaders.Authorization.lowercase(),
+        HttpHeaders.Cookie.lowercase(),
+        HttpHeaders.SetCookie.lowercase(),
+        "x-api-key"
+    )
+    return headers.entries().map { (name, values) ->
+        if (name.lowercase() in sensitive) name to listOf("[REDACTED]") else name to values
+    }
+}
+
+fun redactedBodyText(body: String): String {
+    if (body.isBlank()) return body
+
+    val sensitiveKeys = listOf(
+        "password",
+        "otp",
+        "code",
+        "token",
+        "accessToken",
+        "refreshToken",
+        "refresh_token",
+        "authorization",
+        "cookie",
+        "apiKey",
+        "api_key"
+    )
+
+    var sanitized = body
+    sensitiveKeys.forEach { key ->
+        sanitized = sanitized
+            .replace(Regex("(?i)(\\\"$key\\\"\\s*:\\s*\\\")[^\\\"]*(\\\")"), "$1[REDACTED]$2")
+            .replace(Regex("(?i)(\\b$key\\s*=\\s*)[^,)]*"), "$1[REDACTED]")
+    }
+    return sanitized
+}
+
 suspend inline fun <reified T> safeApiCall(block: () -> HttpResponse): NetworkResult<T> {
     return try {
         val response = block()
         val request = response.call.request
         
-        // Log Request
+        // Log Request. Never print raw Authorization headers; Android Studio logs
+        // are frequently shared while debugging and bearer tokens must not leak.
         AppLogger.d("API_CALL", "--- START API CALL ---")
         AppLogger.d("API_CALL", "REQUEST: ${request.method.value} ${request.url}")
-        AppLogger.d("API_CALL", "REQUEST HEADERS: ${request.headers.entries()}")
+        AppLogger.d("API_CALL", "REQUEST HEADERS: ${redactedHeaders(request.headers)}")
         
         val requestBody = request.content
         if (requestBody is TextContent) {
-            AppLogger.d("API_CALL", "REQUEST BODY: ${requestBody.text}")
+            AppLogger.d("API_CALL", "REQUEST BODY: ${redactedBodyText(requestBody.text)}")
         } else if (requestBody !is OutgoingContent.NoContent) {
             AppLogger.d("API_CALL", "REQUEST BODY: [Binary/Serialized Content]")
         }
@@ -36,13 +75,13 @@ suspend inline fun <reified T> safeApiCall(block: () -> HttpResponse): NetworkRe
         if (response.status.value in 200..299) {
             val body = response.body<T>()
             AppLogger.d("API_CALL", "RESPONSE STATUS: ${response.status.value}")
-            AppLogger.d("API_CALL", "RESPONSE BODY: $body")
+            AppLogger.d("API_CALL", "RESPONSE BODY: ${redactedBodyText(body.toString())}")
             AppLogger.d("API_CALL", "--- END API CALL (SUCCESS) ---")
             NetworkResult.Success(body)
         } else {
             val errorBody = response.bodyAsText()
             AppLogger.e("API_CALL", "RESPONSE STATUS: ${response.status.value}")
-            AppLogger.e("API_CALL", "RESPONSE ERROR BODY: $errorBody")
+            AppLogger.e("API_CALL", "RESPONSE ERROR BODY: ${redactedBodyText(errorBody)}")
             
             val message = try {
                 if (errorBody.contains("\"message\"")) {

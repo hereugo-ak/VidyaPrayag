@@ -23,7 +23,7 @@ fun SchoolDashboardBottomBar(selectedTab: SchoolTab) {
     VidyaPrayagBottomBar(
         items = listOf(
             BottomNavItem(
-                label = "HOME", 
+                label = "Home", 
                 icon = Icons.Default.Home, 
                 isSelected = selectedTab == SchoolTab.HOME,
                 onClick = { if (selectedTab != SchoolTab.HOME) navigator.navigateTo(Destination.SchoolDashboard) }
@@ -47,7 +47,7 @@ fun SchoolDashboardBottomBar(selectedTab: SchoolTab) {
                 onClick = { if (selectedTab != SchoolTab.ENQUIRIES) navigator.navigateTo(Destination.AdmissionCRMDashboard) }
             ),
             BottomNavItem(
-                label = "PROFILE", 
+                label = "Profile", 
                 icon = Icons.Default.Person, 
                 isSelected = selectedTab == SchoolTab.PROFILE,
                 onClick = { if (selectedTab != SchoolTab.PROFILE) navigator.navigateTo(Destination.InstitutionalProfile) }

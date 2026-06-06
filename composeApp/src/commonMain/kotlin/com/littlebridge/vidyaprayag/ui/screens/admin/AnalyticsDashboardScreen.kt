@@ -20,7 +20,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.presentation.AnalyticsDashboardViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.AnalyticsCardData
 import com.littlebridge.vidyaprayag.feature.admin.presentation.InsightItem
@@ -55,6 +54,7 @@ fun AnalyticsDashboardScreen() {
             item {
                 GlobalPerformanceTrendCard(
                     trend = state.performanceTrend,
+                    labels = state.trendLabels,
                     growth = state.currentGrowth
                 )
             }
@@ -110,7 +110,7 @@ private fun AnalyticsHeader() {
 }
 
 @Composable
-private fun GlobalPerformanceTrendCard(trend: List<Float>, growth: String) {
+private fun GlobalPerformanceTrendCard(trend: List<Float>, labels: List<String>, growth: String) {
     VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
@@ -146,35 +146,50 @@ private fun GlobalPerformanceTrendCard(trend: List<Float>, growth: String) {
                 }
             }
 
-            // Mock Bar Chart
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(180.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.Bottom
-            ) {
-                trend.forEachIndexed { index, value ->
-                    val isActive = index == 3 // Mock Apr as active
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight(value)
-                                .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                                .background(if (isActive) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant)
-                        )
-                        Text(
-                            text = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun")[index],
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isActive) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline,
-                            fontSize = 10.sp
-                        )
+            // Bar chart driven by live API series + labels
+            if (trend.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(180.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No trend data available",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                val lastIndex = trend.lastIndex
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    trend.forEachIndexed { index, value ->
+                        // Highlight the most recent month (last bar)
+                        val isActive = index == lastIndex
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .fillMaxHeight(value.coerceIn(0f, 1f))
+                                    .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                                    .background(if (isActive) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant)
+                            )
+                            Text(
+                                text = labels.getOrNull(index) ?: "",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isActive) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline,
+                                fontSize = 10.sp
+                            )
+                        }
                     }
                 }
             }
@@ -200,7 +215,7 @@ private fun AnalyticsDataCard(card: AnalyticsCardData, onClick: () -> Unit) {
                         .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.05f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    AsyncImage(
+                    NetworkImage(
                         model = card.iconUrl,
                         contentDescription = null,
                         modifier = Modifier.size(32.dp),
@@ -239,10 +254,9 @@ private fun SectionTitle(title: String) {
 @Composable
 private fun InsightListItem(insight: InsightItem) {
     Surface(
-        onClick = { },
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Row(
@@ -282,16 +296,12 @@ private fun InsightListItem(insight: InsightItem) {
 
 @Composable
 private fun DownloadReportButton() {
-    Button(
-        onClick = { },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+    // Report export isn't wired yet — show an honest "coming soon" pill instead
+    // of a permanently-disabled button that looks tappable but does nothing.
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center
     ) {
-        Icon(Icons.Default.Download, null)
-        Spacer(modifier = Modifier.width(8.dp))
-        Text("Download Full Report", fontWeight = FontWeight.Bold)
+        ComingSoonPill(label = "Full report export — coming soon")
     }
 }

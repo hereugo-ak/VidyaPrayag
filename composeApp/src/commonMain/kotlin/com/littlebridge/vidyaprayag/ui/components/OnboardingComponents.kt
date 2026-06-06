@@ -124,10 +124,18 @@ fun OnboardingTextField(
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text(placeholder) },
             trailingIcon = if (trailingIcon != null) { { Icon(trailingIcon, contentDescription = null) } } else null,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(16.dp),
             singleLine = singleLine,
             minLines = minLines,
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = keyboardType)
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = keyboardType),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.secondary,
+                focusedLabelColor = MaterialTheme.colorScheme.secondary,
+                cursorColor = MaterialTheme.colorScheme.secondary,
+                focusedContainerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.08f),
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+            )
         )
     }
 }
@@ -157,32 +165,79 @@ fun OnboardingBottomBar(
     onContinue: () -> Unit,
     continueText: String = "Continue"
 ) {
+    // Premium glassy footer. Delegates to the shared PremiumButton system so the
+    // onboarding CTAs match every other button in the app — no second button
+    // style doing the same job.
     Surface(
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
-        tonalElevation = 8.dp,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+        tonalElevation = 10.dp,
+        shadowElevation = 12.dp,
         modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            PremiumOutlineButton(
+                text = "Save Draft",
+                onClick = onSaveDraft,
+                modifier = Modifier.weight(1f)
+            )
+            PremiumButton(
+                text = continueText,
+                onClick = onContinue,
+                modifier = Modifier.weight(2f),
+                icon = {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            )
+        }
+    }
+}
+
+/**
+ * A red-tinted banner used at the top of an onboarding screen to surface a
+ * network / validation error that came back from the backend. Tap the X to
+ * dismiss; the ViewModel's clearError() is invoked.
+ */
+@Composable
+fun OnboardingErrorBanner(
+    message: String,
+    onDismiss: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.errorContainer,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            OutlinedButton(
-                onClick = onSaveDraft,
-                modifier = Modifier.weight(1f).height(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary)
-            ) {
-                Text("Save Draft", color = MaterialTheme.colorScheme.secondary)
-            }
-            Button(
-                onClick = onContinue,
-                modifier = Modifier.weight(2f).height(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-            ) {
-                Text(continueText)
-                Spacer(modifier = Modifier.width(8.dp))
-                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(
+                imageVector = Icons.Default.ErrorOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer
+            )
+            Text(
+                text = message,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                fontWeight = FontWeight.Medium
+            )
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Dismiss",
+                    tint = MaterialTheme.colorScheme.onErrorContainer
+                )
             }
         }
     }

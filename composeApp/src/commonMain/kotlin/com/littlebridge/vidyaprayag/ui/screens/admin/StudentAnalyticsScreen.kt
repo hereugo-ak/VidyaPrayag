@@ -1,5 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.screens.admin
 
+import com.littlebridge.vidyaprayag.ui.theme.StatusColors
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,9 +19,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.littlebridge.vidyaprayag.feature.admin.presentation.RiskStudent
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentAnalyticsViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SubjectEngagement
@@ -76,7 +78,7 @@ fun StudentAnalyticsScreen() {
                         SubjectEngagementCard(state.subjectEngagements)
                     }
                     Box(modifier = Modifier.weight(1f)) {
-                        CohortComparisonCard(state.cohortComparison)
+                        CohortComparisonCard(state.cohortComparison, state.cohortLabels)
                     }
                 }
             }
@@ -142,21 +144,36 @@ private fun VolatilityIndexCard(trend: List<Float>) {
                 }
             }
 
-            // Mock Chart
-            Row(
-                modifier = Modifier.fillMaxWidth().height(160.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.Bottom
-            ) {
-                trend.forEachIndexed { index, value ->
-                    val isAnomaly = index == 9 // Mock Oct 26
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight(value)
-                            .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                            .background(if (isAnomaly) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f))
+            // Live volatility chart: anomaly = the day with the lowest value (biggest drop)
+            if (trend.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(160.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No volatility data available",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            } else {
+                // Detect the anomaly index = the minimum value (largest attendance drop)
+                val anomalyIndex = trend.indexOf(trend.minOrNull())
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(160.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    trend.forEachIndexed { index, value ->
+                        val isAnomaly = index == anomalyIndex
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(value.coerceIn(0f, 1f))
+                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                                .background(if (isAnomaly) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f))
+                        )
+                    }
                 }
             }
             
@@ -182,11 +199,11 @@ private fun VolatilityIndexCard(trend: List<Float>) {
 private fun CorrelationInsightsCard() {
     VidyaPrayagCard(
         modifier = Modifier.fillMaxWidth(),
-        backgroundColor = Color(0xFF0F172A) // Dark Navy
+        backgroundColor = MaterialTheme.colorScheme.primary
     ) {
         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.Default.Psychology, null, tint = Color(0xFFFBBF24))
+                Icon(Icons.Default.Psychology, null, tint = StatusColors.gold)
                 Text("Correlation Insights", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
             }
             
@@ -194,7 +211,7 @@ private fun CorrelationInsightsCard() {
                 InsightBox(
                     label = "Attendance vs. Performance",
                     value = "Students with <85% attendance show a 15.4% drop in Math mastery.",
-                    color = Color(0xFFFACC15)
+                    color = StatusColors.goldBright
                 )
                 InsightBox(
                     label = "Social Factor",
@@ -245,7 +262,7 @@ private fun PEWSSection(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     RiskIndicator("Critical Risk", critical, 0.08f, MaterialTheme.colorScheme.error)
-                    RiskIndicator("Medium Risk", medium, 0.28f, Color(0xFFF59E0B))
+                    RiskIndicator("Medium Risk", medium, 0.28f, StatusColors.warning)
                     RiskIndicator("Low/No Risk", low, 0.64f, MaterialTheme.colorScheme.secondary)
                 }
                 
@@ -288,20 +305,21 @@ private fun RiskStudentItem(student: RiskStudent) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                AsyncImage(
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
+                NetworkImage(
                     model = student.imageUrl,
                     contentDescription = null,
                     modifier = Modifier.size(36.dp).clip(CircleShape),
                     contentScale = ContentScale.Crop
                 )
-                Column {
-                    Text(student.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                    Text("Retention Risk: ${student.retentionRisk}%", style = MaterialTheme.typography.labelSmall, color = if (student.riskLevel == "Critical") MaterialTheme.colorScheme.error else Color(0xFFF59E0B), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Column(modifier = Modifier.weight(1f, fill = false)) {
+                    Text(student.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("Retention Risk: ${student.retentionRisk}%", style = MaterialTheme.typography.labelSmall, color = if (student.riskLevel == "Critical") MaterialTheme.colorScheme.error else StatusColors.warning, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
-            IconButton(onClick = { }) {
-                Icon(Icons.AutoMirrored.Filled.Chat, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
+            Spacer(Modifier.width(8.dp))
+            Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                Icon(Icons.AutoMirrored.Filled.Chat, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             }
         }
     }
@@ -319,14 +337,15 @@ private fun SubjectEngagementCard(engagements: List<SubjectEngagement>) {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 engagements.forEach { engagement ->
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(engagement.name, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                            Text("${(engagement.percentage * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.secondary)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text(engagement.name, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                            Spacer(Modifier.width(8.dp))
+                            Text("${(engagement.percentage * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.secondary, maxLines = 1)
                         }
                         LinearProgressIndicator(
                             progress = { engagement.percentage },
                             modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
-                            color = if (engagement.percentage < 0.8f) Color(0xFFF59E0B) else MaterialTheme.colorScheme.secondary,
+                            color = if (engagement.percentage < 0.8f) StatusColors.warning else MaterialTheme.colorScheme.secondary,
                             trackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     }
@@ -337,29 +356,48 @@ private fun SubjectEngagementCard(engagements: List<SubjectEngagement>) {
 }
 
 @Composable
-private fun CohortComparisonCard(comparison: List<Float>) {
+private fun CohortComparisonCard(comparison: List<Float>, labels: List<String>) {
     VidyaPrayagCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(Icons.Default.Groups, null, tint = MaterialTheme.colorScheme.secondary)
                 Text("Cohort Comparison", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
-            
-            Row(
-                modifier = Modifier.fillMaxWidth().height(120.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                comparison.forEachIndexed { index, value ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .width(32.dp)
-                                .fillMaxHeight(value)
-                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                                .background(if (index == 2) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant)
-                        )
-                        Text(listOf("G9", "G10", "G11", "G12")[index], style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+
+            if (comparison.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No cohort data",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                // Highlight the strongest-performing cohort (highest bar)
+                val topIndex = comparison.indexOf(comparison.maxOrNull())
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    comparison.forEachIndexed { index, value ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .width(32.dp)
+                                    .fillMaxHeight(value.coerceIn(0f, 1f))
+                                    .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                                    .background(if (index == topIndex) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant)
+                            )
+                            Text(
+                                labels.getOrNull(index) ?: "",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
                     }
                 }
             }

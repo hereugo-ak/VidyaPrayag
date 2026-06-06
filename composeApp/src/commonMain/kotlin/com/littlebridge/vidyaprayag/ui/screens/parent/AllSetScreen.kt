@@ -21,7 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
+import com.littlebridge.vidyaprayag.ui.components.NetworkImage
 import com.littlebridge.vidyaprayag.navigation.Destination
 import com.littlebridge.vidyaprayag.navigation.LocalAppNavigator
 import com.littlebridge.vidyaprayag.ui.components.VidyaPrayagCard
@@ -144,8 +144,8 @@ private fun TopMatchPreviewCard() {
     ) {
         Column {
             Box(modifier = Modifier.height(200.dp).fillMaxWidth()) {
-                AsyncImage(
-                    model = "https://lh3.googleusercontent.com/aida-public/AB6AXuCRHBDXZqXjScvsWfe04wMOkXm0iLVFISpCreRVHsvmAdATV5-07X8DFkoQA3eq3_LQSVJwxq4Fhe55Iw5jMr74EN4JV3HOx20G2cr-38dGzZCxnzwNyC87XWd8BiFYNn5io4mPYa0xr6-ZQKxIIH_u8ZnAga7QnnlViM5ykSHGmq800q6fR4tIekTK-MTSyKmACFc3S4IP_vCIgYfxcteuqCEaA84-z5YTcEukwMXb77cS_Efnp4kDUJVM7ZU3Hm3OLckYvKZWioiP",
+                NetworkImage(
+                    model = null,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
