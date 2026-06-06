@@ -9,7 +9,7 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 
 /**
- * TeacherApi — Ktor client for the (new) `api/v1/teacher/*` routes.
+ * TeacherApi — Ktor client for the (new) `api/v1/teacher/…` routes.
  *
  * Mirrors [com.littlebridge.vidyaprayag.feature.parent.data.remote.ParentApi]: every call is wrapped
  * in [safeApiCall], authenticated with a bearer token, and hits the school base URL. Read endpoints
