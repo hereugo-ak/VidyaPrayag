@@ -5,15 +5,21 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -40,6 +46,8 @@ fun VBadge(
     text: String,
     modifier: Modifier = Modifier,
     tone: VBadgeTone = VBadgeTone.Arctic,
+    // §4.2: optional leading glyph (React `<span className="inline-flex gap-1">{icon} {label}</span>`).
+    leadingIcon: ImageVector? = null,
 ) {
     val c = VTheme.colors
     val (bg, fg) = when (tone) {
@@ -49,18 +57,28 @@ fun VBadge(
         VBadgeTone.Danger -> c.danger.copy(alpha = 0.55f) to c.dangerInk
         VBadgeTone.Neutral -> c.cream to c.ink2
     }
-    Text(
-        text = text,
-        // React VBadge: 11 / 600 / 0.04em — NOT uppercase, NOT 0.08em tracking. §matrix.
-        style = VTheme.type.label.colored(fg).copy(
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 0.04.em,
-        ),
-        modifier = modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(bg)
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+    // React VBadge: 11 / 600 / 0.04em — NOT uppercase, NOT 0.08em tracking. §matrix.
+    val textStyle = VTheme.type.label.colored(fg).copy(
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.04.em,
     )
+    val pillModifier = modifier
+        .clip(RoundedCornerShape(999.dp))
+        .background(bg)
+        .padding(horizontal = 10.dp, vertical = 4.dp)
+
+    if (leadingIcon != null) {
+        Row(
+            modifier = pillModifier,
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp), // React gap-1
+        ) {
+            Icon(leadingIcon, contentDescription = null, tint = fg, modifier = Modifier.size(14.dp))
+            Text(text = text, style = textStyle)
+        }
+    } else {
+        Text(text = text, style = textStyle, modifier = pillModifier)
+    }
 }
 
 /**
