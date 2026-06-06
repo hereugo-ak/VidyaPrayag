@@ -266,6 +266,33 @@ Built in small batches (~3 files); each batch → commit + push + PR update + th
 - [x] **Android compile fix:** `VInput.kt` was missing `import …ui.v2.theme.shapeMd` (the `shape*` helpers are top-level extensions on `VDimens`, so they must be imported into the `components` package). Resolved the `Unresolved reference 'shapeMd'` from `:composeApp:compileDevDebugKotlinAndroid`.
 - [ ] **Run the real Gradle build** on a ≥8 GB host / dev machine (sandbox OOM-starves at config). This is the last gate before the next deploy.
 
+#### Batch 3E-3 — full screen parity with the React design ✅ (this batch)
+Ported every remaining top-level screen from the `App.tsx` graph that the portals didn't already
+cover, as faithful Compose-MPP translations using the v2 design tokens (the v2 theme is a verified
+1:1 port of `styles/theme.css`: `--arctic/#3cb9a9 → teal`, `--warning/#FFD4A3`, `--danger/#FFADA8`,
+`--cloud/#F5F5F3 → cream`, `--void → ink/bg`). No old-UI look or elements remain (`ui/` holds only `v2/`).
+
+| New screen (v2) | React source | Backend | Notes |
+|---|---|---|---|
+| `SchoolOnboardingScreenV2` | `Auth.tsx → SchoolOnboarding` | ✅ `onboarding/submit` | 4-step wizard binding the 4 OB VMs; advances only on real submit success. |
+| `ParentLinkChildScreenV2` | `Auth.tsx → ParentLinkChild` | ❌ (gap) | 3-step wizard binding `ChildBasicInfo`/`YourPreferences` VMs (local-state only; no link API yet). |
+| `TeacherFirstLoginScreenV2` | `Auth.tsx → TeacherFirstLogin` | ❌ (gap) | local password validation; no `change-password` endpoint / `must_change_password` flag yet. |
+| `AcademicCalendarScreenV2` | `Discovery.tsx → AcademicCalendar` | ✅ `school/calendar` | real `AcademicCalendarViewModel`; month grid + arctic event dots + upcoming list (single accent — backend has no event `type`). |
+| `NotificationsScreenV2` | `Notifications.tsx` | ❌ (gap) | exact React layout (navy hero · all/unread pills · category-tinted cards · "all caught up" empty · prefs footer); empty list until a notifications feed exists. |
+
+**Wiring:** `SchoolOnboarding` + `ParentLinkChild` reachable from the unauth flow (`NavGraphV2`:
+Welcome "Register your school" → onboarding; Welcome "Get started" → Discovery → "open school" →
+link-child). `Notifications` + `AcademicCalendar` are pushed as full-screen overlays from the header
+bell/calendar in **all three** portals (Parent/School/Teacher).
+
+**Backend gaps documented** in [`BACKEND_GAPS.md`](./BACKEND_GAPS.md) (explicit user request): parent
+child-linking, teacher change-password + `must_change_password`, and the entire notifications
+API/schema. Per the hard UI rule those screens render only real/local state and never fabricate data.
+
+- [x] All `App.tsx` top-level screens now exist in `ui/v2` on Compose Multiplatform.
+- [x] New screens statically verified against VM/state/component surfaces (sandbox can't run Gradle).
+- [x] Backend/Supabase gap list written for screens lacking APIs.
+
 ## PHASE 4 — Polish
 
 - [ ] Bundle Plus Jakarta Sans + DM Mono into `composeResources`; swap `defaultVTypography()` font families (single construction-site change, no call-site churn).
