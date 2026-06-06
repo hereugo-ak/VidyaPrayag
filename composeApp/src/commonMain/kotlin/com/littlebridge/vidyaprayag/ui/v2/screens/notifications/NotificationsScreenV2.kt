@@ -1,7 +1,10 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.notifications
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,34 +31,44 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
-import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.components.VTag
 import com.littlebridge.vidyaprayag.ui.v2.components.VBackHeader
 import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
+import com.littlebridge.vidyaprayag.ui.v2.theme.VElevationLevel
+import com.littlebridge.vidyaprayag.ui.v2.theme.VMotion
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import com.littlebridge.vidyaprayag.ui.v2.theme.vElevation
+import kotlinx.coroutines.delay
 
 /**
  * NotificationsScreenV2 — faithful Compose translation of `Notifications.tsx → NotificationsScreen`.
  *
- * Reproduces the React layout exactly: navy→indigo gradient "Inbox" hero with the unread count,
- * `all / unread` filter pills, the per-item card (category badge + time, title, body, unread dot,
- * chevron, category-tinted icon tile), the "You're all caught up" empty state, and the
- * "Notification preferences" footer button.
+ * Reproduces the React layout exactly (UI_FIDELITY_AUDIT §9):
+ *  - navy→indigo (135°) "Inbox" hero with a top-right radial teal blob, blurred bell chip, an
+ *    `INBOX` overline (12sp / 0.05em / 70% white) and a **mono** unread count (28sp / 600) + "unread";
+ *  - `all / unread` filter pills — **navy fill + white** when active, **cream + ink-2** when not
+ *    (NOT the teal VTag chip), 12sp / 700, "unread · N" suffix;
+ *  - per-item card (category badge + time, title, body, unread teal-deep dot, chevron, category-tinted
+ *    icon tile) with the two React shadow levels (raised for unread, resting for read) and a staggered
+ *    fade-up entrance (delay i*0.04s);
+ *  - the "You're all caught up" empty state and the "Notification preferences" footer (13/600).
  *
- * To match the Figma prototype pixel-for-pixel, [items] defaults to the same five entries the React
- * screen renders from `lib/mock` (mirrored in [MockV2.notifications]). When a real
- * `GET /api/v1/notifications` feed exists, pass a live list (or bind a NotificationsViewModel) into
- * [items] and the entire layout lights up unchanged.
+ * To match the Figma prototype pixel-for-pixel, [items] defaults to the same entries the React
+ * screen renders from `lib/mock` (mirrored in [MockV2.notifications]). A real
+ * `GET /api/v1/notifications` feed can map onto [VNotification] and the layout lights up unchanged.
  */
 @Composable
 fun NotificationsScreenV2(
@@ -86,12 +100,21 @@ fun NotificationsScreenV2(
         VBackHeader(
             title = "Notifications",
             onBack = onBack,
+            // React action: `<Check 14/> Mark all` — a text+icon button in teal-deep / 700.
             action = {
-                Box(
-                    Modifier.clickable { readIds = items.map { it.id }.toSet() },
-                    contentAlignment = Alignment.Center,
+                Row(
+                    Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .clickable { readIds = items.map { it.id }.toSet() },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Icon(VIcons.Check, contentDescription = "Mark all read", tint = c.tealDeep, modifier = Modifier.size(18.dp))
+                    Icon(VIcons.Check, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(14.dp))
+                    Text(
+                        "Mark all",
+                        style = VTheme.type.caption.colored(c.tealDeep).copy(fontWeight = FontWeight.Bold),
+                        maxLines = 1,
+                    )
                 }
             },
         )
@@ -99,93 +122,189 @@ fun NotificationsScreenV2(
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = d.lg, vertical = d.md),
-            verticalArrangement = Arrangement.spacedBy(d.md),
+                .verticalScroll(rememberScrollState()),
         ) {
             // ── Inbox hero ──────────────────────────────────────────────────────────
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(c.navy, Color(0xFF3B3870)),
-                            start = Offset(0f, 0f),
-                            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY),
-                        ),
-                    )
-                    .padding(d.lg),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.14f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(VIcons.Bell, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                    }
-                    Spacer(Modifier.width(d.md))
-                    Column(Modifier.weight(1f)) {
-                        Text("INBOX", style = VTheme.type.label.colored(Color.White.copy(alpha = 0.7f)))
-                        Row(verticalAlignment = Alignment.Bottom) {
-                            Text(unread.toString(), style = VTheme.type.h1.colored(Color.White))
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                "unread",
-                                style = VTheme.type.body.colored(Color.White.copy(alpha = 0.7f)),
-                                modifier = Modifier.padding(bottom = 6.dp),
+            // React: `px-5 pt-2 pb-5` = 20 / 8 / 20px wrapper around an 18px-radius gradient card.
+            Box(Modifier.padding(start = 20.dp, end = 20.dp, top = d.sm, bottom = 20.dp)) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(
+                            // React: linear-gradient(135deg, --navy 0%, #3b3870 100%)
+                            Brush.linearGradient(
+                                colors = listOf(c.navy, Color(0xFF3B3870)),
+                                start = Offset(0f, 0f),
+                                end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY),
+                            ),
+                        )
+                        // §9#2: decorative top-right radial teal blob (rgba(60,185,169,0.45)→transparent).
+                        .drawBehind {
+                            val blobR = 88.dp.toPx() // React w-44/h-44 = 176px → radius 88, offset -40
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(BlobTeal, Color.Transparent),
+                                    center = Offset(size.width + 40.dp.toPx(), -40.dp.toPx()),
+                                    radius = blobR * 2f,
+                                ),
+                                radius = blobR * 2f,
+                                center = Offset(size.width + 40.dp.toPx(), -40.dp.toPx()),
                             )
+                        }
+                        .padding(d.lg),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Blurred white bell chip (React rgba(255,255,255,0.14) + backdrop-blur).
+                        Box(
+                            Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.14f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(VIcons.Bell, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(Modifier.width(d.md))
+                        Column(Modifier.weight(1f)) {
+                            // React: 12sp / 0.05em / uppercase / opacity .7 — NOT the 11sp label token.
+                            Text(
+                                "INBOX",
+                                style = VTheme.type.body.colored(Color.White.copy(alpha = 0.7f)).copy(
+                                    fontSize = 12.sp,
+                                    letterSpacing = 0.05.em,
+                                ),
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            // React: mono 28 / 600 / line-height 1.1, with "unread" at 14 / opacity .7.
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                Text(
+                                    unread.toString(),
+                                    style = VTheme.type.dataLg.colored(Color.White).copy(
+                                        fontSize = 28.sp,
+                                        lineHeight = 30.8.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                    ),
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    "unread",
+                                    style = VTheme.type.body.colored(Color.White.copy(alpha = 0.7f)),
+                                    modifier = Modifier.padding(bottom = 3.dp),
+                                )
+                            }
                         }
                     }
                 }
             }
 
             // ── Filter pills ──────────────────────────────────────────────────────
-            Row(horizontalArrangement = Arrangement.spacedBy(d.sm)) {
-                VTag(text = "All", active = !filterUnread, onClick = { filterUnread = false })
-                VTag(
-                    text = if (unread > 0) "Unread · $unread" else "Unread",
+            // React: `px-5 mb-3 flex gap-2`. Pills: navy active / cream inactive, 12/700, capitalize.
+            Row(
+                Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(d.sm),
+            ) {
+                FilterPill(label = "All", active = !filterUnread) { filterUnread = false }
+                FilterPill(
+                    label = if (unread > 0) "Unread · $unread" else "Unread",
                     active = filterUnread,
-                    onClick = { filterUnread = true },
-                )
+                ) { filterUnread = true }
             }
 
             // ── List or empty state ────────────────────────────────────────────────
-            if (visible.isEmpty()) {
-                CaughtUpState()
-            } else {
-                visible.forEach { NotificationRow(it, onClick = { readIds = readIds + it.id }) }
+            // React: `px-5 pb-8 space-y-2`.
+            Column(
+                Modifier.padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(d.sm),
+            ) {
+                if (visible.isEmpty()) {
+                    CaughtUpState()
+                } else {
+                    visible.forEachIndexed { i, n ->
+                        // React: staggered fade-up entrance (delay i*0.04s).
+                        var shown by remember(n.id) { mutableStateOf(false) }
+                        LaunchedEffect(n.id) {
+                            delay(i * 40L)
+                            shown = true
+                        }
+                        AnimatedVisibility(
+                            visible = shown,
+                            enter = VMotion.fadeUp(delayMs = 0, fromY = 8),
+                        ) {
+                            NotificationRow(n, onClick = { readIds = readIds + n.id })
+                        }
+                    }
+                }
             }
 
             // ── Preferences footer ──────────────────────────────────────────────────
-            Spacer(Modifier.height(d.sm))
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(c.cream)
-                    .clickable {}
-                    .padding(vertical = d.md),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(VIcons.Close, contentDescription = null, tint = c.ink2, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Notification preferences", style = VTheme.type.caption.colored(c.ink2))
+            // React: `px-5 pb-10` wrapper; pb-8 on the list above → extra gap before footer.
+            Spacer(Modifier.height(d.md))
+            Box(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 40.dp)) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(c.cream)
+                        .clickable {}
+                        .padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(VIcons.Close, contentDescription = null, tint = c.ink2, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(d.sm))
+                    // React: 13 / 600 — slightly larger than the 12/500 caption token.
+                    Text(
+                        "Notification preferences",
+                        style = VTheme.type.bodyStrong.colored(c.ink2).copy(fontSize = 13.sp),
+                    )
+                }
             }
-            Spacer(Modifier.height(d.lg))
         }
+    }
+}
+
+@Composable
+private fun FilterPill(label: String, active: Boolean, onClick: () -> Unit) {
+    val c = VTheme.colors
+    val interaction = remember { MutableInteractionSource() }
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(if (active) c.navy else c.cream)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            // React: `px-3.5 py-1.5` = 14 / 6.
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            // React: 12 / 700; active white, inactive ink-2.
+            style = VTheme.type.caption
+                .colored(if (active) Color.White else c.ink2)
+                .copy(fontSize = 12.sp, fontWeight = FontWeight.Bold),
+            maxLines = 1,
+        )
     }
 }
 
 @Composable
 private fun NotificationRow(n: VNotification, onClick: () -> Unit) {
     val c = VTheme.colors
+    val d = VTheme.dimens
     val (tileBg, tileFg) = categoryTile(n.category)
-    VCard(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
+    val interaction = remember { MutableInteractionSource() }
+    // React shadow levels: unread → raised (0 6px 14px -6px navy@12%); read → resting (0 2px 6px navy@4%).
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .vElevation(if (n.unread) VElevationLevel.Raised else VElevationLevel.Card, radius = 14.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(c.card)
+            .border(1.dp, c.hairline, RoundedCornerShape(14.dp))
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .padding(14.dp), // React `p-3.5`
+    ) {
         Row(verticalAlignment = Alignment.Top) {
             Box(
                 Modifier
@@ -196,27 +315,34 @@ private fun NotificationRow(n: VNotification, onClick: () -> Unit) {
             ) {
                 Icon(categoryIcon(n.category), contentDescription = null, tint = tileFg, modifier = Modifier.size(16.dp))
             }
-            Spacer(Modifier.width(VTheme.dimens.md))
+            Spacer(Modifier.width(d.sm + d.xs)) // React gap-3 = 12
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     VBadge(text = n.category, tone = categoryBadgeTone(n.category))
-                    Spacer(Modifier.width(VTheme.dimens.sm))
-                    Text(n.time, style = VTheme.type.caption.colored(c.ink3))
+                    Spacer(Modifier.width(d.sm))
+                    Text(n.time, style = VTheme.type.label.colored(c.ink3).copy(fontSize = 11.sp, letterSpacing = 0.sp))
                 }
-                Spacer(Modifier.height(6.dp))
-                Text(n.title, style = VTheme.type.bodyStrong.colored(c.ink))
-                Text(n.body, style = VTheme.type.caption.colored(c.ink2))
+                Spacer(Modifier.height(6.dp)) // React mt-1.5
+                Text(n.title, style = VTheme.type.bodyStrong.colored(c.ink)) // 14 / 600
+                Spacer(Modifier.height(2.dp)) // React mt-0.5
+                Text(n.body, style = VTheme.type.caption.colored(c.ink2)) // 12 / ink-2
             }
             if (n.unread) {
+                // React: 8px teal-deep dot top-right.
                 Box(
                     Modifier
-                        .padding(start = VTheme.dimens.sm, top = 4.dp)
+                        .padding(start = d.sm, top = 0.dp)
                         .size(8.dp)
                         .clip(CircleShape)
                         .background(c.tealDeep),
                 )
             } else {
-                Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(16.dp))
+                Icon(
+                    VIcons.ChevronRight,
+                    contentDescription = null,
+                    tint = c.ink3,
+                    modifier = Modifier.padding(start = d.xs, top = 4.dp).size(16.dp),
+                )
             }
         }
     }
@@ -251,9 +377,17 @@ data class VNotification(
     val unread: Boolean,
 )
 
+// §9 one-off literals (lifted verbatim from Notifications.tsx; not part of the global palette):
+//  - hero blob = rgba(60,185,169,0.45)
+//  - icon-tile foregrounds: attendance #7a3f00, fees #7a1c18, academic --teal-deep, default #155e3a.
+private val BlobTeal = Color(0x733CB9A9)        // rgba(60,185,169,0.45)
+private val TileFgAttendance = Color(0xFF7A3F00)
+private val TileFgFees = Color(0xFF7A1C18)
+private val TileFgDefault = Color(0xFF155E3A)
+
 private fun categoryIcon(cat: String): ImageVector = when (cat.lowercase()) {
     "attendance" -> VIcons.Calendar
-    "academic" -> VIcons.School
+    "academic" -> VIcons.BookOpen // React iconFor: academic → <BookOpen/>
     "fees" -> VIcons.Wallet
     else -> VIcons.Megaphone
 }
@@ -265,14 +399,14 @@ private fun categoryBadgeTone(cat: String): VBadgeTone = when (cat.lowercase()) 
     else -> VBadgeTone.Success
 }
 
-/** Category-tinted icon-tile colors, matching the React `toneFor()` map. */
+/** Category-tinted icon-tile colors, matching the React `toneFor()` map (§9#4) verbatim. */
 @Composable
 private fun categoryTile(cat: String): Pair<Color, Color> {
     val c = VTheme.colors
     return when (cat.lowercase()) {
-        "attendance" -> c.warning.copy(alpha = 0.55f) to c.warningInk
-        "fees" -> c.danger.copy(alpha = 0.55f) to c.dangerInk
-        "academic" -> c.teal.copy(alpha = 0.18f) to c.tealDeep
-        else -> c.success.copy(alpha = 0.42f) to c.successInk
+        "attendance" -> c.warning.copy(alpha = 0.55f) to TileFgAttendance // rgba(255,212,163,0.55) / #7a3f00
+        "fees" -> c.danger.copy(alpha = 0.55f) to TileFgFees              // rgba(255,173,168,0.55) / #7a1c18
+        "academic" -> c.teal.copy(alpha = 0.18f) to c.tealDeep            // rgba(60,185,169,0.18) / --teal-deep
+        else -> c.success.copy(alpha = 0.42f) to TileFgDefault            // rgba(168,230,207,0.42) / #155e3a
     }
 }
