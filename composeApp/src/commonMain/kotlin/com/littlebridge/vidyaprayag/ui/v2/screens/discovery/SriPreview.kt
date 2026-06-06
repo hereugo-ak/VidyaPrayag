@@ -56,7 +56,7 @@ fun SriPreview(score: Float, modifier: Modifier = Modifier) {
                     },
                     style = VTheme.type.dataLg.colored(c.navy).copy(fontSize = 32.sp, fontWeight = FontWeight.SemiBold, lineHeight = 32.sp),
                 )
-                Text("Above Lucknow median (7.4)", style = VTheme.type.label.colored(c.ink3).copy(fontSize = 11.sp), modifier = Modifier.padding(top = 2.dp))
+                Text("Above Lucknow median (7.4)", style = VTheme.type.label.colored(c.ink3).copy(fontSize = 11.sp, fontWeight = FontWeight.Normal, letterSpacing = 0.sp), modifier = Modifier.padding(top = 2.dp))
             }
             // "+0.3 YoY" chip — pastel mint bg #A8E6CF@40%, dark-green ink #155E3A.
             Row(
@@ -72,7 +72,7 @@ fun SriPreview(score: Float, modifier: Modifier = Modifier) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             signals.forEach { (label, w) ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(label, style = VTheme.type.label.colored(c.ink2).copy(fontSize = 11.sp), modifier = Modifier.width(116.dp))
+                    Text(label, style = VTheme.type.label.colored(c.ink2).copy(fontSize = 11.sp, fontWeight = FontWeight.Normal, letterSpacing = 0.sp), modifier = Modifier.width(116.dp))
                     Box(Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(999.dp)).background(c.cream)) {
                         Box(Modifier.fillMaxWidth(w / 100f).height(6.dp).clip(RoundedCornerShape(999.dp)).background(c.tealDeep))
                     }

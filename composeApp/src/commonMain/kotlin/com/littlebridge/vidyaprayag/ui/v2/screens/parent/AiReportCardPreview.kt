@@ -69,7 +69,7 @@ fun AiReportCardPreview(modifier: Modifier = Modifier) {
                 row.forEach { g ->
                     Column(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(c.cream).padding(10.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Text(g.subj, style = VTheme.type.label.colored(c.ink2).copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold))
+                            Text(g.subj, style = VTheme.type.label.colored(c.ink2).copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.sp))
                             Text(if (g.up) "↑" else "→", style = VTheme.type.caption.colored(if (g.up) upInk else c.ink3).copy(fontSize = 11.sp))
                         }
                         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 2.dp)) {
@@ -86,7 +86,7 @@ fun AiReportCardPreview(modifier: Modifier = Modifier) {
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(b.tone).padding(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Icon(b.icon, contentDescription = null, tint = c.ink, modifier = Modifier.size(12.dp))
-                    Text(b.label, style = VTheme.type.label.colored(c.ink).copy(fontSize = 10.sp, fontWeight = FontWeight.Bold))
+                    Text(b.label, style = VTheme.type.label.colored(c.ink).copy(fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.06.em))
                 }
                 Text(b.body, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 18.sp), modifier = Modifier.padding(top = 4.dp))
             }
