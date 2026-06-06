@@ -84,10 +84,13 @@ fun TeacherHomeScreenV2(
         Column {
             Text("Today's tasks", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                TaskCard(c.successInk, "Class 10-A attendance", "Marked at 9:12 AM • 28 / 32 present", "View details", VIcons.Check)
-                TaskCard(c.warningInk, "Syllabus update pending", "You haven't logged Period 2 — Mathematics", "Update now", VIcons.AlertCircle)
+                // §6: React TaskCard icon-circle uses SOFT pastel fills (not ink):
+                //   success=var(--success) #A8E6CF · warning=var(--warning) #FFD4A3 ·
+                //   arctic=var(--arctic)=teal · neutral=rgba(245,245,243,0.15). (Teacher.tsx L95)
+                TaskCard(c.success, "Class 10-A attendance", "Marked at 9:12 AM • 28 / 32 present", "View details", VIcons.Check)
+                TaskCard(c.warning, "Syllabus update pending", "You haven't logged Period 2 — Mathematics", "Update now", VIcons.AlertCircle)
                 TaskCard(c.teal, "Class 10-A Unit Test 2", "Marks not entered yet • 23 students", "Enter marks", VIcons.ListChecks)
-                TaskCard(c.ink3, "4 students haven't submitted yesterday's HW", "Mathematics – Algebra worksheet", "View", VIcons.Clock, onCalendar = onOpenCalendar)
+                TaskCard(Color(0x26F5F5F3), "4 students haven't submitted yesterday's HW", "Mathematics – Algebra worksheet", "View", VIcons.Clock, onCalendar = onOpenCalendar)
             }
         }
 
@@ -104,7 +107,8 @@ fun TeacherHomeScreenV2(
                             .background(if (active) c.teal else c.ink.copy(alpha = 0.06f))
                             .padding(12.dp),
                     ) {
-                        Text("PERIOD ${p.period}", style = VTheme.type.label.colored(if (active) Color(0xFF080808) else c.ink3))
+                        // §6: React period header uses the `Label` component = labelStrong.
+                        Text("PERIOD ${p.period}", style = VTheme.type.labelStrong.colored(if (active) Color(0xFF080808) else c.ink3))
                         Text(p.subject, style = VTheme.type.bodyStrong.colored(if (active) Color(0xFF080808) else c.ink), modifier = Modifier.padding(top = 4.dp))
                         Text("${p.time} • ${p.klass}", style = VTheme.type.dataSm.colored(if (active) Color(0xFF080808).copy(alpha = 0.8f) else c.ink2).copy(fontSize = 11.sp))
                     }

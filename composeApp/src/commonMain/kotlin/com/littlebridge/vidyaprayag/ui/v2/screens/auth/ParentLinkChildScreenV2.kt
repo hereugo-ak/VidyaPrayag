@@ -26,17 +26,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VInput
+import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
 import com.littlebridge.vidyaprayag.ui.v2.components.VTag
 import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
@@ -79,7 +83,8 @@ fun ParentLinkChildScreenV2(
             .verticalScroll(rememberScrollState()),
     ) {
         Spacer(Modifier.height(40.dp))
-        Text("STEP $step OF $total", style = VTheme.type.label.colored(c.ink3))
+        // §5: React `Label` component = labelStrong (uppercase 11/700/0.10em).
+        VLabel("Step $step of $total")
         Spacer(Modifier.height(d.sm))
         StepBars(current = step, total = total)
 
@@ -100,7 +105,7 @@ fun ParentLinkChildScreenV2(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(d.md))
-                Text("PREFERRED LANGUAGE", style = VTheme.type.label.colored(c.ink3))
+                VLabel("Preferred language")
                 Spacer(Modifier.height(d.sm))
                 Row(horizontalArrangement = Arrangement.spacedBy(d.sm)) {
                     VTag(text = "English", active = language == "English", onClick = { language = "English" })
@@ -126,14 +131,15 @@ fun ParentLinkChildScreenV2(
                 Spacer(Modifier.height(d.sm))
                 VCard(modifier = Modifier.fillMaxWidth()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        // §5: React match-icon circle = solid var(--arctic)=teal, dark glyph (Auth.tsx L294).
                         Box(
                             Modifier
                                 .size(40.dp)
                                 .clip(CircleShape)
-                                .background(c.teal.copy(alpha = 0.16f)),
+                                .background(c.teal),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(VIcons.GraduationCap, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(18.dp))
+                            Icon(VIcons.GraduationCap, contentDescription = null, tint = c.ink, modifier = Modifier.size(18.dp))
                         }
                         Spacer(Modifier.width(d.md))
                         Column(Modifier.weight(1f)) {
@@ -172,19 +178,23 @@ fun ParentLinkChildScreenV2(
                                 style = VTheme.type.caption.colored(c.ink2),
                             )
                         }
-                        Icon(VIcons.Check, contentDescription = null, tint = c.successInk, modifier = Modifier.size(18.dp))
+                        // §5: React resolved-child check = #155e3a (Auth.tsx L319).
+                        Icon(VIcons.Check, contentDescription = null, tint = Color(0xFF155E3A), modifier = Modifier.size(18.dp))
                     }
                 }
                 Spacer(Modifier.height(d.md))
+                // §5: React "+ Add another child" = plain 13/600 #0a3a76 link (Auth.tsx L322).
                 Text(
                     "+ Add another child",
-                    style = VTheme.type.caption.colored(c.tealDeep),
+                    style = VTheme.type.body.colored(Color(0xFF0A3A76)).copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
+                    textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth().padding(vertical = d.xs),
                 )
             }
         }
 
         Spacer(Modifier.height(d.xl))
+        // §5: React has a SINGLE CTA (Continue / Finish) with a trailing ArrowRight; no Back button.
         VButton(
             text = if (step < total) "Continue" else "Finish & open dashboard",
             onClick = { if (step < total) step++ else onDone() },
@@ -192,15 +202,7 @@ fun ParentLinkChildScreenV2(
             size = VButtonSize.Lg,
             tone = VButtonTone.Teal,
             soft = false,
-            leading = { Icon(VIcons.ArrowRight, contentDescription = null, modifier = Modifier.size(16.dp)) },
-        )
-        Spacer(Modifier.height(d.sm))
-        VButton(
-            text = if (step == 1) "Cancel" else "Back",
-            onClick = { if (step == 1) onBack() else step-- },
-            full = true,
-            variant = VButtonVariant.Ghost,
-            tone = VButtonTone.Navy,
+            trailing = { Icon(VIcons.ArrowRight, contentDescription = null, modifier = Modifier.size(16.dp)) },
         )
         Spacer(Modifier.height(d.xl))
     }
@@ -214,9 +216,10 @@ private fun StepBars(current: Int, total: Int) {
             Box(
                 Modifier
                     .weight(1f)
+                    // React: h-1 (4dp) bar — filled var(--arctic)=teal, empty rgba(8,8,8,0.08).
                     .height(4.dp)
                     .clip(CircleShape)
-                    .background(if (i + 1 <= current) c.tealDeep else c.border2),
+                    .background(if (i + 1 <= current) c.teal else Color(0x14080808)),
             )
         }
     }

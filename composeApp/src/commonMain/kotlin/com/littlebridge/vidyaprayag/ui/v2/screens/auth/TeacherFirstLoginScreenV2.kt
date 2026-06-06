@@ -60,12 +60,14 @@ fun TeacherFirstLoginScreenV2(
             .verticalScroll(rememberScrollState()),
     ) {
         Spacer(Modifier.height(VTheme.dimens.xxl))
+        // §5: React `Label` component = labelStrong (11/700/0.10em UPPER), ink3.
         Text(
             if (teacherName.isNullOrBlank()) "Welcome" else "Welcome, $teacherName",
-            style = VTheme.type.label.colored(VTheme.colors.ink3),
+            style = VTheme.type.labelStrong.colored(VTheme.colors.ink3),
         )
         Spacer(Modifier.height(VTheme.dimens.xs))
-        Text("Set a new password", style = VTheme.type.h2.colored(VTheme.colors.ink))
+        // §5: React heading is <h1> (32/800), not h2.
+        Text("Set a new password", style = VTheme.type.h1.colored(VTheme.colors.ink))
         Text(
             "For your security, choose a fresh password before continuing. You'll only do this once.",
             style = VTheme.type.body.colored(VTheme.colors.ink2),
@@ -95,7 +97,8 @@ fun TeacherFirstLoginScreenV2(
             size = VButtonSize.Lg,
             tone = VButtonTone.Teal,
             soft = false,
-            leading = { Icon(VIcons.ArrowRight, contentDescription = null, modifier = Modifier.size(16.dp)) },
+            // §5: React places ArrowRight AFTER the label (trailing), not leading.
+            trailing = { Icon(VIcons.ArrowRight, contentDescription = null, modifier = Modifier.size(16.dp)) },
         )
         Spacer(Modifier.height(VTheme.dimens.md))
         VButton(
