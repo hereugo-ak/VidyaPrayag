@@ -26,7 +26,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBottomNav
 import com.littlebridge.vidyaprayag.ui.v2.components.VDivider
@@ -148,10 +151,15 @@ private fun ChildSwitcher(
             ) {
                 VAvatar(name = child.name, size = 32.dp)
                 Column {
-                    Text(child.name, style = VTheme.type.bodyStrong.colored(c.ink))
+                    // §4.1: child chip name = 13/700 (not bodyStrong 14)
+                    Text(
+                        child.name,
+                        style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                    )
+                    // §4.1: subline = 10px plain text-light-2 (not label 11/upper)
                     Text(
                         "Class ${MockV2.classDisplay(child.klass)} • ${MockV2.school.shortName}",
-                        style = VTheme.type.label.colored(c.ink3),
+                        style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 10.sp),
                     )
                 }
                 Icon(VIcons.ChevronDown, contentDescription = null, tint = c.ink3, modifier = Modifier.size(14.dp))
@@ -186,7 +194,8 @@ private fun ChildSwitcher(
                         Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
-                            .background(if (active) c.teal.copy(alpha = 0.14f) else c.cream)
+                            // §4.1: active row = light blue rgba(200,222,255,0.30) (not teal)
+                            .background(if (active) Color(0xFFC8DEFF).copy(alpha = 0.30f) else c.cream)
                             .clickable(interactionSource = rowInteraction, indication = null) {
                                 onSelectChild(i); open = false
                             }
@@ -196,11 +205,19 @@ private fun ChildSwitcher(
                     ) {
                         VAvatar(name = s.name, size = 32.dp)
                         Column(Modifier.weight(1f)) {
-                            Text(s.name, style = VTheme.type.bodyStrong.colored(c.ink))
-                            Text("Class ${MockV2.classDisplay(s.klass)}", style = VTheme.type.label.colored(c.ink3))
+                            // §4.1: sibling row name = 13/600 (React Parent.tsx L65 fontWeight:600)
+                            Text(
+                                s.name,
+                                style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
+                            )
+                            Text(
+                                "Class ${MockV2.classDisplay(s.klass)}",
+                                style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 10.sp),
+                            )
                         }
                         if (active) {
-                            Icon(VIcons.Check, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(16.dp))
+                            // §4.1: check tint = deep blue #0a3a76
+                            Icon(VIcons.Check, contentDescription = null, tint = Color(0xFF0A3A76), modifier = Modifier.size(16.dp))
                         }
                     }
                 }
