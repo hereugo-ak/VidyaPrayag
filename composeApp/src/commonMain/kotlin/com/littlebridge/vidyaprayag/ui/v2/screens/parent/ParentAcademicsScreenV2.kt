@@ -91,6 +91,7 @@ fun ParentAcademicsScreenV2(
                 "Report" -> VComingSoon(
                     title = "AI Report Card",
                     description = "At the end of each term, VidyaSetu will generate a personalised academic summary for Riya — narrative strengths, focus areas and study tips.",
+                    preview = { AiReportCardPreview() },
                 )
             }
         }

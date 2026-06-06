@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
@@ -53,6 +52,11 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 
 /** Internal view state for the discovery flow (mirrors React `DiscoveryApp` view union). */
 private enum class DiscoveryView { List, Profile }
+
+// React SRI pills use a fixed navy-blue ink (#0a3a76) on an arctic-blue (#C8DEFF) tint —
+// independent of the warm/night remap. §8 / charts.tsx SRI styling.
+private val SriInk = Color(0xFF0A3A76)
+private val SriBg = Color(0xFFC8DEFF)
 
 /**
  * DiscoveryScreenV2 — a pixel-faithful copy of `Discovery.tsx → DiscoveryApp`.
@@ -125,7 +129,8 @@ private fun DiscoveryList(
                         .clickable(interactionSource = exitInteraction, indication = null) { onExit() }
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                 ) {
-                    Text("Sign in", style = VTheme.type.caption.colored(c.ink2).copy(fontWeight = FontWeight.SemiBold))
+                    // React label is "Exit" (leaves the discovery flow).
+                    Text("Exit", style = VTheme.type.caption.colored(c.ink2).copy(fontWeight = FontWeight.SemiBold))
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -229,16 +234,17 @@ private fun SchoolCard(
                 }
             }
             Column(horizontalAlignment = Alignment.End) {
+                // React SRI pill: bg rgba(200,222,255,0.30) (arctic #C8DEFF@30%), ink #0a3a76.
                 Row(
                     Modifier
                         .clip(RoundedCornerShape(999.dp))
-                        .background(c.teal.copy(alpha = 0.16f))
+                        .background(Color(0xFFC8DEFF).copy(alpha = 0.30f))
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Icon(VIcons.Star, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(12.dp))
-                    Text(s.sri.toString(), style = VTheme.type.dataSm.colored(c.tealDeep))
+                    Icon(VIcons.Star, contentDescription = null, tint = SriInk, modifier = Modifier.size(12.dp))
+                    Text(s.sri.toString(), style = VTheme.type.dataSm.colored(SriInk))
                 }
                 Text("SRI score", style = VTheme.type.label.colored(c.ink3), modifier = Modifier.padding(top = 4.dp))
             }
@@ -305,7 +311,15 @@ private fun SchoolProfile(
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                         VBadge(text = school.board, tone = VBadgeTone.Arctic)
                         VBadge(text = school.type, tone = VBadgeTone.Neutral)
-                        VBadge(text = "★ SRI ${school.sri}", tone = VBadgeTone.Arctic)
+                        // React: dedicated SRI pill (Star + "SRI n") on #C8DEFF@30%, ink #0a3a76 — not a VBadge.
+                        Row(
+                            Modifier.clip(RoundedCornerShape(999.dp)).background(SriBg.copy(alpha = 0.30f)).padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Icon(VIcons.Star, contentDescription = null, tint = SriInk, modifier = Modifier.size(11.dp))
+                            Text("SRI ${school.sri}", style = VTheme.type.label.colored(SriInk).copy(letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified, fontWeight = FontWeight.SemiBold))
+                        }
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -347,6 +361,7 @@ private fun SchoolProfile(
                     VComingSoon(
                         title = "School Reputation Index",
                         description = "Our 11-signal score lets you compare schools on academics, safety, facilities and parent sentiment.",
+                        preview = { SriPreview(score = school.sri.toFloat()) },
                     )
                 }
                 ProfileSection("Parent reviews") {
