@@ -38,6 +38,7 @@ fun WelcomeScreenV2(
     onGetStarted: () -> Unit,
     onHaveAccount: () -> Unit,
     modifier: Modifier = Modifier,
+    onRegisterSchool: () -> Unit = {},
 ) {
     val c = VTheme.colors
     val d = VTheme.dimens
@@ -121,6 +122,14 @@ fun WelcomeScreenV2(
                 size = VButtonSize.Lg,
                 tone = VButtonTone.Navy,
                 variant = VButtonVariant.Secondary,
+            )
+            VButton(
+                text = "Register your school",
+                onClick = onRegisterSchool,
+                full = true,
+                size = VButtonSize.Lg,
+                tone = VButtonTone.Navy,
+                variant = VButtonVariant.Ghost,
             )
             Text(
                 "By continuing you agree to our Terms & Privacy Policy",

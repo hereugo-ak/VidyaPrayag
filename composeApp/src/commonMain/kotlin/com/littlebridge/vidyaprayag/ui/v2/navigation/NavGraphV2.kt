@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.LoginScreenV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.auth.SchoolOnboardingScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.WelcomeScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.discovery.DiscoveryScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.parent.ParentPortalV2
@@ -63,7 +64,7 @@ fun NavGraphV2(
 }
 
 /** Internal screens shown before a session exists: Welcome → Login → Discovery (browse-first). */
-private enum class AuthRoute { Welcome, Login, Discovery }
+private enum class AuthRoute { Welcome, Login, Discovery, SchoolOnboarding }
 
 @Composable
 private fun UnauthFlow(modifier: Modifier = Modifier) {
@@ -79,6 +80,7 @@ private fun UnauthFlow(modifier: Modifier = Modifier) {
             AuthRoute.Welcome -> WelcomeScreenV2(
                 onGetStarted = { route = AuthRoute.Discovery },
                 onHaveAccount = { route = AuthRoute.Login },
+                onRegisterSchool = { route = AuthRoute.SchoolOnboarding },
             )
             AuthRoute.Login -> LoginScreenV2(
                 // On success the host MainViewModel's authState flips isAuthenticated=true and
@@ -87,6 +89,13 @@ private fun UnauthFlow(modifier: Modifier = Modifier) {
             )
             AuthRoute.Discovery -> DiscoveryScreenV2(
                 onOpenSchool = {},
+            )
+            // The school-setup wizard reached from Welcome. On the final step's backend success
+            // the host MainViewModel session flips and NavGraphV2 recomposes into the Admin portal;
+            // until then we return the user to Welcome on cancel.
+            AuthRoute.SchoolOnboarding -> SchoolOnboardingScreenV2(
+                onComplete = { route = AuthRoute.Login },
+                onBack = { route = AuthRoute.Welcome },
             )
         }
     }
