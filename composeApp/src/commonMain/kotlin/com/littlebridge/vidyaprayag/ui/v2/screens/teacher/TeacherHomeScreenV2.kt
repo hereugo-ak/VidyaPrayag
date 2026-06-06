@@ -85,9 +85,9 @@ fun TeacherHomeScreenV2(
             Text("Today's tasks", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 TaskCard(c.successInk, "Class 10-A attendance", "Marked at 9:12 AM • 28 / 32 present", "View details", VIcons.Check)
-                TaskCard(c.warningInk, "Syllabus update pending", "You haven't logged Period 2 — Mathematics", "Update now", VIcons.Bell)
-                TaskCard(c.teal, "Class 10-A Unit Test 2", "Marks not entered yet • 23 students", "Enter marks", VIcons.Check)
-                TaskCard(c.ink3, "4 students haven't submitted yesterday's HW", "Mathematics – Algebra worksheet", "View", VIcons.Calendar, onCalendar = onOpenCalendar)
+                TaskCard(c.warningInk, "Syllabus update pending", "You haven't logged Period 2 — Mathematics", "Update now", VIcons.AlertCircle)
+                TaskCard(c.teal, "Class 10-A Unit Test 2", "Marks not entered yet • 23 students", "Enter marks", VIcons.ListChecks)
+                TaskCard(c.ink3, "4 students haven't submitted yesterday's HW", "Mathematics – Algebra worksheet", "View", VIcons.Clock, onCalendar = onOpenCalendar)
             }
         }
 

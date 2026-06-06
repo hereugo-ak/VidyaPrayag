@@ -429,7 +429,7 @@ private fun TeachersStep(teachers: MutableList<OBTeacher>, subjects: List<OBSubj
         full = true,
         tone = VButtonTone.Sand,
         soft = false,
-        leading = { Icon(VIcons.Plus, contentDescription = null, modifier = Modifier.size(14.dp)) },
+        leading = { Icon(VIcons.Upload, contentDescription = null, modifier = Modifier.size(14.dp)) },
     )
 }
 
@@ -466,7 +466,7 @@ private fun StudentsStep() {
 
     VCard(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(vertical = d.lg), horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(VIcons.Share, contentDescription = null, tint = c.ink3, modifier = Modifier.size(32.dp))
+            Icon(VIcons.Upload, contentDescription = null, tint = c.ink3, modifier = Modifier.size(32.dp))
             Spacer(Modifier.height(d.sm))
             Text("Drop your students CSV here", style = VTheme.type.bodyStrong.colored(c.ink))
             Text("or tap to browse", style = VTheme.type.caption.colored(c.ink3))
@@ -545,7 +545,7 @@ private fun CompletionScreen(onComplete: () -> Unit) {
             Text("GET STARTED", style = VTheme.type.label.colored(c.ink3))
             listOf(
                 Triple(VIcons.Mail, "Email teachers their credentials", "8 invites · sent in one tap"),
-                Triple(VIcons.Share, "Download parent invite pack", "Personalised PDF · 156 parents"),
+                Triple(VIcons.Upload, "Download parent invite pack", "Personalised PDF · 156 parents"),
                 Triple(VIcons.Lock, "Review attendance permissions", "Class teachers only by default"),
             ).forEach { (icon, title, sub) ->
                 VCard(modifier = Modifier.fillMaxWidth(), onClick = {}) {

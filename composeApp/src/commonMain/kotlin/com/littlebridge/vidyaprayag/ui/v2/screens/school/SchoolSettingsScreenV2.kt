@@ -44,11 +44,11 @@ fun SchoolSettingsScreenV2(
     val rows = listOf(
         SettingRow(VIcons.GraduationCap, "School profile", "Logo, address, contact info"),
         SettingRow(VIcons.Calendar, "Academic year", "Currently 2025-26 • 173 days left"),
-        SettingRow(VIcons.Bookmark, "Classes & subjects", "6 classes • 42 subjects"),
+        SettingRow(VIcons.BookOpen, "Classes & subjects", "6 classes • 42 subjects"),
         SettingRow(VIcons.Users, "Teacher management", "8 teachers • download credentials"),
         SettingRow(VIcons.Wallet, "Fee structure", "Edit heads & amounts for next cycle"),
         SettingRow(VIcons.Bell, "Notifications", "Channels & quiet hours"),
-        SettingRow(VIcons.Settings, "Data export", "CSV / PDF / UDISE (Coming Soon)"),
+        SettingRow(VIcons.Download, "Data export", "CSV / PDF / UDISE (Coming Soon)"),
         SettingRow(VIcons.Settings, "Account", "Admin email & password"),
     )
 

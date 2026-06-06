@@ -178,6 +178,217 @@ object VIcons {
             close()
         }
     }
+
+    // ── Additional lucide glyphs (2px stroke, rounded caps) ─────────────────────
+
+    /** AlertCircle (lucide) — circle + exclamation. */
+    val AlertCircle: ImageVector by lazy {
+        materialStroke("v_alert_circle") {
+            // ring
+            moveTo(12f, 3f); curveTo(7.03f, 3f, 3f, 7.03f, 3f, 12f); curveTo(3f, 16.97f, 7.03f, 21f, 12f, 21f); curveTo(16.97f, 21f, 21f, 16.97f, 21f, 12f); curveTo(21f, 7.03f, 16.97f, 3f, 12f, 3f); close()
+            // stem
+            moveTo(12f, 8f); lineTo(12f, 12f)
+            // dot
+            moveTo(12f, 16f); lineTo(12.01f, 16f)
+        }
+    }
+
+    /** AlertTriangle (lucide) — triangle + exclamation. */
+    val AlertTriangle: ImageVector by lazy {
+        materialStroke("v_alert_triangle") {
+            moveTo(10.29f, 3.86f)
+            lineTo(1.82f, 18f)
+            curveTo(1.47f, 18.6f, 1.46f, 19.34f, 1.81f, 19.95f)
+            curveTo(2.16f, 20.55f, 2.8f, 20.93f, 3.5f, 20.94f)
+            lineTo(20.5f, 20.94f)
+            curveTo(21.2f, 20.93f, 21.84f, 20.55f, 22.19f, 19.95f)
+            curveTo(22.54f, 19.34f, 22.53f, 18.6f, 22.18f, 18f)
+            lineTo(13.71f, 3.86f)
+            curveTo(13.35f, 3.27f, 12.7f, 2.91f, 12f, 2.91f)
+            curveTo(11.3f, 2.91f, 10.65f, 3.27f, 10.29f, 3.86f)
+            close()
+            moveTo(12f, 9f); lineTo(12f, 13f)
+            moveTo(12f, 17f); lineTo(12.01f, 17f)
+        }
+    }
+
+    /** Clock (lucide) — circle + hands. */
+    val Clock: ImageVector by lazy {
+        materialStroke("v_clock") {
+            moveTo(12f, 3f); curveTo(7.03f, 3f, 3f, 7.03f, 3f, 12f); curveTo(3f, 16.97f, 7.03f, 21f, 12f, 21f); curveTo(16.97f, 21f, 21f, 16.97f, 21f, 12f); curveTo(21f, 7.03f, 16.97f, 3f, 12f, 3f); close()
+            moveTo(12f, 6f); lineTo(12f, 12f); lineTo(16f, 14f)
+        }
+    }
+
+    /** Upload (lucide) — tray + up arrow. */
+    val Upload: ImageVector by lazy {
+        materialStroke("v_upload") {
+            // tray
+            moveTo(21f, 15f); lineTo(21f, 19f); curveTo(21f, 20.1f, 20.1f, 21f, 19f, 21f); lineTo(5f, 21f); curveTo(3.9f, 21f, 3f, 20.1f, 3f, 19f); lineTo(3f, 15f)
+            // arrow head
+            moveTo(7f, 8f); lineTo(12f, 3f); lineTo(17f, 8f)
+            // stem
+            moveTo(12f, 3f); lineTo(12f, 15f)
+        }
+    }
+
+    /** Download (lucide) — tray + down arrow. */
+    val Download: ImageVector by lazy {
+        materialStroke("v_download") {
+            moveTo(21f, 15f); lineTo(21f, 19f); curveTo(21f, 20.1f, 20.1f, 21f, 19f, 21f); lineTo(5f, 21f); curveTo(3.9f, 21f, 3f, 20.1f, 3f, 19f); lineTo(3f, 15f)
+            moveTo(7f, 10f); lineTo(12f, 15f); lineTo(17f, 10f)
+            moveTo(12f, 15f); lineTo(12f, 3f)
+        }
+    }
+
+    /** Edit3 (lucide) — pen line. */
+    val Edit3: ImageVector by lazy {
+        materialStroke("v_edit3") {
+            moveTo(12f, 20f); lineTo(21f, 20f)
+            moveTo(16.5f, 3.5f)
+            curveTo(17.33f, 2.67f, 18.67f, 2.67f, 19.5f, 3.5f)
+            curveTo(20.33f, 4.33f, 20.33f, 5.67f, 19.5f, 6.5f)
+            lineTo(7f, 19f)
+            lineTo(3f, 20f)
+            lineTo(4f, 16f)
+            close()
+        }
+    }
+
+    /** Eye (lucide) — eye + pupil. */
+    val Eye: ImageVector by lazy {
+        materialStroke("v_eye") {
+            moveTo(2f, 12f)
+            curveTo(2f, 12f, 5f, 5f, 12f, 5f)
+            curveTo(19f, 5f, 22f, 12f, 22f, 12f)
+            curveTo(22f, 12f, 19f, 19f, 12f, 19f)
+            curveTo(5f, 19f, 2f, 12f, 2f, 12f)
+            close()
+            moveTo(12f, 9f); curveTo(10.34f, 9f, 9f, 10.34f, 9f, 12f); curveTo(9f, 13.66f, 10.34f, 15f, 12f, 15f); curveTo(13.66f, 15f, 15f, 13.66f, 15f, 12f); curveTo(15f, 10.34f, 13.66f, 9f, 12f, 9f); close()
+        }
+    }
+
+    /** ShieldCheck (lucide) — shield + tick. */
+    val ShieldCheck: ImageVector by lazy {
+        materialStroke("v_shield_check") {
+            moveTo(12f, 2f)
+            lineTo(4f, 5f)
+            lineTo(4f, 11f)
+            curveTo(4f, 16f, 7.4f, 20.5f, 12f, 22f)
+            curveTo(16.6f, 20.5f, 20f, 16f, 20f, 11f)
+            lineTo(20f, 5f)
+            close()
+            moveTo(9f, 12f); lineTo(11f, 14f); lineTo(15f, 10f)
+        }
+    }
+
+    /** ClipboardList (lucide) — clipboard + lines. */
+    val ClipboardList: ImageVector by lazy {
+        materialStroke("v_clipboard_list") {
+            // board
+            moveTo(16f, 4f)
+            lineTo(18f, 4f)
+            curveTo(19.1f, 4f, 20f, 4.9f, 20f, 6f)
+            lineTo(20f, 20f)
+            curveTo(20f, 21.1f, 19.1f, 22f, 18f, 22f)
+            lineTo(6f, 22f)
+            curveTo(4.9f, 22f, 4f, 21.1f, 4f, 20f)
+            lineTo(4f, 6f)
+            curveTo(4f, 4.9f, 4.9f, 4f, 6f, 4f)
+            lineTo(8f, 4f)
+            // clip
+            moveTo(9f, 2f)
+            lineTo(15f, 2f)
+            curveTo(15.55f, 2f, 16f, 2.45f, 16f, 3f)
+            lineTo(16f, 5f)
+            curveTo(16f, 5.55f, 15.55f, 6f, 15f, 6f)
+            lineTo(9f, 6f)
+            curveTo(8.45f, 6f, 8f, 5.55f, 8f, 5f)
+            lineTo(8f, 3f)
+            curveTo(8f, 2.45f, 8.45f, 2f, 9f, 2f)
+            close()
+            // list lines + bullets
+            moveTo(8f, 11f); lineTo(8.01f, 11f)
+            moveTo(11f, 11f); lineTo(16f, 11f)
+            moveTo(8f, 16f); lineTo(8.01f, 16f)
+            moveTo(11f, 16f); lineTo(16f, 16f)
+        }
+    }
+
+    /** ListChecks (lucide) — checks + lines. */
+    val ListChecks: ImageVector by lazy {
+        materialStroke("v_list_checks") {
+            // first check
+            moveTo(3f, 7f); lineTo(5f, 9f); lineTo(9f, 5f)
+            // first line
+            moveTo(12f, 7f); lineTo(21f, 7f)
+            // second check
+            moveTo(3f, 17f); lineTo(5f, 19f); lineTo(9f, 15f)
+            // second line
+            moveTo(12f, 17f); lineTo(21f, 17f)
+        }
+    }
+
+    /** FileText (lucide) — document + lines. */
+    val FileText: ImageVector by lazy {
+        materialStroke("v_file_text") {
+            moveTo(14f, 2f)
+            lineTo(6f, 2f)
+            curveTo(4.9f, 2f, 4f, 2.9f, 4f, 4f)
+            lineTo(4f, 20f)
+            curveTo(4f, 21.1f, 4.9f, 22f, 6f, 22f)
+            lineTo(18f, 22f)
+            curveTo(19.1f, 22f, 20f, 21.1f, 20f, 20f)
+            lineTo(20f, 8f)
+            close()
+            // fold
+            moveTo(14f, 2f); lineTo(14f, 8f); lineTo(20f, 8f)
+            // lines
+            moveTo(8f, 13f); lineTo(16f, 13f)
+            moveTo(8f, 17f); lineTo(16f, 17f)
+            moveTo(8f, 9f); lineTo(10f, 9f)
+        }
+    }
+
+    /** BookOpen (lucide) — open book. */
+    val BookOpen: ImageVector by lazy {
+        materialStroke("v_book_open") {
+            moveTo(12f, 7f)
+            curveTo(12f, 5.9f, 11.3f, 5f, 10f, 4.6f)
+            curveTo(8.5f, 4.1f, 5.5f, 4f, 3f, 4f)
+            lineTo(3f, 18f)
+            curveTo(5.5f, 18f, 8.5f, 18.1f, 10f, 18.6f)
+            curveTo(11.3f, 19f, 12f, 19.9f, 12f, 21f)
+            moveTo(12f, 7f)
+            curveTo(12f, 5.9f, 12.7f, 5f, 14f, 4.6f)
+            curveTo(15.5f, 4.1f, 18.5f, 4f, 21f, 4f)
+            lineTo(21f, 18f)
+            curveTo(18.5f, 18f, 15.5f, 18.1f, 14f, 18.6f)
+            curveTo(12.7f, 19f, 12f, 19.9f, 12f, 21f)
+            moveTo(12f, 7f); lineTo(12f, 21f)
+        }
+    }
+
+    /** Filter (lucide) — funnel. */
+    val Filter: ImageVector by lazy {
+        materialStroke("v_filter") {
+            moveTo(22f, 3f)
+            lineTo(2f, 3f)
+            lineTo(10f, 12.46f)
+            lineTo(10f, 19f)
+            lineTo(14f, 21f)
+            lineTo(14f, 12.46f)
+            close()
+        }
+    }
+
+    /** TrendingUp (lucide) — rising line + arrow. */
+    val TrendingUp: ImageVector by lazy {
+        materialStroke("v_trending_up") {
+            moveTo(23f, 6f); lineTo(13.5f, 15.5f); lineTo(8.5f, 10.5f); lineTo(1f, 18f)
+            moveTo(17f, 6f); lineTo(23f, 6f); lineTo(23f, 12f)
+        }
+    }
 }
 
 // ── Builders ───────────────────────────────────────────────────────────────────

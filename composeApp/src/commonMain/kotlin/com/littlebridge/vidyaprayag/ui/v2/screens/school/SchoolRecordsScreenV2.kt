@@ -240,7 +240,7 @@ private fun RecordsDocs() {
         VCard {
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFC8DEFF).copy(alpha = 0.20f)), contentAlignment = Alignment.Center) {
-                    Icon(VIcons.Bookmark, contentDescription = null, tint = c.ink, modifier = Modifier.size(18.dp))
+                    Icon(VIcons.FileText, contentDescription = null, tint = c.ink, modifier = Modifier.size(18.dp))
                 }
                 Column(Modifier.weight(1f)) {
                     Text(title, style = VTheme.type.bodyStrong.colored(c.ink))
@@ -248,9 +248,9 @@ private fun RecordsDocs() {
                     Spacer(Modifier.height(4.dp))
                     VBadge(text = recipients, tone = VBadgeTone.Neutral)
                 }
-                Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp).clickable {})
+                Icon(VIcons.Download, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp).clickable {})
             }
         }
     }
-    VButton(text = "Upload document", onClick = {}, full = true, variant = VButtonVariant.Secondary, leading = { Icon(VIcons.Plus, null, modifier = Modifier.size(14.dp)) })
+    VButton(text = "Upload document", onClick = {}, full = true, variant = VButtonVariant.Secondary, leading = { Icon(VIcons.Upload, null, modifier = Modifier.size(14.dp)) })
 }

@@ -225,7 +225,7 @@ fun SchoolHomeScreenV2(
                 MockV2.pendingActions.forEach { p ->
                     VCard {
                         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Icon(VIcons.Bell, contentDescription = null, tint = c.warningInk, modifier = Modifier.size(18.dp).padding(top = 2.dp))
+                            Icon(VIcons.AlertCircle, contentDescription = null, tint = c.warningInk, modifier = Modifier.size(18.dp).padding(top = 2.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(p.title, style = VTheme.type.bodyStrong.colored(c.ink))
                                 Text(p.sub, style = VTheme.type.caption.colored(c.ink2))
