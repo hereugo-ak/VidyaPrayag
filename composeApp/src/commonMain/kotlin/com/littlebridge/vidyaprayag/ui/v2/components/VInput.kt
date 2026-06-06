@@ -57,8 +57,12 @@ fun VInput(
     leadingIcon: ImageVector? = null,
     keyboardType: KeyboardType = KeyboardType.Text,
     isPassword: Boolean = false,
+    // When [isPassword], setting this true reveals the masked text (drives the React Eye toggle).
+    passwordVisible: Boolean = false,
     singleLine: Boolean = true,
     enabled: Boolean = true,
+    // Optional trailing affordance (e.g. the password Eye toggle), rendered after the field.
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     val c = VTheme.colors
     val interaction = remember { MutableInteractionSource() }
@@ -108,10 +112,13 @@ fun VInput(
                         textStyle = VTheme.type.body.colored(c.ink),
                         cursorBrush = SolidColor(c.tealDeep),
                         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-                        visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
+                        visualTransformation = if (isPassword && !passwordVisible) PasswordVisualTransformation() else VisualTransformation.None,
                         interactionSource = interaction,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                }
+                if (trailing != null) {
+                    trailing()
                 }
             }
         }

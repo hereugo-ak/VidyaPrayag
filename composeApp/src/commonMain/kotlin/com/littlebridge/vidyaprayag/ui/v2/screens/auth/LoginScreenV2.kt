@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -85,6 +86,8 @@ fun LoginScreenV2(
 
     // The selected portal pill. Mirror it into the VM's role on change.
     var portal by remember { mutableStateOf(if (state.role == "ADMIN") "admin" else "parent") }
+    // Password reveal toggle (the React Eye affordance).
+    var passwordVisible by remember { mutableStateOf(false) }
 
     Column(
         modifier
@@ -149,7 +152,13 @@ fun LoginScreenV2(
                 selected = portal,
                 onSelect = { p ->
                     portal = p
-                    viewModel.onRoleChanged(if (p == "admin") "ADMIN" else "PARENT")
+                    viewModel.onRoleChanged(
+                        when (p) {
+                            "admin" -> "ADMIN"
+                            "teacher" -> "TEACHER"
+                            else -> "PARENT"
+                        },
+                    )
                 },
             )
 
@@ -189,7 +198,21 @@ fun LoginScreenV2(
                             placeholder = "••••••••",
                             leadingIcon = VIcons.Lock,
                             isPassword = true,
+                            passwordVisible = passwordVisible,
                             modifier = Modifier.fillMaxWidth(),
+                            trailing = {
+                                Icon(
+                                    VIcons.Eye,
+                                    contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                    tint = c.ink3,
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null,
+                                        ) { passwordVisible = !passwordVisible },
+                                )
+                            },
                         )
                         Spacer(Modifier.height(6.dp))
                         Text(
@@ -225,7 +248,7 @@ fun LoginScreenV2(
                         onValueChange = viewModel::onOtpChanged,
                         label = "OTP",
                         placeholder = "6-digit code",
-                        leadingIcon = VIcons.Check,
+                        leadingIcon = VIcons.ShieldCheck,
                         keyboardType = KeyboardType.Number,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -252,9 +275,8 @@ fun LoginScreenV2(
                 full = true,
                 size = VButtonSize.Lg,
                 tone = VButtonTone.Teal,
-                soft = false,
                 loading = state.isLoading,
-                leading = null,
+                trailing = { Icon(VIcons.ArrowRight, contentDescription = null, modifier = Modifier.size(16.dp)) },
             )
 
             if (state.step != AuthStep.Identifier) {
