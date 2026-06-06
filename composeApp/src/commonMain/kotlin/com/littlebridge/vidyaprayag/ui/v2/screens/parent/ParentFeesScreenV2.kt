@@ -1,6 +1,8 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.parent
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,102 +10,181 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.littlebridge.vidyaprayag.feature.parent.presentation.FeeAnnouncement
-import com.littlebridge.vidyaprayag.feature.parent.presentation.FeeViewModel
-import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
-import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
+import androidx.compose.ui.unit.sp
+import com.littlebridge.vidyaprayag.ui.v2.components.VChartDatum
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
-import com.littlebridge.vidyaprayag.ui.v2.components.VEmptyState
-import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
-import com.littlebridge.vidyaprayag.ui.v2.screens.VSectionHeader
-import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
+import com.littlebridge.vidyaprayag.ui.v2.components.VDonut
+import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
+import com.littlebridge.vidyaprayag.ui.v2.components.VLegendDot
+import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
-import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * ParentFeesScreenV2 — parent "Fees" tab, translated from Parent.tsx → Fees.
+ * ParentFeesScreenV2 — a pixel-faithful copy of `Parent.tsx → Fees`.
  *
- * Outstanding/collected summary card with a collection-progress bar, an overdue counter, and the
- * fee-announcements feed. Bound 1:1 to the existing [FeeViewModel]; all monetary strings come pre-
- * formatted from the VM (no client-side currency math).
+ * Navy-gradient balance hero (₹ total due + "Pay now · Coming Soon"), a donut split of the fee
+ * breakdown with a legend, the per-head breakdown list, and payment history — all from [MockV2].
  */
 @Composable
 fun ParentFeesScreenV2(
     modifier: Modifier = Modifier,
-    viewModel: FeeViewModel = koinViewModel(),
 ) {
     val c = VTheme.colors
     val d = VTheme.dimens
-    val state by viewModel.state.collectAsStateV2()
+
+    val total = MockV2.feeBreakdown.sumOf { it.amount }
+    val paid = MockV2.feeHistory.sumOf { it.amount }
+    val palette = listOf(c.tealDeep, c.navy, Color(0xFFE08A3C), Color(0xFFA87CF0), Color(0xFFC14A44))
+    val donutData = MockV2.feeBreakdown.mapIndexed { i, f ->
+        VChartDatum(label = f.head, value = f.amount.toFloat(), color = palette[i % palette.size])
+    }
+    val paidPct = ((paid.toFloat() / (paid + total).toFloat()) * 100f).toInt()
 
     Column(
         modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = d.md, vertical = d.md),
-        verticalArrangement = Arrangement.spacedBy(d.md),
+            .padding(horizontal = 20.dp)
+            .padding(top = 20.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(d.sm + 4.dp),
     ) {
-        // Summary
-        VCard {
-            Text("OUTSTANDING", style = VTheme.type.label.colored(c.ink3))
-            Text(state.outstandingFees, style = VTheme.type.dataLg.colored(c.ink))
-            Spacer(Modifier.height(d.sm))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Collected ${state.totalCollected}", style = VTheme.type.dataSm.colored(c.ink2))
-                if (state.overdueCount > 0) {
-                    VBadge(text = "${state.overdueCount} OVERDUE", tone = VBadgeTone.Danger)
-                } else {
-                    VBadge(text = "ON TRACK", tone = VBadgeTone.Success)
+        Text("Fees", style = VTheme.type.h1.colored(c.ink))
+
+        // ── Hero: balance + donut ──────────────────────────────────────────
+        VCard(padding = 0.dp) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.linearGradient(listOf(c.navy, Color(0xFF3B3870))),
+                    )
+                    .padding(20.dp),
+            ) {
+                Column {
+                    VLabel("Balance due", color = Color.White.copy(alpha = 0.7f))
+                    Text(
+                        "₹ ${formatInt(total)}",
+                        style = VTheme.type.dataLg.colored(Color.White).copy(fontSize = 36.sp, fontWeight = FontWeight.SemiBold),
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(top = 4.dp),
+                    ) {
+                        Box(Modifier.size(6.dp).clip(RoundedCornerShape(999.dp)).background(Color(0xFFFFD4A3)))
+                        Text("Due 11 Jun 2026 · 6 days remaining", style = VTheme.type.caption.colored(Color.White.copy(alpha = 0.78f)))
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(c.teal)
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Pay now", style = VTheme.type.bodyStrong.colored(Color.White))
+                            Text(" · Coming Soon", style = VTheme.type.caption.colored(Color.White.copy(alpha = 0.8f)))
+                        }
+                    }
                 }
             }
-            Spacer(Modifier.height(d.xs))
-            VProgressBar(
-                value = (state.collectionProgress.coerceIn(0f, 1f)) * 100f,
-                tone = if (state.overdueCount > 0) VBadgeTone.Warning else VBadgeTone.Success,
-            )
+            Row(
+                Modifier.fillMaxWidth().padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                VDonut(
+                    data = donutData,
+                    size = 132.dp,
+                    thickness = 14.dp,
+                    center = {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("TOTAL", style = VTheme.type.label.colored(c.ink3))
+                            Text("₹${total / 1000}k", style = VTheme.type.data.colored(c.navy).copy(fontWeight = FontWeight.Bold, fontSize = 18.sp))
+                            Text("$paidPct% paid YTD", style = VTheme.type.label.colored(c.ink3))
+                        }
+                    },
+                )
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    donutData.forEach { dt ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                            VLegendDot(color = dt.color, label = dt.label)
+                            Text("₹${oneDecimalK(dt.value.toInt())}k", style = VTheme.type.dataSm.colored(c.ink).copy(fontWeight = FontWeight.SemiBold))
+                        }
+                    }
+                }
+            }
         }
 
-        VSectionHeader("FEE UPDATES")
-        if (state.announcements.isEmpty() && !state.isLoading) {
-            VEmptyState(title = "No fee updates", icon = VIcons.Wallet, body = "Payment reminders and campaigns appear here.")
-        } else {
-            state.announcements.forEach { FeeAnnouncementCard(it) }
+        // ── Breakdown ──────────────────────────────────────────────────────
+        VLabel("Fee breakdown")
+        MockV2.feeBreakdown.forEach { f ->
+            VCard {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column {
+                        Text(f.head, style = VTheme.type.bodyStrong.colored(c.ink))
+                        Text("${f.status} • Due ${f.dueDate}", style = VTheme.type.caption.colored(c.ink2))
+                    }
+                    Text("₹ ${formatInt(f.amount)}", style = VTheme.type.data.colored(c.ink))
+                }
+            }
         }
 
-        if (state.error != null) {
-            Text(state.error!!, style = VTheme.type.caption.colored(c.dangerInk))
+        // ── History ────────────────────────────────────────────────────────
+        VLabel("Payment history")
+        MockV2.feeHistory.forEach { f ->
+            VCard {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column {
+                        Text(f.head, style = VTheme.type.bodyStrong.colored(c.ink))
+                        Text("${f.date} • ${f.receipt}", style = VTheme.type.dataSm.colored(c.ink2))
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("₹ ${formatInt(f.amount)}", style = VTheme.type.data.colored(c.ink))
+                        Text("Receipt", style = VTheme.type.label.colored(c.tealDeep))
+                    }
+                }
+            }
         }
-        Spacer(Modifier.height(d.xl))
+
+        Text(
+            "Have a question about your fees? Message the school →",
+            style = VTheme.type.caption.colored(c.tealDeep).copy(fontWeight = FontWeight.SemiBold),
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        )
     }
 }
 
-@Composable
-private fun FeeAnnouncementCard(a: FeeAnnouncement) {
-    val c = VTheme.colors
-    val tone = when (a.type) {
-        "Emergency" -> VBadgeTone.Danger
-        "Payment" -> VBadgeTone.Success
-        else -> VBadgeTone.Arctic
+/** Group an integer with thousands commas (e.g. 12500 → "12,500"). */
+private fun formatInt(v: Int): String {
+    val s = v.toString()
+    val sb = StringBuilder()
+    val rev = s.reversed()
+    for (i in rev.indices) {
+        if (i > 0 && i % 3 == 0) sb.append(',')
+        sb.append(rev[i])
     }
-    VCard {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(a.title, style = VTheme.type.h4.colored(c.ink))
-            VBadge(text = a.type.uppercase(), tone = tone)
-        }
-        Text(a.time, style = VTheme.type.dataSm.colored(c.ink3))
-        if (a.description.isNotBlank()) {
-            Spacer(Modifier.height(VTheme.dimens.xs))
-            Text(a.description, style = VTheme.type.body.colored(c.ink2))
-        }
-    }
+    return sb.reverse().toString()
+}
+
+/** Amount in thousands with one decimal (e.g. 8500 → "8.5"). */
+private fun oneDecimalK(v: Int): String {
+    val whole = v / 1000
+    val frac = (v % 1000) / 100
+    return "$whole.$frac"
 }

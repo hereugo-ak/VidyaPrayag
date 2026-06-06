@@ -1,7 +1,6 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.parent
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,160 +11,209 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.littlebridge.vidyaprayag.domain.util.UiState
-import com.littlebridge.vidyaprayag.feature.auth.domain.model.UserDetailsData
-import com.littlebridge.vidyaprayag.presentation.ParentDashboardViewModel
+import androidx.compose.ui.unit.sp
+import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
+import com.littlebridge.vidyaprayag.ui.v2.components.VButton
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
-import com.littlebridge.vidyaprayag.ui.v2.components.VEmptyState
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.components.VStatusDot
-import com.littlebridge.vidyaprayag.ui.v2.screens.VPortalHeader
-import com.littlebridge.vidyaprayag.ui.v2.screens.VSectionHeader
-import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
+import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
+import com.littlebridge.vidyaprayag.ui.v2.components.VSparkline
+import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
-import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * ParentHomeScreenV2 — parent "Home" tab, translated from Parent.tsx → Home.
+ * ParentHomeScreenV2 — a pixel-faithful copy of `Parent.tsx → ParentHome`.
  *
- * Child hero (avatar + name + today's status), a quick-glance status strip, and a shortlisted-
- * schools list (Discovery cross-link). Bound to the existing [ParentDashboardViewModel] — which
- * exposes `userDetails` (child/parent identity) and `schools` (Discovery list + shortlist).
- *
- * The richer daily-status feed (topics / homework / tests) is owned by `DailyStatusViewModel` and
- * surfaced in the Academics tab; Home keeps the lightweight glance per the design.
+ * Renders the gradient child-hero card (avatar + name + today-status badge + attendance % +
+ * sparkline), today's schedule, "what was covered today", an exam reminder, the fees-due card and
+ * this-month's attendance bar. All values come from [MockV2] so the screen matches the design.
  */
 @Composable
 fun ParentHomeScreenV2(
+    child: MockV2.Student = MockV2.childForParent,
     modifier: Modifier = Modifier,
-    viewModel: ParentDashboardViewModel = koinViewModel(),
-    onOpenNotifications: () -> Unit = {},
-    onOpenCalendar: () -> Unit = {},
 ) {
     val c = VTheme.colors
     val d = VTheme.dimens
-    val userState by viewModel.userDetails.collectAsStateV2()
-    val hasChild by viewModel.hasChildProfile.collectAsStateV2()
-
-    val name = (userState as? UiState.Success<UserDetailsData>)?.data?.personalDetails?.name ?: ""
-    val photo = (userState as? UiState.Success<UserDetailsData>)?.data?.personalDetails?.profilePic
 
     Column(
         modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = d.md, vertical = d.md),
+            .padding(horizontal = 20.dp)
+            .padding(top = 20.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(d.md),
     ) {
-        VPortalHeader(
-            name = name,
-            subtitle = "Welcome back",
-            photoUrl = photo,
-            trailing = {
-                Box(
-                    Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(c.cream)
-                        .clickable { onOpenNotifications() },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    androidx.compose.material3.Icon(VIcons.Bell, contentDescription = "Notifications", tint = c.ink, modifier = Modifier.size(20.dp))
-                }
-            },
-        )
-
-        // Today's glance strip
-        VCard {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(d.md)) {
-                VStatusDot(color = if (hasChild) c.successInk else c.warningInk, ring = true)
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        if (hasChild) "Your child is marked present today" else "Link your child to see daily status",
-                        style = VTheme.type.h4.colored(c.ink),
+        // ── Child hero ────────────────────────────────────────────────────────
+        VCard(padding = 0.dp) {
+            // gradient top
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.linearGradient(
+                            colors = if (c.isNight) listOf(c.cream, c.card)
+                            else listOf(Color(0xFFF6F1FF), Color(0xFFE8F7F3)),
+                        ),
                     )
-                    Text("Live attendance & updates", style = VTheme.type.caption.colored(c.ink3))
+                    .padding(20.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    VAvatar(name = child.name, size = 68.dp, ring = true)
+                    Column(Modifier.weight(1f)) {
+                        Text(child.name, style = VTheme.type.h2.colored(c.ink))
+                        Text(
+                            "Class ${MockV2.classDisplay(child.klass)} • ${MockV2.school.name}",
+                            style = VTheme.type.caption.colored(c.ink2),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        val (tone, label) = when (child.today) {
+                            MockV2.Presence.Present -> VBadgeTone.Success to "● Present today"
+                            MockV2.Presence.Absent -> VBadgeTone.Danger to "● Absent today"
+                            MockV2.Presence.Late -> VBadgeTone.Warning to "● Late today"
+                        }
+                        VBadge(text = label, tone = tone)
+                    }
                 }
-                VBadge(text = if (hasChild) "ACTIVE" else "SETUP", tone = if (hasChild) VBadgeTone.Success else VBadgeTone.Warning)
+            }
+            // attendance strip
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    VLabel("Attendance · last 30 days")
+                    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("92%", style = VTheme.type.dataLg.colored(c.navy).copy(fontWeight = FontWeight.Bold, fontSize = 24.sp))
+                        Text(
+                            "+4 vs class avg",
+                            style = VTheme.type.label.colored(c.successInk).copy(fontWeight = FontWeight.SemiBold),
+                            modifier = Modifier.padding(bottom = 4.dp),
+                        )
+                    }
+                }
+                VSparkline(
+                    values = listOf(78f, 82f, 80f, 85f, 88f, 90f, 87f, 92f, 94f, 92f),
+                    width = 120.dp,
+                    height = 44.dp,
+                )
             }
         }
 
-        VSectionHeader("QUICK ACTIONS")
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(d.sm)) {
-            QuickAction("Calendar", VIcons.Calendar, Modifier.weight(1f), onClick = onOpenCalendar)
-            QuickAction("Notifications", VIcons.Bell, Modifier.weight(1f), onClick = onOpenNotifications)
-            QuickAction("Fees", VIcons.Wallet, Modifier.weight(1f))
-        }
-
-        // Shortlisted schools (Discovery cross-link)
-        ShortlistSection(viewModel)
-
-        if (userState is UiState.Error) {
-            Text((userState as UiState.Error).message, style = VTheme.type.caption.colored(c.dangerInk))
-        }
-        Spacer(Modifier.height(d.xl))
-    }
-}
-
-@Composable
-private fun QuickAction(
-    label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
-) {
-    val c = VTheme.colors
-    VCard(modifier = modifier, onClick = onClick) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(VTheme.dimens.xs)) {
-            androidx.compose.material3.Icon(icon, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(22.dp))
-            Text(label, style = VTheme.type.caption.colored(c.ink2))
-        }
-    }
-}
-
-@Composable
-private fun ShortlistSection(viewModel: ParentDashboardViewModel) {
-    val c = VTheme.colors
-    val schoolsState by viewModel.schools.collectAsStateV2()
-    val shortlist by viewModel.shortlist.collectAsStateV2()
-
-    VSectionHeader("SHORTLISTED SCHOOLS")
-    when (val s = schoolsState) {
-        is UiState.Loading -> VEmptyState(title = "Loading schools", icon = VIcons.School)
-        is UiState.Error -> Text(s.message, style = VTheme.type.caption.colored(c.dangerInk))
-        is UiState.Success -> {
-            val shortlisted = s.data.filter { shortlist.contains(it.id) }
-            if (shortlisted.isEmpty()) {
-                VEmptyState(
-                    title = "No schools shortlisted",
-                    icon = VIcons.Bookmark,
-                    body = "Explore Discovery and bookmark up to 3 schools to compare.",
-                )
-            } else {
-                shortlisted.forEach { school ->
-                    VCard(onClick = { viewModel.toggleShortlist(school.id) }) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(VTheme.dimens.md)) {
-                            Box(Modifier.weight(1f)) {
-                                Text(school.name, style = VTheme.type.h4.colored(c.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            VBadge(text = "SHORTLISTED", tone = VBadgeTone.Arctic)
+        // ── Today's schedule ────────────────────────────────────────────────
+        VCard {
+            VLabel("Today's schedule")
+            Spacer(Modifier.height(12.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                MockV2.timetableToday.take(5).forEachIndexed { i, p ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            p.period.toString(),
+                            style = VTheme.type.dataSm.colored(c.ink3),
+                            modifier = Modifier.width(20.dp),
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(p.subject, style = VTheme.type.bodyStrong.colored(c.ink))
+                            Text(p.teacher, style = VTheme.type.caption.colored(c.ink3))
                         }
+                        Text(p.time.substringBefore(" – "), style = VTheme.type.dataSm.colored(c.ink2))
+                        if (i == 2) VBadge(text = "Now", tone = VBadgeTone.Arctic)
                     }
                 }
+            }
+        }
+
+        // ── What was covered today ─────────────────────────────────────────
+        VCard {
+            VLabel("What was covered today")
+            Spacer(Modifier.height(8.dp))
+            Text("Science — Ch 6 Periodic Table", style = VTheme.type.bodyStrong.colored(c.ink))
+            Text(
+                "Trends across periods & groups. Mendeleev vs. modern arrangement. Homework: Ex 6.2 Q 1–6.",
+                style = VTheme.type.caption.colored(c.ink2),
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Text("By Dr. Ramesh Sharma • 2h ago", style = VTheme.type.label.colored(c.ink3), modifier = Modifier.padding(top = 8.dp))
+        }
+
+        // ── Reminder ───────────────────────────────────────────────────────
+        VCard {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(
+                    Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(c.warning.copy(alpha = 0.45f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(VIcons.Calendar, contentDescription = null, tint = c.warningInk, modifier = Modifier.size(18.dp))
+                }
+                Column(Modifier.weight(1f)) {
+                    VLabel("Remind ${child.name.substringBefore(" ")} about this")
+                    Text("Mathematics Unit Test — Day after tomorrow", style = VTheme.type.bodyStrong.colored(c.ink), modifier = Modifier.padding(top = 2.dp))
+                    Text("Trigonometric Identities • Ch 8", style = VTheme.type.caption.colored(c.ink2))
+                }
+            }
+        }
+
+        // ── Fees due ───────────────────────────────────────────────────────
+        VCard {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column {
+                    VLabel("Fees")
+                    Text("₹ 12,500 due", style = VTheme.type.data.colored(c.warmOrange).copy(fontSize = 20.sp), modifier = Modifier.padding(top = 4.dp))
+                    Text("by 11 Jun 2026", style = VTheme.type.caption.colored(c.ink2))
+                }
+                VButton(
+                    text = "Pay now",
+                    onClick = {},
+                    tone = VButtonTone.Peach,
+                    size = VButtonSize.Sm,
+                    stateful = true,
+                    successLabel = "Soon",
+                )
+            }
+        }
+
+        // ── This month's attendance ────────────────────────────────────────
+        VCard {
+            VLabel("This month's attendance")
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("91%", style = VTheme.type.dataLg.colored(c.ink).copy(fontSize = 38.sp))
+                Text("21 of 23 days", style = VTheme.type.caption.colored(c.ink2), modifier = Modifier.padding(bottom = 6.dp))
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(999.dp)),
+            ) {
+                Box(Modifier.weight(21f).fillMaxSize().background(c.teal))
+                Box(Modifier.weight(2f).fillMaxSize().background(c.dangerInk))
             }
         }
     }

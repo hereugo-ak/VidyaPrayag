@@ -88,6 +88,8 @@ private fun UnauthFlow(modifier: Modifier = Modifier) {
                 // On success the host MainViewModel's authState flips isAuthenticated=true and
                 // NavGraphV2 recomposes into the role portal; nothing else to do here.
                 onAuthSuccess = {},
+                // "Register Now" routes new families into the marketplace → child-link flow.
+                onRegister = { route = AuthRoute.Discovery },
             )
             AuthRoute.Discovery -> DiscoveryScreenV2(
                 // Tapping a school from the marketplace opens the family "link your child" flow.
