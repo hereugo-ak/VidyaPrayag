@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
@@ -51,7 +52,8 @@ fun TeacherProfileScreenV2(
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             VAvatar(name = me.name, size = 88.dp)
             Text(me.name, style = VTheme.type.h2.colored(c.ink), modifier = Modifier.padding(top = 12.dp))
-            Text(me.username, style = VTheme.type.dataSm.colored(c.ink2))
+            // §6.3 React: username font-mono 12 / text-dark-2 (Teacher.tsx:333)
+            Text(me.username, style = VTheme.type.dataSm.colored(c.ink2).copy(fontSize = 12.sp))
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 me.subjects.forEach { VBadge(text = it, tone = VBadgeTone.Arctic) }
@@ -69,8 +71,9 @@ fun TeacherProfileScreenV2(
                 VCard {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                         Column(Modifier.weight(1f)) {
+                            // §6.3 React: title 600, sub fontSize 11 / text-dark-2 (Teacher.tsx:348-349)
                             Text(title, style = VTheme.type.bodyStrong.colored(c.ink))
-                            Text(sub, style = VTheme.type.caption.colored(c.ink2))
+                            Text(sub, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp))
                         }
                         Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(16.dp))
                     }

@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,6 +33,7 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VBackHeader
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
+import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
@@ -68,8 +71,14 @@ fun TeacherClassesScreenV2(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 rowCls.forEach { cls ->
                     VCard(modifier = Modifier.weight(1f), onClick = { detail = cls; onOpenClass(cls) }) {
-                        Text(MockV2.classDisplay(cls), style = VTheme.type.h3.colored(c.ink).copy(fontSize = 18.sp, fontWeight = FontWeight.Bold))
-                        Text("Mathematics", style = VTheme.type.caption.colored(c.ink2))
+                        // §6.3 React card title is `${c.slice(0,-1)}-${c.slice(-1)}` → "10-A" (NO spaces),
+                        // unlike the ClassDetail header which uses " - " spacing (Teacher.tsx:269 vs :292).
+                        Text(
+                            cls.dropLast(1) + "-" + cls.takeLast(1),
+                            style = VTheme.type.h3.colored(c.ink).copy(fontSize = 18.sp, fontWeight = FontWeight.Bold),
+                        )
+                        // §6.3 React: fontSize 11, color text-dark-2 (Teacher.tsx:270)
+                        Text("Mathematics", style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp))
                         Spacer(Modifier.height(12.dp))
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
                             Column {
@@ -93,7 +102,14 @@ fun TeacherClassesScreenV2(
 private fun ClassDetail(id: String, onBack: () -> Unit, modifier: Modifier) {
     val c = VTheme.colors
     Column(modifier.fillMaxSize()) {
-        VBackHeader(title = "Class ${MockV2.classDisplay(id)}", onBack = onBack)
+        // §6.3 React: <VBackHeader … action={<button><Edit3 size={16}/></button>} /> (Teacher.tsx:292)
+        VBackHeader(
+            title = "Class ${MockV2.classDisplay(id)}",
+            onBack = onBack,
+            action = {
+                Icon(VIcons.Edit3, contentDescription = "Edit", tint = c.ink, modifier = Modifier.size(16.dp))
+            },
+        )
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MiniStat("32", "Students", Modifier.weight(1f))
@@ -107,10 +123,12 @@ private fun ClassDetail(id: String, onBack: () -> Unit, modifier: Modifier) {
                     Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         VAvatar(name = s.name, size = 32.dp)
                         Column(Modifier.weight(1f)) {
-                            Text(s.name, style = VTheme.type.bodyStrong.colored(c.ink))
-                            Text("Roll ${s.roll}", style = VTheme.type.dataSm.colored(c.ink3))
+                            // §6.3 React: name 13/600, "Roll N" mono 11/ink3 (Teacher.tsx:314-315)
+                            Text(s.name, style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 13.sp))
+                            Text("Roll ${s.roll}", style = VTheme.type.dataSm.colored(c.ink3).copy(fontSize = 11.sp))
                         }
-                        Text("${s.attendance}%", style = VTheme.type.data.colored(c.ink))
+                        // §6.3 React: attendance% mono 13 (Teacher.tsx:317)
+                        Text("${s.attendance}%", style = VTheme.type.data.colored(c.ink).copy(fontSize = 13.sp))
                     }
                 }
             }

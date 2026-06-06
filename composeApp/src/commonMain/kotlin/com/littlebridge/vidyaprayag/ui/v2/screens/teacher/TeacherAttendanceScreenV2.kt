@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
@@ -64,13 +65,17 @@ fun TeacherAttendanceScreenV2(
                 Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     VAvatar(name = s.name, size = 32.dp)
                     Column(Modifier.weight(1f)) {
-                        Text(s.name, style = VTheme.type.bodyStrong.colored(c.ink))
-                        Text("Roll ${s.roll}", style = VTheme.type.dataSm.colored(c.ink3))
+                        // §6.2 React: name 13/600, "Roll N" mono 11/text-dark-3 (Teacher.tsx:139-140)
+                        Text(s.name, style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 13.sp))
+                        Text("Roll ${s.roll}", style = VTheme.type.dataSm.colored(c.ink3).copy(fontSize = 11.sp))
                     }
+                    // §6.2 React selected pill fill = soft tone (var(--success)/--danger/--warning =
+                    // pastel #A8E6CF/#FFADA8/#FFD4A3), NOT the dark *-ink. Text = var(--void) (near-white
+                    // in .warm = #fcf8ff). Teacher.tsx:142-150.
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        PalPill("P", s.today == MockV2.Presence.Present, c.successInk)
-                        PalPill("A", s.today == MockV2.Presence.Absent, c.dangerInk)
-                        PalPill("L", s.today == MockV2.Presence.Late, c.warningInk)
+                        PalPill("P", s.today == MockV2.Presence.Present, c.success)
+                        PalPill("A", s.today == MockV2.Presence.Absent, c.danger)
+                        PalPill("L", s.today == MockV2.Presence.Late, c.warning)
                     }
                 }
             }
@@ -92,10 +97,12 @@ fun TeacherAttendanceScreenV2(
 @Composable
 private fun PalPill(letter: String, active: Boolean, tone: Color) {
     val c = VTheme.colors
+    // §6.2 React: selected → tone fill + var(--void) (near-white) text; unselected →
+    // rgba(245,245,243,0.06) (≈ ink@6%) + text-dark-3. 11px / 600. (Teacher.tsx:147)
     Box(
         Modifier.clip(RoundedCornerShape(999.dp)).background(if (active) tone else c.ink.copy(alpha = 0.06f)).padding(horizontal = 10.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(letter, style = VTheme.type.label.colored(if (active) Color.White else c.ink3).copy(letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified, fontWeight = FontWeight.SemiBold))
+        Text(letter, style = VTheme.type.label.colored(if (active) c.background else c.ink3).copy(letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified, fontWeight = FontWeight.SemiBold))
     }
 }
