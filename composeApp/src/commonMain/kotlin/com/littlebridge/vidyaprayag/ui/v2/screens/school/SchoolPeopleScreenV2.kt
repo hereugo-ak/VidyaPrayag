@@ -1,8 +1,10 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.school
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -91,75 +93,100 @@ private fun PeopleList(
     var tab by remember { mutableStateOf("Students") }
     var query by remember { mutableStateOf("") }
 
-    Column(
-        modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
-            .padding(top = 24.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text("People", style = VTheme.type.h1.colored(c.ink))
-        VTopTabs(tabs = listOf("Students", "Teachers"), selected = tab, onSelect = { tab = it })
+    Box(modifier.fillMaxSize()) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(top = 24.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text("People", style = VTheme.type.h1.colored(c.ink))
+            VTopTabs(tabs = listOf("Students", "Teachers"), selected = tab, onSelect = { tab = it })
 
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            VInput(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = "Search ${tab.lowercase()}",
-                leadingIcon = VIcons.Search,
-                modifier = Modifier.weight(1f),
-            )
-            Box(
-                Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)).background(c.ink.copy(alpha = 0.06f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(VIcons.Menu, contentDescription = "Filter", tint = c.ink, modifier = Modifier.size(18.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                VInput(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = "Search ${tab.lowercase()}",
+                    leadingIcon = VIcons.Search,
+                    modifier = Modifier.weight(1f),
+                )
+                // React: 48×48 chip, bg rgba(245,245,243,0.06) (→ ink@6% in warm), border-dark-2, Filter glyph.
+                Box(
+                    Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)).background(c.ink.copy(alpha = 0.06f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(VIcons.Filter, contentDescription = "Filter", tint = c.ink, modifier = Modifier.size(18.dp))
+                }
             }
-        }
 
-        val filters = if (tab == "Students") listOf("All classes", "Class 10-A", "Class 9-A", "Status") else listOf("All subjects", "Active 7d", "Inactive")
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            filters.forEachIndexed { i, f -> VTag(text = f, active = i == 0) }
-        }
+            val filters = if (tab == "Students") listOf("All classes", "Class 10-A", "Class 9-A", "Status") else listOf("All subjects", "Active 7d", "Inactive")
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // React renders an inline <ChevronDown size={12}/> after each chip label.
+                filters.forEachIndexed { i, f -> VTag(text = f, active = i == 0, trailingIcon = VIcons.ChevronDown) }
+            }
 
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (tab == "Students") {
-                MockV2.students.forEach { s ->
-                    VCard(onClick = { onOpenStudent(s.id) }) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            VAvatar(name = s.name, size = 42.dp)
-                            Column(Modifier.weight(1f)) {
-                                Text(s.name, style = VTheme.type.bodyStrong.colored(c.ink))
-                                Text("Roll ${s.roll} • ${s.klass}", style = VTheme.type.dataSm.colored(c.ink2))
-                            }
-                            Column(horizontalAlignment = Alignment.End) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    VStatusDot(color = pewsColor(s.pews))
-                                    Text("${s.attendance}%", style = VTheme.type.dataSm.colored(c.ink))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (tab == "Students") {
+                    MockV2.students.forEach { s ->
+                        VCard(onClick = { onOpenStudent(s.id) }) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                VAvatar(name = s.name, size = 42.dp)
+                                Column(Modifier.weight(1f)) {
+                                    Text(s.name, style = VTheme.type.bodyStrong.colored(c.ink))
+                                    Text("Roll ${s.roll} • ${s.klass}", style = VTheme.type.dataSm.colored(c.ink2))
                                 }
-                                Text("Attendance", style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = TextUnit.Unspecified, fontSize = 10.sp))
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        VStatusDot(color = pewsColor(s.pews))
+                                        Text("${s.attendance}%", style = VTheme.type.dataSm.colored(c.ink))
+                                    }
+                                    Text("Attendance", style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = TextUnit.Unspecified, fontSize = 10.sp))
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    MockV2.teachers.forEach { t ->
+                        VCard(onClick = { onOpenTeacher(t.id) }) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                VAvatar(name = t.name, size = 42.dp)
+                                Column(Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text(t.name, style = VTheme.type.bodyStrong.colored(c.ink))
+                                        // React VStatusDot tone uses the pastel --success/--warning, not the *Ink variant.
+                                        VStatusDot(color = if (t.active) c.success else c.warning)
+                                    }
+                                    Text("${t.subjects.joinToString(" • ")} · ${t.classes.size} classes", style = VTheme.type.caption.colored(c.ink2))
+                                }
+                                Text(t.lastActive, style = VTheme.type.caption.colored(c.ink3))
                             }
                         }
                     }
                 }
-            } else {
-                MockV2.teachers.forEach { t ->
-                    VCard(onClick = { onOpenTeacher(t.id) }) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            VAvatar(name = t.name, size = 42.dp)
-                            Column(Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text(t.name, style = VTheme.type.bodyStrong.colored(c.ink))
-                                    VStatusDot(color = if (t.active) c.successInk else c.warningInk)
-                                }
-                                Text("${t.subjects.joinToString(" • ")} · ${t.classes.size} classes", style = VTheme.type.caption.colored(c.ink2))
-                            }
-                            Text(t.lastActive, style = VTheme.type.caption.colored(c.ink3))
-                        }
-                    }
-                }
             }
+
+            Spacer(Modifier.height(64.dp)) // breathing room so the FAB never overlaps the last row
+        }
+
+        // React: fixed FAB — bottom-right, 56dp, bg --arctic (teal-deep in warm), Plus glyph in --void.
+        Box(
+            Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 24.dp, bottom = 24.dp)
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(c.tealDeep)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {},
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(VIcons.Plus, contentDescription = "Add", tint = c.background, modifier = Modifier.size(22.dp))
         }
     }
 }
@@ -366,19 +393,27 @@ fun AttendanceHeatV2(modifier: Modifier = Modifier) {
         MockV2.attendanceMonth.chunked(7).forEach { week ->
             Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 week.forEach { day ->
+                    // React `AttendanceHeat.tone`: pastel --arctic/--danger/--warning fills.
                     val fill = when (day.status) {
-                        MockV2.DayStatus.Present -> c.teal
-                        MockV2.DayStatus.Absent -> c.dangerInk
-                        MockV2.DayStatus.Late -> c.warningInk
-                        MockV2.DayStatus.Holiday -> c.ink.copy(alpha = 0.06f)
+                        MockV2.DayStatus.Present -> c.tealDeep                 // var(--arctic)
+                        MockV2.DayStatus.Absent -> c.danger                    // var(--danger) (pastel #FFADA8)
+                        MockV2.DayStatus.Late -> c.warning                     // var(--warning) (pastel #FFD4A3)
+                        MockV2.DayStatus.Holiday -> c.ink.copy(alpha = 0.04f)  // rgba(8,8,8,0.04)
                         MockV2.DayStatus.Future -> Color.Transparent
                     }
-                    val faded = day.status == MockV2.DayStatus.Future || day.status == MockV2.DayStatus.Holiday
-                    Box(
-                        Modifier.weight(1f).aspectRatio(1f).clip(CircleShape).background(fill),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(day.day.toString(), style = VTheme.type.dataSm.colored(if (faded) c.ink3 else Color.White).copy(fontSize = 11.sp))
+                    // React fg: present #0a3a76, absent #7a1c18, late #7a3f00, else text-light-3.
+                    val fg = when (day.status) {
+                        MockV2.DayStatus.Present -> Color(0xFF0A3A76) // §AttendanceHeat present ink
+                        MockV2.DayStatus.Absent -> Color(0xFF7A1C18)  // §AttendanceHeat absent ink
+                        MockV2.DayStatus.Late -> Color(0xFF7A3F00)    // §AttendanceHeat late ink
+                        else -> c.ink3
+                    }
+                    var cell = Modifier.weight(1f).aspectRatio(1f).clip(CircleShape).background(fill)
+                    if (day.status == MockV2.DayStatus.Future) {
+                        cell = cell.border(1.dp, c.border1, CircleShape) // future days get a hairline ring
+                    }
+                    Box(cell, contentAlignment = Alignment.Center) {
+                        Text(day.day.toString(), style = VTheme.type.dataSm.colored(fg).copy(fontSize = 11.sp))
                     }
                 }
                 repeat(7 - week.size) { Spacer(Modifier.weight(1f)) }
@@ -400,11 +435,13 @@ private fun HeatLegend(n: Int, label: String) {
     }
 }
 
+// React VStatusDot maps tone→ --success/--warning/--danger (the *pastel* semantic colors),
+// not the darker *Ink ramps. See primitives.tsx `VStatusDot`.
 @Composable
 private fun pewsColor(p: MockV2.Pews): Color = when (p) {
-    MockV2.Pews.Ok -> VTheme.colors.successInk
-    MockV2.Pews.Warn -> VTheme.colors.warningInk
-    MockV2.Pews.Risk -> VTheme.colors.dangerInk
+    MockV2.Pews.Ok -> VTheme.colors.success
+    MockV2.Pews.Warn -> VTheme.colors.warning
+    MockV2.Pews.Risk -> VTheme.colors.danger
 }
 
 @Composable

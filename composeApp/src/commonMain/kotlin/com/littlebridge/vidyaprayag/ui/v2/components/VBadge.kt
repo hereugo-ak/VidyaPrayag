@@ -91,6 +91,7 @@ fun VTag(
     modifier: Modifier = Modifier,
     active: Boolean = false,
     onClick: (() -> Unit)? = null,
+    trailingIcon: ImageVector? = null, // §7.2: People filter chips carry an inline ChevronDown
     contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
 ) {
     val c = VTheme.colors
@@ -109,10 +110,19 @@ fun VTag(
         mod = mod.clickable(interactionSource = interaction, indication = null, onClick = onClick)
     }
 
-    Text(
-        text = text,
-        style = VTheme.type.caption.colored(fg).copy(fontWeight = FontWeight.SemiBold),
-        maxLines = 1,
+    Row(
         modifier = mod.padding(contentPadding),
-    )
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = text,
+            style = VTheme.type.caption.colored(fg).copy(fontWeight = FontWeight.SemiBold),
+            maxLines = 1,
+        )
+        if (trailingIcon != null) {
+            // React renders `<ChevronDown size={12} />` inline-block after the label.
+            Icon(trailingIcon, contentDescription = null, tint = fg, modifier = Modifier.size(12.dp))
+        }
+    }
 }
