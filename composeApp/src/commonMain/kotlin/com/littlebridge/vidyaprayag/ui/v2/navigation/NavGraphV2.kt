@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.LoginScreenV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.auth.ParentLinkChildScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.SchoolOnboardingScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.WelcomeScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.discovery.DiscoveryScreenV2
@@ -64,7 +65,7 @@ fun NavGraphV2(
 }
 
 /** Internal screens shown before a session exists: Welcome → Login → Discovery (browse-first). */
-private enum class AuthRoute { Welcome, Login, Discovery, SchoolOnboarding }
+private enum class AuthRoute { Welcome, Login, Discovery, SchoolOnboarding, ParentLinkChild }
 
 @Composable
 private fun UnauthFlow(modifier: Modifier = Modifier) {
@@ -78,6 +79,7 @@ private fun UnauthFlow(modifier: Modifier = Modifier) {
     ) { current ->
         when (current) {
             AuthRoute.Welcome -> WelcomeScreenV2(
+                // New families browse the marketplace first, then link their child from there.
                 onGetStarted = { route = AuthRoute.Discovery },
                 onHaveAccount = { route = AuthRoute.Login },
                 onRegisterSchool = { route = AuthRoute.SchoolOnboarding },
@@ -88,7 +90,14 @@ private fun UnauthFlow(modifier: Modifier = Modifier) {
                 onAuthSuccess = {},
             )
             AuthRoute.Discovery -> DiscoveryScreenV2(
-                onOpenSchool = {},
+                // Tapping a school from the marketplace opens the family "link your child" flow.
+                onOpenSchool = { _ -> route = AuthRoute.ParentLinkChild },
+            )
+            // Family onboarding wizard. No parent→child link API exists yet (see PHASE_PLAN gap
+            // list), so this collects input locally and routes to Login to obtain a real session.
+            AuthRoute.ParentLinkChild -> ParentLinkChildScreenV2(
+                onDone = { route = AuthRoute.Login },
+                onBack = { route = AuthRoute.Discovery },
             )
             // The school-setup wizard reached from Welcome. On the final step's backend success
             // the host MainViewModel session flips and NavGraphV2 recomposes into the Admin portal;
