@@ -70,4 +70,29 @@ class AuthApi(
             }
         }
     }
+
+    /**
+     * Exchange a refresh token for a fresh access token (audit §3.4, finding F).
+     * The server's /refresh route was previously unreachable because no client
+     * method called it.
+     */
+    suspend fun refresh(refreshToken: String): NetworkResult<ApiResponse<AuthResponse>> {
+        return safeApiCall {
+            client.post(getUrl("api/v1/auth/refresh")) {
+                contentType(ContentType.Application.Json)
+                setBody(RefreshRequest(refreshToken))
+            }
+        }
+    }
+
+    /** Revoke the current session server-side (audit §3.6). */
+    suspend fun logout(token: String, refreshToken: String?): NetworkResult<ApiResponse<Unit>> {
+        return safeApiCall {
+            client.post(getUrl("api/v1/auth/logout")) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(LogoutRequest(refreshToken))
+            }
+        }
+    }
 }

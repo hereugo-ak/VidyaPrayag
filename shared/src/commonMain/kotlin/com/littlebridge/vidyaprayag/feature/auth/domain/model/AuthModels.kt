@@ -28,7 +28,7 @@ data class LoginRequest(
     val identifier: String,
     val password: String? = null,
     val otp: String? = null,
-    val role: String // "ADMIN" or "PARENT"
+    val role: String // "ADMIN" | "TEACHER" | "PARENT"
 )
 
 @Serializable
@@ -64,4 +64,14 @@ data class OtpRequest(
 @Serializable
 data class OtpResponse(
     val message: String
+)
+
+@Serializable
+data class RefreshRequest(
+    @SerialName("refresh_token") val refreshToken: String
+)
+
+@Serializable
+data class LogoutRequest(
+    @SerialName("refresh_token") val refreshToken: String? = null
 )

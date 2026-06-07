@@ -39,6 +39,17 @@ if (devBaseUrl == renderFallbackUrl) {
 }
 
 kotlin {
+    // Project-wide opt-in to the experimental cross-platform BackHandler API
+    // (androidx.compose.ui.backhandler.BackHandler is annotated
+    // @ExperimentalComposeUiApi). Declared as a real `-opt-in` compiler arg on
+    // EVERY Kotlin compilation (not just languageSettings, which can fail to
+    // propagate to the Android Kotlin compile task) so the experimental-API
+    // diagnostic ("This API is experimental and is likely to change in the
+    // future") is silenced consistently across android/ios/js/wasmJs/jvm.
+    compilerOptions {
+        optIn.add("androidx.compose.ui.ExperimentalComposeUiApi")
+    }
+
     androidTarget {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_21)
@@ -69,6 +80,15 @@ kotlin {
     }
     
     sourceSets {
+        // Opt in to the experimental cross-platform BackHandler API
+        // (androidx.compose.ui.backhandler.BackHandler is marked
+        // @ExperimentalComposeUiApi). Declared at the source-set level so every
+        // portal/nav composable that wires the system back gesture compiles
+        // without a per-function @OptIn. Mirrors the opt-in already used in
+        // webMain/main.kt.
+        all {
+            languageSettings.optIn("androidx.compose.ui.ExperimentalComposeUiApi")
+        }
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.activity.compose)
@@ -83,6 +103,11 @@ kotlin {
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)
             implementation(libs.compose.ui)
+            // Cross-platform BackHandler (Android predictive back / iOS edge-swipe).
+            // androidx.compose.ui.backhandler.BackHandler lives in this separate
+            // artifact — not bundled with compose-ui — so it must be declared
+            // explicitly or every BackHandler reference fails to resolve.
+            implementation(libs.compose.ui.backhandler)
             implementation(libs.compose.components.resources)
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)

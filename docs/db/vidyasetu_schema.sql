@@ -1,7 +1,7 @@
-academic_calender:
+-- academic_calender:
 
 
-create table public.academic_calendar (
+create table if not exists public.academic_calendar (
   id uuid not null,
   school_id uuid not null,
   event_id text not null,
@@ -18,11 +18,11 @@ create table public.academic_calendar (
 
 
 
-admission_enquiries:
+-- admission_enquiries:
 
 
 
-create table public.admission_enquiries (
+create table if not exists public.admission_enquiries (
   id uuid not null,
   school_id uuid not null,
   student_name text not null,
@@ -45,12 +45,12 @@ create table public.admission_enquiries (
 
 
 
-announcements:
+-- announcements:
 
 
 
 
-create table public.announcements (
+create table if not exists public.announcements (
   id uuid not null,
   school_id uuid not null,
   event_id text not null,
@@ -72,10 +72,10 @@ create table public.announcements (
 
 
 
-app_config:
+-- app_config:
 
 
-create table public.app_config (
+create table if not exists public.app_config (
   key text not null,
   value text not null,
   updated_at timestamp without time zone not null,
@@ -85,9 +85,9 @@ create table public.app_config (
 
 
 
-app_users:
+-- app_users:
 
-create table public.app_users (
+create table if not exists public.app_users (
   id uuid not null,
   linked_auth_user_id uuid null,
   school_id uuid null,
@@ -114,10 +114,10 @@ create table public.app_users (
 
 
 
-attendance_records:
+-- attendance_records:
 
 
-create table public.attendance_records (
+create table if not exists public.attendance_records (
   id uuid not null,
   school_id uuid not null,
   date character varying(12) not null,
@@ -133,10 +133,10 @@ create table public.attendance_records (
 
 
 
-auth_otps:
+-- auth_otps:
 
 
-create table public.auth_otps (
+create table if not exists public.auth_otps (
   id uuid not null,
   identifier text not null,
   identifier_type character varying(8) not null,
@@ -169,10 +169,10 @@ create table public.auth_otps (
 
 
 
-children:
+-- children:
 
 
-create table public.children (
+create table if not exists public.children (
   id uuid not null,
   parent_id uuid not null,
   school_id uuid null,
@@ -194,10 +194,10 @@ create table public.children (
 
 
 
-cms_landing_content:
+-- cms_landing_content:
 
 
-create table public.cms_landing_content (
+create table if not exists public.cms_landing_content (
   key text not null,
   value text not null,
   updated_at timestamp without time zone not null,
@@ -206,10 +206,10 @@ create table public.cms_landing_content (
 
 
 
-exam_results :
+-- exam_results:
 
 
-create table public.exam_results (
+create table if not exists public.exam_results (
   id uuid not null,
   school_id uuid not null,
   test text not null,
@@ -232,36 +232,15 @@ create table public.exam_results (
 
 
 
-faculty :
-
-
-create table public.exam_results (
-  id uuid not null,
-  school_id uuid not null,
-  test text not null,
-  class_name text not null,
-  subject text not null,
-  student_id text not null,
-  student_name text not null,
-  image_url text null,
-  attendance character varying(8) not null default '0%'::character varying,
-  score character varying(8) not null default ''::character varying,
-  status character varying(16) not null default 'Pending'::character varying,
-  trend character varying(8) not null default '0%'::character varying,
-  created_at timestamp without time zone not null,
-  updated_at timestamp without time zone not null,
-  constraint exam_results_pkey primary key (id),
-  constraint ux_exam_results_unique unique (school_id, test, class_name, subject, student_id)
-) TABLESPACE pg_default;
 
 
 
 
 
-fee_records:
+-- fee_records:
 
 
-create table public.fee_records (
+create table if not exists public.fee_records (
   id uuid not null,
   parent_id uuid not null,
   child_id uuid null,
@@ -269,7 +248,7 @@ create table public.fee_records (
   title text not null,
   description text null,
   amount double precision not null default 0.0,
-  currency character varying(8) not null default 'USD'::character varying,
+  currency character varying(8) not null default 'INR'::character varying,
   due_date character varying(12) null,
   status character varying(16) not null default 'DUE'::character varying,
   category character varying(32) not null default 'Tuition'::character varying,
@@ -283,30 +262,12 @@ create table public.fee_records (
 
 
 
-holiday_list:
-
-create table public.fee_records (
-  id uuid not null,
-  parent_id uuid not null,
-  child_id uuid null,
-  school_id uuid null,
-  title text not null,
-  description text null,
-  amount double precision not null default 0.0,
-  currency character varying(8) not null default 'USD'::character varying,
-  due_date character varying(12) null,
-  status character varying(16) not null default 'DUE'::character varying,
-  category character varying(32) not null default 'Tuition'::character varying,
-  created_at timestamp without time zone not null,
-  updated_at timestamp without time zone not null,
-  constraint fee_records_pkey primary key (id)
-) TABLESPACE pg_default;
 
 
 
-leave_requests:
+-- leave_requests:
 
-create table public.leave_requests (
+create table if not exists public.leave_requests (
   id uuid not null,
   school_id uuid not null,
   requester_id uuid null,
@@ -326,11 +287,11 @@ create table public.leave_requests (
 
 
 
-message_threads:
+-- message_threads:
 
 
 
-create table public.message_threads (
+create table if not exists public.message_threads (
   id uuid not null,
   school_id uuid not null,
   owner_user_id uuid not null,
@@ -351,10 +312,10 @@ create table public.message_threads (
 
 
 
-messages:
+-- messages:
 
 
-create table public.messages (
+create table if not exists public.messages (
   id uuid not null,
   thread_id uuid not null,
   sender_id uuid null,
@@ -365,10 +326,10 @@ create table public.messages (
 
 
 
-otp_delivery_attempts:
+-- otp_delivery_attempts:
 
 
-create table public.otp_delivery_attempts (
+create table if not exists public.otp_delivery_attempts (
   id uuid not null,
   otp_id uuid null,
   identifier text not null,
@@ -389,11 +350,11 @@ create table public.otp_delivery_attempts (
 
 
 
-ptm_class_progress:
+-- ptm_class_progress:
 
 
 
-create table public.ptm_class_progress (
+create table if not exists public.ptm_class_progress (
   id uuid not null,
   ptm_event_id uuid not null,
   class_name text not null,
@@ -409,10 +370,10 @@ create table public.ptm_class_progress (
 
 
 
-ptm_events:
+-- ptm_events:
 
 
-create table public.ptm_events (
+create table if not exists public.ptm_events (
   id uuid not null,
   school_id uuid not null,
   title text not null,
@@ -432,10 +393,10 @@ create table public.ptm_events (
 
 
 
-school_classes:
+-- school_classes:
 
 
-create table public.school_classes (
+create table if not exists public.school_classes (
   id uuid not null,
   school_id uuid not null,
   code text not null,
@@ -451,11 +412,11 @@ create table public.school_classes (
 
 
 
-school_media:
+-- school_media:
 
 
 
-create table public.school_media (
+create table if not exists public.school_media (
   id uuid not null,
   school_id uuid not null,
   kind character varying(8) not null,
@@ -472,10 +433,10 @@ create table public.school_media (
 
 
 
-school_onboarding_drafts:
+-- school_onboarding_drafts:
 
 
-create table public.school_onboarding_drafts (
+create table if not exists public.school_onboarding_drafts (
   id uuid not null,
   user_id uuid not null,
   step_type character varying(16) not null,
@@ -490,10 +451,10 @@ create table public.school_onboarding_drafts (
 
 
 
-school_philosophy:
+-- school_philosophy:
 
 
-create table public.school_philosophy (
+create table if not exists public.school_philosophy (
   school_id uuid not null,
   core_mission text null,
   learning_model text null,
@@ -506,10 +467,10 @@ create table public.school_philosophy (
 
 
 
-school_subjects:
+-- school_subjects:
 
 
-create table public.school_subjects (
+create table if not exists public.school_subjects (
   id uuid not null,
   class_id uuid not null,
   sub_name text not null,
@@ -523,9 +484,9 @@ create table public.school_subjects (
 
 
 
-schools:
+-- schools:
 
-create table public.schools (
+create table if not exists public.schools (
   id uuid not null,
   name text not null,
   slug text not null,
@@ -542,6 +503,11 @@ create table public.schools (
   district text not null,
   state text not null default 'Uttar Pradesh'::text,
   pincode text null,
+  -- geo coordinates for parent /schools/discover Haversine sort (audit §1.3 LATLONG):
+  -- kept in the BASE table so the discover query never throws 'column does not exist'
+  -- even if migration_002 is skipped. migration_002's ADD COLUMN IF NOT EXISTS is then a no-op.
+  latitude double precision null,
+  longitude double precision null,
   logo_url text null,
   brand_color text not null default '#2563EB'::text,
   is_active boolean not null default true,
@@ -556,10 +522,10 @@ create table public.schools (
 
 
 
-storage_metrics:
+-- storage_metrics:
 
 
-create table public.storage_metrics (
+create table if not exists public.storage_metrics (
   school_id uuid not null,
   total_storage text not null default '10 GB'::text,
   storage_used text not null default '0 B'::text,
@@ -572,10 +538,10 @@ create table public.storage_metrics (
 
 
 
-students:
+-- students:
 
 
-create table public.students (
+create table if not exists public.students (
   id uuid not null,
   school_id uuid not null,
   student_code text not null,
@@ -593,10 +559,10 @@ create table public.students (
 
 
 
-user_sessions:
+-- user_sessions:
 
 
-create table public.user_sessions (
+create table if not exists public.user_sessions (
   id uuid not null,
   user_id uuid not null,
   refresh_token_hash text not null,
@@ -617,9 +583,9 @@ create table public.user_sessions (
 
 
 
-users:
+-- users:
 
-create table public.users (
+create table if not exists public.users (
   id uuid not null,
   name character varying(255) not null,
   contact character varying(255) not null,
@@ -637,9 +603,9 @@ create table public.users (
 
 
 
-whatsapp_logs:
+-- whatsapp_logs:
 
-create table public.whatsapp_logs (
+create table if not exists public.whatsapp_logs (
   id uuid not null,
   school_id uuid not null,
   announcement_id text not null,

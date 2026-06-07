@@ -194,7 +194,7 @@ object CmsSeed {
                       "min_value": 0,
                       "max_value": 10000,
                       "default_range": [2000, 5000],
-                      "currency_symbol": "$"
+                      "currency_symbol": "₹"
                     }
                 """.trimIndent(),
 
@@ -337,28 +337,32 @@ object CmsSeed {
                         {"name":"Literature","percentage":54,"trend":"down"},
                         {"name":"History","percentage":68,"trend":"up"}
                       ],
-                      "risk": {"critical_count":12,"moderate_count":28,"proficiency_target_reach":75},
-                      "top_performer": {"name":"Elena Rodriguez","details":"GPA: 3.98 • Grade 11-B"},
-                      "recent_progress": [
-                        {"name":"Jordan Davis","initials":"JD","math":"92%","science":"88%","literature":"85%","attendance":"98%","status":"EXCELLING"},
-                        {"name":"Sarah Miller","initials":"SM","math":"58%","science":"62%","literature":"78%","attendance":"74%","status":"PEWS ALERT"},
-                        {"name":"Thomas Kim","initials":"TK","math":"74%","science":"81%","literature":"79%","attendance":"92%","status":"CONSISTENT"}
-                      ]
+                      "risk": {"critical_count":0,"moderate_count":0,"proficiency_target_reach":75},
+                      "top_performer": null,
+                      "recent_progress": []
                     }
                 """.trimIndent(),
+                // NOTE (audit §5.1): `top_performer` and `recent_progress` are NO
+                // LONGER fabricated people. They are computed at request time from
+                // real `exam_results` rows in SchoolAnalyticsRouting./class-performance
+                // and overlaid onto this template. The empty defaults above are the
+                // honest "no real data yet" state.
 
                 // ---------------- Student Analytics Cohort ---------------
                 // Cohort-level view consumed by StudentAnalyticsScreen.
                 // The per-student template is `school_student_analytics_template`
                 // (above); this blob is the school-wide rollup.
+                //
+                // NOTE (audit §5.1): `at_risk_students`, `risk` counts and
+                // `daily_volatility` are NO LONGER fabricated. They are computed at
+                // request time from real `exam_results` / `attendance_records` in
+                // SchoolAnalyticsRouting./student-cohort and overlaid onto this
+                // template. The empty defaults below are the honest "no data" state.
                 "school_student_analytics_cohort" to """
                     {
-                      "daily_volatility": [0.92,0.88,0.94,0.91,0.98,0.89,0.95,0.93,0.90,0.64,0.85,0.89,0.91],
-                      "risk": {"critical_count":12,"medium_count":45,"low_count":782},
-                      "at_risk_students": [
-                        {"id":"1","name":"Julian Henderson","image_url":"","retention_risk":89,"mastery_trend":"-15% (1wk)","risk_level":"Critical"},
-                        {"id":"2","name":"Marcus Sterling","image_url":"","retention_risk":62,"mastery_trend":"-8% (1wk)","risk_level":"Medium"}
-                      ],
+                      "daily_volatility": [],
+                      "risk": {"critical_count":0,"medium_count":0,"low_count":0},
+                      "at_risk_students": [],
                       "subject_engagements": [
                         {"name":"Advanced Mathematics","percentage":0.942},
                         {"name":"Physical Sciences","percentage":0.76,"status":"Risk Level High"},
@@ -369,16 +373,17 @@ object CmsSeed {
                 """.trimIndent(),
 
                 // ---------------- Teacher Performance --------------------
+                // NOTE (audit §5.1): `accountability_matrix` is NO LONGER fabricated
+                // people. It is computed at request time from the real `faculty`
+                // table + 30-day attendance in SchoolAnalyticsRouting./teacher-performance
+                // and overlaid onto this template. The empty default is the honest
+                // "no faculty yet" state. (`star_faculty` was already real.)
                 "school_teacher_performance" to """
                     {
                       "aggregate_compliance": "94.2%",
                       "compliance_trend": "+2.4% from last month",
                       "syllabus_update_trend": [0.4, 0.6, 0.5, 0.85, 0.7, 1.0, 0.5, 0.75],
-                      "accountability_matrix": [
-                        {"id":"1","name":"James Miller","department":"Chemistry Dept.","compliance_score":92,"avg_update_delay":"1.2 Days","student_avg_mark":"84.5%","risk_correlation":"Stable","initials":"JM"},
-                        {"id":"2","name":"Bradley Thompson","department":"Literature Dept.","compliance_score":68,"avg_update_delay":"5.8 Days","student_avg_mark":"71.2%","risk_correlation":"High Risk","initials":"BT"},
-                        {"id":"3","name":"Linda Wright","department":"Sociology Dept.","compliance_score":81,"avg_update_delay":"2.5 Days","student_avg_mark":"78.0%","risk_correlation":"Watching","initials":"LW"}
-                      ],
+                      "accountability_matrix": [],
                       "dept_efficiencies": [
                         {"name":"Science & Technology","percentage":96},
                         {"name":"Humanities","percentage":84},

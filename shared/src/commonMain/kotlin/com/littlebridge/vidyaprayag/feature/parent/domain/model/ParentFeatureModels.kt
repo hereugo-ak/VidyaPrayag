@@ -3,6 +3,50 @@ package com.littlebridge.vidyaprayag.feature.parent.domain.model
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 
+// --- Dashboard (the primary parent "handshake" — server GET /api/v1/parent/dashboard, §8.1) ---
+// Mirrors server feature/parent/ParentDashboardRouting.kt → DashboardResponse field-for-field.
+@Serializable
+data class ParentDashboardResponse(
+    val success: Boolean,
+    val data: ParentDashboardData
+)
+
+@Serializable
+data class ParentDashboardData(
+    val greeting: String,
+    @SerialName("child_summary") val childSummary: DashboardChildSummary? = null,
+    val alerts: List<DashboardAlertDto> = emptyList(),
+    @SerialName("featured_schools") val featuredSchools: List<FeaturedSchoolDto> = emptyList(),
+    @SerialName("curation_logic") val curationLogic: String = ""
+)
+
+@Serializable
+data class DashboardChildSummary(
+    val id: String,
+    val name: String,
+    @SerialName("overall_progress") val overallProgress: Double,
+    @SerialName("current_level") val currentLevel: Int,
+    @SerialName("attendance_status") val attendanceStatus: String,
+    @SerialName("profile_pic") val profilePic: String? = null
+)
+
+@Serializable
+data class DashboardAlertDto(
+    val id: String,
+    val title: String,
+    val value: String,
+    val type: String // CRITICAL | INFO | WARNING
+)
+
+@Serializable
+data class FeaturedSchoolDto(
+    val id: String,
+    val name: String,
+    val rating: Double,
+    val location: String,
+    val image: String? = null
+)
+
 // --- Fees ---
 @Serializable
 data class FeeResponse(
@@ -88,4 +132,71 @@ data class ParentAnnouncementDto(
     val category: String,
     @SerialName("is_featured") val isFeatured: Boolean = false,
     @SerialName("image_url") val imageUrl: String? = null
+)
+
+// --- Notifications (report §5.3 — replaces MockV2.notifications) ---
+@Serializable
+data class ParentNotificationsResponse(
+    val success: Boolean,
+    val data: ParentNotificationsData
+)
+
+@Serializable
+data class ParentNotificationsData(
+    val notifications: List<ParentNotificationDto>,
+    @SerialName("unread_count") val unreadCount: Int
+)
+
+@Serializable
+data class ParentNotificationDto(
+    val id: String,
+    val category: String, // "fees" | "academic" | "attendance" | "announcement"
+    val title: String,
+    val body: String,
+    val time: String,
+    val unread: Boolean = true
+)
+
+// --- Link Your Child wizard (report §5.3 — replaces MockV2.childForParent/school) ---
+@Serializable
+data class SchoolSearchResponse(
+    val success: Boolean,
+    val data: SchoolSearchData
+)
+
+@Serializable
+data class SchoolSearchData(
+    val schools: List<SchoolMatchDto>
+)
+
+@Serializable
+data class SchoolMatchDto(
+    val id: String,
+    val name: String,
+    val board: String,
+    val city: String,
+    @SerialName("logo_url") val logoUrl: String? = null
+)
+
+@Serializable
+data class LinkChildRequest(
+    @SerialName("school_id") val schoolId: String,
+    @SerialName("roll_number") val rollNumber: String,
+    @SerialName("parent_name") val parentName: String? = null
+)
+
+@Serializable
+data class LinkChildResponse(
+    val success: Boolean,
+    val data: LinkedChildDto
+)
+
+@Serializable
+data class LinkedChildDto(
+    @SerialName("child_id") val childId: String,
+    @SerialName("child_name") val childName: String,
+    @SerialName("class_name") val className: String,
+    val roll: String,
+    @SerialName("school_name") val schoolName: String,
+    @SerialName("profile_photo_url") val profilePhotoUrl: String? = null
 )

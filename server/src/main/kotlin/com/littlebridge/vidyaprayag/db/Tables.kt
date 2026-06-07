@@ -2,16 +2,24 @@
  * File: Tables.kt
  * Module: db
  *
- * Exposed table definitions mapped 1:1 to the real Supabase Postgres schema.
+ * Exposed table definitions mapped 1:1 to the Postgres schema the backend
+ * actually uses (the `vidyasetu_schema.sql` model — NOT the root
+ * /supabase_schema doc, which only covers 2 of these tables).
  *
- * Two source-of-truth SQL files describe what's deployed in Supabase:
- *   - /supabase_schema                            (operational tables, v2.1)
- *   - /docs/backend/sql/01_supplementary_schema.sql  (everything the Ktor
- *                                                    backend additionally needs)
+ * CANONICAL PROVISIONING ORDER (the ONLY complete recipe — see
+ * docs/db/PROVISION.sql which lists these in order):
+ *   1. docs/db/vidyasetu_schema.sql
+ *   2. docs/db/migration_001_faculty_and_holiday_list.sql
+ *   3. docs/db/migration_002_segmentation_geo_assignments.sql   (segmentation + assignments;
+ *      schools lat/long now live in the BASE schema per §1.3, so this only re-asserts them
+ *      via ADD COLUMN IF NOT EXISTS — a harmless no-op)
+ *   4. docs/backend/sql/02_teacher_schema.sql
  *
- * Run BOTH SQL files in Supabase → SQL Editor before pointing the backend
- * at production.  For local-dev SQLite fallback, Exposed auto-creates the
- * tables in the order declared in DatabaseFactory.allTables.
+ * Run all four in Supabase → SQL Editor before pointing the backend at
+ * production. For local-dev SQLite fallback, Exposed auto-creates the tables
+ * in the order declared in DatabaseFactory.allTables. In Postgres, boot-time
+ * validation (DatabaseFactory.validateSchema) logs any of the 38 tables that
+ * are missing and refuses to start when AUTO_CREATE_TABLES is not enabled.
  *
  * IMPORTANT DESIGN CHOICES
  * ------------------------
@@ -19,8 +27,6 @@
  *    flow uses `app_users` for phone-OTP-first signup.  Email-only users
  *    can still be created (password_hash column).
  *  - We use UUIDs everywhere to match Supabase.
- *  - Foreign keys are declared with .references() so SchemaUtils generates
- *    proper FK constraints in SQLite dev too.
  *  - JSONB columns are stored as `text` here; we marshal them with
  *    kotlinx.serialization on the way in/out.
  *
@@ -468,7 +474,7 @@ object FeeRecordsTable : UUIDTable("fee_records", "id") {
     val title       = text("title")
     val description = text("description").nullable()
     val amount      = double("amount").default(0.0)
-    val currency    = varchar("currency", 8).default("USD")
+    val currency    = varchar("currency", 8).default("INR")             // India-first default (audit §11 L3)
     val dueDate     = varchar("due_date", 12).nullable()                // YYYY-MM-DD
     val status      = varchar("status", 16).default("DUE")              // PAID | DUE | OVERDUE
     val category    = varchar("category", 32).default("Tuition")        // Tuition | Transport | ...
@@ -600,4 +606,176 @@ object ExamResultsTable : UUIDTable("exam_results", "id") {
     init {
         uniqueIndex("ux_exam_results_unique", schoolId, test, className, subject, studentId)
     }
+}
+
+// =====================================================================
+// Teacher vertical (master doc Step 7 / §9 / gap G1)
+//
+// These tables back the `api/v1/teacher/*` routes consumed by the KMP
+// client's `shared/feature/teacher` data layer. They are scoped through
+// `teacher_subject_assignments` (who teaches what to which class+section)
+// which already exists above. Attendance reuses `attendance_records`
+// (student rows, marked_by = teacher). Marks are normalised here into a
+// proper assessment → marks model (master doc G4: "normalized vs. the
+// freeform academic_records / string-score exam_results").
+//
+// DDL: docs/backend/sql/02_teacher_schema.sql (idempotent, Supabase).
+// =====================================================================
+
+/**
+ * A teacher-authored assessment definition (a "test"/"exam") for one
+ * class+section+subject, with a max-marks denominator. Marks themselves
+ * live in [AssessmentMarksTable]. This is the normalized counterpart to
+ * the school-admin, string-scored [ExamResultsTable] — the teacher portal
+ * needs a numeric max-marks denominator + an `exam_id` to enter scores
+ * against (TeacherMarksData.maxMarks / SubmitMarksRequest.examId).
+ *
+ * `teacherId` is the assignment owner (app_users.id of the teacher).
+ */
+object AssessmentsTable : UUIDTable("assessments", "id") {
+    val schoolId  = uuid("school_id")
+    val teacherId = uuid("teacher_id").nullable()        // FK app_users.id (assessment author)
+    val className = text("class_name")                   // denormalised for fast reads / display
+    val section   = varchar("section", 8).default("A")
+    val subject   = text("subject")
+    val name       = text("name")                        // "Unit Test I", "Mid Term", …
+    val maxMarks  = integer("max_marks").default(100)
+    val examDate  = varchar("exam_date", 12).nullable()  // YYYY-MM-DD
+    val isActive  = bool("is_active").default(true)
+    val createdAt = timestamp("created_at")
+    val updatedAt = timestamp("updated_at")
+}
+
+/**
+ * Per-student score for an [AssessmentsTable] row. `marks` is a Double so a
+ * teacher can enter half-marks; the route clamps it to [0, assessment.maxMarks].
+ * One (assessment, student) pair is unique so re-submitting updates in place.
+ */
+object AssessmentMarksTable : UUIDTable("assessment_marks", "id") {
+    val assessmentId = uuid("assessment_id")             // FK assessments.id
+    val studentId    = text("student_id")                // students.student_code
+    val studentName  = text("student_name")
+    val marks        = double("marks").nullable()        // null = not yet entered
+    val enteredBy    = uuid("entered_by").nullable()     // FK app_users.id (teacher)
+    val createdAt    = timestamp("created_at")
+    val updatedAt    = timestamp("updated_at")
+    init {
+        uniqueIndex("ux_assessment_marks_unique", assessmentId, studentId)
+    }
+}
+
+/**
+ * Syllabus unit (chapter/topic) for a class+section+subject, with a covered
+ * flag + the date it was marked covered. Backs TeacherSyllabusData / the
+ * PATCH /teacher/syllabus toggle. `position` orders units within a subject.
+ */
+object SyllabusUnitsTable : UUIDTable("syllabus_units", "id") {
+    val schoolId   = uuid("school_id")
+    val className  = text("class_name")
+    val section    = varchar("section", 8).default("A")
+    val subject    = text("subject")
+    val title      = text("title")
+    val position   = integer("position").default(0)
+    val isCovered  = bool("is_covered").default(false)
+    val coveredOn  = varchar("covered_on", 12).nullable()  // YYYY-MM-DD
+    val coveredBy  = uuid("covered_by").nullable()          // FK app_users.id (teacher)
+    val createdAt  = timestamp("created_at")
+    val updatedAt  = timestamp("updated_at")
+}
+
+/**
+ * A homework/assignment authored by a teacher for one class+section+subject.
+ * `submittedCount` is derived live from [HomeworkSubmissionsTable] at read
+ * time; `totalCount` is the headcount of the target class (computed from
+ * `students`). Backs TeacherHomeworkData / CreateHomeworkRequest.
+ */
+object HomeworkTable : UUIDTable("homework", "id") {
+    val schoolId    = uuid("school_id")
+    val teacherId   = uuid("teacher_id").nullable()     // FK app_users.id (author)
+    val className   = text("class_name")
+    val section     = varchar("section", 8).default("A")
+    val subject     = text("subject")
+    val title       = text("title")
+    val description = text("description").default("")
+    val dueDate     = varchar("due_date", 12)           // YYYY-MM-DD
+    val isActive    = bool("is_active").default(true)
+    val createdAt   = timestamp("created_at")
+    val updatedAt   = timestamp("updated_at")
+}
+
+/**
+ * One student's submission against a [HomeworkTable] row. Used to compute the
+ * submitted/total ratio shown on the teacher's homework cards. Unique on
+ * (homework, student).
+ */
+object HomeworkSubmissionsTable : UUIDTable("homework_submissions", "id") {
+    val homeworkId  = uuid("homework_id")               // FK homework.id
+    val studentId   = text("student_id")                // students.student_code
+    val status      = varchar("status", 16).default("submitted") // submitted | graded | late
+    val submittedAt = timestamp("submitted_at")
+    init {
+        uniqueIndex("ux_homework_submissions_unique", homeworkId, studentId)
+    }
+}
+
+/**
+ * Optional timetable: a teacher's periods on a given weekday. The teacher Home
+ * "today's periods" strip reads this; when a school hasn't entered a timetable
+ * the response is an honest empty list (never fabricated). `weekday` is 1..7
+ * (Mon..Sun) to match java.time.DayOfWeek.value.
+ */
+object TeacherPeriodsTable : UUIDTable("teacher_periods", "id") {
+    val schoolId   = uuid("school_id")
+    val teacherId  = uuid("teacher_id")                 // FK app_users.id
+    val weekday    = integer("weekday")                 // 1=Mon … 7=Sun
+    val startTime  = varchar("start_time", 8)           // "HH:mm"
+    val endTime    = varchar("end_time", 8)             // "HH:mm"
+    val className  = text("class_name")
+    val section    = varchar("section", 8).default("A")
+    val subject    = text("subject")
+    val room       = text("room").default("")
+    val position   = integer("position").default(0)
+    val createdAt  = timestamp("created_at")
+}
+
+// =====================================================================
+// Parent Scholarships (parent_api_spec.artifact.md §Module: Scholarships)
+// =====================================================================
+
+/**
+ * Scholarship opportunities surfaced on the parent Scholarships screen.
+ *
+ * Replaces the hardcoded `"$45,000 STEM Award"` fiction (audit §4.2/§5.2) the
+ * `/scholarships` route used to return. Rows are operator-curated (seeded /
+ * managed) opportunities; the endpoint reads real rows from here so adding or
+ * retiring a scholarship is a DB write, not a redeploy. `isActive=false` hides
+ * a row without deleting it. `position` controls display order.
+ */
+object ScholarshipsTable : UUIDTable("scholarships", "id") {
+    val title       = text("title")
+    val description = text("description")
+    val amount      = text("amount")                    // display string e.g. "₹45,000"
+    val timeLeft    = text("time_left").default("")      // display string e.g. "3d : 12h"
+    val category    = varchar("category", 48).default("Merit Based")
+    val isCritical  = bool("is_critical").default(false)
+    val position    = integer("position").default(0)
+    val isActive    = bool("is_active").default(true)
+    val createdAt   = timestamp("created_at")
+    val updatedAt   = timestamp("updated_at")
+}
+
+/**
+ * A parent's scholarship applications (the "applications" list on the same
+ * screen). Scoped to the applying parent so each parent sees only their own.
+ * `iconName` mirrors the UI's institution glyph.
+ */
+object ScholarshipApplicationsTable : UUIDTable("scholarship_applications", "id") {
+    val parentId    = uuid("parent_id")                 // FK app_users.id
+    val institution = text("institution")
+    val program     = text("program")
+    val status      = varchar("status", 24).default("Received") // Received | Under Review | Shortlisted
+    val iconName    = varchar("icon_name", 32).default("school")
+    val position    = integer("position").default(0)
+    val createdAt   = timestamp("created_at")
+    val updatedAt   = timestamp("updated_at")
 }

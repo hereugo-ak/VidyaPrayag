@@ -72,7 +72,17 @@ object DatabaseFactory {
         PtmClassProgressTable,
         MessageThreadsTable,
         MessagesTable,
-        ExamResultsTable
+        ExamResultsTable,
+        // Teacher vertical (master doc Step 7 / gap G1)
+        AssessmentsTable,
+        AssessmentMarksTable,
+        SyllabusUnitsTable,
+        HomeworkTable,
+        HomeworkSubmissionsTable,
+        TeacherPeriodsTable,
+        // Parent scholarships (audit §4.2/§5.2 — DB-backed, replaces hardcoded list)
+        ScholarshipsTable,
+        ScholarshipApplicationsTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */
@@ -125,6 +135,12 @@ object DatabaseFactory {
             println("DB_INIT: Skipping auto-creation (AUTO_CREATE_TABLES is not 'true').")
         }
 
+        // Boot-time schema completeness validation (audit finding A). In
+        // Postgres without auto-create, a missing table means a guessed/
+        // incomplete provisioning recipe was used and dependent routes would
+        // 500 at runtime. We surface that loudly at boot instead.
+        validateSchema(autoCreate)
+
         // CMS seed (landing + app_config). Always idempotent — only inserts
         // missing keys; never overwrites operator-edited values.
         val seedCms = (dotenv["APP_SEED_CMS"] ?: System.getenv("APP_SEED_CMS") ?: "true")
@@ -147,6 +163,71 @@ object DatabaseFactory {
                     throw e
                 }
             }
+        }
+
+        // Operational demo seed (audit finding B): one working credential per
+        // profile type + minimal operational data, so a fresh deploy is
+        // immediately loginable instead of empty/unlogin-able. Idempotent.
+        val seedDemo = (dotenv["APP_SEED_DEMO"] ?: System.getenv("APP_SEED_DEMO") ?: "true")
+            .equals("true", ignoreCase = true)
+
+        if (seedDemo) {
+            println("DB_INIT: Running operational demo seed...")
+            try {
+                DemoSeed.ensureDemoData()
+                println("DB_INIT: Demo seed completed successfully.")
+            } catch (e: Exception) {
+                val msg = e.message ?: ""
+                if (msg.contains("relation", ignoreCase = true) && msg.contains("does not exist", ignoreCase = true)) {
+                    System.err.println("DB_INIT_WARNING: Demo seeding skipped because tables are missing.")
+                    System.err.println("DB_INIT_TIP: Set AUTO_CREATE_TABLES=true on Render to create tables automatically.")
+                } else {
+                    System.err.println("DB_INIT_ERROR: Demo seeding failed with unexpected error!")
+                    e.printStackTrace()
+                    // Non-fatal: CMS + schema are already in place; don't crash-loop.
+                }
+            }
+        }
+    }
+
+    /**
+     * Audit finding A: verify every one of the 36 registered tables exists.
+     * In Postgres without auto-create, any missing table means an incomplete
+     * provisioning recipe was used (see docs/db/PROVISION.sql for the only
+     * complete one) and dependent routes would 500 at runtime — so we refuse
+     * to boot. In SQLite/dev or when AUTO_CREATE_TABLES handled creation, we
+     * only warn.
+     */
+    private fun validateSchema(autoCreate: Boolean) {
+        try {
+            val existing = transaction {
+                SchemaUtils.listTables().map { it.substringAfterLast('.').lowercase().trim('"') }.toSet()
+            }
+            val missing = allTables
+                .map { it.tableName.substringAfterLast('.').lowercase().trim('"') }
+                .filter { it !in existing }
+
+            if (missing.isEmpty()) {
+                println("DB_INIT: Schema validation OK — all ${allTables.size} tables present.")
+                return
+            }
+
+            val msg = "DB_INIT: Schema validation FOUND ${missing.size} MISSING table(s): ${missing.sorted()}"
+            if (isPostgres && !autoCreate) {
+                System.err.println(msg)
+                System.err.println("DB_INIT_TIP: Provision with docs/db/PROVISION.sql (the only complete recipe) " +
+                    "or set AUTO_CREATE_TABLES=true.")
+                throw IllegalStateException(
+                    "Refusing to boot: Postgres schema is incomplete (missing ${missing.size} tables). " +
+                    "See docs/db/PROVISION.sql."
+                )
+            } else {
+                System.err.println("$msg (non-fatal: SQLite/dev or auto-create enabled).")
+            }
+        } catch (e: IllegalStateException) {
+            throw e
+        } catch (e: Exception) {
+            System.err.println("DB_INIT_WARNING: Schema validation could not run: ${e.message}")
         }
     }
 

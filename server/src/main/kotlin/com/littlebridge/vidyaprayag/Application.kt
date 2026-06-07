@@ -29,6 +29,7 @@
  *   - parentDashboardRouting()            — /api/v1/parent/dashboard
  *   - trackProgressRouting()              — /api/v1/parent/track-progress
  *   - parentFeesRouting()                 — /api/v1/parent/fees
+ *   - parentLinkRouting()                 — /api/v1/parent/{schools/search, link-child}
  *   - schoolDashboardRouting()            — /api/v1/school/dashboard
  *   - schoolAnalyticsRouting()            — /api/v1/school/analytics/{overview,class-performance,teacher-performance,student/{id},syllabus-coverage}
  *   - leaveRequestsRouting()              — /api/v1/school/leave-requests[…]
@@ -37,6 +38,7 @@
  *   - resultsRouting()                    — /api/v1/school/results
  *   - teacherAssignmentRouting()          — /api/v1/school/teacher-assignments[…]
  *   - mediaRouting()                      — /api/v1/school/media/upload[…] (binary → Supabase Storage)
+ *   - teacherRouting()                    — /api/v1/teacher/{home,classes,profile,attendance,marks,syllabus,homework}
  *
  * On boot:
  *   DatabaseFactory.init() creates/migrates all tables and seeds CMS + demo data.
@@ -62,6 +64,7 @@ import com.littlebridge.vidyaprayag.feature.media.mediaRouting
 import com.littlebridge.vidyaprayag.feature.onboarding.onboardingRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentDashboardRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentFeesRouting
+import com.littlebridge.vidyaprayag.feature.parent.parentLinkRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentOnboardingRouting
 import com.littlebridge.vidyaprayag.feature.parent.trackProgressRouting
 import com.littlebridge.vidyaprayag.feature.school.leaveRequestsRouting
@@ -72,6 +75,8 @@ import com.littlebridge.vidyaprayag.feature.school.schoolAnalyticsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolDashboardRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRouting
 import com.littlebridge.vidyaprayag.feature.school.teacherAssignmentRouting
+import com.littlebridge.vidyaprayag.feature.school.teacherProvisioningRouting
+import com.littlebridge.vidyaprayag.feature.teacher.teacherRouting
 import com.littlebridge.vidyaprayag.feature.user.parentRouting
 import com.littlebridge.vidyaprayag.feature.user.parentMessagesRouting
 import com.littlebridge.vidyaprayag.feature.user.userDetailsRouting
@@ -166,6 +171,7 @@ fun Application.module() {
         parentDashboardRouting()     // /api/v1/parent/dashboard
         trackProgressRouting()       // /api/v1/parent/track-progress
         parentFeesRouting()          // /api/v1/parent/fees
+        parentLinkRouting()          // /api/v1/parent/{schools/search, link-child} — Link Your Child wizard (audit §5.3 / SWEEP-A)
 
         // School ecosystem (school_api_spec.artifact.md)
         schoolDashboardRouting()     // /api/v1/school/dashboard
@@ -175,6 +181,10 @@ fun Application.module() {
         messagesRouting()            // /api/v1/school/messages[…]
         resultsRouting()             // /api/v1/school/results
         teacherAssignmentRouting()   // /api/v1/school/teacher-assignments[…] — structured teacher⇄class⇄subject model (report §5.5)
+        teacherProvisioningRouting() // /api/v1/school/teachers[…] — school-admin creates teacher app_users rows (audit finding C)
         mediaRouting()               // /api/v1/school/media/upload[…] — REAL binary uploads → Supabase Storage (kills URL placeholders)
+
+        // Teacher vertical (master rebuild doc Step 7 / gap G1)
+        teacherRouting()             // /api/v1/teacher/{home,classes,profile,attendance,marks,syllabus,homework}
     }
 }

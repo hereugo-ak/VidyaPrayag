@@ -8,6 +8,10 @@ import com.littlebridge.vidyaprayag.feature.parent.domain.repository.ParentRepos
 class ParentRepositoryImpl(
     private val api: ParentApi
 ) : ParentRepository {
+    override suspend fun getDashboard(token: String): NetworkResult<ParentDashboardResponse> {
+        return api.getDashboard(token)
+    }
+
     override suspend fun getTrackProgress(token: String): NetworkResult<TrackProgressResponse> {
         return api.getTrackProgress(token)
     }
@@ -22,5 +26,17 @@ class ParentRepositoryImpl(
 
     override suspend fun getAnnouncements(token: String): NetworkResult<ParentAnnouncementsResponse> {
         return api.getAnnouncements(token)
+    }
+
+    override suspend fun getNotifications(token: String): NetworkResult<ParentNotificationsResponse> {
+        return api.getNotifications(token)
+    }
+
+    override suspend fun searchSchools(token: String, query: String): NetworkResult<SchoolSearchResponse> {
+        return api.searchSchools(token, query)
+    }
+
+    override suspend fun linkChild(token: String, request: LinkChildRequest): NetworkResult<LinkChildResponse> {
+        return api.linkChild(token, request)
     }
 }
