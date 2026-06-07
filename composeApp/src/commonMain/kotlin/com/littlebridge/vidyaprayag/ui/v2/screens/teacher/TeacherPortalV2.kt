@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.unit.dp
@@ -39,6 +40,7 @@ private enum class TeacherOverlay { None, Notifications, Calendar }
  * Notifications and AcademicCalendar (from the `App.tsx` graph) are pushed as full-screen overlays.
  * Class/exam/subject ids are stubbed locally for now; Phase 3E wires real selection + navigation.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun TeacherPortalV2(
     onLogout: () -> Unit = {},

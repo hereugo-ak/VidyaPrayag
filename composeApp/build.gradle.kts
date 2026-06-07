@@ -69,6 +69,15 @@ kotlin {
     }
     
     sourceSets {
+        // Opt in to the experimental cross-platform BackHandler API
+        // (androidx.compose.ui.backhandler.BackHandler is marked
+        // @ExperimentalComposeUiApi). Declared at the source-set level so every
+        // portal/nav composable that wires the system back gesture compiles
+        // without a per-function @OptIn. Mirrors the opt-in already used in
+        // webMain/main.kt.
+        all {
+            languageSettings.optIn("androidx.compose.ui.ExperimentalComposeUiApi")
+        }
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.activity.compose)

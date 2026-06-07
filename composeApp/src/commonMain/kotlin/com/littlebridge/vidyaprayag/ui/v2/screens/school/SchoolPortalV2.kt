@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
 import com.littlebridge.vidyaprayag.ui.v2.components.VBottomNav
@@ -31,6 +32,7 @@ private enum class SchoolOverlay { None, Notifications, Calendar }
  *
  * Notifications and AcademicCalendar (from the `App.tsx` graph) are pushed as full-screen overlays.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SchoolPortalV2(
     onLogout: () -> Unit = {},

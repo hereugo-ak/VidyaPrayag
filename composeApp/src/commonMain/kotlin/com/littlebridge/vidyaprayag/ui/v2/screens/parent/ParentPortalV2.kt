@@ -24,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.clip
@@ -56,6 +57,7 @@ private enum class ParentOverlay { None, Notifications, Calendar }
  * `koinViewModel()` — no MockV2 in any production path. Notifications & Calendar are pushed as
  * full-screen overlays.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun ParentPortalV2(
     onLogout: () -> Unit = {},

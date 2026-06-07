@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.LoginScreenV2
@@ -68,6 +69,7 @@ fun NavGraphV2(
 /** Internal screens shown before a session exists: Welcome → Login → Discovery (browse-first). */
 private enum class AuthRoute { Welcome, Login, Discovery, SchoolOnboarding, ParentLinkChild }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun UnauthFlow(modifier: Modifier = Modifier) {
     var route by remember { mutableStateOf(AuthRoute.Welcome) }
