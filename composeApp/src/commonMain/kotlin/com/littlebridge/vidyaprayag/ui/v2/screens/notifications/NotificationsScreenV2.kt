@@ -37,21 +37,24 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.littlebridge.vidyaprayag.feature.parent.presentation.NotificationsState
+import com.littlebridge.vidyaprayag.feature.parent.presentation.NotificationsViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VBackHeader
-import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
+import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VElevationLevel
 import com.littlebridge.vidyaprayag.ui.v2.theme.VMotion
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 import com.littlebridge.vidyaprayag.ui.v2.theme.vElevation
 import kotlinx.coroutines.delay
+import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * NotificationsScreenV2 — faithful Compose translation of `Notifications.tsx → NotificationsScreen`.
@@ -66,35 +69,55 @@ import kotlinx.coroutines.delay
  *    fade-up entrance (delay i*0.04s);
  *  - the "You're all caught up" empty state and the "Notification preferences" footer (13/600).
  *
- * To match the Figma prototype pixel-for-pixel, [items] defaults to the same entries the React
- * screen renders from `lib/mock` (mirrored in [MockV2.notifications]). A real
- * `GET /api/v1/notifications` feed can map onto [VNotification] and the layout lights up unchanged.
+ * **Wired to the real [NotificationsViewModel]** (`shared/`) →
+ * `ParentRepository.getNotifications` → `GET /api/v1/parent/notifications`, which aggregates the
+ * parent's school announcements and outstanding fee reminders. MockV2 is no longer referenced; the
+ * three UI states (loading / error / empty) are handled by [VStateHost] (report §5.3, SWEEP-A).
  */
 @Composable
 fun NotificationsScreenV2(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    items: List<VNotification> = MockV2.notifications.map {
-        VNotification(
-            id = it.id,
-            category = it.category.name.lowercase(),
-            title = it.title,
-            body = it.body,
-            time = it.time,
-            unread = it.unread,
-        )
-    },
+    viewModel: NotificationsViewModel = koinViewModel(),
+) {
+    val state by viewModel.state.collectAsStateV2()
+    NotificationsContent(
+        state = state,
+        onBack = onBack,
+        onMarkAll = viewModel::markAllRead,
+        onMarkRead = viewModel::markRead,
+        onRetry = viewModel::load,
+        modifier = modifier,
+    )
+}
+
+/** Stateless body — also used by the @Preview with seeded state (no MockV2 in the live path). */
+@Composable
+private fun NotificationsContent(
+    state: NotificationsState,
+    onBack: () -> Unit,
+    onMarkAll: () -> Unit,
+    onMarkRead: (String) -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
     val d = VTheme.dimens
 
     var filterUnread by remember { mutableStateOf(false) }
-    // Local read-state overlay so tapping an item / "Mark all" feels live even before a backend.
-    var readIds by remember { mutableStateOf(setOf<String>()) }
 
-    val effective = items.map { it.copy(unread = it.unread && !readIds.contains(it.id)) }
-    val unread = effective.count { it.unread }
-    val visible = if (filterUnread) effective.filter { it.unread } else effective
+    val items = state.notifications.map {
+        VNotification(
+            id = it.id,
+            category = it.category,
+            title = it.title,
+            body = it.body,
+            time = it.time,
+            unread = it.unread,
+        )
+    }
+    val unread = items.count { it.unread }
+    val visible = if (filterUnread) items.filter { it.unread } else items
 
     Column(modifier.fillMaxSize().background(c.background)) {
         VBackHeader(
@@ -105,7 +128,7 @@ fun NotificationsScreenV2(
                 Row(
                     Modifier
                         .clip(RoundedCornerShape(999.dp))
-                        .clickable { readIds = items.map { it.id }.toSet() },
+                        .clickable { onMarkAll() },
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
@@ -211,15 +234,21 @@ fun NotificationsScreenV2(
                 ) { filterUnread = true }
             }
 
-            // ── List or empty state ────────────────────────────────────────────────
+            // ── List · loading · error · empty (LAW 3 via VStateHost) ──────────────
             // React: `px-5 pb-8 space-y-2`.
             Column(
                 Modifier.padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(d.sm),
             ) {
-                if (visible.isEmpty()) {
-                    CaughtUpState()
-                } else {
+                VStateHost(
+                    loading = state.isLoading,
+                    error = state.error,
+                    isEmpty = visible.isEmpty(),
+                    emptyIcon = VIcons.Check,
+                    emptyTitle = "You're all caught up",
+                    emptyBody = if (filterUnread) "No unread notifications." else "No notifications yet.",
+                    onRetry = onRetry,
+                ) {
                     visible.forEachIndexed { i, n ->
                         // React: staggered fade-up entrance (delay i*0.04s).
                         var shown by remember(n.id) { mutableStateOf(false) }
@@ -231,7 +260,7 @@ fun NotificationsScreenV2(
                             visible = shown,
                             enter = VMotion.fadeUp(delayMs = 0, fromY = 8),
                         ) {
-                            NotificationRow(n, onClick = { readIds = readIds + n.id })
+                            NotificationRow(n, onClick = { onMarkRead(n.id) })
                         }
                     }
                 }
@@ -348,26 +377,7 @@ private fun NotificationRow(n: VNotification, onClick: () -> Unit) {
     }
 }
 
-@Composable
-private fun CaughtUpState() {
-    val c = VTheme.colors
-    Column(
-        Modifier.fillMaxWidth().padding(vertical = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Box(
-            Modifier.size(56.dp).clip(CircleShape).background(c.cream),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(VIcons.Check, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(22.dp))
-        }
-        Text("You're all caught up", style = VTheme.type.bodyStrong.colored(c.ink), textAlign = TextAlign.Center)
-        Text("No unread notifications.", style = VTheme.type.caption.colored(c.ink3), textAlign = TextAlign.Center)
-    }
-}
-
-/** UI-only notification model. Mirrors the React `notifications` mock shape so a real feed can map to it. */
+/** UI-only notification model. Mirrors the server feed shape so a real feed can map to it. */
 data class VNotification(
     val id: String,
     val category: String, // "attendance" | "academic" | "fees" | "announcement"

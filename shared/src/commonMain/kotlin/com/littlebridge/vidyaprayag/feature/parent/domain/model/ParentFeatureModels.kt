@@ -89,3 +89,26 @@ data class ParentAnnouncementDto(
     @SerialName("is_featured") val isFeatured: Boolean = false,
     @SerialName("image_url") val imageUrl: String? = null
 )
+
+// --- Notifications (report §5.3 — replaces MockV2.notifications) ---
+@Serializable
+data class ParentNotificationsResponse(
+    val success: Boolean,
+    val data: ParentNotificationsData
+)
+
+@Serializable
+data class ParentNotificationsData(
+    val notifications: List<ParentNotificationDto>,
+    @SerialName("unread_count") val unreadCount: Int
+)
+
+@Serializable
+data class ParentNotificationDto(
+    val id: String,
+    val category: String, // "fees" | "academic" | "attendance" | "announcement"
+    val title: String,
+    val body: String,
+    val time: String,
+    val unread: Boolean = true
+)

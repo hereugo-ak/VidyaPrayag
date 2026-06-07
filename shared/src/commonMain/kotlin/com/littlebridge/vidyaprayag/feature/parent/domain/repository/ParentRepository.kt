@@ -8,4 +8,5 @@ interface ParentRepository {
     suspend fun getFees(token: String): NetworkResult<FeeResponse>
     suspend fun getScholarships(token: String): NetworkResult<ScholarshipsResponse>
     suspend fun getAnnouncements(token: String): NetworkResult<ParentAnnouncementsResponse>
+    suspend fun getNotifications(token: String): NetworkResult<ParentNotificationsResponse>
 }

@@ -18,6 +18,7 @@ import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentReportsVie
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentSchedulePTMViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentAnnouncementViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentMessageViewModel
+import com.littlebridge.vidyaprayag.feature.parent.presentation.NotificationsViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.TrackProgressViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolDashboardViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.InstitutionalBasicOBViewModel
@@ -299,6 +300,7 @@ val viewModelModule = module {
     factory { ParentReportsViewModel() }
     factory { ParentSchedulePTMViewModel() }
     factory { ParentAnnouncementViewModel(get(), get()) }
+    factory { NotificationsViewModel(get(), get()) }
     factory { ParentMessageViewModel() }
     factory { TrackProgressViewModel(get(), get()) }
     factory { SchoolDashboardViewModel(get(), get()) }

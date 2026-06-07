@@ -47,4 +47,12 @@ class ParentApi(
             }
         }
     }
+
+    suspend fun getNotifications(token: String): NetworkResult<ParentNotificationsResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/notifications")) {
+                header("Authorization", "Bearer $token")
+            }
+        }
+    }
 }
