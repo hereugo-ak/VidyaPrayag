@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.ui.v2.components.VBottomNav
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
@@ -50,6 +51,13 @@ fun TeacherPortalV2(
         var tab by remember { mutableStateOf("home") }
         var updateSub by remember { mutableStateOf("Attendance") }
         var overlay by remember { mutableStateOf(TeacherOverlay.None) }
+
+        // §11 cross-platform — Android predictive back / iOS edge-swipe pops
+        // the full-screen Notifications/Calendar overlay back to the teacher
+        // tabs instead of leaving the portal. Mirrors the React `onBack` wiring.
+        BackHandler(enabled = overlay != TeacherOverlay.None) {
+            overlay = TeacherOverlay.None
+        }
 
         when (overlay) {
             TeacherOverlay.Notifications -> {
