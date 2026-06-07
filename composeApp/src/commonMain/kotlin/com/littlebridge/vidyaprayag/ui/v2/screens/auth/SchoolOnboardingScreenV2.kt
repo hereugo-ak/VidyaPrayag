@@ -1,5 +1,12 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.auth
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -136,12 +143,19 @@ fun SchoolOnboardingScreenV2(
                 Spacer(Modifier.height(d.sm))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(d.xs)) {
                     repeat(6) { i ->
+                        // Smooth fill — each completed bar cross-fades into teal vs the inactive grey.
+                        val active = i < step
+                        val targetColor by androidx.compose.animation.animateColorAsState(
+                            targetValue = if (active) c.teal else c.ink.copy(alpha = 0.08f),
+                            animationSpec = tween(durationMillis = 250),
+                            label = "stepBar$i",
+                        )
                         Box(
                             Modifier
                                 .weight(1f)
                                 .height(4.dp)
                                 .clip(CircleShape)
-                                .background(if (i < step) c.teal else c.ink.copy(alpha = 0.08f)),
+                                .background(targetColor),
                         )
                     }
                 }
@@ -150,23 +164,45 @@ fun SchoolOnboardingScreenV2(
                 Text("Step $step of 6", style = VTheme.type.caption.colored(c.ink3))
             }
 
-            Column(
-                Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = d.lg),
-                verticalArrangement = Arrangement.spacedBy(d.md),
-            ) {
-                when (step) {
-                    1 -> IdentityStep()
-                    2 -> AcademicYearStep()
-                    3 -> ClassesStep(classesBuilt)
-                    4 -> SubjectsStep(subjects, classCodes)
-                    5 -> TeachersStep(teachers, subjects, classCodes)
-                    else -> StudentsStep()
+            // §13.2 — wrap the per-step body in an AnimatedContent so each step
+            // slides in from the side of the press direction (Continue→right→left;
+            // Back→left→right). Fades cross to keep the transition gentle. The
+            // outer Column owns weight(1f) + scroll so step swaps don't jump.
+            AnimatedContent(
+                targetState = step,
+                transitionSpec = {
+                    val forward = targetState > initialState
+                    val dur = 280
+                    val enter = slideInHorizontally(
+                        animationSpec = tween(dur),
+                        initialOffsetX = { if (forward) it / 4 else -it / 4 },
+                    ) + fadeIn(tween(dur))
+                    val exit = slideOutHorizontally(
+                        animationSpec = tween(dur),
+                        targetOffsetX = { if (forward) -it / 4 else it / 4 },
+                    ) + fadeOut(tween(dur))
+                    enter togetherWith exit
+                },
+                label = "onboardingStep",
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            ) { current ->
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = d.lg),
+                    verticalArrangement = Arrangement.spacedBy(d.md),
+                ) {
+                    when (current) {
+                        1 -> IdentityStep()
+                        2 -> AcademicYearStep()
+                        3 -> ClassesStep(classesBuilt)
+                        4 -> SubjectsStep(subjects, classCodes)
+                        5 -> TeachersStep(teachers, subjects, classCodes)
+                        else -> StudentsStep()
+                    }
+                    Spacer(Modifier.height(d.sm))
                 }
-                Spacer(Modifier.height(d.sm))
             }
 
             // ── Footer nav (top hairline border, like React borderTop --border-dark-1) ──

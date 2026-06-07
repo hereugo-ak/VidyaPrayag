@@ -1,5 +1,8 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.auth
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -88,7 +91,12 @@ fun ParentLinkChildScreenV2(
         Spacer(Modifier.height(d.sm))
         StepBars(current = step, total = total)
 
-        when (step) {
+        // §13.2 — Crossfade step content for a smooth swap (no slide inside a verticalScroll,
+        // which would break the parent's height measurement). 240ms tween matches the React
+        // step indicator timing.
+        Crossfade(targetState = step, animationSpec = tween(240), label = "linkStep") { current ->
+        Column {
+        when (current) {
             1 -> {
                 Spacer(Modifier.height(d.lg))
                 Text("Tell us about you", style = VTheme.type.h1.colored(c.ink))
@@ -192,6 +200,8 @@ fun ParentLinkChildScreenV2(
                 )
             }
         }
+        }
+        }
 
         Spacer(Modifier.height(d.xl))
         // §5: React has a SINGLE CTA (Continue / Finish) with a trailing ArrowRight; no Back button.
@@ -213,13 +223,20 @@ private fun StepBars(current: Int, total: Int) {
     val c = VTheme.colors
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(d6())) {
         repeat(total) { i ->
+            // §13.2 — animate the bar fill instead of swapping colors instantly.
+            val active = i + 1 <= current
+            val targetColor by animateColorAsState(
+                targetValue = if (active) c.teal else Color(0x14080808),
+                animationSpec = tween(durationMillis = 250),
+                label = "linkStepBar$i",
+            )
             Box(
                 Modifier
                     .weight(1f)
                     // React: h-1 (4dp) bar — filled var(--arctic)=teal, empty rgba(8,8,8,0.08).
                     .height(4.dp)
                     .clip(CircleShape)
-                    .background(if (i + 1 <= current) c.teal else Color(0x14080808)),
+                    .background(targetColor),
             )
         }
     }
