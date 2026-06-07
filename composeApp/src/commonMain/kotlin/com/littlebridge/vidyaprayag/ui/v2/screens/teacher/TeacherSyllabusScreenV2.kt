@@ -1,7 +1,10 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,50 +12,75 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.littlebridge.vidyaprayag.ui.v2.components.VButton
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherSyllabusState
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherSyllabusViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
+import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VInput
 import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
+import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
+import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
+import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import org.koin.compose.viewmodel.koinViewModel
+import kotlin.math.roundToInt
 
 /**
- * TeacherSyllabusScreenV2 — a pixel-faithful copy of `Teacher.tsx → SyllabusFlow`.
+ * TeacherSyllabusScreenV2 — `Teacher.tsx → SyllabusFlow`, wired to the real
+ * [TeacherSyllabusViewModel] (`TeacherRepository.getSyllabus` / `updateSyllabus`).
  *
- * Class/subject selectors, a "log today's progress" form (chapter/topics/homework/note), a live
- * parent-notification preview, and a "Log & notify parents" stateful button.
+ * Class/subject selectors, an overall-progress bar, and a tappable unit checklist that toggles
+ * coverage and notifies parents via the VM. No MockV2 in production; the three UI states come
+ * from [VStateHost]. When [classId]/[subject] are blank an empty prompt is shown.
  */
 @Composable
 fun TeacherSyllabusScreenV2(
     classId: String = "",
     subject: String = "",
     modifier: Modifier = Modifier,
+    viewModel: TeacherSyllabusViewModel = koinViewModel(),
+) {
+    val state by viewModel.state.collectAsStateV2()
+
+    LaunchedEffect(classId, subject) {
+        if (classId.isNotBlank() && subject.isNotBlank()) viewModel.load(classId, subject)
+    }
+
+    TeacherSyllabusContent(
+        state = state,
+        hasSelection = classId.isNotBlank() && subject.isNotBlank(),
+        onToggle = viewModel::toggleUnit,
+        onRetry = { if (classId.isNotBlank() && subject.isNotBlank()) viewModel.load(classId, subject) },
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun TeacherSyllabusContent(
+    state: TeacherSyllabusState,
+    hasSelection: Boolean,
+    onToggle: (String) -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
-    var chapter by remember { mutableStateOf("Ch 8 — Trigonometric Identities") }
-    var topics by remember { mutableStateOf("") }
-    var homework by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
-
     Column(
         modifier
             .fillMaxSize()
@@ -62,38 +90,67 @@ fun TeacherSyllabusScreenV2(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            VInput(value = "Class 10-A", onValueChange = {}, modifier = Modifier.weight(1f), enabled = false)
-            VInput(value = "Mathematics", onValueChange = {}, modifier = Modifier.weight(1f), enabled = false)
+            VInput(value = state.className.ifBlank { "Select class" }, onValueChange = {}, modifier = Modifier.weight(1f), enabled = false)
+            VInput(value = state.subject.ifBlank { "Subject" }, onValueChange = {}, modifier = Modifier.weight(1f), enabled = false)
         }
-        VCard {
-            VLabel("Log today's progress")
-            Spacer(Modifier.height(12.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                VInput(value = chapter, onValueChange = { chapter = it }, label = "Chapter")
-                VInput(value = topics, onValueChange = { topics = it }, label = "Topics covered", placeholder = "Pythagorean identities, sum-of-angles…")
-                VInput(value = homework, onValueChange = { homework = it }, label = "Homework given", placeholder = "Exercise 8.3, Q 4–14")
-                VInput(value = note, onValueChange = { note = it }, label = "Teaching note (admin only)", placeholder = "Class struggled with topic X")
+
+        VStateHost(
+            loading = state.isLoading,
+            error = state.error,
+            isEmpty = !hasSelection || state.units.isEmpty(),
+            emptyTitle = if (hasSelection) "No units" else "Choose a class",
+            emptyBody = if (hasSelection) "This subject has no syllabus units yet."
+            else "Pick a class and subject to log progress.",
+            emptyIcon = VIcons.FileText,
+            onRetry = onRetry,
+        ) {
+            VCard {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    VLabel("Syllabus progress")
+                    Text(
+                        "${(state.overallProgress * 100).roundToInt()}% • ${state.coveredCount}/${state.units.size}",
+                        style = VTheme.type.dataSm.colored(c.ink2).copy(fontSize = 11.sp),
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                VProgressBar(value = state.overallProgress * 100f)
             }
-        }
-        VCard {
-            VLabel("Parent notification preview")
-            Spacer(Modifier.height(8.dp))
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(c.ink.copy(alpha = 0.06f)).padding(12.dp)) {
-                // Faithful to React: fontSize:13 prose (→ body/ink) with the chapter title bolded
-                // ("…covered <b>Trigonometric Identities</b> in Mathematics today…").
-                Text(
-                    text = buildAnnotatedString {
-                        append("Class 10-A covered ")
-                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                            append("Trigonometric Identities")
+            VCard {
+                state.units.forEachIndexed { i, unit ->
+                    if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(c.border1))
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        CoverToggle(covered = unit.isCovered, enabled = state.updatingUnitId == null) { onToggle(unit.id) }
+                        Column(Modifier.weight(1f)) {
+                            Text(unit.title, style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 13.sp))
+                            if (unit.isCovered && !unit.coveredOn.isNullOrBlank()) {
+                                Text("Covered ${unit.coveredOn}", style = VTheme.type.dataSm.colored(c.ink3).copy(fontSize = 11.sp))
+                            }
                         }
-                        append(" in Mathematics today. Homework: Exercise 8.3, Q 4–14.")
-                    },
-                    // §6.2 React preview box is fontSize 13 (Teacher.tsx:224)
-                    style = VTheme.type.body.colored(c.ink).copy(fontSize = 13.sp),
-                )
+                    }
+                }
             }
         }
-        VButton(text = "Log & notify parents", onClick = {}, full = true, size = VButtonSize.Lg, tone = VButtonTone.Lavender, stateful = true, successLabel = "Logged")
+    }
+}
+
+@Composable
+private fun CoverToggle(covered: Boolean, enabled: Boolean, onToggle: () -> Unit) {
+    val c = VTheme.colors
+    val interaction = remember { MutableInteractionSource() }
+    Box(
+        Modifier
+            .size(28.dp)
+            .clip(CircleShape)
+            .background(if (covered) c.success else c.ink.copy(alpha = 0.06f))
+            .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onToggle),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (covered) {
+            Icon(VIcons.Check, contentDescription = "Covered", tint = Color(0xFF080808), modifier = Modifier.size(16.dp))
+        }
     }
 }

@@ -2,13 +2,11 @@ package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,33 +26,58 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClass
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClassesState
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClassesViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VBackHeader
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
+import com.littlebridge.vidyaprayag.ui.v2.components.VComingSoon
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
+import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import org.koin.compose.viewmodel.koinViewModel
+import kotlin.math.roundToInt
 
 /**
- * TeacherClassesScreenV2 — a pixel-faithful copy of `Teacher.tsx → MyClasses` + `ClassDetail`.
+ * TeacherClassesScreenV2 — `Teacher.tsx → MyClasses` + `ClassDetail`, wired to the real
+ * [TeacherClassesViewModel] (`TeacherRepository.getClasses` → `GET /api/v1/teacher/classes`).
  *
  * A 2-column grid of class cards (students + today %), tapping one opens a back-headered class
- * detail (3-stat header + message button + roster). From [MockV2].
+ * detail (stat header + roster placeholder). No MockV2 in production; the per-student roster has
+ * no backend yet, so the detail surfaces real class stats and a [VComingSoon] roster card.
  */
 @Composable
 fun TeacherClassesScreenV2(
     onOpenClass: (String) -> Unit = {},
     modifier: Modifier = Modifier,
+    viewModel: TeacherClassesViewModel = koinViewModel(),
+) {
+    val state by viewModel.state.collectAsStateV2()
+    TeacherClassesContent(
+        state = state,
+        onOpenClass = onOpenClass,
+        onRetry = viewModel::load,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun TeacherClassesContent(
+    state: TeacherClassesState,
+    onOpenClass: (String) -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
-    val me = MockV2.teachers[1]
-    var detail by remember { mutableStateOf<String?>(null) }
+    var detailId by remember { mutableStateOf<String?>(null) }
 
-    detail?.let { id ->
-        ClassDetail(id = id, onBack = { detail = null }, modifier = modifier)
+    val detail = detailId?.let { id -> state.classes.firstOrNull { it.id == id } }
+    if (detail != null) {
+        ClassDetail(cls = detail, onBack = { detailId = null }, modifier = modifier)
         return
     }
 
@@ -67,71 +90,74 @@ fun TeacherClassesScreenV2(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text("My Classes", style = VTheme.type.h1.colored(c.ink))
-        me.classes.chunked(2).forEach { rowCls ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                rowCls.forEach { cls ->
-                    VCard(modifier = Modifier.weight(1f), onClick = { detail = cls; onOpenClass(cls) }) {
-                        // §6.3 React card title is `${c.slice(0,-1)}-${c.slice(-1)}` → "10-A" (NO spaces),
-                        // unlike the ClassDetail header which uses " - " spacing (Teacher.tsx:269 vs :292).
-                        Text(
-                            cls.dropLast(1) + "-" + cls.takeLast(1),
-                            style = VTheme.type.h3.colored(c.ink).copy(fontSize = 18.sp, fontWeight = FontWeight.Bold),
-                        )
-                        // §6.3 React: fontSize 11, color text-dark-2 (Teacher.tsx:270)
-                        Text("Mathematics", style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp))
-                        Spacer(Modifier.height(12.dp))
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
-                            Column {
-                                Text("32", style = VTheme.type.data.colored(c.ink).copy(fontSize = 18.sp))
-                                Text("Students", style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = TextUnit.Unspecified, fontSize = 10.sp))
-                            }
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text("92%", style = VTheme.type.data.colored(c.teal).copy(fontSize = 18.sp))
-                                Text("Today", style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = TextUnit.Unspecified, fontSize = 10.sp))
+
+        VStateHost(
+            loading = state.isLoading,
+            error = state.error,
+            isEmpty = state.classes.isEmpty(),
+            emptyTitle = "No classes assigned",
+            emptyBody = "Classes you teach will appear here once your school adds them.",
+            emptyIcon = VIcons.Users,
+            onRetry = onRetry,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                state.classes.chunked(2).forEach { rowCls ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        rowCls.forEach { cls ->
+                            VCard(modifier = Modifier.weight(1f), onClick = { detailId = cls.id; onOpenClass(cls.id) }) {
+                                Text(
+                                    cls.className,
+                                    style = VTheme.type.h3.colored(c.ink).copy(fontSize = 18.sp, fontWeight = FontWeight.Bold),
+                                )
+                                Text(cls.subject, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp))
+                                Spacer(Modifier.height(12.dp))
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Column {
+                                        Text(cls.studentCount.toString(), style = VTheme.type.data.colored(c.ink).copy(fontSize = 18.sp))
+                                        Text("Students", style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = TextUnit.Unspecified, fontSize = 10.sp))
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text("${(cls.avgAttendance * 100).roundToInt()}%", style = VTheme.type.data.colored(c.teal).copy(fontSize = 18.sp))
+                                        Text("Attendance", style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = TextUnit.Unspecified, fontSize = 10.sp))
+                                    }
+                                }
                             }
                         }
+                        if (rowCls.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
-                if (rowCls.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }
 }
 
 @Composable
-private fun ClassDetail(id: String, onBack: () -> Unit, modifier: Modifier) {
+private fun ClassDetail(cls: TeacherClass, onBack: () -> Unit, modifier: Modifier) {
     val c = VTheme.colors
     Column(modifier.fillMaxSize()) {
-        // §6.3 React: <VBackHeader … action={<button><Edit3 size={16}/></button>} /> (Teacher.tsx:292)
         VBackHeader(
-            title = "Class ${MockV2.classDisplay(id)}",
+            title = cls.className,
             onBack = onBack,
             action = {
                 Icon(VIcons.Edit3, contentDescription = "Edit", tint = c.ink, modifier = Modifier.size(16.dp))
             },
         )
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                MiniStat("32", "Students", Modifier.weight(1f))
-                MiniStat("92%", "Today", Modifier.weight(1f))
-                MiniStat("74", "UT2 avg", Modifier.weight(1f))
+                MiniStat(cls.studentCount.toString(), "Students", Modifier.weight(1f))
+                MiniStat("${(cls.avgAttendance * 100).roundToInt()}%", "Attendance", Modifier.weight(1f))
+                MiniStat("${(cls.syllabusProgress * 100).roundToInt()}%", "Syllabus", Modifier.weight(1f))
             }
             VButton(text = "Message class parents", onClick = {}, full = true, variant = VButtonVariant.Secondary)
-            VCard {
-                MockV2.students.filter { it.klass == id }.forEachIndexed { i, s ->
-                    if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(c.border1))
-                    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        VAvatar(name = s.name, size = 32.dp)
-                        Column(Modifier.weight(1f)) {
-                            // §6.3 React: name 13/600, "Roll N" mono 11/ink3 (Teacher.tsx:314-315)
-                            Text(s.name, style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 13.sp))
-                            Text("Roll ${s.roll}", style = VTheme.type.dataSm.colored(c.ink3).copy(fontSize = 11.sp))
-                        }
-                        // §6.3 React: attendance% mono 13 (Teacher.tsx:317)
-                        Text("${s.attendance}%", style = VTheme.type.data.colored(c.ink).copy(fontSize = 13.sp))
-                    }
-                }
-            }
+            // No per-class roster endpoint exists yet (LAW 2: no MockV2 in production paths) —
+            // surface an honest placeholder until the roster backend lands.
+            VComingSoon(
+                title = "Student roster",
+                description = "The per-student roster for ${cls.className} will appear here once the class-detail backend is available.",
+            )
         }
     }
 }

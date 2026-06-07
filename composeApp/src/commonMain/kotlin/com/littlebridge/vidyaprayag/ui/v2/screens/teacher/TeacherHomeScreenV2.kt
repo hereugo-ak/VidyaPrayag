@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -22,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,19 +31,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherHomeState
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherHomeViewModel
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherTask
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
-import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
+import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * TeacherHomeScreenV2 — a pixel-faithful copy of `Teacher.tsx → TeacherHome` (dark / night).
+ * TeacherHomeScreenV2 — `Teacher.tsx → TeacherHome`, wired to the real [TeacherHomeViewModel]
+ * (`TeacherRepository.getHome` → `GET /api/v1/teacher/home`).
  *
  * Greeting header (bell + avatar) · "Today's tasks" colour-coded cards · "Today's periods"
- * horizontal scroller (Period 3 highlighted) · recent-activity list. From [MockV2].
+ * horizontal scroller · recent-activity list — all from live VM state. No MockV2 in production:
+ * the three UI states (Loading · Error · Empty) come from [VStateHost].
  */
 @Composable
 fun TeacherHomeScreenV2(
@@ -51,16 +58,35 @@ fun TeacherHomeScreenV2(
     onOpenNotifications: () -> Unit = {},
     onOpenCalendar: () -> Unit = {},
     onExit: () -> Unit = {},
+    viewModel: TeacherHomeViewModel = koinViewModel(),
+) {
+    val state by viewModel.state.collectAsStateV2()
+    TeacherHomeContent(
+        state = state,
+        onOpenNotifications = onOpenNotifications,
+        onOpenCalendar = onOpenCalendar,
+        onExit = onExit,
+        onRetry = viewModel::load,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun TeacherHomeContent(
+    state: TeacherHomeState,
+    onOpenNotifications: () -> Unit,
+    onOpenCalendar: () -> Unit,
+    onExit: () -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
-    val me = MockV2.teachers[1] // Mrs. Priya Iyer
+    val firstName = state.teacherName.substringBefore(' ').ifBlank { state.teacherName }
 
     Column(
         modifier
             .fillMaxSize()
-            // §11.1 — push header under the status bar / iOS notch. The bottom
-            // is owned by the host's VBottomNav (already applies
-            // navigationBarsPadding); we only need top here.
+            // §11.1 — push header under the status bar / iOS notch.
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
@@ -70,9 +96,13 @@ fun TeacherHomeScreenV2(
         // ── Header ──────────────────────────────────────────────────────────
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
             Column {
-                VLabel("Good morning")
-                Text("Priya", style = VTheme.type.h1.colored(c.ink), modifier = Modifier.padding(top = 4.dp))
-                Text("Friday, 5 June 2026", style = VTheme.type.caption.colored(c.ink2))
+                VLabel("Welcome back")
+                Text(
+                    firstName.ifBlank { "Teacher" },
+                    style = VTheme.type.h1.colored(c.ink),
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Text(state.schoolName, style = VTheme.type.caption.colored(c.ink2))
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(
@@ -81,61 +111,83 @@ fun TeacherHomeScreenV2(
                 ) {
                     Icon(VIcons.Bell, contentDescription = "Notifications", tint = c.ink, modifier = Modifier.size(18.dp))
                 }
-                Box(Modifier.clickable { onExit() }) { VAvatar(name = me.name, size = 40.dp) }
+                Box(Modifier.clickable { onExit() }) { VAvatar(name = state.teacherName.ifBlank { "Teacher" }, size = 40.dp) }
             }
         }
 
-        // ── Today's tasks ────────────────────────────────────────────────────
-        Column {
-            Text("Today's tasks", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                // §6: React TaskCard icon-circle uses SOFT pastel fills (not ink):
-                //   success=var(--success) #A8E6CF · warning=var(--warning) #FFD4A3 ·
-                //   arctic=var(--arctic)=teal · neutral=rgba(245,245,243,0.15). (Teacher.tsx L95)
-                TaskCard(c.success, "Class 10-A attendance", "Marked at 9:12 AM • 28 / 32 present", "View details", VIcons.Check)
-                TaskCard(c.warning, "Syllabus update pending", "You haven't logged Period 2 — Mathematics", "Update now", VIcons.AlertCircle)
-                TaskCard(c.teal, "Class 10-A Unit Test 2", "Marks not entered yet • 23 students", "Enter marks", VIcons.ListChecks)
-                TaskCard(Color(0x26F5F5F3), "4 students haven't submitted yesterday's HW", "Mathematics – Algebra worksheet", "View", VIcons.Clock, onCalendar = onOpenCalendar)
-            }
-        }
-
-        // ── Today's periods ──────────────────────────────────────────────────
-        Column {
-            Text("Today's periods", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                MockV2.timetableToday.forEachIndexed { i, p ->
-                    val active = i == 2
-                    Column(
-                        Modifier
-                            .widthIn(min = 150.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (active) c.teal else c.ink.copy(alpha = 0.06f))
-                            .padding(12.dp),
-                    ) {
-                        // §6: React period header uses the `Label` component = labelStrong.
-                        Text("PERIOD ${p.period}", style = VTheme.type.labelStrong.colored(if (active) Color(0xFF080808) else c.ink3))
-                        Text(p.subject, style = VTheme.type.bodyStrong.colored(if (active) Color(0xFF080808) else c.ink), modifier = Modifier.padding(top = 4.dp))
-                        Text("${p.time} • ${p.klass}", style = VTheme.type.dataSm.colored(if (active) Color(0xFF080808).copy(alpha = 0.8f) else c.ink2).copy(fontSize = 11.sp))
+        VStateHost(
+            loading = state.isLoading,
+            error = state.error,
+            isEmpty = state.periods.isEmpty() && state.tasks.isEmpty(),
+            emptyTitle = "Nothing scheduled",
+            emptyBody = "Your tasks and periods for today will show up here.",
+            emptyIcon = VIcons.Calendar,
+            onRetry = onRetry,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                // ── Today's tasks ────────────────────────────────────────────
+                if (state.tasks.isNotEmpty()) {
+                    Column {
+                        Text("Today's tasks", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            state.tasks.forEach { task ->
+                                TaskCard(
+                                    tone = toneForTask(task),
+                                    title = task.title,
+                                    sub = task.subtitle,
+                                    cta = ctaForTask(task),
+                                    icon = iconForTask(task),
+                                    onTap = onOpenCalendar,
+                                )
+                            }
+                        }
                     }
                 }
-            }
-        }
 
-        // ── Recent activity ──────────────────────────────────────────────────
-        Column {
-            Text("Recent activity", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
-            VCard {
-                val rows = listOf(
-                    "Marked Class 9-A attendance" to "9:12 AM",
-                    "Entered Class 10-A Math UT2 marks" to "Yesterday 3:40 PM",
-                    "Updated Class 9-A syllabus — Ch 4" to "Yesterday 11:20 AM",
-                    "Assigned homework — Class 10-A" to "Wed 4:10 PM",
-                )
-                rows.forEachIndexed { i, (what, whenAt) ->
-                    if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(c.border1))
-                    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(what, style = VTheme.type.body.colored(c.ink), modifier = Modifier.weight(1f))
-                        Text(whenAt, style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = TextUnit.Unspecified))
+                // ── Today's periods ──────────────────────────────────────────
+                if (state.periods.isNotEmpty()) {
+                    Column {
+                        Text("Today's periods", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            state.periods.forEach { p ->
+                                val active = p.status.equals("active", ignoreCase = true) ||
+                                    p.status.equals("current", ignoreCase = true)
+                                Column(
+                                    Modifier
+                                        .widthIn(min = 150.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (active) c.teal else c.ink.copy(alpha = 0.06f))
+                                        .padding(12.dp),
+                                ) {
+                                    Text(p.time, style = VTheme.type.labelStrong.colored(if (active) Color(0xFF080808) else c.ink3))
+                                    Text(p.subject, style = VTheme.type.bodyStrong.colored(if (active) Color(0xFF080808) else c.ink), modifier = Modifier.padding(top = 4.dp))
+                                    Text(
+                                        listOfNotNull(p.className.ifBlank { null }, p.room.ifBlank { null }).joinToString(" • "),
+                                        style = VTheme.type.dataSm.colored(if (active) Color(0xFF080808).copy(alpha = 0.8f) else c.ink2).copy(fontSize = 11.sp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── At a glance (live counts) ────────────────────────────────
+                Column {
+                    Text("At a glance", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
+                    VCard {
+                        val rows = listOf(
+                            "Classes today" to state.classesToday.toString(),
+                            "Pending attendance" to state.pendingAttendance.toString(),
+                            "Pending marks" to state.pendingMarks.toString(),
+                            "Homework due" to state.homeworkDue.toString(),
+                        )
+                        rows.forEachIndexed { i, (what, count) ->
+                            if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(c.border1))
+                            Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(what, style = VTheme.type.body.colored(c.ink), modifier = Modifier.weight(1f))
+                                Text(count, style = VTheme.type.data.colored(c.ink).copy(letterSpacing = TextUnit.Unspecified))
+                            }
+                        }
                     }
                 }
             }
@@ -143,8 +195,34 @@ fun TeacherHomeScreenV2(
     }
 }
 
+/** Map a task's `type` to the pastel tone used by the React TaskCard icon-circle. */
 @Composable
-private fun TaskCard(tone: Color, title: String, sub: String, cta: String, icon: ImageVector, onCalendar: () -> Unit = {}) {
+private fun toneForTask(task: TeacherTask): Color {
+    val c = VTheme.colors
+    return when (task.type.lowercase()) {
+        "attendance" -> c.success
+        "syllabus" -> c.warning
+        "marks" -> c.teal
+        else -> Color(0x26F5F5F3)
+    }
+}
+
+private fun iconForTask(task: TeacherTask): ImageVector = when (task.type.lowercase()) {
+    "attendance" -> VIcons.Check
+    "syllabus" -> VIcons.AlertCircle
+    "marks" -> VIcons.ListChecks
+    else -> VIcons.Clock
+}
+
+private fun ctaForTask(task: TeacherTask): String = when (task.type.lowercase()) {
+    "attendance" -> "View details"
+    "syllabus" -> "Update now"
+    "marks" -> "Enter marks"
+    else -> "View"
+}
+
+@Composable
+private fun TaskCard(tone: Color, title: String, sub: String, cta: String, icon: ImageVector, onTap: () -> Unit = {}) {
     val c = VTheme.colors
     VCard {
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -155,7 +233,7 @@ private fun TaskCard(tone: Color, title: String, sub: String, cta: String, icon:
                 Text(title, style = VTheme.type.bodyStrong.colored(c.ink))
                 Text(sub, style = VTheme.type.caption.colored(c.ink2))
             }
-            Text(cta, style = VTheme.type.caption.colored(c.teal).copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.clickable { onCalendar() })
+            Text(cta, style = VTheme.type.caption.colored(c.teal).copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.clickable { onTap() })
         }
     }
 }
