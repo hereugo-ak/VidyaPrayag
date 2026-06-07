@@ -1,11 +1,15 @@
 package com.littlebridge.vidyaprayag
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +28,7 @@ import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.crossfade
 import com.littlebridge.vidyaprayag.presentation.MainViewModel
 import com.littlebridge.vidyaprayag.ui.v2.navigation.NavGraphV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.auth.SplashScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VColors
 import com.littlebridge.vidyaprayag.ui.v2.theme.VPortalTone
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
@@ -97,21 +102,26 @@ fun App() {
         val splashColors: VColors = vColorsFor(VPortalTone.Light)
 
         Box(modifier = Modifier.fillMaxSize().background(splashColors.background)) {
-            if (!authState.isLoaded) {
-                // Minimal loading state until auth/role have been read from preferences.
-                VTheme(tone = VPortalTone.Light) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = splashColors.teal)
-                    }
+            // PHASE 2 — Splash shows the brand while the session check (JWT + role) runs in
+            // parallel inside MainViewModel.authState. The instant `isLoaded` flips true we
+            // crossfade straight into the role-driven graph: no artificial hold, no blank frame.
+            AnimatedContent(
+                targetState = authState.isLoaded,
+                transitionSpec = { fadeIn(tween(280)) togetherWith fadeOut(tween(220)) },
+                label = "splash-to-app",
+                modifier = Modifier.fillMaxSize(),
+            ) { loaded ->
+                if (!loaded) {
+                    SplashScreenV2(modifier = Modifier.fillMaxSize())
+                } else {
+                    val isAuthenticated = !authState.token.isNullOrBlank()
+                    NavGraphV2(
+                        role = authState.role,
+                        isAuthenticated = isAuthenticated,
+                        onLogout = { viewModel.logout() },
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
-            } else {
-                val isAuthenticated = !authState.token.isNullOrBlank()
-                NavGraphV2(
-                    role = authState.role,
-                    isAuthenticated = isAuthenticated,
-                    onLogout = { viewModel.logout() },
-                    modifier = Modifier.fillMaxSize(),
-                )
             }
 
             // Debug-only backend banner (SCHOOL_SIDE_STATUS_REPORT §8.4).
