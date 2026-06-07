@@ -68,11 +68,11 @@ fun NavGraphV2(
 
 /** Typed app role, parsed once from the persisted JWT role string (LAW: no scattered role literals). */
 enum class EntryRole {
-    Parent, SchoolAdmin, Teacher, Unknown;
+    Parent, SchoolAdmin, SuperAdmin, Teacher, Unknown;
 
     fun tone(isAuthenticated: Boolean): VPortalTone = when {
         !isAuthenticated -> VPortalTone.Light
-        this == SchoolAdmin || this == Teacher -> VPortalTone.Warm
+        this == SchoolAdmin || this == SuperAdmin || this == Teacher -> VPortalTone.Warm
         else -> VPortalTone.Light
     }
 
@@ -80,6 +80,9 @@ enum class EntryRole {
         fun from(raw: String?): EntryRole = when (raw?.trim()?.uppercase()) {
             "PARENT" -> Parent
             "ADMIN", "SCHOOL_ADMIN", "SCHOOLADMIN" -> SchoolAdmin
+            // Audit §3.5: super_admin was previously unmapped → Unknown → Parent
+            // portal. It is an operator/admin role, so it lands on the admin surface.
+            "SUPER_ADMIN", "SUPERADMIN" -> SuperAdmin
             "TEACHER" -> Teacher
             else -> Unknown
         }
@@ -224,7 +227,10 @@ private fun AuthedFlow(
 @Composable
 private fun RolePortal(role: EntryRole, onLogout: () -> Unit, modifier: Modifier = Modifier) {
     when (role) {
-        EntryRole.SchoolAdmin -> SchoolPortalV2(onLogout = onLogout, modifier = modifier)
+        // super_admin currently shares the school-admin operator surface (no
+        // dedicated super-admin portal exists yet) — but it is no longer
+        // silently dropped into the parent UI (audit §3.5).
+        EntryRole.SchoolAdmin, EntryRole.SuperAdmin -> SchoolPortalV2(onLogout = onLogout, modifier = modifier)
         EntryRole.Teacher -> TeacherPortalV2(onLogout = onLogout, modifier = modifier)
         EntryRole.Parent -> ParentPortalV2(onLogout = onLogout, modifier = modifier)
         // Authenticated but role unknown → safest default is the parent surface.
