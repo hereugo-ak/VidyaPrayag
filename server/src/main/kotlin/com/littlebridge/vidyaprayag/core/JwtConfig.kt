@@ -34,14 +34,47 @@ import com.auth0.jwt.algorithms.Algorithm
 import java.util.Date
 
 object JwtConfig {
+    private const val DEV_SECRET_FALLBACK = "vidyaprayag-dev-secret-change-me"
+
     private fun env(name: String, default: String): String =
         System.getenv(name)?.takeIf { it.isNotBlank() } ?: default
 
-    val secret: String   by lazy { env("JWT_SECRET", "vidyaprayag-dev-secret-change-me") }
+    private fun rawEnv(name: String): String? =
+        System.getenv(name)?.takeIf { it.isNotBlank() }
+
+    /**
+     * Treat the deployment as production whenever a real Postgres database is
+     * configured (Render/Supabase set DATABASE_URL). This mirrors
+     * DatabaseFactory's own prod detection so we have a single, consistent
+     * signal instead of inventing a new env var.
+     */
+    private val isProduction: Boolean
+        get() = rawEnv("DATABASE_URL") != null
+
+    /**
+     * Resolve the signing secret, HARD-FAILING the boot in production if it is
+     * unset or still the public dev default (audit §3.2, finding E). In dev
+     * (SQLite, no DATABASE_URL) we fall back to the well-known dev secret so a
+     * fresh clone still boots.
+     */
+    val secret: String by lazy {
+        val configured = rawEnv("JWT_SECRET")
+        if (isProduction && (configured == null || configured == DEV_SECRET_FALLBACK)) {
+            throw IllegalStateException(
+                "FATAL: JWT_SECRET must be set to a strong, unique value in production " +
+                "(DATABASE_URL is configured). Refusing to boot with a missing or default " +
+                "signing key — this would allow trivial token forgery."
+            )
+        }
+        configured ?: DEV_SECRET_FALLBACK
+    }
+
     val issuer: String   by lazy { env("JWT_ISSUER", "vidyaprayag-api") }
     val audience: String by lazy { env("JWT_AUDIENCE", "vidyaprayag-app") }
     val realm: String    by lazy { env("JWT_REALM", "vidyaprayag") }
-    val expirySecs: Long by lazy { env("JWT_EXPIRY_SECS", "604800").toLong() } // 7 days
+    // Default access-token TTL shortened to 1 day (was 7) to limit the blast
+    // radius of a leaked/forged token. Refresh tokens cover longer sessions.
+    val expirySecs: Long by lazy { env("JWT_EXPIRY_SECS", "86400").toLong() } // 1 day
 
     private val algorithm by lazy { Algorithm.HMAC256(secret) }
 

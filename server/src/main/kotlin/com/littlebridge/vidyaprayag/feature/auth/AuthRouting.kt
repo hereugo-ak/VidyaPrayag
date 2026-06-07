@@ -161,8 +161,14 @@ internal fun sha256Hex(s: String): String {
     return md.digest(s.toByteArray()).joinToString("") { "%02x".format(it) }
 }
 
-/** Plain SHA-256 password hash. Adequate for MVP; swap to bcrypt later. */
-internal fun hashPassword(p: String): String = sha256Hex("pwd:$p")
+/**
+ * Salted, work-factored password hash (PBKDF2-HMAC-SHA256, per-user random
+ * salt). Replaces the previous unsalted `sha256Hex("pwd:$p")` (audit §3.3).
+ * Delegates to [PasswordHasher] so signup writes a secure hash. Login MUST
+ * verify via [PasswordHasher.verify], never by re-hashing and comparing
+ * strings (a salted hash is non-deterministic).
+ */
+internal fun hashPassword(p: String): String = PasswordHasher.hash(p)
 
 private fun lookupUserByIdentifier(identifier: String): org.jetbrains.exposed.sql.ResultRow? {
     return AppUsersTable.selectAll()
@@ -399,9 +405,19 @@ fun Route.authRouting() {
             // Email → password.  Phone → OTP.
             if (isEmail(id)) {
                 val stored = row[AppUsersTable.passwordHash]
-                if (stored == null || stored != hashPassword(req.password.orEmpty())) {
+                if (!PasswordHasher.verify(req.password.orEmpty(), stored)) {
                     call.fail("Invalid password", HttpStatusCode.Unauthorized, "INVALID_CREDENTIALS")
                     return@post
+                }
+                // Transparently upgrade legacy unsalted SHA-256 hashes on a
+                // successful login so the password store self-heals over time.
+                if (PasswordHasher.needsRehash(stored)) {
+                    val upgraded = PasswordHasher.hash(req.password.orEmpty())
+                    dbQuery {
+                        AppUsersTable.update({ AppUsersTable.id eq row[AppUsersTable.id] }) {
+                            it[passwordHash] = upgraded
+                        }
+                    }
                 }
             } else {
                 if (req.otp.isNullOrBlank()) {
