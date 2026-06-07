@@ -7,6 +7,8 @@ import com.littlebridge.vidyaprayag.db.AppConfigTable
 import com.littlebridge.vidyaprayag.db.ChildrenTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.FeeRecordsTable
+import com.littlebridge.vidyaprayag.db.ScholarshipApplicationsTable
+import com.littlebridge.vidyaprayag.db.ScholarshipsTable
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.response.*
@@ -162,22 +164,64 @@ data class ParentNotificationsDataDto(
 fun Route.parentRouting() {
     authenticate("jwt") {
         route("/api/v1/parent") {
+            // -------- SCHOLARSHIPS (audit §4.2/§5.2 — now DB-backed) --------
+            // Reads real opportunity rows from ScholarshipsTable and the
+            // parent's own applications from ScholarshipApplicationsTable
+            // (scoped by parent uid). Replaces the hardcoded "$45,000 STEM"
+            // fiction. When operators haven't curated any rows yet the lists
+            // are honestly empty (never fabricated).
             get("/scholarships") {
-                val data = ScholarshipsDataDto(
-                    scholarships = listOf(
-                        ScholarshipDto("1", "Global Excellence STEM Award 2024", "Engineering or Math focus.", "$45,000", "3d : 12h", "Full Funding", true),
-                        ScholarshipDto("2", "Social Impact Grant", "Community initiatives support.", "$5,000", "24h left", "Merit Based", true),
-                        ScholarshipDto("3", "Bridge-to-Learning Fund", "First-gen college student aid.", "$12,000", "14 days", "International")
-                    ),
-                    applications = listOf(
-                        ScholarshipApplicationDto("1", "University of Applied Sciences", "B.Arch - Sustainable Urbanism", "Shortlisted", "architecture"),
-                        ScholarshipApplicationDto("2", "Tech Institute of Innovation", "M.Sc - AI", "Under Review", "biotech"),
-                        ScholarshipApplicationDto("3", "Royal Academy of Arts", "BFA - Digital Media Design", "Received", "history_edu")
-                    ),
-                    profileStrength = 85,
-                    streakDays = 3,
-                    currentLevel = 4
-                )
+                val uid = call.principalUserUuid() ?: run {
+                    call.respond(HttpStatusCode.Unauthorized); return@get
+                }
+
+                val data = dbQuery {
+                    val scholarships = ScholarshipsTable.selectAll()
+                        .where { ScholarshipsTable.isActive eq true }
+                        .orderBy(ScholarshipsTable.position, SortOrder.ASC)
+                        .map { row ->
+                            ScholarshipDto(
+                                id = row[ScholarshipsTable.id].value.toString(),
+                                title = row[ScholarshipsTable.title],
+                                description = row[ScholarshipsTable.description],
+                                amount = row[ScholarshipsTable.amount],
+                                timeLeft = row[ScholarshipsTable.timeLeft],
+                                category = row[ScholarshipsTable.category],
+                                isCritical = row[ScholarshipsTable.isCritical]
+                            )
+                        }
+
+                    val applications = ScholarshipApplicationsTable.selectAll()
+                        .where { ScholarshipApplicationsTable.parentId eq uid }
+                        .orderBy(ScholarshipApplicationsTable.position, SortOrder.ASC)
+                        .map { row ->
+                            ScholarshipApplicationDto(
+                                id = row[ScholarshipApplicationsTable.id].value.toString(),
+                                institution = row[ScholarshipApplicationsTable.institution],
+                                program = row[ScholarshipApplicationsTable.program],
+                                status = row[ScholarshipApplicationsTable.status],
+                                iconName = row[ScholarshipApplicationsTable.iconName]
+                            )
+                        }
+
+                    // Gamification fields derived from real signals (no fixed fiction):
+                    //  - profile_strength scales with how complete the parent's
+                    //    application footprint is (0 apps → 40, capped at 100).
+                    //  - current_level = highest child level the parent has.
+                    val childLevels = ChildrenTable.selectAll()
+                        .where { (ChildrenTable.parentId eq uid) and (ChildrenTable.isActive eq true) }
+                        .map { it[ChildrenTable.currentLevel] }
+                    val currentLevel = childLevels.maxOrNull() ?: 1
+                    val profileStrength = (40 + applications.size * 15).coerceAtMost(100)
+
+                    ScholarshipsDataDto(
+                        scholarships = scholarships,
+                        applications = applications,
+                        profileStrength = profileStrength,
+                        streakDays = 0,
+                        currentLevel = currentLevel
+                    )
+                }
                 call.ok(data, message = "Scholarships data fetched")
             }
 

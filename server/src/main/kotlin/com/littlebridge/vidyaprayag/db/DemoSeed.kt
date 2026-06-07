@@ -51,6 +51,10 @@ object DemoSeed {
     private val PARENT_ID  = UUID.fromString("00000000-0000-0000-0000-0000000000b4")
     private val CHILD_ID   = UUID.fromString("00000000-0000-0000-0000-0000000000c1")
 
+    // Deterministic anchor ids so the scholarship seed is idempotent across boots.
+    private val SCHOLARSHIP_ANCHOR_ID = UUID.fromString("00000000-0000-0000-0000-0000000000d1")
+    private val APPLICATION_ANCHOR_ID = UUID.fromString("00000000-0000-0000-0000-0000000000e1")
+
     fun ensureDemoData() {
         transaction {
             seedSchool()
@@ -61,6 +65,7 @@ object DemoSeed {
             seedChild()
             seedFeeRecords()
             seedAnnouncement()
+            seedScholarships()
         }
     }
 
@@ -191,6 +196,119 @@ object DemoSeed {
             it[createdBy] = ADMIN_ID
             it[createdAt] = now
             it[updatedAt] = now
+        }
+    }
+
+    /**
+     * Seeds a small set of operator-curated scholarship opportunities plus a few
+     * applications for the demo parent, so the parent Scholarships screen shows
+     * real DB-backed rows on first boot (audit §4.2/§5.2). The hardcoded
+     * "$45,000 STEM Award" fiction used to live in the /scholarships handler;
+     * now it lives here as honest, editable seed data.
+     *
+     * Idempotency: the opportunity seed is guarded on a deterministic anchor id
+     * (first row) and the application seed on a deterministic anchor id, so
+     * repeated cold boots never duplicate rows.
+     */
+    private fun seedScholarships() {
+        val now = Instant.now()
+
+        val scholarshipsSeeded = ScholarshipsTable.selectAll()
+            .where { ScholarshipsTable.id eq SCHOLARSHIP_ANCHOR_ID }
+            .any()
+        if (!scholarshipsSeeded) {
+            data class Opportunity(
+                val anchorId: UUID?,
+                val title: String,
+                val description: String,
+                val amount: String,
+                val timeLeft: String,
+                val category: String,
+                val critical: Boolean,
+                val position: Int
+            )
+            val opportunities = listOf(
+                Opportunity(
+                    SCHOLARSHIP_ANCHOR_ID,
+                    "Global Excellence STEM Award 2026",
+                    "For students with a strong focus on Engineering or Mathematics.",
+                    "₹45,000", "3d : 12h", "Full Funding", true, 0
+                ),
+                Opportunity(
+                    null,
+                    "Social Impact Grant",
+                    "Supports students leading community initiatives.",
+                    "₹5,000", "24h left", "Merit Based", true, 1
+                ),
+                Opportunity(
+                    null,
+                    "Bridge-to-Learning Fund",
+                    "First-generation college student aid.",
+                    "₹12,000", "14 days", "Need Based", false, 2
+                )
+            )
+            opportunities.forEach { opp ->
+                ScholarshipsTable.insert {
+                    it[id] = opp.anchorId ?: UUID.randomUUID()
+                    it[title] = opp.title
+                    it[description] = opp.description
+                    it[amount] = opp.amount
+                    it[timeLeft] = opp.timeLeft
+                    it[category] = opp.category
+                    it[isCritical] = opp.critical
+                    it[position] = opp.position
+                    it[isActive] = true
+                    it[createdAt] = now
+                    it[updatedAt] = now
+                }
+            }
+        }
+
+        val applicationsSeeded = ScholarshipApplicationsTable.selectAll()
+            .where { ScholarshipApplicationsTable.id eq APPLICATION_ANCHOR_ID }
+            .any()
+        if (!applicationsSeeded) {
+            data class Application(
+                val anchorId: UUID?,
+                val institution: String,
+                val program: String,
+                val status: String,
+                val icon: String,
+                val position: Int
+            )
+            val applications = listOf(
+                Application(
+                    APPLICATION_ANCHOR_ID,
+                    "University of Applied Sciences",
+                    "B.Arch - Sustainable Urbanism",
+                    "Shortlisted", "architecture", 0
+                ),
+                Application(
+                    null,
+                    "Tech Institute of Innovation",
+                    "M.Sc - AI",
+                    "Under Review", "biotech", 1
+                ),
+                Application(
+                    null,
+                    "Royal Academy of Arts",
+                    "BFA - Digital Media Design",
+                    "Received", "history_edu", 2
+                )
+            )
+            applications.forEach { app ->
+                ScholarshipApplicationsTable.insert {
+                    it[id] = app.anchorId ?: UUID.randomUUID()
+                    it[parentId] = PARENT_ID
+                    it[institution] = app.institution
+                    it[program] = app.program
+                    it[status] = app.status
+                    it[iconName] = app.icon
+                    it[position] = app.position
+                    it[createdAt] = now
+                    it[updatedAt] = now
+                }
+            }
         }
     }
 }

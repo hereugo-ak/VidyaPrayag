@@ -16,7 +16,7 @@
  * Run all four in Supabase → SQL Editor before pointing the backend at
  * production. For local-dev SQLite fallback, Exposed auto-creates the tables
  * in the order declared in DatabaseFactory.allTables. In Postgres, boot-time
- * validation (DatabaseFactory.validateSchema) logs any of the 36 tables that
+ * validation (DatabaseFactory.validateSchema) logs any of the 38 tables that
  * are missing and refuses to start when AUTO_CREATE_TABLES is not enabled.
  *
  * IMPORTANT DESIGN CHOICES
@@ -734,4 +734,46 @@ object TeacherPeriodsTable : UUIDTable("teacher_periods", "id") {
     val room       = text("room").default("")
     val position   = integer("position").default(0)
     val createdAt  = timestamp("created_at")
+}
+
+// =====================================================================
+// Parent Scholarships (parent_api_spec.artifact.md §Module: Scholarships)
+// =====================================================================
+
+/**
+ * Scholarship opportunities surfaced on the parent Scholarships screen.
+ *
+ * Replaces the hardcoded `"$45,000 STEM Award"` fiction (audit §4.2/§5.2) the
+ * `/scholarships` route used to return. Rows are operator-curated (seeded /
+ * managed) opportunities; the endpoint reads real rows from here so adding or
+ * retiring a scholarship is a DB write, not a redeploy. `isActive=false` hides
+ * a row without deleting it. `position` controls display order.
+ */
+object ScholarshipsTable : UUIDTable("scholarships", "id") {
+    val title       = text("title")
+    val description = text("description")
+    val amount      = text("amount")                    // display string e.g. "₹45,000"
+    val timeLeft    = text("time_left").default("")      // display string e.g. "3d : 12h"
+    val category    = varchar("category", 48).default("Merit Based")
+    val isCritical  = bool("is_critical").default(false)
+    val position    = integer("position").default(0)
+    val isActive    = bool("is_active").default(true)
+    val createdAt   = timestamp("created_at")
+    val updatedAt   = timestamp("updated_at")
+}
+
+/**
+ * A parent's scholarship applications (the "applications" list on the same
+ * screen). Scoped to the applying parent so each parent sees only their own.
+ * `iconName` mirrors the UI's institution glyph.
+ */
+object ScholarshipApplicationsTable : UUIDTable("scholarship_applications", "id") {
+    val parentId    = uuid("parent_id")                 // FK app_users.id
+    val institution = text("institution")
+    val program     = text("program")
+    val status      = varchar("status", 24).default("Received") // Received | Under Review | Shortlisted
+    val iconName    = varchar("icon_name", 32).default("school")
+    val position    = integer("position").default(0)
+    val createdAt   = timestamp("created_at")
+    val updatedAt   = timestamp("updated_at")
 }

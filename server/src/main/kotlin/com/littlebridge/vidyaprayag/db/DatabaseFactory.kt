@@ -79,7 +79,10 @@ object DatabaseFactory {
         SyllabusUnitsTable,
         HomeworkTable,
         HomeworkSubmissionsTable,
-        TeacherPeriodsTable
+        TeacherPeriodsTable,
+        // Parent scholarships (audit §4.2/§5.2 — DB-backed, replaces hardcoded list)
+        ScholarshipsTable,
+        ScholarshipApplicationsTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */
