@@ -6,6 +6,7 @@ import com.littlebridge.vidyaprayag.db.AnnouncementsTable
 import com.littlebridge.vidyaprayag.db.AppConfigTable
 import com.littlebridge.vidyaprayag.db.ChildrenTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
+import com.littlebridge.vidyaprayag.db.FeeRecordsTable
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.response.*
@@ -134,6 +135,30 @@ data class ParentAnnouncementsDataDto(
     @SerialName("is_whatsapp_sync_enabled") val isWhatsAppSyncEnabled: Boolean
 )
 
+// --- Notifications (report §5.3 — MockV2 eradication, SWEEP-A) ---
+// A unified inbox feed for the parent. Aggregates two real signals:
+//   1. School announcements (AnnouncementsTable) scoped to the parent's
+//      children's schools — same source as /announcements.
+//   2. Fee reminders (FeeRecordsTable) for DUE/OVERDUE line items belonging
+//      to this parent — surfaced as actionable notifications.
+// The client maps `category` → the existing VNotification tinting:
+//   "fees" | "academic" | "attendance" | "announcement".
+@Serializable
+data class ParentNotificationDto(
+    val id: String,
+    val category: String,
+    val title: String,
+    val body: String,
+    val time: String,
+    val unread: Boolean = true
+)
+
+@Serializable
+data class ParentNotificationsDataDto(
+    val notifications: List<ParentNotificationDto>,
+    @SerialName("unread_count") val unreadCount: Int
+)
+
 fun Route.parentRouting() {
     authenticate("jwt") {
         route("/api/v1/parent") {
@@ -219,6 +244,89 @@ fun Route.parentRouting() {
                     )
                 }
                 call.ok(data, message = "Announcements data fetched")
+            }
+
+            // -------- NOTIFICATIONS (report §5.3, SWEEP-A) --------
+            // Real unified inbox replacing MockV2.notifications. Combines the
+            // school announcements this parent can see with fee reminders for
+            // any DUE/OVERDUE line items they owe, newest first.
+            get("/notifications") {
+                val uid = call.principalUserUuid() ?: run {
+                    call.respond(HttpStatusCode.Unauthorized); return@get
+                }
+
+                val data = dbQuery {
+                    val items = mutableListOf<Pair<java.time.Instant, ParentNotificationDto>>()
+
+                    // 1) School announcements scoped to the parent's children.
+                    val schoolIds = ChildrenTable.selectAll()
+                        .where {
+                            (ChildrenTable.parentId eq uid) and (ChildrenTable.isActive eq true)
+                        }
+                        .mapNotNull { it[ChildrenTable.schoolId] }
+                        .distinct()
+
+                    if (schoolIds.isNotEmpty()) {
+                        val schoolFilter = schoolIds
+                            .map { schoolId -> AnnouncementsTable.schoolId eq schoolId }
+                            .reduce { acc, op -> acc or op }
+
+                        AnnouncementsTable.selectAll()
+                            .where { schoolFilter }
+                            .orderBy(AnnouncementsTable.createdAt, SortOrder.DESC)
+                            .forEach { row ->
+                                val createdAt = row[AnnouncementsTable.createdAt]
+                                items += createdAt to ParentNotificationDto(
+                                    id = "ann_" + row[AnnouncementsTable.id].value.toString(),
+                                    category = "announcement",
+                                    title = row[AnnouncementsTable.title],
+                                    body = row[AnnouncementsTable.description],
+                                    time = row[AnnouncementsTable.date],
+                                    unread = true,
+                                )
+                            }
+                    }
+
+                    // 2) Fee reminders — only outstanding (DUE/OVERDUE) items.
+                    FeeRecordsTable.selectAll()
+                        .where {
+                            (FeeRecordsTable.parentId eq uid) and
+                                ((FeeRecordsTable.status eq "DUE") or (FeeRecordsTable.status eq "OVERDUE"))
+                        }
+                        .orderBy(FeeRecordsTable.updatedAt, SortOrder.DESC)
+                        .forEach { row ->
+                            val overdue = row[FeeRecordsTable.status].equals("OVERDUE", ignoreCase = true)
+                            val currency = row[FeeRecordsTable.currency]
+                            val amount = row[FeeRecordsTable.amount]
+                            val due = row[FeeRecordsTable.dueDate]
+                            items += row[FeeRecordsTable.updatedAt] to ParentNotificationDto(
+                                id = "fee_" + row[FeeRecordsTable.id].value.toString(),
+                                category = "fees",
+                                title = if (overdue) {
+                                    "Overdue: ${row[FeeRecordsTable.title]}"
+                                } else {
+                                    "Fee due: ${row[FeeRecordsTable.title]}"
+                                },
+                                body = buildString {
+                                    append("$currency ")
+                                    append(if (amount % 1.0 == 0.0) amount.toLong().toString() else amount.toString())
+                                    if (!due.isNullOrBlank()) append(" • due $due")
+                                },
+                                time = due ?: "",
+                                unread = true,
+                            )
+                        }
+
+                    val ordered = items
+                        .sortedByDescending { it.first }
+                        .map { it.second }
+
+                    ParentNotificationsDataDto(
+                        notifications = ordered,
+                        unreadCount = ordered.count { it.unread },
+                    )
+                }
+                call.ok(data, message = "Notifications fetched")
             }
         }
     }
