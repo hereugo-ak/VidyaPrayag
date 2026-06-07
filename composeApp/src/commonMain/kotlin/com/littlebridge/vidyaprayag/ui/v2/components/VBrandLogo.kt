@@ -23,14 +23,14 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 /**
  * VBrandLogo — the **single source of truth** for the VidyaSetu "Setu" (bridge) mark.
  *
- * This is the exact bridge geometry the auth surface renders (LoginScreenV2 `LogoCube`,
- * WelcomeScreenV2 `BridgeMark`): a white arc spanning two grounded pillars over a deck, three
- * suspension cables and a navy centre node — drawn on a 56-unit viewBox so it scales crisply at any
- * size. Splash, landing and login all draw from here so the logo is byte-identical everywhere.
+ * This is the exact bridge geometry the auth surface renders: a white arc spanning two grounded
+ * pillars over a deck, three suspension cables and a navy centre node — drawn on a 56-unit viewBox
+ * so it scales crisply at any size. Splash, landing and the auth screens all draw from here so the
+ * logo is byte-identical everywhere.
  *
  * Two presentations:
  *  • [VBrandLogo]      — the glass "cube" plate (frosted white-on-teal) carrying the mark, used on
- *                         the teal hero of Splash / Login / Welcome.
+ *                         the teal hero of Splash / auth surfaces.
  *  • [VBridgeMark]     — the bare stroked mark (no plate), for when the caller supplies the surface.
  */
 @Composable
@@ -59,7 +59,7 @@ fun VBrandLogo(
  * white arc + deck + 3 cables, two white pillar caps and a navy centre node at (28,22).
  *
  * Pass [stroke] to recolor the strokes (defaults to white, for the teal hero); the centre node uses
- * [navyDot]. Identical geometry to `LoginScreenV2.LogoCube` / `WelcomeScreenV2.BridgeMark`.
+ * [navyDot]. This component is the single source of the mark's geometry across every surface.
  */
 @Composable
 fun VBridgeMark(

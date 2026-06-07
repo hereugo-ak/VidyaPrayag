@@ -76,7 +76,7 @@ fun SplashScreenV2(modifier: Modifier = Modifier) = VTheme(tone = VPortalTone.Li
         launch { taglineAlpha.animateTo(1f, tween(400, delayMillis = 380)) }
     }
 
-    // Halo pulse — opacity [0,.6,0] over 2.4s, ∞ (mirrors WelcomeScreenV2).
+    // Halo pulse — opacity [0,.6,0] over 2.4s, ∞.
     val halo = rememberInfiniteTransition(label = "splash-halo")
     val haloAlpha by halo.animateFloat(
         initialValue = 0f,

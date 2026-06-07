@@ -52,7 +52,7 @@ import kotlinx.coroutines.launch
 /**
  * AuthScaffoldV2 — the shared chrome for the role-scoped auth screens (PHASE 4).
  *
- * Reproduces the LoginScreenV2 silhouette — a teal brand hero carrying the single-source
+ * The canonical auth silhouette — a teal brand hero carrying the single-source
  * [VBrandLogo], a back chip, the screen [title]/[subtitle], and a rounded form sheet that overlaps
  * the hero — but without the portal selector, so each scoped screen renders only its own role's UI
  * (LAW 3: no role leakage). The caller supplies the role-specific fields + CTA via [content].

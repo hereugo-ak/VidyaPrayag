@@ -28,7 +28,7 @@ import org.koin.compose.viewmodel.koinViewModel
 /**
  * ParentAuthScreenV2 — the parent-scoped sign-in / sign-up (PHASE 4).
  *
- * A fork of the combined `LoginScreenV2`, locked to the **PARENT** role with the OTP (phone) flow
+ * The parent-only auth surface, locked to the **PARENT** role with the OTP (phone) flow
  * only. There is zero admin UI here (LAW 3: no role leakage) — no portal selector, no password
  * field, no email/credential affordance. Copy speaks only to families.
  *
