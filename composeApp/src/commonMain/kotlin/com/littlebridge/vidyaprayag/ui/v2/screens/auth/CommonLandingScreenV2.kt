@@ -56,14 +56,19 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.littlebridge.vidyaprayag.domain.util.UiState
+import com.littlebridge.vidyaprayag.feature.content.domain.model.LandingData
+import com.littlebridge.vidyaprayag.feature.content.presentation.LandingViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VBrandLogo
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
+import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VMotion
 import com.littlebridge.vidyaprayag.ui.v2.theme.VPortalTone
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 import com.littlebridge.vidyaprayag.ui.v2.theme.pressScale
+import org.koin.compose.viewmodel.koinViewModel
 import kotlinx.coroutines.launch
 
 /**
@@ -85,9 +90,18 @@ fun CommonLandingScreenV2(
     onParent: () -> Unit,
     onAdmin: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: LandingViewModel = koinViewModel(),
 ) = VTheme(tone = VPortalTone.Light) {
     val c = VTheme.colors
     val d = VTheme.dimens
+
+    // §9 finding L — the landing copy is now driven by the real CMS pipeline
+    // (LandingViewModel → ContentRepository → GET /api/v1/content/landing,
+    // cms_landing_content). The hardcoded strings below act only as graceful
+    // fallbacks while the content loads or if the CMS is empty/unreachable, so
+    // the entry cards are never blocked by a network state on a public screen.
+    val landingState by viewModel.landingState.collectAsStateV2()
+    val cms: LandingData? = (landingState as? UiState.Success)?.data
 
     // Reveal ladder (mirrors the Welcome/Splash motion vocabulary).
     val logoScale = remember { Animatable(0.84f) }
@@ -186,7 +200,9 @@ fun CommonLandingScreenV2(
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Education with trust. Progress with purpose.",
+                    cms?.let { listOf(it.topTagline, it.subTagline).filter(String::isNotBlank).joinToString(" ") }
+                        ?.takeIf { it.isNotBlank() }
+                        ?: "Education with trust. Progress with purpose.",
                     style = VTheme.type.body.colored(Color.White.copy(alpha = 0.92f)).copy(fontSize = 14.sp),
                     textAlign = TextAlign.Center,
                     modifier = Modifier
@@ -288,7 +304,8 @@ fun CommonLandingScreenV2(
                     accent = c.teal,
                     accentInk = c.tealDeep,
                     title = "I'm a Parent",
-                    body = "Track attendance, fees, homework and your child's progress — secured by a quick OTP sign-in.",
+                    body = cms?.parentInfo?.subTagline?.takeIf { it.isNotBlank() }
+                        ?: "Track attendance, fees, homework and your child's progress — secured by a quick OTP sign-in.",
                     onClick = onParent,
                 )
                 RoleCard(
@@ -296,7 +313,8 @@ fun CommonLandingScreenV2(
                     accent = c.warmOrange,
                     accentInk = c.warmOrange,
                     title = "School / Administration",
-                    body = "For school admins and teachers. Manage classes, staff, records and announcements.",
+                    body = cms?.schoolInfo?.subTagline?.takeIf { it.isNotBlank() }
+                        ?: "For school admins and teachers. Manage classes, staff, records and announcements.",
                     onClick = onAdmin,
                 )
             }
