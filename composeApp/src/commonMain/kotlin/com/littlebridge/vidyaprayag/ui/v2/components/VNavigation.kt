@@ -26,7 +26,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -116,10 +118,30 @@ fun VBottomNav(
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
+    // §14/§13.1 — the design floats the bar with a soft UPWARD navy-tinted
+    // shadow (`0 -4px 20px navy@4%`), not the default downward Material shadow.
+    // Modifier.shadow can only cast downward + can't tint, so we draw a short
+    // navy gradient that fades upward just above the bar's top edge.
+    val topShadow = if (c.isNight) {
+        Modifier
+    } else {
+        Modifier.drawBehind {
+            val h = 20.dp.toPx()
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color.Transparent, c.shadowTint.copy(alpha = 0.04f)),
+                    startY = -h,
+                    endY = 0f,
+                ),
+                topLeft = Offset(0f, -h),
+                size = androidx.compose.ui.geometry.Size(size.width, h),
+            )
+        }
+    }
     Column(
         modifier
             .fillMaxWidth()
-            .shadow(if (c.isNight) 0.dp else 20.dp)
+            .then(topShadow)
             .background(c.card),
     ) {
         VDivider()
