@@ -194,7 +194,7 @@ object CmsSeed {
                       "min_value": 0,
                       "max_value": 10000,
                       "default_range": [2000, 5000],
-                      "currency_symbol": "$"
+                      "currency_symbol": "₹"
                     }
                 """.trimIndent(),
 

@@ -472,7 +472,7 @@ object FeeRecordsTable : UUIDTable("fee_records", "id") {
     val title       = text("title")
     val description = text("description").nullable()
     val amount      = double("amount").default(0.0)
-    val currency    = varchar("currency", 8).default("USD")
+    val currency    = varchar("currency", 8).default("INR")             // India-first default (audit §11 L3)
     val dueDate     = varchar("due_date", 12).nullable()                // YYYY-MM-DD
     val status      = varchar("status", 16).default("DUE")              // PAID | DUE | OVERDUE
     val category    = varchar("category", 32).default("Tuition")        // Tuition | Transport | ...
