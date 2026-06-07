@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -130,6 +131,9 @@ private fun ChildSwitcher(
         modifier
             .fillMaxWidth()
             .background(c.card)
+            // §11.1 — push the opaque switcher card below the status bar on
+            // Android + iOS so the avatar/name aren't clipped by the notch.
+            .statusBarsPadding()
             .padding(horizontal = 20.dp)
             .padding(top = 20.dp, bottom = 12.dp),
     ) {
