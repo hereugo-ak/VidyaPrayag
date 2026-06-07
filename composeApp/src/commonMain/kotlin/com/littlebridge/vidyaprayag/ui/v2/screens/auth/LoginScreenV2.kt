@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.feature.auth.presentation.AuthStep
 import com.littlebridge.vidyaprayag.feature.auth.presentation.AuthViewModel
+import com.littlebridge.vidyaprayag.ui.v2.components.VBrandLogo
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
@@ -371,44 +372,13 @@ fun LoginScreenV2(
 // Brand panel pieces
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** The frosted-glass logo cube with the white bridge mark — identical to Splash. */
+/**
+ * The frosted-glass logo cube with the white bridge mark — identical to Splash & Landing because all
+ * three now render the single-source [VBrandLogo] (PHASE 1: zero visual discrepancy across surfaces).
+ */
 @Composable
 private fun LogoCube(modifier: Modifier = Modifier) {
-    val navy = VTheme.colors.navy
-    Box(
-        modifier
-            .size(160.dp)
-            .clip(RoundedCornerShape(28.dp))
-            .background(Color.White.copy(alpha = 0.16f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(Modifier.size(100.dp)) {
-            val s = size.width / 56f
-            fun x(v: Float) = v * s
-            fun y(v: Float) = v * s
-
-            // arc M12 32 Q28 12 44 32
-            val arc = Path().apply {
-                moveTo(x(12f), y(32f))
-                quadraticTo(x(28f), y(12f), x(44f), y(32f))
-            }
-            drawPath(arc, color = Color.White, style = Stroke(width = 3f * s, cap = StrokeCap.Round))
-
-            // deck M10 40 H46
-            drawLine(Color.White, Offset(x(10f), y(40f)), Offset(x(46f), y(40f)), strokeWidth = 3.5f * s, cap = StrokeCap.Round)
-
-            // cables
-            val cable = Color.White.copy(alpha = 0.75f)
-            drawLine(cable, Offset(x(18f), y(32f)), Offset(x(18f), y(40f)), strokeWidth = 1.6f * s, cap = StrokeCap.Round)
-            drawLine(cable, Offset(x(28f), y(22f)), Offset(x(28f), y(40f)), strokeWidth = 1.6f * s, cap = StrokeCap.Round)
-            drawLine(cable, Offset(x(38f), y(32f)), Offset(x(38f), y(40f)), strokeWidth = 1.6f * s, cap = StrokeCap.Round)
-
-            // pillar caps
-            drawCircle(Color.White, radius = 2.6f * s, center = Offset(x(12f), y(32f)))
-            drawCircle(Color.White, radius = 2.6f * s, center = Offset(x(44f), y(32f)))
-            drawCircle(navy, radius = 2.2f * s, center = Offset(x(28f), y(22f)))
-        }
-    }
+    VBrandLogo(modifier = modifier, size = 160.dp)
 }
 
 /** A small wispy cloud outline used as faint hero decoration. */
