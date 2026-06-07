@@ -186,7 +186,10 @@ private fun AuthedFlow(
             .getOrNull() ?: true // null session (returning user / restart) → treat as completed
         route = when (role) {
             EntryRole.Parent -> if (profileCompleted) AuthedRoute.Portal else AuthedRoute.ParentLinkChild
-            EntryRole.SchoolAdmin -> if (profileCompleted) AuthedRoute.Portal else AuthedRoute.SchoolOnboarding
+            // super_admin shares the school-admin operator surface (see RolePortal below)
+            // and therefore shares its first-login gate too.
+            EntryRole.SchoolAdmin,
+            EntryRole.SuperAdmin -> if (profileCompleted) AuthedRoute.Portal else AuthedRoute.SchoolOnboarding
             EntryRole.Teacher -> if (profileCompleted) AuthedRoute.Portal else AuthedRoute.TeacherFirstLogin
             EntryRole.Unknown -> AuthedRoute.Portal
         }
