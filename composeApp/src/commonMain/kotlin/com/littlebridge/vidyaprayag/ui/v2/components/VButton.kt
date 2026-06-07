@@ -200,12 +200,15 @@ fun VButton(
             drawContent()
             val s = sweep.value
             if (s > 0f && s < 1f) {
-                val w = size.width
+                // NOTE: the VButton function has a `size: VButtonSize` parameter which
+                // shadows DrawScope.size inside this lambda, so we bind it explicitly.
+                val canvasSize = this@drawWithContent.size
+                val w = canvasSize.width
                 val bandW = w * 0.55f
                 // Travel from fully off-screen left to fully off-screen right.
                 val centerX = -bandW + (w + bandW * 2f) * s
                 // Skew -20°: offset the gradient's top vs bottom horizontally.
-                val skew = size.height * 0.36f // tan(20°) ≈ 0.364
+                val skew = canvasSize.height * 0.36f // tan(20°) ≈ 0.364
                 val brush = Brush.linearGradient(
                     colorStops = arrayOf(
                         0f to Color.Transparent,
@@ -213,7 +216,7 @@ fun VButton(
                         1f to Color.Transparent,
                     ),
                     start = Offset(centerX - bandW / 2f + skew, 0f),
-                    end = Offset(centerX + bandW / 2f - skew, size.height),
+                    end = Offset(centerX + bandW / 2f - skew, canvasSize.height),
                 )
                 drawRect(brush = brush)
             }
