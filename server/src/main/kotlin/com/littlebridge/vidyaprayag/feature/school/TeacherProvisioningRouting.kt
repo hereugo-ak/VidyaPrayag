@@ -4,7 +4,7 @@
  *
  * Fixes audit finding C (§3.1): there was previously NO code path anywhere that
  * created a `teacher` app_users row, so login could never find a teacher and
- * the entire /api/v1/teacher/* surface + teacher portal were dead in
+ * the entire /api/v1/teacher/... surface + teacher portal were dead in
  * production. This adds a school-admin-only endpoint that provisions a teacher
  * account scoped to the admin's own school.
  *
