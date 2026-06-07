@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -64,6 +65,14 @@ fun ParentPortalV2(
     var overlay by remember { mutableStateOf(ParentOverlay.None) }
     var activeChild by remember { mutableStateOf(0) }
     val child = MockV2.siblings[activeChild]
+
+    // §11 cross-platform — Android predictive back / iOS edge-swipe should
+    // dismiss the full-screen Notifications/Calendar overlay back to the tabs,
+    // not exit the portal entirely. Mirrors the React `onBack` wiring that
+    // each overlay screen already passes to its sheet.
+    BackHandler(enabled = overlay != ParentOverlay.None) {
+        overlay = ParentOverlay.None
+    }
 
     when (overlay) {
         ParentOverlay.Notifications -> {
