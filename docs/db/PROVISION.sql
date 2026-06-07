@@ -1,15 +1,23 @@
 -- ============================================================================
 -- VidyaPrayag — CANONICAL DATABASE PROVISIONING SCRIPT
--- ----------------------------------------------------------------------------
--- Audit finding A (§1): there were two conflicting "source of truth" schemas
--- and NO single document that listed the complete table set. Following either
--- previously-documented recipe left the server missing 6–15 tables, so the
--- teacher / messaging / ptm / fee endpoints 500'd on a fresh deploy.
+-- ============================================================================
 --
--- THIS is the only complete recipe. Run the four files below, IN THIS ORDER,
--- against a fresh Postgres / Supabase database (Supabase → SQL Editor, or psql).
--- Together they create all 36 tables registered in
--- server/.../db/DatabaseFactory.kt#allTables.
+-- TL;DR — if you are running against Supabase, do this:
+--
+--   1. Open Supabase → SQL Editor → + New query
+--   2. Paste ALL of:  scripts/schema-all-in-one-2026-06-07.sql
+--   3. Click Run.  This creates every table the backend + seed need.
+--   4. Paste ALL of:  scripts/seed-2026-06-07.sql
+--   5. Click Run.  This loads the test data.
+--
+-- That's it. PROVISION.sql ITSELF DOES NOTHING — it's just documentation.
+-- The actual schema is split across the files listed below, all rolled into
+-- the all-in-one file referenced above.
+--
+-- ----------------------------------------------------------------------------
+-- WHAT FILES ARE IN THE ALL-IN-ONE
+-- ----------------------------------------------------------------------------
+-- scripts/schema-all-in-one-2026-06-07.sql concatenates, in dependency order:
 --
 --   1. docs/db/vidyasetu_schema.sql
 --        Base operational tables (app_users, auth_otps, user_sessions,
@@ -19,51 +27,41 @@
 --
 --   2. docs/db/migration_001_faculty_and_holiday_list.sql
 --        Adds the supplementary tables Tables.kt maps but the base omitted:
---        faculty, holiday_list. (Use these — NOT the duplicate copy-paste
---        faculty:/holiday_list: blocks inside the base file.)
+--        faculty, holiday_list.
 --
 --   3. docs/db/migration_002_segmentation_geo_assignments.sql
 --        Adds announcement broadcast segmentation columns; the
 --        teacher_subject_assignments table; and children.student_code.
---        NOTE (audit §1.3 LATLONG): schools.latitude / schools.longitude — REQUIRED
---        by the parent /schools/discover Haversine sort — are now part of the BASE
---        schema (step 1) so that query can never throw "column does not exist" even
---        if this migration is skipped. migration_002 still ADD COLUMN IF NOT EXISTS
---        for them, which is a harmless no-op once the base schema has created them.
 --
 --   4. docs/backend/sql/02_teacher_schema.sql
---        The 6 teacher-vertical tables: assessments, assessment_marks,
+--        Teacher-vertical tables: assessments, assessment_marks,
 --        syllabus_units, homework, homework_submissions, teacher_periods.
---        (This step was missing from every previously-documented recipe.)
 --
--- AFTER running all four, the backend's boot-time schema validation
--- (DatabaseFactory.validateSchema) will report "all 36 tables present" and the
--- server will start. If any table is missing it logs the list and refuses to
--- boot in production (unless AUTO_CREATE_TABLES=true is set, which lets Exposed
--- create them itself).
+--   5. scripts/schema-patch-2026-06-07.sql
+--        Scholarships + scholarship_applications (RE-AUDIT RA-05).
+--
+-- ALL CREATE TABLE statements use IF NOT EXISTS, so it is safe to re-run.
 --
 -- ----------------------------------------------------------------------------
--- HOW TO RUN
+-- ALTERNATIVE: running with psql from the repo root
 -- ----------------------------------------------------------------------------
--- Option A — psql with \i includes (run from the repository root):
+-- If you have psql installed, you can run the original files in order:
 --
 --     \i docs/db/vidyasetu_schema.sql
 --     \i docs/db/migration_001_faculty_and_holiday_list.sql
 --     \i docs/db/migration_002_segmentation_geo_assignments.sql
 --     \i docs/backend/sql/02_teacher_schema.sql
+--     \i scripts/schema-patch-2026-06-07.sql
+--     \i scripts/seed-2026-06-07.sql
 --
--- Option B — Supabase SQL Editor: open each of the four files in order and run
--- them one after another.
---
--- Option C — let the backend create everything itself by setting
--- AUTO_CREATE_TABLES=true on first boot (Exposed createMissingTablesAndColumns).
---
--- NOTE: the \i lines below are commented out so this file is itself safe to
--- paste into the Supabase editor as a runbook. Uncomment them only when running
--- via psql from the repo root.
+-- ----------------------------------------------------------------------------
+-- ALTERNATIVE: let the backend self-create everything
+-- ----------------------------------------------------------------------------
+-- Set AUTO_CREATE_TABLES=true on first boot and Exposed will run
+-- createMissingTablesAndColumns() for the 38 registered tables. After it
+-- succeeds you can flip the env var back to false.
 -- ============================================================================
 
--- \i docs/db/vidyasetu_schema.sql
--- \i docs/db/migration_001_faculty_and_holiday_list.sql
--- \i docs/db/migration_002_segmentation_geo_assignments.sql
--- \i docs/backend/sql/02_teacher_schema.sql
+-- This file intentionally contains no executable SQL.
+-- See scripts/schema-all-in-one-2026-06-07.sql for the runnable bundle.
+SELECT 'PROVISION.sql is documentation only — run scripts/schema-all-in-one-2026-06-07.sql instead' AS notice;
