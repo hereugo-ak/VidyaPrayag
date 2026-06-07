@@ -5,9 +5,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -161,7 +163,26 @@ fun AuthScaffoldV2(
 
             if (error != null) {
                 Spacer(Modifier.height(12.dp))
-                Text(error, style = VTheme.type.caption.colored(c.dangerInk))
+                Text(
+                    error,
+                    style = VTheme.type.caption.colored(c.dangerInk),
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                    textAlign = TextAlign.Center,
+                )
+            }
+
+            // Consistent secured footer across every auth surface — quiet, premium trust signal.
+            Spacer(Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(VIcons.ShieldCheck, contentDescription = null, tint = c.ink3, modifier = Modifier.size(13.dp))
+                Text(
+                    "Secured with end-to-end encryption",
+                    style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
+                )
             }
         }
     }
