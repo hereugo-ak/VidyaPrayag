@@ -23,10 +23,13 @@
 --        faculty:/holiday_list: blocks inside the base file.)
 --
 --   3. docs/db/migration_002_segmentation_geo_assignments.sql
---        Adds announcement broadcast segmentation columns; schools.latitude /
---        schools.longitude (REQUIRED by the parent /schools/discover distance
---        sort — skipping this makes that query throw "column does not exist");
---        the teacher_subject_assignments table; and children.student_code.
+--        Adds announcement broadcast segmentation columns; the
+--        teacher_subject_assignments table; and children.student_code.
+--        NOTE (audit §1.3 LATLONG): schools.latitude / schools.longitude — REQUIRED
+--        by the parent /schools/discover Haversine sort — are now part of the BASE
+--        schema (step 1) so that query can never throw "column does not exist" even
+--        if this migration is skipped. migration_002 still ADD COLUMN IF NOT EXISTS
+--        for them, which is a harmless no-op once the base schema has created them.
 --
 --   4. docs/backend/sql/02_teacher_schema.sql
 --        The 6 teacher-vertical tables: assessments, assessment_marks,

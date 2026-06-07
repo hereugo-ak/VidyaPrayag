@@ -542,6 +542,11 @@ create table public.schools (
   district text not null,
   state text not null default 'Uttar Pradesh'::text,
   pincode text null,
+  -- geo coordinates for parent /schools/discover Haversine sort (audit §1.3 LATLONG):
+  -- kept in the BASE table so the discover query never throws 'column does not exist'
+  -- even if migration_002 is skipped. migration_002's ADD COLUMN IF NOT EXISTS is then a no-op.
+  latitude double precision null,
+  longitude double precision null,
   logo_url text null,
   brand_color text not null default '#2563EB'::text,
   is_active boolean not null default true,
