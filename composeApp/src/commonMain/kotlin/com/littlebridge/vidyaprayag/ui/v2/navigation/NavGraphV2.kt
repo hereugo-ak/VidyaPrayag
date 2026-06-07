@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.backhandler.BackHandler
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.LoginScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.ParentLinkChildScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.SchoolOnboardingScreenV2
@@ -70,6 +71,20 @@ private enum class AuthRoute { Welcome, Login, Discovery, SchoolOnboarding, Pare
 @Composable
 private fun UnauthFlow(modifier: Modifier = Modifier) {
     var route by remember { mutableStateOf(AuthRoute.Welcome) }
+
+    // §11 cross-platform — wire the system back gesture (Android predictive
+    // back + iOS edge-swipe via Compose Multiplatform 1.10's commonMain
+    // BackHandler) so popping the auth stack feels native instead of exiting
+    // the app from Login/Discovery/etc.
+    BackHandler(enabled = route != AuthRoute.Welcome) {
+        route = when (route) {
+            AuthRoute.Login -> AuthRoute.Welcome
+            AuthRoute.Discovery -> AuthRoute.Welcome
+            AuthRoute.SchoolOnboarding -> AuthRoute.Welcome
+            AuthRoute.ParentLinkChild -> AuthRoute.Discovery
+            AuthRoute.Welcome -> AuthRoute.Welcome
+        }
+    }
 
     AnimatedContent(
         targetState = route,
