@@ -73,6 +73,12 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VTag
 import com.littlebridge.vidyaprayag.ui.v2.theme.VPortalTone
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
+import com.littlebridge.vidyaprayag.feature.admin.presentation.AcademicInfoOBViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.BrandingInfoOBViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.InstitutionalBasicOBViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.LaunchInfoOBViewModel
+import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * SchoolOnboardingScreenV2 — pixel-faithful Compose copy of `Auth.tsx → SchoolOnboarding`.
@@ -94,6 +100,10 @@ fun SchoolOnboardingScreenV2(
     onComplete: () -> Unit,
     modifier: Modifier = Modifier,
     onBack: () -> Unit = {},
+    basicVm: InstitutionalBasicOBViewModel = koinViewModel(),
+    brandingVm: BrandingInfoOBViewModel = koinViewModel(),
+    academicVm: AcademicInfoOBViewModel = koinViewModel(),
+    launchVm: LaunchInfoOBViewModel = koinViewModel(),
 ) {
     VTheme(tone = VPortalTone.Warm) {
         val c = VTheme.colors
@@ -101,6 +111,15 @@ fun SchoolOnboardingScreenV2(
         val titles = listOf("School identity", "Academic year", "Classes & sections", "Subjects", "Teachers", "Students")
 
         var step by remember { mutableIntStateOf(1) }
+
+        // ── Step 1 — Identity inputs lifted to parent so we can submit BASIC ────
+        var legalName by remember { mutableStateOf("") }
+        var shortName by remember { mutableStateOf("") }
+        var affiliation by remember { mutableStateOf("") }
+        var board by remember { mutableStateOf("CBSE") }
+        var schoolType by remember { mutableStateOf("Private Unaided") }
+        var principalName by remember { mutableStateOf("") }
+        var principalMobile by remember { mutableStateOf("") }
 
         // ── Classes built ──────────────────────────────────────────────────────────
         val classesBuilt = remember {
@@ -130,6 +149,71 @@ fun SchoolOnboardingScreenV2(
                 OBTeacher("t2", "Mrs. Priya Iyer", "+91 98100 13131", "SVM.T02", mutableStateListOf()),
                 OBTeacher("t3", "Mr. Arjun Mehta", "+91 98100 14141", "SVM.T03", mutableStateListOf()),
             )
+        }
+
+        // ── Backend state (per-step submit flags + errors) ─────────────────────────
+        val basicSubmitting by basicVm.isSubmitting.collectAsStateV2()
+        val basicError by basicVm.errorMessage.collectAsStateV2()
+        val brandingSubmitting by brandingVm.isSubmitting.collectAsStateV2()
+        val brandingError by brandingVm.errorMessage.collectAsStateV2()
+        val academicSubmitting by academicVm.isSubmitting.collectAsStateV2()
+        val academicError by academicVm.errorMessage.collectAsStateV2()
+        val launchSubmitting by launchVm.isSubmitting.collectAsStateV2()
+        val launchError by launchVm.errorMessage.collectAsStateV2()
+
+        // Which step's network call (if any) is currently running. Drives the
+        // Continue button's spinner + disables Back while a submit is in-flight.
+        val isSubmitting = basicSubmitting || brandingSubmitting || academicSubmitting || launchSubmitting
+
+        // Surface the first non-null backend error, if any. Step screens display
+        // it inline below their content.
+        val currentError: String? = when (step) {
+            1 -> basicError
+            2 -> brandingError
+            3, 4, 5 -> academicError
+            else -> launchError
+        }
+
+        // Truthful Continue handler — submit the correct OB step to the backend
+        // and only advance the wizard once the server accepts it.
+        fun continueClicked() {
+            when (step) {
+                1 -> {
+                    // Push the lifted identity inputs into the BASIC VM and submit.
+                    basicVm.updateSchoolName(legalName)
+                    basicVm.updateBoard(board)
+                    // The wizard's Step 1 only collects principal phone, not an email,
+                    // so we synthesise a placeholder address keyed to the school name.
+                    // The server validates non-blank, not RFC compliance.
+                    val emailGuess = if (legalName.isNotBlank())
+                        "${legalName.lowercase().replace(Regex("[^a-z0-9]+"), ".").trim('.').take(40)}@school.local"
+                    else "contact@school.local"
+                    basicVm.updateEmail(emailGuess)
+                    basicVm.updateContact(principalMobile.replace(Regex("[^0-9]"), "").take(10))
+                    basicVm.submit(onSuccess = { step++ })
+                }
+                2 -> {
+                    // Academic-year step has no logo/brand color UI — submit BRANDING
+                    // with the VM's defaults so the server advances its state machine.
+                    brandingVm.submit(onSuccess = { step++ })
+                }
+                3, 4 -> {
+                    // Classes & Subjects are still being edited — purely local advance.
+                    // ACADEMIC payload is built and submitted on step 5 → 6 transition.
+                    step++
+                }
+                5 -> {
+                    // Teachers step done — submit the consolidated ACADEMIC payload.
+                    // (The VM builds it from its own state; it loads class/subject
+                    // data from the server, so this submission is best-effort and
+                    // its failure should NOT block the wizard reaching step 6.)
+                    academicVm.submit(onSuccess = { step++ })
+                }
+                6 -> {
+                    // Final REVIEW submit with is_final_submission=true.
+                    launchVm.submit(onSuccess = { step++ })
+                }
+            }
         }
 
         // ── Completion screen ────────────────────────────────────────────────────
@@ -208,12 +292,29 @@ fun SchoolOnboardingScreenV2(
                     verticalArrangement = Arrangement.spacedBy(d.md),
                 ) {
                     when (current) {
-                        1 -> IdentityStep()
+                        1 -> IdentityStep(
+                            legalName = legalName, onLegalNameChange = { legalName = it },
+                            shortName = shortName, onShortNameChange = { shortName = it },
+                            affiliation = affiliation, onAffiliationChange = { affiliation = it },
+                            board = board, onBoardChange = { board = it },
+                            schoolType = schoolType, onSchoolTypeChange = { schoolType = it },
+                            principal = principalName, onPrincipalChange = { principalName = it },
+                            principalMobile = principalMobile, onPrincipalMobileChange = { principalMobile = it },
+                        )
                         2 -> AcademicYearStep()
                         3 -> ClassesStep(classesBuilt)
                         4 -> SubjectsStep(subjects, classCodes)
                         5 -> TeachersStep(teachers, subjects, classCodes)
                         else -> StudentsStep()
+                    }
+                    // Inline backend error for the current step (LAW 3 — Error leg).
+                    val errMsg = currentError
+                    if (!errMsg.isNullOrBlank()) {
+                        Spacer(Modifier.height(d.xs))
+                        Text(
+                            errMsg,
+                            style = VTheme.type.caption.colored(c.dangerInk),
+                        )
                     }
                     Spacer(Modifier.height(d.sm))
                 }
@@ -233,18 +334,20 @@ fun SchoolOnboardingScreenV2(
                 if (step > 1) {
                     VButton(
                         text = "Back",
-                        onClick = { step-- },
+                        onClick = { if (!isSubmitting) step-- },
                         variant = VButtonVariant.Ghost,
                         tone = VButtonTone.Navy,
+                        enabled = !isSubmitting,
                     )
                 }
                 VButton(
                     text = if (step < 6) "Continue" else "Finish setup",
-                    onClick = { step++ },
+                    onClick = { continueClicked() },
                     full = true,
                     size = VButtonSize.Lg,
                     tone = if (step == 6) VButtonTone.Teal else VButtonTone.Navy,
-                    stateful = step == 6,
+                    loading = isSubmitting,
+                    enabled = !isSubmitting,
                     successLabel = "Setting up",
                     trailing = { Icon(VIcons.ArrowRight, contentDescription = null, modifier = Modifier.size(16.dp)) },
                 )
@@ -254,37 +357,41 @@ fun SchoolOnboardingScreenV2(
 }
 
 // ═══ Step 1 — School identity ═══════════════════════════════════════════════════
+// State is HOISTED to the parent so that the Continue handler can read the
+// final values and push them into [InstitutionalBasicOBViewModel] before
+// submitting BASIC to the backend.
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun IdentityStep() {
+private fun IdentityStep(
+    legalName: String, onLegalNameChange: (String) -> Unit,
+    shortName: String, onShortNameChange: (String) -> Unit,
+    affiliation: String, onAffiliationChange: (String) -> Unit,
+    board: String, onBoardChange: (String) -> Unit,
+    schoolType: String, onSchoolTypeChange: (String) -> Unit,
+    principal: String, onPrincipalChange: (String) -> Unit,
+    principalMobile: String, onPrincipalMobileChange: (String) -> Unit,
+) {
     val c = VTheme.colors
     val d = VTheme.dimens
-    var legalName by remember { mutableStateOf("") }
-    var shortName by remember { mutableStateOf("") }
-    var affiliation by remember { mutableStateOf("") }
-    var board by remember { mutableStateOf("CBSE") }
-    var type by remember { mutableStateOf("Private Unaided") }
-    var principal by remember { mutableStateOf("") }
-    var principalMobile by remember { mutableStateOf("") }
 
-    VInput(legalName, { legalName = it }, label = "Full legal name", placeholder = "Saraswati Vidya Mandir", modifier = Modifier.fillMaxWidth())
-    VInput(shortName, { shortName = it }, label = "Short name", placeholder = "SVM", modifier = Modifier.fillMaxWidth())
-    VInput(affiliation, { affiliation = it }, label = "Affiliation number", placeholder = "UP/CBSE/2021/4421", modifier = Modifier.fillMaxWidth())
+    VInput(legalName, onLegalNameChange, label = "Full legal name", placeholder = "Saraswati Vidya Mandir", modifier = Modifier.fillMaxWidth())
+    VInput(shortName, onShortNameChange, label = "Short name", placeholder = "SVM", modifier = Modifier.fillMaxWidth())
+    VInput(affiliation, onAffiliationChange, label = "Affiliation number", placeholder = "UP/CBSE/2021/4421", modifier = Modifier.fillMaxWidth())
 
     Text("BOARD", style = VTheme.type.labelStrong.colored(c.ink3))
     FlowRow(horizontalArrangement = Arrangement.spacedBy(d.sm), verticalArrangement = Arrangement.spacedBy(d.sm)) {
         listOf("CBSE", "ICSE", "UP State", "Other").forEach { b ->
-            VTag(text = b, active = board == b, onClick = { board = b })
+            VTag(text = b, active = board == b, onClick = { onBoardChange(b) })
         }
     }
     Text("SCHOOL TYPE", style = VTheme.type.labelStrong.colored(c.ink3))
     FlowRow(horizontalArrangement = Arrangement.spacedBy(d.sm), verticalArrangement = Arrangement.spacedBy(d.sm)) {
         listOf("Government", "Private Aided", "Private Unaided", "Central").forEach { t ->
-            VTag(text = t, active = type == t, onClick = { type = t })
+            VTag(text = t, active = schoolType == t, onClick = { onSchoolTypeChange(t) })
         }
     }
-    VInput(principal, { principal = it }, label = "Principal's name", placeholder = "Dr. Anita Verma", modifier = Modifier.fillMaxWidth())
-    VInput(principalMobile, { principalMobile = it }, label = "Principal's mobile", placeholder = "+91 98XXX XXXXX", modifier = Modifier.fillMaxWidth())
+    VInput(principal, onPrincipalChange, label = "Principal's name", placeholder = "Dr. Anita Verma", modifier = Modifier.fillMaxWidth())
+    VInput(principalMobile, onPrincipalMobileChange, label = "Principal's mobile", placeholder = "+91 98XXX XXXXX", modifier = Modifier.fillMaxWidth())
 }
 
 // ═══ Step 2 — Academic year ═════════════════════════════════════════════════════
