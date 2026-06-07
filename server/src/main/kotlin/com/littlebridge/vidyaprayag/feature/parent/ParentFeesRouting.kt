@@ -35,26 +35,31 @@ import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.selectAll
 import java.util.UUID
 
-@Serializable
-data class FeesStats(
-    @SerialName("total_collected") val totalCollected: String,
-    val progress: Double,
-    val outstanding: String,
-    @SerialName("overdue_count") val overdueCount: Int
-)
-
+/**
+ * Response DTO that MUST stay field-for-field identical to the client model
+ * `shared/.../parent/domain/model/ParentFeatureModels.kt#FeeData`. The client
+ * wraps this in `FeeResponse{success, data: FeeData}` and deserializes against
+ * the canonical `{success, message, data}` envelope, so `data` here is exactly
+ * `FeeData`. Any drift causes a kotlinx.serialization MissingFieldException and
+ * crashes the Parent Fees tab on open (VM auto-loads in init).
+ */
 @Serializable
 data class FeesAnnouncement(
     val id: String,
     val title: String,
     val time: String,
-    val desc: String,
+    val description: String,
+    @SerialName("open_rate") val openRate: String,
+    val engagement: String,
     val type: String
 )
 
 @Serializable
 data class ParentFeesResponse(
-    val stats: FeesStats,
+    @SerialName("total_collected") val totalCollected: String,
+    @SerialName("collection_progress") val collectionProgress: Float,
+    @SerialName("outstanding_fees") val outstandingFees: String,
+    @SerialName("overdue_count") val overdueCount: Int,
     val announcements: List<FeesAnnouncement>
 )
 
@@ -92,15 +97,8 @@ fun Route.parentFeesRouting() {
                     val overdueCount = rows.count { it[FeeRecordsTable.status] == "OVERDUE" }
 
                     val total = collected + outstanding
-                    val progress = if (total <= 0.0) 0.0
-                                   else (collected / total).coerceIn(0.0, 1.0)
-
-                    val stats = FeesStats(
-                        totalCollected = money(collected, currency),
-                        progress = progress,
-                        outstanding = money(outstanding, currency),
-                        overdueCount = overdueCount
-                    )
+                    val progress = if (total <= 0.0) 0f
+                                   else (collected / total).coerceIn(0.0, 1.0).toFloat()
 
                     // ----- announcements (CMS) -----
                     val annRaw = AppConfigTable.selectAll()
@@ -116,12 +114,20 @@ fun Route.parentFeesRouting() {
                             id = "f1",
                             title = "Deadline",
                             time = "2h ago",
-                            desc = "Submit Q3 fees.",
+                            description = "Submit Q3 fees.",
+                            openRate = "0%",
+                            engagement = "0",
                             type = "Payment"
                         )
                     )
 
-                    ParentFeesResponse(stats = stats, announcements = announcements)
+                    ParentFeesResponse(
+                        totalCollected = money(collected, currency),
+                        collectionProgress = progress,
+                        outstandingFees = money(outstanding, currency),
+                        overdueCount = overdueCount,
+                        announcements = announcements
+                    )
                 }
 
                 call.ok(response, message = "Fee status fetched successfully")
