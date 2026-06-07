@@ -20,7 +20,20 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.VPortalTone
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 
 /** Full-screen overlays the admin portal can push above its tab content. */
-private enum class SchoolOverlay { None, Notifications, Calendar }
+private enum class SchoolOverlay {
+    None,
+    Notifications,
+    Calendar,
+    Messages,
+    LeaveRequests,
+    AdmissionsCRM,
+    Results,
+    SchedulePTM,
+    DailyAttendance,
+    ClassPerformance,
+    TeacherPerformance,
+    AnalyticsDashboard,
+}
 
 /**
  * SchoolPortalV2 — the 5-tab admin shell, translated from Admin.tsx.
@@ -60,6 +73,30 @@ fun SchoolPortalV2(
             SchoolOverlay.Calendar -> {
                 AcademicCalendarScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
                 return@VTheme
+            }
+            SchoolOverlay.Messages -> {
+                MessagesScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
+                return@VTheme
+            }
+            SchoolOverlay.LeaveRequests -> {
+                LeaveRequestsScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
+                return@VTheme
+            }
+            SchoolOverlay.AdmissionsCRM -> {
+                AdmissionsCrmScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
+                return@VTheme
+            }
+            // Results / SchedulePTM / DailyAttendance / ClassPerformance / TeacherPerformance /
+            // AnalyticsDashboard overlays are wired by their own follow-up batches once their
+            // screen files land. Until then they short-circuit to the tabs so the enum stays
+            // exhaustive without referencing not-yet-created composables.
+            SchoolOverlay.Results,
+            SchoolOverlay.SchedulePTM,
+            SchoolOverlay.DailyAttendance,
+            SchoolOverlay.ClassPerformance,
+            SchoolOverlay.TeacherPerformance,
+            SchoolOverlay.AnalyticsDashboard -> {
+                overlay = SchoolOverlay.None
             }
             SchoolOverlay.None -> Unit
         }
