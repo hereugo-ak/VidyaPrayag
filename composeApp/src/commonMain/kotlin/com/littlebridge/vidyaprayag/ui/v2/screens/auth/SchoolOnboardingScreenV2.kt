@@ -20,8 +20,11 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -135,7 +138,18 @@ fun SchoolOnboardingScreenV2(
             return@VTheme
         }
 
-        Column(modifier.fillMaxSize().background(c.background)) {
+        // §11 cross-platform — wrap the screen in safe-area padding before any
+        // content. statusBars first (top hero), imePadding lifts the form when
+        // the keyboard opens. The footer Row applies navigationBarsPadding
+        // separately so the CTA never sits under the gesture bar even when
+        // the AnimatedContent body is empty.
+        Column(
+            modifier
+                .fillMaxSize()
+                .background(c.background)
+                .statusBarsPadding()
+                .imePadding(),
+        ) {
             // ── Header + step indicator ─────────────────────────────────────────────
             Column(Modifier.fillMaxWidth().padding(horizontal = d.lg, vertical = d.md)) {
                 Spacer(Modifier.height(d.sm))
@@ -208,7 +222,12 @@ fun SchoolOnboardingScreenV2(
             // ── Footer nav (top hairline border, like React borderTop --border-dark-1) ──
             VDivider()
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = d.lg, vertical = d.md),
+                Modifier
+                    .fillMaxWidth()
+                    // §11.3 — keep the bottom CTAs above the gesture bar on Android +
+                    // home indicator on iOS.
+                    .navigationBarsPadding()
+                    .padding(horizontal = d.lg, vertical = d.md),
                 horizontalArrangement = Arrangement.spacedBy(d.sm),
             ) {
                 if (step > 1) {

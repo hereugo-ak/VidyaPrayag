@@ -6,8 +6,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
@@ -56,6 +59,13 @@ fun TeacherFirstLoginScreenV2(
         modifier
             .fillMaxSize()
             .background(VTheme.colors.background)
+            // §11 cross-platform — respect the status bar, IME, and gesture bar
+            // on both Android and iOS. Order matters: statusBars first, then IME
+            // (so the keyboard lifts the content), then navigationBars (so the
+            // bottom CTA never sits under the gesture bar).
+            .statusBarsPadding()
+            .imePadding()
+            .navigationBarsPadding()
             .padding(horizontal = 24.dp)
             .verticalScroll(rememberScrollState()),
     ) {

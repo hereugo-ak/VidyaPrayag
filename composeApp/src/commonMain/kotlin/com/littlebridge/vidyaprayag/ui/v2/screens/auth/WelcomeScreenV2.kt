@@ -19,8 +19,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
@@ -184,7 +186,12 @@ fun WelcomeScreenV2(
             )
 
             Column(
-                Modifier.padding(top = 80.dp, bottom = 90.dp),
+                // §11.1 — extend the teal behind the status bar (edge-to-edge), but
+                // push the hero content down so the logo/title stay visible. Total
+                // top spacing = statusBars + the React 80dp tower padding.
+                Modifier
+                    .statusBarsPadding()
+                    .padding(top = 80.dp, bottom = 90.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 // ── Logo cube — 160dp glass plate + halo ring, bridge drawn directly ──
@@ -259,6 +266,10 @@ fun WelcomeScreenV2(
                     )
                 }
                 .background(c.background, RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                // §11.3 — push CTAs above the gesture / nav bar on Android +
+                // the home-indicator on iOS. Applied BEFORE the 32dp bottom
+                // padding so that visible bottom space = max(navBars, 32dp).
+                .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
                 .padding(top = 40.dp, bottom = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

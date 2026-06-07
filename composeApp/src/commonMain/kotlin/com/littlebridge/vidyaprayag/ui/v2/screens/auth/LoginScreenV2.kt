@@ -15,8 +15,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -137,7 +140,11 @@ fun LoginScreenV2(
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 48.dp),
+                // §11.1 — extend the teal hero behind the status bar (edge-to-edge),
+                // push the brand content down so it stays visible.
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 48.dp),
             ) {
                 LogoCube(
                     modifier = Modifier.graphicsLayer {
@@ -182,6 +189,11 @@ fun LoginScreenV2(
                 }
                 .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
                 .background(c.background)
+                // §11.2 — when the IME opens, lift the whole form sheet so the
+                // bottom CTA stays visible. §11.3 — also keep the CTA above the
+                // gesture bar on Android / home-indicator on iOS.
+                .imePadding()
+                .navigationBarsPadding()
                 .padding(horizontal = 20.dp)
                 .padding(top = 32.dp, bottom = 32.dp),
         ) {
