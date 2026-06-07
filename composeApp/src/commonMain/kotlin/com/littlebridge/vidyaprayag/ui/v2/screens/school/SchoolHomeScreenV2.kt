@@ -2,19 +2,17 @@ package com.littlebridge.vidyaprayag.ui.v2.screens.school
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,39 +20,42 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingStep
+import com.littlebridge.vidyaprayag.feature.admin.presentation.DashboardOnboardingStatus
+import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolDashboardViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
+import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
-import com.littlebridge.vidyaprayag.ui.v2.components.VBars
-import com.littlebridge.vidyaprayag.ui.v2.components.VButton
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
-import com.littlebridge.vidyaprayag.ui.v2.components.VChartDatum
 import com.littlebridge.vidyaprayag.ui.v2.components.VComingSoon
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
-import com.littlebridge.vidyaprayag.ui.v2.components.VLegendDot
 import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
-import com.littlebridge.vidyaprayag.ui.v2.components.VProgressRing
-import com.littlebridge.vidyaprayag.ui.v2.components.VSparkline
-import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
+import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import org.koin.compose.viewmodel.koinViewModel
+import kotlin.math.roundToInt
 
 /**
- * SchoolHomeScreenV2 — a pixel-faithful copy of `Admin.tsx → AdminHome` (dark / night).
+ * SchoolHomeScreenV2 — `Admin.tsx → AdminHome`, wired to the real
+ * [SchoolDashboardViewModel] (`AuthRepository` → `GET /api/v1/user/details`).
  *
- * School chip header (avatar + day-of-year + bell + admin avatar) · "Good afternoon" greeting ·
- * horizontally-scrolling glance cards · attendance-by-class grid · syllabus coverage · subject
- * performance (bars + sparkline) · teacher activity feed · PEWS early-warning preview · pending
- * actions. All values from [MockV2].
+ * ⚠️ This VM exposes **six separate flows** (adminName / progress / steps /
+ * onboardingStatus / isLoading / errorMessage), not a single state object. The only
+ * data the dashboard endpoint genuinely returns today is the **onboarding hero**
+ * (greeting + onboarding progress + the four setup steps). The rich operational
+ * metrics in the original mock (attendance-by-class, syllabus coverage, subject
+ * performance, teacher activity, fee glance) have no backend feed at the home level,
+ * so they're shown as `VComingSoon` rather than fabricating numbers (LAW 6). No
+ * MockV2 in production; the three UI states come from [VStateHost] (LAW 2/3).
  */
 @Composable
 fun SchoolHomeScreenV2(
@@ -62,33 +63,68 @@ fun SchoolHomeScreenV2(
     onOpenNotifications: () -> Unit = {},
     onOpenCalendar: () -> Unit = {},
     onExit: () -> Unit = {},
+    viewModel: SchoolDashboardViewModel = koinViewModel(),
+) {
+    val adminName by viewModel.adminName.collectAsStateV2()
+    val progress by viewModel.progress.collectAsStateV2()
+    val steps by viewModel.steps.collectAsStateV2()
+    val onboardingStatus by viewModel.onboardingStatus.collectAsStateV2()
+    val isLoading by viewModel.isLoading.collectAsStateV2()
+    val errorMessage by viewModel.errorMessage.collectAsStateV2()
+
+    SchoolHomeContent(
+        adminName = adminName,
+        progress = progress,
+        steps = steps,
+        onboardingStatus = onboardingStatus,
+        isLoading = isLoading,
+        errorMessage = errorMessage,
+        onRetry = viewModel::refresh,
+        onOpenNotifications = onOpenNotifications,
+        onOpenCalendar = onOpenCalendar,
+        onExit = onExit,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun SchoolHomeContent(
+    adminName: String,
+    progress: Float,
+    steps: List<OnboardingStep>,
+    onboardingStatus: DashboardOnboardingStatus,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onRetry: () -> Unit,
+    onOpenNotifications: () -> Unit,
+    onOpenCalendar: () -> Unit,
+    onExit: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
+    val completed = onboardingStatus == DashboardOnboardingStatus.COMPLETED
 
     Column(
         modifier
             .fillMaxSize()
-            // §11.1 — keep the header row below the status bar / iOS notch.
-            // The bottom is owned by the host's VBottomNav (already applies
-            // navigationBarsPadding); we only need top here.
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
             .padding(top = 24.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        // ── Header row ───────────────────────────────────────────────────────
+        // ── Header row ────────────────────────────────────────────────────────
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(
-                    Modifier.size(40.dp).clip(CircleShape).background(c.teal),
-                    contentAlignment = Alignment.Center,
-                ) {
+                Box(Modifier.size(40.dp).clip(CircleShape).background(c.teal), contentAlignment = Alignment.Center) {
                     Icon(VIcons.GraduationCap, contentDescription = null, tint = Color(0xFF080808), modifier = Modifier.size(18.dp))
                 }
                 Column {
-                    Text(MockV2.school.shortName, style = VTheme.type.h4.colored(c.ink))
-                    Text("Day ${MockV2.school.dayOfYear} of ${MockV2.school.totalDays}", style = VTheme.type.caption.colored(c.ink2))
+                    Text("School console", style = VTheme.type.h4.colored(c.ink))
+                    Text(
+                        if (completed) "Campus live" else "Setup in progress",
+                        style = VTheme.type.caption.colored(c.ink2),
+                    )
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -97,155 +133,65 @@ fun SchoolHomeScreenV2(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(VIcons.Bell, contentDescription = "Notifications", tint = c.ink, modifier = Modifier.size(18.dp))
-                    // §7.1#14 React unread dot = var(--danger) (soft #FFADA8), not the dark danger-ink (Admin.tsx:65).
                     Box(Modifier.align(Alignment.TopEnd).padding(8.dp).size(6.dp).clip(CircleShape).background(c.danger))
                 }
-                Box(Modifier.clickable { onExit() }) { VAvatar(name = "Admin Office", size = 36.dp) }
+                Box(Modifier.clickable { onExit() }) { VAvatar(name = adminName, size = 36.dp) }
             }
         }
 
-        // ── Greeting ──────────────────────────────────────────────────────────
-        Column {
-            Text("Good afternoon", style = VTheme.type.h1.colored(c.ink))
-            Text("Here's how ${MockV2.school.name} is doing today.", style = VTheme.type.body.colored(c.ink2))
-        }
-
-        // ── Glance cards (horizontal scroll) ───────────────────────────────────
-        Row(
-            Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        VStateHost(
+            loading = isLoading,
+            error = errorMessage,
+            isEmpty = false,
+            onRetry = onRetry,
         ) {
-            GlanceCard(title = "Attendance today", big = "87%", sub = "274 present / 316 total", ring = 87f, cta = "View details")
-            GlanceCard(title = "Pending from teachers", big = "3", sub = "haven't marked yet", chips = listOf("Mr. Pillai", "Ms. Bose", "+1"), cta = "Send reminder")
-            GlanceCard(title = "Fee collection", big = "₹ 24,500", sub = "₹ 2,18,400 outstanding", bar = 42f, cta = "Fee dashboard")
-            GlanceCard(title = "Upcoming", big = "PTM", sub = "Class 10 — Tomorrow 10 AM", cta = "View calendar", onCta = onOpenCalendar)
-        }
-
-        // ── Attendance by class ─────────────────────────────────────────────────
-        VCard {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Attendance by class", style = VTheme.type.h3.colored(c.ink))
-                Text("Today", style = VTheme.type.caption.colored(c.ink2))
-            }
-            Spacer(Modifier.height(12.dp))
-            MockV2.classAttendanceGrid.chunked(3).forEach { rowCells ->
-                Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    rowCells.forEach { (cls, pct) ->
-                        // §7.1#6 React exact literals (Admin.tsx:92-93):
-                        //   ≥80 bg rgba(200,222,255,0.30) / fg #0a3a76 (DEEP blue, not light #7FB0FF)
-                        //   60–79 bg rgba(255,212,163,0.45) / fg #7a3f00
-                        //   <60   bg rgba(255,173,168,0.45) / fg #7a1c18
-                        val (bg, fg) = when {
-                            pct >= 80 -> Color(0xFFC8DEFF).copy(alpha = 0.30f) to Color(0xFF0A3A76)
-                            pct >= 60 -> c.warning.copy(alpha = 0.45f) to Color(0xFF7A3F00)
-                            else -> c.danger.copy(alpha = 0.45f) to Color(0xFF7A1C18)
-                        }
-                        Column(
-                            Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(bg).padding(12.dp),
-                        ) {
-                            Text("${cls.name.removePrefix("Class ")} ${cls.section}", style = VTheme.type.label.colored(fg).copy(letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified, fontWeight = FontWeight.SemiBold))
-                            Text("$pct%", style = VTheme.type.dataLg.colored(fg).copy(fontSize = 18.sp), modifier = Modifier.padding(top = 4.dp))
-                        }
-                    }
-                    repeat(3 - rowCells.size) { Spacer(Modifier.weight(1f)) }
-                }
-            }
-        }
-
-        // ── Syllabus coverage ───────────────────────────────────────────────────
-        VCard {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Syllabus coverage", style = VTheme.type.h3.colored(c.ink))
-                // §7.1 React var(--arctic) → in .warm scope = #006a60 (teal-deep) (Admin.tsx:108).
-                Text("Full report", style = VTheme.type.caption.colored(c.tealDeep))
-            }
-            Spacer(Modifier.height(12.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                MockV2.syllabusCoverage.forEach { s ->
-                    Column {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(s.klass, style = VTheme.type.body.colored(c.ink))
-                            Text("${s.pct}%", style = VTheme.type.dataSm.colored(c.ink2))
-                        }
-                        Spacer(Modifier.height(4.dp))
-                        VProgressBar(value = s.pct.toFloat(), tone = if (s.pct < 70) VBadgeTone.Warning else VBadgeTone.Arctic)
-                    }
-                }
-            }
-        }
-
-        // ── Subject performance ──────────────────────────────────────────────────
-        VCard {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                // ── Greeting ───────────────────────────────────────────────────
                 Column {
-                    Text("Subject performance", style = VTheme.type.h3.colored(c.ink))
-                    Text("Class 10 averages · last 7 days", style = VTheme.type.caption.colored(c.ink2))
+                    Text("Welcome, $adminName", style = VTheme.type.h1.colored(c.ink))
+                    Text(
+                        if (completed) "Your campus is live. Manage everything from here."
+                        else "Let's finish setting up your school.",
+                        style = VTheme.type.body.colored(c.ink2),
+                    )
                 }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("78%", style = VTheme.type.dataLg.colored(c.ink).copy(fontSize = 18.sp, fontWeight = FontWeight.SemiBold))
-                    VSparkline(values = listOf(72f, 70f, 74f, 71f, 75f, 76f, 78f), width = 84.dp, height = 28.dp)
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            VBars(
-                data = listOf(
-                    VChartDatum("Math", 74f), VChartDatum("Sci", 81f), VChartDatum("Eng", 86f),
-                    VChartDatum("Hin", 72f), VChartDatum("Soc", 69f), VChartDatum("Today", 78f),
-                ),
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                VLegendDot(color = c.teal.copy(alpha = 0.45f), label = "Week")
-                VLegendDot(color = c.tealDeep, label = "Today", value = "78%")
-            }
-        }
 
-        // ── Teacher activity ─────────────────────────────────────────────────────
-        VCard {
-            Text("Teacher activity", style = VTheme.type.h3.colored(c.ink))
-            Spacer(Modifier.height(8.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                MockV2.recentTeacherActivity.forEach { a ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        VAvatar(name = a.who, size = 32.dp)
-                        Column(Modifier.weight(1f)) {
-                            Row {
-                                Text(a.who, style = VTheme.type.bodyStrong.colored(c.ink))
-                                Text(" ${a.what}", style = VTheme.type.body.colored(c.ink2))
-                            }
-                            Text(a.whenAt, style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified))
-                        }
+                // ── Onboarding hero (REAL data) ────────────────────────────────
+                VCard {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        VLabel(if (completed) "Onboarding complete" else "Onboarding progress")
+                        VBadge(
+                            text = "${(progress * 100).roundToInt()}%",
+                            tone = if (completed) VBadgeTone.Success else VBadgeTone.Arctic,
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    VProgressBar(
+                        value = progress * 100f,
+                        tone = if (completed) VBadgeTone.Success else VBadgeTone.Arctic,
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        steps.forEach { step -> OnboardingStepRow(step) }
                     }
                 }
-            }
-        }
 
-        // ── PEWS — early-warning radar ───────────────────────────────────────────
-        Column {
-            Text("Early-warning radar", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
-            // §7.1#11 React passes preview={<PEWSPreview/>} (Admin.tsx:168) — wire the rich mockup.
-            VComingSoon(
-                title = "PEWS — Predictive Early Warning",
-                description = "Combines attendance, marks, fee status and behavioural signals to surface at-risk students before exam season.",
-                preview = { PewsPreview() },
-            )
-        }
+                // ── Operational metrics (no backend feed yet) ──────────────────
+                Column {
+                    Text("Today at a glance", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
+                    VComingSoon(
+                        title = "Live campus metrics",
+                        description = "Attendance-by-class, syllabus coverage, subject performance and the teacher activity feed will appear here once the daily-metrics rollup endpoint is connected.",
+                    )
+                }
 
-        // ── Pending actions ──────────────────────────────────────────────────────
-        Column {
-            Text("Pending actions", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                MockV2.pendingActions.forEach { p ->
-                    VCard {
-                        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Icon(VIcons.AlertCircle, contentDescription = null, tint = c.warningInk, modifier = Modifier.size(18.dp).padding(top = 2.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(p.title, style = VTheme.type.bodyStrong.colored(c.ink))
-                                Text(p.sub, style = VTheme.type.caption.colored(c.ink2))
-                            }
-                            VButton(text = p.cta, onClick = {}, variant = VButtonVariant.Secondary, size = VButtonSize.Sm)
-                        }
-                    }
+                Column {
+                    Text("Early-warning radar", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
+                    VComingSoon(
+                        title = "PEWS — Predictive Early Warning",
+                        description = "Combines attendance, marks, fee status and behavioural signals to surface at-risk students before exam season.",
+                        preview = { PewsPreview() },
+                    )
                 }
             }
         }
@@ -253,53 +199,28 @@ fun SchoolHomeScreenV2(
 }
 
 @Composable
-private fun GlanceCard(
-    title: String,
-    big: String,
-    sub: String,
-    cta: String,
-    ring: Float? = null,
-    bar: Float? = null,
-    chips: List<String>? = null,
-    onCta: () -> Unit = {},
-) {
+private fun OnboardingStepRow(step: OnboardingStep) {
     val c = VTheme.colors
-    VCard(modifier = Modifier.widthIn(min = 230.dp)) {
-        VLabel(title)
-        Spacer(Modifier.height(8.dp))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
-            Column {
-                Text(big, style = VTheme.type.dataLg.colored(c.ink).copy(fontSize = 28.sp))
-                Text(sub, style = VTheme.type.caption.colored(c.ink2), modifier = Modifier.padding(top = 4.dp))
-            }
-            if (ring != null) VProgressRing(value = ring, size = 56.dp, strokeWidth = 6.dp)
-        }
-        if (bar != null) {
-            Spacer(Modifier.height(12.dp))
-            VProgressBar(value = bar)
-        }
-        if (chips != null) {
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                chips.forEach { ch ->
-                    Text(
-                        ch,
-                        style = VTheme.type.caption.colored(c.ink2),
-                        modifier = Modifier.clip(CircleShape).background(c.ink.copy(alpha = 0.06f)).padding(horizontal = 8.dp, vertical = 4.dp),
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.clickable { onCta() },
+    val (icon, tint) = when {
+        step.isCompleted -> VIcons.Check to c.successInk
+        step.status.equals(OnboardingStep.STATUS_LOCKED, ignoreCase = true) -> VIcons.Lock to c.ink3
+        else -> VIcons.ClipboardList to c.ink2
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(
+            Modifier.size(32.dp).clip(CircleShape).background(c.ink.copy(alpha = 0.06f)),
+            contentAlignment = Alignment.Center,
         ) {
-            // §7.1#3 React GlanceCard CTA: "{cta} <ChevronRight size={14}/>" with var(--arctic)
-            // (= teal-deep in .warm). The chevron IS present in Admin.tsx:210 (keep it). (Admin.tsx:210)
-            Text(cta, style = VTheme.type.caption.colored(c.tealDeep).copy(fontWeight = FontWeight.SemiBold))
-            Icon(VIcons.ChevronRight, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(14.dp))
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(step.title, style = VTheme.type.bodyStrong.colored(c.ink))
+            if (step.description.isNotBlank()) {
+                Text(step.description, style = VTheme.type.caption.colored(c.ink2))
+            }
+        }
+        if (step.isCompleted) {
+            VBadge(text = "Done", tone = VBadgeTone.Success)
         }
     }
 }

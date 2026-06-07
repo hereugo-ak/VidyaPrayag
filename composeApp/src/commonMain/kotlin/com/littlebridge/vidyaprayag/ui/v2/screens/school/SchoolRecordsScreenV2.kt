@@ -1,10 +1,6 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.school
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,8 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -26,38 +20,56 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
+import com.littlebridge.vidyaprayag.feature.admin.presentation.SyllabusCoverageState
+import com.littlebridge.vidyaprayag.feature.admin.presentation.SyllabusCoverageViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
-import com.littlebridge.vidyaprayag.ui.v2.components.VButton
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
+import com.littlebridge.vidyaprayag.ui.v2.components.VComingSoon
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.components.VInput
 import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
+import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
 import com.littlebridge.vidyaprayag.ui.v2.components.VTopTabs
-import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
+import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import org.koin.compose.viewmodel.koinViewModel
+import kotlin.math.roundToInt
 
 /**
- * SchoolRecordsScreenV2 — a pixel-faithful copy of `Admin.tsx → Records`.
+ * SchoolRecordsScreenV2 — `Admin.tsx → Records`, wired to the real
+ * [SyllabusCoverageViewModel] (`AnalyticsApi` → `GET /api/v1/syllabus-coverage`).
  *
- * Five sub-tabs — Attendance (mark P/A/L per student + submit), Marks (entry grid), Syllabus
- * (chapter status), Fee (outstanding overview + history), Documents (file rows + upload). All from
- * [MockV2].
+ * The **Coverage** tab renders live department progress, lagging alerts and academic
+ * milestones from the analytics endpoint. The other admin-records tabs (per-student
+ * Attendance, Marks entry, Fee collection, Documents) belong to the teacher data plane
+ * or to backends that don't yet exist at the admin level, so they're shown as
+ * `VComingSoon` rather than fabricating data (LAW 6). No MockV2 in production; the three
+ * UI states come from [VStateHost].
  */
 @Composable
-fun SchoolRecordsScreenV2(modifier: Modifier = Modifier) {
+fun SchoolRecordsScreenV2(
+    modifier: Modifier = Modifier,
+    viewModel: SyllabusCoverageViewModel = koinViewModel(),
+) {
+    val state by viewModel.state.collectAsStateV2()
+    SchoolRecordsContent(
+        state = state,
+        onRetry = viewModel::load,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun SchoolRecordsContent(
+    state: SyllabusCoverageState,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val c = VTheme.colors
-    var tab by remember { mutableStateOf("Attendance") }
+    var tab by remember { mutableStateOf("Coverage") }
 
     Column(
         modifier
@@ -68,140 +80,29 @@ fun SchoolRecordsScreenV2(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text("Records", style = VTheme.type.h1.colored(c.ink))
-        VTopTabs(tabs = listOf("Attendance", "Marks", "Syllabus", "Fee", "Documents"), selected = tab, onSelect = { tab = it })
+        VTopTabs(
+            tabs = listOf("Coverage", "Attendance", "Marks", "Fee", "Documents"),
+            selected = tab,
+            onSelect = { tab = it },
+        )
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             when (tab) {
-                "Attendance" -> RecordsAttendance()
-                "Marks" -> RecordsMarks()
-                "Syllabus" -> RecordsSyllabus()
-                "Fee" -> RecordsFee()
-                "Documents" -> RecordsDocs()
-            }
-        }
-    }
-}
-
-@Composable
-private fun RecordsAttendance() {
-    val c = VTheme.colors
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        VInput(value = "5 Jun 2026", onValueChange = {}, leadingIcon = VIcons.Calendar, modifier = Modifier.weight(1f), enabled = false)
-        VInput(value = "Class 10-A", onValueChange = {}, leadingIcon = VIcons.GraduationCap, modifier = Modifier.weight(1f), enabled = false)
-    }
-    VCard {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Column {
-                VLabel("Class 10-A")
-                Text("28 / 32 present", style = VTheme.type.bodyStrong.colored(c.ink), modifier = Modifier.padding(top = 4.dp))
-            }
-            VButton(text = "Mark all present", onClick = {}, variant = VButtonVariant.Secondary, size = VButtonSize.Sm)
-        }
-        MockV2.students.take(6).forEach { s ->
-            Spacer(Modifier.height(10.dp)); Box(Modifier.fillMaxWidth().height(1.dp).background(c.border1)); Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                VAvatar(name = s.name, size = 32.dp)
-                Column(Modifier.weight(1f)) {
-                    Text(s.name, style = VTheme.type.bodyStrong.colored(c.ink))
-                    Text("Roll ${s.roll}", style = VTheme.type.dataSm.colored(c.ink3))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    // React PAL fills use the pastel --success/--danger/--warning (not *Ink).
-                    PALButton("P", s.today == MockV2.Presence.Present, c.success)
-                    PALButton("A", s.today == MockV2.Presence.Absent, c.danger)
-                    PALButton("L", s.today == MockV2.Presence.Late, c.warning)
-                }
-            }
-        }
-    }
-    VButton(text = "Submit attendance", onClick = {}, full = true, size = VButtonSize.Lg, stateful = true, successLabel = "Submitted", leading = { Icon(VIcons.Check, null, modifier = Modifier.size(16.dp)) })
-}
-
-@Composable
-private fun PALButton(letter: String, active: Boolean, tone: Color) {
-    val c = VTheme.colors
-    Box(
-        Modifier.size(36.dp).clip(CircleShape).background(if (active) tone else c.ink.copy(alpha = 0.06f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        // Active PAL text is var(--void) (near-white background token), idle is text-dark-3.
-        Text(letter, style = VTheme.type.label.colored(if (active) c.background else c.ink3).copy(letterSpacing = TextUnit.Unspecified, fontWeight = FontWeight.Bold))
-    }
-}
-
-@Composable
-private fun RecordsMarks() {
-    val c = VTheme.colors
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        VInput(value = "Class 10-A", onValueChange = {}, modifier = Modifier.weight(1f), enabled = false)
-        VInput(value = "Mathematics", onValueChange = {}, modifier = Modifier.weight(1f), enabled = false)
-    }
-    VCard {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
-            Column {
-                VLabel("Unit Test 2 — Trigonometry")
-                Text("Max 100 • 02 Jun", style = VTheme.type.caption.colored(c.ink2), modifier = Modifier.padding(top = 4.dp))
-            }
-            VBadge(text = "Live class avg 68", tone = VBadgeTone.Arctic)
-        }
-        MockV2.students.take(5).forEachIndexed { i, s ->
-            Spacer(Modifier.height(10.dp)); Box(Modifier.fillMaxWidth().height(1.dp).background(c.border1)); Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                VAvatar(name = s.name, size = 30.dp)
-                Text(s.name, style = VTheme.type.body.colored(c.ink), modifier = Modifier.weight(1f))
-                MarkBox(listOf(78, 71, 88, 65, 92)[i].toString())
-                Box(Modifier.size(36.dp).clip(CircleShape).background(c.ink.copy(alpha = 0.06f)), contentAlignment = Alignment.Center) {
-                    Text("AB", style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = TextUnit.Unspecified, fontWeight = FontWeight.Bold))
-                }
-            }
-        }
-    }
-    VButton(text = "Save & publish", onClick = {}, full = true, size = VButtonSize.Lg, stateful = true, successLabel = "Published")
-}
-
-@Composable
-private fun MarkBox(value: String) {
-    val c = VTheme.colors
-    // React: w-20 (80px), rounded-md (6px), 1px border-dark-2, right-aligned mono, px-3.
-    Box(
-        Modifier
-            .size(width = 80.dp, height = 32.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .background(c.ink.copy(alpha = 0.06f))
-            .border(1.dp, c.border2, RoundedCornerShape(6.dp)),
-        contentAlignment = Alignment.CenterEnd,
-    ) {
-        Text(value, style = VTheme.type.data.colored(c.ink), modifier = Modifier.padding(end = 12.dp))
-    }
-}
-
-@Composable
-private fun RecordsSyllabus() {
-    val c = VTheme.colors
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        VInput(value = "Class 10-A", onValueChange = {}, modifier = Modifier.weight(1f), enabled = false)
-        VInput(value = "Chemistry", onValueChange = {}, modifier = Modifier.weight(1f), enabled = false)
-    }
-    val chapters = listOf(
-        "Ch 1 — Chemical Reactions", "Ch 2 — Acids, Bases & Salts", "Ch 3 — Metals & Non-Metals",
-        "Ch 4 — Carbon Compounds", "Ch 5 — Periodic Classification", "Ch 6 — Life Processes",
-    )
-    chapters.forEachIndexed { i, ch ->
-        VCard {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Column(Modifier.weight(1f)) {
-                    Text(ch, style = VTheme.type.bodyStrong.colored(c.ink))
-                    Text(
-                        when {
-                            i < 4 -> "Covered ${10 + i} Apr — ${20 + i} May"
-                            i == 4 -> "In progress"
-                            else -> "Not started"
-                        },
-                        style = VTheme.type.caption.colored(c.ink2),
-                    )
-                }
-                VBadge(
-                    text = if (i < 4) "Done" else if (i == 4) "Active" else "Upcoming",
-                    tone = if (i < 4) VBadgeTone.Success else if (i == 4) VBadgeTone.Warning else VBadgeTone.Neutral,
+                "Coverage" -> CoverageTab(state = state, onRetry = onRetry)
+                "Attendance" -> VComingSoon(
+                    title = "School-wide attendance register",
+                    description = "Class-by-class daily attendance rolls up here once the admin attendance feed is connected.",
+                )
+                "Marks" -> VComingSoon(
+                    title = "Exam marks & report cards",
+                    description = "Consolidated marks entry and report-card generation arrive with the assessments backend.",
+                )
+                "Fee" -> VComingSoon(
+                    title = "Fee collection records",
+                    description = "Outstanding fees, collections and reminders surface here when the fees ledger endpoint is live.",
+                )
+                "Documents" -> VComingSoon(
+                    title = "Document library",
+                    description = "Circulars, timetables and holiday lists will be uploadable once media storage is configured.",
                 )
             }
         }
@@ -209,55 +110,114 @@ private fun RecordsSyllabus() {
 }
 
 @Composable
-private fun RecordsFee() {
+private fun CoverageTab(state: SyllabusCoverageState, onRetry: () -> Unit) {
     val c = VTheme.colors
-    VTopTabs(tabs = listOf("Structure", "Collections"), selected = "Collections", onSelect = {})
-    VCard {
-        VLabel("Outstanding overview")
-        Text("₹ 2,18,400", style = VTheme.type.dataLg.colored(c.ink).copy(fontSize = 26.sp), modifier = Modifier.padding(top = 4.dp))
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FeeStat("84", "Pending", Modifier.weight(1f))
-            FeeStat("12", "Overdue", Modifier.weight(1f), c.dangerInk)
-            FeeStat("220", "Paid", Modifier.weight(1f))
-        }
-    }
-    VButton(text = "Send reminders to 84 parents", onClick = {}, full = true, variant = VButtonVariant.Secondary, leading = { Icon(VIcons.Send, null, modifier = Modifier.size(14.dp)) })
-    MockV2.feeHistory.forEach { FeeRowCard(it) }
-}
-
-@Composable
-private fun FeeStat(n: String, label: String, modifier: Modifier = Modifier, tone: Color? = null) {
-    val c = VTheme.colors
-    Column(modifier.clip(RoundedCornerShape(10.dp)).background(c.ink.copy(alpha = 0.06f)).padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(n, style = VTheme.type.data.colored(tone ?: c.ink).copy(fontSize = 16.sp))
-        Text(label, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 10.sp))
-    }
-}
-
-@Composable
-private fun RecordsDocs() {
-    val c = VTheme.colors
-    val docs = listOf(
-        Triple("Circular — PTM Notice", "PDF • Uploaded 3 Jun", "All parents"),
-        Triple("Half-Yearly Timetable", "PDF • Uploaded 1 Jun", "Class 9, 10, 12"),
-        Triple("Holiday List 2025-26", "PDF • Uploaded 12 Apr", "All school"),
-    )
-    docs.forEach { (title, date, recipients) ->
-        VCard {
-            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFC8DEFF).copy(alpha = 0.20f)), contentAlignment = Alignment.Center) {
-                    Icon(VIcons.FileText, contentDescription = null, tint = c.ink, modifier = Modifier.size(18.dp))
+    VStateHost(
+        loading = state.isLoading,
+        error = state.errorMessage,
+        isEmpty = state.departmentProgress.isEmpty() && state.alerts.isEmpty() && state.milestones.isEmpty(),
+        emptyTitle = "No coverage data yet",
+        emptyBody = "Syllabus coverage will appear here once teachers start marking units complete.",
+        emptyIcon = VIcons.BookOpen,
+        onRetry = onRetry,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            // ── Overall ───────────────────────────────────────────────────────
+            VCard {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    VLabel("Overall syllabus coverage")
+                    if (state.overallTrend.isNotBlank()) {
+                        VBadge(text = state.overallTrend, tone = VBadgeTone.Arctic)
+                    }
                 }
-                Column(Modifier.weight(1f)) {
-                    Text(title, style = VTheme.type.bodyStrong.colored(c.ink))
-                    Text(date, style = VTheme.type.caption.colored(c.ink2))
-                    Spacer(Modifier.height(4.dp))
-                    VBadge(text = recipients, tone = VBadgeTone.Neutral)
+                Spacer(Modifier.height(8.dp))
+                Text("${state.overallPercentage}%", style = VTheme.type.dataLg.colored(c.ink))
+                Spacer(Modifier.height(8.dp))
+                VProgressBar(
+                    value = state.overallPercentage.toFloat(),
+                    tone = if (state.overallPercentage < 70) VBadgeTone.Warning else VBadgeTone.Arctic,
+                )
+            }
+
+            // ── By department ─────────────────────────────────────────────────
+            if (state.departmentProgress.isNotEmpty()) {
+                VCard {
+                    Text("By department", style = VTheme.type.h3.colored(c.ink))
+                    Spacer(Modifier.height(12.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        state.departmentProgress.forEach { d ->
+                            Column {
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(d.name, style = VTheme.type.body.colored(c.ink))
+                                    Text("${(d.progress * 100).roundToInt()}%", style = VTheme.type.dataSm.colored(c.ink2))
+                                }
+                                Spacer(Modifier.height(4.dp))
+                                VProgressBar(
+                                    value = d.progress * 100f,
+                                    tone = if (d.isDelayed) VBadgeTone.Danger else VBadgeTone.Arctic,
+                                )
+                                if (d.trend.isNotBlank()) {
+                                    Text(d.trend, style = VTheme.type.label.colored(if (d.isDelayed) c.dangerInk else c.ink3))
+                                }
+                            }
+                        }
+                    }
                 }
-                Icon(VIcons.Download, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp).clickable {})
+            }
+
+            // ── Lagging alerts ────────────────────────────────────────────────
+            if (state.alerts.isNotEmpty()) {
+                Column {
+                    Text("Lagging classes", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        state.alerts.forEach { a ->
+                            VCard {
+                                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Icon(VIcons.AlertCircle, contentDescription = null, tint = if (a.isCritical) c.dangerInk else c.warningInk, modifier = Modifier.size(18.dp).padding(top = 2.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text("${a.subject} • ${a.className}", style = VTheme.type.bodyStrong.colored(c.ink))
+                                        if (a.instructor.isNotBlank()) {
+                                            Text(a.instructor, style = VTheme.type.caption.colored(c.ink2))
+                                        }
+                                    }
+                                    VBadge(
+                                        text = "${a.delayPercentage}% behind",
+                                        tone = if (a.isCritical) VBadgeTone.Danger else VBadgeTone.Warning,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Academic milestones ───────────────────────────────────────────
+            if (state.milestones.isNotEmpty()) {
+                Column {
+                    Text("Academic milestones", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        state.milestones.forEach { m ->
+                            VCard {
+                                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(m.month, style = VTheme.type.label.colored(c.ink3))
+                                        Text(m.day, style = VTheme.type.dataLg.colored(c.ink))
+                                    }
+                                    Column(Modifier.weight(1f)) {
+                                        Text(m.title, style = VTheme.type.bodyStrong.colored(c.ink))
+                                        if (m.description.isNotBlank()) {
+                                            Text(m.description, style = VTheme.type.caption.colored(c.ink2))
+                                        }
+                                    }
+                                    if (m.isVerified) {
+                                        Icon(VIcons.Check, contentDescription = "Verified", tint = c.successInk, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
-    VButton(text = "Upload document", onClick = {}, full = true, variant = VButtonVariant.Secondary, leading = { Icon(VIcons.Upload, null, modifier = Modifier.size(14.dp)) })
 }

@@ -1,6 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.school
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,38 +26,65 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
+import com.littlebridge.vidyaprayag.feature.admin.presentation.Announcement
+import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolAnnouncementsState
+import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolAnnouncementsViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VBackHeader
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
-import com.littlebridge.vidyaprayag.ui.v2.components.VButton
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VComingSoon
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
-import com.littlebridge.vidyaprayag.ui.v2.components.VProgressRing
 import com.littlebridge.vidyaprayag.ui.v2.components.VTopTabs
-import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
+import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * SchoolCommsScreenV2 — a pixel-faithful copy of `Admin.tsx → Comms`.
+ * SchoolCommsScreenV2 — `Admin.tsx → Comms`, wired to the real
+ * [SchoolAnnouncementsViewModel] (`AnnouncementsApi` → `GET/POST /api/v1/announcements`).
  *
- * Four sub-tabs — Announcements (compose + list with open-rate badge), Messages (parent inbox),
- * PTM (next-meeting card + schedule + online-PTM preview), Notifications (delivery log). From [MockV2].
+ * The **Announcements** tab renders real announcements from the server (title, category,
+ * date) with category filtering, and a detail leaf. The **Messages**, **PTM** and
+ * **Notifications** tabs are dedicated backends/screens that don't exist yet (Phase D/E),
+ * so they're shown as `VComingSoon` rather than fabricating data (LAW 6). No MockV2 in
+ * production; the three UI states come from [VStateHost].
  */
 @Composable
-fun SchoolCommsScreenV2(modifier: Modifier = Modifier) {
+fun SchoolCommsScreenV2(
+    modifier: Modifier = Modifier,
+    viewModel: SchoolAnnouncementsViewModel = koinViewModel(),
+) {
+    val state by viewModel.state.collectAsStateV2()
+    SchoolCommsContent(
+        state = state,
+        onRetry = viewModel::loadAnnouncements,
+        onSelectCategory = viewModel::setCategoryFilter,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun SchoolCommsContent(
+    state: SchoolAnnouncementsState,
+    onRetry: () -> Unit,
+    onSelectCategory: (String?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val c = VTheme.colors
     var tab by remember { mutableStateOf("Announcements") }
     var openAnnouncement by remember { mutableStateOf<String?>(null) }
 
-    // React `Comms` opens `AnnouncementDetail` on card tap; we mirror that with a leaf overlay.
+    // Mirror React `Comms`: tapping a card opens an AnnouncementDetail leaf.
     openAnnouncement?.let { id ->
-        AnnouncementDetailV2(id = id, onBack = { openAnnouncement = null }, modifier = modifier)
+        AnnouncementDetailV2(
+            announcement = state.announcements.find { it.id == id }
+                ?: state.allAnnouncements.find { it.id == id },
+            onBack = { openAnnouncement = null },
+            modifier = modifier,
+        )
         return
     }
 
@@ -69,121 +97,141 @@ fun SchoolCommsScreenV2(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text("Communications", style = VTheme.type.h1.colored(c.ink))
-        VTopTabs(tabs = listOf("Announcements", "Messages", "PTM", "Notifications"), selected = tab, onSelect = { tab = it })
+        VTopTabs(
+            tabs = listOf("Announcements", "Messages", "PTM", "Notifications"),
+            selected = tab,
+            onSelect = { tab = it },
+        )
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             when (tab) {
-                "Announcements" -> {
-                    VButton(text = "Compose announcement", onClick = {}, full = true, size = VButtonSize.Lg, tone = VButtonTone.Teal, leading = { Icon(VIcons.Plus, null, modifier = Modifier.size(16.dp)) })
-                    MockV2.announcements.forEach { a ->
-                        VCard(onClick = { openAnnouncement = a.id }) {
-                            Text(a.title, style = VTheme.type.bodyStrong.colored(c.ink))
-                            // React: subtitle has marginTop 2 below the title.
-                            Text("${a.recipients} • ${a.date}", style = VTheme.type.caption.colored(c.ink2), modifier = Modifier.padding(top = 2.dp))
-                            Spacer(Modifier.height(8.dp))
-                            VBadge(text = "Opens ${a.opens}", tone = VBadgeTone.Arctic)
-                        }
+                "Announcements" -> AnnouncementsTab(
+                    state = state,
+                    onRetry = onRetry,
+                    onSelectCategory = onSelectCategory,
+                    onOpen = { openAnnouncement = it },
+                )
+                "Messages" -> VComingSoon(
+                    title = "Parent messages",
+                    description = "Two-way parent ↔ school messaging arrives with the messaging backend.",
+                )
+                "PTM" -> VComingSoon(
+                    title = "Parent–Teacher meetings",
+                    description = "Schedule PTMs and track slot bookings once the PTM backend is live.",
+                )
+                "Notifications" -> VComingSoon(
+                    title = "Delivery log",
+                    description = "Push/SMS/WhatsApp delivery receipts surface here when the notifications service ships.",
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnnouncementsTab(
+    state: SchoolAnnouncementsState,
+    onRetry: () -> Unit,
+    onSelectCategory: (String?) -> Unit,
+    onOpen: (String) -> Unit,
+) {
+    val c = VTheme.colors
+    VStateHost(
+        loading = state.isLoading,
+        error = state.errorMessage,
+        isEmpty = state.announcements.isEmpty(),
+        emptyTitle = "No announcements yet",
+        emptyBody = "Posts you publish to parents and staff will appear here.",
+        emptyIcon = VIcons.Megaphone,
+        onRetry = onRetry,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Category filter chips derived from the loaded data.
+            val categories = remember(state.allAnnouncements) {
+                state.allAnnouncements.map { it.category }.filter { it.isNotBlank() }.distinct()
+            }
+            if (categories.isNotEmpty()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip("All", state.selectedCategory == null) { onSelectCategory(null) }
+                    categories.forEach { cat ->
+                        FilterChip(cat, state.selectedCategory.equals(cat, ignoreCase = true)) { onSelectCategory(cat) }
                     }
                 }
-                "Messages" -> {
-                    MockV2.messagesInbox.forEach { m ->
-                        VCard {
-                            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                VAvatar(name = m.parent, size = 36.dp)
-                                Column(Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Text(m.parent, style = VTheme.type.bodyStrong.colored(c.ink))
-                                        if (m.overdue) VBadge(text = "Overdue", tone = VBadgeTone.Danger)
-                                    }
-                                    Text(m.child, style = VTheme.type.label.colored(c.ink3))
-                                    Text(m.preview, style = VTheme.type.caption.colored(c.ink2), modifier = Modifier.padding(top = 6.dp))
-                                    Text(m.time, style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified), modifier = Modifier.padding(top = 4.dp))
-                                }
-                            }
-                        }
+            }
+            state.announcements.forEach { a ->
+                VCard(onClick = { onOpen(a.id) }) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(a.title, style = VTheme.type.bodyStrong.colored(c.ink), modifier = Modifier.weight(1f))
+                        if (a.category.isNotBlank()) VBadge(text = a.category, tone = VBadgeTone.Arctic)
                     }
-                }
-                "PTM" -> {
-                    VCard {
-                        VLabel("Next PTM")
-                        Text("Half-yearly PTM — Class 10", style = VTheme.type.bodyStrong.colored(c.ink), modifier = Modifier.padding(top = 4.dp))
-                        Text("Tomorrow, 10:00 AM — 1:00 PM • Physical", style = VTheme.type.caption.colored(c.ink2))
-                        Spacer(Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            VProgressRing(value = 74f, size = 56.dp, strokeWidth = 6.dp)
-                            Column {
-                                Text("47 of 65 slots booked", style = VTheme.type.bodyStrong.colored(c.ink))
-                                Text("Bookings close in 18 hours", style = VTheme.type.caption.colored(c.ink2))
-                            }
-                        }
+                    if (a.date.isNotBlank()) {
+                        Text(a.date, style = VTheme.type.caption.colored(c.ink2), modifier = Modifier.padding(top = 2.dp))
                     }
-                    VButton(text = "Schedule new PTM", onClick = {}, full = true, size = VButtonSize.Lg, tone = VButtonTone.Peach, leading = { Icon(VIcons.Plus, null, modifier = Modifier.size(16.dp)) })
-                    VComingSoon(title = "Online PTM (video)", description = "Hold the meeting inside the app over secure video. Releasing next quarter.")
-                }
-                "Notifications" -> {
-                    MockV2.notifications.take(6).forEach { n ->
-                        VCard {
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text(n.title, style = VTheme.type.body.colored(c.ink), modifier = Modifier.weight(1f))
-                                VBadge(text = "Delivered", tone = VBadgeTone.Success)
-                            }
-                            Text("${n.body} • ${n.time}", style = VTheme.type.label.colored(c.ink3).copy(letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified), modifier = Modifier.padding(top = 2.dp))
-                        }
+                    if (a.description.isNotBlank()) {
+                        Text(
+                            a.description,
+                            style = VTheme.type.caption.colored(c.ink2),
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun FilterChip(label: String, active: Boolean, onClick: () -> Unit) {
+    val c = VTheme.colors
+    val (bg, fg) = if (active) c.teal.copy(alpha = 0.16f) to c.tealDeep else c.cream to c.ink2
+    Text(
+        label,
+        style = VTheme.type.label.colored(fg),
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(bg)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    )
 }
 
 /**
- * AnnouncementDetailV2 — `Admin.tsx → AnnouncementDetail` (exported). Title, meta, recipient +
- * channel badges, body copy, and (Admin context = React `dark`) the 3-up Delivery stat card.
+ * AnnouncementDetailV2 — title, category + date, body copy. Renders from the real
+ * [Announcement] model (no recipients/opens fields exist on the server model, so the
+ * old mock-only "Delivery" stats are intentionally dropped — LAW 6).
  */
 @Composable
-private fun AnnouncementDetailV2(id: String, onBack: () -> Unit, modifier: Modifier = Modifier) {
+private fun AnnouncementDetailV2(
+    announcement: Announcement?,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val c = VTheme.colors
-    val a = MockV2.announcements.find { it.id == id } ?: MockV2.announcements[0]
-    // React splits opens "opened / sent" — index 0 = opened, index 1 = sent.
-    val parts = a.opens.split(" / ")
-    val opened = parts.getOrElse(0) { a.opens }
-    val sent = parts.getOrElse(1) { a.opens }
-
     Column(modifier.fillMaxSize()) {
         VBackHeader(title = "Announcement", onBack = onBack)
+        if (announcement == null) {
+            Column(Modifier.fillMaxSize().padding(20.dp)) {
+                Text("Announcement unavailable", style = VTheme.type.h3.colored(c.ink))
+            }
+            return
+        }
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(vertical = 20.dp),
         ) {
-            Text(a.title, style = VTheme.type.h2.colored(c.ink))
-            Text("${a.date} • Posted by School Administration", style = VTheme.type.caption.colored(c.ink2), modifier = Modifier.padding(top = 4.dp))
+            Text(announcement.title, style = VTheme.type.h2.colored(c.ink))
+            Text(
+                "${announcement.date} • Posted by School Administration",
+                style = VTheme.type.caption.colored(c.ink2),
+                modifier = Modifier.padding(top = 4.dp),
+            )
             Spacer(Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                VBadge(text = a.recipients, tone = VBadgeTone.Arctic)
-                VBadge(text = "App + WhatsApp", tone = VBadgeTone.Success)
+            if (announcement.category.isNotBlank()) {
+                VBadge(text = announcement.category, tone = VBadgeTone.Arctic)
             }
-            // React body: 14px, line-height 1.6 → 22.4sp.
-            Text(a.body, style = VTheme.type.body.colored(c.ink2).copy(lineHeight = 22.4.sp), modifier = Modifier.padding(top = 16.dp))
-            Spacer(Modifier.height(16.dp))
-            VCard {
-                VLabel("Delivery")
-                Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DeliveryStat("Sent", sent, Modifier.weight(1f))
-                    DeliveryStat("Opened", opened, Modifier.weight(1f))
-                    DeliveryStat("Replied", "9", Modifier.weight(1f))
-                }
-            }
+            Text(
+                announcement.description,
+                style = VTheme.type.body.colored(c.ink2).copy(lineHeight = 22.4.sp),
+                modifier = Modifier.padding(top = 16.dp),
+            )
         }
-    }
-}
-
-@Composable
-private fun DeliveryStat(label: String, value: String, modifier: Modifier = Modifier) {
-    val c = VTheme.colors
-    // Mirrors Admin.tsx `Stat`: tile bg ink@6%, 10px label, 16px mono value.
-    Column(
-        modifier.clip(RoundedCornerShape(12.dp)).background(c.ink.copy(alpha = 0.06f)).padding(12.dp),
-    ) {
-        Text(label.uppercase(), style = VTheme.type.label.colored(c.ink3).copy(fontSize = 10.sp))
-        Text(value, style = VTheme.type.data.colored(c.ink).copy(fontSize = 16.sp), modifier = Modifier.padding(top = 4.dp))
     }
 }
