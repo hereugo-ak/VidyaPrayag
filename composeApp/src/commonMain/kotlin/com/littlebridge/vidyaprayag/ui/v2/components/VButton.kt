@@ -1,6 +1,8 @@
 package com.littlebridge.vidyaprayag.ui.v2.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -15,6 +17,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -37,8 +40,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -146,6 +152,27 @@ fun VButton(
     val isBusy = activePhase != VButtonPhase.Idle
     val isInteractive = enabled && !isBusy
 
+    // §13.6 — diagonal light sweep on FILLED PRIMARY buttons only.
+    // primitives.tsx:142-153 draws a 55%-wide skewed(-20deg) gradient
+    // `linear-gradient(90deg, transparent, rgba(255,255,255,0.32), transparent)`
+    // translating -100% → 220% over 900ms ease. The web triggers it on
+    // group-hover; there is no hover on touch, so per the audit (§13.6) we
+    // fire it once on press-release. `sweep` runs 0f→1f and maps to the
+    // gradient's horizontal travel.
+    val interaction = remember { MutableInteractionSource() }
+    val isPrimaryFilled = variant == VButtonVariant.Primary && !soft
+    val sweep = remember { Animatable(0f) }
+    if (isPrimaryFilled) {
+        LaunchedEffect(interaction) {
+            interaction.interactions.collect { i ->
+                if (i is PressInteraction.Release && isInteractive) {
+                    sweep.snapTo(0f)
+                    sweep.animateTo(1f, tween(900, easing = FastOutSlowInEasing))
+                }
+            }
+        }
+    }
+
     // Resolve fill / fg / border per variant.
     data class Skin(val bg: Color, val fg: Color, val border: Color?)
     val skin: Skin = when (variant) {
@@ -163,9 +190,37 @@ fun VButton(
         mod = mod.shadow(if (soft) 8.dp else 6.dp, shape, ambientColor = pal.softShadow, spotColor = pal.shadow)
     }
     mod = mod.clip(shape).background(skin.bg)
+    // §13.6 — the sweep is drawn *after* the background (so it rides on top of
+    // the fill) but inside the clip (so it stays masked to the rounded shape).
+    // The band is ~55% of the width, skewed -20° via a sheared linear gradient,
+    // travelling left→right as `sweep` goes 0→1. Idle (sweep==0 or ==1) draws
+    // nothing — it only flashes during the 900ms animation after a press.
+    if (isPrimaryFilled) {
+        mod = mod.drawWithContent {
+            drawContent()
+            val s = sweep.value
+            if (s > 0f && s < 1f) {
+                val w = size.width
+                val bandW = w * 0.55f
+                // Travel from fully off-screen left to fully off-screen right.
+                val centerX = -bandW + (w + bandW * 2f) * s
+                // Skew -20°: offset the gradient's top vs bottom horizontally.
+                val skew = size.height * 0.36f // tan(20°) ≈ 0.364
+                val brush = Brush.linearGradient(
+                    colorStops = arrayOf(
+                        0f to Color.Transparent,
+                        0.5f to Color.White.copy(alpha = 0.32f),
+                        1f to Color.Transparent,
+                    ),
+                    start = Offset(centerX - bandW / 2f + skew, 0f),
+                    end = Offset(centerX + bandW / 2f - skew, size.height),
+                )
+                drawRect(brush = brush)
+            }
+        }
+    }
     skin.border?.let { mod = mod.border(BorderStroke(1.dp, it), shape) }
 
-    val interaction = remember { MutableInteractionSource() }
     mod = mod.clickable(
         interactionSource = interaction,
         indication = null,
