@@ -69,25 +69,10 @@ data class TrackProgressResponse(
 )
 
 // --- Fees ---
-@Serializable
-data class FeeAnnouncementDto(
-    val id: String,
-    val title: String,
-    val time: String,
-    val description: String,
-    @SerialName("open_rate") val openRate: String,
-    val engagement: String,
-    val type: String
-)
-
-@Serializable
-data class FeeDataDto(
-    @SerialName("total_collected") val totalCollected: String,
-    @SerialName("collection_progress") val collectionProgress: Float,
-    @SerialName("outstanding_fees") val outstandingFees: String,
-    @SerialName("overdue_count") val overdueCount: Int,
-    val announcements: List<FeeAnnouncementDto>
-)
+// (audit §8.2) The /fees endpoint is owned by feature/parent/ParentFeesRouting.kt,
+// which serves the client-correct `FeeData` shape (finding D). The previously-dead
+// `FeeDataDto`/`FeeAnnouncementDto` that used to live here were never registered by
+// any route in this file, so they were removed to kill the duplicate/dead contract.
 
 // --- Scholarships ---
 @Serializable
