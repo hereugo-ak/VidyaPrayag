@@ -2,16 +2,22 @@
  * File: Tables.kt
  * Module: db
  *
- * Exposed table definitions mapped 1:1 to the real Supabase Postgres schema.
+ * Exposed table definitions mapped 1:1 to the Postgres schema the backend
+ * actually uses (the `vidyasetu_schema.sql` model — NOT the root
+ * /supabase_schema doc, which only covers 2 of these tables).
  *
- * Two source-of-truth SQL files describe what's deployed in Supabase:
- *   - /supabase_schema                            (operational tables, v2.1)
- *   - /docs/backend/sql/01_supplementary_schema.sql  (everything the Ktor
- *                                                    backend additionally needs)
+ * CANONICAL PROVISIONING ORDER (the ONLY complete recipe — see
+ * docs/db/PROVISION.sql which lists these in order):
+ *   1. docs/db/vidyasetu_schema.sql
+ *   2. docs/db/migration_001_faculty_and_holiday_list.sql
+ *   3. docs/db/migration_002_segmentation_geo_assignments.sql   (adds schools lat/long)
+ *   4. docs/backend/sql/02_teacher_schema.sql
  *
- * Run BOTH SQL files in Supabase → SQL Editor before pointing the backend
- * at production.  For local-dev SQLite fallback, Exposed auto-creates the
- * tables in the order declared in DatabaseFactory.allTables.
+ * Run all four in Supabase → SQL Editor before pointing the backend at
+ * production. For local-dev SQLite fallback, Exposed auto-creates the tables
+ * in the order declared in DatabaseFactory.allTables. In Postgres, boot-time
+ * validation (DatabaseFactory.validateSchema) logs any of the 36 tables that
+ * are missing and refuses to start when AUTO_CREATE_TABLES is not enabled.
  *
  * IMPORTANT DESIGN CHOICES
  * ------------------------
@@ -19,8 +25,6 @@
  *    flow uses `app_users` for phone-OTP-first signup.  Email-only users
  *    can still be created (password_hash column).
  *  - We use UUIDs everywhere to match Supabase.
- *  - Foreign keys are declared with .references() so SchemaUtils generates
- *    proper FK constraints in SQLite dev too.
  *  - JSONB columns are stored as `text` here; we marshal them with
  *    kotlinx.serialization on the way in/out.
  *

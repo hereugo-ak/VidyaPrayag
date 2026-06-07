@@ -1,0 +1,66 @@
+-- ============================================================================
+-- VidyaPrayag — CANONICAL DATABASE PROVISIONING SCRIPT
+-- ----------------------------------------------------------------------------
+-- Audit finding A (§1): there were two conflicting "source of truth" schemas
+-- and NO single document that listed the complete table set. Following either
+-- previously-documented recipe left the server missing 6–15 tables, so the
+-- teacher / messaging / ptm / fee endpoints 500'd on a fresh deploy.
+--
+-- THIS is the only complete recipe. Run the four files below, IN THIS ORDER,
+-- against a fresh Postgres / Supabase database (Supabase → SQL Editor, or psql).
+-- Together they create all 36 tables registered in
+-- server/.../db/DatabaseFactory.kt#allTables.
+--
+--   1. docs/db/vidyasetu_schema.sql
+--        Base operational tables (app_users, auth_otps, user_sessions,
+--        schools, students, children, fee_records, exam_results,
+--        message_threads, messages, leave_requests, ptm_events,
+--        ptm_class_progress, cms_landing_content, app_config, …).
+--
+--   2. docs/db/migration_001_faculty_and_holiday_list.sql
+--        Adds the supplementary tables Tables.kt maps but the base omitted:
+--        faculty, holiday_list. (Use these — NOT the duplicate copy-paste
+--        faculty:/holiday_list: blocks inside the base file.)
+--
+--   3. docs/db/migration_002_segmentation_geo_assignments.sql
+--        Adds announcement broadcast segmentation columns; schools.latitude /
+--        schools.longitude (REQUIRED by the parent /schools/discover distance
+--        sort — skipping this makes that query throw "column does not exist");
+--        the teacher_subject_assignments table; and children.student_code.
+--
+--   4. docs/backend/sql/02_teacher_schema.sql
+--        The 6 teacher-vertical tables: assessments, assessment_marks,
+--        syllabus_units, homework, homework_submissions, teacher_periods.
+--        (This step was missing from every previously-documented recipe.)
+--
+-- AFTER running all four, the backend's boot-time schema validation
+-- (DatabaseFactory.validateSchema) will report "all 36 tables present" and the
+-- server will start. If any table is missing it logs the list and refuses to
+-- boot in production (unless AUTO_CREATE_TABLES=true is set, which lets Exposed
+-- create them itself).
+--
+-- ----------------------------------------------------------------------------
+-- HOW TO RUN
+-- ----------------------------------------------------------------------------
+-- Option A — psql with \i includes (run from the repository root):
+--
+--     \i docs/db/vidyasetu_schema.sql
+--     \i docs/db/migration_001_faculty_and_holiday_list.sql
+--     \i docs/db/migration_002_segmentation_geo_assignments.sql
+--     \i docs/backend/sql/02_teacher_schema.sql
+--
+-- Option B — Supabase SQL Editor: open each of the four files in order and run
+-- them one after another.
+--
+-- Option C — let the backend create everything itself by setting
+-- AUTO_CREATE_TABLES=true on first boot (Exposed createMissingTablesAndColumns).
+--
+-- NOTE: the \i lines below are commented out so this file is itself safe to
+-- paste into the Supabase editor as a runbook. Uncomment them only when running
+-- via psql from the repo root.
+-- ============================================================================
+
+-- \i docs/db/vidyasetu_schema.sql
+-- \i docs/db/migration_001_faculty_and_holiday_list.sql
+-- \i docs/db/migration_002_segmentation_geo_assignments.sql
+-- \i docs/backend/sql/02_teacher_schema.sql

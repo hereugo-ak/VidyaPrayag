@@ -15,11 +15,18 @@ root `supabase_schema`, the uploaded `Vidyasetu schema.txt`, and `Tables.kt`).
 
 ## How to provision a fresh Supabase / Postgres database
 
+> ⚡ The canonical, copy-pasteable runbook is **`PROVISION.sql`** in this folder.
+> It lists the four files below in the exact order. Use it as the single source
+> of truth (audit finding A).
+
 Run these in order in **Supabase → SQL Editor**:
 
 1. `vidyasetu_schema.sql`  — base operational tables.
 2. `migration_001_faculty_and_holiday_list.sql` — adds `faculty` + `holiday_list`.
-3. `migration_002_segmentation_geo_assignments.sql` — adds segmentation, geo, teacher assignments, and the `children.student_code` link.
+3. `migration_002_segmentation_geo_assignments.sql` — adds segmentation, geo (`schools.latitude`/`longitude`), teacher assignments, and the `children.student_code` link.
+4. `../backend/sql/02_teacher_schema.sql` — the 6 teacher-vertical tables: `assessments`, `assessment_marks`, `syllabus_units`, `homework`, `homework_submissions`, `teacher_periods`. **(Previously omitted from every documented recipe — without it the teacher endpoints 500.)**
+
+After this, the backend's boot-time schema validation reports "all 36 tables present" and starts; otherwise it logs the missing tables and refuses to boot in production.
 
 > ⚠️ The `faculty:` and `holiday_list:` blocks in the raw uploaded
 > `Vidyasetu schema.txt` / `vidyasetu_schema.sql` are copy-paste duplicates of
