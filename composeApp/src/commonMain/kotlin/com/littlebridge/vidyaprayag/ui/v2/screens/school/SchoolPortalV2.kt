@@ -86,13 +86,19 @@ fun SchoolPortalV2(
                 AdmissionsCrmScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
                 return@VTheme
             }
-            // Results / SchedulePTM / DailyAttendance / ClassPerformance / TeacherPerformance /
-            // AnalyticsDashboard overlays are wired by their own follow-up batches once their
-            // screen files land. Until then they short-circuit to the tabs so the enum stays
-            // exhaustive without referencing not-yet-created composables.
-            SchoolOverlay.Results,
-            SchoolOverlay.SchedulePTM,
-            SchoolOverlay.DailyAttendance,
+            SchoolOverlay.Results -> {
+                ResultsPublishScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
+                return@VTheme
+            }
+            SchoolOverlay.SchedulePTM -> {
+                SchedulePtmScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
+                return@VTheme
+            }
+            SchoolOverlay.DailyAttendance -> {
+                DailyAttendanceScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
+                return@VTheme
+            }
+            // ClassPerformance / TeacherPerformance / AnalyticsDashboard land in batch 3.
             SchoolOverlay.ClassPerformance,
             SchoolOverlay.TeacherPerformance,
             SchoolOverlay.AnalyticsDashboard -> {
