@@ -83,6 +83,11 @@ kotlin {
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)
             implementation(libs.compose.ui)
+            // Cross-platform BackHandler (Android predictive back / iOS edge-swipe).
+            // androidx.compose.ui.backhandler.BackHandler lives in this separate
+            // artifact — not bundled with compose-ui — so it must be declared
+            // explicitly or every BackHandler reference fails to resolve.
+            implementation(libs.compose.ui.backhandler)
             implementation(libs.compose.components.resources)
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
