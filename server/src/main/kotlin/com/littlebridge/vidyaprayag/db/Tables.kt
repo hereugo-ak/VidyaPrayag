@@ -10,7 +10,9 @@
  * docs/db/PROVISION.sql which lists these in order):
  *   1. docs/db/vidyasetu_schema.sql
  *   2. docs/db/migration_001_faculty_and_holiday_list.sql
- *   3. docs/db/migration_002_segmentation_geo_assignments.sql   (adds schools lat/long)
+ *   3. docs/db/migration_002_segmentation_geo_assignments.sql   (segmentation + assignments;
+ *      schools lat/long now live in the BASE schema per §1.3, so this only re-asserts them
+ *      via ADD COLUMN IF NOT EXISTS — a harmless no-op)
  *   4. docs/backend/sql/02_teacher_schema.sql
  *
  * Run all four in Supabase → SQL Editor before pointing the backend at
