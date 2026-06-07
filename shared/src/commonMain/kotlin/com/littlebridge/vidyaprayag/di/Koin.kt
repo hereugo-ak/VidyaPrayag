@@ -225,6 +225,14 @@ val commonModule = module {
 
 val viewModelModule = module {
     factory { MainViewModel(get(), get(), get()) }
+    // Schools-discovery marketplace VM — drives DiscoveryScreenV2 off the real
+    // GET /api/v1/parent/schools/discover endpoint. See BACKEND_GAPS.md §3.
+    factory {
+        com.littlebridge.vidyaprayag.feature.schools.presentation.SchoolDiscoveryViewModel(
+            get(),  // KtorSchoolApi
+            get(),  // PreferenceRepository
+        )
+    }
     factory { ParentDashboardViewModel(get(), get(), get()) }
     factory { FeeViewModel(get(), get()) }
     factory { ChildBasicInfoViewModel() }

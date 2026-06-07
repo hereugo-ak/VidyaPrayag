@@ -33,6 +33,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.littlebridge.vidyaprayag.feature.schools.presentation.DiscoveredSchool
+import com.littlebridge.vidyaprayag.feature.schools.presentation.SchoolDiscoveryState
+import com.littlebridge.vidyaprayag.feature.schools.presentation.SchoolDiscoveryViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VBackHeader
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
@@ -46,9 +49,11 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VDivider
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VInput
 import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
-import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
+import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import org.koin.compose.viewmodel.koinViewModel
 
 /** Internal view state for the discovery flow (mirrors React `DiscoveryApp` view union). */
 private enum class DiscoveryView { List, Profile }
@@ -59,54 +64,84 @@ private val SriInk = Color(0xFF0A3A76)
 private val SriBg = Color(0xFFC8DEFF)
 
 /**
- * DiscoveryScreenV2 — a pixel-faithful copy of `Discovery.tsx → DiscoveryApp`.
+ * DiscoveryScreenV2 — the marketplace, wired to the real
+ * [SchoolDiscoveryViewModel] → `GET /api/v1/parent/schools/discover` endpoint
+ * (BACKEND_GAPS.md §3 + Phase C batch 4). The previous MockV2 driver is gone;
+ * the screen now renders genuine schools sourced from the server.
  *
- * The marketplace: a white header ("Find your child's school" + search + filter tags), the school
- * cards (cover photo + distance pill + SRI + board/type badges + fee range + Compare/Enquire), and
- * an in-place school profile (hero photo + sections). Driven by [MockV2.discoverySchools].
+ * Fields the backend does not currently send (board, type, fee range, medium, board result)
+ * are surfaced as `Coming Soon` placeholders rather than fabricated — LAW 6 / no guessed
+ * data. Per the React design, the search field + tag chips remain visible because they are
+ * the page's primary navigation affordance, but server-side filtering is not yet wired
+ * (Phase D will plumb `lat/lng` + chip filters into [SchoolDiscoveryViewModel.load]).
  */
 @Composable
 fun DiscoveryScreenV2(
     modifier: Modifier = Modifier,
     onOpenSchool: (String) -> Unit = {},
+    viewModel: SchoolDiscoveryViewModel = koinViewModel(),
 ) {
+    val state by viewModel.state.collectAsStateV2()
     var view by remember { mutableStateOf(DiscoveryView.List) }
-    var active by remember { mutableStateOf(MockV2.discoverySchools.first()) }
+    var active by remember { mutableStateOf<DiscoveredSchool?>(null) }
     var compare by remember { mutableStateOf(setOf<String>()) }
-    var query by remember { mutableStateOf("") }
 
-    when (view) {
+    // If the profile view was requested but `active` is null (defensive), fall back to List.
+    val effectiveView = if (view == DiscoveryView.Profile && active == null) DiscoveryView.List else view
+    when (effectiveView) {
         DiscoveryView.List -> DiscoveryList(
             modifier = modifier,
-            query = query,
-            onQuery = { query = it },
+            state = state,
+            onQuery = viewModel::setQuery,
+            onRetry = viewModel::load,
             compare = compare,
             onToggleCompare = { id ->
                 compare = if (id in compare) compare - id else if (compare.size < 3) compare + id else compare
             },
             onOpen = { s -> active = s; view = DiscoveryView.Profile },
-            onExit = { onOpenSchool(active.id) },
+            // Header "Exit" sends the user out of the marketplace; no specific school selected,
+            // so we pass an empty id to the host (NavGraphV2 only routes off non-empty ids).
+            onExit = { onOpenSchool(active?.id.orEmpty()) },
         )
-        DiscoveryView.Profile -> SchoolProfile(
-            modifier = modifier,
-            school = active,
-            onBack = { view = DiscoveryView.List },
-            onEnquire = { onOpenSchool(active.id) },
-        )
+        DiscoveryView.Profile -> {
+            // Smart-cast guard: `active` is a `var` in this scope, so we capture into a local.
+            val s = active
+            if (s != null) {
+                SchoolProfile(
+                    modifier = modifier,
+                    school = s,
+                    onBack = { view = DiscoveryView.List },
+                    onEnquire = { onOpenSchool(s.id) },
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun DiscoveryList(
     modifier: Modifier,
-    query: String,
+    state: SchoolDiscoveryState,
     onQuery: (String) -> Unit,
+    onRetry: () -> Unit,
     compare: Set<String>,
     onToggleCompare: (String) -> Unit,
-    onOpen: (MockV2.DiscoverySchool) -> Unit,
+    onOpen: (DiscoveredSchool) -> Unit,
     onExit: () -> Unit,
 ) {
     val c = VTheme.colors
+
+    // Client-side query filter (substring against name + location). The endpoint already
+    // supports `city=` for proper server-side filtering — Phase D will switch this over
+    // once the design specifies per-key behaviour.
+    val filtered = remember(state.schools, state.query) {
+        val q = state.query.trim()
+        if (q.isBlank()) state.schools
+        else state.schools.filter {
+            it.name.contains(q, ignoreCase = true) || it.location.contains(q, ignoreCase = true)
+        }
+    }
+
     Column(modifier.fillMaxSize().background(c.background)) {
         // header
         Column(
@@ -135,13 +170,16 @@ private fun DiscoveryList(
             }
             Spacer(Modifier.height(12.dp))
             VInput(
-                value = query,
+                value = state.query,
                 onValueChange = onQuery,
                 placeholder = "Find schools near you or by name",
                 leadingIcon = VIcons.Search,
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(12.dp))
+            // Tag chips are unfiltered today — they will become real filter pills once the
+            // server-side filter contract for board / fee-range / SRI is finalised (Phase D).
+            // Keeping the visual affordance preserves the React fidelity per LAW 5.
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("📍 Within 3 km", "🎓 CBSE", "💰 Fee range", "🏫 Type", "⭐ SRI").forEachIndexed { i, f ->
                     com.littlebridge.vidyaprayag.ui.v2.components.VTag(text = f, active = i == 0)
@@ -149,17 +187,36 @@ private fun DiscoveryList(
             }
         }
 
-        // list
-        Column(
-            Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+        // body — Loading · Error · Empty · Content (LAW 3)
+        VStateHost(
+            loading = state.isLoading,
+            error = state.errorMessage,
+            isEmpty = !state.isLoading && state.errorMessage == null && filtered.isEmpty(),
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            emptyTitle = if (state.query.isBlank()) "No schools yet" else "No matches",
+            emptyBody = if (state.query.isBlank()) {
+                "Schools registered on VidyaPrayag will appear here."
+            } else {
+                "Try another name or city."
+            },
+            emptyIcon = VIcons.Search,
+            onRetry = onRetry,
         ) {
-            MockV2.discoverySchools.forEach { s ->
-                SchoolCard(s, inCompare = s.id in compare, onToggleCompare = { onToggleCompare(s.id) }, onOpen = { onOpen(s) })
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                filtered.forEach { s ->
+                    SchoolCard(
+                        s,
+                        inCompare = s.id in compare,
+                        onToggleCompare = { onToggleCompare(s.id) },
+                        onOpen = { onOpen(s) },
+                    )
+                }
             }
         }
 
@@ -185,7 +242,7 @@ private fun DiscoveryList(
 
 @Composable
 private fun SchoolCard(
-    s: MockV2.DiscoverySchool,
+    s: DiscoveredSchool,
     inCompare: Boolean,
     onToggleCompare: () -> Unit,
     onOpen: () -> Unit,
@@ -199,7 +256,7 @@ private fun SchoolCard(
                 .clip(RoundedCornerShape(12.dp)),
         ) {
             AsyncImage(
-                model = s.photo,
+                model = s.image,
                 contentDescription = s.name,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
@@ -209,18 +266,22 @@ private fun SchoolCard(
                     Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.35f))),
                 ),
             )
-            Row(
-                Modifier
-                    .align(Alignment.TopStart)
-                    .padding(12.dp)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(Color.White.copy(alpha = 0.85f))
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Icon(VIcons.MapPin, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(11.dp))
-                Text(s.distance, style = VTheme.type.label.colored(c.ink).copy(letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified))
+            // Distance pill — only shown when the server populated `distance_km`
+            // (i.e. when lat/lng were available). LAW 6: don't fabricate "1.8 km" otherwise.
+            s.distanceLabel?.let { dist ->
+                Row(
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(12.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Color.White.copy(alpha = 0.85f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(VIcons.MapPin, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(11.dp))
+                    Text(dist, style = VTheme.type.label.colored(c.ink).copy(letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified))
+                }
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -228,9 +289,10 @@ private fun SchoolCard(
             Column(Modifier.weight(1f)) {
                 Text(s.name, style = VTheme.type.h3.colored(c.ink))
                 Spacer(Modifier.height(6.dp))
+                // Board/type badges were MockV2-only fields. The backend will surface them
+                // in a follow-up — until then we show the city only, which we DO have.
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    VBadge(text = s.board, tone = VBadgeTone.Arctic)
-                    VBadge(text = s.type, tone = VBadgeTone.Neutral)
+                    VBadge(text = s.location, tone = VBadgeTone.Neutral)
                 }
             }
             Column(horizontalAlignment = Alignment.End) {
@@ -244,17 +306,11 @@ private fun SchoolCard(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Icon(VIcons.Star, contentDescription = null, tint = SriInk, modifier = Modifier.size(12.dp))
-                    Text(s.sri.toString(), style = VTheme.type.dataSm.colored(SriInk))
+                    Text(formatRating(s.rating), style = VTheme.type.dataSm.colored(SriInk))
                 }
                 Text("SRI score", style = VTheme.type.label.colored(c.ink3), modifier = Modifier.padding(top = 4.dp))
             }
         }
-        Spacer(Modifier.height(12.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(s.medium, style = VTheme.type.caption.colored(c.ink2))
-            Text("Board result ${s.result}", style = VTheme.type.caption.colored(c.ink2))
-        }
-        Text("${s.feeRange} / year", style = VTheme.type.dataSm.colored(c.ink), modifier = Modifier.padding(top = 8.dp))
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             VButton(
@@ -285,7 +341,7 @@ private fun SchoolCard(
 @Composable
 private fun SchoolProfile(
     modifier: Modifier,
-    school: MockV2.DiscoverySchool,
+    school: DiscoveredSchool,
     onBack: () -> Unit,
     onEnquire: () -> Unit,
 ) {
@@ -297,7 +353,7 @@ private fun SchoolProfile(
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Box(Modifier.fillMaxWidth().height(224.dp)) {
                 AsyncImage(
-                    model = school.photo,
+                    model = school.image,
                     contentDescription = school.name,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
@@ -309,22 +365,20 @@ private fun SchoolProfile(
                     Text(school.name, style = VTheme.type.h2.colored(c.ink))
                     Spacer(Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        VBadge(text = school.board, tone = VBadgeTone.Arctic)
-                        VBadge(text = school.type, tone = VBadgeTone.Neutral)
-                        // React: dedicated SRI pill (Star + "SRI n") on #C8DEFF@30%, ink #0a3a76 — not a VBadge.
+                        VBadge(text = school.location, tone = VBadgeTone.Neutral)
+                        // Dedicated SRI pill (real `rating` from the endpoint).
                         Row(
                             Modifier.clip(RoundedCornerShape(999.dp)).background(SriBg.copy(alpha = 0.30f)).padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Icon(VIcons.Star, contentDescription = null, tint = SriInk, modifier = Modifier.size(11.dp))
-                            Text("SRI ${school.sri}", style = VTheme.type.label.colored(SriInk).copy(letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified, fontWeight = FontWeight.SemiBold))
+                            Text("SRI ${formatRating(school.rating)}", style = VTheme.type.label.colored(SriInk).copy(letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified, fontWeight = FontWeight.SemiBold))
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(school.distance, style = VTheme.type.caption.colored(c.ink2))
-                        Text(school.medium, style = VTheme.type.caption.colored(c.ink2))
+                    school.distanceLabel?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, style = VTheme.type.caption.colored(c.ink2))
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -333,63 +387,45 @@ private fun SchoolProfile(
                     VButton(text = "Enquire now", onClick = onEnquire, size = VButtonSize.Sm, tone = VButtonTone.Sky, soft = false, full = true, modifier = Modifier.weight(1f))
                 }
 
+                // About / academics / fees / reviews / location need richer endpoints
+                // (school profile API, fees API, reviews API). Until they ship, surface
+                // the real "we don't have this yet" message rather than fabricating data.
                 ProfileSection("About") {
-                    Text(
-                        "Founded 1987 • English-medium co-educational institution focused on holistic CBSE-pattern education with strong emphasis on STEM and the arts.",
-                        style = VTheme.type.caption.colored(c.ink2),
+                    VComingSoon(
+                        title = "School profile",
+                        description = "Rich school descriptions and tags will appear here once schools complete their public profile in the admin portal.",
                     )
-                    Spacer(Modifier.height(8.dp))
-                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf("Smart Classrooms", "Library", "Sports Ground", "Computer Lab", "Canteen", "Transport").forEach {
-                            VBadge(text = it, tone = VBadgeTone.Neutral)
-                        }
-                    }
                 }
                 ProfileSection("Academics") {
-                    ProfileRow("Board", school.board)
-                    ProfileRow("Classes offered", "Nursery – 12")
-                    ProfileRow("Medium", school.medium)
-                    ProfileRow("Board result (last yr)", school.result)
-                    ProfileRow("Teacher–student ratio", "Coming Soon")
+                    VComingSoon(
+                        title = "Academics",
+                        description = "Board, classes offered, medium, ratios — these will populate from each school's institutional profile.",
+                    )
                 }
                 ProfileSection("Fee structure") {
-                    ProfileRow("Tuition (annual)", school.feeRange)
-                    ProfileRow("Admission", "₹ 18,000 (one-time)")
-                    ProfileRow("Transport", "₹ 22,000 / yr")
+                    VComingSoon(
+                        title = "Fee structure",
+                        description = "Tuition and one-time fees will appear once the school admin publishes its fee plan.",
+                    )
                 }
                 ProfileSection("SRI breakdown") {
                     VComingSoon(
                         title = "School Reputation Index",
                         description = "Our 11-signal score lets you compare schools on academics, safety, facilities and parent sentiment.",
-                        preview = { SriPreview(score = school.sri.toFloat()) },
+                        preview = { SriPreview(score = school.rating.toFloat()) },
                     )
                 }
                 ProfileSection("Parent reviews") {
-                    VCard {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            repeat(4) { Icon(VIcons.Star, contentDescription = null, tint = Color(0xFFFFD4A3), modifier = Modifier.size(14.dp)) }
-                            Icon(VIcons.Star, contentDescription = null, tint = c.border2, modifier = Modifier.size(14.dp))
-                            Text("4.2 / 5 — 84 reviews", style = VTheme.type.dataSm.colored(c.ink2), modifier = Modifier.padding(start = 8.dp))
-                        }
-                        Text(
-                            "\"Teachers actually respond. Attendance updates land within minutes.\" — Verified parent",
-                            style = VTheme.type.caption.colored(c.ink2),
-                            modifier = Modifier.padding(top = 12.dp),
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        VBadge(text = "Verified VidyaSetu parents only", tone = VBadgeTone.Success)
-                    }
+                    VComingSoon(
+                        title = "Parent reviews",
+                        description = "Verified-parent reviews launch alongside the family link-child flow.",
+                    )
                 }
                 ProfileSection("Location") {
-                    VCard {
-                        Box(
-                            Modifier.fillMaxWidth().height(128.dp).clip(RoundedCornerShape(10.dp)).background(c.cream),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(VIcons.MapPin, contentDescription = null, tint = c.ink3, modifier = Modifier.size(28.dp))
-                        }
-                        Text("12 Civil Lines, Lucknow, UP 226001", style = VTheme.type.caption.colored(c.ink), modifier = Modifier.padding(top = 8.dp))
-                    }
+                    VComingSoon(
+                        title = "On the map",
+                        description = "Map embedding ships with the upcoming Maps integration. City: ${school.location}.",
+                    )
                 }
                 Spacer(Modifier.height(16.dp))
             }
@@ -406,6 +442,7 @@ private fun ProfileSection(title: String, content: @Composable () -> Unit) {
     }
 }
 
+@Suppress("unused")
 @Composable
 private fun ProfileRow(k: String, v: String) {
     val c = VTheme.colors
@@ -420,4 +457,11 @@ private fun ProfileRow(k: String, v: String) {
         }
         VDivider()
     }
+}
+
+/** "8.4" / "9.0" — server sends a Double rating; format to one decimal. */
+private fun formatRating(r: Double): String {
+    if (r <= 0.0) return "—"
+    val rounded = (r * 10).toLong()
+    return "${rounded / 10}.${rounded % 10}"
 }
