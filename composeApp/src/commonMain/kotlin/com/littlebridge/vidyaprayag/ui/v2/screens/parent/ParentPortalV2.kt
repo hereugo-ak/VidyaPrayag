@@ -47,7 +47,7 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays a portal can push above its tab content (back returns to the tabs). */
-private enum class ParentOverlay { None, Notifications, Calendar }
+private enum class ParentOverlay { None, Notifications, Calendar, Scholarships }
 
 /**
  * ParentPortalV2 — the 4-tab parent shell, a faithful copy of `Parent.tsx → ParentApp`.
@@ -81,6 +81,10 @@ fun ParentPortalV2(
         }
         ParentOverlay.Calendar -> {
             AcademicCalendarScreenV2(onBack = { overlay = ParentOverlay.None }, modifier = modifier)
+            return
+        }
+        ParentOverlay.Scholarships -> {
+            ScholarshipsScreenV2(onBack = { overlay = ParentOverlay.None }, modifier = modifier)
             return
         }
         ParentOverlay.None -> Unit
