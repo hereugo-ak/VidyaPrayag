@@ -39,6 +39,17 @@ if (devBaseUrl == renderFallbackUrl) {
 }
 
 kotlin {
+    // Project-wide opt-in to the experimental cross-platform BackHandler API
+    // (androidx.compose.ui.backhandler.BackHandler is annotated
+    // @ExperimentalComposeUiApi). Declared as a real `-opt-in` compiler arg on
+    // EVERY Kotlin compilation (not just languageSettings, which can fail to
+    // propagate to the Android Kotlin compile task) so the experimental-API
+    // diagnostic ("This API is experimental and is likely to change in the
+    // future") is silenced consistently across android/ios/js/wasmJs/jvm.
+    compilerOptions {
+        optIn.add("androidx.compose.ui.ExperimentalComposeUiApi")
+    }
+
     androidTarget {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_21)
