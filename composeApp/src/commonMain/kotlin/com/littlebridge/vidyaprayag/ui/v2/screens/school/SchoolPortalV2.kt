@@ -98,11 +98,17 @@ fun SchoolPortalV2(
                 DailyAttendanceScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
                 return@VTheme
             }
-            // ClassPerformance / TeacherPerformance / AnalyticsDashboard land in batch 3.
-            SchoolOverlay.ClassPerformance,
-            SchoolOverlay.TeacherPerformance,
+            SchoolOverlay.ClassPerformance -> {
+                ClassPerformanceScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
+                return@VTheme
+            }
+            SchoolOverlay.TeacherPerformance -> {
+                TeacherPerformanceScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
+                return@VTheme
+            }
             SchoolOverlay.AnalyticsDashboard -> {
-                overlay = SchoolOverlay.None
+                AnalyticsDashboardScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
+                return@VTheme
             }
             SchoolOverlay.None -> Unit
         }
