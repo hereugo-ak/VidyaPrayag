@@ -1,5 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.auth
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -36,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -51,8 +54,11 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VInput
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
+import com.littlebridge.vidyaprayag.ui.v2.theme.VMotion
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -85,9 +91,31 @@ fun LoginScreenV2(
     }
 
     // The selected portal pill. Mirror it into the VM's role on change.
-    var portal by remember { mutableStateOf(if (state.role == "ADMIN") "admin" else "parent") }
+    var portal by remember {
+        mutableStateOf(
+            when (state.role) {
+                "ADMIN" -> "admin"
+                "TEACHER" -> "teacher"
+                else -> "parent"
+            },
+        )
+    }
     // Password reveal toggle (the React Eye affordance).
     var passwordVisible by remember { mutableStateOf(false) }
+
+    // ── §13.2 entrance reveal ladder (verbatim from Auth.tsx → Login) ──
+    //   Logo cube  spring(s=240,d=22)            → scale .85→1 + alpha 0→1
+    //   Form sheet spring(s=260,d=30), delay .1s → y +40→0 + alpha 0→1
+    val logoScale = remember { Animatable(0.85f) }
+    val logoAlpha = remember { Animatable(0f) }
+    val sheetY = remember { Animatable(40f) }
+    val sheetAlpha = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        launch { logoScale.animateTo(1f, VMotion.springSoft) }
+        launch { logoAlpha.animateTo(1f, tween(400)) }
+        launch { delay(100); sheetY.animateTo(0f, VMotion.springCard) }
+        launch { delay(100); sheetAlpha.animateTo(1f, tween(300)) }
+    }
 
     Column(
         modifier
@@ -111,7 +139,13 @@ fun LoginScreenV2(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 48.dp),
             ) {
-                LogoCube()
+                LogoCube(
+                    modifier = Modifier.graphicsLayer {
+                        scaleX = logoScale.value
+                        scaleY = logoScale.value
+                        alpha = logoAlpha.value
+                    },
+                )
                 Spacer(Modifier.height(24.dp))
                 Text(
                     "Welcome to VidyaSetu. 👋",
@@ -142,6 +176,10 @@ fun LoginScreenV2(
             Modifier
                 .fillMaxWidth()
                 .offset(y = (-16).dp)
+                .graphicsLayer {
+                    translationY = sheetY.value * density
+                    alpha = sheetAlpha.value
+                }
                 .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
                 .background(c.background)
                 .padding(horizontal = 20.dp)

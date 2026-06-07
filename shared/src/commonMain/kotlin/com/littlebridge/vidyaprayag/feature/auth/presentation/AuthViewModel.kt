@@ -24,7 +24,7 @@ data class AuthUiState(
     val password: String = "",
     val confirmPassword: String = "",
     val otp: String = "",
-    val role: String = "PARENT", // "ADMIN" or "PARENT"
+    val role: String = "PARENT", // "ADMIN" | "TEACHER" | "PARENT"
     val isLoading: Boolean = false,
     val error: String? = null,
     val isAuthSuccessful: Boolean = false

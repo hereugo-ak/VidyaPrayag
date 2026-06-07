@@ -28,7 +28,7 @@ data class LoginRequest(
     val identifier: String,
     val password: String? = null,
     val otp: String? = null,
-    val role: String // "ADMIN" or "PARENT"
+    val role: String // "ADMIN" | "TEACHER" | "PARENT"
 )
 
 @Serializable
