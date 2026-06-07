@@ -155,6 +155,30 @@ object DatabaseFactory {
                 }
             }
         }
+
+        // Operational demo seed (audit finding B): one working credential per
+        // profile type + minimal operational data, so a fresh deploy is
+        // immediately loginable instead of empty/unlogin-able. Idempotent.
+        val seedDemo = (dotenv["APP_SEED_DEMO"] ?: System.getenv("APP_SEED_DEMO") ?: "true")
+            .equals("true", ignoreCase = true)
+
+        if (seedDemo) {
+            println("DB_INIT: Running operational demo seed...")
+            try {
+                DemoSeed.ensureDemoData()
+                println("DB_INIT: Demo seed completed successfully.")
+            } catch (e: Exception) {
+                val msg = e.message ?: ""
+                if (msg.contains("relation", ignoreCase = true) && msg.contains("does not exist", ignoreCase = true)) {
+                    System.err.println("DB_INIT_WARNING: Demo seeding skipped because tables are missing.")
+                    System.err.println("DB_INIT_TIP: Set AUTO_CREATE_TABLES=true on Render to create tables automatically.")
+                } else {
+                    System.err.println("DB_INIT_ERROR: Demo seeding failed with unexpected error!")
+                    e.printStackTrace()
+                    // Non-fatal: CMS + schema are already in place; don't crash-loop.
+                }
+            }
+        }
     }
 
     private fun createPostgresDataSource(
