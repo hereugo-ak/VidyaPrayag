@@ -29,6 +29,7 @@
  *   - parentDashboardRouting()            — /api/v1/parent/dashboard
  *   - trackProgressRouting()              — /api/v1/parent/track-progress
  *   - parentFeesRouting()                 — /api/v1/parent/fees
+ *   - parentLinkRouting()                 — /api/v1/parent/{schools/search, link-child}
  *   - schoolDashboardRouting()            — /api/v1/school/dashboard
  *   - schoolAnalyticsRouting()            — /api/v1/school/analytics/{overview,class-performance,teacher-performance,student/{id},syllabus-coverage}
  *   - leaveRequestsRouting()              — /api/v1/school/leave-requests[…]
@@ -63,6 +64,7 @@ import com.littlebridge.vidyaprayag.feature.media.mediaRouting
 import com.littlebridge.vidyaprayag.feature.onboarding.onboardingRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentDashboardRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentFeesRouting
+import com.littlebridge.vidyaprayag.feature.parent.parentLinkRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentOnboardingRouting
 import com.littlebridge.vidyaprayag.feature.parent.trackProgressRouting
 import com.littlebridge.vidyaprayag.feature.school.leaveRequestsRouting
@@ -169,6 +171,7 @@ fun Application.module() {
         parentDashboardRouting()     // /api/v1/parent/dashboard
         trackProgressRouting()       // /api/v1/parent/track-progress
         parentFeesRouting()          // /api/v1/parent/fees
+        parentLinkRouting()          // /api/v1/parent/{schools/search, link-child} — Link Your Child wizard (audit §5.3 / SWEEP-A)
 
         // School ecosystem (school_api_spec.artifact.md)
         schoolDashboardRouting()     // /api/v1/school/dashboard
