@@ -1,0 +1,137 @@
+package com.littlebridge.vidyaprayag.ui.v2.screens.parent
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentProfileState
+import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentProfileViewModel
+import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
+import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
+import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
+import com.littlebridge.vidyaprayag.ui.v2.components.VButton
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
+import com.littlebridge.vidyaprayag.ui.v2.components.VCard
+import com.littlebridge.vidyaprayag.ui.v2.components.VBackHeader
+import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
+import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
+import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
+import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
+import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import org.koin.compose.viewmodel.koinViewModel
+
+/**
+ * ParentProfileScreenV2 — the parent's own profile, wired to the real
+ * [ParentProfileViewModel] (`GET /api/v1/user/details` → `personal_details`).
+ *
+ * Audit finding **K** (§7): previously the parent portal had NO profile screen and
+ * the avatar in [ParentPortalV2] was bound to `onLogout`, so tapping your photo
+ * logged you out — a behaviour every user reads as a bug. This screen gives the
+ * avatar a real destination and moves **Log out** to an explicit button here.
+ *
+ * Mirrors the existing `TeacherProfileScreenV2` design (frozen design language,
+ * RULE-6) and exits with all three states via [VStateHost] (RULE-7).
+ */
+@Composable
+fun ParentProfileScreenV2(
+    onBack: () -> Unit = {},
+    onLogout: () -> Unit = {},
+    modifier: Modifier = Modifier,
+    viewModel: ParentProfileViewModel = koinViewModel(),
+) {
+    val state by viewModel.state.collectAsStateV2()
+    ParentProfileContent(
+        state = state,
+        onBack = onBack,
+        onLogout = onLogout,
+        onRetry = viewModel::load,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun ParentProfileContent(
+    state: ParentProfileState,
+    onBack: () -> Unit,
+    onLogout: () -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+
+    Column(modifier.fillMaxSize()) {
+        VBackHeader(title = "Profile", onBack = onBack)
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(top = 12.dp, bottom = 24.dp),
+        ) {
+            VStateHost(
+                loading = state.isLoading,
+                error = state.error,
+                isEmpty = state.profile == null,
+                emptyTitle = "Profile unavailable",
+                emptyBody = "We couldn't load your profile. Please try again.",
+                emptyIcon = VIcons.User,
+                onRetry = onRetry,
+            ) {
+                val me = state.profile!!
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    VAvatar(name = me.name, src = me.photoUrl, size = 88.dp)
+                    Text(
+                        me.name.ifBlank { "Parent" },
+                        style = VTheme.type.h2.colored(c.ink),
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    VBadge(text = me.role.lowercase().replaceFirstChar { it.uppercase() }, tone = VBadgeTone.Arctic)
+                }
+                Spacer(Modifier.height(24.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val rows = listOf(
+                        "Personal details" to listOf(me.phone, me.email).filter { it.isNotBlank() }
+                            .joinToString(" • ").ifBlank { "Mobile, email, photo" },
+                        "Linked children" to "Manage who you follow",
+                        "Notification preferences" to "Push, WhatsApp, quiet hours",
+                        "Change password" to "Keep your account secure",
+                        "Help & support" to "Contact VidyaPrayag",
+                    )
+                    rows.forEach { (title, sub) ->
+                        VCard {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(title, style = VTheme.type.bodyStrong.colored(c.ink))
+                                    Text(sub, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp))
+                                }
+                                Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    VButton(text = "Log out", onClick = onLogout, full = true, variant = VButtonVariant.Ghost)
+                }
+            }
+        }
+    }
+}

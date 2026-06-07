@@ -110,7 +110,9 @@ fun TeacherPortalV2(
                     "home" -> TeacherHomeScreenV2(
                         onOpenNotifications = { overlay = TeacherOverlay.Notifications },
                         onOpenCalendar = { overlay = TeacherOverlay.Calendar },
-                        onExit = onLogout,
+                        // §7 finding K — tapping the avatar opens the Profile tab (where logout
+                        // lives), instead of logging the teacher out outright.
+                        onExit = { tab = "profile" },
                     )
                     "classes" -> TeacherClassesScreenV2()
                     "profile" -> TeacherProfileScreenV2(onLogout = onLogout)

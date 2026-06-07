@@ -132,7 +132,9 @@ fun SchoolPortalV2(
                     "home" -> SchoolHomeScreenV2(
                         onOpenNotifications = { overlay = SchoolOverlay.Notifications },
                         onOpenCalendar = { overlay = SchoolOverlay.Calendar },
-                        onExit = onLogout,
+                        // §7 finding K — tapping the avatar opens the Settings tab (where logout
+                        // lives), instead of logging the admin out outright.
+                        onExit = { tab = "settings" },
                     )
                     "people" -> SchoolPeopleScreenV2()
                     "records" -> SchoolRecordsScreenV2()

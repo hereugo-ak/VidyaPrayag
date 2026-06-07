@@ -47,7 +47,7 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays a portal can push above its tab content (back returns to the tabs). */
-private enum class ParentOverlay { None, Notifications, Calendar, Scholarships }
+private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, Profile }
 
 /**
  * ParentPortalV2 — the 4-tab parent shell, a faithful copy of `Parent.tsx → ParentApp`.
@@ -87,6 +87,16 @@ fun ParentPortalV2(
             ScholarshipsScreenV2(onBack = { overlay = ParentOverlay.None }, modifier = modifier)
             return
         }
+        ParentOverlay.Profile -> {
+            // §7 finding K — the avatar opens the real profile screen; logout now lives
+            // on an explicit button inside it (no more "tap your photo = logout").
+            ParentProfileScreenV2(
+                onBack = { overlay = ParentOverlay.None },
+                onLogout = onLogout,
+                modifier = modifier,
+            )
+            return
+        }
         ParentOverlay.None -> Unit
     }
 
@@ -104,7 +114,7 @@ fun ParentPortalV2(
                 childName = progress.childName,
                 childSubline = progress.journeyDescription.ifBlank { "Level ${progress.currentLevel}" },
                 onOpenNotifications = { overlay = ParentOverlay.Notifications },
-                onExit = onLogout,
+                onExit = { overlay = ParentOverlay.Profile },
             )
         },
         bottomBar = {
@@ -124,8 +134,9 @@ fun ParentPortalV2(
 
 /**
  * ParentHeader — child identity chip (from real track-progress data), a notification bell with an
- * unread dot, and the parent's avatar (exit). Faithful to `Parent.tsx → ChildSwitcher`, minus the
- * sibling picker (multi-child linking lands with the parent-link-child backend).
+ * unread dot, and the parent's avatar (opens the Profile screen, where logout lives — §7 finding K).
+ * Faithful to `Parent.tsx → ChildSwitcher`, minus the sibling picker (multi-child linking lands with
+ * the parent-link-child backend).
  */
 @Composable
 private fun ParentHeader(
