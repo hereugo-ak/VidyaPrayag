@@ -65,3 +65,13 @@ data class OtpRequest(
 data class OtpResponse(
     val message: String
 )
+
+@Serializable
+data class RefreshRequest(
+    @SerialName("refresh_token") val refreshToken: String
+)
+
+@Serializable
+data class LogoutRequest(
+    @SerialName("refresh_token") val refreshToken: String? = null
+)

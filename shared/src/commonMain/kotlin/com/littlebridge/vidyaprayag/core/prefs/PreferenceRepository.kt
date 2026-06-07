@@ -12,5 +12,18 @@ interface PreferenceRepository {
     fun getUserToken(): Flow<String?>
     suspend fun setUserToken(token: String?)
 
+    // --- session persistence (audit §3.4, finding F) ---
+    // These three were previously only held in an in-memory cache and were
+    // permanently lost on app restart, making the full session unrecoverable
+    // and the server's refresh infrastructure unreachable.
+    fun getUserId(): Flow<String?>
+    suspend fun setUserId(userId: String?)
+
+    fun getRefreshToken(): Flow<String?>
+    suspend fun setRefreshToken(token: String?)
+
+    fun getProfileCompleted(): Flow<Boolean?>
+    suspend fun setProfileCompleted(completed: Boolean?)
+
     suspend fun clearSession()
 }

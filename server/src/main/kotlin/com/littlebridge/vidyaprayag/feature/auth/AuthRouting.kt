@@ -38,11 +38,14 @@ import com.littlebridge.vidyaprayag.core.JwtConfig
 import com.littlebridge.vidyaprayag.core.created
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
+import com.littlebridge.vidyaprayag.core.okMessage
+import com.littlebridge.vidyaprayag.core.principalUserId
 import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.AuthOtpsTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.UserSessionsTable
 import io.ktor.http.*
+import io.ktor.server.auth.*
 import io.ktor.server.plugins.origin
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
@@ -137,6 +140,9 @@ data class AuthTokenResponse(
 
 @Serializable
 data class RefreshDto(@SerialName("refresh_token") val refreshToken: String)
+
+@Serializable
+data class LogoutDto(@SerialName("refresh_token") val refreshToken: String? = null)
 
 // ============================================================
 // Helpers
@@ -503,6 +509,39 @@ fun Route.authRouting() {
                 ),
                 message = "Token refreshed"
             )
+        }
+    }
+
+    // -------- logout (server-side revocation, audit §3.6) --------
+    // Requires a valid access token; revokes the matching refresh-token session
+    // row so the refresh token cannot be reused for its remaining 30-day life.
+    authenticate("jwt") {
+        route("/api/v1/auth") {
+            post("/logout") {
+                val uid = call.principalUserId()
+                    ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@post }
+                val body = runCatching { call.receive<LogoutDto>() }.getOrNull()
+                val now = Instant.now()
+                dbQuery {
+                    val refreshHash = body?.refreshToken?.let { sha256Hex(it) }
+                    if (refreshHash != null) {
+                        // Revoke just the session tied to this refresh token.
+                        UserSessionsTable.update({
+                            (UserSessionsTable.userId eq uid) and
+                                (UserSessionsTable.refreshTokenHash eq refreshHash)
+                        }) { it[revokedAt] = now }
+                    } else {
+                        // No refresh token supplied → revoke all of the user's
+                        // sessions as a safe fallback (idempotent for already-
+                        // revoked rows).
+                        UserSessionsTable.update({
+                            UserSessionsTable.userId eq uid
+                        }) { it[revokedAt] = now }
+                    }
+                }
+                call.okMessage("Logged out")
+            }
         }
     }
 }

@@ -83,6 +83,7 @@ kotlin {
             implementation(libs.okio)
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.contentNegotiation)
+            implementation(libs.ktor.client.auth)
             implementation(libs.ktor.serialization.kotlinxJson)
         }
         commonTest.dependencies {

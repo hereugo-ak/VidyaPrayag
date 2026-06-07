@@ -11,6 +11,7 @@ interface AuthRepository {
     suspend fun verifyOtp(identifier: String, code: String, purpose: String? = null): NetworkResult<Boolean>
     suspend fun saveSession(response: AuthResponse)
     suspend fun getSession(): AuthResponse?
+    suspend fun refresh(): NetworkResult<AuthResponse>
     suspend fun logout()
     suspend fun getUserDetails(token: String): NetworkResult<UserDetailsResponse>
 }
