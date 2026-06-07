@@ -194,6 +194,24 @@ fun CommonLandingScreenV2(
                         .padding(horizontal = d.lg)
                         .graphicsLayer { alpha = wordAlpha.value },
                 )
+                Spacer(Modifier.height(18.dp))
+                // Premium trust pill — frosted glass on the teal hero, reads as bank-grade reassurance.
+                Row(
+                    modifier = Modifier
+                        .graphicsLayer { alpha = wordAlpha.value }
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Color.White.copy(alpha = 0.16f))
+                        .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(999.dp))
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(VIcons.ShieldCheck, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                    Text(
+                        "Bank-grade encryption",
+                        style = VTheme.type.caption.colored(Color.White).copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
+                    )
+                }
             }
         }
 
@@ -317,21 +335,36 @@ private fun RoleCard(
             .fillMaxWidth()
             .pressScale(interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick),
-        padding = 18.dp,
+        padding = 0.dp,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.fillMaxWidth()) {
+            // Premium accent bar — a thin role-tinted gradient strip seating the card in its colour.
             Box(
-                Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).background(accent.copy(alpha = 0.14f)),
-                contentAlignment = Alignment.Center,
+                Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .background(
+                        Brush.horizontalGradient(listOf(accent.copy(alpha = 0.95f), accent.copy(alpha = 0.45f))),
+                    ),
+            )
+            Row(
+                Modifier.padding(18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Icon(icon, contentDescription = null, tint = accentInk, modifier = Modifier.size(26.dp))
+                Box(
+                    Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).background(accent.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, contentDescription = null, tint = accentInk, modifier = Modifier.size(26.dp))
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(title, style = VTheme.type.h3.colored(c.ink))
+                    Spacer(Modifier.height(3.dp))
+                    Text(body, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 16.sp))
+                }
+                Icon(VIcons.ArrowRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
             }
-            Column(Modifier.weight(1f)) {
-                Text(title, style = VTheme.type.h3.colored(c.ink))
-                Spacer(Modifier.height(3.dp))
-                Text(body, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 16.sp))
-            }
-            Icon(VIcons.ArrowRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
         }
     }
 }
