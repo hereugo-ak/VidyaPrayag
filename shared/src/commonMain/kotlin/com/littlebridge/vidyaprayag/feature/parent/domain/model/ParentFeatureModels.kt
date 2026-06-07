@@ -112,3 +112,47 @@ data class ParentNotificationDto(
     val time: String,
     val unread: Boolean = true
 )
+
+// --- Link Your Child wizard (report §5.3 — replaces MockV2.childForParent/school) ---
+@Serializable
+data class SchoolSearchResponse(
+    val success: Boolean,
+    val data: SchoolSearchData
+)
+
+@Serializable
+data class SchoolSearchData(
+    val schools: List<SchoolMatchDto>
+)
+
+@Serializable
+data class SchoolMatchDto(
+    val id: String,
+    val name: String,
+    val board: String,
+    val city: String,
+    @SerialName("logo_url") val logoUrl: String? = null
+)
+
+@Serializable
+data class LinkChildRequest(
+    @SerialName("school_id") val schoolId: String,
+    @SerialName("roll_number") val rollNumber: String,
+    @SerialName("parent_name") val parentName: String? = null
+)
+
+@Serializable
+data class LinkChildResponse(
+    val success: Boolean,
+    val data: LinkedChildDto
+)
+
+@Serializable
+data class LinkedChildDto(
+    @SerialName("child_id") val childId: String,
+    @SerialName("child_name") val childName: String,
+    @SerialName("class_name") val className: String,
+    val roll: String,
+    @SerialName("school_name") val schoolName: String,
+    @SerialName("profile_photo_url") val profilePhotoUrl: String? = null
+)

@@ -27,4 +27,12 @@ class ParentRepositoryImpl(
     override suspend fun getNotifications(token: String): NetworkResult<ParentNotificationsResponse> {
         return api.getNotifications(token)
     }
+
+    override suspend fun searchSchools(token: String, query: String): NetworkResult<SchoolSearchResponse> {
+        return api.searchSchools(token, query)
+    }
+
+    override suspend fun linkChild(token: String, request: LinkChildRequest): NetworkResult<LinkChildResponse> {
+        return api.linkChild(token, request)
+    }
 }

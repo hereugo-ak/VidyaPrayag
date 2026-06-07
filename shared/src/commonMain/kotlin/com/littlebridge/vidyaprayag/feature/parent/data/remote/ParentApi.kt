@@ -5,6 +5,8 @@ import com.littlebridge.vidyaprayag.core.network.safeApiCall
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.*
 import io.ktor.client.*
 import io.ktor.client.request.*
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 
 class ParentApi(
     private val client: HttpClient,
@@ -52,6 +54,25 @@ class ParentApi(
         return safeApiCall {
             client.get(getUrl("api/v1/parent/notifications")) {
                 header("Authorization", "Bearer $token")
+            }
+        }
+    }
+
+    suspend fun searchSchools(token: String, query: String): NetworkResult<SchoolSearchResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/schools/search")) {
+                header("Authorization", "Bearer $token")
+                url { parameters.append("q", query) }
+            }
+        }
+    }
+
+    suspend fun linkChild(token: String, request: LinkChildRequest): NetworkResult<LinkChildResponse> {
+        return safeApiCall {
+            client.post(getUrl("api/v1/parent/link-child")) {
+                header("Authorization", "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(request)
             }
         }
     }
