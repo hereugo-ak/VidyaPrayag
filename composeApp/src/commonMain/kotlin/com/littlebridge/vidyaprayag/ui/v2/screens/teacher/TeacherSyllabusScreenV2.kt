@@ -126,8 +126,11 @@ private fun TeacherSyllabusContent(
                         CoverToggle(covered = unit.isCovered, enabled = state.updatingUnitId == null) { onToggle(unit.id) }
                         Column(Modifier.weight(1f)) {
                             Text(unit.title, style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 13.sp))
-                            if (unit.isCovered && !unit.coveredOn.isNullOrBlank()) {
-                                Text("Covered ${unit.coveredOn}", style = VTheme.type.dataSm.colored(c.ink3).copy(fontSize = 11.sp))
+                            // Smart-cast on `unit.coveredOn` is forbidden cross-module
+                            // (the property lives in :shared). Pin into a local val.
+                            val coveredOn = unit.coveredOn
+                            if (unit.isCovered && !coveredOn.isNullOrBlank()) {
+                                Text("Covered $coveredOn", style = VTheme.type.dataSm.colored(c.ink3).copy(fontSize = 11.sp))
                             }
                         }
                     }

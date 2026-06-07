@@ -305,9 +305,12 @@ fun LoginScreenV2(
                 }
             }
 
-            if (state.error != null) {
+            // Capture into a local val rather than relying on smart-cast / `!!` on a
+            // public property from another module (LAW: don't fight Kotlin's safety).
+            val authError = state.error
+            if (authError != null) {
                 Spacer(Modifier.height(12.dp))
-                Text(state.error!!, style = VTheme.type.caption.colored(c.dangerInk))
+                Text(authError, style = VTheme.type.caption.colored(c.dangerInk))
             }
 
             Spacer(Modifier.height(24.dp))

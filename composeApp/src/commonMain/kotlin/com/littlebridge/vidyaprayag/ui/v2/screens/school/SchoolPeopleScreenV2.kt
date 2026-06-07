@@ -130,8 +130,13 @@ private fun SchoolPeopleContent(
                                         value = e.percentage,
                                         tone = if (e.percentage < 60f) VBadgeTone.Warning else VBadgeTone.Arctic,
                                     )
-                                    if (!e.status.isNullOrBlank()) {
-                                        Text(e.status, style = VTheme.type.label.colored(c.ink3))
+                                    // Capture into a local val so Kotlin can smart-cast — the
+                                    // public `status: String?` on `SubjectEngagement` lives in
+                                    // the `shared/` module and cannot be smart-cast directly
+                                    // through `!e.status.isNullOrBlank()`.
+                                    val status = e.status
+                                    if (!status.isNullOrBlank()) {
+                                        Text(status, style = VTheme.type.label.colored(c.ink3))
                                     }
                                 }
                             }
