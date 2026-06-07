@@ -232,27 +232,6 @@ create table public.exam_results (
 
 
 
-faculty :
-
-
-create table public.exam_results (
-  id uuid not null,
-  school_id uuid not null,
-  test text not null,
-  class_name text not null,
-  subject text not null,
-  student_id text not null,
-  student_name text not null,
-  image_url text null,
-  attendance character varying(8) not null default '0%'::character varying,
-  score character varying(8) not null default ''::character varying,
-  status character varying(16) not null default 'Pending'::character varying,
-  trend character varying(8) not null default '0%'::character varying,
-  created_at timestamp without time zone not null,
-  updated_at timestamp without time zone not null,
-  constraint exam_results_pkey primary key (id),
-  constraint ux_exam_results_unique unique (school_id, test, class_name, subject, student_id)
-) TABLESPACE pg_default;
 
 
 
@@ -283,24 +262,6 @@ create table public.fee_records (
 
 
 
-holiday_list:
-
-create table public.fee_records (
-  id uuid not null,
-  parent_id uuid not null,
-  child_id uuid null,
-  school_id uuid null,
-  title text not null,
-  description text null,
-  amount double precision not null default 0.0,
-  currency character varying(8) not null default 'INR'::character varying,
-  due_date character varying(12) null,
-  status character varying(16) not null default 'DUE'::character varying,
-  category character varying(32) not null default 'Tuition'::character varying,
-  created_at timestamp without time zone not null,
-  updated_at timestamp without time zone not null,
-  constraint fee_records_pkey primary key (id)
-) TABLESPACE pg_default;
 
 
 
