@@ -39,6 +39,7 @@ import io.ktor.http.content.PartData
 import io.ktor.http.content.forEachPart
 import io.ktor.http.content.streamProvider
 import io.ktor.server.application.Application
+import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
 import io.ktor.server.request.receiveMultipart
 import io.ktor.server.routing.delete
@@ -75,10 +76,15 @@ private val VALID_KINDS = setOf("IMAGE", "VIDEO", "LOGO", "PROFILE")
 
 fun Application.mediaRouting() {
     routing {
-        route("/api/v1/school/media") {
+        // Audit finding I (§6): without this authenticate("jwt") block the
+        // route has no JWTPrincipal, so requireSchoolContext() always 401s and
+        // the upload is dead. Wrapping it (mirroring ResultsRouting.kt:234)
+        // makes the school-scoped upload/delete actually reachable.
+        authenticate("jwt") {
+            route("/api/v1/school/media") {
 
-            // -------- POST /upload --------
-            post("/upload") {
+                // -------- POST /upload --------
+                post("/upload") {
                 val ctx = call.requireSchoolContext() ?: return@post
 
                 if (!SupabaseStorage.isConfigured()) {
@@ -202,6 +208,7 @@ fun Application.mediaRouting() {
                 call.okMessage(
                     if (removed > 0) "Media removed" else "Media not found (already removed)",
                 )
+            }
             }
         }
     }
