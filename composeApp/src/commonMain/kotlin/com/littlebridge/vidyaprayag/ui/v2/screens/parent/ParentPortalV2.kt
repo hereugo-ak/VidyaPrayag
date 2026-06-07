@@ -1,6 +1,5 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.parent
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -28,10 +27,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.littlebridge.vidyaprayag.feature.parent.presentation.TrackProgressViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBottomNav
 import com.littlebridge.vidyaprayag.ui.v2.components.VDivider
@@ -39,11 +38,12 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VNavItem
 import com.littlebridge.vidyaprayag.ui.v2.components.VScreenScaffold
 import com.littlebridge.vidyaprayag.ui.v2.components.VStatusDot
-import com.littlebridge.vidyaprayag.ui.v2.data.MockV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.discovery.AcademicCalendarScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.notifications.NotificationsScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays a portal can push above its tab content (back returns to the tabs). */
 private enum class ParentOverlay { None, Notifications, Calendar }
@@ -51,25 +51,23 @@ private enum class ParentOverlay { None, Notifications, Calendar }
 /**
  * ParentPortalV2 — the 4-tab parent shell, a faithful copy of `Parent.tsx → ParentApp`.
  *
- * It owns the [ChildSwitcher] header (so the selected child is shared across all tabs) and the
- * bottom nav (Home · Academics · Fees · Activity, with a "2" badge on Activity). Each leaf renders
- * from [MockV2] so the screens look identical to the Figma prototype. Notifications & Calendar are
- * pushed as full-screen overlays, matching the design's bell / calendar entries.
+ * Owns the header (child identity from the real [TrackProgressViewModel]) and the bottom nav
+ * (Home · Academics · Fees · Activity). Each leaf is now wired to its own real ViewModel via
+ * `koinViewModel()` — no MockV2 in any production path. Notifications & Calendar are pushed as
+ * full-screen overlays.
  */
 @Composable
 fun ParentPortalV2(
     onLogout: () -> Unit = {},
     modifier: Modifier = Modifier,
+    headerViewModel: TrackProgressViewModel = koinViewModel(),
 ) {
     var tab by remember { mutableStateOf("home") }
     var overlay by remember { mutableStateOf(ParentOverlay.None) }
-    var activeChild by remember { mutableStateOf(0) }
-    val child = MockV2.siblings[activeChild]
+    val progress by headerViewModel.state.collectAsStateV2()
 
-    // §11 cross-platform — Android predictive back / iOS edge-swipe should
-    // dismiss the full-screen Notifications/Calendar overlay back to the tabs,
-    // not exit the portal entirely. Mirrors the React `onBack` wiring that
-    // each overlay screen already passes to its sheet.
+    // §11 cross-platform — predictive back / edge-swipe dismisses the full-screen overlay back to
+    // the tabs, not the portal.
     BackHandler(enabled = overlay != ParentOverlay.None) {
         overlay = ParentOverlay.None
     }
@@ -90,16 +88,15 @@ fun ParentPortalV2(
         VNavItem("home", "Home", VIcons.Home),
         VNavItem("academics", "Academics", VIcons.School),
         VNavItem("fees", "Fees", VIcons.Wallet),
-        VNavItem("activity", "Activity", VIcons.Bell, badge = 2),
+        VNavItem("activity", "Activity", VIcons.Bell),
     )
 
     VScreenScaffold(
         modifier = modifier,
         topBar = {
-            ChildSwitcher(
-                activeIndex = activeChild,
-                child = child,
-                onSelectChild = { activeChild = it },
+            ParentHeader(
+                childName = progress.childName,
+                childSubline = progress.journeyDescription.ifBlank { "Level ${progress.currentLevel}" },
                 onOpenNotifications = { overlay = ParentOverlay.Notifications },
                 onExit = onLogout,
             )
@@ -110,7 +107,7 @@ fun ParentPortalV2(
     ) { _ ->
         Box(Modifier.fillMaxSize()) {
             when (tab) {
-                "home" -> ParentHomeScreenV2(child = child)
+                "home" -> ParentHomeScreenV2()
                 "academics" -> ParentAcademicsScreenV2()
                 "fees" -> ParentFeesScreenV2()
                 "activity" -> ParentActivityScreenV2()
@@ -120,28 +117,24 @@ fun ParentPortalV2(
 }
 
 /**
- * ChildSwitcher — the parent header: a tappable child chip (avatar + name + class) that expands a
- * sibling picker, a notification bell with an unread dot, and the parent's own avatar (exit).
- * Faithful to `Parent.tsx → ChildSwitcher`.
+ * ParentHeader — child identity chip (from real track-progress data), a notification bell with an
+ * unread dot, and the parent's avatar (exit). Faithful to `Parent.tsx → ChildSwitcher`, minus the
+ * sibling picker (multi-child linking lands with the parent-link-child backend).
  */
 @Composable
-private fun ChildSwitcher(
-    activeIndex: Int,
-    child: MockV2.Student,
-    onSelectChild: (Int) -> Unit,
+private fun ParentHeader(
+    childName: String,
+    childSubline: String,
     onOpenNotifications: () -> Unit,
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
-    var open by remember { mutableStateOf(false) }
 
     Column(
         modifier
             .fillMaxWidth()
             .background(c.card)
-            // §11.1 — push the opaque switcher card below the status bar on
-            // Android + iOS so the avatar/name aren't clipped by the notch.
             .statusBarsPadding()
             .padding(horizontal = 20.dp)
             .padding(top = 20.dp, bottom = 12.dp),
@@ -152,30 +145,25 @@ private fun ChildSwitcher(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             // child chip
-            val chipInteraction = remember { MutableInteractionSource() }
             Row(
                 Modifier
                     .clip(RoundedCornerShape(999.dp))
                     .background(c.cream)
-                    .clickable(interactionSource = chipInteraction, indication = null) { open = !open }
                     .padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                VAvatar(name = child.name, size = 32.dp)
+                VAvatar(name = childName.ifBlank { "?" }, size = 32.dp)
                 Column {
-                    // §4.1: child chip name = 13/700 (not bodyStrong 14)
                     Text(
-                        child.name,
+                        childName.ifBlank { "Your child" },
                         style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
                     )
-                    // §4.1: subline = 10px plain text-light-2 (not label 11/upper)
                     Text(
-                        "Class ${MockV2.classDisplay(child.klass)} • ${MockV2.school.shortName}",
+                        childSubline,
                         style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 10.sp),
                     )
                 }
-                Icon(VIcons.ChevronDown, contentDescription = null, tint = c.ink3, modifier = Modifier.size(14.dp))
             }
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -193,46 +181,7 @@ private fun ChildSwitcher(
                 }
                 val exitInteraction = remember { MutableInteractionSource() }
                 Box(Modifier.clickable(interactionSource = exitInteraction, indication = null) { onExit() }) {
-                    VAvatar(name = MockV2.parentName, size = 32.dp)
-                }
-            }
-        }
-
-        AnimatedVisibility(visible = open) {
-            Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                MockV2.siblings.forEachIndexed { i, s ->
-                    val rowInteraction = remember { MutableInteractionSource() }
-                    val active = i == activeIndex
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            // §4.1: active row = light blue rgba(200,222,255,0.30) (not teal)
-                            .background(if (active) Color(0xFFC8DEFF).copy(alpha = 0.30f) else c.cream)
-                            .clickable(interactionSource = rowInteraction, indication = null) {
-                                onSelectChild(i); open = false
-                            }
-                            .padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        VAvatar(name = s.name, size = 32.dp)
-                        Column(Modifier.weight(1f)) {
-                            // §4.1: sibling row name = 13/600 (React Parent.tsx L65 fontWeight:600)
-                            Text(
-                                s.name,
-                                style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
-                            )
-                            Text(
-                                "Class ${MockV2.classDisplay(s.klass)}",
-                                style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 10.sp),
-                            )
-                        }
-                        if (active) {
-                            // §4.1: check tint = deep blue #0a3a76
-                            Icon(VIcons.Check, contentDescription = null, tint = Color(0xFF0A3A76), modifier = Modifier.size(16.dp))
-                        }
-                    }
+                    VAvatar(name = "Parent", size = 32.dp)
                 }
             }
         }
