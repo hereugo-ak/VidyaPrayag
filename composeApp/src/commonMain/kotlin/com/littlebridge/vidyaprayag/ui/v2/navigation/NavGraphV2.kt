@@ -5,6 +5,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -12,35 +13,35 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
-import com.littlebridge.vidyaprayag.ui.v2.screens.auth.LoginScreenV2
+import com.littlebridge.vidyaprayag.feature.auth.domain.repository.AuthRepository
+import com.littlebridge.vidyaprayag.ui.v2.screens.auth.AdminAuthScreenV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.auth.CommonLandingScreenV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.auth.ParentAuthScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.ParentLinkChildScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.SchoolOnboardingScreenV2
-import com.littlebridge.vidyaprayag.ui.v2.screens.auth.WelcomeScreenV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.auth.TeacherFirstLoginScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.discovery.DiscoveryScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.parent.ParentPortalV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.school.SchoolPortalV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.teacher.TeacherPortalV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VPortalTone
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
+import org.koin.compose.koinInject
 
 /**
- * The portal-aware root for the `ui/v2` UI — the Compose translation of `App.tsx`'s screen graph.
+ * NavGraphV2 — the single source of nav truth for the `ui/v2` entry experience (PHASE 7).
  *
- * Replaces the old `navigation/NavGraph.kt` (35-destination `NavHost`) with a small role-driven
- * switch: the auth state decides which **portal** is shown, and each portal owns its own internal
- * tab navigation (`*PortalV2`). The correct [VPortalTone] is applied per role:
+ * This is the Compose translation of the target entry flow. Navigation is **state-driven** (no flat
+ * NavHost): the persisted session decides auth-vs-portal, and small enum state machines own the
+ * unauth funnel and the post-login gate. Every transition is explicit and every post-auth jump pops
+ * its predecessor so back-press can never return to splash, landing, or an auth screen (LAW 4).
  *
- * | role     | start surface              | tone   |
- * |----------|----------------------------|--------|
- * | (none)   | Welcome → Login → Discovery| Light  |
- * | PARENT   | `ParentPortalV2`           | Light  |
- * | TEACHER  | `TeacherPortalV2`          | Warm   |
- * | ADMIN    | `SchoolPortalV2`           | Warm   |
+ *   Splash (in App.kt)
+ *     ├─ valid session → [AuthedFlow] → role gate → correct portal
+ *     └─ no session    → [UnauthFlow] → CommonLanding → Parent/Admin auth
  *
- * Keeping navigation role-scoped (rather than one flat 35-route graph) matches the design, where
- * each portal is a self-contained tabbed app. Cross-portal deep-links (Notifications, school detail,
- * onboarding wizard) are layered on in a later pass once the screens exist; the unauth flow already
- * reaches Discovery so the marketplace is browsable before sign-in.
+ * Role is the persisted JWT role; [EntryRole] normalizes it (handles ADMIN / SCHOOL_ADMIN / TEACHER
+ * / PARENT) so no decision site hardcodes a raw string.
  */
 @Composable
 fun NavGraphV2(
@@ -49,92 +50,184 @@ fun NavGraphV2(
     onLogout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val tone = toneFor(role, isAuthenticated)
+    val entryRole = EntryRole.from(role)
+    val tone = entryRole.tone(isAuthenticated)
 
     VTheme(tone = tone) {
         if (isAuthenticated) {
-            when (role?.uppercase()) {
-                "ADMIN" -> SchoolPortalV2(onLogout = onLogout, modifier = modifier)
-                "TEACHER" -> TeacherPortalV2(onLogout = onLogout, modifier = modifier)
-                "PARENT" -> ParentPortalV2(onLogout = onLogout, modifier = modifier)
-                // Authenticated but role unknown → fall back to the parent surface.
-                else -> ParentPortalV2(onLogout = onLogout, modifier = modifier)
-            }
+            AuthedFlow(role = entryRole, onLogout = onLogout, modifier = modifier)
         } else {
             UnauthFlow(modifier = modifier)
         }
     }
 }
 
-/** Internal screens shown before a session exists: Welcome → Login → Discovery (browse-first). */
-private enum class AuthRoute { Welcome, Login, Discovery, SchoolOnboarding, ParentLinkChild }
+// ─────────────────────────────────────────────────────────────────────────────
+// Role model — one place that turns the persisted string into a typed role.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Typed app role, parsed once from the persisted JWT role string (LAW: no scattered role literals). */
+enum class EntryRole {
+    Parent, SchoolAdmin, Teacher, Unknown;
+
+    fun tone(isAuthenticated: Boolean): VPortalTone = when {
+        !isAuthenticated -> VPortalTone.Light
+        this == SchoolAdmin || this == Teacher -> VPortalTone.Warm
+        else -> VPortalTone.Light
+    }
+
+    companion object {
+        fun from(raw: String?): EntryRole = when (raw?.trim()?.uppercase()) {
+            "PARENT" -> Parent
+            "ADMIN", "SCHOOL_ADMIN", "SCHOOLADMIN" -> SchoolAdmin
+            "TEACHER" -> Teacher
+            else -> Unknown
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Unauthenticated funnel:  CommonLanding → Parent/Admin auth (+ discovery/link/onboard branches)
+// ─────────────────────────────────────────────────────────────────────────────
+
+private enum class UnauthRoute { Landing, ParentAuth, AdminAuth, Discovery, ParentLinkChild, SchoolOnboarding }
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun UnauthFlow(modifier: Modifier = Modifier) {
-    var route by remember { mutableStateOf(AuthRoute.Welcome) }
+    var route by remember { mutableStateOf(UnauthRoute.Landing) }
 
-    // §11 cross-platform — wire the system back gesture (Android predictive
-    // back + iOS edge-swipe via Compose Multiplatform 1.10's commonMain
-    // BackHandler) so popping the auth stack feels native instead of exiting
-    // the app from Login/Discovery/etc.
-    BackHandler(enabled = route != AuthRoute.Welcome) {
+    // System back: collapse the funnel toward the landing screen (never exit from a leaf).
+    BackHandler(enabled = route != UnauthRoute.Landing) {
         route = when (route) {
-            AuthRoute.Login -> AuthRoute.Welcome
-            AuthRoute.Discovery -> AuthRoute.Welcome
-            AuthRoute.SchoolOnboarding -> AuthRoute.Welcome
-            AuthRoute.ParentLinkChild -> AuthRoute.Discovery
-            AuthRoute.Welcome -> AuthRoute.Welcome
+            UnauthRoute.ParentAuth -> UnauthRoute.Landing
+            UnauthRoute.AdminAuth -> UnauthRoute.Landing
+            UnauthRoute.Discovery -> UnauthRoute.ParentAuth
+            UnauthRoute.ParentLinkChild -> UnauthRoute.Discovery
+            UnauthRoute.SchoolOnboarding -> UnauthRoute.AdminAuth
+            UnauthRoute.Landing -> UnauthRoute.Landing
         }
     }
 
     AnimatedContent(
         targetState = route,
         transitionSpec = { fadeIn() togetherWith fadeOut() },
-        label = "auth-flow",
+        label = "unauth-flow",
         modifier = modifier,
     ) { current ->
         when (current) {
-            AuthRoute.Welcome -> WelcomeScreenV2(
-                // New families browse the marketplace first, then link their child from there.
-                onGetStarted = { route = AuthRoute.Discovery },
-                onHaveAccount = { route = AuthRoute.Login },
-                // Welcome mirrors React `Splash`, which has only two CTAs — the school-setup wizard
-                // is reached from the Login "Register Now" path, not a third Welcome button.
-                onRegisterSchool = { route = AuthRoute.SchoolOnboarding },
+            UnauthRoute.Landing -> CommonLandingScreenV2(
+                onParent = { route = UnauthRoute.ParentAuth },
+                onAdmin = { route = UnauthRoute.AdminAuth },
             )
-            AuthRoute.Login -> LoginScreenV2(
-                // On success the host MainViewModel's authState flips isAuthenticated=true and
-                // NavGraphV2 recomposes into the role portal; nothing else to do here.
+            UnauthRoute.ParentAuth -> ParentAuthScreenV2(
+                // On success the persisted session flips isAuthenticated=true and NavGraphV2
+                // recomposes into AuthedFlow, which runs the child-link gate (PHASE 6).
                 onAuthSuccess = {},
-                // "Register Now" routes new families into the marketplace → child-link flow.
-                onRegister = { route = AuthRoute.Discovery },
+                onBack = { route = UnauthRoute.Landing },
             )
-            AuthRoute.Discovery -> DiscoveryScreenV2(
-                // Tapping a school from the marketplace opens the family "link your child" flow.
-                onOpenSchool = { _ -> route = AuthRoute.ParentLinkChild },
+            UnauthRoute.AdminAuth -> AdminAuthScreenV2(
+                // On success the session flips and AuthedFlow runs the onboard / first-login gate.
+                onAuthSuccess = {},
+                onBack = { route = UnauthRoute.Landing },
             )
-            // Family onboarding wizard. No parent→child link API exists yet (see PHASE_PLAN gap
-            // list), so this collects input locally and routes to Login to obtain a real session.
-            AuthRoute.ParentLinkChild -> ParentLinkChildScreenV2(
-                onDone = { route = AuthRoute.Login },
-                onBack = { route = AuthRoute.Discovery },
+            // Browse-first marketplace, reachable from the parent path for new families.
+            UnauthRoute.Discovery -> DiscoveryScreenV2(
+                onOpenSchool = { _ -> route = UnauthRoute.ParentLinkChild },
             )
-            // The school-setup wizard reached from Welcome. On the final step's backend success
-            // the host MainViewModel session flips and NavGraphV2 recomposes into the Admin portal;
-            // until then we return the user to Welcome on cancel.
-            AuthRoute.SchoolOnboarding -> SchoolOnboardingScreenV2(
-                onComplete = { route = AuthRoute.Login },
-                onBack = { route = AuthRoute.Welcome },
+            UnauthRoute.ParentLinkChild -> ParentLinkChildScreenV2(
+                onDone = { route = UnauthRoute.ParentAuth },
+                onBack = { route = UnauthRoute.Discovery },
+            )
+            UnauthRoute.SchoolOnboarding -> SchoolOnboardingScreenV2(
+                onComplete = { route = UnauthRoute.AdminAuth },
+                onBack = { route = UnauthRoute.AdminAuth },
             )
         }
     }
 }
 
-/** Parent & Discovery are LIGHT (lavender); Teacher & Admin are WARM. Night handled by host later. */
-private fun toneFor(role: String?, isAuthenticated: Boolean): VPortalTone = when {
-    !isAuthenticated -> VPortalTone.Light
-    role.equals("ADMIN", ignoreCase = true) -> VPortalTone.Warm
-    role.equals("TEACHER", ignoreCase = true) -> VPortalTone.Warm
-    else -> VPortalTone.Light
+// ─────────────────────────────────────────────────────────────────────────────
+// Authenticated gate:  role → (child-link | onboarding | first-login) → portal
+// ─────────────────────────────────────────────────────────────────────────────
+
+private enum class AuthedRoute { Resolving, ParentLinkChild, SchoolOnboarding, TeacherFirstLogin, Portal }
+
+/**
+ * AuthedFlow — runs the one-time post-login gate before handing control to the role portal.
+ *
+ * Decision inputs come from the **live session** read via [AuthRepository.getSession]:
+ *  • PARENT      — `profileCompleted == false` → child-link flow (Discovery + LinkChild), else portal.
+ *  • SCHOOL_ADMIN— `profileCompleted == false` → school-onboarding wizard, else portal.
+ *  • TEACHER     — `profileCompleted == false` → first-login change-password gate, else portal.
+ *
+ * Returning users (valid JWT after an app restart) have no in-memory session cache, so the gate
+ * resolves immediately to the portal — which is correct: they've already onboarded/linked. Every
+ * gate completion advances to [AuthedRoute.Portal] with no way back into the gate (LAW 4). The
+ * change-password gate is local-only until the documented `POST /auth/change-password` +
+ * `must_change_password` backend lands (BACKEND_GAPS §5); we never fake a server write.
+ */
+@Composable
+private fun AuthedFlow(
+    role: EntryRole,
+    onLogout: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val authRepository = koinInject<AuthRepository>()
+
+    var route by remember(role) { mutableStateOf(AuthedRoute.Resolving) }
+
+    // Resolve the gate exactly once per authenticated session.
+    LaunchedEffect(role) {
+        val profileCompleted = runCatching { authRepository.getSession()?.profileCompleted }
+            .getOrNull() ?: true // null session (returning user / restart) → treat as completed
+        route = when (role) {
+            EntryRole.Parent -> if (profileCompleted) AuthedRoute.Portal else AuthedRoute.ParentLinkChild
+            EntryRole.SchoolAdmin -> if (profileCompleted) AuthedRoute.Portal else AuthedRoute.SchoolOnboarding
+            EntryRole.Teacher -> if (profileCompleted) AuthedRoute.Portal else AuthedRoute.TeacherFirstLogin
+            EntryRole.Unknown -> AuthedRoute.Portal
+        }
+    }
+
+    // Inside a portal, back-press is owned by the portal's own tab logic; the gate screens never
+    // allow a back path to auth/splash (the session is already established).
+    AnimatedContent(
+        targetState = route,
+        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        label = "authed-flow",
+        modifier = modifier,
+    ) { current ->
+        when (current) {
+            // Brief resolving frame — themed background only, no spinner flash for the common
+            // (already-completed) case which resolves on the first composition.
+            AuthedRoute.Resolving -> androidx.compose.foundation.layout.Box(
+                Modifier.then(modifier),
+            ) {}
+
+            AuthedRoute.ParentLinkChild -> ParentLinkChildScreenV2(
+                onDone = { route = AuthedRoute.Portal },
+                onBack = { route = AuthedRoute.Portal },
+            )
+            AuthedRoute.SchoolOnboarding -> SchoolOnboardingScreenV2(
+                onComplete = { route = AuthedRoute.Portal },
+                onBack = { route = AuthedRoute.Portal },
+            )
+            AuthedRoute.TeacherFirstLogin -> TeacherFirstLoginScreenV2(
+                onDone = { route = AuthedRoute.Portal },
+            )
+            AuthedRoute.Portal -> RolePortal(role = role, onLogout = onLogout)
+        }
+    }
+}
+
+/** Maps the typed role to its self-contained, tabbed portal (the role's "dashboard"). */
+@Composable
+private fun RolePortal(role: EntryRole, onLogout: () -> Unit, modifier: Modifier = Modifier) {
+    when (role) {
+        EntryRole.SchoolAdmin -> SchoolPortalV2(onLogout = onLogout, modifier = modifier)
+        EntryRole.Teacher -> TeacherPortalV2(onLogout = onLogout, modifier = modifier)
+        EntryRole.Parent -> ParentPortalV2(onLogout = onLogout, modifier = modifier)
+        // Authenticated but role unknown → safest default is the parent surface.
+        EntryRole.Unknown -> ParentPortalV2(onLogout = onLogout, modifier = modifier)
+    }
 }
