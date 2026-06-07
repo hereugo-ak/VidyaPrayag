@@ -6,18 +6,9 @@ import com.littlebridge.vidyaprayag.feature.schools.data.repository.SchoolReposi
 import com.littlebridge.vidyaprayag.feature.schools.domain.repository.SchoolRepository
 import com.littlebridge.vidyaprayag.feature.schools.domain.usecase.GetSchoolsUseCase
 import com.littlebridge.vidyaprayag.presentation.MainViewModel
-import com.littlebridge.vidyaprayag.presentation.ParentDashboardViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.FeeViewModel
-import com.littlebridge.vidyaprayag.feature.parent.presentation.ChildBasicInfoViewModel
-import com.littlebridge.vidyaprayag.feature.parent.presentation.YourPreferencesViewModel
-import com.littlebridge.vidyaprayag.feature.parent.presentation.LocationRequestViewModel
-import com.littlebridge.vidyaprayag.feature.parent.presentation.CareerPathViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ScholarshipsViewModel
-import com.littlebridge.vidyaprayag.feature.parent.presentation.DailyStatusViewModel
-import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentReportsViewModel
-import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentSchedulePTMViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentAnnouncementViewModel
-import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentMessageViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.NotificationsViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.LinkChildViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentHomeViewModel
@@ -292,22 +283,20 @@ val viewModelModule = module {
             get(),  // PreferenceRepository
         )
     }
-    factory { ParentDashboardViewModel(get(), get(), get()) }
+    // NOTE (SWEEP-B): the following V1 parent VMs were registered here but had
+    // ZERO injection/usage anywhere after the V1->V2 screen migration
+    // (ParentDashboardViewModel superseded by ParentHomeViewModel + SchoolDiscoveryViewModel;
+    //  ChildBasicInfo/YourPreferences/LocationRequest/CareerPath/DailyStatus/ParentReports/
+    //  ParentSchedulePTM/ParentMessage screens dropped in V2). Their dead factory
+    // registrations were removed to keep the Koin graph clean — every remaining
+    // registration below is actually consumed via koinViewModel().
     factory { FeeViewModel(get(), get()) }
-    factory { ChildBasicInfoViewModel() }
-    factory { YourPreferencesViewModel() }
-    factory { LocationRequestViewModel() }
-    factory { CareerPathViewModel() }
     factory { ScholarshipsViewModel(get(), get()) }
-    factory { DailyStatusViewModel() }
-    factory { ParentReportsViewModel() }
-    factory { ParentSchedulePTMViewModel() }
     factory { ParentAnnouncementViewModel(get(), get()) }
     factory { NotificationsViewModel(get(), get()) }
     factory { LinkChildViewModel(get(), get()) }
     factory { ParentHomeViewModel(get(), get()) }
     factory { ParentProfileViewModel(get(), get()) }
-    factory { ParentMessageViewModel() }
     factory { TrackProgressViewModel(get(), get()) }
     factory { SchoolDashboardViewModel(get(), get()) }
     factory { InstitutionalBasicOBViewModel(get(), get()) }
