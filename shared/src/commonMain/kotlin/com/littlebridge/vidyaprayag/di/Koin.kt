@@ -20,6 +20,7 @@ import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentAnnounceme
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentMessageViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.NotificationsViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.LinkChildViewModel
+import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentHomeViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentProfileViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.TrackProgressViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolDashboardViewModel
@@ -304,6 +305,7 @@ val viewModelModule = module {
     factory { ParentAnnouncementViewModel(get(), get()) }
     factory { NotificationsViewModel(get(), get()) }
     factory { LinkChildViewModel(get(), get()) }
+    factory { ParentHomeViewModel(get(), get()) }
     factory { ParentProfileViewModel(get(), get()) }
     factory { ParentMessageViewModel() }
     factory { TrackProgressViewModel(get(), get()) }

@@ -3,6 +3,50 @@ package com.littlebridge.vidyaprayag.feature.parent.domain.model
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 
+// --- Dashboard (the primary parent "handshake" — server GET /api/v1/parent/dashboard, §8.1) ---
+// Mirrors server feature/parent/ParentDashboardRouting.kt → DashboardResponse field-for-field.
+@Serializable
+data class ParentDashboardResponse(
+    val success: Boolean,
+    val data: ParentDashboardData
+)
+
+@Serializable
+data class ParentDashboardData(
+    val greeting: String,
+    @SerialName("child_summary") val childSummary: DashboardChildSummary? = null,
+    val alerts: List<DashboardAlertDto> = emptyList(),
+    @SerialName("featured_schools") val featuredSchools: List<FeaturedSchoolDto> = emptyList(),
+    @SerialName("curation_logic") val curationLogic: String = ""
+)
+
+@Serializable
+data class DashboardChildSummary(
+    val id: String,
+    val name: String,
+    @SerialName("overall_progress") val overallProgress: Double,
+    @SerialName("current_level") val currentLevel: Int,
+    @SerialName("attendance_status") val attendanceStatus: String,
+    @SerialName("profile_pic") val profilePic: String? = null
+)
+
+@Serializable
+data class DashboardAlertDto(
+    val id: String,
+    val title: String,
+    val value: String,
+    val type: String // CRITICAL | INFO | WARNING
+)
+
+@Serializable
+data class FeaturedSchoolDto(
+    val id: String,
+    val name: String,
+    val rating: Double,
+    val location: String,
+    val image: String? = null
+)
+
 // --- Fees ---
 @Serializable
 data class FeeResponse(

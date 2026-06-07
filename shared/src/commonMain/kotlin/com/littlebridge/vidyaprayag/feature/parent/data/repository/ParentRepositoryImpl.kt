@@ -8,6 +8,10 @@ import com.littlebridge.vidyaprayag.feature.parent.domain.repository.ParentRepos
 class ParentRepositoryImpl(
     private val api: ParentApi
 ) : ParentRepository {
+    override suspend fun getDashboard(token: String): NetworkResult<ParentDashboardResponse> {
+        return api.getDashboard(token)
+    }
+
     override suspend fun getTrackProgress(token: String): NetworkResult<TrackProgressResponse> {
         return api.getTrackProgress(token)
     }

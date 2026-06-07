@@ -18,6 +18,14 @@ class ParentApi(
         return "$base$cleanPath"
     }
 
+    suspend fun getDashboard(token: String): NetworkResult<ParentDashboardResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/dashboard")) {
+                header("Authorization", "Bearer $token")
+            }
+        }
+    }
+
     suspend fun getTrackProgress(token: String): NetworkResult<TrackProgressResponse> {
         return safeApiCall {
             client.get(getUrl("api/v1/parent/track-progress")) {
