@@ -26,15 +26,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.littlebridge.vidyaprayag.feature.admin.presentation.Announcement
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolAnnouncementsState
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolAnnouncementsViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VBackHeader
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
+import com.littlebridge.vidyaprayag.ui.v2.components.VButton
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VComingSoon
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
+import com.littlebridge.vidyaprayag.ui.v2.components.VInput
 import com.littlebridge.vidyaprayag.ui.v2.components.VTopTabs
 import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
@@ -62,6 +67,15 @@ fun SchoolCommsScreenV2(
         state = state,
         onRetry = viewModel::loadAnnouncements,
         onSelectCategory = viewModel::setCategoryFilter,
+        onCreate = { type, title, description, date, onCreated ->
+            viewModel.createAnnouncement(
+                type = type,
+                title = title,
+                description = description,
+                date = date,
+                onCreated = onCreated,
+            )
+        },
         modifier = modifier,
     )
 }
@@ -71,6 +85,7 @@ private fun SchoolCommsContent(
     state: SchoolAnnouncementsState,
     onRetry: () -> Unit,
     onSelectCategory: (String?) -> Unit,
+    onCreate: (type: String, title: String, description: String, date: String, onCreated: (() -> Unit)?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -109,6 +124,7 @@ private fun SchoolCommsContent(
                     onRetry = onRetry,
                     onSelectCategory = onSelectCategory,
                     onOpen = { openAnnouncement = it },
+                    onCreate = onCreate,
                 )
                 "Messages" -> VComingSoon(
                     title = "Parent messages",
@@ -133,8 +149,40 @@ private fun AnnouncementsTab(
     onRetry: () -> Unit,
     onSelectCategory: (String?) -> Unit,
     onOpen: (String) -> Unit,
+    onCreate: (type: String, title: String, description: String, date: String, onCreated: (() -> Unit)?) -> Unit,
 ) {
     val c = VTheme.colors
+    var showCompose by remember { mutableStateOf(false) }
+
+    // Compose button lives ABOVE the state host so an admin can post the very
+    // first announcement even when the list is empty (RA-23). Frozen primitives.
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text("Announcements", style = VTheme.type.h3.colored(c.ink))
+        VButton(
+            text = "New announcement",
+            onClick = { showCompose = true },
+            variant = VButtonVariant.Primary,
+            size = VButtonSize.Sm,
+            leading = { Icon(VIcons.Plus, contentDescription = null, modifier = Modifier.size(14.dp)) },
+            enabled = !state.isCreating,
+        )
+    }
+    Spacer(Modifier.height(12.dp))
+
+    if (showCompose) {
+        ComposeAnnouncementDialog(
+            isCreating = state.isCreating,
+            onDismiss = { showCompose = false },
+            onSubmit = { type, title, description, date ->
+                onCreate(type, title, description, date) { showCompose = false }
+            },
+        )
+    }
+
     VStateHost(
         loading = state.isLoading,
         error = state.errorMessage,
@@ -174,6 +222,84 @@ private fun AnnouncementsTab(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * RA-23: compose-and-send dialog for school announcements. Posts to
+ * `POST /api/v1/announcements` via [SchoolAnnouncementsViewModel.createAnnouncement].
+ * Uses only frozen V* primitives + theme tokens (no Material defaults, no new tokens).
+ * The dialog dismisses only after the server round-trip succeeds.
+ */
+@Composable
+private fun ComposeAnnouncementDialog(
+    isCreating: Boolean,
+    onDismiss: () -> Unit,
+    onSubmit: (type: String, title: String, description: String, date: String) -> Unit,
+) {
+    val c = VTheme.colors
+    val categories = listOf("Update", "Holidays", "PTM", "Events", "Reminder")
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var date by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf(categories.first()) }
+
+    val canSubmit = title.isNotBlank() && description.isNotBlank() && date.isNotBlank() && !isCreating
+
+    Dialog(onDismissRequest = onDismiss) {
+        VCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("New announcement", style = VTheme.type.h3.colored(c.ink))
+
+                // Category chips (reuse the existing FilterChip primitive).
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    categories.forEach { cat ->
+                        FilterChip(cat, category.equals(cat, ignoreCase = true)) { category = cat }
+                    }
+                }
+
+                VInput(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = "Title",
+                    placeholder = "e.g. Annual Sports Day",
+                    leadingIcon = VIcons.Megaphone,
+                )
+                VInput(
+                    value = date,
+                    onValueChange = { date = it },
+                    label = "Date",
+                    placeholder = "e.g. 2026-06-20",
+                    leadingIcon = VIcons.Calendar,
+                )
+                VInput(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = "Message",
+                    placeholder = "What do parents and staff need to know?",
+                    singleLine = false,
+                )
+                Spacer(Modifier.height(4.dp))
+                VButton(
+                    text = "Publish announcement",
+                    onClick = { onSubmit(category, title, description, date) },
+                    variant = VButtonVariant.Primary,
+                    full = true,
+                    enabled = canSubmit,
+                    loading = isCreating,
+                )
+                VButton(
+                    text = "Cancel",
+                    onClick = onDismiss,
+                    variant = VButtonVariant.Ghost,
+                    full = true,
+                    enabled = !isCreating,
+                )
             }
         }
     }
