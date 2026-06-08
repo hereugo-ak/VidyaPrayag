@@ -20,12 +20,10 @@ import com.littlebridge.vidyaprayag.feature.admin.domain.model.LeaveRequestsResp
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.UpdateLeaveStatusRequest
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.request.header
 import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 
 class LeaveRequestsApi(
@@ -48,9 +46,7 @@ class LeaveRequestsApi(
             add("type=$type")
             status?.let { add("status=$it") }
         }.joinToString("&")
-        client.get(getUrl("api/v1/school/leave-requests?$params")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.get(getUrl("api/v1/school/leave-requests?$params"))
     }
 
     suspend fun createLeaveRequest(
@@ -58,7 +54,6 @@ class LeaveRequestsApi(
         request: CreateLeaveRequest
     ): NetworkResult<ApiResponse<LeaveRequestDto>> = safeApiCall {
         client.post(getUrl("api/v1/school/leave-requests")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(request)
         }
@@ -70,7 +65,6 @@ class LeaveRequestsApi(
         status: String
     ): NetworkResult<ApiResponse<LeaveRequestDto>> = safeApiCall {
         client.patch(getUrl("api/v1/school/leave-requests/$id/status")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(UpdateLeaveStatusRequest(status))
         }

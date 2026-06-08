@@ -18,11 +18,9 @@ import com.littlebridge.vidyaprayag.feature.admin.domain.model.PtmActiveEventDto
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.PtmResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 
 class PtmApi(
@@ -39,9 +37,7 @@ class PtmApi(
     suspend fun getPtm(
         token: String
     ): NetworkResult<ApiResponse<PtmResponse>> = safeApiCall {
-        client.get(getUrl("api/v1/school/ptm")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.get(getUrl("api/v1/school/ptm"))
     }
 
     suspend fun createPtm(
@@ -49,7 +45,6 @@ class PtmApi(
         request: CreatePtmRequest
     ): NetworkResult<ApiResponse<PtmActiveEventDto>> = safeApiCall {
         client.post(getUrl("api/v1/school/ptm")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(request)
         }

@@ -9,12 +9,10 @@ import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingSubmitR
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingSubmitResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 
 /**
@@ -51,7 +49,6 @@ class OnboardingApi(
     ): NetworkResult<ApiResponse<OnboardingStepResponse>> {
         return safeApiCall {
             client.get(getUrl("api/v1/onboarding/step")) {
-                header(HttpHeaders.Authorization, "Bearer $token")
                 parameter("obStepType", obStepType)
             }
         }
@@ -66,7 +63,6 @@ class OnboardingApi(
     ): NetworkResult<ApiResponse<OnboardingSubmitResponse>> {
         return safeApiCall {
             client.post(getUrl("api/v1/onboarding/submit")) {
-                header(HttpHeaders.Authorization, "Bearer $token")
                 contentType(ContentType.Application.Json)
                 setBody(request)
             }
@@ -82,7 +78,6 @@ class OnboardingApi(
     ): NetworkResult<ApiResponse<ClassDetailsResponse>> {
         return safeApiCall {
             client.get(getUrl("api/v1/onboarding/academic/class-details")) {
-                header(HttpHeaders.Authorization, "Bearer $token")
                 parameter("classId", classId)
             }
         }

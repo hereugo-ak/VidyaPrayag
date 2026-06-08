@@ -5,7 +5,6 @@ import com.littlebridge.vidyaprayag.core.network.safeApiCall
 import com.littlebridge.vidyaprayag.feature.schools.domain.model.School
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -65,7 +64,6 @@ class KtorSchoolApi(
     ): NetworkResult<SchoolDiscoveryEnvelope> {
         return safeApiCall {
             client.get(url("api/v1/parent/schools/discover")) {
-                header("Authorization", "Bearer $token")
                 if (lat != null) parameter("lat", lat)
                 if (lng != null) parameter("lng", lng)
                 if (radiusKm != null) parameter("radius_km", radiusKm)

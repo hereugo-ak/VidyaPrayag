@@ -65,9 +65,7 @@ class AuthApi(
 
     suspend fun getUserDetails(token: String): NetworkResult<UserDetailsResponse> {
         return safeApiCall {
-            client.get(getUrl("api/v1/user/details")) {
-                header(HttpHeaders.Authorization, "Bearer $token")
-            }
+            client.get(getUrl("api/v1/user/details"))
         }
     }
 
@@ -89,7 +87,6 @@ class AuthApi(
     suspend fun logout(token: String, refreshToken: String?): NetworkResult<ApiResponse<Unit>> {
         return safeApiCall {
             client.post(getUrl("api/v1/auth/logout")) {
-                header(HttpHeaders.Authorization, "Bearer $token")
                 contentType(ContentType.Application.Json)
                 setBody(LogoutRequest(refreshToken))
             }

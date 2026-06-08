@@ -13,8 +13,6 @@ import com.littlebridge.vidyaprayag.core.network.safeApiCall
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.AttendanceResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.request.header
-import io.ktor.http.HttpHeaders
 
 class AttendanceApi(
     private val client: HttpClient,
@@ -43,8 +41,6 @@ class AttendanceApi(
             grade?.let { add("grade=$it") }
             date?.let { add("date=$it") }
         }.joinToString("&")
-        client.get(getUrl("api/v1/school/attendance/daily?$params")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.get(getUrl("api/v1/school/attendance/daily?$params"))
     }
 }

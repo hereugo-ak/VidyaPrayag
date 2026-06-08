@@ -13,8 +13,6 @@ import com.littlebridge.vidyaprayag.core.network.safeApiCall
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.CalendarResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.request.header
-import io.ktor.http.HttpHeaders
 
 class CalendarApi(
     private val client: HttpClient,
@@ -38,8 +36,6 @@ class CalendarApi(
         }.joinToString("&")
         val url = if (params.isBlank()) getUrl("api/v1/school/calendar")
                   else getUrl("api/v1/school/calendar?$params")
-        client.get(url) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.get(url)
     }
 }

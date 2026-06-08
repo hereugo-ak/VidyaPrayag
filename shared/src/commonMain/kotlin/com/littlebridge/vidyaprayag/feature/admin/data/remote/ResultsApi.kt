@@ -16,11 +16,9 @@ import com.littlebridge.vidyaprayag.feature.admin.domain.model.PublishResultsRes
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.ResultsResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 
 class ResultsApi(
@@ -46,9 +44,7 @@ class ResultsApi(
         }.joinToString("&")
         val url = if (params.isBlank()) getUrl("api/v1/school/results")
                   else getUrl("api/v1/school/results?$params")
-        client.get(url) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.get(url)
     }
 
     suspend fun publishResults(
@@ -56,7 +52,6 @@ class ResultsApi(
         request: PublishResultsRequest
     ): NetworkResult<ApiResponse<PublishResultsResponse>> = safeApiCall {
         client.post(getUrl("api/v1/school/results")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(request)
         }

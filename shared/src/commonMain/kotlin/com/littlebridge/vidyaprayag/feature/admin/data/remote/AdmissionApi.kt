@@ -23,13 +23,11 @@ import com.littlebridge.vidyaprayag.feature.admin.domain.model.EnquirySummary
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.UpdateEnquiryStatusRequest
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 
 class AdmissionApi(
@@ -46,9 +44,7 @@ class AdmissionApi(
     suspend fun getSummary(
         token: String
     ): NetworkResult<ApiResponse<EnquirySummary>> = safeApiCall {
-        client.get(getUrl("api/v1/admissions/enquiries/summary")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.get(getUrl("api/v1/admissions/enquiries/summary"))
     }
 
     suspend fun listEnquiries(
@@ -57,7 +53,6 @@ class AdmissionApi(
         limit: Int
     ): NetworkResult<ApiResponse<EnquiryListResponse>> = safeApiCall {
         client.get(getUrl("api/v1/admissions/enquiries")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             parameter("page", page)
             parameter("limit", limit)
         }
@@ -68,7 +63,6 @@ class AdmissionApi(
         request: CreateEnquiryRequest
     ): NetworkResult<ApiResponse<Enquiry>> = safeApiCall {
         client.post(getUrl("api/v1/admissions/enquiries")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(request)
         }
@@ -86,7 +80,6 @@ class AdmissionApi(
         status: String
     ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
         client.patch(getUrl("api/v1/admissions/enquiries/$enquiryId/status")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(UpdateEnquiryStatusRequest(status = status))
         }

@@ -22,11 +22,9 @@ import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherListRespon
 import io.ktor.client.HttpClient
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
-import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 
 class TeachersApi(
@@ -43,9 +41,7 @@ class TeachersApi(
     suspend fun getTeachers(
         token: String
     ): NetworkResult<ApiResponse<TeacherListResponse>> = safeApiCall {
-        client.get(getUrl("api/v1/school/teachers")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.get(getUrl("api/v1/school/teachers"))
     }
 
     suspend fun createTeacher(
@@ -53,7 +49,6 @@ class TeachersApi(
         request: CreateTeacherRequest
     ): NetworkResult<ApiResponse<TeacherAccountDto>> = safeApiCall {
         client.post(getUrl("api/v1/school/teachers")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(request)
         }
@@ -63,8 +58,6 @@ class TeachersApi(
         token: String,
         teacherId: String
     ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
-        client.delete(getUrl("api/v1/school/teachers/$teacherId")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.delete(getUrl("api/v1/school/teachers/$teacherId"))
     }
 }
