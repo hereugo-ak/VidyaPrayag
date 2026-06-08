@@ -223,3 +223,40 @@ fun Modifier.staggeredItemEntrance(
         translationY = ty.value * density
     }
 }
+
+/**
+ * shakeOnError — horizontal field-shake on validation failure (Feature 7).
+ *
+ * When [trigger] flips to true the field container snaps through
+ * `+8dp → -8dp → +4dp → -4dp → 0` over ~300ms via a single [Animatable], the
+ * exact keyframe ladder in the spec. Applied via [graphicsLayer] translationX so
+ * it never reflows neighbouring content (RULE-2: no layout shift). The shake
+ * fires exactly once per `false → true` edge of [trigger]; holding [trigger] true
+ * does not loop it.
+ *
+ * Pair this with the existing **error colour token** on the field's border
+ * (`VTheme.colors.dangerInk`) — this modifier only owns the *motion*, never a
+ * colour, so RULE-1 is preserved.
+ *
+ * ```
+ * VInput(..., modifier = Modifier.shakeOnError(state.emailError != null))
+ * ```
+ */
+@Composable
+fun Modifier.shakeOnError(trigger: Boolean): Modifier {
+    val offsetX = remember { Animatable(0f) }
+    LaunchedEffect(trigger) {
+        if (trigger) {
+            // Keyframe ladder: +8 → -8 → +4 → -4 → 0 (dp), each leg a short tween
+            // so the whole shake lands in ~300ms. snapTo seeds the first frame so
+            // there is no easing-in lag on the initial kick.
+            val legs = listOf(8f, -8f, 4f, -4f, 0f)
+            for (target in legs) {
+                offsetX.animateTo(target, tween(durationMillis = 60, easing = FastOutSlowInEasing))
+            }
+        } else {
+            offsetX.snapTo(0f)
+        }
+    }
+    return this.graphicsLayer { translationX = offsetX.value * density }
+}

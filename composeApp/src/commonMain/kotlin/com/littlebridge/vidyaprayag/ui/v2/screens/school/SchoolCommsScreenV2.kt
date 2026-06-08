@@ -41,11 +41,13 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VComingSoon
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VInput
+import com.littlebridge.vidyaprayag.ui.v2.components.VPullRefresh
 import com.littlebridge.vidyaprayag.ui.v2.components.VTopTabs
 import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import com.littlebridge.vidyaprayag.ui.v2.theme.shakeOnError
 import com.littlebridge.vidyaprayag.ui.v2.theme.staggeredItemEntrance
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -111,8 +113,17 @@ private fun SchoolCommsContent(
         return
     }
 
+    // Feature 7 — pull-to-refresh on this scrollable list screen. `isRefreshing`
+    // tracks the load flag; `onRefresh` re-runs the announcements fetch. On
+    // completion the announcement cards re-enter via the Feature 5 staggered
+    // ladder already wired below.
+    VPullRefresh(
+        isRefreshing = state.isLoading,
+        onRefresh = onRetry,
+        modifier = modifier.fillMaxSize(),
+    ) {
     Column(
-        modifier
+        Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
@@ -155,6 +166,7 @@ private fun SchoolCommsContent(
                 )
             }
         }
+    }
     }
 }
 
@@ -269,7 +281,14 @@ private fun ComposeAnnouncementDialog(
     var date by remember { mutableStateOf("") }
     var category by remember { mutableStateOf(categories.first()) }
 
-    val canSubmit = title.isNotBlank() && description.isNotBlank() && date.isNotBlank() && !isCreating
+    // Feature 7 — error-shake triggers. Each flips true for one frame on a failed
+    // submit attempt of a blank field, then resets, so shakeOnError fires once per
+    // attempt. Validating on tap (rather than disabling the button) lets the user
+    // see WHICH field is missing via the shake.
+    var titleError by remember { mutableStateOf(false) }
+    var dateError by remember { mutableStateOf(false) }
+    var descriptionError by remember { mutableStateOf(false) }
+    val allValid = title.isNotBlank() && description.isNotBlank() && date.isNotBlank()
 
     Dialog(onDismissRequest = onDismiss) {
         VCard(modifier = Modifier.fillMaxWidth()) {
@@ -288,32 +307,41 @@ private fun ComposeAnnouncementDialog(
 
                 VInput(
                     value = title,
-                    onValueChange = { title = it },
+                    onValueChange = { title = it; titleError = false },
                     label = "Title",
                     placeholder = "e.g. Annual Sports Day",
                     leadingIcon = VIcons.Megaphone,
+                    modifier = Modifier.shakeOnError(titleError),
                 )
                 VInput(
                     value = date,
-                    onValueChange = { date = it },
+                    onValueChange = { date = it; dateError = false },
                     label = "Date",
                     placeholder = "e.g. 2026-06-20",
                     leadingIcon = VIcons.Calendar,
+                    modifier = Modifier.shakeOnError(dateError),
                 )
                 VInput(
                     value = description,
-                    onValueChange = { description = it },
+                    onValueChange = { description = it; descriptionError = false },
                     label = "Message",
                     placeholder = "What do parents and staff need to know?",
                     singleLine = false,
+                    modifier = Modifier.shakeOnError(descriptionError),
                 )
                 Spacer(Modifier.height(4.dp))
                 VButton(
                     text = "Publish announcement",
-                    onClick = { onSubmit(category, title, description, date) },
+                    onClick = {
+                        // Validate on tap; shake the blank field(s) via Feature 7.
+                        titleError = title.isBlank()
+                        dateError = date.isBlank()
+                        descriptionError = description.isBlank()
+                        if (allValid) onSubmit(category, title, description, date)
+                    },
                     variant = VButtonVariant.Primary,
                     full = true,
-                    enabled = canSubmit,
+                    enabled = !isCreating,
                     loading = isCreating,
                 )
                 VButton(
