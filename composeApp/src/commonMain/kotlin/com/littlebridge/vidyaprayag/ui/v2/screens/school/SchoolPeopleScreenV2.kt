@@ -65,14 +65,18 @@ import kotlin.math.roundToInt
  * The backend's people endpoint is a **cohort-analytics** feed (risk distribution,
  * at-risk students, subject engagement, cohort comparison) — not a flat student/teacher
  * roster. So this screen renders the analytics it actually returns rather than the old
- * mock roster + per-student detail (which had no backing endpoint). A directory/roster
- * screen is tracked as a later addition. No MockV2 in production; the three UI states
- * come from [VStateHost] (LAW 2/3/6).
+ * mock roster + per-student detail (which had no backing endpoint). RA-45 now adds the
+ * real student roster + student/teacher profile screens (`GET /school/students`,
+ * `/students/{id}`, `/teachers/{id}`), reachable from the entry cards / tappable teacher
+ * rows here. No MockV2 in production; the three UI states come from [VStateHost] (LAW 2/3/6).
  */
 @Composable
 fun SchoolPeopleScreenV2(
     modifier: Modifier = Modifier,
     onOpenLinkRequests: () -> Unit = {},
+    // RA-45 — open the live student roster + a single teacher's profile.
+    onOpenStudentRoster: () -> Unit = {},
+    onOpenTeacher: (String) -> Unit = {},
     viewModel: StudentAnalyticsViewModel = koinViewModel(),
     teachersViewModel: SchoolTeachersViewModel = koinViewModel(),
 ) {
@@ -86,6 +90,8 @@ fun SchoolPeopleScreenV2(
         onAddTeacher = teachersViewModel::addTeacher,
         onRemoveTeacher = teachersViewModel::removeTeacher,
         onOpenLinkRequests = onOpenLinkRequests,
+        onOpenStudentRoster = onOpenStudentRoster,
+        onOpenTeacher = onOpenTeacher,
         modifier = modifier,
     )
 }
@@ -99,6 +105,8 @@ private fun SchoolPeopleContent(
     onAddTeacher: (name: String, identifier: String, initialPassword: String?, onAdded: (() -> Unit)?) -> Unit,
     onRemoveTeacher: (teacherId: String) -> Unit,
     onOpenLinkRequests: () -> Unit,
+    onOpenStudentRoster: () -> Unit,
+    onOpenTeacher: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -130,12 +138,27 @@ private fun SchoolPeopleContent(
             }
         }
 
+        // ── RA-45: student roster entry ────────────────────────────────────
+        VCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenStudentRoster)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Student roster", style = VTheme.type.bodyStrong.colored(c.ink))
+                    Text(
+                        "View, add or remove students; open a student's full record",
+                        style = VTheme.type.caption.colored(c.ink2),
+                    )
+                }
+                Icon(VIcons.ArrowRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
+            }
+        }
+
         // ── Teacher roster (RA-22) ─────────────────────────────────────────
         TeacherRosterSection(
             state = teachersState,
             onRetry = onTeachersRetry,
             onAddClick = { showAddTeacher = true },
             onRemoveClick = { pendingRemoval = it },
+            onOpenTeacher = onOpenTeacher,
         )
 
         Text("Cohort analytics", style = VTheme.type.h3.colored(c.ink))
@@ -270,6 +293,7 @@ private fun TeacherRosterSection(
     onRetry: () -> Unit,
     onAddClick: () -> Unit,
     onRemoveClick: (TeacherRosterItem) -> Unit,
+    onOpenTeacher: (String) -> Unit,
 ) {
     val c = VTheme.colors
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -312,6 +336,7 @@ private fun TeacherRosterSection(
                             item = t,
                             mutating = state.isMutating,
                             onRemove = { onRemoveClick(t) },
+                            onClick = { onOpenTeacher(t.id) },
                         )
                     }
                 }
@@ -325,9 +350,10 @@ private fun TeacherRosterRow(
     item: TeacherRosterItem,
     mutating: Boolean,
     onRemove: () -> Unit,
+    onClick: () -> Unit,
 ) {
     val c = VTheme.colors
-    VCard {
+    VCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
