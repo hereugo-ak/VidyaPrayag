@@ -6,6 +6,7 @@ import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.CreateTeacherRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherAccountDto
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherCredentialDto
 import com.littlebridge.vidyaprayag.feature.admin.domain.repository.TeachersRepository
 import com.littlebridge.vidyaprayag.util.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +28,10 @@ data class SchoolTeachersState(
     val isMutating: Boolean = false,
     val errorMessage: String? = null,
     val infoMessage: String? = null,
+    // RA-32: a freshly-issued credential, shown ONCE in a dialog after a
+    // password reset so the admin can hand it over. Cleared via
+    // [dismissIssuedCredential] when the admin closes the dialog.
+    val issuedCredential: TeacherCredentialDto? = null,
 )
 
 /**
@@ -136,6 +141,51 @@ class SchoolTeachersViewModel(
                 }
             }
         }
+    }
+
+    /**
+     * RA-32: reissue a teacher's initial password. The server generates a new
+     * secure password, persists only its hash, revokes the teacher's live
+     * sessions, and returns the plaintext ONCE — surfaced via
+     * [SchoolTeachersState.issuedCredential] for the admin to hand over.
+     */
+    fun resetPassword(teacherId: String) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isMutating = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isMutating = false, errorMessage = "Not signed in")
+                return@launch
+            }
+            when (val r = repository.resetTeacherPassword(token, teacherId)) {
+                is NetworkResult.Success -> {
+                    val cred = r.data.data
+                    if (cred != null) {
+                        _state.value = _state.value.copy(
+                            isMutating = false,
+                            infoMessage = "New password issued",
+                            issuedCredential = cred
+                        )
+                    } else {
+                        _state.value = _state.value.copy(
+                            isMutating = false,
+                            infoMessage = "New password issued"
+                        )
+                    }
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(isMutating = false, errorMessage = r.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(isMutating = false, errorMessage = "Connection error. Check your internet.")
+                }
+            }
+        }
+    }
+
+    /** RA-32: dismiss the one-time credential dialog. */
+    fun dismissIssuedCredential() {
+        _state.value = _state.value.copy(issuedCredential = null)
     }
 
     fun clearMessages() {

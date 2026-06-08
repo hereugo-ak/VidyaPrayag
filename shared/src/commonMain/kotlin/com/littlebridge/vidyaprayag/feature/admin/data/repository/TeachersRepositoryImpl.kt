@@ -5,6 +5,7 @@ import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.feature.admin.data.remote.TeachersApi
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.CreateTeacherRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherAccountDto
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherCredentialDto
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherListResponse
 import com.littlebridge.vidyaprayag.feature.admin.domain.repository.TeachersRepository
 
@@ -20,4 +21,7 @@ class TeachersRepositoryImpl(
 
     override suspend fun deleteTeacher(token: String, teacherId: String): NetworkResult<ApiResponse<Unit>> =
         api.deleteTeacher(token, teacherId)
+
+    override suspend fun resetTeacherPassword(token: String, teacherId: String): NetworkResult<ApiResponse<TeacherCredentialDto>> =
+        api.resetTeacherPassword(token, teacherId)
 }

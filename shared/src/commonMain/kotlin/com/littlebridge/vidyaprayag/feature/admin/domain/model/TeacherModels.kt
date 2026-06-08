@@ -7,6 +7,7 @@
  *   GET    /api/v1/school/teachers
  *   POST   /api/v1/school/teachers
  *   DELETE /api/v1/school/teachers/{id}
+ *   POST   /api/v1/school/teachers/{id}/reset-password  (RA-32)
  */
 package com.littlebridge.vidyaprayag.feature.admin.domain.model
 
@@ -33,4 +34,13 @@ data class CreateTeacherRequest(
     val name: String,
     val identifier: String,                                  // email OR phone
     @SerialName("initial_password") val initialPassword: String? = null
+)
+
+/** RA-32: server returns the freshly-issued plaintext password exactly once. */
+@Serializable
+data class TeacherCredentialDto(
+    val id: String,
+    val name: String,
+    val email: String,
+    @SerialName("initial_password") val initialPassword: String
 )

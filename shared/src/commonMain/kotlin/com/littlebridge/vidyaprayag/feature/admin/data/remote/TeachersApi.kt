@@ -10,6 +10,7 @@
  *   GET    /api/v1/school/teachers
  *   POST   /api/v1/school/teachers
  *   DELETE /api/v1/school/teachers/{id}
+ *   POST   /api/v1/school/teachers/{id}/reset-password  (RA-32)
  */
 package com.littlebridge.vidyaprayag.feature.admin.data.remote
 
@@ -18,6 +19,7 @@ import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.network.safeApiCall
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.CreateTeacherRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherAccountDto
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherCredentialDto
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherListResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.request.delete
@@ -59,5 +61,13 @@ class TeachersApi(
         teacherId: String
     ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
         client.delete(getUrl("api/v1/school/teachers/$teacherId"))
+    }
+
+    /** RA-32: reissue an initial password; server returns the plaintext once. */
+    suspend fun resetTeacherPassword(
+        token: String,
+        teacherId: String
+    ): NetworkResult<ApiResponse<TeacherCredentialDto>> = safeApiCall {
+        client.post(getUrl("api/v1/school/teachers/$teacherId/reset-password"))
     }
 }
