@@ -2,6 +2,7 @@ package com.littlebridge.vidyaprayag.ui.v2.theme
 
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -18,12 +19,15 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import kotlin.math.sqrt
+import kotlinx.coroutines.launch
 
 /**
  * VMotion — the design's spring/entrance tokens (UI_FIDELITY_AUDIT §13.2/§13.3).
@@ -114,4 +118,108 @@ fun Modifier.pressScale(
         label = "pressScale",
     )
     this.scale(scale)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Feature 5 — Card press scale + staggered list entrance
+//
+// Two stricter variants of the existing micro-interaction primitives, kept
+// SEPARATE from [pressScale] (which is wired into ~30+ existing callsites and
+// must not move) so we never regress visual rhythm anywhere it already lives.
+// New navigable cards opt into [cardPressScale] (graphicsLayer-based, no
+// ripple conflict, .97f spec target). New list screens opt into
+// [staggeredItemEntrance] for the post-skeleton ladder.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * cardPressScale — navigable-card press feedback, spec-aligned to Feature 5.
+ *
+ * - Scales to **0.97f** on pointer down, springs back to 1.0f on release.
+ * - Applied via [graphicsLayer] (NOT [scale]) so it composes cleanly with a
+ *   `Modifier.clickable(indication = ripple())` underneath — no ripple
+ *   clipping artefacts when the card scales.
+ * - Spring is `Spring.DampingRatioMediumBouncy` for a tactile-not-rubbery feel.
+ *
+ * Caller responsibility (RULE-2 / RULE-3):
+ *  - Apply ONLY to cards that are navigable (have an `onClick`). Static
+ *    display cards never scale — they would feel broken on tap.
+ *  - Stack BEFORE `clickable(...)` in the modifier chain so the press scale
+ *    wraps the ripple visually, never the other way round.
+ */
+fun Modifier.cardPressScale(
+    interactionSource: MutableInteractionSource,
+    pressedScale: Float = 0.97f,
+): Modifier = composed {
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) pressedScale else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium,
+        ),
+        label = "cardPressScale",
+    )
+    this.graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+    }
+}
+
+/**
+ * staggeredItemEntrance — the post-skeleton ladder (Feature 5).
+ *
+ * When [trigger] flips from false → true, each item runs a 220ms `fadeIn +
+ * slideInVertically(+16px → 0)` with a `index * 40ms` delay, capped at 200ms
+ * (so item 6+ all enter together — the rhythm never drags). When [trigger] is
+ * already true on first composition (e.g. the user returned to a list whose
+ * data was cached), the animation runs once on mount; subsequent recompositions
+ * do NOT re-run it (RULE-2: no recomposition loops).
+ *
+ * Apply via [Modifier.graphicsLayer] so it never causes layout shift — only
+ * the alpha and translationY of the existing item box change per frame.
+ *
+ * ```
+ * itemsIndexed(rows) { i, row ->
+ *     RowCard(row, modifier = Modifier.staggeredItemEntrance(i, ready))
+ * }
+ * ```
+ *
+ * [trigger] should be wired to "data is loaded and non-empty" (i.e. the
+ * skeleton → content transition has begun). It MUST NOT toggle back to false
+ * on a refresh — otherwise items would shake on every pull-to-refresh.
+ */
+@Composable
+fun Modifier.staggeredItemEntrance(
+    index: Int,
+    trigger: Boolean,
+    stepMs: Int = 40,
+    maxDelayMs: Int = 200,
+    durationMs: Int = 220,
+    fromY: Float = 16f,
+): Modifier {
+    val alpha = remember { Animatable(0f) }
+    val ty = remember { Animatable(fromY) }
+    // The `trigger` key + `index` key means each item animates exactly ONCE per
+    // (data-load, position) pair. Compose deliberately calls LaunchedEffect's
+    // block again only when a key changes — so a pull-to-refresh that keeps
+    // `trigger = true` will NOT re-run the entrance.
+    LaunchedEffect(trigger, index) {
+        if (trigger) {
+            val delayMs = (index * stepMs).coerceAtMost(maxDelayMs).toLong()
+            kotlinx.coroutines.delay(delayMs)
+            // LaunchedEffect's own CoroutineScope receiver: launch the two anims
+            // in parallel so alpha and translationY run together (the spec's
+            // "fade + slide").
+            launch {
+                alpha.animateTo(1f, tween(durationMs, easing = FastOutSlowInEasing))
+            }
+            launch {
+                ty.animateTo(0f, tween(durationMs, easing = FastOutSlowInEasing))
+            }
+        }
+    }
+    return this.graphicsLayer {
+        this.alpha = alpha.value
+        translationY = ty.value * density
+    }
 }

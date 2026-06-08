@@ -46,6 +46,7 @@ import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import com.littlebridge.vidyaprayag.ui.v2.theme.staggeredItemEntrance
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -220,21 +221,28 @@ private fun AnnouncementsTab(
                     }
                 }
             }
-            state.announcements.forEach { a ->
-                VCard(onClick = { onOpen(a.id) }) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(a.title, style = VTheme.type.bodyStrong.colored(c.ink), modifier = Modifier.weight(1f))
-                        if (a.category.isNotBlank()) VBadge(text = a.category, tone = VBadgeTone.Arctic)
-                    }
-                    if (a.date.isNotBlank()) {
-                        Text(a.date, style = VTheme.type.caption.colored(c.ink2), modifier = Modifier.padding(top = 2.dp))
-                    }
-                    if (a.description.isNotBlank()) {
-                        Text(
-                            a.description,
-                            style = VTheme.type.caption.colored(c.ink2),
-                            modifier = Modifier.padding(top = 6.dp),
-                        )
+            // Feature 5 — staggered list entrance for announcement cards once
+            // VStateHost flips from skeleton → content. `ready` only flips on
+            // the *initial* data-load; subsequent refreshes keep it true so
+            // items never re-animate (RULE-2: no jank).
+            val ready = state.announcements.isNotEmpty() && !state.isLoading
+            state.announcements.forEachIndexed { index, a ->
+                Box(modifier = Modifier.staggeredItemEntrance(index = index, trigger = ready)) {
+                    VCard(onClick = { onOpen(a.id) }) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(a.title, style = VTheme.type.bodyStrong.colored(c.ink), modifier = Modifier.weight(1f))
+                            if (a.category.isNotBlank()) VBadge(text = a.category, tone = VBadgeTone.Arctic)
+                        }
+                        if (a.date.isNotBlank()) {
+                            Text(a.date, style = VTheme.type.caption.colored(c.ink2), modifier = Modifier.padding(top = 2.dp))
+                        }
+                        if (a.description.isNotBlank()) {
+                            Text(
+                                a.description,
+                                style = VTheme.type.caption.colored(c.ink2),
+                                modifier = Modifier.padding(top = 6.dp),
+                            )
+                        }
                     }
                 }
             }

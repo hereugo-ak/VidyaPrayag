@@ -2,6 +2,7 @@ package com.littlebridge.vidyaprayag.ui.v2.screens.school
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -52,6 +53,7 @@ import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import com.littlebridge.vidyaprayag.ui.v2.theme.staggeredItemEntrance
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.roundToInt
 
@@ -280,12 +282,20 @@ private fun TeacherRosterSection(
             skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonList(rows = 5) },
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                state.teachers.forEach { t ->
-                    TeacherRosterRow(
-                        item = t,
-                        mutating = state.isMutating,
-                        onRemove = { onRemoveClick(t) },
-                    )
+                // Feature 5 — staggered list entrance after the skeleton → content
+                // transition. `trigger` is the "list is loaded and non-empty"
+                // condition; it does NOT flip back on refresh so the entrance
+                // runs ONCE per data-load. RULE-2: the modifier only animates
+                // alpha + translationY via graphicsLayer — no layout shift.
+                val ready = state.teachers.isNotEmpty() && !state.isLoading
+                state.teachers.forEachIndexed { index, t ->
+                    Box(modifier = Modifier.staggeredItemEntrance(index = index, trigger = ready)) {
+                        TeacherRosterRow(
+                            item = t,
+                            mutating = state.isMutating,
+                            onRemove = { onRemoveClick(t) },
+                        )
+                    }
                 }
             }
         }
