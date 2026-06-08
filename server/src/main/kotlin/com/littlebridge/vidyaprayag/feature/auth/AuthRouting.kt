@@ -405,8 +405,36 @@ fun Route.authRouting() {
             val id = normaliseIdentifier(req.identifier)
             if (id.isBlank()) { call.fail("identifier is required"); return@post }
 
+            // RA-41: throttle the email/password path before any DB work so
+            // credential stuffing can't run unbounded. Checked per-IP AND
+            // per-identifier; the OTP path keeps its own OtpService throttle.
+            val clientIp = call.request.origin.remoteHost
+            if (isEmail(id) && LoginThrottle.isThrottled(clientIp, id)) {
+                call.fail(
+                    "Too many login attempts. Please wait a few minutes and try again.",
+                    HttpStatusCode.TooManyRequests,
+                    "LOGIN_THROTTLED"
+                )
+                return@post
+            }
+
+            // RA-41: ONE generic outcome for "unknown account" and "wrong
+            // password" on the email path, so the response can't be used to
+            // enumerate which accounts exist. (Previously USER_NOT_FOUND vs
+            // INVALID_CREDENTIALS distinguished the two.)
             val row = dbQuery { lookupUserByIdentifier(id) }
-                ?: run { call.fail("User not found", HttpStatusCode.Unauthorized, "USER_NOT_FOUND"); return@post }
+            if (row == null) {
+                if (isEmail(id)) {
+                    LoginThrottle.recordFailure(clientIp, id)
+                    call.fail("Invalid email or password", HttpStatusCode.Unauthorized, "INVALID_CREDENTIALS")
+                } else {
+                    // Phone path can't proceed without a user + OTP; keep the
+                    // OTP-flow wording (an unknown phone reveals nothing extra
+                    // because /send-otp must succeed first anyway).
+                    call.fail("No active OTP. Call /send-otp first.", HttpStatusCode.NotFound, "OTP_NOT_FOUND")
+                }
+                return@post
+            }
 
             // RA-34: a deactivated / off-boarded account must never be able to
             // authenticate. Reject before any credential check so an inactive
@@ -420,9 +448,15 @@ fun Route.authRouting() {
             if (isEmail(id)) {
                 val stored = row[AppUsersTable.passwordHash]
                 if (!PasswordHasher.verify(req.password.orEmpty(), stored)) {
-                    call.fail("Invalid password", HttpStatusCode.Unauthorized, "INVALID_CREDENTIALS")
+                    // RA-41: record the failure and return the SAME generic
+                    // message/code as the unknown-account branch above.
+                    LoginThrottle.recordFailure(clientIp, id)
+                    call.fail("Invalid email or password", HttpStatusCode.Unauthorized, "INVALID_CREDENTIALS")
                     return@post
                 }
+                // RA-41: a correct password clears the identifier throttle window
+                // so earlier typos don't keep a legitimate user locked out.
+                LoginThrottle.recordSuccess(id)
                 // Transparently upgrade legacy unsalted SHA-256 hashes on a
                 // successful login so the password store self-heals over time.
                 if (PasswordHasher.needsRehash(stored)) {
