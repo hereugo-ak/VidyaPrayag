@@ -63,7 +63,7 @@ package com.littlebridge.vidyaprayag.feature.auth
 import com.littlebridge.vidyaprayag.db.AuthOtpsTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.OtpDeliveryAttemptsTable
-import org.jetbrains.exposed.sql.ForUpdateOption
+import org.jetbrains.exposed.sql.vendors.ForUpdateOption
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.and

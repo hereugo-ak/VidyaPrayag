@@ -121,7 +121,7 @@ data class StudentProfileDto(
 )
 
 @Serializable
-data class TeacherAssignmentDto(
+data class TeacherProfileAssignmentDto(
     @SerialName("class_name") val className: String,
     val section: String,
     val subject: String
@@ -134,7 +134,7 @@ data class TeacherProfileDto(
     val email: String? = null,
     val phone: String? = null,
     val role: String,
-    val assignments: List<TeacherAssignmentDto>,
+    val assignments: List<TeacherProfileAssignmentDto>,
     @SerialName("class_count") val classCount: Int,
     @SerialName("subject_count") val subjectCount: Int
 )
@@ -341,7 +341,7 @@ fun Route.schoolStudentsRouting() {
                         (TeacherSubjectAssignmentsTable.teacherId eq id) and
                         (TeacherSubjectAssignmentsTable.isActive eq true)
                 }.map {
-                    TeacherAssignmentDto(
+                    TeacherProfileAssignmentDto(
                         className = it[TeacherSubjectAssignmentsTable.className],
                         section = it[TeacherSubjectAssignmentsTable.section],
                         subject = it[TeacherSubjectAssignmentsTable.subject]
