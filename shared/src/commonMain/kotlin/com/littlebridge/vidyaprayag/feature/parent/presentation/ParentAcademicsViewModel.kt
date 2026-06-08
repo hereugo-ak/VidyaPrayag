@@ -99,13 +99,14 @@ class ParentAcademicsViewModel(
         loadAttendance(childId)
     }
 
-    fun loadAttendance(childId: String = currentChildId() ?: return) {
+    fun loadAttendance(childId: String? = null) {
+        val resolvedChildId = childId ?: currentChildId() ?: return
         viewModelScope.launch {
             _state.update { it.copy(attendanceLoading = true, attendanceError = null) }
             val token = token() ?: run {
                 _state.update { it.copy(attendanceLoading = false, attendanceError = "Not authenticated") }; return@launch
             }
-            when (val r = repository.getChildAttendance(token, childId)) {
+            when (val r = repository.getChildAttendance(token, resolvedChildId)) {
                 is NetworkResult.Success -> _state.update { it.copy(attendanceLoading = false, attendance = r.data.data) }
                 is NetworkResult.Error -> _state.update { it.copy(attendanceLoading = false, attendanceError = r.message) }
                 is NetworkResult.ConnectionError -> _state.update { it.copy(attendanceLoading = false, attendanceError = "Connection error") }
@@ -113,13 +114,14 @@ class ParentAcademicsViewModel(
         }
     }
 
-    fun loadMarks(childId: String = currentChildId() ?: return) {
+    fun loadMarks(childId: String? = null) {
+        val resolvedChildId = childId ?: currentChildId() ?: return
         viewModelScope.launch {
             _state.update { it.copy(marksLoading = true, marksError = null) }
             val token = token() ?: run {
                 _state.update { it.copy(marksLoading = false, marksError = "Not authenticated") }; return@launch
             }
-            when (val r = repository.getChildMarks(token, childId)) {
+            when (val r = repository.getChildMarks(token, resolvedChildId)) {
                 is NetworkResult.Success -> _state.update { it.copy(marksLoading = false, marks = r.data.data) }
                 is NetworkResult.Error -> _state.update { it.copy(marksLoading = false, marksError = r.message) }
                 is NetworkResult.ConnectionError -> _state.update { it.copy(marksLoading = false, marksError = "Connection error") }
@@ -127,13 +129,14 @@ class ParentAcademicsViewModel(
         }
     }
 
-    fun loadSyllabus(childId: String = currentChildId() ?: return) {
+    fun loadSyllabus(childId: String? = null) {
+        val resolvedChildId = childId ?: currentChildId() ?: return
         viewModelScope.launch {
             _state.update { it.copy(syllabusLoading = true, syllabusError = null) }
             val token = token() ?: run {
                 _state.update { it.copy(syllabusLoading = false, syllabusError = "Not authenticated") }; return@launch
             }
-            when (val r = repository.getChildSyllabus(token, childId)) {
+            when (val r = repository.getChildSyllabus(token, resolvedChildId)) {
                 is NetworkResult.Success -> _state.update { it.copy(syllabusLoading = false, syllabus = r.data.data) }
                 is NetworkResult.Error -> _state.update { it.copy(syllabusLoading = false, syllabusError = r.message) }
                 is NetworkResult.ConnectionError -> _state.update { it.copy(syllabusLoading = false, syllabusError = "Connection error") }
