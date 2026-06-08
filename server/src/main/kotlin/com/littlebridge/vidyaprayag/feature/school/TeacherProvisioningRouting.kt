@@ -24,6 +24,7 @@ import com.littlebridge.vidyaprayag.core.created
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.okMessage
+import com.littlebridge.vidyaprayag.core.requireSchoolAdmin
 import com.littlebridge.vidyaprayag.core.requireSchoolContext
 import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
@@ -99,9 +100,9 @@ fun Route.teacherProvisioningRouting() {
     authenticate("jwt") {
         route("/api/v1/school/teachers") {
 
-            // ---- create a teacher account ----
+            // ---- create a teacher account (privileged: RA-39) ----
             post {
-                val ctx = call.requireSchoolContext() ?: return@post
+                val ctx = call.requireSchoolAdmin() ?: return@post
                 val req = runCatching { call.receive<CreateTeacherDto>() }.getOrNull()
                     ?: run { call.fail("Invalid body"); return@post }
 
@@ -194,7 +195,7 @@ fun Route.teacherProvisioningRouting() {
             // soft-delete (is_active=false) which integrates with the RA-34
             // kill-switch, and revokes the teacher's sessions immediately.
             delete("/{id}") {
-                val ctx = call.requireSchoolContext() ?: return@delete
+                val ctx = call.requireSchoolAdmin() ?: return@delete   // privileged: RA-39
                 val teacherId = call.parameters["id"]
                     ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                     ?: run { call.fail("A valid teacher id is required", HttpStatusCode.BadRequest, "BAD_TEACHER_ID"); return@delete }
@@ -239,7 +240,7 @@ fun Route.teacherProvisioningRouting() {
             // admin can only reset teachers in their OWN school. Email teachers
             // only — phone teachers authenticate via OTP (no password to reset).
             post("/{id}/reset-password") {
-                val ctx = call.requireSchoolContext() ?: return@post
+                val ctx = call.requireSchoolAdmin() ?: return@post   // privileged: RA-39
                 val teacherId = call.parameters["id"]
                     ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                     ?: run { call.fail("A valid teacher id is required", HttpStatusCode.BadRequest, "BAD_TEACHER_ID"); return@post }

@@ -33,8 +33,17 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.selectAll
 import java.util.UUID
 
-/** Roles permitted to access the school admin surface. */
+/** Roles permitted to access the school admin surface (reads + shared writes). */
 val SCHOOL_ROLES = setOf("school_admin", "school_staff", "admin")
+
+/**
+ * RA-39: roles permitted to perform PRIVILEGED school writes — provisioning or
+ * removing teachers, resetting credentials, deleting media, and publishing
+ * school-wide announcements. `school_staff` is deliberately EXCLUDED: delegated
+ * staff can operate the day-to-day surface (`SCHOOL_ROLES`) but must not be able
+ * to manage accounts/credentials or broadcast on the school's behalf.
+ */
+val SCHOOL_ADMIN_ROLES = setOf("school_admin", "admin")
 
 /** Resolved, trusted context for a school-side request. */
 data class SchoolContext(
@@ -101,4 +110,29 @@ suspend fun ApplicationCall.requireSchoolContext(): SchoolContext? {
         return null
     }
     return SchoolContext(uid, schoolId, effectiveRole)
+}
+
+/**
+ * RA-39: stricter guard for PRIVILEGED school writes. Identical to
+ * [requireSchoolContext] (same DB-read of role, same is_active / onboarding
+ * checks) but additionally requires the resolved role to be in
+ * [SCHOOL_ADMIN_ROLES] — so `school_staff` is rejected with 403 even though it
+ * passes the general school guard. Role is read from the DB, so a forged/stale
+ * JWT claim cannot widen access here either.
+ *
+ *   401 – no/invalid token
+ *   403 – authenticated but not a school role, OR a school_staff lacking admin rights
+ *   404 – school role but no school yet
+ */
+suspend fun ApplicationCall.requireSchoolAdmin(): SchoolContext? {
+    val ctx = requireSchoolContext() ?: return null   // already responded on failure
+    if (ctx.role !in SCHOOL_ADMIN_ROLES) {
+        fail(
+            "This action requires a school administrator. Ask your school admin to do this.",
+            HttpStatusCode.Forbidden,
+            "ADMIN_REQUIRED"
+        )
+        return null
+    }
+    return ctx
 }

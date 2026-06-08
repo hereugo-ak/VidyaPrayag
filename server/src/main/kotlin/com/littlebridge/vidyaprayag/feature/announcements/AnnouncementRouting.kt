@@ -34,6 +34,7 @@ import com.littlebridge.vidyaprayag.core.accepted
 import com.littlebridge.vidyaprayag.core.created
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
+import com.littlebridge.vidyaprayag.core.requireSchoolAdmin
 import com.littlebridge.vidyaprayag.core.requireSchoolContext
 import com.littlebridge.vidyaprayag.db.AnnouncementsTable
 import com.littlebridge.vidyaprayag.db.AppUsersTable
@@ -169,9 +170,9 @@ fun Route.announcementRouting() {
                 call.ok(AnnouncementsListResponse(list), message = "Search results fetched")
             }
 
-            // ---- create ----
+            // ---- create (privileged: RA-39 — staff cannot broadcast) ----
             post {
-                val ctx = call.requireSchoolContext() ?: return@post
+                val ctx = call.requireSchoolAdmin() ?: return@post
                 val uid = ctx.userId
                 val req = call.receive<CreateAnnouncementDto>()
                 val schoolId = effectiveSchoolId(ctx.schoolId, ctx.role, req.schoolId)
@@ -225,9 +226,9 @@ fun Route.announcementRouting() {
                 )
             }
 
-            // ---- sync-whatsapp ----
+            // ---- sync-whatsapp (privileged: RA-39 — staff cannot broadcast) ----
             post("/sync-whatsapp") {
-                val ctx = call.requireSchoolContext() ?: return@post
+                val ctx = call.requireSchoolAdmin() ?: return@post
                 val req = call.receive<SyncWhatsAppRequest>()
                 val schoolId = effectiveSchoolId(ctx.schoolId, ctx.role, req.schoolId)
 
