@@ -118,6 +118,14 @@ private fun UnauthFlow(modifier: Modifier = Modifier) {
         modifier = modifier,
     ) { current ->
         when (current) {
+            // The single landing surface for BOTH roles (PHASE 7). Its two role-entry cards are the
+            // only auth CTAs: "I'm a Parent" → [onParent] → OTP funnel; "School / Administration" →
+            // [onAdmin] → credential funnel (teachers sign in via the Admin path). A tap on any
+            // Featured-Institution card or Portal-access row also funnels into the matching auth
+            // screen (a school tap leads families into the parent OTP sign-in). Content (hero copy,
+            // featured schools, offerings, portals) is CMS-driven inside the screen itself via
+            // LandingViewModel + MainViewModel — both fetch in `init`, so no extra wiring is needed
+            // here; this site only supplies the navigation callbacks.
             UnauthRoute.Landing -> CommonLandingScreenV2(
                 onParent = { route = UnauthRoute.ParentAuth },
                 onAdmin = { route = UnauthRoute.AdminAuth },
