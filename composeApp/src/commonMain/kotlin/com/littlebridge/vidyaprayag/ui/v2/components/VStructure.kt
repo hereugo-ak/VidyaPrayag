@@ -8,8 +8,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -24,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 
@@ -145,6 +148,75 @@ fun VComingSoon(
                 Text(
                     "Notify me when ready",
                     style = VTheme.type.caption.colored(c.ink2),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * VConfirmDialog — the universal confirmation gate for destructive actions
+ * (logout, delete, remove). RA-21: every confirmation-less destructive action
+ * must route through this dialog first.
+ *
+ * Built entirely from the frozen design language (RULE-6): the panel is a [VCard]
+ * on the `--card` surface, actions are [VButton]s ([VButtonVariant.Destructive] for
+ * the confirm CTA, [VButtonVariant.Ghost] for cancel), text uses [VTheme.type]
+ * tokens and the scrim uses the existing navy `shadowTint` token. Zero new tokens.
+ *
+ * Renders nothing when [visible] is false. Dismissing (scrim tap / back) calls
+ * [onDismiss]; the confirm CTA calls [onConfirm].
+ */
+@Composable
+fun VConfirmDialog(
+    visible: Boolean,
+    title: String,
+    message: String,
+    confirmLabel: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    cancelLabel: String = "Cancel",
+    icon: ImageVector? = null,
+) {
+    if (!visible) return
+    val c = VTheme.colors
+    Dialog(onDismissRequest = onDismiss) {
+        VCard(modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth()) {
+            Column(
+                Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (icon != null) {
+                    Box(
+                        Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(c.danger.copy(alpha = if (c.isNight) 0.18f else 0.28f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(icon, contentDescription = null, tint = c.dangerInk, modifier = Modifier.size(26.dp))
+                    }
+                }
+                Text(title, style = VTheme.type.h3.colored(c.ink), textAlign = TextAlign.Center)
+                Text(
+                    message,
+                    style = VTheme.type.caption.colored(c.ink2),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.widthIn(max = 320.dp),
+                )
+                Spacer(Modifier.height(8.dp))
+                VButton(
+                    text = confirmLabel,
+                    onClick = onConfirm,
+                    full = true,
+                    variant = VButtonVariant.Destructive,
+                )
+                VButton(
+                    text = cancelLabel,
+                    onClick = onDismiss,
+                    full = true,
+                    variant = VButtonVariant.Ghost,
                 )
             }
         }
