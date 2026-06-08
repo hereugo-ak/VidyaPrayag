@@ -171,6 +171,13 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    // RA-47: institutional-profile (schools row) read/edit
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.SchoolProfileApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
     single {
         com.littlebridge.vidyaprayag.feature.admin.data.remote.PtmApi(
             client = get(),
@@ -260,6 +267,10 @@ val commonModule = module {
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.TeachersRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.TeachersRepositoryImpl(get())
     }
+    // RA-47
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.SchoolProfileRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.SchoolProfileRepositoryImpl(get())
+    }
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.PtmRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.PtmRepositoryImpl(get())
     }
@@ -327,6 +338,7 @@ val viewModelModule = module {
     factory { AcademicInfoOBViewModel(get(), get()) }
     factory { LaunchInfoOBViewModel(get(), get()) }
     factory { InstitutionalProfileViewModel(get(), get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolProfileViewModel(get(), get()) } // RA-47
     factory { AdmissionCRMViewModel(get(), get()) }
     factory { SchoolAnnouncementsViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolTeachersViewModel(get(), get()) }

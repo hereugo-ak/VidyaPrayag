@@ -57,6 +57,8 @@ import org.koin.compose.viewmodel.koinViewModel
 fun SchoolSettingsScreenV2(
     onLogout: () -> Unit = {},
     onOpenTeachers: () -> Unit = {},
+    // RA-47 — open the editable institutional-profile (schools row) screen.
+    onOpenProfile: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: InstitutionalProfileViewModel = koinViewModel(),
 ) {
@@ -65,6 +67,7 @@ fun SchoolSettingsScreenV2(
         state = state,
         onLogout = onLogout,
         onOpenTeachers = onOpenTeachers,
+        onOpenProfile = onOpenProfile,
         onRetry = viewModel::load,
         modifier = modifier,
     )
@@ -75,6 +78,7 @@ private fun SchoolSettingsContent(
     state: InstitutionalProfileState,
     onLogout: () -> Unit,
     onOpenTeachers: () -> Unit,
+    onOpenProfile: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -155,6 +159,9 @@ private fun SchoolSettingsContent(
             // These mirror Admin.tsx → SettingsScreen. Where there's no backend
             // endpoint they're labelled "Coming Soon" instead of showing fake data.
             val rows = listOf(
+                // RA-47 — edit the live schools row (name, board, contact,
+                // principal, address) instead of leaving it read-only.
+                SettingRow(VIcons.School, "Edit institutional profile", "Name, board, contact, principal & address", onClick = onOpenProfile),
                 SettingRow(VIcons.Calendar, "Academic year", "Manage term dates & holidays (Coming Soon)"),
                 SettingRow(VIcons.BookOpen, "Classes & subjects", "Class & subject setup (Coming Soon)"),
                 // RA-24: teacher management is live (RA-22 roster on the People

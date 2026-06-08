@@ -34,6 +34,7 @@ private enum class SchoolOverlay {
     ClassPerformance,
     TeacherPerformance,
     AnalyticsDashboard,
+    EditProfile,
 }
 
 /**
@@ -116,6 +117,11 @@ fun SchoolPortalV2(
                 AnalyticsDashboardScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
                 return@VTheme
             }
+            SchoolOverlay.EditProfile -> {
+                // RA-47 — edit the live schools row (institutional profile).
+                EditSchoolProfileScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
+                return@VTheme
+            }
             SchoolOverlay.None -> Unit
         }
 
@@ -163,6 +169,8 @@ fun SchoolPortalV2(
                         // RA-24 — "Teacher management" opens the live People tab
                         // roster (RA-22) rather than a Coming-Soon label.
                         onOpenTeachers = { tab = "people" },
+                        // RA-47 — open the editable institutional-profile screen.
+                        onOpenProfile = { overlay = SchoolOverlay.EditProfile },
                     )
                 }
             }
