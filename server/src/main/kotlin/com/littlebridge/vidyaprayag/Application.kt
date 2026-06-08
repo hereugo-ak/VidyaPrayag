@@ -75,6 +75,7 @@ import com.littlebridge.vidyaprayag.feature.school.resultsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolAnalyticsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolDashboardRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolProfileRouting
+import com.littlebridge.vidyaprayag.feature.school.schoolRecordsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolStudentsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRouting
 import com.littlebridge.vidyaprayag.feature.school.teacherAssignmentRouting
@@ -244,6 +245,7 @@ fun Application.module() {
         teacherProvisioningRouting() // /api/v1/school/teachers[…] — school-admin creates teacher app_users rows (audit finding C)
         schoolProfileRouting()       // /api/v1/school/profile — RA-47 read/edit institutional schools row (school-admin write)
         schoolStudentsRouting()      // /api/v1/school/students[…] + teachers/{id} — RA-45 student roster + student/teacher profile (school-scoped)
+        schoolRecordsRouting()       // /api/v1/school/{attendance/summary,marks/summary,fees/ledger} — RA-52 admin Records rollups (school-scoped reads)
         mediaRouting()               // /api/v1/school/media/upload[…] — REAL binary uploads → Supabase Storage (kills URL placeholders)
 
         // Teacher vertical (master rebuild doc Step 7 / gap G1)
