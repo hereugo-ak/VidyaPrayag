@@ -15,6 +15,10 @@ data class ParentDashboardResponse(
 data class ParentDashboardData(
     val greeting: String,
     @SerialName("child_summary") val childSummary: DashboardChildSummary? = null,
+    // RA-31: ALL active children (parent with 2+ kids). `child_summary` is the
+    // first child, kept for backward compatibility. Defaults to empty so older
+    // server builds that omit the field still deserialize.
+    val children: List<DashboardChildSummary> = emptyList(),
     val alerts: List<DashboardAlertDto> = emptyList(),
     @SerialName("featured_schools") val featuredSchools: List<FeaturedSchoolDto> = emptyList(),
     @SerialName("curation_logic") val curationLogic: String = ""
@@ -198,5 +202,9 @@ data class LinkedChildDto(
     @SerialName("class_name") val className: String,
     val roll: String,
     @SerialName("school_name") val schoolName: String,
-    @SerialName("profile_photo_url") val profilePhotoUrl: String? = null
+    @SerialName("profile_photo_url") val profilePhotoUrl: String? = null,
+    // RA-48: linking is now request→approve. "pending" means a school admin must
+    // approve before the child appears on the dashboard; "approved" carries a
+    // real child_id. Defaulted so the field is optional on the wire.
+    val status: String = "approved",
 )

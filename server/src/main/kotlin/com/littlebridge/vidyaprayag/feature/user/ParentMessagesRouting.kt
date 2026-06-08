@@ -30,6 +30,9 @@ import com.littlebridge.vidyaprayag.db.ChildrenTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.MessageThreadsTable
 import com.littlebridge.vidyaprayag.db.MessagesTable
+import com.littlebridge.vidyaprayag.feature.school.conversationMessagesFor
+import com.littlebridge.vidyaprayag.feature.school.resolveMessagingUser
+import com.littlebridge.vidyaprayag.feature.school.sendInConversation
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.request.*
@@ -39,7 +42,6 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import java.time.Instant
@@ -159,21 +161,20 @@ fun Route.parentMessagesRouting() {
                         .where { (MessageThreadsTable.id eq id) and (MessageThreadsTable.ownerUserId eq uid) }
                         .singleOrNull() ?: return@dbQuery null
 
-                    val msgs = MessagesTable.selectAll()
-                        .where { MessagesTable.threadId eq id }
-                        .orderBy(MessagesTable.createdAt, SortOrder.ASC)
-                        .map { row ->
-                            val sid = row[MessagesTable.senderId]
-                            val created = row[MessagesTable.createdAt]
-                            ParentMessageDto(
-                                id = row[MessagesTable.id].value.toString(),
-                                body = row[MessagesTable.body],
-                                isMine = sid == uid,
-                                senderId = sid?.toString(),
-                                createdAt = created.toString(),
-                                time = fmtParentTime(created)
-                            )
-                        }
+                    // RA-51: read by conversation_id so the parent sees both sides.
+                    val (_, rows) = conversationMessagesFor(id, uid) ?: return@dbQuery null
+                    val msgs = rows.map { row ->
+                        val sid = row[MessagesTable.senderId]
+                        val created = row[MessagesTable.createdAt]
+                        ParentMessageDto(
+                            id = row[MessagesTable.id].value.toString(),
+                            body = row[MessagesTable.body],
+                            isMine = sid == uid,
+                            senderId = sid?.toString(),
+                            createdAt = created.toString(),
+                            time = fmtParentTime(created)
+                        )
+                    }
                     ParentThreadMessagesResponse(
                         threadId = id.toString(),
                         senderName = thread[MessageThreadsTable.senderName],
@@ -232,55 +233,49 @@ fun Route.parentMessagesRouting() {
                 }
 
                 val now = Instant.now()
-                val result = dbQuery {
-                    val schoolId = resolveParentSchoolId(uid)
-                    val threadId: UUID = if (req.threadId != null) {
-                        val parsed = UUID.fromString(req.threadId)
-                        MessageThreadsTable.update({
-                            (MessageThreadsTable.id eq parsed) and (MessageThreadsTable.ownerUserId eq uid)
-                        }) {
-                            it[lastMessage] = req.body.take(200)
-                            it[lastMessageAt] = now
-                            it[updatedAt] = now
-                            it[isRead] = true
-                        }
-                        parsed
-                    } else {
-                        val recipient = req.recipientUserId
-                            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                            ?: uid
-                        val newThread = UUID.randomUUID()
-                        MessageThreadsTable.insert {
-                            it[id] = newThread
-                            // school_id is non-null in the table; fall back to the
-                            // parent's own id namespace only if no child-school yet.
-                            it[MessageThreadsTable.schoolId] = schoolId ?: uid
-                            it[ownerUserId] = recipient
-                            it[senderName] = req.senderName ?: "School"
-                            it[senderRole] = req.senderRole ?: "Support"
-                            it[senderImageUrl] = req.senderImageUrl
-                            it[iconName] = req.iconName
-                            it[lastMessage] = req.body.take(200)
-                            it[lastMessageAt] = now
-                            it[unreadCount] = if (recipient == uid) 0 else 1
-                            it[isRead] = recipient == uid
-                            it[createdAt] = now
-                            it[updatedAt] = now
-                        }
-                        newThread
-                    }
 
-                    val msgId = UUID.randomUUID()
-                    MessagesTable.insert {
-                        it[id] = msgId
-                        it[MessagesTable.threadId] = threadId
-                        it[senderId] = uid
-                        it[body] = req.body
-                        it[createdAt] = now
-                    }
-                    ParentSendMessageResponse(threadId.toString(), msgId.toString())
+                // RA-51: the parent's school is derived from their child — NEVER the
+                // body and NEVER a user-id fallback (the old `schoolId ?: uid` wrote a
+                // user UUID into the school_id column, corrupting school-scoped reads).
+                // A brand-new conversation requires a known school; replies to an
+                // existing owned thread reuse that thread's school.
+                val recipientId = req.recipientUserId
+                    ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                // Resolve a REAL school id (child's school, else the parent's own
+                // app_users.school_id) — never a user id (the old `schoolId ?: uid`
+                // corrupted the school_id column).
+                val parentSchoolId = dbQuery { resolveParentSchoolId(uid) ?: resolveMessagingUser(uid)?.schoolId }
+
+                // A new conversation (not a reply to an owned thread) needs a school.
+                if (req.threadId == null && parentSchoolId == null) {
+                    call.fail("Link a child to a school before messaging", HttpStatusCode.Conflict)
+                    return@post
                 }
-                call.created(result, message = "Message sent")
+
+                val result = dbQuery {
+                    // For a reply (threadId given) the engine ignores senderSchoolId;
+                    // for a new conversation parentSchoolId is guaranteed non-null above.
+                    sendInConversation(
+                        senderId = uid,
+                        senderSchoolId = parentSchoolId ?: uid /* unused on the reply path */,
+                        body = req.body,
+                        threadId = req.threadId?.let { UUID.fromString(it) },
+                        recipientId = recipientId,
+                        senderName = req.senderName ?: resolveMessagingUser(uid)?.fullName ?: "Parent",
+                        senderRole = req.senderRole ?: "Parent",
+                        senderImageUrl = req.senderImageUrl,
+                        iconName = req.iconName,
+                        now = now,
+                    )
+                }
+                if (result == null) {
+                    call.fail("Thread not found", HttpStatusCode.NotFound)
+                } else {
+                    call.created(
+                        ParentSendMessageResponse(result.senderThreadId.toString(), result.messageId.toString()),
+                        message = "Message sent"
+                    )
+                }
             }
         }
     }

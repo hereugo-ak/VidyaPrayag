@@ -15,6 +15,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -28,6 +31,7 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VBackHeader
+import com.littlebridge.vidyaprayag.ui.v2.components.VConfirmDialog
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
@@ -73,6 +77,21 @@ private fun ParentProfileContent(
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
+    // RA-21: logout is destructive — gate it behind a confirmation dialog.
+    var showLogoutConfirm by remember { mutableStateOf(false) }
+
+    VConfirmDialog(
+        visible = showLogoutConfirm,
+        title = "Log out?",
+        message = "You'll need to sign in again to follow your child's progress.",
+        confirmLabel = "Log out",
+        onConfirm = {
+            showLogoutConfirm = false
+            onLogout()
+        },
+        onDismiss = { showLogoutConfirm = false },
+        icon = VIcons.AlertTriangle,
+    )
 
     Column(modifier.fillMaxSize()) {
         VBackHeader(title = "Profile", onBack = onBack)
@@ -91,6 +110,7 @@ private fun ParentProfileContent(
                 emptyBody = "We couldn't load your profile. Please try again.",
                 emptyIcon = VIcons.User,
                 onRetry = onRetry,
+                skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonProfile() },
             ) {
                 val me = state.profile!!
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -129,7 +149,7 @@ private fun ParentProfileContent(
                         }
                     }
                     Spacer(Modifier.height(8.dp))
-                    VButton(text = "Log out", onClick = onLogout, full = true, variant = VButtonVariant.Ghost)
+                    VButton(text = "Log out", onClick = { showLogoutConfirm = true }, full = true, variant = VButtonVariant.Ghost)
                 }
             }
         }

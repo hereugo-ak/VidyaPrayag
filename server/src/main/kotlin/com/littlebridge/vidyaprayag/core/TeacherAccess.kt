@@ -86,6 +86,11 @@ suspend fun ApplicationCall.requireTeacherContext(): TeacherContext? {
         fail("User not found", HttpStatusCode.Unauthorized, "UNAUTHORIZED")
         return null
     }
+    // RA-34: a deactivated account must pass no guard.
+    if (!row[AppUsersTable.isActive]) {
+        fail("This account has been deactivated. Contact your administrator.", HttpStatusCode.Forbidden, "ACCOUNT_DEACTIVATED")
+        return null
+    }
     val role = row[AppUsersTable.role]
     if (role !in TEACHER_ROLES) {
         fail("You do not have access to teacher resources", HttpStatusCode.Forbidden, "FORBIDDEN")

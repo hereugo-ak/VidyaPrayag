@@ -3,6 +3,7 @@ package com.littlebridge.vidyaprayag.ui.v2.screens.school
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,20 +27,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.littlebridge.vidyaprayag.feature.admin.presentation.Announcement
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolAnnouncementsState
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolAnnouncementsViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VBackHeader
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
+import com.littlebridge.vidyaprayag.ui.v2.components.VButton
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VComingSoon
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
+import com.littlebridge.vidyaprayag.ui.v2.components.VInput
+import com.littlebridge.vidyaprayag.ui.v2.components.VPullRefresh
 import com.littlebridge.vidyaprayag.ui.v2.components.VTopTabs
 import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import com.littlebridge.vidyaprayag.ui.v2.theme.shakeOnError
+import com.littlebridge.vidyaprayag.ui.v2.theme.staggeredItemEntrance
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -55,6 +64,8 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun SchoolCommsScreenV2(
     modifier: Modifier = Modifier,
+    onOpenMessages: () -> Unit = {},
+    onOpenPtm: () -> Unit = {},
     viewModel: SchoolAnnouncementsViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
@@ -62,6 +73,19 @@ fun SchoolCommsScreenV2(
         state = state,
         onRetry = viewModel::loadAnnouncements,
         onSelectCategory = viewModel::setCategoryFilter,
+        onCreate = { type, title, description, date, audienceType, audienceValues, onCreated ->
+            viewModel.createAnnouncement(
+                type = type,
+                title = title,
+                description = description,
+                date = date,
+                audienceType = audienceType,
+                audienceValues = audienceValues,
+                onCreated = onCreated,
+            )
+        },
+        onOpenMessages = onOpenMessages,
+        onOpenPtm = onOpenPtm,
         modifier = modifier,
     )
 }
@@ -71,6 +95,9 @@ private fun SchoolCommsContent(
     state: SchoolAnnouncementsState,
     onRetry: () -> Unit,
     onSelectCategory: (String?) -> Unit,
+    onCreate: (type: String, title: String, description: String, date: String, audienceType: String, audienceValues: List<String>, onCreated: (() -> Unit)?) -> Unit,
+    onOpenMessages: () -> Unit,
+    onOpenPtm: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -88,8 +115,17 @@ private fun SchoolCommsContent(
         return
     }
 
+    // Feature 7 — pull-to-refresh on this scrollable list screen. `isRefreshing`
+    // tracks the load flag; `onRefresh` re-runs the announcements fetch. On
+    // completion the announcement cards re-enter via the Feature 5 staggered
+    // ladder already wired below.
+    VPullRefresh(
+        isRefreshing = state.isLoading,
+        onRefresh = onRetry,
+        modifier = modifier.fillMaxSize(),
+    ) {
     Column(
-        modifier
+        Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
@@ -109,14 +145,22 @@ private fun SchoolCommsContent(
                     onRetry = onRetry,
                     onSelectCategory = onSelectCategory,
                     onOpen = { openAnnouncement = it },
+                    onCreate = onCreate,
                 )
-                "Messages" -> VComingSoon(
+                // RA-24: Messages and PTM have real backends (MessagesRouting,
+                // PtmRouting) and real screens — open them instead of showing a
+                // dead Coming-Soon card.
+                "Messages" -> CommsEntryCard(
+                    icon = VIcons.Chat,
                     title = "Parent messages",
-                    description = "Two-way parent ↔ school messaging arrives with the messaging backend.",
+                    description = "Open two-way parent ↔ school message threads.",
+                    onClick = onOpenMessages,
                 )
-                "PTM" -> VComingSoon(
+                "PTM" -> CommsEntryCard(
+                    icon = VIcons.Calendar,
                     title = "Parent–Teacher meetings",
-                    description = "Schedule PTMs and track slot bookings once the PTM backend is live.",
+                    description = "Schedule PTMs and track slot bookings.",
+                    onClick = onOpenPtm,
                 )
                 "Notifications" -> VComingSoon(
                     title = "Delivery log",
@@ -124,6 +168,7 @@ private fun SchoolCommsContent(
                 )
             }
         }
+    }
     }
 }
 
@@ -133,8 +178,40 @@ private fun AnnouncementsTab(
     onRetry: () -> Unit,
     onSelectCategory: (String?) -> Unit,
     onOpen: (String) -> Unit,
+    onCreate: (type: String, title: String, description: String, date: String, audienceType: String, audienceValues: List<String>, onCreated: (() -> Unit)?) -> Unit,
 ) {
     val c = VTheme.colors
+    var showCompose by remember { mutableStateOf(false) }
+
+    // Compose button lives ABOVE the state host so an admin can post the very
+    // first announcement even when the list is empty (RA-23). Frozen primitives.
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text("Announcements", style = VTheme.type.h3.colored(c.ink))
+        VButton(
+            text = "New announcement",
+            onClick = { showCompose = true },
+            variant = VButtonVariant.Primary,
+            size = VButtonSize.Sm,
+            leading = { Icon(VIcons.Plus, contentDescription = null, modifier = Modifier.size(14.dp)) },
+            enabled = !state.isCreating,
+        )
+    }
+    Spacer(Modifier.height(12.dp))
+
+    if (showCompose) {
+        ComposeAnnouncementDialog(
+            isCreating = state.isCreating,
+            onDismiss = { showCompose = false },
+            onSubmit = { type, title, description, date, audienceType, audienceValues ->
+                onCreate(type, title, description, date, audienceType, audienceValues) { showCompose = false }
+            },
+        )
+    }
+
     VStateHost(
         loading = state.isLoading,
         error = state.errorMessage,
@@ -143,6 +220,7 @@ private fun AnnouncementsTab(
         emptyBody = "Posts you publish to parents and staff will appear here.",
         emptyIcon = VIcons.Megaphone,
         onRetry = onRetry,
+        skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonAnnouncements() },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             // Category filter chips derived from the loaded data.
@@ -157,24 +235,208 @@ private fun AnnouncementsTab(
                     }
                 }
             }
-            state.announcements.forEach { a ->
-                VCard(onClick = { onOpen(a.id) }) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(a.title, style = VTheme.type.bodyStrong.colored(c.ink), modifier = Modifier.weight(1f))
-                        if (a.category.isNotBlank()) VBadge(text = a.category, tone = VBadgeTone.Arctic)
-                    }
-                    if (a.date.isNotBlank()) {
-                        Text(a.date, style = VTheme.type.caption.colored(c.ink2), modifier = Modifier.padding(top = 2.dp))
-                    }
-                    if (a.description.isNotBlank()) {
-                        Text(
-                            a.description,
-                            style = VTheme.type.caption.colored(c.ink2),
-                            modifier = Modifier.padding(top = 6.dp),
-                        )
+            // Feature 5 — staggered list entrance for announcement cards once
+            // VStateHost flips from skeleton → content. `ready` only flips on
+            // the *initial* data-load; subsequent refreshes keep it true so
+            // items never re-animate (RULE-2: no jank).
+            val ready = state.announcements.isNotEmpty() && !state.isLoading
+            state.announcements.forEachIndexed { index, a ->
+                Box(modifier = Modifier.staggeredItemEntrance(index = index, trigger = ready)) {
+                    VCard(onClick = { onOpen(a.id) }) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(a.title, style = VTheme.type.bodyStrong.colored(c.ink), modifier = Modifier.weight(1f))
+                            if (a.category.isNotBlank()) VBadge(text = a.category, tone = VBadgeTone.Arctic)
+                        }
+                        if (a.date.isNotBlank()) {
+                            Text(a.date, style = VTheme.type.caption.colored(c.ink2), modifier = Modifier.padding(top = 2.dp))
+                        }
+                        if (a.description.isNotBlank()) {
+                            Text(
+                                a.description,
+                                style = VTheme.type.caption.colored(c.ink2),
+                                modifier = Modifier.padding(top = 6.dp),
+                            )
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * RA-23: compose-and-send dialog for school announcements. Posts to
+ * `POST /api/v1/announcements` via [SchoolAnnouncementsViewModel.createAnnouncement].
+ * Uses only frozen V* primitives + theme tokens (no Material defaults, no new tokens).
+ * The dialog dismisses only after the server round-trip succeeds.
+ */
+@Composable
+private fun ComposeAnnouncementDialog(
+    isCreating: Boolean,
+    onDismiss: () -> Unit,
+    onSubmit: (
+        type: String,
+        title: String,
+        description: String,
+        date: String,
+        audienceType: String,
+        audienceValues: List<String>,
+    ) -> Unit,
+) {
+    val c = VTheme.colors
+    val categories = listOf("Update", "Holidays", "PTM", "Events", "Reminder")
+    // RA-49 — audience targeting. Labels map to the server's audience_type
+    // contract (ALL_SCHOOL / CLASS / SUBJECT / STUDENT). The free-text targets
+    // field is split on commas into the audience_filter list.
+    val audienceOptions = listOf(
+        "Everyone" to "ALL_SCHOOL",
+        "Class" to "CLASS",
+        "Subject" to "SUBJECT",
+        "Students" to "STUDENT",
+    )
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var date by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf(categories.first()) }
+    var audienceType by remember { mutableStateOf("ALL_SCHOOL") }
+    var audienceTargets by remember { mutableStateOf("") }
+
+    // Feature 7 — error-shake triggers. Each flips true for one frame on a failed
+    // submit attempt of a blank field, then resets, so shakeOnError fires once per
+    // attempt. Validating on tap (rather than disabling the button) lets the user
+    // see WHICH field is missing via the shake.
+    var titleError by remember { mutableStateOf(false) }
+    var dateError by remember { mutableStateOf(false) }
+    var descriptionError by remember { mutableStateOf(false) }
+    var targetsError by remember { mutableStateOf(false) }
+
+    val needsTargets = audienceType != "ALL_SCHOOL"
+    val targetList = audienceTargets.split(",").map { it.trim() }.filter { it.isNotBlank() }
+    val allValid = title.isNotBlank() && description.isNotBlank() && date.isNotBlank() &&
+        (!needsTargets || targetList.isNotEmpty())
+
+    val targetsHint = when (audienceType) {
+        "CLASS" -> "e.g. Grade 4-A, Grade 5-B"
+        "SUBJECT" -> "e.g. Mathematics, Science"
+        "STUDENT" -> "e.g. DEMO-S001, S-2024-017"
+        else -> ""
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        VCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("New announcement", style = VTheme.type.h3.colored(c.ink))
+
+                // Category chips (reuse the existing FilterChip primitive).
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    categories.forEach { cat ->
+                        FilterChip(cat, category.equals(cat, ignoreCase = true)) { category = cat }
+                    }
+                }
+
+                // RA-49 — audience selector. Choosing anything other than
+                // "Everyone" reveals the targets field. The chosen scope + the
+                // comma-separated targets become the server audience_filter.
+                Text("Send to", style = VTheme.type.caption.colored(c.ink2))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    audienceOptions.forEach { (label, value) ->
+                        FilterChip(label, audienceType == value) {
+                            audienceType = value
+                            targetsError = false
+                        }
+                    }
+                }
+                if (needsTargets) {
+                    VInput(
+                        value = audienceTargets,
+                        onValueChange = { audienceTargets = it; targetsError = false },
+                        label = "Targets (comma-separated)",
+                        placeholder = targetsHint,
+                        leadingIcon = VIcons.ListChecks,
+                        modifier = Modifier.shakeOnError(targetsError),
+                    )
+                }
+
+                VInput(
+                    value = title,
+                    onValueChange = { title = it; titleError = false },
+                    label = "Title",
+                    placeholder = "e.g. Annual Sports Day",
+                    leadingIcon = VIcons.Megaphone,
+                    modifier = Modifier.shakeOnError(titleError),
+                )
+                VInput(
+                    value = date,
+                    onValueChange = { date = it; dateError = false },
+                    label = "Date",
+                    placeholder = "e.g. 2026-06-20",
+                    leadingIcon = VIcons.Calendar,
+                    modifier = Modifier.shakeOnError(dateError),
+                )
+                VInput(
+                    value = description,
+                    onValueChange = { description = it; descriptionError = false },
+                    label = "Message",
+                    placeholder = "What do parents and staff need to know?",
+                    singleLine = false,
+                    modifier = Modifier.shakeOnError(descriptionError),
+                )
+                Spacer(Modifier.height(4.dp))
+                VButton(
+                    text = "Publish announcement",
+                    onClick = {
+                        // Validate on tap; shake the blank field(s) via Feature 7.
+                        titleError = title.isBlank()
+                        dateError = date.isBlank()
+                        descriptionError = description.isBlank()
+                        targetsError = needsTargets && targetList.isEmpty()
+                        if (allValid) onSubmit(category, title, description, date, audienceType, targetList)
+                    },
+                    variant = VButtonVariant.Primary,
+                    full = true,
+                    enabled = !isCreating,
+                    loading = isCreating,
+                )
+                VButton(
+                    text = "Cancel",
+                    onClick = onDismiss,
+                    variant = VButtonVariant.Ghost,
+                    full = true,
+                    enabled = !isCreating,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * RA-24: tappable entry card opening an existing, backend-backed Comms screen
+ * (Messages / PTM). Frozen V* primitives only.
+ */
+@Composable
+private fun CommsEntryCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    description: String,
+    onClick: () -> Unit,
+) {
+    val c = VTheme.colors
+    VCard(onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(
+                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(c.teal.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(18.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(title, style = VTheme.type.bodyStrong.colored(c.ink))
+                Text(description, style = VTheme.type.caption.colored(c.ink2))
+            }
+            Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
         }
     }
 }

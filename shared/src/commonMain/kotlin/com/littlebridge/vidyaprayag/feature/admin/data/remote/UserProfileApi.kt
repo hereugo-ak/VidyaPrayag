@@ -24,11 +24,9 @@ import com.littlebridge.vidyaprayag.feature.admin.domain.model.VisibilityRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.VisibilityResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.request.header
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 
 class UserProfileApi(
@@ -45,9 +43,7 @@ class UserProfileApi(
     suspend fun getProfile(
         token: String
     ): NetworkResult<ApiResponse<UserProfileResponse>> = safeApiCall {
-        client.get(getUrl("api/v1/user/profile")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.get(getUrl("api/v1/user/profile"))
     }
 
     suspend fun updatePhilosophy(
@@ -55,7 +51,6 @@ class UserProfileApi(
         body: PhilosophyDetailsDto
     ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
         client.put(getUrl("api/v1/user/profile/philosophy")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(body)
         }
@@ -66,7 +61,6 @@ class UserProfileApi(
         body: TourVideosRequest
     ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
         client.put(getUrl("api/v1/user/profile/tour-videos")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(body)
         }
@@ -77,7 +71,6 @@ class UserProfileApi(
         body: GalleryRequest
     ): NetworkResult<ApiResponse<GalleryUpdateResponse>> = safeApiCall {
         client.put(getUrl("api/v1/user/profile/gallery")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(body)
         }
@@ -88,7 +81,6 @@ class UserProfileApi(
         body: VisibilityRequest
     ): NetworkResult<ApiResponse<VisibilityResponse>> = safeApiCall {
         client.put(getUrl("api/v1/user/profile/visibility")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(body)
         }

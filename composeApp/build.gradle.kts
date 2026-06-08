@@ -95,6 +95,9 @@ kotlin {
             // Provides ContextCompat for runtime location-permission checks
             // (real "use current location" in school onboarding, report §11.2).
             implementation(libs.androidx.core.ktx)
+            // Native Android 12+ SplashScreen API (with compat back to API 24)
+            // — zero white flash before the Compose content draws.
+            implementation(libs.androidx.core.splashscreen)
             implementation(libs.koin.android)
             implementation(libs.koin.androidx.compose)
         }
@@ -139,8 +142,16 @@ android {
         applicationId = "com.littlebridge.vidyaprayag"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
+        // versionCode bumped to 2 (was 1) on 2026-06-08 alongside the upgraded
+        // CommonLandingScreenV2 (commit 78c33bf). The previous symptom — a fresh
+        // build still appearing to ship the OLD landing — turned out to be the
+        // Android device refusing to re-install when packageName + versionCode +
+        // signature were all unchanged, leaving the cached old APK on the phone.
+        // Bumping the version guarantees a true install on every push, in addition
+        // to the build-cache disable in gradle.properties (commit 22c9ed0) and the
+        // forced re-run of the Compose-Multiplatform resource generator below.
+        versionCode = 2
+        versionName = "1.1"
     }
     
     buildFeatures {
@@ -184,6 +195,45 @@ android {
 
 dependencies {
     debugImplementation(libs.compose.uiTooling)
+}
+
+// ---------------------------------------------------------------------------
+// Belt-and-braces fix for the "OLD landing keeps shipping" symptom (2026-06-08).
+//
+// Background: commit 78c33bf upgraded `CommonLandingScreenV2` and added bundled
+// `landing_school_*.webp` drawables under `composeResources`. Despite the V2
+// routing being verified correct end-to-end (NavGraphV2 → screen + Koin factory),
+// fresh builds kept appearing to ship the OLD landing UI. The Gradle build cache
+// (`org.gradle.caching=true`) was the loudest suspect (now disabled in
+// `gradle.properties`, commit 22c9ed0), but it is NOT the only place stale
+// Compose-Multiplatform resource accessors can come from:
+//
+//   1. The Gradle daemon's in-memory task cache can serve a stale
+//      `generateComposeResClass` output across builds within the same daemon JVM.
+//   2. AGP's intermediate-artifact cache can reuse `mergeResources` outputs
+//      even when the upstream Compose resources have been regenerated.
+//
+// The block below forces both generator and the file-copy tasks the Compose
+// Multiplatform plugin schedules under those names to run on EVERY build
+// (`upToDateWhen { false }`). Task lookup is by name match so the wiring is
+// resilient across CMP versions that have renamed the tasks (e.g. the
+// `*ForCommonMain` vs `*ForAndroidMain` variants). This adds ~1–2s to a clean
+// build but makes the landing-ship symptom impossible to reproduce.
+//
+// Pair with `./gradlew clean` ONCE after pulling this commit so any pre-existing
+// stale outputs in `composeApp/build/generated/` are wiped; subsequent builds
+// re-generate deterministically without manual intervention.
+// ---------------------------------------------------------------------------
+tasks.matching { task ->
+    val n = task.name
+    n.startsWith("generateComposeResClass") ||
+        n.startsWith("generateResourceAccessorsForCommonMain") ||
+        n.startsWith("generateResourceAccessorsFor") ||
+        n.startsWith("copyNonXmlValueResourcesForCommonMain") ||
+        n.startsWith("copyNonXmlValueResourcesFor") ||
+        n.startsWith("prepareComposeResources")
+}.configureEach {
+    outputs.upToDateWhen { false }
 }
 
 compose.desktop {

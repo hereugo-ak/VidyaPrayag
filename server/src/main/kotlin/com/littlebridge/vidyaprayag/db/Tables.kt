@@ -56,6 +56,11 @@ object AppUsersTable : UUIDTable("app_users", "id") {
     val isPhoneVerified  = bool("is_phone_verified").default(false)
     val isEmailVerified  = bool("is_email_verified").default(false)
     val profileCompleted = bool("profile_completed").default(false)
+    // RA-54: server-side signal for the teacher first-login "force change initial
+    // password" gate. Provisioned teachers are created with this = true; the
+    // POST /auth/change-password endpoint clears it (and flips profile_completed)
+    // once the teacher sets their own password. NavGraphV2 reads it via login.
+    val mustChangePassword = bool("must_change_password").default(false)
     val isActive         = bool("is_active").default(true)
     val lastLoginAt      = timestamp("last_login_at").nullable()
     val createdAt        = timestamp("created_at")
@@ -507,6 +512,17 @@ object LeaveRequestsTable : UUIDTable("leave_requests", "id") {
     val status        = varchar("status", 16).default("Pending")        // Pending | Approved | Rejected
     val actionedBy    = uuid("actioned_by").nullable()
     val actionedAt    = timestamp("actioned_at").nullable()
+    // RA-44: cross-role leave workflow. A parent applies on behalf of a child;
+    // the request is routed to the child's class teacher(s) (resolved at apply
+    // time from teacher_subject_assignments) and can be decided by that teacher
+    // or overridden by an admin. All nullable so legacy teacher-leave rows and
+    // pre-PATCH-103 data still load.
+    val classId       = uuid("class_id").nullable()                     // FK school_classes.id (the class)
+    val className     = varchar("class_name", 64).nullable()
+    val section       = varchar("section", 16).nullable()
+    val teacherId     = uuid("teacher_id").nullable()                   // FK app_users.id (routed-to teacher)
+    val childId       = uuid("child_id").nullable()                     // FK children.id (the student)
+    val parentId      = uuid("parent_id").nullable()                    // FK app_users.id (the applicant)
     val createdAt     = timestamp("created_at")
     val updatedAt     = timestamp("updated_at")
 }
@@ -562,8 +578,16 @@ object PtmClassProgressTable : UUIDTable("ptm_class_progress", "id") {
  */
 object MessageThreadsTable : UUIDTable("message_threads", "id") {
     val schoolId       = uuid("school_id")
-    val ownerUserId    = uuid("owner_user_id")                          // recipient (admin) — JWT.sub
-    val senderName     = text("sender_name")
+    val ownerUserId    = uuid("owner_user_id")                          // this row's inbox holder — JWT.sub
+    // RA-51: a conversation between two users is represented by ONE row per
+    // participant, all sharing the same conversation_id. Each row carries the
+    // owner's view (unread/read), peer_user_id identifies the other party, and
+    // MessagesTable is keyed by conversation_id so both sides see one history.
+    // Legacy/system threads leave conversation_id = their own id and
+    // peer_user_id null (single-owner inbox, e.g. system alerts).
+    val conversationId = uuid("conversation_id").nullable()             // shared key across both participants' rows
+    val peerUserId     = uuid("peer_user_id").nullable()                // the OTHER participant (null = system/self)
+    val senderName     = text("sender_name")                            // display name of the peer, as seen by owner
     val senderRole     = text("sender_role")
     val senderImageUrl = text("sender_image_url").nullable()
     val iconName       = text("icon_name").nullable()                   // when no avatar (e.g. "payments")
@@ -576,10 +600,11 @@ object MessageThreadsTable : UUIDTable("message_threads", "id") {
 }
 
 object MessagesTable : UUIDTable("messages", "id") {
-    val threadId  = uuid("thread_id")                                   // FK message_threads.id
-    val senderId  = uuid("sender_id").nullable()                        // null for system messages
-    val body      = text("body")
-    val createdAt = timestamp("created_at")
+    val threadId       = uuid("thread_id")                              // FK message_threads.id (the sender's owning row)
+    val conversationId = uuid("conversation_id").nullable()             // RA-51: shared key — both participants read by this
+    val senderId       = uuid("sender_id").nullable()                   // null for system messages
+    val body           = text("body")
+    val createdAt      = timestamp("created_at")
 }
 
 /**
@@ -642,6 +667,10 @@ object AssessmentsTable : UUIDTable("assessments", "id") {
     val maxMarks  = integer("max_marks").default(100)
     val examDate  = varchar("exam_date", 12).nullable()  // YYYY-MM-DD
     val isActive  = bool("is_active").default(true)
+    // RA-43: marks become parent-visible only once published. The teacher
+    // marks-submit can publish; parent reads filter on isPublished = true.
+    val isPublished = bool("is_published").default(false)
+    val publishedAt = timestamp("published_at").nullable()
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
 }
@@ -778,4 +807,64 @@ object ScholarshipApplicationsTable : UUIDTable("scholarship_applications", "id"
     val position    = integer("position").default(0)
     val createdAt   = timestamp("created_at")
     val updatedAt   = timestamp("updated_at")
+}
+
+// =====================================================================
+// notifications  (RA-41/42/46/50 — the cross-user notification spine)
+// =====================================================================
+/**
+ * Recipient-scoped notification rows. Every row targets exactly one recipient
+ * (`userId` = the app_users.id the bell belongs to) and carries the originating
+ * `schoolId` for tenant isolation. The Notify helper writes here; the role-aware
+ * GET /notifications reads by `userId = jwt.sub`; /summary returns the unread
+ * count for the portal bells (kills the hardcoded red-dot RA-50 and the
+ * parent-only synth that broke for admins/teachers RA-42).
+ */
+object NotificationsTable : UUIDTable("notifications", "id") {
+    val schoolId   = uuid("school_id").nullable()
+    val userId     = uuid("user_id")                    // recipient app_users.id
+    val category   = varchar("category", 32).default("general") // attendance|marks|homework|announcement|leave|fees|link|general
+    val title      = text("title")
+    val body       = text("body").default("")
+    val deepLink   = text("deep_link").nullable()
+    val actorId    = uuid("actor_id").nullable()        // who triggered it (teacher/admin/parent)
+    val refType    = varchar("ref_type", 32).nullable() // e.g. attendance_record|assessment|homework|announcement|leave_request|fee_record|parent_child_link
+    val refId      = text("ref_id").nullable()
+    val isRead     = bool("is_read").default(false)
+    val createdAt  = timestamp("created_at")
+    val readAt     = timestamp("read_at").nullable()
+}
+
+// =====================================================================
+// device_tokens  (RA-41 push — FCM/APNs registry; dispatch is Phase E)
+// =====================================================================
+object DeviceTokensTable : UUIDTable("device_tokens", "id") {
+    val userId    = uuid("user_id")
+    val token     = text("token")
+    val platform  = varchar("platform", 16).default("android")
+    val isActive  = bool("is_active").default(true)
+    val createdAt = timestamp("created_at")
+    val updatedAt = timestamp("updated_at")
+}
+
+// =====================================================================
+// parent_child_links  (RA-48 — parent→child link approval workflow)
+// =====================================================================
+/**
+ * A pending/approved/rejected request from a parent to link a child. The live
+ * link still materialises in `children` on approval; this table records the
+ * approval state so a school admin can vet roll-number claims (RA-03/RA-48)
+ * before a parent gains read access to a student's academic data.
+ */
+object ParentChildLinksTable : UUIDTable("parent_child_links", "id") {
+    val parentId    = uuid("parent_id")
+    val schoolId    = uuid("school_id").nullable()
+    val studentCode = varchar("student_code", 64).nullable()
+    val rollNumber  = varchar("roll_number", 64).nullable()
+    val childName   = text("child_name").nullable()
+    val childId     = uuid("child_id").nullable()       // children.id once approved
+    val status      = varchar("status", 16).default("pending") // pending | approved | rejected
+    val requestedAt = timestamp("requested_at")
+    val actionedBy  = uuid("actioned_by").nullable()
+    val actionedAt  = timestamp("actioned_at").nullable()
 }

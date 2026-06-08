@@ -27,7 +27,7 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.VPortalTone
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 
 /** Full-screen overlays the teacher portal can push above its tab content. */
-private enum class TeacherOverlay { None, Notifications, Calendar }
+private enum class TeacherOverlay { None, Notifications, Calendar, Leave }
 
 /**
  * TeacherPortalV2 — the 4-tab teacher shell, translated from Teacher.tsx.
@@ -38,7 +38,9 @@ private enum class TeacherOverlay { None, Notifications, Calendar }
  * (set by the host `VTheme`).
  *
  * Notifications and AcademicCalendar (from the `App.tsx` graph) are pushed as full-screen overlays.
- * Class/exam/subject ids are stubbed locally for now; Phase 3E wires real selection + navigation.
+ * RA-40: the Update plane now sources real class/subject/exam ids from [TeacherClassPicker] /
+ * [TeacherExamPicker] (backed by `GET /teacher/classes` and `GET /teacher/assessments`) instead
+ * of the previously hardcoded blank ids, which made the teacher write plane unreachable.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -54,6 +56,13 @@ fun TeacherPortalV2(
         var updateSub by remember { mutableStateOf("Attendance") }
         var overlay by remember { mutableStateOf(TeacherOverlay.None) }
 
+        // RA-40: the Update plane (Attendance/Marks/Syllabus) needs real ids. These
+        // hold the teacher's current class/subject/exam selection (sourced from the
+        // class + exam pickers below) and replace the previously hardcoded blanks.
+        var selectedClassId by remember { mutableStateOf("") }
+        var selectedSubject by remember { mutableStateOf("") }
+        var selectedExamId by remember { mutableStateOf("") }
+
         // §11 cross-platform — Android predictive back / iOS edge-swipe pops
         // the full-screen Notifications/Calendar overlay back to the teacher
         // tabs instead of leaving the portal. Mirrors the React `onBack` wiring.
@@ -68,6 +77,11 @@ fun TeacherPortalV2(
             }
             TeacherOverlay.Calendar -> {
                 AcademicCalendarScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
+                return@VTheme
+            }
+            TeacherOverlay.Leave -> {
+                // RA-44: the teacher leg of the leave workflow.
+                TeacherLeaveScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
                 return@VTheme
             }
             TeacherOverlay.None -> Unit
@@ -110,17 +124,42 @@ fun TeacherPortalV2(
                     "home" -> TeacherHomeScreenV2(
                         onOpenNotifications = { overlay = TeacherOverlay.Notifications },
                         onOpenCalendar = { overlay = TeacherOverlay.Calendar },
+                        // RA-44 — open the teacher leave-requests queue.
+                        onOpenLeave = { overlay = TeacherOverlay.Leave },
                         // §7 finding K — tapping the avatar opens the Profile tab (where logout
                         // lives), instead of logging the teacher out outright.
                         onExit = { tab = "profile" },
                     )
                     "classes" -> TeacherClassesScreenV2()
                     "profile" -> TeacherProfileScreenV2(onLogout = onLogout)
-                    "update" -> when (updateSub) {
-                        "Attendance" -> TeacherAttendanceScreenV2(classId = "", date = "")
-                        "Marks" -> TeacherMarksScreenV2(classId = "", examId = "")
-                        "Syllabus" -> TeacherSyllabusScreenV2(classId = "", subject = "")
-                        "Homework" -> TeacherHomeworkScreenV2()
+                    "update" -> Column(Modifier.fillMaxSize()) {
+                        // RA-40: Homework authors its own class field, so the shared class
+                        // picker only fronts the Attendance/Marks/Syllabus planes.
+                        if (updateSub != "Homework") {
+                            TeacherClassPicker(
+                                selectedClassId = selectedClassId,
+                                onSelectClass = { cls ->
+                                    selectedClassId = cls.id
+                                    selectedSubject = cls.subject
+                                    selectedExamId = ""   // exam belongs to a class; reset on class change
+                                },
+                            )
+                        }
+                        when (updateSub) {
+                            "Attendance" -> TeacherAttendanceScreenV2(classId = selectedClassId, date = "")
+                            "Marks" -> {
+                                // Marks additionally needs a valid exam_id (RA-40 root).
+                                if (selectedClassId.isNotBlank()) {
+                                    TeacherExamPicker(
+                                        classId = selectedClassId,
+                                        onSelectExam = { selectedExamId = it },
+                                    )
+                                }
+                                TeacherMarksScreenV2(classId = selectedClassId, examId = selectedExamId)
+                            }
+                            "Syllabus" -> TeacherSyllabusScreenV2(classId = selectedClassId, subject = selectedSubject)
+                            "Homework" -> TeacherHomeworkScreenV2()
+                        }
                     }
                 }
             }

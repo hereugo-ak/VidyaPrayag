@@ -166,6 +166,33 @@ val commonModule = module {
         )
     }
     single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.TeachersApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    // RA-47: institutional-profile (schools row) read/edit
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.SchoolProfileApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    // RA-45: student roster + student/teacher profile detail
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.StudentsApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    // RA-52: admin Records rollups (attendance / marks / fees)
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.RecordsApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single {
         com.littlebridge.vidyaprayag.feature.admin.data.remote.PtmApi(
             client = get(),
             baseUrl = AppConfig.schoolBaseUrl
@@ -185,6 +212,13 @@ val commonModule = module {
     }
     single {
         com.littlebridge.vidyaprayag.feature.admin.data.remote.LeaveRequestsApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    // RA-48: school-admin link-request queue API.
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.LinkRequestsApi(
             client = get(),
             baseUrl = AppConfig.schoolBaseUrl
         )
@@ -244,6 +278,21 @@ val commonModule = module {
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AnnouncementsRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.AnnouncementsRepositoryImpl(get())
     }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.TeachersRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.TeachersRepositoryImpl(get())
+    }
+    // RA-47
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.SchoolProfileRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.SchoolProfileRepositoryImpl(get())
+    }
+    // RA-45
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.StudentsRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.StudentsRepositoryImpl(get())
+    }
+    // RA-52
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.RecordsRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.RecordsRepositoryImpl(get())
+    }
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.PtmRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.PtmRepositoryImpl(get())
     }
@@ -255,6 +304,10 @@ val commonModule = module {
     }
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.LeaveRequestsRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.LeaveRequestsRepositoryImpl(get())
+    }
+    // RA-48: school-admin link-request queue repository.
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.LinkRequestsRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.LinkRequestsRepositoryImpl(get())
     }
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AnalyticsRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.AnalyticsRepositoryImpl(get())
@@ -298,18 +351,28 @@ val viewModelModule = module {
     factory { ParentHomeViewModel(get(), get()) }
     factory { ParentProfileViewModel(get(), get()) }
     factory { TrackProgressViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentAcademicsViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentLeaveViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentMessageViewModel(get(), get()) }
     factory { SchoolDashboardViewModel(get(), get()) }
     factory { InstitutionalBasicOBViewModel(get(), get()) }
     factory { BrandingInfoOBViewModel(get(), get(), get()) }
     factory { AcademicInfoOBViewModel(get(), get()) }
     factory { LaunchInfoOBViewModel(get(), get()) }
     factory { InstitutionalProfileViewModel(get(), get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolProfileViewModel(get(), get()) } // RA-47
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.StudentRosterViewModel(get(), get()) } // RA-45
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.StudentProfileViewModel(get(), get()) } // RA-45
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.TeacherProfileViewModel(get(), get()) } // RA-45
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolRecordsViewModel(get(), get()) } // RA-52
     factory { AdmissionCRMViewModel(get(), get()) }
     factory { SchoolAnnouncementsViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolTeachersViewModel(get(), get()) }
     factory { MessagesViewModel(get(), get()) }
     factory { SchedulePTMViewModel(get(), get()) }
     factory { AcademicCalendarViewModel(get(), get()) }
     factory { LeaveRequestsViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.LinkRequestsViewModel(get(), get()) }
     factory { DailyAttendanceViewModel(get(), get()) }
     factory { AnalyticsDashboardViewModel(get(), get()) }
     factory { StudentAnalyticsViewModel(get(), get()) }
@@ -324,9 +387,11 @@ val viewModelModule = module {
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClassesViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherAttendanceViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherMarksViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherAssessmentsViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherSyllabusViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherHomeworkViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherProfileViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherLeaveViewModel(get(), get()) }
 }
 
 fun initKoin(

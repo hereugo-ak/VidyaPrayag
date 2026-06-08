@@ -18,6 +18,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,6 +32,7 @@ import com.littlebridge.vidyaprayag.feature.admin.presentation.InstitutionalProf
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
+import com.littlebridge.vidyaprayag.ui.v2.components.VConfirmDialog
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
 import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
@@ -52,6 +56,9 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun SchoolSettingsScreenV2(
     onLogout: () -> Unit = {},
+    onOpenTeachers: () -> Unit = {},
+    // RA-47 — open the editable institutional-profile (schools row) screen.
+    onOpenProfile: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: InstitutionalProfileViewModel = koinViewModel(),
 ) {
@@ -59,6 +66,8 @@ fun SchoolSettingsScreenV2(
     SchoolSettingsContent(
         state = state,
         onLogout = onLogout,
+        onOpenTeachers = onOpenTeachers,
+        onOpenProfile = onOpenProfile,
         onRetry = viewModel::load,
         modifier = modifier,
     )
@@ -68,10 +77,27 @@ fun SchoolSettingsScreenV2(
 private fun SchoolSettingsContent(
     state: InstitutionalProfileState,
     onLogout: () -> Unit,
+    onOpenTeachers: () -> Unit,
+    onOpenProfile: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
+    // RA-21: logout is destructive — gate it behind a confirmation dialog.
+    var showLogoutConfirm by remember { mutableStateOf(false) }
+
+    VConfirmDialog(
+        visible = showLogoutConfirm,
+        title = "Log out?",
+        message = "You'll be signed out of the admin console and need to sign in again.",
+        confirmLabel = "Log out",
+        onConfirm = {
+            showLogoutConfirm = false
+            onLogout()
+        },
+        onDismiss = { showLogoutConfirm = false },
+        icon = VIcons.AlertTriangle,
+    )
 
     Column(
         modifier
@@ -133,13 +159,18 @@ private fun SchoolSettingsContent(
             // These mirror Admin.tsx → SettingsScreen. Where there's no backend
             // endpoint they're labelled "Coming Soon" instead of showing fake data.
             val rows = listOf(
+                // RA-47 — edit the live schools row (name, board, contact,
+                // principal, address) instead of leaving it read-only.
+                SettingRow(VIcons.School, "Edit institutional profile", "Name, board, contact, principal & address", onClick = onOpenProfile),
                 SettingRow(VIcons.Calendar, "Academic year", "Manage term dates & holidays (Coming Soon)"),
                 SettingRow(VIcons.BookOpen, "Classes & subjects", "Class & subject setup (Coming Soon)"),
-                SettingRow(VIcons.Users, "Teacher management", "Add teachers & download credentials (Coming Soon)"),
+                // RA-24: teacher management is live (RA-22 roster on the People
+                // tab) — open it instead of showing a Coming-Soon label.
+                SettingRow(VIcons.Users, "Teacher management", "Add, view & remove teachers", onClick = onOpenTeachers),
                 SettingRow(VIcons.Wallet, "Fee structure", "Edit heads & amounts for next cycle (Coming Soon)"),
                 SettingRow(VIcons.Bell, "Notifications", "Channels & quiet hours (Coming Soon)"),
                 SettingRow(VIcons.Download, "Data export", "CSV / PDF / UDISE (Coming Soon)"),
-                SettingRow(VIcons.Settings, "Account", "Sign out of the admin console", onClick = onLogout),
+                SettingRow(VIcons.Settings, "Account", "Sign out of the admin console", onClick = { showLogoutConfirm = true }),
             )
             Spacer(Modifier.height(0.dp))
             rows.forEach { row ->

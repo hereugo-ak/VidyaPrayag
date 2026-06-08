@@ -58,8 +58,17 @@ import org.koin.core.annotation.KoinExperimentalAPI
 @OptIn(KoinExperimentalAPI::class, coil3.annotation.ExperimentalCoilApi::class)
 @Composable
 @Preview
-fun App() {
+fun App(
+    // FEATURE 1: fired once Compose has drawn its first frame so the Android host
+    // can dismiss the native SplashScreen with zero white flash. No-op default keeps
+    // iOS / desktop / @Preview callers unchanged (RULE-5: commonMain-safe).
+    onContentRendered: () -> Unit = {},
+) {
     KoinContext {
+        // Signal the platform host after the first composition lands. SideEffect runs
+        // after every successful recomposition; the host only reads the first flip.
+        SideEffect { onContentRendered() }
+
         val viewModel: MainViewModel = koinViewModel()
         val authState by viewModel.authState.collectAsState()
 

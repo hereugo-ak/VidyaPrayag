@@ -57,6 +57,7 @@ fun TeacherHomeScreenV2(
     modifier: Modifier = Modifier,
     onOpenNotifications: () -> Unit = {},
     onOpenCalendar: () -> Unit = {},
+    onOpenLeave: () -> Unit = {},
     onExit: () -> Unit = {},
     viewModel: TeacherHomeViewModel = koinViewModel(),
 ) {
@@ -65,6 +66,7 @@ fun TeacherHomeScreenV2(
         state = state,
         onOpenNotifications = onOpenNotifications,
         onOpenCalendar = onOpenCalendar,
+        onOpenLeave = onOpenLeave,
         onExit = onExit,
         onRetry = viewModel::load,
         modifier = modifier,
@@ -76,6 +78,7 @@ private fun TeacherHomeContent(
     state: TeacherHomeState,
     onOpenNotifications: () -> Unit,
     onOpenCalendar: () -> Unit,
+    onOpenLeave: () -> Unit,
     onExit: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
@@ -115,6 +118,29 @@ private fun TeacherHomeContent(
             }
         }
 
+        // ── RA-44: leave-requests queue entry ────────────────────────────────
+        VCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenLeave)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Box(
+                    Modifier.size(36.dp).clip(CircleShape).background(c.ink.copy(alpha = 0.06f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(VIcons.ClipboardList, contentDescription = null, tint = c.ink, modifier = Modifier.size(18.dp))
+                }
+                Column(Modifier.weight(1f)) {
+                    Text("Leave requests", style = VTheme.type.bodyStrong.colored(c.ink))
+                    Text(
+                        "Review and decide student leave for your classes",
+                        style = VTheme.type.caption.colored(c.ink2),
+                    )
+                }
+                Icon(VIcons.ArrowRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
+            }
+        }
+
         VStateHost(
             loading = state.isLoading,
             error = state.error,
@@ -123,6 +149,7 @@ private fun TeacherHomeContent(
             emptyBody = "Your tasks and periods for today will show up here.",
             emptyIcon = VIcons.Calendar,
             onRetry = onRetry,
+            skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonDashboard() },
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 // ── Today's tasks ────────────────────────────────────────────

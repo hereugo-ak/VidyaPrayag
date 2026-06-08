@@ -27,9 +27,7 @@ import com.littlebridge.vidyaprayag.feature.admin.domain.model.AnalyticsOverview
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.StudentAnalyticsResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.request.header
 import io.ktor.client.request.parameter
-import io.ktor.http.HttpHeaders
 import kotlinx.serialization.json.JsonElement
 
 class AnalyticsApi(
@@ -46,18 +44,14 @@ class AnalyticsApi(
     suspend fun getOverview(
         token: String
     ): NetworkResult<ApiResponse<AnalyticsOverviewResponse>> = safeApiCall {
-        client.get(getUrl("api/v1/school/analytics/overview")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.get(getUrl("api/v1/school/analytics/overview"))
     }
 
     suspend fun getStudentAnalytics(
         token: String,
         studentId: String
     ): NetworkResult<ApiResponse<StudentAnalyticsResponse>> = safeApiCall {
-        client.get(getUrl("api/v1/school/analytics/student/$studentId")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.get(getUrl("api/v1/school/analytics/student/$studentId"))
     }
 
     /**
@@ -70,7 +64,6 @@ class AnalyticsApi(
         className: String? = null
     ): NetworkResult<ApiResponse<JsonElement>> = safeApiCall {
         client.get(getUrl("api/v1/school/analytics/class-performance")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             if (!className.isNullOrBlank()) parameter("class", className)
         }
     }
@@ -82,9 +75,7 @@ class AnalyticsApi(
     suspend fun getTeacherPerformance(
         token: String
     ): NetworkResult<ApiResponse<JsonElement>> = safeApiCall {
-        client.get(getUrl("api/v1/school/analytics/teacher-performance")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.get(getUrl("api/v1/school/analytics/teacher-performance"))
     }
 
     /**
@@ -93,9 +84,7 @@ class AnalyticsApi(
     suspend fun getSyllabusCoverage(
         token: String
     ): NetworkResult<ApiResponse<JsonElement>> = safeApiCall {
-        client.get(getUrl("api/v1/school/analytics/syllabus-coverage")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.get(getUrl("api/v1/school/analytics/syllabus-coverage"))
     }
 
     /**
@@ -105,8 +94,6 @@ class AnalyticsApi(
     suspend fun getStudentCohort(
         token: String
     ): NetworkResult<ApiResponse<JsonElement>> = safeApiCall {
-        client.get(getUrl("api/v1/school/analytics/student-cohort")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.get(getUrl("api/v1/school/analytics/student-cohort"))
     }
 }

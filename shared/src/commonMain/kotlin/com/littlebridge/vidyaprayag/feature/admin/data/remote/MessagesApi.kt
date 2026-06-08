@@ -22,11 +22,9 @@ import com.littlebridge.vidyaprayag.feature.admin.domain.model.SendMessageRespon
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.ThreadMessagesResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 
 class MessagesApi(
@@ -43,9 +41,7 @@ class MessagesApi(
     suspend fun getThreads(
         token: String
     ): NetworkResult<ApiResponse<MessageThreadsResponse>> = safeApiCall {
-        client.get(getUrl("api/v1/school/messages/threads")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.get(getUrl("api/v1/school/messages/threads"))
     }
 
     /**
@@ -58,9 +54,7 @@ class MessagesApi(
         token: String,
         threadId: String
     ): NetworkResult<ApiResponse<ThreadMessagesResponse>> = safeApiCall {
-        client.get(getUrl("api/v1/school/messages/threads/$threadId/messages")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.get(getUrl("api/v1/school/messages/threads/$threadId/messages"))
     }
 
     /**
@@ -71,9 +65,7 @@ class MessagesApi(
         token: String,
         threadId: String
     ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
-        client.post(getUrl("api/v1/school/messages/threads/$threadId/read")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.post(getUrl("api/v1/school/messages/threads/$threadId/read"))
     }
 
     suspend fun sendMessage(
@@ -81,7 +73,6 @@ class MessagesApi(
         request: SendMessageRequest
     ): NetworkResult<ApiResponse<SendMessageResponse>> = safeApiCall {
         client.post(getUrl("api/v1/school/messages")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(request)
         }

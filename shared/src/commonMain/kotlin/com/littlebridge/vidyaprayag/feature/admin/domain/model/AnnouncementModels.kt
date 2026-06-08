@@ -9,6 +9,7 @@ package com.littlebridge.vidyaprayag.feature.admin.domain.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class AnnouncementDto(
@@ -18,7 +19,11 @@ data class AnnouncementDto(
     @SerialName("sub_title") val subTitle: String? = null,
     val description: String,
     @SerialName("event_image") val eventImage: String? = null,
-    val date: String
+    val date: String,
+    // RA-49: audience segmentation echoed back by the server so the list/detail
+    // can surface who a post was targeted at. Defaults keep older posts working.
+    @SerialName("audience_type") val audienceType: String = "ALL_SCHOOL",
+    @SerialName("audience_filter") val audienceFilter: JsonElement? = null
 )
 
 @Serializable
@@ -33,7 +38,13 @@ data class CreateAnnouncementRequest(
     @SerialName("sub_title") val subTitle: String? = null,
     val description: String,
     @SerialName("event_image") val eventImage: String? = null,
-    val date: String
+    val date: String,
+    // RA-49: audience targeting from the UI. audienceType is one of
+    // ALL_SCHOOL / CLASS / SECTION / SUBJECT / STUDENT / CUSTOM (server
+    // validates). audienceFilter carries the scope JSON (e.g. class_names).
+    // Both omitted → server defaults to ALL_SCHOOL (back-compat).
+    @SerialName("audience_type") val audienceType: String? = null,
+    @SerialName("audience_filter") val audienceFilter: JsonElement? = null
 )
 
 @Serializable

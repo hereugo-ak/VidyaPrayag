@@ -31,6 +31,7 @@ package com.littlebridge.vidyaprayag.feature.media
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.okMessage
+import com.littlebridge.vidyaprayag.core.requireSchoolAdmin
 import com.littlebridge.vidyaprayag.core.requireSchoolContext
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.SchoolMediaTable
@@ -183,9 +184,9 @@ fun Application.mediaRouting() {
                 )
             }
 
-            // -------- DELETE / (by url) --------
+            // -------- DELETE / (by url) — privileged: RA-39 --------
             delete {
-                val ctx = call.requireSchoolContext() ?: return@delete
+                val ctx = call.requireSchoolAdmin() ?: return@delete
                 val req = call.receive<DeleteMediaRequest>()
                 val url = req.url.trim()
                 if (url.isEmpty()) {

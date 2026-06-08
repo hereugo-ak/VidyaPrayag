@@ -509,6 +509,134 @@ private fun facultyAccountability(schoolId: UUID): JsonArray {
     }
 }
 
+/**
+ * RA-59 — REAL grade distribution from exam averages.
+ * Buckets every student's overall exam average into letter bands and returns
+ * `[{band, count, percentage}]`. Empty (honest) when there is no exam data,
+ * so the caller keeps the fabricated CMS blob only as a last resort.
+ */
+private fun gradeDistribution(snapshots: List<StudentSnapshot>): JsonArray {
+    if (snapshots.isEmpty()) return JsonArray(emptyList())
+    val bands = listOf(
+        "A (90-100%)" to (90.0..100.0),
+        "B (75-89%)" to (75.0..89.999),
+        "C (60-74%)" to (60.0..74.999),
+        "D (45-59%)" to (45.0..59.999),
+        "F (<45%)" to (0.0..44.999),
+    )
+    val total = snapshots.size
+    return buildJsonArray {
+        bands.forEach { (label, range) ->
+            val count = snapshots.count { it.avg in range }
+            add(buildJsonObject {
+                put("band", label)
+                put("count", count)
+                put("percentage", if (total == 0) 0 else (count * 100 / total))
+            })
+        }
+    }
+}
+
+/**
+ * RA-59 — REAL per-subject engagement/matrix from exam_results.
+ * For every subject the school examines, averages the per-student subject score
+ * into a single school-wide figure. Returns `[{name, score, students}]` sorted
+ * high→low. Empty (honest) when no exam data exists.
+ */
+private fun subjectMatrix(snapshots: List<StudentSnapshot>): JsonArray {
+    if (snapshots.isEmpty()) return JsonArray(emptyList())
+    // subject -> list of per-student averages for that subject
+    val bySubject = mutableMapOf<String, MutableList<Int>>()
+    snapshots.forEach { s ->
+        s.perSubject.forEach { (subject, score) ->
+            bySubject.getOrPut(subject) { mutableListOf() }.add(score)
+        }
+    }
+    if (bySubject.isEmpty()) return JsonArray(emptyList())
+    val rows = bySubject.map { (subject, scores) ->
+        Triple(subject, if (scores.isEmpty()) 0 else scores.average().toInt(), scores.size)
+    }.sortedByDescending { it.second }
+    return buildJsonArray {
+        rows.forEach { (subject, avg, n) ->
+            add(buildJsonObject {
+                put("name", subject)
+                put("score", avg)
+                put("students", n)
+                put("trend", if (avg >= 75) "On Target" else "Needs Attention")
+            })
+        }
+    }
+}
+
+/**
+ * RA-59 — REAL per-class performance from exam_results.
+ * Groups students by className and averages their overall exam averages.
+ * Returns `[{name, average, students}]`. Empty (honest) when no exam data.
+ */
+private fun byClassPerformance(snapshots: List<StudentSnapshot>): JsonArray {
+    if (snapshots.isEmpty()) return JsonArray(emptyList())
+    val byClass = snapshots.filter { it.className.isNotBlank() }.groupBy { it.className }
+    if (byClass.isEmpty()) return JsonArray(emptyList())
+    val rows = byClass.map { (className, members) ->
+        Triple(className, members.map { it.avg }.average().toInt(), members.size)
+    }.sortedByDescending { it.second }
+    return buildJsonArray {
+        rows.forEach { (className, avg, n) ->
+            add(buildJsonObject {
+                put("name", className)
+                put("average", avg)
+                put("students", n)
+                put("status", statusForAvg(avg.toDouble()))
+            })
+        }
+    }
+}
+
+/**
+ * RA-59 — REAL departmental efficiency from the faculty table + their 30-day
+ * attendance reliability, aggregated per department. Returns
+ * `[{department, efficiency, faculty_count}]` sorted high→low. Empty (honest)
+ * when the school has no active faculty.
+ */
+private fun deptEfficiencies(schoolId: UUID): JsonArray {
+    val faculty = FacultyTable.selectAll()
+        .where { (FacultyTable.schoolId eq schoolId) and (FacultyTable.isActive eq true) }
+        .toList()
+    if (faculty.isEmpty()) return JsonArray(emptyList())
+
+    val cutoff = LocalDate.now().minusDays(30)
+    val attByPerson = AttendanceRecordsTable.selectAll()
+        .where {
+            (AttendanceRecordsTable.schoolId eq schoolId) and
+                (AttendanceRecordsTable.type eq "faculty")
+        }
+        .toList()
+        .filter { runCatching { LocalDate.parse(it[AttendanceRecordsTable.date]).isAfter(cutoff) }.getOrDefault(false) }
+        .groupBy { it[AttendanceRecordsTable.personId] }
+
+    // department -> list of per-faculty reliability scores
+    val byDept = mutableMapOf<String, MutableList<Int>>()
+    faculty.forEach { r ->
+        val dept = (r[FacultyTable.department] ?: "").ifBlank { "General" }
+        val recs = attByPerson[r[FacultyTable.externalId]].orEmpty()
+        val score = if (recs.isEmpty()) 90
+            else recs.count { it[AttendanceRecordsTable.status].equals("PRESENT", true) } * 100 / recs.size
+        byDept.getOrPut(dept) { mutableListOf() }.add(score)
+    }
+    val rows = byDept.map { (dept, scores) ->
+        Triple(dept, if (scores.isEmpty()) 0 else scores.average().toInt(), scores.size)
+    }.sortedByDescending { it.second }
+    return buildJsonArray {
+        rows.forEach { (dept, eff, n) ->
+            add(buildJsonObject {
+                put("department", dept)
+                put("efficiency", eff)
+                put("faculty_count", n)
+            })
+        }
+    }
+}
+
 fun Route.schoolAnalyticsRouting() {
     authenticate("jwt") {
         route("/api/v1/school/analytics") {
@@ -638,6 +766,23 @@ fun Route.schoolAnalyticsRouting() {
                             }
                         }
                     }
+
+                    // --- RA-59: REAL aggregate blobs that were previously
+                    // fabricated CMS pass-throughs. Each overlays only when we
+                    // have live exam data; otherwise the CMS value is left as-is
+                    // (eventually empty once seeds are removed). ---
+                    val grade = gradeDistribution(snapshots)
+                    if (grade.isNotEmpty()) blob["grade_distribution"] = grade
+                    val matrix = subjectMatrix(snapshots)
+                    if (matrix.isNotEmpty()) {
+                        // subject_engagements and subject_matrix are two names the
+                        // UI uses for the same per-subject roll-up.
+                        blob["subject_engagements"] = matrix
+                        blob["subject_matrix"] = matrix
+                    }
+                    val byClass = byClassPerformance(snapshots)
+                    if (byClass.isNotEmpty()) blob["by_class"] = byClass
+
                     JsonObject(blob)
                 }
                 call.ok(payload, message = "Class performance fetched successfully")
@@ -671,6 +816,11 @@ fun Route.schoolAnalyticsRouting() {
                     } else if (blob["accountability_matrix"] == null) {
                         blob["accountability_matrix"] = JsonArray(emptyList())
                     }
+
+                    // --- RA-59: REAL departmental efficiency (was fabricated CMS) ---
+                    val depts = deptEfficiencies(schoolId)
+                    if (depts.isNotEmpty()) blob["dept_efficiencies"] = depts
+
                     JsonObject(blob)
                 }
                 call.ok(payload, message = "Teacher performance fetched successfully")
@@ -826,7 +976,35 @@ fun Route.schoolAnalyticsRouting() {
                             put("trend", (blob["overall"] as? JsonObject)
                                 ?.get("trend")?.jsonPrimitive?.content ?: "")
                         }
+                        // RA-59: aggregate_compliance is the real overall coverage,
+                        // not a fabricated "94.2%". by_class derives from real
+                        // per-class exam averages (honest empty when no data).
+                        blob["aggregate_compliance"] = JsonPrimitive("$overallPct%")
+                        val byClass = byClassPerformance(studentSnapshots(schoolId))
+                        if (byClass.isNotEmpty()) {
+                            blob["by_class"] = buildJsonArray {
+                                byClass.forEach { el ->
+                                    val o = el.jsonObject
+                                    add(buildJsonObject {
+                                        put("class", o["name"]?.jsonPrimitive?.content ?: "")
+                                        put("percentage", o["average"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0)
+                                    })
+                                }
+                            }
+                        }
                     }
+
+                    // RA-59: these blobs have NO backing table (curriculum
+                    // schedule / compliance audit log don't exist server-side).
+                    // Rather than ship fabricated seed values, replace them with
+                    // honest empty states. compliance_trend is cleared (no source);
+                    // milestones/alerts become empty arrays so the UI renders a
+                    // zero-state instead of fake "Dr. Miller / Mid-Term Verification".
+                    blob["compliance_trend"] = JsonPrimitive("")
+                    blob["milestones"] = JsonArray(emptyList())
+                    blob["alerts"] = JsonArray(emptyList())
+                    blob["syllabus_update_trend"] = JsonArray(emptyList())
+
                     JsonObject(blob)
                 }
                 call.ok(payload, message = "Syllabus coverage fetched successfully")
@@ -917,6 +1095,23 @@ fun Route.schoolAnalyticsRouting() {
                         }
                         blob["cohort_labels"] = buildJsonArray {
                             cohortLabels.forEach { add(JsonPrimitive(it)) }
+                        }
+                    }
+
+                    // --- RA-59: REAL subject engagements (was fabricated CMS) ---
+                    // Per-subject school-wide average as a 0..1 fraction to match
+                    // the screen's existing percentage shape.
+                    val matrix = subjectMatrix(snapshots)
+                    if (matrix.isNotEmpty()) {
+                        blob["subject_engagements"] = buildJsonArray {
+                            matrix.forEach { el ->
+                                val o = el.jsonObject
+                                add(buildJsonObject {
+                                    put("name", o["name"]?.jsonPrimitive?.content ?: "")
+                                    val score = o["score"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                                    put("percentage", score / 100.0)
+                                })
+                            }
                         }
                     }
 

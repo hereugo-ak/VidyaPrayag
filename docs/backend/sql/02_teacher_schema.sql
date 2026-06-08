@@ -30,9 +30,10 @@
 -- ALL `CREATE TABLE` statements use `IF NOT EXISTS` so this file is safe to
 -- re-run. Run it in Supabase Dashboard → SQL Editor → New Query → paste → Run.
 --
--- ⚠️  PREREQUISITES (run first, in order):
---        1.  /supabase_schema                              (base operational)
---        2.  /docs/backend/sql/01_supplementary_schema.sql (backend extras)
+-- ⚠️  PREREQUISITES (RA-63): the canonical path bundles this fragment into
+--     scripts/schema-all-in-one-2026-06-07.sql — run THAT (see
+--     docs/db/PROVISION.sql / scripts/README-RUN-ORDER.md), not the legacy
+--     root "VIDYASETU v2.1" schema (archived to docs/_archive/...ABANDONED.sql).
 --     This file depends on `schools`, `app_users`, `students`, and
 --     `teacher_subject_assignments` already existing.
 --

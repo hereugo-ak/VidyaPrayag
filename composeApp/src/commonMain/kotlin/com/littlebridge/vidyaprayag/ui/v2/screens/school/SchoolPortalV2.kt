@@ -26,6 +26,7 @@ private enum class SchoolOverlay {
     Calendar,
     Messages,
     LeaveRequests,
+    LinkRequests,
     AdmissionsCRM,
     Results,
     SchedulePTM,
@@ -33,6 +34,10 @@ private enum class SchoolOverlay {
     ClassPerformance,
     TeacherPerformance,
     AnalyticsDashboard,
+    EditProfile,
+    StudentRoster,
+    StudentProfile,
+    TeacherProfile,
 }
 
 /**
@@ -57,6 +62,9 @@ fun SchoolPortalV2(
     VTheme(tone = VPortalTone.Warm) {
         var tab by remember { mutableStateOf("home") }
         var overlay by remember { mutableStateOf(SchoolOverlay.None) }
+        // RA-45 — id carried into the student/teacher profile overlays.
+        var selectedStudentId by remember { mutableStateOf<String?>(null) }
+        var selectedTeacherId by remember { mutableStateOf<String?>(null) }
 
         // §11 cross-platform — Android predictive back / iOS edge-swipe pops
         // the full-screen Notifications/Calendar overlay back to the admin tabs
@@ -80,6 +88,11 @@ fun SchoolPortalV2(
             }
             SchoolOverlay.LeaveRequests -> {
                 LeaveRequestsScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
+                return@VTheme
+            }
+            SchoolOverlay.LinkRequests -> {
+                // RA-48: the parent→child link approval queue.
+                LinkRequestsScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
                 return@VTheme
             }
             SchoolOverlay.AdmissionsCRM -> {
@@ -110,6 +123,42 @@ fun SchoolPortalV2(
                 AnalyticsDashboardScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
                 return@VTheme
             }
+            SchoolOverlay.EditProfile -> {
+                // RA-47 — edit the live schools row (institutional profile).
+                EditSchoolProfileScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
+                return@VTheme
+            }
+            SchoolOverlay.StudentRoster -> {
+                // RA-45 — the live student roster; rows open a student profile.
+                StudentRosterScreenV2(
+                    onBack = { overlay = SchoolOverlay.None },
+                    onOpenStudent = { id -> selectedStudentId = id; overlay = SchoolOverlay.StudentProfile },
+                    modifier = modifier,
+                )
+                return@VTheme
+            }
+            SchoolOverlay.StudentProfile -> {
+                // RA-45 — single student record (attendance/marks/leave/fees).
+                val id = selectedStudentId
+                if (id == null) { overlay = SchoolOverlay.StudentRoster; return@VTheme }
+                StudentProfileScreenV2(
+                    studentId = id,
+                    onBack = { overlay = SchoolOverlay.StudentRoster },
+                    modifier = modifier,
+                )
+                return@VTheme
+            }
+            SchoolOverlay.TeacherProfile -> {
+                // RA-45 — single teacher detail (assignments/coverage).
+                val id = selectedTeacherId
+                if (id == null) { overlay = SchoolOverlay.None; return@VTheme }
+                TeacherProfileScreenV2(
+                    teacherId = id,
+                    onBack = { overlay = SchoolOverlay.None },
+                    modifier = modifier,
+                )
+                return@VTheme
+            }
             SchoolOverlay.None -> Unit
         }
 
@@ -132,14 +181,37 @@ fun SchoolPortalV2(
                     "home" -> SchoolHomeScreenV2(
                         onOpenNotifications = { overlay = SchoolOverlay.Notifications },
                         onOpenCalendar = { overlay = SchoolOverlay.Calendar },
+                        // RA-24 — the Home "live metrics" / PEWS cards now open the
+                        // real analytics dashboard and the at-risk cohort (People
+                        // tab) instead of dead Coming-Soon placeholders.
+                        onOpenAnalytics = { overlay = SchoolOverlay.AnalyticsDashboard },
+                        onOpenPews = { tab = "people" },
                         // §7 finding K — tapping the avatar opens the Settings tab (where logout
                         // lives), instead of logging the admin out outright.
                         onExit = { tab = "settings" },
                     )
-                    "people" -> SchoolPeopleScreenV2()
+                    "people" -> SchoolPeopleScreenV2(
+                        // RA-48 — open the parent→child link approval queue.
+                        onOpenLinkRequests = { overlay = SchoolOverlay.LinkRequests },
+                        // RA-45 — open the live student roster + teacher profile.
+                        onOpenStudentRoster = { overlay = SchoolOverlay.StudentRoster },
+                        onOpenTeacher = { id -> selectedTeacherId = id; overlay = SchoolOverlay.TeacherProfile },
+                    )
                     "records" -> SchoolRecordsScreenV2()
-                    "comms" -> SchoolCommsScreenV2()
-                    "settings" -> SchoolSettingsScreenV2(onLogout = onLogout)
+                    "comms" -> SchoolCommsScreenV2(
+                        // RA-24 — Messages and PTM open their real backend-backed
+                        // screens as overlays instead of Coming-Soon cards.
+                        onOpenMessages = { overlay = SchoolOverlay.Messages },
+                        onOpenPtm = { overlay = SchoolOverlay.SchedulePTM },
+                    )
+                    "settings" -> SchoolSettingsScreenV2(
+                        onLogout = onLogout,
+                        // RA-24 — "Teacher management" opens the live People tab
+                        // roster (RA-22) rather than a Coming-Soon label.
+                        onOpenTeachers = { tab = "people" },
+                        // RA-47 — open the editable institutional-profile screen.
+                        onOpenProfile = { overlay = SchoolOverlay.EditProfile },
+                    )
                 }
             }
         }

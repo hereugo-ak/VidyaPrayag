@@ -1,3 +1,20 @@
+-- #############################################################################
+-- ##  ⛔ ABANDONED — DO NOT PROVISION FROM THIS FILE (RA-63)                  ##
+-- ##                                                                         ##
+-- ##  This is the legacy "VIDYASETU v2.1" schema (11 tables, Postgres enums, ##
+-- ##  RLS policies, auth.users triggers). It does NOT match Tables.kt and is ##
+-- ##  referenced by NOTHING in server/. It was the design-era schema before  ##
+-- ##  the backend settled on app-level scoping + app_users.                  ##
+-- ##                                                                         ##
+-- ##  THE REAL, CANONICAL PROVISIONING SOURCE IS:                            ##
+-- ##      scripts/schema-all-in-one-2026-06-07.sql   (schema)                ##
+-- ##      scripts/seed-2026-06-07.sql                (seed)                  ##
+-- ##  built in dependency order from docs/db/vidyasetu_schema.sql +          ##
+-- ##  docs/db/migration_001/002/003 + the part-2 patch.                      ##
+-- ##  See docs/db/PROVISION.sql and scripts/README-RUN-ORDER.md.             ##
+-- ##                                                                         ##
+-- ##  Kept only for historical reference. Archived from repo root → here.    ##
+-- #############################################################################
 -- =============================================================================
 -- VIDYASETU — COMPLETE SUPABASE DATABASE SCHEMA
 -- Version: 2.1  |  Engine: PostgreSQL (Supabase)

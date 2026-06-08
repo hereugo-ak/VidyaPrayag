@@ -1,9 +1,6 @@
 package com.littlebridge.vidyaprayag.ui.v2.navigation
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,6 +21,7 @@ import com.littlebridge.vidyaprayag.ui.v2.screens.discovery.DiscoveryScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.parent.ParentPortalV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.school.SchoolPortalV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.teacher.TeacherPortalV2
+import com.littlebridge.vidyaprayag.ui.v2.theme.VMotion
 import com.littlebridge.vidyaprayag.ui.v2.theme.VPortalTone
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import org.koin.compose.koinInject
@@ -114,11 +112,20 @@ private fun UnauthFlow(modifier: Modifier = Modifier) {
 
     AnimatedContent(
         targetState = route,
-        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        // Funnel screens advance "deeper" → subtle forward horizontal momentum + fade.
+        transitionSpec = { VMotion.forwardSlide() },
         label = "unauth-flow",
         modifier = modifier,
     ) { current ->
         when (current) {
+            // The single landing surface for BOTH roles (PHASE 7). Its two role-entry cards are the
+            // only auth CTAs: "I'm a Parent" → [onParent] → OTP funnel; "School / Administration" →
+            // [onAdmin] → credential funnel (teachers sign in via the Admin path). A tap on any
+            // Featured-Institution card or Portal-access row also funnels into the matching auth
+            // screen (a school tap leads families into the parent OTP sign-in). Content (hero copy,
+            // featured schools, offerings, portals) is CMS-driven inside the screen itself via
+            // LandingViewModel + MainViewModel — both fetch in `init`, so no extra wiring is needed
+            // here; this site only supplies the navigation callbacks.
             UnauthRoute.Landing -> CommonLandingScreenV2(
                 onParent = { route = UnauthRoute.ParentAuth },
                 onAdmin = { route = UnauthRoute.AdminAuth },
@@ -167,8 +174,10 @@ private enum class AuthedRoute { Resolving, ParentLinkChild, SchoolOnboarding, T
  * Returning users (valid JWT after an app restart) have no in-memory session cache, so the gate
  * resolves immediately to the portal — which is correct: they've already onboarded/linked. Every
  * gate completion advances to [AuthedRoute.Portal] with no way back into the gate (LAW 4). The
- * change-password gate is local-only until the documented `POST /auth/change-password` +
- * `must_change_password` backend lands (BACKEND_GAPS §5); we never fake a server write.
+ * change-password gate (RA-54) is now backed by a real `POST /auth/change-password` +
+ * `must_change_password` flag: a provisioned teacher logs in with profileCompleted=false, the
+ * gate calls the endpoint, the server flips profile_completed=true, and the gate resolves
+ * permanently across cold starts.
  */
 @Composable
 private fun AuthedFlow(
@@ -199,7 +208,16 @@ private fun AuthedFlow(
     // allow a back path to auth/splash (the session is already established).
     AnimatedContent(
         targetState = route,
-        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        // Gate steps (link-child / onboarding / first-login) read as modal sheets →
+        // vertical rise + fade. The brief Resolving frame uses a quiet cross-fade so
+        // the common (already-completed) path never shows a directional slide.
+        transitionSpec = {
+            if (initialState == AuthedRoute.Resolving || targetState == AuthedRoute.Resolving) {
+                VMotion.quietFade()
+            } else {
+                VMotion.modalRise()
+            }
+        },
         label = "authed-flow",
         modifier = modifier,
     ) { current ->

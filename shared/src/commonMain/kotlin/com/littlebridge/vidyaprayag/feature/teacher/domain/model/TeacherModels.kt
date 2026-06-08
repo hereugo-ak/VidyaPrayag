@@ -254,3 +254,94 @@ data class TeacherProfileData(
     val email: String = "",
     val phone: String = "",
 )
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Assessments (exams) — list + create. RA-40: the marks plane needs a valid
+// exam_id; these models back the exam selector that feeds SubmitMarksRequest.
+// Mirror server TeacherAssessmentDto / TeacherAssessmentsData / CreateAssessmentRequest.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class TeacherAssessmentsResponse(
+    val success: Boolean,
+    val data: TeacherAssessmentsData,
+)
+
+@Serializable
+data class TeacherAssessmentsData(
+    val assessments: List<TeacherAssessmentDto> = emptyList(),
+)
+
+@Serializable
+data class TeacherAssessmentDto(
+    val id: String,
+    val name: String,
+    val subject: String,
+    @SerialName("max_marks") val maxMarks: Int,
+    @SerialName("exam_date") val examDate: String? = null,
+    @SerialName("is_published") val isPublished: Boolean = false,
+)
+
+@Serializable
+data class CreateAssessmentRequest(
+    @SerialName("class_id") val classId: String,
+    val name: String,
+    @SerialName("max_marks") val maxMarks: Int? = null,
+    @SerialName("exam_date") val examDate: String? = null,
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RA-44: teacher leave workflow. Mirror server/.../teacher/TeacherLeaveRouting.kt.
+// A teacher lists leave requests routed to their classes and approves/rejects.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class TeacherLeaveListResponse(
+    val success: Boolean = true,
+    val data: TeacherLeaveListData = TeacherLeaveListData(),
+)
+
+@Serializable
+data class TeacherLeaveListData(
+    @SerialName("pending_count") val pendingCount: Int = 0,
+    val requests: List<TeacherLeaveDto> = emptyList(),
+)
+
+@Serializable
+data class TeacherLeaveDto(
+    val id: String,
+    @SerialName("student_name") val studentName: String,
+    @SerialName("class_name") val className: String? = null,
+    val section: String? = null,
+    @SerialName("date_from") val dateFrom: String,
+    @SerialName("date_to") val dateTo: String,
+    val reason: String,
+    @SerialName("image_url") val imageUrl: String? = null,
+    val status: String,
+)
+
+@Serializable
+data class TeacherLeaveDecisionRequest(val status: String) // Approved | Rejected
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RA-51 — teacher messaging (1:1 + "message class parents" broadcast).
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class TeacherClassBroadcastRequest(
+    @SerialName("class_name") val className: String,
+    val section: String? = null,
+    val body: String,
+)
+
+@Serializable
+data class TeacherClassBroadcastData(
+    val recipients: Int = 0,
+)
+
+@Serializable
+data class TeacherClassBroadcastResponse(
+    val success: Boolean = false,
+    val message: String? = null,
+    val data: TeacherClassBroadcastData? = null,
+)

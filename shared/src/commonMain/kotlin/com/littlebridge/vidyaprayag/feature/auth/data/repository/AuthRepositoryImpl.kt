@@ -11,7 +11,12 @@ class AuthRepositoryImpl(
     private val api: AuthApi,
     private val preferenceRepository: PreferenceRepository
 ) : AuthRepository {
-    private var cachedSession: AuthResponse? = null
+    // RA-29: there is NO in-memory session cache. `prefs` is the single source
+    // of truth — the same store the Ktor `Auth` plugin's `refreshTokens` writes
+    // the rotated access/refresh tokens into. A previous `cachedSession` field
+    // was written once on login but never updated on refresh, so `getSession()`
+    // could hand back a stale (pre-rotation) token until the next cold start.
+    // Reading prefs every time keeps the repository and the plugin in lock-step.
 
     override suspend fun checkUser(identifier: String): NetworkResult<AuthFlow> {
         return when (val result = api.checkUser(identifier)) {
@@ -72,7 +77,6 @@ class AuthRepositoryImpl(
     }
 
     override suspend fun saveSession(response: AuthResponse) {
-        cachedSession = response
         // Persist the FULL session so it survives an app restart (audit §3.4).
         // Previously only token+role were stored and userId/refreshToken/
         // profileCompleted lived only in the in-memory cache → unrecoverable
@@ -85,8 +89,9 @@ class AuthRepositoryImpl(
     }
 
     override suspend fun getSession(): AuthResponse? {
-        cachedSession?.let { return it }
-        // Reconstruct from persisted prefs after a cold start.
+        // RA-29: always read the live prefs (single source of truth). After a
+        // 401-triggered token refresh, the Auth plugin rewrites the token here,
+        // so this reflects the rotated token immediately rather than a stale one.
         val token = preferenceRepository.getUserToken().first() ?: return null
         val refreshToken = preferenceRepository.getRefreshToken().first() ?: ""
         val userId = preferenceRepository.getUserId().first() ?: ""
@@ -99,7 +104,7 @@ class AuthRepositoryImpl(
             name = "",
             role = role,
             profileCompleted = profileCompleted
-        ).also { cachedSession = it }
+        )
     }
 
     override suspend fun refresh(): NetworkResult<AuthResponse> {
@@ -116,6 +121,25 @@ class AuthRepositoryImpl(
         }
     }
 
+    override suspend fun changePassword(oldPassword: String?, newPassword: String): NetworkResult<Unit> {
+        return when (val result = api.changePassword(
+            com.littlebridge.vidyaprayag.feature.auth.domain.model.ChangePasswordRequest(
+                oldPassword = oldPassword,
+                newPassword = newPassword
+            )
+        )) {
+            is NetworkResult.Success -> {
+                // RA-54: the server flipped profile_completed=true and cleared
+                // must_change_password. Persist the resolved gate locally so the
+                // TeacherFirstLogin gate never reappears on cold start.
+                preferenceRepository.setProfileCompleted(true)
+                NetworkResult.Success(Unit)
+            }
+            is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)
+            is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
+        }
+    }
+
     override suspend fun logout() {
         // Best-effort server-side revocation (audit §3.6) before clearing local
         // state, so the refresh token cannot be reused for 30 days.
@@ -124,7 +148,6 @@ class AuthRepositoryImpl(
         if (token != null) {
             runCatching { api.logout(token, refreshToken) }
         }
-        cachedSession = null
         preferenceRepository.clearSession()
     }
 

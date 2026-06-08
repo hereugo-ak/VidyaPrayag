@@ -25,7 +25,6 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.delete
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
-import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -60,7 +59,6 @@ class MediaApi(
         kind: String
     ): NetworkResult<ApiResponse<MediaUploadResponse>> = safeApiCall {
         client.post(getUrl("api/v1/school/media/upload")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             setBody(
                 MultiPartFormDataContent(
                     formData {
@@ -88,7 +86,6 @@ class MediaApi(
         url: String
     ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
         client.delete(getUrl("api/v1/school/media")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(DeleteMediaBody(url))
         }

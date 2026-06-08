@@ -25,7 +25,6 @@
  *   - announcementRouting()               — /api/v1/school/announcements[…]
  *   - admissionRouting()                  — /api/v1/admissions/enquiries[…]
  *   - schoolRouting()                     — /api/v1/school/{analytics,calendar,holidays,attendance/daily}
- *   - parentOnboardingRouting()           — /api/v1/parent/onboarding/{metadata, child-info, preference-options}
  *   - parentDashboardRouting()            — /api/v1/parent/dashboard
  *   - trackProgressRouting()              — /api/v1/parent/track-progress
  *   - parentFeesRouting()                 — /api/v1/parent/fees
@@ -61,11 +60,13 @@ import com.littlebridge.vidyaprayag.feature.config.versionRouting
 import com.littlebridge.vidyaprayag.feature.content.landingRouting
 import com.littlebridge.vidyaprayag.feature.content.supportRouting
 import com.littlebridge.vidyaprayag.feature.media.mediaRouting
+import com.littlebridge.vidyaprayag.feature.notifications.notificationsRouting
 import com.littlebridge.vidyaprayag.feature.onboarding.onboardingRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentDashboardRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentFeesRouting
+import com.littlebridge.vidyaprayag.feature.parent.parentLeaveRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentLinkRouting
-import com.littlebridge.vidyaprayag.feature.parent.parentOnboardingRouting
+import com.littlebridge.vidyaprayag.feature.parent.parentAcademicsRouting
 import com.littlebridge.vidyaprayag.feature.parent.trackProgressRouting
 import com.littlebridge.vidyaprayag.feature.school.leaveRequestsRouting
 import com.littlebridge.vidyaprayag.feature.school.messagesRouting
@@ -73,14 +74,20 @@ import com.littlebridge.vidyaprayag.feature.school.ptmRouting
 import com.littlebridge.vidyaprayag.feature.school.resultsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolAnalyticsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolDashboardRouting
+import com.littlebridge.vidyaprayag.feature.school.schoolProfileRouting
+import com.littlebridge.vidyaprayag.feature.school.schoolRecordsRouting
+import com.littlebridge.vidyaprayag.feature.school.schoolStudentsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRouting
 import com.littlebridge.vidyaprayag.feature.school.teacherAssignmentRouting
 import com.littlebridge.vidyaprayag.feature.school.teacherProvisioningRouting
+import com.littlebridge.vidyaprayag.feature.teacher.teacherLeaveRouting
+import com.littlebridge.vidyaprayag.feature.teacher.teacherMessagesRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherRouting
 import com.littlebridge.vidyaprayag.feature.user.parentRouting
 import com.littlebridge.vidyaprayag.feature.user.parentMessagesRouting
 import com.littlebridge.vidyaprayag.feature.user.userDetailsRouting
 import com.littlebridge.vidyaprayag.feature.user.userProfileRouting
+import com.littlebridge.vidyaprayag.core.ApiError
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -92,9 +99,18 @@ import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.statuspages.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
+
+/**
+ * RA-36: max accepted Content-Length for non-multipart (JSON) requests, in bytes.
+ * Without this, any `call.receive<…>()` buffers an unbounded body into memory →
+ * a single fat POST to e.g. /api/v1/auth/login can OOM the 512 MB dyno. The media
+ * upload route enforces its own 25 MB multipart cap, so we exempt multipart here.
+ */
+private const val MAX_JSON_BODY_BYTES = 1L * 1024 * 1024 // 1 MB
 
 fun main() {
     DatabaseFactory.init()
@@ -106,8 +122,52 @@ fun main() {
 fun Application.module() {
     install(IgnoreTrailingSlash)
 
+    // RA-36: reject oversized JSON bodies before they are buffered into memory.
+    // Multipart uploads (media route) are exempt — they enforce their own 25 MB
+    // streaming cap. Anything else declaring a Content-Length over the JSON limit
+    // is refused with 413 so a single fat POST cannot OOM the dyno.
+    intercept(ApplicationCallPipeline.Plugins) {
+        val contentType = call.request.contentType()
+        val isMultipart = contentType.match(ContentType.MultiPart.FormData)
+        val declaredLength = call.request.headers[HttpHeaders.ContentLength]?.toLongOrNull()
+        if (!isMultipart && declaredLength != null && declaredLength > MAX_JSON_BODY_BYTES) {
+            call.respond(
+                HttpStatusCode.PayloadTooLarge,
+                ApiError(
+                    message = "Request body too large (max ${MAX_JSON_BODY_BYTES / 1024} KB).",
+                    errorCode = "PAYLOAD_TOO_LARGE",
+                ),
+            )
+            return@intercept finish()
+        }
+    }
+
     install(CORS) {
-        anyHost()
+        // RA-37: open CORS (anyHost) is fine in dev but in production lets any
+        // origin script authenticated cross-origin calls with a captured bearer
+        // token. In prod (DATABASE_URL present) we lock to an explicit allow-list
+        // from CORS_ALLOWED_ORIGINS (comma-separated host[:port], optionally with
+        // scheme). Only dev/local falls back to anyHost().
+        val isProduction = System.getenv("DATABASE_URL")?.isNotBlank() == true
+        val configuredOrigins = System.getenv("CORS_ALLOWED_ORIGINS")
+            ?.split(",")
+            ?.map { it.trim() }
+            ?.filter { it.isNotBlank() }
+            .orEmpty()
+        if (isProduction && configuredOrigins.isNotEmpty()) {
+            configuredOrigins.forEach { origin ->
+                // Accept "https://app.example.com", "app.example.com" or with a port.
+                val withoutScheme = origin.substringAfter("://", origin)
+                val scheme = if (origin.contains("://")) origin.substringBefore("://") else null
+                val host = withoutScheme.substringBefore(":")
+                val schemes = scheme?.let { listOf(it) } ?: listOf("https", "http")
+                allowHost(host, schemes = schemes)
+            }
+        } else {
+            // Dev/local (no DATABASE_URL) or prod without an explicit allow-list:
+            // keep the permissive default so local web + device testing still work.
+            anyHost()
+        }
         allowHeader(HttpHeaders.ContentType)
         allowHeader(HttpHeaders.Authorization)
         allowHeader("App-Version")
@@ -167,11 +227,12 @@ fun Application.module() {
         schoolRouting()
 
         // Parent ecosystem (parent_api_spec.artifact.md)
-        parentOnboardingRouting()    // /api/v1/parent/onboarding/{metadata, child-info, preference-options}
         parentDashboardRouting()     // /api/v1/parent/dashboard
         trackProgressRouting()       // /api/v1/parent/track-progress
+        parentAcademicsRouting()     // /api/v1/parent/child/{id}/{attendance,marks,syllabus} — RA-43/RA-56 child-scoped reads
         parentFeesRouting()          // /api/v1/parent/fees
-        parentLinkRouting()          // /api/v1/parent/{schools/search, link-child} — Link Your Child wizard (audit §5.3 / SWEEP-A)
+        parentLeaveRouting()         // /api/v1/parent/leave — RA-44 parent applies/lists child leave (routes to class teacher)
+        parentLinkRouting()          // /api/v1/parent/{schools/search, link-child} + /api/v1/school/link-requests{,/{id}/approve|reject} — RA-48 link approval workflow
 
         // School ecosystem (school_api_spec.artifact.md)
         schoolDashboardRouting()     // /api/v1/school/dashboard
@@ -182,9 +243,18 @@ fun Application.module() {
         resultsRouting()             // /api/v1/school/results
         teacherAssignmentRouting()   // /api/v1/school/teacher-assignments[…] — structured teacher⇄class⇄subject model (report §5.5)
         teacherProvisioningRouting() // /api/v1/school/teachers[…] — school-admin creates teacher app_users rows (audit finding C)
+        schoolProfileRouting()       // /api/v1/school/profile — RA-47 read/edit institutional schools row (school-admin write)
+        schoolStudentsRouting()      // /api/v1/school/students[…] + teachers/{id} — RA-45 student roster + student/teacher profile (school-scoped)
+        schoolRecordsRouting()       // /api/v1/school/{attendance/summary,marks/summary,fees/ledger} — RA-52 admin Records rollups (school-scoped reads)
         mediaRouting()               // /api/v1/school/media/upload[…] — REAL binary uploads → Supabase Storage (kills URL placeholders)
 
         // Teacher vertical (master rebuild doc Step 7 / gap G1)
         teacherRouting()             // /api/v1/teacher/{home,classes,profile,attendance,marks,syllabus,homework}
+        teacherLeaveRouting()        // /api/v1/teacher/leave-requests[…] — RA-44 teacher lists/decides leave for their classes
+        teacherMessagesRouting()     // /api/v1/teacher/messages[…] — RA-51 teacher↔parent messaging + class broadcast
+
+        // Cross-user notification spine (audit part-2 RA-41/42/46/50) — role-aware
+        // inbox replacing the parent-only synth; persisted read state; bell summary.
+        notificationsRouting()       // /api/v1/notifications[/summary,/{id}/read,/read-all,/device-token]
     }
 }

@@ -1,5 +1,10 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -86,13 +91,19 @@ fun VErrorState(
 /**
  * VStateHost — the single contract that gives every wired screen the three required UI states
  * (LAW 3). It inspects a [loading]/[error]/[isEmpty] triple and renders:
- *   • Loading  → [VLoadingState] spinner
+ *   • Loading  → [skeleton] shimmer (FEATURE 2) when supplied, else [VLoadingState] spinner
  *   • Error    → [VErrorState] with optional retry
  *   • Empty    → [emptyTitle]/[emptyBody] zero-state via [VEmptyState]
  *   • Content  → [content]
  *
  * Screens collect their VM state, then wrap their happy-path body in this host. This keeps the
  * loading/error/empty handling identical and dependency-free across the whole portal surface.
+ *
+ * FEATURE 2 — when a screen passes a [skeleton] composable, the loading leg shows that skeleton
+ * instead of the spinner, and the loading→content hand-off crossfades (300ms) via [AnimatedContent]
+ * so there is no jump-cut. Screens that do not pass a skeleton are unchanged (spinner as before).
+ * The crossfade key is `loading || error != null || isEmpty` collapsed to a stable phase so a
+ * recomposition that does not change phase never re-triggers the transition (RULE-2: no loop).
  */
 @Composable
 fun VStateHost(
@@ -104,20 +115,45 @@ fun VStateHost(
     emptyBody: String? = null,
     emptyIcon: androidx.compose.ui.graphics.vector.ImageVector? = VIcons.FileText,
     onRetry: (() -> Unit)? = null,
+    skeleton: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
-    when {
-        loading -> VLoadingState(modifier)
-        error != null -> VErrorState(message = error, onRetry = onRetry, modifier = modifier)
-        isEmpty -> VEmptyState(
-            modifier = modifier,
-            icon = emptyIcon,
-            title = emptyTitle,
-            body = emptyBody,
-        )
-        else -> content()
+    // No skeleton supplied → preserve the original behaviour exactly (spinner loading leg).
+    if (skeleton == null) {
+        when {
+            loading -> VLoadingState(modifier)
+            error != null -> VErrorState(message = error, onRetry = onRetry, modifier = modifier)
+            isEmpty -> VEmptyState(modifier = modifier, icon = emptyIcon, title = emptyTitle, body = emptyBody)
+            else -> content()
+        }
+        return
+    }
+
+    // Skeleton supplied → crossfade between the four phases. A stable enum key means only a real
+    // phase change drives the 300ms fade; ordinary recompositions do not re-animate.
+    val phase = when {
+        loading -> VStatePhase.Loading
+        error != null -> VStatePhase.Error
+        isEmpty -> VStatePhase.Empty
+        else -> VStatePhase.Content
+    }
+    AnimatedContent(
+        targetState = phase,
+        transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) },
+        label = "state-host-crossfade",
+        modifier = modifier,
+    ) { p ->
+        when (p) {
+            VStatePhase.Loading -> skeleton()
+            VStatePhase.Error -> VErrorState(message = error ?: "", onRetry = onRetry)
+            VStatePhase.Empty -> VEmptyState(icon = emptyIcon, title = emptyTitle, body = emptyBody)
+            VStatePhase.Content -> content()
+        }
     }
 }
+
+/** The four mutually-exclusive phases [VStateHost] crossfades between (FEATURE 2). */
+private enum class VStatePhase { Loading, Error, Empty, Content }
 
 /** A consistent ALL-CAPS section header + optional trailing action, used inside scroll content. */
 @Composable

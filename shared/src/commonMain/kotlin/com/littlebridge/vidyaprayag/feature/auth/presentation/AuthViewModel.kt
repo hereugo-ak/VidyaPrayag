@@ -98,7 +98,20 @@ class AuthViewModel(
                     ))
                 }
                 AuthStep.SignupDetails -> {
-                    if (currentState.password != currentState.confirmPassword) {
+                    if (currentState.name.isBlank()) {
+                        _state.update { it.copy(isLoading = false, error = "Please enter your name") }
+                        return@launch
+                    }
+                    if (currentState.password.isBlank()) {
+                        _state.update { it.copy(isLoading = false, error = "Please create a password") }
+                        return@launch
+                    }
+                    // Only enforce the confirm-password match when the UI actually collected a
+                    // confirmation value. Otherwise confirmPassword is "" and the check would
+                    // always fail even though the user only ever saw a single password field.
+                    if (currentState.confirmPassword.isNotEmpty() &&
+                        currentState.password != currentState.confirmPassword
+                    ) {
                         _state.update { it.copy(isLoading = false, error = "Passwords do not match") }
                         return@launch
                     }
@@ -151,5 +164,18 @@ class AuthViewModel(
     
     fun goBack() {
         _state.update { it.copy(step = AuthStep.Identifier, error = null) }
+    }
+
+    /**
+     * Clears every field of the auth form back to a pristine [AuthUiState].
+     *
+     * The [AuthViewModel] outlives a single sign-in attempt (it is bound to the unauth
+     * ViewModelStoreOwner, so the same instance is reused after a logout → landing → login
+     * round-trip). Without an explicit reset, the previously typed identifier/password —
+     * and even a stale `isAuthSuccessful` flag — leak into the next login attempt. Each auth
+     * screen calls this on mount so re-entering sign-in always starts from a blank form.
+     */
+    fun reset() {
+        _state.value = AuthUiState()
     }
 }

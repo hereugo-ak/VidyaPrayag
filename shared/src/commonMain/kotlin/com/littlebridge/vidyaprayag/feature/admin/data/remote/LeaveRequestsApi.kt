@@ -20,12 +20,11 @@ import com.littlebridge.vidyaprayag.feature.admin.domain.model.LeaveRequestsResp
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.UpdateLeaveStatusRequest
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.request.header
+import io.ktor.client.request.parameter
 import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 
 class LeaveRequestsApi(
@@ -44,12 +43,10 @@ class LeaveRequestsApi(
         type: String = "student",
         status: String? = null
     ): NetworkResult<ApiResponse<LeaveRequestsResponse>> = safeApiCall {
-        val params = buildList {
-            add("type=$type")
-            status?.let { add("status=$it") }
-        }.joinToString("&")
-        client.get(getUrl("api/v1/school/leave-requests?$params")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
+        // RA-64: URL-encode via parameter(...).
+        client.get(getUrl("api/v1/school/leave-requests")) {
+            parameter("type", type)
+            status?.let { parameter("status", it) }
         }
     }
 
@@ -58,7 +55,6 @@ class LeaveRequestsApi(
         request: CreateLeaveRequest
     ): NetworkResult<ApiResponse<LeaveRequestDto>> = safeApiCall {
         client.post(getUrl("api/v1/school/leave-requests")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(request)
         }
@@ -70,7 +66,6 @@ class LeaveRequestsApi(
         status: String
     ): NetworkResult<ApiResponse<LeaveRequestDto>> = safeApiCall {
         client.patch(getUrl("api/v1/school/leave-requests/$id/status")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(UpdateLeaveStatusRequest(status))
         }

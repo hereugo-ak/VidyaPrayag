@@ -21,11 +21,10 @@ import com.littlebridge.vidyaprayag.feature.admin.domain.model.AnnouncementDto
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.SyncWhatsAppResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.request.header
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 
 class AnnouncementsApi(
@@ -42,17 +41,16 @@ class AnnouncementsApi(
     suspend fun getAnnouncements(
         token: String
     ): NetworkResult<ApiResponse<AnnouncementListResponse>> = safeApiCall {
-        client.get(getUrl("api/v1/school/announcements")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.get(getUrl("api/v1/school/announcements"))
     }
 
     suspend fun searchAnnouncements(
         token: String,
         query: String
     ): NetworkResult<ApiResponse<AnnouncementListResponse>> = safeApiCall {
-        client.get(getUrl("api/v1/school/announcements/search?query=$query")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
+        // RA-64: URL-encode the search term (may contain spaces/'#'/'&').
+        client.get(getUrl("api/v1/school/announcements/search")) {
+            parameter("query", query)
         }
     }
 
@@ -61,7 +59,6 @@ class AnnouncementsApi(
         request: CreateAnnouncementRequest
     ): NetworkResult<ApiResponse<AnnouncementDto>> = safeApiCall {
         client.post(getUrl("api/v1/school/announcements")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(request)
         }
@@ -71,7 +68,6 @@ class AnnouncementsApi(
         token: String
     ): NetworkResult<ApiResponse<SyncWhatsAppResponse>> = safeApiCall {
         client.post(getUrl("api/v1/school/announcements/sync-whatsapp")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(emptyMap<String, String>())
         }

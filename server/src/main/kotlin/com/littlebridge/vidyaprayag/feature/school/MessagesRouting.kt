@@ -40,7 +40,6 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import java.time.Instant
@@ -165,21 +164,20 @@ fun Route.messagesRouting() {
                         .singleOrNull()
                         ?: return@dbQuery null
 
-                    val msgs = MessagesTable.selectAll()
-                        .where { MessagesTable.threadId eq id }
-                        .orderBy(MessagesTable.createdAt, SortOrder.ASC)
-                        .map { row ->
-                            val sid = row[MessagesTable.senderId]
-                            val createdInstant = row[MessagesTable.createdAt]
-                            MessageDto(
-                                id = row[MessagesTable.id].value.toString(),
-                                body = row[MessagesTable.body],
-                                isMine = sid == ctx.userId,
-                                senderId = sid?.toString(),
-                                createdAt = createdInstant.toString(),
-                                time = formatThreadTime(createdInstant)
-                            )
-                        }
+                    // RA-51: read by conversation_id so the admin sees both sides.
+                    val (_, rows) = conversationMessagesFor(id, ctx.userId) ?: return@dbQuery null
+                    val msgs = rows.map { row ->
+                        val sid = row[MessagesTable.senderId]
+                        val createdInstant = row[MessagesTable.createdAt]
+                        MessageDto(
+                            id = row[MessagesTable.id].value.toString(),
+                            body = row[MessagesTable.body],
+                            isMine = sid == ctx.userId,
+                            senderId = sid?.toString(),
+                            createdAt = createdInstant.toString(),
+                            time = formatThreadTime(createdInstant)
+                        )
+                    }
                     ThreadMessagesResponse(
                         threadId = id.toString(),
                         senderName = thread[MessageThreadsTable.senderName],
@@ -250,57 +248,31 @@ fun Route.messagesRouting() {
                     }
                 }
 
+                // RA-51: one shared engine handles append / two-party / self.
+                val recipientId = req.recipientUserId
+                    ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                 val result = dbQuery {
-                    val threadId: UUID = if (req.threadId != null) {
-                        val parsed = UUID.fromString(req.threadId)
-                        // Refresh thread metadata (ownership already verified).
-                        MessageThreadsTable.update({
-                            (MessageThreadsTable.id eq parsed) and (MessageThreadsTable.ownerUserId eq uid)
-                        }) {
-                            it[lastMessage] = req.body.take(200)
-                            it[lastMessageAt] = now
-                            it[updatedAt] = now
-                            // Sender = current user, so this thread is "read" for them.
-                            it[isRead] = true
-                        }
-                        parsed
-                    } else {
-                        // Brand-new thread.  Default recipient = self (admin desk).
-                        val recipient = req.recipientUserId
-                            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                            ?: uid
-                        // Fan out unread to the recipient when it isn't the sender.
-                        val newThread = UUID.randomUUID()
-                        MessageThreadsTable.insert {
-                            it[id] = newThread
-                            it[MessageThreadsTable.schoolId] = schoolId
-                            it[ownerUserId] = recipient
-                            it[senderName] = req.senderName ?: "Admin Desk"
-                            it[senderRole] = req.senderRole ?: "Support"
-                            it[senderImageUrl] = req.senderImageUrl
-                            it[iconName] = req.iconName
-                            it[lastMessage] = req.body.take(200)
-                            it[lastMessageAt] = now
-                            it[unreadCount] = if (recipient == uid) 0 else 1
-                            it[isRead] = recipient == uid
-                            it[createdAt] = now
-                            it[updatedAt] = now
-                        }
-                        newThread
-                    }
-
-                    val msgId = UUID.randomUUID()
-                    MessagesTable.insert {
-                        it[id] = msgId
-                        it[MessagesTable.threadId] = threadId
-                        it[senderId] = uid
-                        it[body] = req.body
-                        it[createdAt] = now
-                    }
-                    SendMessageResponse(threadId.toString(), msgId.toString())
+                    sendInConversation(
+                        senderId = uid,
+                        senderSchoolId = schoolId,
+                        body = req.body,
+                        threadId = req.threadId?.let { UUID.fromString(it) },
+                        recipientId = recipientId,
+                        senderName = req.senderName ?: resolveMessagingUser(uid)?.fullName ?: "Admin Desk",
+                        senderRole = req.senderRole ?: "Admin",
+                        senderImageUrl = req.senderImageUrl,
+                        iconName = req.iconName,
+                        now = now,
+                    )
                 }
-
-                call.created(result, message = "Message sent")
+                if (result == null) {
+                    call.fail("Thread not found", HttpStatusCode.NotFound)
+                } else {
+                    call.created(
+                        SendMessageResponse(result.senderThreadId.toString(), result.messageId.toString()),
+                        message = "Message sent"
+                    )
+                }
             }
         }
     }

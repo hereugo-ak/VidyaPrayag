@@ -16,11 +16,10 @@ import com.littlebridge.vidyaprayag.feature.admin.domain.model.PublishResultsRes
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.ResultsResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.request.header
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 
 class ResultsApi(
@@ -39,15 +38,11 @@ class ResultsApi(
         className: String? = null,
         subject: String? = null
     ): NetworkResult<ApiResponse<ResultsResponse>> = safeApiCall {
-        val params = buildList {
-            test?.let { add("test=$it") }
-            className?.let { add("class=$it") }
-            subject?.let { add("subject=$it") }
-        }.joinToString("&")
-        val url = if (params.isBlank()) getUrl("api/v1/school/results")
-                  else getUrl("api/v1/school/results?$params")
-        client.get(url) {
-            header(HttpHeaders.Authorization, "Bearer $token")
+        // RA-64: URL-encode via parameter(...) (test/class/subject may contain spaces).
+        client.get(getUrl("api/v1/school/results")) {
+            test?.let { parameter("test", it) }
+            className?.let { parameter("class", it) }
+            subject?.let { parameter("subject", it) }
         }
     }
 
@@ -56,7 +51,6 @@ class ResultsApi(
         request: PublishResultsRequest
     ): NetworkResult<ApiResponse<PublishResultsResponse>> = safeApiCall {
         client.post(getUrl("api/v1/school/results")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(request)
         }

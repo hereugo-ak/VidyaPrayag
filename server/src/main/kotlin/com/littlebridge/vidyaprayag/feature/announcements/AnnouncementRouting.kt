@@ -32,8 +32,11 @@ package com.littlebridge.vidyaprayag.feature.announcements
 
 import com.littlebridge.vidyaprayag.core.accepted
 import com.littlebridge.vidyaprayag.core.created
+import com.littlebridge.vidyaprayag.feature.notifications.Notify
+import com.littlebridge.vidyaprayag.feature.notifications.NotifyRecipients
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
+import com.littlebridge.vidyaprayag.core.requireSchoolAdmin
 import com.littlebridge.vidyaprayag.core.requireSchoolContext
 import com.littlebridge.vidyaprayag.db.AnnouncementsTable
 import com.littlebridge.vidyaprayag.db.AppUsersTable
@@ -169,9 +172,9 @@ fun Route.announcementRouting() {
                 call.ok(AnnouncementsListResponse(list), message = "Search results fetched")
             }
 
-            // ---- create ----
+            // ---- create (privileged: RA-39 — staff cannot broadcast) ----
             post {
-                val ctx = call.requireSchoolContext() ?: return@post
+                val ctx = call.requireSchoolAdmin() ?: return@post
                 val uid = ctx.userId
                 val req = call.receive<CreateAnnouncementDto>()
                 val schoolId = effectiveSchoolId(ctx.schoolId, ctx.role, req.schoolId)
@@ -216,6 +219,41 @@ fun Route.announcementRouting() {
                         it[updatedAt] = now
                     }
                 }
+                // RA-41 + RA-49: an announcement reaches parents + teachers
+                // in-app, not just the WhatsApp sync. The IN-APP fan-out now
+                // honours the audience scope (no blasting the whole school when
+                // a post targets one class/subject/student). Parents are resolved
+                // precisely from the audience_filter; teachers receive the post
+                // only when it is school-wide (a class/student-scoped parent
+                // notice isn't relevant to every teacher).
+                val audienceParents = NotifyRecipients.parentsForAudience(
+                    schoolId = schoolId,
+                    audienceType = audienceType,
+                    classNames = audienceStrList(req.audienceFilter, "class_names")
+                        + audienceStr(req.audienceFilter, "class_name"),
+                    subjects = audienceStrList(req.audienceFilter, "subjects")
+                        + audienceStr(req.audienceFilter, "subject"),
+                    studentCodes = audienceStrList(req.audienceFilter, "student_codes")
+                        + audienceStr(req.audienceFilter, "student_code"),
+                )
+                val recipients = if (audienceType == "ALL_SCHOOL") {
+                    (audienceParents + NotifyRecipients.teachersInSchool(schoolId)).distinct()
+                } else {
+                    audienceParents.distinct()
+                }
+                if (recipients.isNotEmpty()) {
+                    Notify.toUsers(
+                        userIds = recipients,
+                        category = "announcement",
+                        title = req.title,
+                        body = req.subTitle ?: req.description.take(140),
+                        schoolId = schoolId,
+                        actorId = uid,
+                        deepLink = "announcements/$eventId",
+                        refType = "announcement",
+                        refId = eventId,
+                    )
+                }
                 call.created(
                     AnnouncementDto(
                         req.type, eventId, req.title, req.subTitle, req.description,
@@ -225,9 +263,9 @@ fun Route.announcementRouting() {
                 )
             }
 
-            // ---- sync-whatsapp ----
+            // ---- sync-whatsapp (privileged: RA-39 — staff cannot broadcast) ----
             post("/sync-whatsapp") {
-                val ctx = call.requireSchoolContext() ?: return@post
+                val ctx = call.requireSchoolAdmin() ?: return@post
                 val req = call.receive<SyncWhatsAppRequest>()
                 val schoolId = effectiveSchoolId(ctx.schoolId, ctx.role, req.schoolId)
 
@@ -342,6 +380,23 @@ fun Route.announcementRouting() {
 }
 
 private val lenientJson = Json { ignoreUnknownKeys = true; isLenient = true }
+
+/**
+ * RA-49 helpers: pull a string list / single string out of the audience_filter
+ * JSON the client sends so the IN-APP notification fan-out can resolve the same
+ * recipients the WhatsApp expansion does. Tolerant of missing keys / shapes.
+ */
+private fun audienceStrList(filter: JsonElement?, key: String): List<String> {
+    val obj = (filter as? JsonObject) ?: return emptyList()
+    return obj[key]?.let {
+        runCatching { it.jsonArray.mapNotNull { e -> e.jsonPrimitive.contentOrNull } }.getOrNull()
+    } ?: emptyList()
+}
+
+private fun audienceStr(filter: JsonElement?, key: String): List<String> {
+    val obj = (filter as? JsonObject) ?: return emptyList()
+    return obj[key]?.jsonPrimitive?.contentOrNull?.let { listOf(it) } ?: emptyList()
+}
 
 private fun org.jetbrains.exposed.sql.ResultRow.toDto(): AnnouncementDto {
     val filterText = this[AnnouncementsTable.audienceFilter]

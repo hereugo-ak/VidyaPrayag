@@ -50,6 +50,15 @@ object DemoSeed {
     private val TEACHER_ID = UUID.fromString("00000000-0000-0000-0000-0000000000b3")
     private val PARENT_ID  = UUID.fromString("00000000-0000-0000-0000-0000000000b4")
     private val CHILD_ID   = UUID.fromString("00000000-0000-0000-0000-0000000000c1")
+    private val STUDENT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000c2")
+
+    // RA-61: the canonical school-side student row the parent's child links to.
+    // attendance_records / assessment_marks / analytics all key off
+    // students.student_code, so the demo child needs a matching students row or
+    // every academic read for the demo child resolves to nothing.
+    private const val DEMO_STUDENT_CODE = "DEMO-S001"
+    private const val DEMO_CLASS = "Grade 4"
+    private const val DEMO_SECTION = "A"
 
     // Deterministic anchor ids so the scholarship seed is idempotent across boots.
     private val SCHOLARSHIP_ANCHOR_ID = UUID.fromString("00000000-0000-0000-0000-0000000000d1")
@@ -62,6 +71,7 @@ object DemoSeed {
             seedUser(ADMIN_ID, "Demo School Admin", "admin@vidyaprayag.demo", "school_admin", schoolId = SCHOOL_ID)
             seedUser(TEACHER_ID, "Demo Teacher", "teacher@vidyaprayag.demo", "teacher", schoolId = SCHOOL_ID)
             seedUser(PARENT_ID, "Demo Parent", "parent@vidyaprayag.demo", "parent", schoolId = null)
+            seedStudent()   // RA-61: school-side student row the child links to
             seedChild()
             seedFeeRecords()
             seedAnnouncement()
@@ -120,6 +130,33 @@ object DemoSeed {
         }
     }
 
+    /**
+     * RA-61: the school's canonical students row for the demo child. Without
+     * this, the parent's child (student_code = DEMO-S001) had no counterpart in
+     * `students`, so the admin daily-attendance roster, per-student analytics,
+     * and any read that joins on students.student_code found nothing for the
+     * demo child. school_id matches the child + the demo school so the row is
+     * tenant-consistent (closes the school_id=null/SCHOOL_ID mismatch note).
+     */
+    private fun seedStudent() {
+        val exists = StudentsTable.selectAll()
+            .where { (StudentsTable.id eq STUDENT_ID) or (StudentsTable.studentCode eq DEMO_STUDENT_CODE) }
+            .any()
+        if (exists) return
+        val now = Instant.now()
+        StudentsTable.insert {
+            it[id] = STUDENT_ID
+            it[schoolId] = SCHOOL_ID
+            it[studentCode] = DEMO_STUDENT_CODE
+            it[fullName] = "Demo Child"
+            it[className] = DEMO_CLASS
+            it[section] = DEMO_SECTION
+            it[rollNumber] = "1"
+            it[isActive] = true
+            it[createdAt] = now
+        }
+    }
+
     private fun seedChild() {
         val exists = ChildrenTable.selectAll()
             .where { ChildrenTable.id eq CHILD_ID }
@@ -130,11 +167,11 @@ object DemoSeed {
             it[id] = CHILD_ID
             it[parentId] = PARENT_ID
             it[schoolId] = SCHOOL_ID
-            it[studentCode] = "DEMO-S001"
+            it[studentCode] = DEMO_STUDENT_CODE   // RA-61: matches the students row
             it[childName] = "Demo Child"
             it[dateOfBirth] = "2015-06-01"
             it[gender] = "MALE"
-            it[currentGrade] = "Grade 4"
+            it[currentGrade] = DEMO_CLASS
             it[overallProgress] = 0.72
             it[currentLevel] = 4
             it[attendanceStatus] = "PRESENT"

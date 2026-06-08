@@ -27,6 +27,24 @@ import io.ktor.server.plugins.statuspages.StatusPagesConfig
 import io.ktor.server.request.header
 import io.ktor.server.request.uri
 import io.ktor.server.response.respond
+import org.slf4j.LoggerFactory
+
+/**
+ * RA-40: server errors go through SLF4J (not raw stderr/printStackTrace), so a
+ * production deployment can route them to a real sink — a Sentry SLF4J appender,
+ * JSON logs, log shipping, etc. — instead of unstructured stderr lines.
+ */
+private val errorLog = LoggerFactory.getLogger("VidyaPrayag.Errors")
+
+/**
+ * RA-40: production signal, identical to `JwtConfig.isProduction` /
+ * `OtpService.isProduction` — a managed deploy (Render/Supabase) always sets
+ * `DATABASE_URL`. Used to HARD-GATE the `DEBUG_ERRORS` leak so a stray
+ * `DEBUG_ERRORS=true` on a prod dyno can never echo raw exception detail to
+ * clients.
+ */
+private val isProduction: Boolean
+    get() = System.getenv("DATABASE_URL")?.takeIf { it.isNotBlank() } != null
 
 fun StatusPagesConfig.configureErrorHandling() {
     // BadRequestException is the parent of Ktor's ContentTransformationException,
@@ -50,11 +68,18 @@ fun StatusPagesConfig.configureErrorHandling() {
         )
     }
     exception<Throwable> { call, cause ->
-        // Log to stderr; production should pipe this to a real logger / Sentry.
-        System.err.println("[VidyaPrayag] Unhandled error on ${call.request.uri}: ${cause.message}")
-        cause.printStackTrace()
+        // RA-40: structured logging through SLF4J. Passing `cause` as the last
+        // arg logs the full stack trace via the configured appender (logback.xml)
+        // and is the hook point a Sentry SLF4J appender attaches to — replaces the
+        // previous raw System.err.println + cause.printStackTrace().
+        errorLog.error("Unhandled error on {}", call.request.uri, cause)
 
-        val showFullError = System.getenv("DEBUG_ERRORS") == "true"
+        // RA-40: DEBUG_ERRORS echoes raw exception detail to the client. It is
+        // opt-in (default off) AND hard-gated to non-production: even if
+        // DEBUG_ERRORS=true is set on a prod dyno, the leak is suppressed whenever
+        // DATABASE_URL is configured (same prod signal as JwtConfig/OtpService).
+        // NEVER set DEBUG_ERRORS=true in production.
+        val showFullError = !isProduction && System.getenv("DEBUG_ERRORS") == "true"
         val message = if (showFullError) {
             "DEBUG_ERROR: ${cause.message ?: cause.toString()}"
         } else {

@@ -13,6 +13,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 data class Announcement(
     val id: String,
@@ -154,10 +159,24 @@ class SchoolAnnouncementsViewModel(
         date: String,
         subTitle: String? = null,
         eventImage: String? = null,
+        // RA-49: audience targeting. audienceType defaults to ALL_SCHOOL.
+        // For CLASS/SECTION/SUBJECT/STUDENT, audienceValues holds the raw
+        // user-entered class names / subjects / student codes (comma-separated
+        // is split by the caller). For ALL_SCHOOL the list is ignored.
+        audienceType: String = "ALL_SCHOOL",
+        audienceValues: List<String> = emptyList(),
         onCreated: (() -> Unit)? = null
     ) {
         if (title.isBlank() || description.isBlank() || date.isBlank()) {
             _state.value = _state.value.copy(errorMessage = "Title, description and date are required.")
+            return
+        }
+        val normalizedAudience = audienceType.trim().uppercase().ifBlank { "ALL_SCHOOL" }
+        val cleanValues = audienceValues.map { it.trim() }.filter { it.isNotBlank() }
+        if (normalizedAudience != "ALL_SCHOOL" && cleanValues.isEmpty()) {
+            _state.value = _state.value.copy(
+                errorMessage = "Add at least one target for a $normalizedAudience announcement."
+            )
             return
         }
         viewModelScope.launch {
@@ -167,13 +186,16 @@ class SchoolAnnouncementsViewModel(
                 _state.value = _state.value.copy(isCreating = false, errorMessage = "Not signed in")
                 return@launch
             }
+            val filter = buildAudienceFilter(normalizedAudience, cleanValues)
             val body = CreateAnnouncementRequest(
                 type = type.ifBlank { "Update" },
                 title = title.trim(),
                 subTitle = subTitle?.trim()?.takeIf { it.isNotBlank() },
                 description = description.trim(),
                 eventImage = eventImage?.trim()?.takeIf { it.isNotBlank() },
-                date = date.trim()
+                date = date.trim(),
+                audienceType = normalizedAudience,
+                audienceFilter = filter
             )
             when (val r = announcementsRepository.createAnnouncement(token, body)) {
                 is NetworkResult.Success -> {
@@ -210,6 +232,29 @@ class SchoolAnnouncementsViewModel(
                 announcementsRepository.syncWhatsApp(token)
             }
         }
+    }
+
+    /**
+     * RA-49: turn a chosen audience scope + the admin's free-text targets into
+     * the JSON `audience_filter` the server's [resolveRecipientPhones] /
+     * [NotifyRecipients] expand. Key shapes mirror the server contract:
+     *   CLASS / SECTION → {"class_names":[...]}
+     *   SUBJECT         → {"subjects":[...]}
+     *   STUDENT         → {"student_codes":[...]}
+     *   CUSTOM          → {"phones":[...]}
+     * ALL_SCHOOL needs no filter (null).
+     */
+    private fun buildAudienceFilter(audienceType: String, values: List<String>): JsonElement? {
+        if (audienceType == "ALL_SCHOOL" || values.isEmpty()) return null
+        val arr = JsonArray(values.map { JsonPrimitive(it) })
+        val key = when (audienceType) {
+            "CLASS", "SECTION" -> "class_names"
+            "SUBJECT" -> "subjects"
+            "STUDENT" -> "student_codes"
+            "CUSTOM" -> "phones"
+            else -> "class_names"
+        }
+        return buildJsonObject { put(key, arr) }
     }
 
     private fun AnnouncementDto.toUiModel() = Announcement(

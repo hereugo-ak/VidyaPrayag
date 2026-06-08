@@ -29,6 +29,7 @@ import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.OnboardingDraftsTable
 import com.littlebridge.vidyaprayag.db.SchoolClassesTable
+import com.littlebridge.vidyaprayag.db.SchoolMediaTable
 import com.littlebridge.vidyaprayag.db.SchoolSubjectsTable
 import com.littlebridge.vidyaprayag.db.SchoolsTable
 import io.ktor.http.*
@@ -47,6 +48,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -433,6 +435,15 @@ fun Route.onboardingRouting() {
                     }
 
                     "REVIEW" -> {
+                        // RA-60: the REVIEW step previously rendered FABRICATED
+                        // compliance docs ("Affiliation Cert", "Building Safety")
+                        // and a fixed module list with no backing table. There is
+                        // no document-upload step in onboarding and no compliance
+                        // table, so compliance_docs is now an honest empty list
+                        // (the UI shows a zero-state instead of fake verified rows).
+                        // The module list is DERIVED from the school's REAL
+                        // onboarding state: a module reads as configured only when
+                        // the school actually set up its prerequisite data.
                         val schoolId = resolveSchoolIdForUser(uid)
                         val school = schoolId?.let {
                             dbQuery { SchoolsTable.selectAll().where { SchoolsTable.id eq it }.singleOrNull() }
@@ -441,14 +452,39 @@ fun Route.onboardingRouting() {
                             institutionName = school?.get(SchoolsTable.name) ?: "—",
                             isVerified = (school?.get(SchoolsTable.onboardedAt) != null)
                         )
-                        val docs = listOf(
-                            ReviewComplianceDoc("d_1", "Affiliation Cert", false),
-                            ReviewComplianceDoc("d_2", "Building Safety", false)
-                        )
+
+                        // Real onboarding signals (school-scoped). All counts are
+                        // 0 when the school has not been created yet.
+                        val (hasClasses, hasSubjects, hasMedia) = if (schoolId == null) {
+                            Triple(false, false, false)
+                        } else dbQuery {
+                            val classCount = SchoolClassesTable.selectAll()
+                                .where { SchoolClassesTable.schoolId eq schoolId }.count()
+                            val classIds = SchoolClassesTable.selectAll()
+                                .where { SchoolClassesTable.schoolId eq schoolId }
+                                .map { it[SchoolClassesTable.id].value }
+                            val subjectCount = if (classIds.isEmpty()) 0L else
+                                SchoolSubjectsTable.selectAll()
+                                    .where {
+                                        classIds.map { cid -> SchoolSubjectsTable.classId eq cid }
+                                            .reduce { acc, op -> acc or op }
+                                    }.count()
+                            val mediaCount = SchoolMediaTable.selectAll()
+                                .where { SchoolMediaTable.schoolId eq schoolId }.count()
+                            Triple(classCount > 0, subjectCount > 0, mediaCount > 0)
+                        }
+
+                        // compliance_docs: no backing source → honest empty.
+                        val docs = emptyList<ReviewComplianceDoc>()
+                        // modules: derived from real setup state, not fabricated.
+                        //  - Analytics is configured once the school has classes
+                        //    (the analytics surface needs class/exam data).
+                        //  - Branding is configured once any media is uploaded.
+                        //  - Academics is configured once subjects exist.
                         val modules = listOf(
-                            ReviewModule("Analytics", true),
-                            ReviewModule("PTM Management", true),
-                            ReviewModule("Scholarships", false)
+                            ReviewModule("Academic structure", hasSubjects),
+                            ReviewModule("Analytics", hasClasses),
+                            ReviewModule("Branding & media", hasMedia)
                         )
                         call.ok(
                             OnboardingStepResponse(

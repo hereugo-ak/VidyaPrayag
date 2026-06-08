@@ -83,7 +83,12 @@ class NotificationsViewModel(
         }
     }
 
-    /** Local optimistic "mark all read" — clears unread overlay until the next refresh. */
+    /**
+     * RA-46: persist "mark all read" on the server (optimistic UI first, then
+     * the real PATCH so the bell count is correct after a refresh / on other
+     * devices). Synthetic bridge items (ann_/fee_) are not server rows, so the
+     * call only affects real NotificationsTable rows — which is correct.
+     */
     fun markAllRead() {
         _state.update { s ->
             s.copy(
@@ -91,13 +96,25 @@ class NotificationsViewModel(
                 unreadCount = 0,
             )
         }
+        viewModelScope.launch {
+            val token = preferenceRepository.getUserToken().first() ?: return@launch
+            repository.markAllNotificationsRead(token)
+        }
     }
 
-    /** Local optimistic single mark-read. */
+    /** RA-46: persist a single mark-read on the server (optimistic UI first). */
     fun markRead(id: String) {
         _state.update { s ->
             val updated = s.notifications.map { if (it.id == id) it.copy(unread = false) else it }
             s.copy(notifications = updated, unreadCount = updated.count { it.unread })
+        }
+        // Only real rows (UUID ids) are server-persistable; synth bridge ids are
+        // prefixed (ann_/fee_) and are skipped server-side anyway.
+        if (!id.startsWith("ann_") && !id.startsWith("fee_")) {
+            viewModelScope.launch {
+                val token = preferenceRepository.getUserToken().first() ?: return@launch
+                repository.markNotificationRead(token, id)
+            }
         }
     }
 }

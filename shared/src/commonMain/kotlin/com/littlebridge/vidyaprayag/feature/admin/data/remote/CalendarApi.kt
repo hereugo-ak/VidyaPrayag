@@ -13,8 +13,7 @@ import com.littlebridge.vidyaprayag.core.network.safeApiCall
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.CalendarResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.request.header
-import io.ktor.http.HttpHeaders
+import io.ktor.client.request.parameter
 
 class CalendarApi(
     private val client: HttpClient,
@@ -32,14 +31,10 @@ class CalendarApi(
         date: String? = null,
         viewType: String = "month"
     ): NetworkResult<ApiResponse<CalendarResponse>> = safeApiCall {
-        val params = buildList {
-            date?.let { add("date=$it") }
-            add("view_type=$viewType")
-        }.joinToString("&")
-        val url = if (params.isBlank()) getUrl("api/v1/school/calendar")
-                  else getUrl("api/v1/school/calendar?$params")
-        client.get(url) {
-            header(HttpHeaders.Authorization, "Bearer $token")
+        // RA-64: URL-encode via parameter(...).
+        client.get(getUrl("api/v1/school/calendar")) {
+            date?.let { parameter("date", it) }
+            parameter("view_type", viewType)
         }
     }
 }

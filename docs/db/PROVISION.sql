@@ -33,11 +33,16 @@
 --        Adds announcement broadcast segmentation columns; the
 --        teacher_subject_assignments table; and children.student_code.
 --
---   4. docs/backend/sql/02_teacher_schema.sql
+--   4. docs/db/migration_003_leave_workflow_and_two_party_messaging.sql
+--        Cross-role leave routing columns on leave_requests (RA-44) and the
+--        two-party conversation_id/peer_user_id columns on message_threads /
+--        messages (RA-51).
+--
+--   5. docs/backend/sql/02_teacher_schema.sql
 --        Teacher-vertical tables: assessments, assessment_marks,
 --        syllabus_units, homework, homework_submissions, teacher_periods.
 --
---   5. scripts/schema-patch-2026-06-07.sql
+--   6. scripts/schema-patch-2026-06-07.sql
 --        Scholarships + scholarship_applications (RE-AUDIT RA-05).
 --
 -- ALL CREATE TABLE statements use IF NOT EXISTS, so it is safe to re-run.
@@ -50,6 +55,7 @@
 --     \i docs/db/vidyasetu_schema.sql
 --     \i docs/db/migration_001_faculty_and_holiday_list.sql
 --     \i docs/db/migration_002_segmentation_geo_assignments.sql
+--     \i docs/db/migration_003_leave_workflow_and_two_party_messaging.sql
 --     \i docs/backend/sql/02_teacher_schema.sql
 --     \i scripts/schema-patch-2026-06-07.sql
 --     \i scripts/seed-2026-06-07.sql

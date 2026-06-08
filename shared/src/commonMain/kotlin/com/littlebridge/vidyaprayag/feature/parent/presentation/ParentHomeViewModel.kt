@@ -18,13 +18,20 @@ import kotlinx.coroutines.launch
 /** UI-facing parent-home state, sourced from the real `GET /api/v1/parent/dashboard`. */
 data class ParentHomeState(
     val greeting: String = "",
-    val childSummary: DashboardChildSummary? = null,
+    /** All active children (RA-31). May be empty (no child) or have 2+ entries. */
+    val children: List<DashboardChildSummary> = emptyList(),
+    /** Id of the child currently shown in the hero; null until children load. */
+    val selectedChildId: String? = null,
     val alerts: List<DashboardAlertDto> = emptyList(),
     val featuredSchools: List<FeaturedSchoolDto> = emptyList(),
     val curationLogic: String = "",
     val isLoading: Boolean = false,
     val error: String? = null,
-)
+) {
+    /** The child currently selected (falls back to the first child). */
+    val childSummary: DashboardChildSummary?
+        get() = children.firstOrNull { it.id == selectedChildId } ?: children.firstOrNull()
+}
 
 /**
  * ParentHomeViewModel — drives [ParentHomeScreenV2] off the real
@@ -58,11 +65,18 @@ class ParentHomeViewModel(
             when (val result = repository.getDashboard(token)) {
                 is NetworkResult.Success -> {
                     val data = result.data.data
+                    // RA-31: prefer the `children` array; fall back to the single
+                    // `child_summary` when talking to an older server build.
+                    val children = data.children.ifEmpty { listOfNotNull(data.childSummary) }
                     _state.update {
+                        // Preserve the current selection if it's still present,
+                        // otherwise default to the first child.
+                        val keepSelected = it.selectedChildId?.takeIf { id -> children.any { c -> c.id == id } }
                         it.copy(
                             isLoading = false,
                             greeting = data.greeting,
-                            childSummary = data.childSummary,
+                            children = children,
+                            selectedChildId = keepSelected ?: children.firstOrNull()?.id,
                             alerts = data.alerts,
                             featuredSchools = data.featuredSchools,
                             curationLogic = data.curationLogic,
@@ -75,5 +89,10 @@ class ParentHomeViewModel(
                     _state.update { it.copy(isLoading = false, error = "Connection error") }
             }
         }
+    }
+
+    /** RA-31: switch the child shown in the hero (no network round-trip). */
+    fun selectChild(childId: String) {
+        _state.update { it.copy(selectedChildId = childId) }
     }
 }

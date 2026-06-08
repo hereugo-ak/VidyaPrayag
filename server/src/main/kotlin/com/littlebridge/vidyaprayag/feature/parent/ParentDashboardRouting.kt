@@ -9,7 +9,8 @@
  *
  * The primary "handshake" API. Drives the home screen:
  *   - greeting           : time-of-day + parent first-name (from JWT.name claim)
- *   - child_summary      : first active child of the parent
+ *   - child_summary      : first active child (kept for backward compatibility)
+ *   - children           : ALL active children of the parent (RA-31 multi-child)
  *   - alerts             : OVERDUE fees → CRITICAL alert; INFO fallback from CMS
  *   - featured_schools   : top 5 active schools from the SchoolsTable
  *   - curation_logic     : pulled from app_config (CMS string)
@@ -70,7 +71,11 @@ data class FeaturedSchool(
 @Serializable
 data class DashboardResponse(
     val greeting: String,
+    // RA-31: `child_summary` is kept as the FIRST active child for backward
+    // compatibility; `children` carries ALL active children so a parent with
+    // 2+ linked kids can switch between them. Clients should prefer `children`.
     @SerialName("child_summary") val childSummary: ChildSummary? = null,
+    val children: List<ChildSummary> = emptyList(),
     val alerts: List<DashboardAlert>,
     @SerialName("featured_schools") val featuredSchools: List<FeaturedSchool>,
     @SerialName("curation_logic") val curationLogic: String
@@ -118,12 +123,13 @@ private fun timeOfDayGreeting(): String {
 private fun firstName(full: String?): String = full?.trim()?.split(" ")?.firstOrNull().orEmpty()
 
 private fun formatMoney(amount: Double, currency: String): String {
+    // RA-25: India-first product — default to ₹ (INR) for unknown codes.
     val symbol = when (currency.uppercase()) {
         "USD" -> "$"
         "INR" -> "₹"
         "EUR" -> "€"
         "GBP" -> "£"
-        else  -> "$"
+        else  -> "₹"
     }
     val rounded = amount.toLong()
     val withCommas = "%,d".format(rounded)
@@ -147,22 +153,22 @@ fun Route.parentDashboardRouting() {
                     val greeting = if (displayFirstName.isBlank()) timeOfDayGreeting()
                                    else "${timeOfDayGreeting()}, $displayFirstName"
 
-                    // ----- child summary (first active child) -----
-                    val childRow = ChildrenTable.selectAll()
+                    // ----- children (RA-31: ALL active children, oldest first) -----
+                    val children = ChildrenTable.selectAll()
                         .where { (ChildrenTable.parentId eq uid) and (ChildrenTable.isActive eq true) }
                         .orderBy(ChildrenTable.createdAt, SortOrder.ASC)
-                        .firstOrNull()
-
-                    val childSummary = childRow?.let {
-                        ChildSummary(
-                            id = it[ChildrenTable.id].value.toString(),
-                            name = it[ChildrenTable.childName],
-                            overallProgress = it[ChildrenTable.overallProgress],
-                            currentLevel = it[ChildrenTable.currentLevel],
-                            attendanceStatus = it[ChildrenTable.attendanceStatus],
-                            profilePic = it[ChildrenTable.profilePic]
-                        )
-                    }
+                        .map {
+                            ChildSummary(
+                                id = it[ChildrenTable.id].value.toString(),
+                                name = it[ChildrenTable.childName],
+                                overallProgress = it[ChildrenTable.overallProgress],
+                                currentLevel = it[ChildrenTable.currentLevel],
+                                attendanceStatus = it[ChildrenTable.attendanceStatus],
+                                profilePic = it[ChildrenTable.profilePic]
+                            )
+                        }
+                    // First child mirrored into child_summary for backward compatibility.
+                    val childSummary = children.firstOrNull()
 
                     // ----- alerts: overdue fees -----
                     val alerts = mutableListOf<DashboardAlert>()
@@ -221,6 +227,7 @@ fun Route.parentDashboardRouting() {
                     DashboardResponse(
                         greeting = greeting,
                         childSummary = childSummary,
+                        children = children,
                         alerts = alerts,
                         featuredSchools = schools,
                         curationLogic = curationLogic

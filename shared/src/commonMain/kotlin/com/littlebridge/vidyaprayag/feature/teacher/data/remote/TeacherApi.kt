@@ -29,15 +29,11 @@ class TeacherApi(
     // ── Reads ───────────────────────────────────────────────────────────────
 
     suspend fun getHome(token: String): NetworkResult<TeacherHomeResponse> = safeApiCall {
-        client.get(getUrl("api/v1/teacher/home")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.get(getUrl("api/v1/teacher/home"))
     }
 
     suspend fun getClasses(token: String): NetworkResult<TeacherClassesResponse> = safeApiCall {
-        client.get(getUrl("api/v1/teacher/classes")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.get(getUrl("api/v1/teacher/classes"))
     }
 
     suspend fun getAttendance(
@@ -46,7 +42,6 @@ class TeacherApi(
         date: String,
     ): NetworkResult<TeacherAttendanceResponse> = safeApiCall {
         client.get(getUrl("api/v1/teacher/attendance")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             parameter("class_id", classId)
             parameter("date", date)
         }
@@ -58,7 +53,6 @@ class TeacherApi(
         examId: String,
     ): NetworkResult<TeacherMarksResponse> = safeApiCall {
         client.get(getUrl("api/v1/teacher/marks")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             parameter("class_id", classId)
             parameter("exam_id", examId)
         }
@@ -70,22 +64,28 @@ class TeacherApi(
         subject: String,
     ): NetworkResult<TeacherSyllabusResponse> = safeApiCall {
         client.get(getUrl("api/v1/teacher/syllabus")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             parameter("class_id", classId)
             parameter("subject", subject)
         }
     }
 
     suspend fun getHomework(token: String): NetworkResult<TeacherHomeworkResponse> = safeApiCall {
-        client.get(getUrl("api/v1/teacher/homework")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
+        client.get(getUrl("api/v1/teacher/homework"))
+    }
+
+    // RA-40: list the exams a teacher can mark for an owned class. The marks
+    // plane requires a valid exam_id; this is where the exam selector sources it.
+    suspend fun getAssessments(
+        token: String,
+        classId: String,
+    ): NetworkResult<TeacherAssessmentsResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/assessments")) {
+            parameter("class_id", classId)
         }
     }
 
     suspend fun getProfile(token: String): NetworkResult<TeacherProfileResponse> = safeApiCall {
-        client.get(getUrl("api/v1/teacher/profile")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+        client.get(getUrl("api/v1/teacher/profile"))
     }
 
     // ── Writes ──────────────────────────────────────────────────────────────
@@ -95,7 +95,6 @@ class TeacherApi(
         request: SubmitAttendanceRequest,
     ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
         client.post(getUrl("api/v1/teacher/attendance")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(request)
         }
@@ -106,7 +105,6 @@ class TeacherApi(
         request: SubmitMarksRequest,
     ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
         client.post(getUrl("api/v1/teacher/marks")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(request)
         }
@@ -117,7 +115,6 @@ class TeacherApi(
         request: UpdateSyllabusRequest,
     ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
         client.patch(getUrl("api/v1/teacher/syllabus")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(request)
         }
@@ -128,7 +125,53 @@ class TeacherApi(
         request: CreateHomeworkRequest,
     ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
         client.post(getUrl("api/v1/teacher/homework")) {
-            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    // RA-40: create a new exam for an owned class. Server replies 201 with the
+    // created assessment in `data`, so the UI can immediately select it.
+    suspend fun createAssessment(
+        token: String,
+        request: CreateAssessmentRequest,
+    ): NetworkResult<ApiResponse<TeacherAssessmentDto>> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/assessments")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    // ── RA-44: teacher leave workflow ─────────────────────────────────────────
+
+    /** Leave requests routed to this teacher's classes (optionally status-filtered). */
+    suspend fun getLeaveRequests(
+        token: String,
+        status: String? = null,
+    ): NetworkResult<TeacherLeaveListResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/leave-requests")) {
+            if (status != null) parameter("status", status)
+        }
+    }
+
+    /** Approve / reject a leave request the teacher owns. */
+    suspend fun decideLeaveRequest(
+        token: String,
+        id: String,
+        request: TeacherLeaveDecisionRequest,
+    ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
+        client.patch(getUrl("api/v1/teacher/leave-requests/$id")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    /** RA-51: broadcast a message to every parent of an owned class. */
+    suspend fun broadcastToClass(
+        token: String,
+        request: TeacherClassBroadcastRequest,
+    ): NetworkResult<TeacherClassBroadcastResponse> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/messages/class")) {
             contentType(ContentType.Application.Json)
             setBody(request)
         }

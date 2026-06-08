@@ -9,11 +9,42 @@ import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.utils.io.errors.*
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 sealed class NetworkResult<out T> {
     data class Success<out T>(val data: T) : NetworkResult<T>()
     data class Error(val message: String, val code: Int? = null) : NetworkResult<Nothing>()
     data object ConnectionError : NetworkResult<Nothing>()
+}
+
+/**
+ * Minimal projection of the canonical `{success, message, data}` envelope used
+ * only to extract a human-readable error message (RA-30). Lenient + ignores
+ * unknown keys so it survives schema drift and extra fields.
+ */
+@Serializable
+private data class ErrorEnvelope(val message: String? = null, val error: String? = null)
+
+private val errorJson = Json { ignoreUnknownKeys = true; isLenient = true }
+
+/**
+ * RA-30: robustly extract a server error message from a non-2xx response body.
+ * Replaces fragile `substringAfter("\"message\":\"")` parsing (which broke on
+ * escaped quotes, pretty-printed JSON, or a null message) with proper lenient
+ * deserialization of the standard envelope, falling back to the status line.
+ */
+fun extractErrorMessage(errorBody: String, statusCode: Int): String {
+    val trimmed = errorBody.trim()
+    if (trimmed.startsWith("{")) {
+        val parsed = runCatching {
+            errorJson.decodeFromString(ErrorEnvelope.serializer(), trimmed)
+        }.getOrNull()
+        val msg = parsed?.message?.takeIf { it.isNotBlank() }
+            ?: parsed?.error?.takeIf { it.isNotBlank() }
+        if (msg != null) return msg
+    }
+    return trimmed.ifBlank { "Server returned $statusCode" }
 }
 
 fun redactedHeaders(headers: Headers): List<Pair<String, List<String>>> {
@@ -83,15 +114,7 @@ suspend inline fun <reified T> safeApiCall(block: () -> HttpResponse): NetworkRe
             AppLogger.e("API_CALL", "RESPONSE STATUS: ${response.status.value}")
             AppLogger.e("API_CALL", "RESPONSE ERROR BODY: ${redactedBodyText(errorBody)}")
             
-            val message = try {
-                if (errorBody.contains("\"message\"")) {
-                    errorBody.substringAfter("\"message\":\"").substringBefore("\"")
-                } else {
-                    errorBody.ifBlank { "Server returned ${response.status.value}" }
-                }
-            } catch (e: Exception) {
-                "Error: ${response.status.value}"
-            }
+            val message = extractErrorMessage(errorBody, response.status.value)
             AppLogger.d("API_CALL", "--- END API CALL (ERROR) ---")
             NetworkResult.Error(message, response.status.value)
         }

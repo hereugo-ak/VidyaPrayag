@@ -23,6 +23,8 @@
 package com.littlebridge.vidyaprayag.feature.teacher
 
 import com.littlebridge.vidyaprayag.core.created
+import com.littlebridge.vidyaprayag.feature.notifications.Notify
+import com.littlebridge.vidyaprayag.feature.notifications.NotifyRecipients
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.okMessage
@@ -161,6 +163,29 @@ data class CreateHomeworkRequest(
     @SerialName("due_date") val dueDate: String,
 )
 
+@kotlinx.serialization.Serializable
+data class TeacherAssessmentDto(
+    val id: String,
+    val name: String,
+    val subject: String,
+    @SerialName("max_marks") val maxMarks: Int,
+    @SerialName("exam_date") val examDate: String? = null,
+    @SerialName("is_published") val isPublished: Boolean = false,
+)
+
+@kotlinx.serialization.Serializable
+data class TeacherAssessmentsData(
+    val assessments: List<TeacherAssessmentDto> = emptyList(),
+)
+
+@kotlinx.serialization.Serializable
+data class CreateAssessmentRequest(
+    @SerialName("class_id") val classId: String,
+    val name: String,
+    @SerialName("max_marks") val maxMarks: Int? = null,
+    @SerialName("exam_date") val examDate: String? = null,
+)
+
 private val VALID_ATTENDANCE = setOf("present", "absent", "late")
 
 /** Mounts the attendance/marks/syllabus/homework child routes under /api/v1/teacher. */
@@ -255,6 +280,27 @@ fun Route.teacherTaskRoutes() {
                             it[createdAt] = now
                         }
                     }
+                }
+            }
+
+            // RA-41: alert each affected parent when their child is absent/late.
+            // Recipients resolved per student_code within this school (multi-tenant).
+            val flagged = req.entries.filter { it.status.lowercase() in setOf("absent", "late") }
+            for (e in flagged) {
+                val parents = NotifyRecipients.parentsOfStudent(ctx.schoolId, e.studentId)
+                if (parents.isNotEmpty()) {
+                    val verb = if (e.status.lowercase() == "absent") "marked absent" else "marked late"
+                    Notify.toUsers(
+                        userIds = parents,
+                        category = "attendance",
+                        title = "Attendance update",
+                        body = "Your child was $verb on $date.",
+                        schoolId = ctx.schoolId,
+                        actorId = ctx.userId,
+                        deepLink = "parent/academics/attendance",
+                        refType = "attendance",
+                        refId = e.studentId,
+                    )
                 }
             }
             call.okMessage("Attendance saved for ${req.entries.size} student(s)")
@@ -385,8 +431,106 @@ fun Route.teacherTaskRoutes() {
                         }
                     }
                 }
+                // RA-43: entering marks publishes the assessment so parents can read
+                // it. The parent marks endpoint filters on isPublished = true, so an
+                // unpublished (draft) assessment stays invisible until a teacher submits.
+                AssessmentsTable.update({ AssessmentsTable.id eq assessmentId }) {
+                    it[isPublished] = true
+                    it[publishedAt] = now
+                    it[updatedAt] = now
+                }
+            }
+
+            // RA-41: notify the class parents that a result was published. Scoped
+            // to the owned class within this school (multi-tenant isolation).
+            val examName = assessment[AssessmentsTable.name]
+            val parents = NotifyRecipients.parentsOfClass(ctx.schoolId, asg.className)
+            if (parents.isNotEmpty()) {
+                Notify.toUsers(
+                    userIds = parents,
+                    category = "marks",
+                    title = "Results published",
+                    body = "Marks for \"$examName\" (${asg.subject}) have been published.",
+                    schoolId = ctx.schoolId,
+                    actorId = ctx.userId,
+                    deepLink = "parent/academics/marks",
+                    refType = "assessment",
+                    refId = assessmentId.toString(),
+                )
             }
             call.okMessage("Marks saved for ${req.entries.size} student(s)")
+        }
+    }
+
+    // ── Assessments (exams) — list + create, so the marks flow is reachable ───
+    // RA-40: the marks screen needs a valid exam_id. Without a way to list or
+    // create assessments the teacher could never get one, so the marks plane
+    // was unreachable even once a class was selected. These two routes close it.
+    route("/assessments") {
+        // GET ?class_id= → exams the teacher can mark for this owned class.
+        get {
+            val ctx = call.requireTeacherContext() ?: return@get
+            val classId = call.request.queryParameters["class_id"]
+            val asg = call.requireOwnedAssignment(ctx, classId) ?: return@get
+            val rows = dbQuery {
+                AssessmentsTable.selectAll().where {
+                    (AssessmentsTable.schoolId eq ctx.schoolId) and
+                        (AssessmentsTable.className eq asg.className) and
+                        (AssessmentsTable.section eq asg.section) and
+                        (AssessmentsTable.subject eq asg.subject) and
+                        (AssessmentsTable.isActive eq true)
+                }.orderBy(AssessmentsTable.createdAt, SortOrder.DESC).map { a ->
+                    TeacherAssessmentDto(
+                        id = a[AssessmentsTable.id].value.toString(),
+                        name = a[AssessmentsTable.name],
+                        subject = a[AssessmentsTable.subject],
+                        maxMarks = a[AssessmentsTable.maxMarks],
+                        examDate = a[AssessmentsTable.examDate],
+                        isPublished = a[AssessmentsTable.isPublished],
+                    )
+                }
+            }
+            call.ok(TeacherAssessmentsData(assessments = rows), message = "Assessments loaded")
+        }
+
+        // POST → create a new assessment for an owned class.
+        post {
+            val ctx = call.requireTeacherContext() ?: return@post
+            val req = call.receive<CreateAssessmentRequest>()
+            val asg = call.requireOwnedAssignment(ctx, req.classId) ?: return@post
+            if (req.name.isBlank()) {
+                call.fail("Exam name is required", HttpStatusCode.BadRequest, "BAD_NAME"); return@post
+            }
+            val now = Instant.now()
+            val newId = UUID.randomUUID()
+            dbQuery {
+                AssessmentsTable.insert {
+                    it[id] = newId
+                    it[schoolId] = ctx.schoolId
+                    it[teacherId] = ctx.userId
+                    it[className] = asg.className
+                    it[section] = asg.section
+                    it[subject] = asg.subject
+                    it[name] = req.name.trim()
+                    it[maxMarks] = req.maxMarks ?: 100
+                    it[examDate] = req.examDate
+                    it[isActive] = true
+                    it[isPublished] = false
+                    it[createdAt] = now
+                    it[updatedAt] = now
+                }
+            }
+            call.created(
+                TeacherAssessmentDto(
+                    id = newId.toString(),
+                    name = req.name.trim(),
+                    subject = asg.subject,
+                    maxMarks = req.maxMarks ?: 100,
+                    examDate = req.examDate,
+                    isPublished = false,
+                ),
+                message = "Assessment created",
+            )
         }
     }
 
@@ -544,6 +688,22 @@ fun Route.teacherTaskRoutes() {
                     it[createdAt] = now
                     it[updatedAt] = now
                 }
+            }
+
+            // RA-41: notify the class parents that new homework was assigned.
+            val parents = NotifyRecipients.parentsOfClass(ctx.schoolId, asg.className)
+            if (parents.isNotEmpty()) {
+                Notify.toUsers(
+                    userIds = parents,
+                    category = "homework",
+                    title = "New homework",
+                    body = "${asg.subject}: ${req.title} — due ${req.dueDate}.",
+                    schoolId = ctx.schoolId,
+                    actorId = ctx.userId,
+                    deepLink = "parent/academics",
+                    refType = "homework",
+                    refId = newId.toString(),
+                )
             }
             call.created(mapOf("id" to newId.toString()), message = "Homework created")
         }

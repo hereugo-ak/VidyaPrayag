@@ -12,6 +12,8 @@ interface AuthRepository {
     suspend fun saveSession(response: AuthResponse)
     suspend fun getSession(): AuthResponse?
     suspend fun refresh(): NetworkResult<AuthResponse>
+    /** RA-54: change password; on success persists profileCompleted=true locally. */
+    suspend fun changePassword(oldPassword: String?, newPassword: String): NetworkResult<Unit>
     suspend fun logout()
     suspend fun getUserDetails(token: String): NetworkResult<UserDetailsResponse>
 }

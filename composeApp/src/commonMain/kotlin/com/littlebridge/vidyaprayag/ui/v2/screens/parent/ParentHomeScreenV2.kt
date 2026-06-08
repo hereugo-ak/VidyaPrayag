@@ -1,6 +1,8 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.parent
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,8 +13,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
+import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -55,7 +59,12 @@ fun ParentHomeScreenV2(
     viewModel: ParentHomeViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
-    ParentHomeContent(state = state, onRetry = viewModel::load, modifier = modifier)
+    ParentHomeContent(
+        state = state,
+        onRetry = viewModel::load,
+        onSelectChild = viewModel::selectChild,
+        modifier = modifier,
+    )
 }
 
 /** Stateless body — also used by @Preview with seeded state (no MockV2 in the live path). */
@@ -63,6 +72,7 @@ fun ParentHomeScreenV2(
 private fun ParentHomeContent(
     state: ParentHomeState,
     onRetry: () -> Unit,
+    onSelectChild: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -85,10 +95,27 @@ private fun ParentHomeContent(
             emptyTitle = "No child linked yet",
             emptyBody = "Link your child to see their daily journey and progress.",
             onRetry = onRetry,
+            skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonDashboard() },
         ) {
             // ── Greeting ────────────────────────────────────────────────────────
             if (state.greeting.isNotBlank()) {
                 Text(state.greeting, style = VTheme.type.h2.colored(c.ink))
+            }
+
+            // ── Child switcher (RA-31: only when 2+ children are linked) ─────────
+            if (state.children.size > 1) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    state.children.forEach { ch ->
+                        ChildChip(
+                            name = ch.name.ifBlank { "—" },
+                            selected = ch.id == state.selectedChildId,
+                            onClick = { onSelectChild(ch.id) },
+                        )
+                    }
+                }
             }
 
             // ── Child hero ──────────────────────────────────────────────────────
@@ -188,5 +215,28 @@ private fun ParentHomeContent(
                 }
             }
         }
+    }
+}
+
+/**
+ * RA-31: a child selector chip used when a parent has 2+ linked children.
+ * Frozen V* primitives + theme tokens only (teal/tealDeep, cream, ink) — no
+ * new tokens, no Material defaults.
+ */
+@Composable
+private fun ChildChip(name: String, selected: Boolean, onClick: () -> Unit) {
+    val c = VTheme.colors
+    val (bg, fg) = if (selected) c.teal.copy(alpha = 0.16f) to c.tealDeep else c.cream to c.ink2
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(bg)
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        VAvatar(name = name, size = 24.dp)
+        Text(name, style = VTheme.type.label.colored(fg))
     }
 }

@@ -90,7 +90,12 @@ fun defaultVTypography(
     dataFamily = dataFamily,
     h1 = TextStyle(fontFamily = uiFamily, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 35.2.sp, letterSpacing = (-0.02).em),
     h2 = TextStyle(fontFamily = uiFamily, fontSize = 22.sp, fontWeight = FontWeight.Bold, lineHeight = 26.4.sp, letterSpacing = (-0.01).em),
-    h3 = TextStyle(fontFamily = uiFamily, fontSize = 17.sp, fontWeight = FontWeight.Bold, lineHeight = 22.sp),
+    // Feature 8 — heading letter-spacing tightening. h1/h2 already carry the
+    // design's em-based negative tracking; h3 had none. A subtle -0.3sp makes the
+    // 17sp section headers feel more premium without touching size/weight/family.
+    // h4 is deliberately LEFT at 0 — it doubles as VButton's label style, where
+    // tightening would distort button text (RULE-2: stability over polish).
+    h3 = TextStyle(fontFamily = uiFamily, fontSize = 17.sp, fontWeight = FontWeight.Bold, lineHeight = 22.sp, letterSpacing = (-0.3).sp),
     h4 = TextStyle(fontFamily = uiFamily, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, lineHeight = 20.sp),
     body = TextStyle(fontFamily = uiFamily, fontSize = 14.sp, fontWeight = FontWeight.Normal, lineHeight = 21.sp),
     bodyStrong = TextStyle(fontFamily = uiFamily, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, lineHeight = 21.sp),

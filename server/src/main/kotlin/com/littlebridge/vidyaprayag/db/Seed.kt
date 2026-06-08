@@ -321,22 +321,19 @@ object CmsSeed {
                 """.trimIndent(),
 
                 // ---------------- Class Performance ----------------------
+                // RA-59: grade_distribution / subject_matrix / subject_engagements
+                // / by_class are now computed at request time from real
+                // exam_results in SchoolAnalyticsRouting./class-performance and
+                // overlaid onto this template. summary.active_students is overlaid
+                // from the real students count. The empty defaults below are the
+                // honest "no real data yet" state — no fabricated bars/people.
                 "school_class_performance" to """
                     {
-                      "grade_distribution": [
-                        {"grade":"F","percentage":12,"value":0.20},
-                        {"grade":"D","percentage":21,"value":0.35},
-                        {"grade":"C","percentage":32,"value":0.55},
-                        {"grade":"B","percentage":48,"value":0.85},
-                        {"grade":"A","percentage":38,"value":0.65}
-                      ],
-                      "summary": {"avg_proficiency":"78.4%","active_students":428,"median_grade":"B+"},
-                      "subject_matrix": [
-                        {"name":"Mathematics","percentage":82,"trend":"up"},
-                        {"name":"Science","percentage":76,"trend":"flat"},
-                        {"name":"Literature","percentage":54,"trend":"down"},
-                        {"name":"History","percentage":68,"trend":"up"}
-                      ],
+                      "grade_distribution": [],
+                      "summary": {"avg_proficiency":"","active_students":0,"median_grade":""},
+                      "subject_matrix": [],
+                      "subject_engagements": [],
+                      "by_class": [],
                       "risk": {"critical_count":0,"moderate_count":0,"proficiency_target_reach":75},
                       "top_performer": null,
                       "recent_progress": []
@@ -358,17 +355,17 @@ object CmsSeed {
                 // request time from real `exam_results` / `attendance_records` in
                 // SchoolAnalyticsRouting./student-cohort and overlaid onto this
                 // template. The empty defaults below are the honest "no data" state.
+                // RA-59: subject_engagements + cohort_comparison are now computed
+                // at request time from real exam_results in
+                // SchoolAnalyticsRouting./student-cohort and overlaid here. Empty
+                // defaults are the honest "no data" state (no fabricated subjects).
                 "school_student_analytics_cohort" to """
                     {
                       "daily_volatility": [],
                       "risk": {"critical_count":0,"medium_count":0,"low_count":0},
                       "at_risk_students": [],
-                      "subject_engagements": [
-                        {"name":"Advanced Mathematics","percentage":0.942},
-                        {"name":"Physical Sciences","percentage":0.76,"status":"Risk Level High"},
-                        {"name":"Computer Programming","percentage":0.918}
-                      ],
-                      "cohort_comparison": [0.85,0.92,0.98,0.78]
+                      "subject_engagements": [],
+                      "cohort_comparison": []
                     }
                 """.trimIndent(),
 
@@ -378,17 +375,20 @@ object CmsSeed {
                 // table + 30-day attendance in SchoolAnalyticsRouting./teacher-performance
                 // and overlaid onto this template. The empty default is the honest
                 // "no faculty yet" state. (`star_faculty` was already real.)
+                // RA-59: every metric here is now computed at request time from
+                // real tables in SchoolAnalyticsRouting (dept_efficiencies from
+                // faculty+attendance; accountability_matrix from faculty;
+                // aggregate_compliance/compliance_trend/syllabus_update_trend have
+                // no backing table and are returned as honest empty states by the
+                // route). The seed is reduced to empty defaults so NO fabricated
+                // value can ever leak if a future route path forgets to overlay.
                 "school_teacher_performance" to """
                     {
-                      "aggregate_compliance": "94.2%",
-                      "compliance_trend": "+2.4% from last month",
-                      "syllabus_update_trend": [0.4, 0.6, 0.5, 0.85, 0.7, 1.0, 0.5, 0.75],
+                      "aggregate_compliance": "",
+                      "compliance_trend": "",
+                      "syllabus_update_trend": [],
                       "accountability_matrix": [],
-                      "dept_efficiencies": [
-                        {"name":"Science & Technology","percentage":96},
-                        {"name":"Humanities","percentage":84},
-                        {"name":"Physical Education","percentage":92}
-                      ]
+                      "dept_efficiencies": []
                     }
                 """.trimIndent(),
 
@@ -410,28 +410,20 @@ object CmsSeed {
                 "school_student_analytics_narrative" to "\"Strong rebound in numeracy this quarter; literacy steady.\"",
 
                 // ---------------- Syllabus Coverage ----------------------
+                // RA-59: overall/by_subject/by_class/aggregate_compliance are
+                // computed at request time from real exam_results in
+                // SchoolAnalyticsRouting./syllabus-coverage. alerts/milestones/
+                // compliance_trend/syllabus_update_trend have NO backing table
+                // (no curriculum-schedule/compliance-audit log server-side) and
+                // are returned as honest empty states by the route. Seed reduced
+                // to empty defaults so no fabricated value can leak.
                 "school_syllabus_coverage" to """
                     {
-                      "overall": {"percentage":78,"trend":"+2.1%"},
-                      "by_subject": [
-                        {"name":"Science Dept","percentage":75,"behind_by_days":0,"trend":"+5% from last week"},
-                        {"name":"Mathematics","percentage":90,"behind_by_days":0,"trend":"On Target"},
-                        {"name":"Humanities","percentage":42,"behind_by_days":7,"trend":"Delayed Entry"},
-                        {"name":"Fine Arts","percentage":60,"behind_by_days":0,"trend":"Steady Growth"}
-                      ],
-                      "by_class": [
-                        {"class":"Grade 10-A","percentage":88},
-                        {"class":"Grade 10-B","percentage":72},
-                        {"class":"Grade 9-A","percentage":81}
-                      ],
-                      "alerts": [
-                        {"id":"1","subject":"Chemistry","class_name":"Grade 10-B","delay_percentage":14,"instructor":"Dr. Miller","is_critical":true},
-                        {"id":"2","subject":"World History","class_name":"Grade 8-C","delay_percentage":8,"instructor":"Sarah J.","is_critical":false}
-                      ],
-                      "milestones": [
-                        {"id":"1","month":"Oct","day":"12","title":"Mid-Term Syllabus Verification","description":"Department heads to submit progress audits for Q2.","is_verified":true},
-                        {"id":"2","month":"Oct","day":"28","title":"Practical Assessment Window","description":"Science labs opening for senior grade assessments.","is_verified":false}
-                      ]
+                      "overall": {"percentage":0,"trend":""},
+                      "by_subject": [],
+                      "by_class": [],
+                      "alerts": [],
+                      "milestones": []
                     }
                 """.trimIndent(),
 
