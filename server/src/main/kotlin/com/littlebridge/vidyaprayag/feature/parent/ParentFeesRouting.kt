@@ -66,12 +66,14 @@ data class ParentFeesResponse(
 private val lenientJson = Json { ignoreUnknownKeys = true; isLenient = true }
 
 private fun money(amount: Double, currency: String): String {
+    // RA-25: India-first product — default to ₹ (INR), matching the
+    // FeeRecordsTable.currency column default. Other codes still map correctly.
     val symbol = when (currency.uppercase()) {
         "USD" -> "$"
         "INR" -> "₹"
         "EUR" -> "€"
         "GBP" -> "£"
-        else  -> "$"
+        else  -> "₹"
     }
     return "$symbol${"%,d".format(amount.toLong())}"
 }
@@ -89,7 +91,9 @@ fun Route.parentFeesRouting() {
                         .where { FeeRecordsTable.parentId eq uid }
                         .toList()
 
-                    val currency = rows.firstOrNull()?.get(FeeRecordsTable.currency) ?: "USD"
+                    // RA-25: fall back to INR (India-first) when the parent has no
+                    // fee record yet, instead of USD.
+                    val currency = rows.firstOrNull()?.get(FeeRecordsTable.currency) ?: "INR"
                     val collected = rows.filter { it[FeeRecordsTable.status] == "PAID" }
                         .sumOf { it[FeeRecordsTable.amount] }
                     val outstanding = rows.filter { it[FeeRecordsTable.status] in setOf("DUE", "OVERDUE") }

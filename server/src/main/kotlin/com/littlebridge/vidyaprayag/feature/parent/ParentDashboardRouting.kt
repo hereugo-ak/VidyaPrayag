@@ -123,12 +123,13 @@ private fun timeOfDayGreeting(): String {
 private fun firstName(full: String?): String = full?.trim()?.split(" ")?.firstOrNull().orEmpty()
 
 private fun formatMoney(amount: Double, currency: String): String {
+    // RA-25: India-first product — default to ₹ (INR) for unknown codes.
     val symbol = when (currency.uppercase()) {
         "USD" -> "$"
         "INR" -> "₹"
         "EUR" -> "€"
         "GBP" -> "£"
-        else  -> "$"
+        else  -> "₹"
     }
     val rounded = amount.toLong()
     val withCommas = "%,d".format(rounded)
