@@ -55,8 +55,13 @@ fun AdminAuthScreenV2(
     val state by viewModel.state.collectAsStateV2()
     var passwordVisible by remember { mutableStateOf(false) }
 
-    // Pin to the ADMIN credential flow; real role comes from the JWT post-login.
-    LaunchedEffect(Unit) { viewModel.onRoleChanged("ADMIN") }
+    // Clear any state left over from a prior session (the AuthViewModel is reused across a
+    // logout → landing → login round-trip) so the email/password fields start blank, then pin
+    // to the ADMIN credential flow; the real role comes from the JWT post-login.
+    LaunchedEffect(Unit) {
+        viewModel.reset()
+        viewModel.onRoleChanged("ADMIN")
+    }
     LaunchedEffect(state.isAuthSuccessful) { if (state.isAuthSuccessful) onAuthSuccess() }
 
     AuthScaffoldV2(

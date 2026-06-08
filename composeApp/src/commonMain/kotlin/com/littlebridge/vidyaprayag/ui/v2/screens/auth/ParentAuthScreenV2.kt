@@ -46,8 +46,12 @@ fun ParentAuthScreenV2(
 ) {
     val state by viewModel.state.collectAsStateV2()
 
-    // Pin the role to PARENT the moment this scoped screen mounts.
-    LaunchedEffect(Unit) { viewModel.onRoleChanged("PARENT") }
+    // Clear any state left over from a prior session (the AuthViewModel is reused across a
+    // logout → landing → login round-trip), then pin the role to PARENT for this scoped screen.
+    LaunchedEffect(Unit) {
+        viewModel.reset()
+        viewModel.onRoleChanged("PARENT")
+    }
     LaunchedEffect(state.isAuthSuccessful) { if (state.isAuthSuccessful) onAuthSuccess() }
 
     AuthScaffoldV2(

@@ -152,4 +152,17 @@ class AuthViewModel(
     fun goBack() {
         _state.update { it.copy(step = AuthStep.Identifier, error = null) }
     }
+
+    /**
+     * Clears every field of the auth form back to a pristine [AuthUiState].
+     *
+     * The [AuthViewModel] outlives a single sign-in attempt (it is bound to the unauth
+     * ViewModelStoreOwner, so the same instance is reused after a logout → landing → login
+     * round-trip). Without an explicit reset, the previously typed identifier/password —
+     * and even a stale `isAuthSuccessful` flag — leak into the next login attempt. Each auth
+     * screen calls this on mount so re-entering sign-in always starts from a blank form.
+     */
+    fun reset() {
+        _state.value = AuthUiState()
+    }
 }
