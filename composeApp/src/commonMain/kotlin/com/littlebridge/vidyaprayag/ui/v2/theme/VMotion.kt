@@ -1,5 +1,6 @@
 package com.littlebridge.vidyaprayag.ui.v2.theme
 
+import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -8,7 +9,12 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Composable
@@ -48,6 +54,42 @@ object VMotion {
                 animationSpec = tween(durationMs, delayMillis = delayMs, easing = FastOutSlowInEasing),
                 initialOffsetY = { fromY },
             )
+
+    // ── Screen transitions (Feature 4) ────────────────────────────────────────
+    // Subtle "momentum" cues: the incoming screen slides a short distance (NOT a
+    // full-screen swipe) while fading in; the outgoing screen drifts the other way
+    // while fading out. Offsets are intentionally small (≈30px) so the motion reads
+    // as a directional hint, not a carousel. Easing/duration reuse the design tokens
+    // (FastOutSlowInEasing) already used by fadeUp. All APIs are commonMain-safe.
+
+    /** Momentum distance for screen transitions, in px. Within the 20–40px spec band. */
+    private const val MOMENTUM_PX = 30
+    private const val SCREEN_MS = 280
+
+    private fun screenTween() = tween<Float>(SCREEN_MS, easing = FastOutSlowInEasing)
+    private fun screenTweenInt() = tween<androidx.compose.ui.unit.IntOffset>(SCREEN_MS, easing = FastOutSlowInEasing)
+
+    /**
+     * Forward horizontal momentum: incoming enters from the right (+px) and the
+     * outgoing exits to the left (−px), both cross-fading. Used for funnel screens
+     * that advance "deeper" (landing → auth → discovery …).
+     */
+    fun forwardSlide(): ContentTransform =
+        (fadeIn(screenTween()) + slideInHorizontally(screenTweenInt()) { MOMENTUM_PX }) togetherWith
+            (fadeOut(screenTween()) + slideOutHorizontally(screenTweenInt()) { -MOMENTUM_PX })
+
+    /**
+     * Modal vertical momentum: incoming rises from below (+px) and fades in while the
+     * outgoing fades out. Used for one-time gate steps (link-child / onboarding /
+     * first-login) which read as modal sheets layered over the portal.
+     */
+    fun modalRise(): ContentTransform =
+        (fadeIn(screenTween()) + slideInVertically(screenTweenInt()) { MOMENTUM_PX }) togetherWith
+            (fadeOut(screenTween()) + slideOutVertically(screenTweenInt()) { -MOMENTUM_PX / 2 })
+
+    /** Quiet cross-fade only — for the brief resolving frame (no directional cue). */
+    fun quietFade(): ContentTransform =
+        fadeIn(screenTween()) togetherWith fadeOut(screenTween())
 }
 
 /** Convert a framer-motion (stiffness, damping) pair to a Compose float spring. */

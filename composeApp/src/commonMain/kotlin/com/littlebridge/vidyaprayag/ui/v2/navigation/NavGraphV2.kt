@@ -1,9 +1,6 @@
 package com.littlebridge.vidyaprayag.ui.v2.navigation
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,6 +21,7 @@ import com.littlebridge.vidyaprayag.ui.v2.screens.discovery.DiscoveryScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.parent.ParentPortalV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.school.SchoolPortalV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.teacher.TeacherPortalV2
+import com.littlebridge.vidyaprayag.ui.v2.theme.VMotion
 import com.littlebridge.vidyaprayag.ui.v2.theme.VPortalTone
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import org.koin.compose.koinInject
@@ -114,7 +112,8 @@ private fun UnauthFlow(modifier: Modifier = Modifier) {
 
     AnimatedContent(
         targetState = route,
-        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        // Funnel screens advance "deeper" → subtle forward horizontal momentum + fade.
+        transitionSpec = { VMotion.forwardSlide() },
         label = "unauth-flow",
         modifier = modifier,
     ) { current ->
@@ -199,7 +198,16 @@ private fun AuthedFlow(
     // allow a back path to auth/splash (the session is already established).
     AnimatedContent(
         targetState = route,
-        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        // Gate steps (link-child / onboarding / first-login) read as modal sheets →
+        // vertical rise + fade. The brief Resolving frame uses a quiet cross-fade so
+        // the common (already-completed) path never shows a directional slide.
+        transitionSpec = {
+            if (initialState == AuthedRoute.Resolving || targetState == AuthedRoute.Resolving) {
+                VMotion.quietFade()
+            } else {
+                VMotion.modalRise()
+            }
+        },
         label = "authed-flow",
         modifier = modifier,
     ) { current ->
