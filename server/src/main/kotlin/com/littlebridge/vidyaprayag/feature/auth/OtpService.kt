@@ -164,6 +164,14 @@ object OtpService {
         val expires = now.plus(expiryMinutes, ChronoUnit.MINUTES)
         val windowStart = now.minus(1, ChronoUnit.HOURS)
 
+        // LOGGING FOR TESTING (RA-66): log the plaintext code in non-production.
+        // This ensures the OTP can be seen in Render logs during testing without
+        // needing OTP_DEV_RETURN_CODE=true in the API response.
+       // if (!isProduction) {
+            log.info("[TESTING] Generated OTP for {}: {}", identifier, code)
+            println(">>> [TESTING] OTP for $identifier: $code")
+       // }
+
         // RA-38: the resend-limit check and the UPSERT now run inside ONE
         // transaction with a `SELECT … FOR UPDATE` row lock. Previously the read
         // (existing) and the write (update/insert) were two separate `dbQuery{}`
