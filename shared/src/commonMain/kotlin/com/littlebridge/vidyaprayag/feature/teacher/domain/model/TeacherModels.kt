@@ -254,3 +254,38 @@ data class TeacherProfileData(
     val email: String = "",
     val phone: String = "",
 )
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Assessments (exams) — list + create. RA-40: the marks plane needs a valid
+// exam_id; these models back the exam selector that feeds SubmitMarksRequest.
+// Mirror server TeacherAssessmentDto / TeacherAssessmentsData / CreateAssessmentRequest.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class TeacherAssessmentsResponse(
+    val success: Boolean,
+    val data: TeacherAssessmentsData,
+)
+
+@Serializable
+data class TeacherAssessmentsData(
+    val assessments: List<TeacherAssessmentDto> = emptyList(),
+)
+
+@Serializable
+data class TeacherAssessmentDto(
+    val id: String,
+    val name: String,
+    val subject: String,
+    @SerialName("max_marks") val maxMarks: Int,
+    @SerialName("exam_date") val examDate: String? = null,
+    @SerialName("is_published") val isPublished: Boolean = false,
+)
+
+@Serializable
+data class CreateAssessmentRequest(
+    @SerialName("class_id") val classId: String,
+    val name: String,
+    @SerialName("max_marks") val maxMarks: Int? = null,
+    @SerialName("exam_date") val examDate: String? = null,
+)

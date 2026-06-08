@@ -647,6 +647,10 @@ object AssessmentsTable : UUIDTable("assessments", "id") {
     val maxMarks  = integer("max_marks").default(100)
     val examDate  = varchar("exam_date", 12).nullable()  // YYYY-MM-DD
     val isActive  = bool("is_active").default(true)
+    // RA-43: marks become parent-visible only once published. The teacher
+    // marks-submit can publish; parent reads filter on isPublished = true.
+    val isPublished = bool("is_published").default(false)
+    val publishedAt = timestamp("published_at").nullable()
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
 }

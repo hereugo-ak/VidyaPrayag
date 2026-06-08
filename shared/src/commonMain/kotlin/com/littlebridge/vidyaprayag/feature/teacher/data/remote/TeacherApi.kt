@@ -73,6 +73,17 @@ class TeacherApi(
         client.get(getUrl("api/v1/teacher/homework"))
     }
 
+    // RA-40: list the exams a teacher can mark for an owned class. The marks
+    // plane requires a valid exam_id; this is where the exam selector sources it.
+    suspend fun getAssessments(
+        token: String,
+        classId: String,
+    ): NetworkResult<TeacherAssessmentsResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/assessments")) {
+            parameter("class_id", classId)
+        }
+    }
+
     suspend fun getProfile(token: String): NetworkResult<TeacherProfileResponse> = safeApiCall {
         client.get(getUrl("api/v1/teacher/profile"))
     }
@@ -114,6 +125,18 @@ class TeacherApi(
         request: CreateHomeworkRequest,
     ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
         client.post(getUrl("api/v1/teacher/homework")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    // RA-40: create a new exam for an owned class. Server replies 201 with the
+    // created assessment in `data`, so the UI can immediately select it.
+    suspend fun createAssessment(
+        token: String,
+        request: CreateAssessmentRequest,
+    ): NetworkResult<ApiResponse<TeacherAssessmentDto>> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/assessments")) {
             contentType(ContentType.Application.Json)
             setBody(request)
         }

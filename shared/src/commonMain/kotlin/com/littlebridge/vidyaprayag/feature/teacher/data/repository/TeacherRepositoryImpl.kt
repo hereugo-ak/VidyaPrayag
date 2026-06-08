@@ -30,6 +30,9 @@ class TeacherRepositoryImpl(
     override suspend fun getProfile(token: String): NetworkResult<TeacherProfileResponse> =
         api.getProfile(token)
 
+    override suspend fun getAssessments(token: String, classId: String): NetworkResult<TeacherAssessmentsResponse> =
+        api.getAssessments(token, classId)
+
     override suspend fun submitAttendance(token: String, request: SubmitAttendanceRequest): NetworkResult<ApiResponse<Unit>> =
         api.submitAttendance(token, request)
 
@@ -41,4 +44,7 @@ class TeacherRepositoryImpl(
 
     override suspend fun createHomework(token: String, request: CreateHomeworkRequest): NetworkResult<ApiResponse<Unit>> =
         api.createHomework(token, request)
+
+    override suspend fun createAssessment(token: String, request: CreateAssessmentRequest): NetworkResult<ApiResponse<TeacherAssessmentDto>> =
+        api.createAssessment(token, request)
 }

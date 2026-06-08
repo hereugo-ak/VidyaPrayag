@@ -334,6 +334,7 @@ val viewModelModule = module {
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClassesViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherAttendanceViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherMarksViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherAssessmentsViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherSyllabusViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherHomeworkViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherProfileViewModel(get(), get()) }
