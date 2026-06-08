@@ -25,4 +25,7 @@ interface TeacherRepository {
     // RA-44: teacher leave workflow.
     suspend fun getLeaveRequests(token: String, status: String? = null): NetworkResult<TeacherLeaveListResponse>
     suspend fun decideLeaveRequest(token: String, id: String, request: TeacherLeaveDecisionRequest): NetworkResult<ApiResponse<Unit>>
+
+    // RA-51: message all parents of an owned class.
+    suspend fun broadcastToClass(token: String, request: TeacherClassBroadcastRequest): NetworkResult<TeacherClassBroadcastResponse>
 }

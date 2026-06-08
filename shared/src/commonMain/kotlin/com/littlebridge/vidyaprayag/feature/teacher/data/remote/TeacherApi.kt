@@ -165,4 +165,15 @@ class TeacherApi(
             setBody(request)
         }
     }
+
+    /** RA-51: broadcast a message to every parent of an owned class. */
+    suspend fun broadcastToClass(
+        token: String,
+        request: TeacherClassBroadcastRequest,
+    ): NetworkResult<TeacherClassBroadcastResponse> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/messages/class")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
 }

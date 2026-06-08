@@ -320,6 +320,7 @@ val viewModelModule = module {
     factory { TrackProgressViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentAcademicsViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentLeaveViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentMessageViewModel(get(), get()) }
     factory { SchoolDashboardViewModel(get(), get()) }
     factory { InstitutionalBasicOBViewModel(get(), get()) }
     factory { BrandingInfoOBViewModel(get(), get(), get()) }

@@ -827,6 +827,100 @@ CREATE INDEX IF NOT EXISTS ix_children_student_code ON public.children (student_
 -- END    docs/db/migration_002_segmentation_geo_assignments.sql
 
 
+-- =============================================================================
+-- BEGIN  migration_003_leave_workflow_and_two_party_messaging.sql
+-- =============================================================================
+-- WHY THIS EXISTS
+--   AUTO_CREATE_TABLES is OFF in production (Postgres/Supabase). The KMP server
+--   (DatabaseFactory.kt) only runs SchemaUtils.createMissingTablesAndColumns on
+--   the local SQLite path; against Postgres it runs NO migration. So every new
+--   column added to server/.../db/Tables.kt must be mirrored here as a reviewed
+--   ALTER TABLE, then executed by a human in the Supabase SQL Editor. Without
+--   this, the backend fails in production with errors like:
+--       column "class_id" of relation "leave_requests" does not exist
+--       column "conversation_id" of relation "message_threads" does not exist
+--
+-- HOW TO RUN
+--   Supabase -> SQL Editor -> paste -> Run. Safe to re-run: every statement is
+--   guarded with ADD COLUMN IF NOT EXISTS. It only ADDS nullable columns; it
+--   never drops, rewrites, or backfills data.
+--
+-- Column names/types match server/.../db/Tables.kt EXACTLY.
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- 1) leave_requests — class/teacher/child/parent routing context  (RA-44)
+--    A parent files leave for a child; the class teacher decides; admin can
+--    override. These columns carry the routing context so the request lands in
+--    the right teacher's queue and the right parent gets notified. All nullable
+--    because legacy student-filed rows pre-date this workflow.
+--      class_id    : FK-ish ref to school_classes.id (nullable; name is canonical)
+--      class_name  : denormalized class label the teacher owns
+--      section     : denormalized section label
+--      teacher_id  : the class teacher who should action the request
+--      child_id    : the children.id the leave is for (parent-filed path)
+--      parent_id   : the app_users.id of the filing parent (notify target)
+-- ---------------------------------------------------------------------------
+ALTER TABLE public.leave_requests
+  ADD COLUMN IF NOT EXISTS class_id   uuid NULL;
+ALTER TABLE public.leave_requests
+  ADD COLUMN IF NOT EXISTS class_name character varying(64) NULL;
+ALTER TABLE public.leave_requests
+  ADD COLUMN IF NOT EXISTS section    character varying(16) NULL;
+ALTER TABLE public.leave_requests
+  ADD COLUMN IF NOT EXISTS teacher_id uuid NULL;
+ALTER TABLE public.leave_requests
+  ADD COLUMN IF NOT EXISTS child_id   uuid NULL;
+ALTER TABLE public.leave_requests
+  ADD COLUMN IF NOT EXISTS parent_id  uuid NULL;
+
+-- Helper index: a teacher pulling their pending leave queue filters by
+-- (school_id, teacher_id, status). Keep it lean and guarded.
+CREATE INDEX IF NOT EXISTS ix_leave_requests_teacher
+  ON public.leave_requests (school_id, teacher_id, status);
+
+-- ---------------------------------------------------------------------------
+-- 2) message_threads / messages — two-party conversation engine  (RA-51)
+--    The original model was single-owner (one thread row per owner). Real
+--    parent<->teacher conversations need BOTH participants to see the same
+--    logical conversation, so we introduce a shared conversation_id plus a
+--    peer_user_id on each owner's thread row. MessagingCore.kt creates one
+--    thread row per participant, both carrying the same conversation_id.
+--      message_threads.conversation_id : shared id across both participants'
+--                                        rows (NULL legacy rows fall back to id)
+--      message_threads.peer_user_id    : the other participant's app_users.id
+--      messages.conversation_id        : stamp each message with its conversation
+--    All nullable so legacy single-owner rows keep working (conversationKey()
+--    falls back to the thread's own id when conversation_id IS NULL).
+-- ---------------------------------------------------------------------------
+ALTER TABLE public.message_threads
+  ADD COLUMN IF NOT EXISTS conversation_id uuid NULL;
+ALTER TABLE public.message_threads
+  ADD COLUMN IF NOT EXISTS peer_user_id    uuid NULL;
+ALTER TABLE public.messages
+  ADD COLUMN IF NOT EXISTS conversation_id uuid NULL;
+
+-- Helper indexes: thread lookup by conversation (both participants' rows) and
+-- message fetch by conversation. Guarded + lean.
+CREATE INDEX IF NOT EXISTS ix_message_threads_conversation
+  ON public.message_threads (school_id, conversation_id);
+CREATE INDEX IF NOT EXISTS ix_message_threads_owner_peer
+  ON public.message_threads (owner_user_id, peer_user_id);
+CREATE INDEX IF NOT EXISTS ix_messages_conversation
+  ON public.messages (conversation_id, created_at);
+
+-- =============================================================================
+-- DONE. After running this, the following should work without errors:
+--   POST /api/v1/parent/leave            (parent files leave for a child)
+--   GET/POST /api/v1/teacher/leave-requests   (teacher decides)
+--   GET/POST /api/v1/teacher/messages/*  (two-party + class broadcast)
+--   GET/POST /api/v1/parent/messages/*   (two-party reply path)
+--   GET/POST /api/v1/school/messages/*   (admin two-party path)
+-- =============================================================================
+
+-- END    migration_003_leave_workflow_and_two_party_messaging.sql
+
+
 -- ============================================================================
 -- BEGIN  docs/backend/sql/02_teacher_schema.sql
 -- Teacher vertical (assessments, assessment_marks, syllabus_units, homework, homework_submissions, teacher_periods)
@@ -1207,4 +1301,15 @@ WHERE table_schema = 'public' AND table_name IN (
   'storage_metrics','students','syllabus_units','teacher_subject_assignments'
 );
 -- expected: n = 23
+
+-- migration_003 column-presence check — all 9 added columns must report 'present'
+SELECT 'leave_requests.class_id'        AS object, CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='leave_requests'  AND column_name='class_id')        THEN 'present' ELSE 'MISSING' END AS state
+UNION ALL SELECT 'leave_requests.class_name',  CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='leave_requests'  AND column_name='class_name')  THEN 'present' ELSE 'MISSING' END
+UNION ALL SELECT 'leave_requests.section',     CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='leave_requests'  AND column_name='section')     THEN 'present' ELSE 'MISSING' END
+UNION ALL SELECT 'leave_requests.teacher_id',  CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='leave_requests'  AND column_name='teacher_id')  THEN 'present' ELSE 'MISSING' END
+UNION ALL SELECT 'leave_requests.child_id',    CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='leave_requests'  AND column_name='child_id')    THEN 'present' ELSE 'MISSING' END
+UNION ALL SELECT 'leave_requests.parent_id',   CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='leave_requests'  AND column_name='parent_id')   THEN 'present' ELSE 'MISSING' END
+UNION ALL SELECT 'message_threads.conversation_id', CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='message_threads' AND column_name='conversation_id') THEN 'present' ELSE 'MISSING' END
+UNION ALL SELECT 'message_threads.peer_user_id',    CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='message_threads' AND column_name='peer_user_id')    THEN 'present' ELSE 'MISSING' END
+UNION ALL SELECT 'messages.conversation_id',        CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='messages'        AND column_name='conversation_id') THEN 'present' ELSE 'MISSING' END;
 

@@ -78,6 +78,7 @@ import com.littlebridge.vidyaprayag.feature.school.schoolRouting
 import com.littlebridge.vidyaprayag.feature.school.teacherAssignmentRouting
 import com.littlebridge.vidyaprayag.feature.school.teacherProvisioningRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherLeaveRouting
+import com.littlebridge.vidyaprayag.feature.teacher.teacherMessagesRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherRouting
 import com.littlebridge.vidyaprayag.feature.user.parentRouting
 import com.littlebridge.vidyaprayag.feature.user.parentMessagesRouting
@@ -244,6 +245,7 @@ fun Application.module() {
         // Teacher vertical (master rebuild doc Step 7 / gap G1)
         teacherRouting()             // /api/v1/teacher/{home,classes,profile,attendance,marks,syllabus,homework}
         teacherLeaveRouting()        // /api/v1/teacher/leave-requests[…] — RA-44 teacher lists/decides leave for their classes
+        teacherMessagesRouting()     // /api/v1/teacher/messages[…] — RA-51 teacher↔parent messaging + class broadcast
 
         // Cross-user notification spine (audit part-2 RA-41/42/46/50) — role-aware
         // inbox replacing the parent-only synth; persisted read state; bell summary.

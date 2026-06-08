@@ -67,4 +67,16 @@ class ParentRepositoryImpl(
     override suspend fun applyLeave(token: String, request: CreateParentLeaveRequest): NetworkResult<ParentLeaveCreateResponse> {
         return api.applyLeave(token, request)
     }
+
+    override suspend fun getMessageThreads(token: String): NetworkResult<ParentMessageThreadsResponse> {
+        return api.getMessageThreads(token)
+    }
+
+    override suspend fun getThreadMessages(token: String, threadId: String): NetworkResult<ParentThreadMessagesResponse> {
+        return api.getThreadMessages(token, threadId)
+    }
+
+    override suspend fun sendMessage(token: String, request: ParentSendMessageRequest): NetworkResult<ParentSendMessageResponse> {
+        return api.sendMessage(token, request)
+    }
 }

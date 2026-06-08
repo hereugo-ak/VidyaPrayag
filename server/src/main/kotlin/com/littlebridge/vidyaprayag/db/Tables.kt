@@ -578,8 +578,16 @@ object PtmClassProgressTable : UUIDTable("ptm_class_progress", "id") {
  */
 object MessageThreadsTable : UUIDTable("message_threads", "id") {
     val schoolId       = uuid("school_id")
-    val ownerUserId    = uuid("owner_user_id")                          // recipient (admin) — JWT.sub
-    val senderName     = text("sender_name")
+    val ownerUserId    = uuid("owner_user_id")                          // this row's inbox holder — JWT.sub
+    // RA-51: a conversation between two users is represented by ONE row per
+    // participant, all sharing the same conversation_id. Each row carries the
+    // owner's view (unread/read), peer_user_id identifies the other party, and
+    // MessagesTable is keyed by conversation_id so both sides see one history.
+    // Legacy/system threads leave conversation_id = their own id and
+    // peer_user_id null (single-owner inbox, e.g. system alerts).
+    val conversationId = uuid("conversation_id").nullable()             // shared key across both participants' rows
+    val peerUserId     = uuid("peer_user_id").nullable()                // the OTHER participant (null = system/self)
+    val senderName     = text("sender_name")                            // display name of the peer, as seen by owner
     val senderRole     = text("sender_role")
     val senderImageUrl = text("sender_image_url").nullable()
     val iconName       = text("icon_name").nullable()                   // when no avatar (e.g. "payments")
@@ -592,10 +600,11 @@ object MessageThreadsTable : UUIDTable("message_threads", "id") {
 }
 
 object MessagesTable : UUIDTable("messages", "id") {
-    val threadId  = uuid("thread_id")                                   // FK message_threads.id
-    val senderId  = uuid("sender_id").nullable()                        // null for system messages
-    val body      = text("body")
-    val createdAt = timestamp("created_at")
+    val threadId       = uuid("thread_id")                              // FK message_threads.id (the sender's owning row)
+    val conversationId = uuid("conversation_id").nullable()             // RA-51: shared key — both participants read by this
+    val senderId       = uuid("sender_id").nullable()                   // null for system messages
+    val body           = text("body")
+    val createdAt      = timestamp("created_at")
 }
 
 /**

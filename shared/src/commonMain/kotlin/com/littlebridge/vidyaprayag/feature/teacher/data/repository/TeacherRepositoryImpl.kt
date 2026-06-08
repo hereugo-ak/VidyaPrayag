@@ -53,4 +53,7 @@ class TeacherRepositoryImpl(
 
     override suspend fun decideLeaveRequest(token: String, id: String, request: TeacherLeaveDecisionRequest): NetworkResult<ApiResponse<Unit>> =
         api.decideLeaveRequest(token, id, request)
+
+    override suspend fun broadcastToClass(token: String, request: TeacherClassBroadcastRequest): NetworkResult<TeacherClassBroadcastResponse> =
+        api.broadcastToClass(token, request)
 }

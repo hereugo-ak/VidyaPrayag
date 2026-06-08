@@ -322,3 +322,26 @@ data class TeacherLeaveDto(
 
 @Serializable
 data class TeacherLeaveDecisionRequest(val status: String) // Approved | Rejected
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RA-51 — teacher messaging (1:1 + "message class parents" broadcast).
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class TeacherClassBroadcastRequest(
+    @SerialName("class_name") val className: String,
+    val section: String? = null,
+    val body: String,
+)
+
+@Serializable
+data class TeacherClassBroadcastData(
+    val recipients: Int = 0,
+)
+
+@Serializable
+data class TeacherClassBroadcastResponse(
+    val success: Boolean = false,
+    val message: String? = null,
+    val data: TeacherClassBroadcastData? = null,
+)

@@ -47,7 +47,7 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays a portal can push above its tab content (back returns to the tabs). */
-private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, Profile, Leave }
+private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, Profile, Leave, Messages }
 
 /**
  * ParentPortalV2 — the 4-tab parent shell, a faithful copy of `Parent.tsx → ParentApp`.
@@ -102,6 +102,11 @@ fun ParentPortalV2(
             ParentLeaveScreenV2(onBack = { overlay = ParentOverlay.None }, modifier = modifier)
             return
         }
+        ParentOverlay.Messages -> {
+            // RA-51: parent ↔ teacher/admin messaging.
+            ParentMessagesScreenV2(onBack = { overlay = ParentOverlay.None }, modifier = modifier)
+            return
+        }
         ParentOverlay.None -> Unit
     }
 
@@ -119,6 +124,7 @@ fun ParentPortalV2(
                 childName = progress.childName,
                 childSubline = progress.journeyDescription.ifBlank { "Level ${progress.currentLevel}" },
                 onOpenNotifications = { overlay = ParentOverlay.Notifications },
+                onOpenMessages = { overlay = ParentOverlay.Messages },
                 onExit = { overlay = ParentOverlay.Profile },
             )
         },
@@ -148,6 +154,7 @@ private fun ParentHeader(
     childName: String,
     childSubline: String,
     onOpenNotifications: () -> Unit,
+    onOpenMessages: () -> Unit,
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -189,6 +196,18 @@ private fun ParentHeader(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // RA-51: parent messaging entry point.
+                val chatInteraction = remember { MutableInteractionSource() }
+                Box(
+                    Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(c.cream)
+                        .clickable(interactionSource = chatInteraction, indication = null) { onOpenMessages() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(VIcons.Chat, contentDescription = "Messages", tint = c.ink, modifier = Modifier.size(16.dp))
+                }
                 val bellInteraction = remember { MutableInteractionSource() }
                 Box(
                     Modifier

@@ -128,4 +128,27 @@ class ParentApi(
             }
         }
     }
+
+    // ---------------- RA-51: parent ↔ teacher/admin messaging ----------------
+
+    suspend fun getMessageThreads(token: String): NetworkResult<ParentMessageThreadsResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/messages/threads"))
+        }
+    }
+
+    suspend fun getThreadMessages(token: String, threadId: String): NetworkResult<ParentThreadMessagesResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/messages/threads/$threadId/messages"))
+        }
+    }
+
+    suspend fun sendMessage(token: String, request: ParentSendMessageRequest): NetworkResult<ParentSendMessageResponse> {
+        return safeApiCall {
+            client.post(getUrl("api/v1/parent/messages")) {
+                contentType(ContentType.Application.Json)
+                setBody(request)
+            }
+        }
+    }
 }

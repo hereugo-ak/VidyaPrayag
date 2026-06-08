@@ -22,4 +22,8 @@ interface ParentRepository {
     // RA-44: parent leave workflow.
     suspend fun getLeaveRequests(token: String): NetworkResult<ParentLeaveListResponse>
     suspend fun applyLeave(token: String, request: CreateParentLeaveRequest): NetworkResult<ParentLeaveCreateResponse>
+    // RA-51: parent ↔ teacher/admin messaging.
+    suspend fun getMessageThreads(token: String): NetworkResult<ParentMessageThreadsResponse>
+    suspend fun getThreadMessages(token: String, threadId: String): NetworkResult<ParentThreadMessagesResponse>
+    suspend fun sendMessage(token: String, request: ParentSendMessageRequest): NetworkResult<ParentSendMessageResponse>
 }
