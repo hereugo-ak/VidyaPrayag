@@ -143,7 +143,7 @@ private fun ParentLeaveContent(
                     singleLine = false,
                 )
                 if (state.submitError != null) {
-                    Text(state.submitError, style = VTheme.type.caption.colored(c.danger))
+                    Text(state.submitError!!, style = VTheme.type.caption.colored(c.danger))
                 }
                 VButton(
                     text = "Submit request",
