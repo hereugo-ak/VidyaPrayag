@@ -56,6 +56,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun SchoolSettingsScreenV2(
     onLogout: () -> Unit = {},
+    onOpenTeachers: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: InstitutionalProfileViewModel = koinViewModel(),
 ) {
@@ -63,6 +64,7 @@ fun SchoolSettingsScreenV2(
     SchoolSettingsContent(
         state = state,
         onLogout = onLogout,
+        onOpenTeachers = onOpenTeachers,
         onRetry = viewModel::load,
         modifier = modifier,
     )
@@ -72,6 +74,7 @@ fun SchoolSettingsScreenV2(
 private fun SchoolSettingsContent(
     state: InstitutionalProfileState,
     onLogout: () -> Unit,
+    onOpenTeachers: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -154,7 +157,9 @@ private fun SchoolSettingsContent(
             val rows = listOf(
                 SettingRow(VIcons.Calendar, "Academic year", "Manage term dates & holidays (Coming Soon)"),
                 SettingRow(VIcons.BookOpen, "Classes & subjects", "Class & subject setup (Coming Soon)"),
-                SettingRow(VIcons.Users, "Teacher management", "Add teachers & download credentials (Coming Soon)"),
+                // RA-24: teacher management is live (RA-22 roster on the People
+                // tab) — open it instead of showing a Coming-Soon label.
+                SettingRow(VIcons.Users, "Teacher management", "Add, view & remove teachers", onClick = onOpenTeachers),
                 SettingRow(VIcons.Wallet, "Fee structure", "Edit heads & amounts for next cycle (Coming Soon)"),
                 SettingRow(VIcons.Bell, "Notifications", "Channels & quiet hours (Coming Soon)"),
                 SettingRow(VIcons.Download, "Data export", "CSV / PDF / UDISE (Coming Soon)"),

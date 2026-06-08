@@ -3,6 +3,7 @@ package com.littlebridge.vidyaprayag.ui.v2.screens.school
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -60,6 +61,8 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun SchoolCommsScreenV2(
     modifier: Modifier = Modifier,
+    onOpenMessages: () -> Unit = {},
+    onOpenPtm: () -> Unit = {},
     viewModel: SchoolAnnouncementsViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
@@ -76,6 +79,8 @@ fun SchoolCommsScreenV2(
                 onCreated = onCreated,
             )
         },
+        onOpenMessages = onOpenMessages,
+        onOpenPtm = onOpenPtm,
         modifier = modifier,
     )
 }
@@ -86,6 +91,8 @@ private fun SchoolCommsContent(
     onRetry: () -> Unit,
     onSelectCategory: (String?) -> Unit,
     onCreate: (type: String, title: String, description: String, date: String, onCreated: (() -> Unit)?) -> Unit,
+    onOpenMessages: () -> Unit,
+    onOpenPtm: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -126,13 +133,20 @@ private fun SchoolCommsContent(
                     onOpen = { openAnnouncement = it },
                     onCreate = onCreate,
                 )
-                "Messages" -> VComingSoon(
+                // RA-24: Messages and PTM have real backends (MessagesRouting,
+                // PtmRouting) and real screens — open them instead of showing a
+                // dead Coming-Soon card.
+                "Messages" -> CommsEntryCard(
+                    icon = VIcons.Chat,
                     title = "Parent messages",
-                    description = "Two-way parent ↔ school messaging arrives with the messaging backend.",
+                    description = "Open two-way parent ↔ school message threads.",
+                    onClick = onOpenMessages,
                 )
-                "PTM" -> VComingSoon(
+                "PTM" -> CommsEntryCard(
+                    icon = VIcons.Calendar,
                     title = "Parent–Teacher meetings",
-                    description = "Schedule PTMs and track slot bookings once the PTM backend is live.",
+                    description = "Schedule PTMs and track slot bookings.",
+                    onClick = onOpenPtm,
                 )
                 "Notifications" -> VComingSoon(
                     title = "Delivery log",
@@ -301,6 +315,35 @@ private fun ComposeAnnouncementDialog(
                     enabled = !isCreating,
                 )
             }
+        }
+    }
+}
+
+/**
+ * RA-24: tappable entry card opening an existing, backend-backed Comms screen
+ * (Messages / PTM). Frozen V* primitives only.
+ */
+@Composable
+private fun CommsEntryCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    description: String,
+    onClick: () -> Unit,
+) {
+    val c = VTheme.colors
+    VCard(onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(
+                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(c.teal.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(18.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(title, style = VTheme.type.bodyStrong.colored(c.ink))
+                Text(description, style = VTheme.type.caption.colored(c.ink2))
+            }
+            Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
         }
     }
 }

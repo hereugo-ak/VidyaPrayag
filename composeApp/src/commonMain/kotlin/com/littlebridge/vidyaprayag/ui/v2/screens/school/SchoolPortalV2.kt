@@ -132,14 +132,29 @@ fun SchoolPortalV2(
                     "home" -> SchoolHomeScreenV2(
                         onOpenNotifications = { overlay = SchoolOverlay.Notifications },
                         onOpenCalendar = { overlay = SchoolOverlay.Calendar },
+                        // RA-24 — the Home "live metrics" / PEWS cards now open the
+                        // real analytics dashboard and the at-risk cohort (People
+                        // tab) instead of dead Coming-Soon placeholders.
+                        onOpenAnalytics = { overlay = SchoolOverlay.AnalyticsDashboard },
+                        onOpenPews = { tab = "people" },
                         // §7 finding K — tapping the avatar opens the Settings tab (where logout
                         // lives), instead of logging the admin out outright.
                         onExit = { tab = "settings" },
                     )
                     "people" -> SchoolPeopleScreenV2()
                     "records" -> SchoolRecordsScreenV2()
-                    "comms" -> SchoolCommsScreenV2()
-                    "settings" -> SchoolSettingsScreenV2(onLogout = onLogout)
+                    "comms" -> SchoolCommsScreenV2(
+                        // RA-24 — Messages and PTM open their real backend-backed
+                        // screens as overlays instead of Coming-Soon cards.
+                        onOpenMessages = { overlay = SchoolOverlay.Messages },
+                        onOpenPtm = { overlay = SchoolOverlay.SchedulePTM },
+                    )
+                    "settings" -> SchoolSettingsScreenV2(
+                        onLogout = onLogout,
+                        // RA-24 — "Teacher management" opens the live People tab
+                        // roster (RA-22) rather than a Coming-Soon label.
+                        onOpenTeachers = { tab = "people" },
+                    )
                 }
             }
         }

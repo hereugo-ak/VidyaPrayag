@@ -33,7 +33,6 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
-import com.littlebridge.vidyaprayag.ui.v2.components.VComingSoon
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
 import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
@@ -52,9 +51,11 @@ import kotlin.math.roundToInt
  * onboardingStatus / isLoading / errorMessage), not a single state object. The only
  * data the dashboard endpoint genuinely returns today is the **onboarding hero**
  * (greeting + onboarding progress + the four setup steps). The rich operational
- * metrics in the original mock (attendance-by-class, syllabus coverage, subject
- * performance, teacher activity, fee glance) have no backend feed at the home level,
- * so they're shown as `VComingSoon` rather than fabricating numbers (LAW 6). No
+ * metrics (attendance-by-class, syllabus coverage, subject performance) and the
+ * at-risk cohort (PEWS) ARE served by `SchoolAnalyticsRouting` (/overview,
+ * /class-performance, /syllabus-coverage, /student-cohort), so the dashboard
+ * surfaces them as real entry points into `AnalyticsDashboardScreenV2` and the
+ * People/cohort tab (RA-24) — no Coming-Soon where a feed exists (LAW 6). No
  * MockV2 in production; the three UI states come from [VStateHost] (LAW 2/3).
  */
 @Composable
@@ -62,6 +63,8 @@ fun SchoolHomeScreenV2(
     modifier: Modifier = Modifier,
     onOpenNotifications: () -> Unit = {},
     onOpenCalendar: () -> Unit = {},
+    onOpenAnalytics: () -> Unit = {},
+    onOpenPews: () -> Unit = {},
     onExit: () -> Unit = {},
     viewModel: SchoolDashboardViewModel = koinViewModel(),
 ) {
@@ -82,6 +85,8 @@ fun SchoolHomeScreenV2(
         onRetry = viewModel::refresh,
         onOpenNotifications = onOpenNotifications,
         onOpenCalendar = onOpenCalendar,
+        onOpenAnalytics = onOpenAnalytics,
+        onOpenPews = onOpenPews,
         onExit = onExit,
         modifier = modifier,
     )
@@ -98,6 +103,8 @@ private fun SchoolHomeContent(
     onRetry: () -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenCalendar: () -> Unit,
+    onOpenAnalytics: () -> Unit,
+    onOpenPews: () -> Unit,
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -176,24 +183,70 @@ private fun SchoolHomeContent(
                     }
                 }
 
-                // ── Operational metrics (no backend feed yet) ──────────────────
+                // ── Operational metrics (REAL — opens the Analytics dashboard) ─
+                // RA-24: the /overview, /class-performance, /syllabus-coverage and
+                // /student-cohort aggregates are live and rendered by
+                // AnalyticsDashboardScreenV2, so this is a real entry point, not a
+                // Coming-Soon placeholder.
                 Column {
                     Text("Today at a glance", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
-                    VComingSoon(
+                    MetricEntryCard(
+                        icon = VIcons.TrendingUp,
                         title = "Live campus metrics",
-                        description = "Attendance-by-class, syllabus coverage, subject performance and the teacher activity feed will appear here once the daily-metrics rollup endpoint is connected.",
+                        description = "Attendance-by-class, syllabus coverage and subject performance from the live analytics rollup.",
+                        onClick = onOpenAnalytics,
                     )
                 }
 
+                // ── Early-warning radar (REAL — opens the at-risk cohort) ──────
+                // RA-24: /student-cohort returns real at_risk_students + risk
+                // counts, rendered on the People tab. Tapping opens it.
                 Column {
                     Text("Early-warning radar", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
-                    VComingSoon(
+                    MetricEntryCard(
+                        icon = VIcons.AlertTriangle,
                         title = "PEWS — Predictive Early Warning",
-                        description = "Combines attendance, marks, fee status and behavioural signals to surface at-risk students before exam season.",
+                        description = "Attendance, marks and risk signals surface at-risk students before exam season.",
+                        onClick = onOpenPews,
                         preview = { PewsPreview() },
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * RA-24: a tappable entry card that opens an existing, backend-backed screen
+ * (Analytics dashboard or the at-risk cohort). Replaces the old `VComingSoon`
+ * placeholders where the data feed already exists. Frozen V* primitives only.
+ */
+@Composable
+private fun MetricEntryCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    description: String,
+    onClick: () -> Unit,
+    preview: (@Composable () -> Unit)? = null,
+) {
+    val c = VTheme.colors
+    VCard(onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(
+                Modifier.size(40.dp).clip(CircleShape).background(c.teal.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(18.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(title, style = VTheme.type.bodyStrong.colored(c.ink))
+                Text(description, style = VTheme.type.caption.colored(c.ink2))
+            }
+            Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
+        }
+        if (preview != null) {
+            Spacer(Modifier.height(12.dp))
+            preview()
         }
     }
 }
