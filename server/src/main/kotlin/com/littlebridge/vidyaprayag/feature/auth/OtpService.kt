@@ -63,6 +63,7 @@ package com.littlebridge.vidyaprayag.feature.auth
 import com.littlebridge.vidyaprayag.db.AuthOtpsTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.OtpDeliveryAttemptsTable
+import org.jetbrains.exposed.sql.ForUpdateOption
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.and
@@ -163,21 +164,27 @@ object OtpService {
         val expires = now.plus(expiryMinutes, ChronoUnit.MINUTES)
         val windowStart = now.minus(1, ChronoUnit.HOURS)
 
-        // Decide UPSERT vs INSERT.
-        val existing = dbQuery {
-            AuthOtpsTable.selectAll()
+        // RA-38: the resend-limit check and the UPSERT now run inside ONE
+        // transaction with a `SELECT … FOR UPDATE` row lock. Previously the read
+        // (existing) and the write (update/insert) were two separate `dbQuery{}`
+        // transactions, so two concurrent /send-otp calls could both read the
+        // same resend_count, both pass the `resends < maxResendsPerHour` check,
+        // and both write — letting an attacker exceed the advertised hourly
+        // resend cap. Holding the row lock for the whole check-then-act
+        // serialises concurrent senders on the same (identifier, purpose) row.
+        val rateLimited = dbQuery {
+            val existing = AuthOtpsTable.selectAll()
                 .where { (AuthOtpsTable.identifier eq identifier) and (AuthOtpsTable.purpose eq purpose) }
+                .forUpdate(ForUpdateOption.ForUpdate)   // lock the row for this txn
                 .singleOrNull()
-        }
 
-        if (existing != null) {
-            val resends = existing[AuthOtpsTable.resendCount].toInt()
-            val firstSent = existing[AuthOtpsTable.firstSentAt]
-            val withinHour = firstSent.isAfter(windowStart)
-            if (withinHour && resends >= maxResendsPerHour) {
-                return OtpSendResult.RateLimited
-            }
-            dbQuery {
+            if (existing != null) {
+                val resends = existing[AuthOtpsTable.resendCount].toInt()
+                val firstSent = existing[AuthOtpsTable.firstSentAt]
+                val withinHour = firstSent.isAfter(windowStart)
+                if (withinHour && resends >= maxResendsPerHour) {
+                    return@dbQuery true   // over the cap — abort without writing
+                }
                 AuthOtpsTable.update({
                     (AuthOtpsTable.identifier eq identifier) and (AuthOtpsTable.purpose eq purpose)
                 }) {
@@ -199,9 +206,7 @@ object OtpService {
                     it[deliveryProvider] = env("OTP_PROVIDER", "mock")
                     it[updatedAt] = now
                 }
-            }
-        } else {
-            dbQuery {
+            } else {
                 AuthOtpsTable.insert {
                     it[AuthOtpsTable.identifier] = identifier
                     it[AuthOtpsTable.identifierType] = identifierType
@@ -227,7 +232,9 @@ object OtpService {
                     it[updatedAt] = now
                 }
             }
+            false
         }
+        if (rateLimited) return OtpSendResult.RateLimited
 
         // Deliver via the multi-provider chain (WhatsApp Cloud → Fast2SMS →
         // MSG91 → Twilio → SMTP → Console).  The dispatcher picks the
@@ -345,24 +352,33 @@ object OtpService {
 
         dbQuery { purgeExpired() }
 
-        val row = dbQuery {
-            AuthOtpsTable.selectAll()
+        // RA-38: the load → compare → attempt-count update is now ONE transaction
+        // with a `SELECT … FOR UPDATE` row lock. Previously the read and the
+        // increment were two separate `dbQuery{}` transactions, so N concurrent
+        // wrong guesses could all read the same attempt_count, all compute
+        // `attempts = count + 1`, and all write the same value — so the lock
+        // threshold (`attempts >= maxAttempts`) could be crossed far more than
+        // maxAttempts times before `is_locked` ever stuck, weakening the
+        // brute-force lock. Holding the lock across the whole check-then-act
+        // serialises concurrent verifiers on this (identifier, purpose) row.
+        return dbQuery {
+            val row = AuthOtpsTable.selectAll()
                 .where { (AuthOtpsTable.identifier eq identifier) and (AuthOtpsTable.purpose eq purpose) }
+                .forUpdate(ForUpdateOption.ForUpdate)   // lock the row for this txn
                 .singleOrNull()
-        } ?: return OtpVerifyResult.NotFound
+                ?: return@dbQuery OtpVerifyResult.NotFound
 
-        if (row[AuthOtpsTable.isLocked]) return OtpVerifyResult.Locked
-        if (Instant.now().isAfter(row[AuthOtpsTable.expiresAt])) return OtpVerifyResult.Expired
+            if (row[AuthOtpsTable.isLocked]) return@dbQuery OtpVerifyResult.Locked
+            if (Instant.now().isAfter(row[AuthOtpsTable.expiresAt])) return@dbQuery OtpVerifyResult.Expired
 
-        val expectedHash = row[AuthOtpsTable.codeHash]
-        val salt = row[AuthOtpsTable.codeSalt]
-        val attempt = sha256("$code:$salt:$pepper")
+            val expectedHash = row[AuthOtpsTable.codeHash]
+            val salt = row[AuthOtpsTable.codeSalt]
+            val attempt = sha256("$code:$salt:$pepper")
 
-        if (!constantTimeEquals(expectedHash, attempt)) {
-            val attempts = row[AuthOtpsTable.attemptCount].toInt() + 1
-            val maxA = row[AuthOtpsTable.maxAttempts].toInt()
-            val shouldLock = attempts >= maxA
-            dbQuery {
+            if (!constantTimeEquals(expectedHash, attempt)) {
+                val attempts = row[AuthOtpsTable.attemptCount].toInt() + 1
+                val maxA = row[AuthOtpsTable.maxAttempts].toInt()
+                val shouldLock = attempts >= maxA
                 AuthOtpsTable.update({
                     (AuthOtpsTable.identifier eq identifier) and (AuthOtpsTable.purpose eq purpose)
                 }) {
@@ -370,13 +386,11 @@ object OtpService {
                     it[isLocked] = shouldLock
                     it[updatedAt] = Instant.now()
                 }
+                return@dbQuery if (shouldLock) OtpVerifyResult.Locked
+                else OtpVerifyResult.Invalid(attemptsLeft = (maxA - attempts).coerceAtLeast(0))
             }
-            return if (shouldLock) OtpVerifyResult.Locked
-            else OtpVerifyResult.Invalid(attemptsLeft = (maxA - attempts).coerceAtLeast(0))
-        }
 
-        // Success path.
-        dbQuery {
+            // Success path.
             AuthOtpsTable.update({
                 (AuthOtpsTable.identifier eq identifier) and (AuthOtpsTable.purpose eq purpose)
             }) {
@@ -384,8 +398,8 @@ object OtpService {
                 it[verifiedAt] = Instant.now()
                 it[updatedAt] = Instant.now()
             }
+            OtpVerifyResult.Ok
         }
-        return OtpVerifyResult.Ok
     }
 
     // --------------------------------------------------------------
