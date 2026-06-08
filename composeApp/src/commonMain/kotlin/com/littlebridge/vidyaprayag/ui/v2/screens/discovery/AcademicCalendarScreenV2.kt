@@ -98,6 +98,7 @@ private fun AcademicCalendarContent(
             emptyBody = "Sign in with a school account to view the academic calendar.",
             emptyIcon = VIcons.Calendar,
             onRetry = onRetry,
+            skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonCalendar() },
         ) {
             Column(
                 Modifier

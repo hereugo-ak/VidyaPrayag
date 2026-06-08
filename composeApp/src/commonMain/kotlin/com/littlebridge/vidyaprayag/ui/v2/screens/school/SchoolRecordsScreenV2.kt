@@ -120,6 +120,7 @@ private fun CoverageTab(state: SyllabusCoverageState, onRetry: () -> Unit) {
         emptyBody = "Syllabus coverage will appear here once teachers start marking units complete.",
         emptyIcon = VIcons.BookOpen,
         onRetry = onRetry,
+        skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonList(rows = 5, withAvatar = false) },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             // ── Overall ───────────────────────────────────────────────────────

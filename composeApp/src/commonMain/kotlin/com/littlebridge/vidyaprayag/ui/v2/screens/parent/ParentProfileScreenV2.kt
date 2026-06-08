@@ -110,6 +110,7 @@ private fun ParentProfileContent(
                 emptyBody = "We couldn't load your profile. Please try again.",
                 emptyIcon = VIcons.User,
                 onRetry = onRetry,
+                skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonProfile() },
             ) {
                 val me = state.profile!!
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {

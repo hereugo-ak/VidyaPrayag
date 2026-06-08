@@ -95,6 +95,7 @@ private fun ParentHomeContent(
             emptyTitle = "No child linked yet",
             emptyBody = "Link your child to see their daily journey and progress.",
             onRetry = onRetry,
+            skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonDashboard() },
         ) {
             // ── Greeting ────────────────────────────────────────────────────────
             if (state.greeting.isNotBlank()) {

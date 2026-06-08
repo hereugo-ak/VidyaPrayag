@@ -123,6 +123,7 @@ private fun TeacherHomeContent(
             emptyBody = "Your tasks and periods for today will show up here.",
             emptyIcon = VIcons.Calendar,
             onRetry = onRetry,
+            skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonDashboard() },
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 // ── Today's tasks ────────────────────────────────────────────

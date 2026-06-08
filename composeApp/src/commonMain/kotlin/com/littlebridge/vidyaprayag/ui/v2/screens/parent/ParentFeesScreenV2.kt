@@ -82,6 +82,7 @@ private fun ParentFeesContent(
                 state.totalCollected.isBlank(),
             emptyTitle = "No fee records yet",
             emptyBody = "Once your school publishes fees, they'll appear here.",
+            skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonFee() },
         ) {
             // ── Hero: outstanding balance + collection progress ─────────────────
             VCard(padding = 0.dp) {

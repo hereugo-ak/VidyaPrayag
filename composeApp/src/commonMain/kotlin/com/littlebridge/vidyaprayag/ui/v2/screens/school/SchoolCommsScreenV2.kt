@@ -205,6 +205,7 @@ private fun AnnouncementsTab(
         emptyBody = "Posts you publish to parents and staff will appear here.",
         emptyIcon = VIcons.Megaphone,
         onRetry = onRetry,
+        skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonAnnouncements() },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             // Category filter chips derived from the loaded data.

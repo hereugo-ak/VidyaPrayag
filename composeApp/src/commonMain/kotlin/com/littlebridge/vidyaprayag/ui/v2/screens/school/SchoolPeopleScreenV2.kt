@@ -132,6 +132,7 @@ private fun SchoolPeopleContent(
             emptyBody = "Student risk and engagement analytics appear here once attendance and marks start flowing in.",
             emptyIcon = VIcons.Users,
             onRetry = onRetry,
+            skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonList(rows = 6) },
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 // ── Risk distribution ─────────────────────────────────────────
@@ -276,6 +277,7 @@ private fun TeacherRosterSection(
             emptyBody = "Add your first teacher so they can sign in and manage their classes.",
             emptyIcon = VIcons.Users,
             onRetry = onRetry,
+            skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonList(rows = 5) },
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 state.teachers.forEach { t ->
