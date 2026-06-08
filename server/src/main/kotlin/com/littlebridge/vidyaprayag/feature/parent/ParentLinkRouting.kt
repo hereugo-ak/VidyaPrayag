@@ -20,6 +20,7 @@ import com.littlebridge.vidyaprayag.core.created
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.principalUserId
+import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.ChildrenTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.SchoolsTable
@@ -189,6 +190,13 @@ fun Route.parentLinkRouting() {
                             it[updatedAt] = now
                         }
                         newId
+                    }
+
+                    // RA-20: a parent who has linked a child has finished onboarding.
+                    // Flip profile_completed=true so the next /login routes them straight
+                    // to the dashboard instead of dumping them back into the link wizard.
+                    AppUsersTable.update({ AppUsersTable.id eq uid }) {
+                        it[profileCompleted] = true
                     }
 
                     LinkResult.Linked(
