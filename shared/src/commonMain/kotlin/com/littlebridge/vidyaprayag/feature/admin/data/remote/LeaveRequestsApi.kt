@@ -20,6 +20,7 @@ import com.littlebridge.vidyaprayag.feature.admin.domain.model.LeaveRequestsResp
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.UpdateLeaveStatusRequest
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
+import io.ktor.client.request.parameter
 import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -42,11 +43,11 @@ class LeaveRequestsApi(
         type: String = "student",
         status: String? = null
     ): NetworkResult<ApiResponse<LeaveRequestsResponse>> = safeApiCall {
-        val params = buildList {
-            add("type=$type")
-            status?.let { add("status=$it") }
-        }.joinToString("&")
-        client.get(getUrl("api/v1/school/leave-requests?$params"))
+        // RA-64: URL-encode via parameter(...).
+        client.get(getUrl("api/v1/school/leave-requests")) {
+            parameter("type", type)
+            status?.let { parameter("status", it) }
+        }
     }
 
     suspend fun createLeaveRequest(

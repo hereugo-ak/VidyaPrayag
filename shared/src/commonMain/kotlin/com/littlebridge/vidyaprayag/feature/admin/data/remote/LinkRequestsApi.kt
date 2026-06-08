@@ -20,6 +20,7 @@ import com.littlebridge.vidyaprayag.feature.admin.domain.model.LinkDecisionResul
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.LinkRequestsResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 
 class LinkRequestsApi(
@@ -37,7 +38,10 @@ class LinkRequestsApi(
         token: String,
         status: String = "pending"
     ): NetworkResult<ApiResponse<LinkRequestsResponse>> = safeApiCall {
-        client.get(getUrl("api/v1/school/link-requests?status=$status"))
+        // RA-64: URL-encode via parameter(...).
+        client.get(getUrl("api/v1/school/link-requests")) {
+            parameter("status", status)
+        }
     }
 
     suspend fun approve(

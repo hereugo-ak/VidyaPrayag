@@ -13,6 +13,7 @@ import com.littlebridge.vidyaprayag.core.network.safeApiCall
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.AttendanceResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
+import io.ktor.client.request.parameter
 
 class AttendanceApi(
     private val client: HttpClient,
@@ -36,11 +37,13 @@ class AttendanceApi(
         grade: String? = null,
         date: String? = null
     ): NetworkResult<ApiResponse<AttendanceResponse>> = safeApiCall {
-        val params = buildList {
-            add("type=$type")
-            grade?.let { add("grade=$it") }
-            date?.let { add("date=$it") }
-        }.joinToString("&")
-        client.get(getUrl("api/v1/school/attendance/daily?$params"))
+        // RA-64: use Ktor's parameter(...) so values are URL-encoded. Raw
+        // interpolation corrupted requests when grade contained spaces/'#'/'&'
+        // (e.g. "Grade 10-A").
+        client.get(getUrl("api/v1/school/attendance/daily")) {
+            parameter("type", type)
+            grade?.let { parameter("grade", it) }
+            date?.let { parameter("date", it) }
+        }
     }
 }

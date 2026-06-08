@@ -21,6 +21,7 @@ import com.littlebridge.vidyaprayag.feature.admin.domain.model.AnnouncementDto
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.SyncWhatsAppResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -47,7 +48,10 @@ class AnnouncementsApi(
         token: String,
         query: String
     ): NetworkResult<ApiResponse<AnnouncementListResponse>> = safeApiCall {
-        client.get(getUrl("api/v1/school/announcements/search?query=$query"))
+        // RA-64: URL-encode the search term (may contain spaces/'#'/'&').
+        client.get(getUrl("api/v1/school/announcements/search")) {
+            parameter("query", query)
+        }
     }
 
     suspend fun createAnnouncement(
