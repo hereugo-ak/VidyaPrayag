@@ -255,6 +255,24 @@ private fun ParentLinkChildContent(
                             style = VTheme.type.caption.colored(Color(0xFF7A1C18)),
                         )
                     }
+                    // RA-48: a submitted request that the school admin must approve.
+                    // We DON'T route into the dashboard; we confirm it's awaiting review.
+                    state.linkPending && linked != null -> {
+                        VCard(modifier = Modifier.fillMaxWidth()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                VAvatar(name = linked.childName, src = linked.profilePhotoUrl, size = 48.dp)
+                                Spacer(Modifier.width(d.md))
+                                Column(Modifier.weight(1f)) {
+                                    Text(linked.childName, style = VTheme.type.bodyStrong.colored(c.ink))
+                                    Text(
+                                        "Request sent — awaiting ${state.selectedSchool?.name ?: "school"} approval",
+                                        style = VTheme.type.caption.colored(c.ink2),
+                                    )
+                                }
+                                Icon(VIcons.Clock, contentDescription = null, tint = Color(0xFFB7791F), modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
                     linked != null -> {
                         // §5: resolved-child preview — only shown once the backend confirms the link.
                         VCard(modifier = Modifier.fillMaxWidth()) {
@@ -292,18 +310,26 @@ private fun ParentLinkChildContent(
         val ctaText = when {
             step < total -> "Continue"
             state.isLinking -> "Linking…"
+            // RA-48: once a request is pending approval the only forward action is
+            // to leave the wizard; a fresh roll cannot be re-submitted from here.
+            state.linkPending -> "Done"
             else -> "Finish & open dashboard"
         }
-        val ctaEnabled = when (step) {
-            2 -> state.selectedSchool != null
-            3 -> !state.isLinking && rollNo.isNotBlank()
-            else -> true
+        val ctaEnabled = when {
+            step == 2 -> state.selectedSchool != null
+            step < total -> true
+            state.linkPending -> true
+            else -> !state.isLinking && rollNo.isNotBlank()
         }
         VButton(
             text = ctaText,
             onClick = {
                 when {
                     step < total -> step++
+                    // RA-48: a pending request returns the parent to wherever onDone
+                    // routes (typically the parent home), where they'll see no child
+                    // yet and the "awaiting approval" empty state.
+                    state.linkPending -> onDone()
                     else -> onLink(onDone)
                 }
             },

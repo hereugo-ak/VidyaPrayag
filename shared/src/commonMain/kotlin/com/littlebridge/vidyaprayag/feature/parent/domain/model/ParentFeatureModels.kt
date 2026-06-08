@@ -202,5 +202,9 @@ data class LinkedChildDto(
     @SerialName("class_name") val className: String,
     val roll: String,
     @SerialName("school_name") val schoolName: String,
-    @SerialName("profile_photo_url") val profilePhotoUrl: String? = null
+    @SerialName("profile_photo_url") val profilePhotoUrl: String? = null,
+    // RA-48: linking is now request→approve. "pending" means a school admin must
+    // approve before the child appears on the dashboard; "approved" carries a
+    // real child_id. Defaulted so the field is optional on the wire.
+    val status: String = "approved",
 )

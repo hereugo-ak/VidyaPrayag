@@ -17,6 +17,7 @@ import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.ChildrenTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import java.util.UUID
 
@@ -56,6 +57,15 @@ object NotifyRecipients {
         AppUsersTable.selectAll().where {
             (AppUsersTable.schoolId eq schoolId) and
                 (AppUsersTable.role eq "teacher") and
+                (AppUsersTable.isActive eq true)
+        }.map { it[AppUsersTable.id].value }.distinct()
+    }
+
+    /** Every active school-admin app_users.id in [schoolId] (school_admin | admin). */
+    suspend fun adminsInSchool(schoolId: UUID): List<UUID> = dbQuery {
+        AppUsersTable.selectAll().where {
+            (AppUsersTable.schoolId eq schoolId) and
+                ((AppUsersTable.role eq "school_admin") or (AppUsersTable.role eq "admin")) and
                 (AppUsersTable.isActive eq true)
         }.map { it[AppUsersTable.id].value }.distinct()
     }

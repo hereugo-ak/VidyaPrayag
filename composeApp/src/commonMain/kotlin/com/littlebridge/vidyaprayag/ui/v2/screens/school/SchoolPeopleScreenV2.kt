@@ -1,6 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.school
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -71,6 +72,7 @@ import kotlin.math.roundToInt
 @Composable
 fun SchoolPeopleScreenV2(
     modifier: Modifier = Modifier,
+    onOpenLinkRequests: () -> Unit = {},
     viewModel: StudentAnalyticsViewModel = koinViewModel(),
     teachersViewModel: SchoolTeachersViewModel = koinViewModel(),
 ) {
@@ -83,6 +85,7 @@ fun SchoolPeopleScreenV2(
         onTeachersRetry = teachersViewModel::load,
         onAddTeacher = teachersViewModel::addTeacher,
         onRemoveTeacher = teachersViewModel::removeTeacher,
+        onOpenLinkRequests = onOpenLinkRequests,
         modifier = modifier,
     )
 }
@@ -95,6 +98,7 @@ private fun SchoolPeopleContent(
     onTeachersRetry: () -> Unit,
     onAddTeacher: (name: String, identifier: String, initialPassword: String?, onAdded: (() -> Unit)?) -> Unit,
     onRemoveTeacher: (teacherId: String) -> Unit,
+    onOpenLinkRequests: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -111,6 +115,20 @@ private fun SchoolPeopleContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text("People", style = VTheme.type.h1.colored(c.ink))
+
+        // ── RA-48: parent→child link approval queue entry ──────────────────
+        VCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenLinkRequests)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Child link requests", style = VTheme.type.bodyStrong.colored(c.ink))
+                    Text(
+                        "Review parents requesting access to a student's records",
+                        style = VTheme.type.caption.colored(c.ink2),
+                    )
+                }
+                Icon(VIcons.ArrowRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
+            }
+        }
 
         // ── Teacher roster (RA-22) ─────────────────────────────────────────
         TeacherRosterSection(

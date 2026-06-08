@@ -30,6 +30,8 @@ data class LinkedChild(
     val roll: String,
     val schoolName: String,
     val profilePhotoUrl: String? = null,
+    // RA-48: "pending" until a school admin approves; "approved" once linked.
+    val status: String = "approved",
 )
 
 data class LinkChildState(
@@ -46,6 +48,10 @@ data class LinkChildState(
     val isLinking: Boolean = false,
     val linkError: String? = null,
     val linkedChild: LinkedChild? = null,
+    // RA-48: true once a pending link request has been submitted for admin
+    // approval (no child is on the dashboard yet — show the "awaiting approval"
+    // confirmation instead of routing into the dashboard).
+    val linkPending: Boolean = false,
 )
 
 /**
@@ -102,7 +108,15 @@ class LinkChildViewModel(
         }
     }
 
-    /** Link the child by roll number against the selected school (step 3). [onSuccess] opens the dashboard. */
+    /**
+     * Link the child by roll number against the selected school (step 3).
+     *
+     * RA-48: the server now returns either an APPROVED link (legacy/auto path,
+     * carries a real child_id) or a PENDING request that a school admin must
+     * approve. [onSuccess] (route into the dashboard) is invoked ONLY for an
+     * approved link; for a pending request we surface [LinkChildState.linkPending]
+     * so the wizard can show an "awaiting approval" confirmation instead.
+     */
     fun linkChild(onSuccess: () -> Unit) {
         val s = _state.value
         val school = s.selectedSchool
@@ -129,9 +143,11 @@ class LinkChildViewModel(
             when (val result = repository.linkChild(token, request)) {
                 is NetworkResult.Success -> {
                     val d = result.data.data
+                    val isPending = d.status == "pending"
                     _state.update {
                         it.copy(
                             isLinking = false,
+                            linkPending = isPending,
                             linkedChild = LinkedChild(
                                 childId = d.childId,
                                 childName = d.childName,
@@ -139,10 +155,14 @@ class LinkChildViewModel(
                                 roll = d.roll,
                                 schoolName = d.schoolName,
                                 profilePhotoUrl = d.profilePhotoUrl,
+                                status = d.status,
                             ),
                         )
                     }
-                    onSuccess()
+                    // Only route into the dashboard for an APPROVED link; a pending
+                    // request leaves the parent on the confirmation screen until a
+                    // school admin approves it.
+                    if (!isPending) onSuccess()
                 }
                 is NetworkResult.Error -> _state.update { it.copy(isLinking = false, linkError = result.message) }
                 is NetworkResult.ConnectionError -> _state.update { it.copy(isLinking = false, linkError = "Connection error") }

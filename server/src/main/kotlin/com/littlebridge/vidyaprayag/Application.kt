@@ -225,7 +225,7 @@ fun Application.module() {
         trackProgressRouting()       // /api/v1/parent/track-progress
         parentAcademicsRouting()     // /api/v1/parent/child/{id}/{attendance,marks,syllabus} — RA-43/RA-56 child-scoped reads
         parentFeesRouting()          // /api/v1/parent/fees
-        parentLinkRouting()          // /api/v1/parent/{schools/search, link-child} — Link Your Child wizard (audit §5.3 / SWEEP-A)
+        parentLinkRouting()          // /api/v1/parent/{schools/search, link-child} + /api/v1/school/link-requests{,/{id}/approve|reject} — RA-48 link approval workflow
 
         // School ecosystem (school_api_spec.artifact.md)
         schoolDashboardRouting()     // /api/v1/school/dashboard

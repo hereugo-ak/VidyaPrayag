@@ -195,6 +195,13 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    // RA-48: school-admin link-request queue API.
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.LinkRequestsApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
     single {
         com.littlebridge.vidyaprayag.feature.admin.data.remote.AnalyticsApi(
             client = get(),
@@ -265,6 +272,10 @@ val commonModule = module {
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.LeaveRequestsRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.LeaveRequestsRepositoryImpl(get())
     }
+    // RA-48: school-admin link-request queue repository.
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.LinkRequestsRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.LinkRequestsRepositoryImpl(get())
+    }
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AnalyticsRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.AnalyticsRepositoryImpl(get())
     }
@@ -321,6 +332,7 @@ val viewModelModule = module {
     factory { SchedulePTMViewModel(get(), get()) }
     factory { AcademicCalendarViewModel(get(), get()) }
     factory { LeaveRequestsViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.LinkRequestsViewModel(get(), get()) }
     factory { DailyAttendanceViewModel(get(), get()) }
     factory { AnalyticsDashboardViewModel(get(), get()) }
     factory { StudentAnalyticsViewModel(get(), get()) }

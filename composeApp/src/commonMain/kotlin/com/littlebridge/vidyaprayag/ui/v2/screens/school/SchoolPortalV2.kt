@@ -26,6 +26,7 @@ private enum class SchoolOverlay {
     Calendar,
     Messages,
     LeaveRequests,
+    LinkRequests,
     AdmissionsCRM,
     Results,
     SchedulePTM,
@@ -80,6 +81,11 @@ fun SchoolPortalV2(
             }
             SchoolOverlay.LeaveRequests -> {
                 LeaveRequestsScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
+                return@VTheme
+            }
+            SchoolOverlay.LinkRequests -> {
+                // RA-48: the parent→child link approval queue.
+                LinkRequestsScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
                 return@VTheme
             }
             SchoolOverlay.AdmissionsCRM -> {
@@ -141,7 +147,10 @@ fun SchoolPortalV2(
                         // lives), instead of logging the admin out outright.
                         onExit = { tab = "settings" },
                     )
-                    "people" -> SchoolPeopleScreenV2()
+                    "people" -> SchoolPeopleScreenV2(
+                        // RA-48 — open the parent→child link approval queue.
+                        onOpenLinkRequests = { overlay = SchoolOverlay.LinkRequests },
+                    )
                     "records" -> SchoolRecordsScreenV2()
                     "comms" -> SchoolCommsScreenV2(
                         // RA-24 — Messages and PTM open their real backend-backed
