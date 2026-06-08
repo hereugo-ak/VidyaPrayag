@@ -25,7 +25,6 @@
  *   - announcementRouting()               — /api/v1/school/announcements[…]
  *   - admissionRouting()                  — /api/v1/admissions/enquiries[…]
  *   - schoolRouting()                     — /api/v1/school/{analytics,calendar,holidays,attendance/daily}
- *   - parentOnboardingRouting()           — /api/v1/parent/onboarding/{metadata, child-info, preference-options}
  *   - parentDashboardRouting()            — /api/v1/parent/dashboard
  *   - trackProgressRouting()              — /api/v1/parent/track-progress
  *   - parentFeesRouting()                 — /api/v1/parent/fees
@@ -66,7 +65,6 @@ import com.littlebridge.vidyaprayag.feature.onboarding.onboardingRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentDashboardRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentFeesRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentLinkRouting
-import com.littlebridge.vidyaprayag.feature.parent.parentOnboardingRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentAcademicsRouting
 import com.littlebridge.vidyaprayag.feature.parent.trackProgressRouting
 import com.littlebridge.vidyaprayag.feature.school.leaveRequestsRouting
@@ -223,7 +221,6 @@ fun Application.module() {
         schoolRouting()
 
         // Parent ecosystem (parent_api_spec.artifact.md)
-        parentOnboardingRouting()    // /api/v1/parent/onboarding/{metadata, child-info, preference-options}
         parentDashboardRouting()     // /api/v1/parent/dashboard
         trackProgressRouting()       // /api/v1/parent/track-progress
         parentAcademicsRouting()     // /api/v1/parent/child/{id}/{attendance,marks,syllabus} — RA-43/RA-56 child-scoped reads
