@@ -81,6 +81,7 @@ import com.littlebridge.vidyaprayag.feature.user.parentRouting
 import com.littlebridge.vidyaprayag.feature.user.parentMessagesRouting
 import com.littlebridge.vidyaprayag.feature.user.userDetailsRouting
 import com.littlebridge.vidyaprayag.feature.user.userProfileRouting
+import com.littlebridge.vidyaprayag.core.ApiError
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -92,9 +93,18 @@ import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.statuspages.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
+
+/**
+ * RA-36: max accepted Content-Length for non-multipart (JSON) requests, in bytes.
+ * Without this, any `call.receive<…>()` buffers an unbounded body into memory →
+ * a single fat POST to e.g. /api/v1/auth/login can OOM the 512 MB dyno. The media
+ * upload route enforces its own 25 MB multipart cap, so we exempt multipart here.
+ */
+private const val MAX_JSON_BODY_BYTES = 1L * 1024 * 1024 // 1 MB
 
 fun main() {
     DatabaseFactory.init()
@@ -105,6 +115,26 @@ fun main() {
 
 fun Application.module() {
     install(IgnoreTrailingSlash)
+
+    // RA-36: reject oversized JSON bodies before they are buffered into memory.
+    // Multipart uploads (media route) are exempt — they enforce their own 25 MB
+    // streaming cap. Anything else declaring a Content-Length over the JSON limit
+    // is refused with 413 so a single fat POST cannot OOM the dyno.
+    intercept(ApplicationCallPipeline.Plugins) {
+        val contentType = call.request.contentType()
+        val isMultipart = contentType.match(ContentType.MultiPart.FormData)
+        val declaredLength = call.request.headers[HttpHeaders.ContentLength]?.toLongOrNull()
+        if (!isMultipart && declaredLength != null && declaredLength > MAX_JSON_BODY_BYTES) {
+            call.respond(
+                HttpStatusCode.PayloadTooLarge,
+                ApiError(
+                    message = "Request body too large (max ${MAX_JSON_BODY_BYTES / 1024} KB).",
+                    errorCode = "PAYLOAD_TOO_LARGE",
+                ),
+            )
+            return@intercept finish()
+        }
+    }
 
     install(CORS) {
         anyHost()
