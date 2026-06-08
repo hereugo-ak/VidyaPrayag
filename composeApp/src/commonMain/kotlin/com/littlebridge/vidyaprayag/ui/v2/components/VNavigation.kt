@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -230,7 +231,9 @@ fun VBottomNav(
                         modifier = Modifier
                             .onGloballyPositioned { coords ->
                                 // x relative to the parent Box (Row fills it), width of this tab.
-                                itemXs[item.id] = with(density) { coords.positionInParent().x.toDp() }
+                                // CMP 1.10: LayoutCoordinates.positionInParent() was removed;
+                                // boundsInParent().left gives the same parent-relative x offset.
+                                itemXs[item.id] = with(density) { coords.boundsInParent().left.toDp() }
                                 itemWidths[item.id] = with(density) { coords.size.width.toDp() }
                             }
                             .clip(RoundedCornerShape(999.dp))
