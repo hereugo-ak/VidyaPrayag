@@ -492,9 +492,20 @@ fun Route.authRouting() {
                 call.fail("Invalid refresh token", HttpStatusCode.Unauthorized, "REFRESH_INVALID")
                 return@post
             }
-            if (row[UserSessionsTable.revokedAt] != null ||
-                row[UserSessionsTable.expiresAt].isBefore(now)
-            ) {
+            // RA-35: refresh-token reuse detection. A token whose row is ALREADY
+            // revoked (but not expired) means someone replayed a rotated token —
+            // either the legitimate client after rotation, or a thief. Treat it
+            // as a theft signal and revoke the ENTIRE session family for the user
+            // so neither party can continue.
+            if (row[UserSessionsTable.revokedAt] != null) {
+                val reuseUid = row[UserSessionsTable.userId]
+                dbQuery {
+                    UserSessionsTable.update({ UserSessionsTable.userId eq reuseUid }) { it[revokedAt] = now }
+                }
+                call.fail("Refresh token has been revoked. Please login again.", HttpStatusCode.Unauthorized, "REFRESH_REUSE_DETECTED")
+                return@post
+            }
+            if (row[UserSessionsTable.expiresAt].isBefore(now)) {
                 call.fail("Refresh token expired", HttpStatusCode.Unauthorized, "REFRESH_EXPIRED")
                 return@post
             }
@@ -512,14 +523,33 @@ fun Route.authRouting() {
                 return@post
             }
             val token = JwtConfig.issueToken(uid.toString(), user[AppUsersTable.role], user[AppUsersTable.fullName])
+
+            // RA-35: ROTATE the refresh token on every use. Mint a new refresh
+            // token, revoke the presented row, and persist a new row (same device
+            // metadata, fresh 30-day window). A leaked old token is now single-use:
+            // replaying it after the legitimate client rotates trips reuse-detection.
+            val newRefresh = JwtConfig.issueRefreshToken(uid.toString())
             dbQuery {
                 UserSessionsTable.update({ UserSessionsTable.id eq row[UserSessionsTable.id] }) {
+                    it[revokedAt] = now
                     it[lastUsedAt] = now
+                }
+                UserSessionsTable.insert {
+                    it[userId] = uid
+                    it[refreshTokenHash] = sha256Hex(newRefresh)
+                    it[deviceId] = row[UserSessionsTable.deviceId]
+                    it[platform] = row[UserSessionsTable.platform]
+                    it[ipAddress] = call.request.origin.remoteHost
+                    it[userAgent] = call.request.headers["User-Agent"]
+                    it[issuedAt] = now
+                    it[expiresAt] = now.plus(30, ChronoUnit.DAYS)
+                    it[lastUsedAt] = now
+                    it[createdAt] = now
                 }
             }
             call.ok(
                 AuthTokenResponse(
-                    token = token, refreshToken = req.refreshToken,
+                    token = token, refreshToken = newRefresh,
                     userId = uid.toString(),
                     name = user[AppUsersTable.fullName],
                     role = user[AppUsersTable.role],
