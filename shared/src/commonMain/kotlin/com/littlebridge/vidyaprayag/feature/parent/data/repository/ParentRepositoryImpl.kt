@@ -40,6 +40,18 @@ class ParentRepositoryImpl(
         return api.markAllNotificationsRead(token)
     }
 
+    override suspend fun getChildAttendance(token: String, childId: String): NetworkResult<ParentAttendanceResponse> {
+        return api.getChildAttendance(token, childId)
+    }
+
+    override suspend fun getChildMarks(token: String, childId: String): NetworkResult<ParentMarksResponse> {
+        return api.getChildMarks(token, childId)
+    }
+
+    override suspend fun getChildSyllabus(token: String, childId: String): NetworkResult<ParentSyllabusResponse> {
+        return api.getChildSyllabus(token, childId)
+    }
+
     override suspend fun searchSchools(token: String, query: String): NetworkResult<SchoolSearchResponse> {
         return api.searchSchools(token, query)
     }

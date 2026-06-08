@@ -13,6 +13,10 @@ interface ParentRepository {
     /** RA-46: persist read state on the server. */
     suspend fun markNotificationRead(token: String, id: String): NetworkResult<Unit>
     suspend fun markAllNotificationsRead(token: String): NetworkResult<Unit>
+    // RA-43/RA-56: child-scoped academic reads.
+    suspend fun getChildAttendance(token: String, childId: String): NetworkResult<ParentAttendanceResponse>
+    suspend fun getChildMarks(token: String, childId: String): NetworkResult<ParentMarksResponse>
+    suspend fun getChildSyllabus(token: String, childId: String): NetworkResult<ParentSyllabusResponse>
     suspend fun searchSchools(token: String, query: String): NetworkResult<SchoolSearchResponse>
     suspend fun linkChild(token: String, request: LinkChildRequest): NetworkResult<LinkChildResponse>
 }

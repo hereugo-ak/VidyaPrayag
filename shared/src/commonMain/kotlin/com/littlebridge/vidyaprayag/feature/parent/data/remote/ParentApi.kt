@@ -71,6 +71,28 @@ class ParentApi(
         }
     }
 
+    // ── RA-43 / RA-56: child-scoped academic reads ───────────────────────────
+    // childId is a server-issued UUID (no encoding hazard); the school+child
+    // ownership check lives server-side in requireOwnedChild().
+
+    suspend fun getChildAttendance(token: String, childId: String): NetworkResult<ParentAttendanceResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/child/$childId/attendance"))
+        }
+    }
+
+    suspend fun getChildMarks(token: String, childId: String): NetworkResult<ParentMarksResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/child/$childId/marks"))
+        }
+    }
+
+    suspend fun getChildSyllabus(token: String, childId: String): NetworkResult<ParentSyllabusResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/child/$childId/syllabus"))
+        }
+    }
+
     suspend fun searchSchools(token: String, query: String): NetworkResult<SchoolSearchResponse> {
         return safeApiCall {
             client.get(getUrl("api/v1/parent/schools/search")) {

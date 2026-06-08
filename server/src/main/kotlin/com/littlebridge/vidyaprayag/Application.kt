@@ -67,6 +67,7 @@ import com.littlebridge.vidyaprayag.feature.parent.parentDashboardRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentFeesRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentLinkRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentOnboardingRouting
+import com.littlebridge.vidyaprayag.feature.parent.parentAcademicsRouting
 import com.littlebridge.vidyaprayag.feature.parent.trackProgressRouting
 import com.littlebridge.vidyaprayag.feature.school.leaveRequestsRouting
 import com.littlebridge.vidyaprayag.feature.school.messagesRouting
@@ -225,6 +226,7 @@ fun Application.module() {
         parentOnboardingRouting()    // /api/v1/parent/onboarding/{metadata, child-info, preference-options}
         parentDashboardRouting()     // /api/v1/parent/dashboard
         trackProgressRouting()       // /api/v1/parent/track-progress
+        parentAcademicsRouting()     // /api/v1/parent/child/{id}/{attendance,marks,syllabus} — RA-43/RA-56 child-scoped reads
         parentFeesRouting()          // /api/v1/parent/fees
         parentLinkRouting()          // /api/v1/parent/{schools/search, link-child} — Link Your Child wizard (audit §5.3 / SWEEP-A)
 
