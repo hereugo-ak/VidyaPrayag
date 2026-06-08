@@ -19,8 +19,16 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 
 /**
- * VDivider — a 1dp hairline rule using the design's subtle border token.
+ * VDivider — a hairline rule using the design's subtle border token.
  * Translated from primitives.tsx → `VDivider`.
+ *
+ * Feature 8 — divider refinement: weight reduced 1dp → 0.5dp. This is the single
+ * divider primitive in the app (no raw Material `Divider`/`HorizontalDivider`
+ * anywhere), so every rule across every screen becomes a true hairline in one
+ * change. The colour token ([VTheme.colors.hairline], navy@6%) is unchanged —
+ * only the weight (RULE-1: no new colour). On all densities Compose renders a
+ * 0.5dp box as the thinnest physically-resolvable line, never zero, so there is
+ * no risk of dividers disappearing (RULE-2).
  */
 @Composable
 fun VDivider(
@@ -30,7 +38,7 @@ fun VDivider(
     Box(
         modifier
             .fillMaxWidth()
-            .height(1.dp)
+            .height(0.5.dp)
             .background(color),
     )
 }

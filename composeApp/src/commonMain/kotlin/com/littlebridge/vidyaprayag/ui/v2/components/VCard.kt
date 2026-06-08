@@ -44,6 +44,20 @@ fun VCard(
 
     // §0.3 / §13.1: resting cards use the navy-tinted hairline shadow (--shadow-light-1),
     // not Material's heavy 10dp grey/black elevation.
+    //
+    // Feature 8 — "tonal elevation on interactive cards" — DELIBERATELY NOT
+    // applied on the elevation channel. The spec's mechanism (M3 Surface
+    // `tonalElevation = 2.dp`) does not exist here: this design owns a bespoke
+    // navy-tinted shadow system (vElevation) whose smallest tier is already
+    // [VElevationLevel.Card], and whose next tier ([Raised], 8px/24px) is the
+    // "raised sheet / popover" weight — far too heavy as a *resting* state for
+    // every navigable card on every screen. Jumping interactive cards to Raised
+    // was trialled and reverted: it reads as visual heaviness / distortion across
+    // dense list screens, which RULE-2 forbids ("stability over polish — revert
+    // that specific change"). Interactive cards are instead differentiated by the
+    // Feature 5 `cardPressScale` press feedback, which is the tactile cue the spec
+    // is really after — without touching the resting elevation. RULE-1 preserved:
+    // no new elevation token introduced.
     if (elevated) {
         base = base.vElevation(VElevationLevel.Card, radius = VTheme.dimens.radiusCard)
     }
