@@ -77,15 +77,15 @@ class AuthRepositoryImpl(
     }
 
     override suspend fun saveSession(response: AuthResponse) {
-        // Persist the FULL session so it survives an app restart (audit §3.4).
-        // Previously only token+role were stored and userId/refreshToken/
-        // profileCompleted lived only in the in-memory cache → unrecoverable
-        // after a cold start, and the server's refresh route was unreachable.
-        preferenceRepository.setUserToken(response.token)
-        preferenceRepository.setUserRole(response.role)
+        // RA-69: re-order writes so profileCompleted is in place BEFORE the
+        // token/role. isAuthenticated in App.kt/NavGraphV2 reacts to the token,
+        // so writing profileCompleted first ensures the post-login gate reads
+        // the correct value on its first resolution.
+        preferenceRepository.setProfileCompleted(response.profileCompleted)
         preferenceRepository.setUserId(response.userId)
         preferenceRepository.setRefreshToken(response.refreshToken)
-        preferenceRepository.setProfileCompleted(response.profileCompleted)
+        preferenceRepository.setUserRole(response.role)
+        preferenceRepository.setUserToken(response.token)
     }
 
     override suspend fun getSession(): AuthResponse? {

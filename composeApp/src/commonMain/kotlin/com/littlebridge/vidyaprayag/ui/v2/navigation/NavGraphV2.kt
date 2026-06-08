@@ -194,7 +194,7 @@ private fun AuthedFlow(
         val profileCompleted = runCatching { authRepository.getSession()?.profileCompleted }
             .getOrNull() ?: true // null session (returning user / restart) → treat as completed
         route = when (role) {
-            EntryRole.Parent -> if (profileCompleted) AuthedRoute.Portal else AuthedRoute.ParentLinkChild
+            EntryRole.Parent -> AuthedRoute.Portal // if (profileCompleted) AuthedRoute.Portal else AuthedRoute.ParentLinkChild
             // super_admin shares the school-admin operator surface (see RolePortal below)
             // and therefore shares its first-login gate too.
             EntryRole.SchoolAdmin,

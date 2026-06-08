@@ -5,8 +5,10 @@ import android.os.Bundle
 import android.view.View
 import android.view.animation.AnticipateInterpolator
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.tooling.preview.Preview
@@ -25,7 +27,22 @@ class MainActivity : ComponentActivity() {
         // API 24) BEFORE super.onCreate() so the system splash window is taken over.
         val splashScreen = installSplashScreen()
 
-        enableEdgeToEdge()
+        // Conditional status bar content color (RA-67): if the system is in dark mode,
+        // use light icons (dark style); otherwise use dark icons (light style).
+        // This satisfies "if background is light make content dark and vice versa".
+        val isDarkMode = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+            Configuration.UI_MODE_NIGHT_YES
+
+        enableEdgeToEdge(
+            statusBarStyle = if (isDarkMode) {
+                SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+            } else {
+                SystemBarStyle.light(
+                    android.graphics.Color.TRANSPARENT,
+                    android.graphics.Color.TRANSPARENT
+                )
+            }
+        )
         super.onCreate(savedInstanceState)
 
         // Hold the splash on screen until Compose draws its first frame — no
@@ -36,16 +53,25 @@ class MainActivity : ComponentActivity() {
 
         // Exit animation: the splash icon fades and scales up slightly as the first
         // screen enters, then the splash view is removed (FEATURE 1 requirement).
-        splashScreen.setOnExitAnimationListener { splashScreenViewProvider ->
-            val iconView = splashScreenViewProvider.iconView
+        splashScreen.setOnExitAnimationListener { provider ->
+            val iconView = runCatching { provider.iconView }.getOrNull()
+
+            if (iconView == null) {
+                provider.remove()
+                return@setOnExitAnimationListener
+            }
+
             val fade = ObjectAnimator.ofFloat(iconView, View.ALPHA, 1f, 0f)
             val scaleX = ObjectAnimator.ofFloat(iconView, View.SCALE_X, 1f, 1.12f)
             val scaleY = ObjectAnimator.ofFloat(iconView, View.SCALE_Y, 1f, 1.12f)
+
             listOf(fade, scaleX, scaleY).forEach {
                 it.interpolator = AnticipateInterpolator()
                 it.duration = 280L
             }
-            fade.doOnEnd { splashScreenViewProvider.remove() }
+
+            fade.doOnEnd { provider.remove() }
+
             fade.start()
             scaleX.start()
             scaleY.start()

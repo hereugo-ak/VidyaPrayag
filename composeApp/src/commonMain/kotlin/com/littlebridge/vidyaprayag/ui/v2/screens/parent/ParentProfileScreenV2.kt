@@ -7,8 +7,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
@@ -93,7 +96,11 @@ private fun ParentProfileContent(
         icon = VIcons.AlertTriangle,
     )
 
-    Column(modifier.fillMaxSize()) {
+    Column(modifier.fillMaxSize()
+        .statusBarsPadding()
+        .imePadding()
+        .navigationBarsPadding()
+    ) {
         VBackHeader(title = "Profile", onBack = onBack)
         Column(
             Modifier
@@ -114,42 +121,67 @@ private fun ParentProfileContent(
             ) {
                 val me = state.profile!!
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    VAvatar(name = me.name, src = me.photoUrl, size = 88.dp)
-                    Text(
-                        me.name.ifBlank { "Parent" },
-                        style = VTheme.type.h2.colored(c.ink),
-                        modifier = Modifier.padding(top = 12.dp),
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    VBadge(text = me.role.lowercase().replaceFirstChar { it.uppercase() }, tone = VBadgeTone.Arctic)
-                }
-                Spacer(Modifier.height(24.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val rows = listOf(
-                        "Personal details" to listOf(me.phone, me.email).filter { it.isNotBlank() }
-                            .joinToString(" • ").ifBlank { "Mobile, email, photo" },
-                        "Linked children" to "Manage who you follow",
-                        "Notification preferences" to "Push, WhatsApp, quiet hours",
-                        "Change password" to "Keep your account secure",
-                        "Help & support" to "Contact VidyaPrayag",
-                    )
-                    rows.forEach { (title, sub) ->
-                        VCard {
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(title, style = VTheme.type.bodyStrong.colored(c.ink))
-                                    Text(sub, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp))
+                    Column(
+                        Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        VAvatar(name = me.name, src = me.photoUrl, size = 88.dp)
+                        Text(
+                            me.name.ifBlank { "Parent" },
+                            style = VTheme.type.h2.colored(c.ink),
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        VBadge(
+                            text = me.role.lowercase().replaceFirstChar { it.uppercase() },
+                            tone = VBadgeTone.Arctic
+                        )
+                    }
+                    Spacer(Modifier.height(24.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val rows = listOf(
+                            "Personal details" to listOf(
+                                me.phone,
+                                me.email
+                            ).filter { it.isNotBlank() }
+                                .joinToString(" • ").ifBlank { "Mobile, email, photo" },
+                            "Linked children" to "Manage who you follow",
+                            "Notification preferences" to "Push, WhatsApp, quiet hours",
+                            "Change password" to "Keep your account secure",
+                            "Help & support" to "Contact VidyaPrayag",
+                        )
+                        rows.forEach { (title, sub) ->
+                            VCard {
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(title, style = VTheme.type.bodyStrong.colored(c.ink))
+                                        Text(
+                                            sub,
+                                            style = VTheme.type.caption.colored(c.ink2)
+                                                .copy(fontSize = 11.sp)
+                                        )
+                                    }
+                                    Icon(
+                                        VIcons.ChevronRight,
+                                        contentDescription = null,
+                                        tint = c.ink3,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
-                                Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(16.dp))
                             }
                         }
+                        Spacer(Modifier.height(8.dp))
+                        VButton(
+                            text = "Log out",
+                            onClick = { showLogoutConfirm = true },
+                            full = true,
+                            variant = VButtonVariant.Ghost
+                        )
                     }
-                    Spacer(Modifier.height(8.dp))
-                    VButton(text = "Log out", onClick = { showLogoutConfirm = true }, full = true, variant = VButtonVariant.Ghost)
                 }
             }
         }
