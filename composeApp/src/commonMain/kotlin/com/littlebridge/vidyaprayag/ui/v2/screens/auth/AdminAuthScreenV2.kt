@@ -133,6 +133,34 @@ fun AdminAuthScreenV2(
                     placeholder = "••••••••",
                     leadingIcon = VIcons.Lock,
                     isPassword = true,
+                    passwordVisible = passwordVisible,
+                    modifier = Modifier.fillMaxWidth(),
+                    trailing = {
+                        Icon(
+                            VIcons.Eye,
+                            contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                            tint = c.ink3,
+                            modifier = Modifier
+                                .size(18.dp)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) { passwordVisible = !passwordVisible },
+                        )
+                    },
+                )
+                Spacer(Modifier.height(16.dp))
+                // Account creation needs a confirm field so the VM's password-match check is
+                // meaningful — without it, confirmPassword stays "" and signup always failed
+                // with "Passwords do not match".
+                VInput(
+                    value = state.confirmPassword,
+                    onValueChange = viewModel::onConfirmPasswordChanged,
+                    label = "Confirm password",
+                    placeholder = "••••••••",
+                    leadingIcon = VIcons.Lock,
+                    isPassword = true,
+                    passwordVisible = passwordVisible,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

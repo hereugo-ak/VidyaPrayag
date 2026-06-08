@@ -98,7 +98,20 @@ class AuthViewModel(
                     ))
                 }
                 AuthStep.SignupDetails -> {
-                    if (currentState.password != currentState.confirmPassword) {
+                    if (currentState.name.isBlank()) {
+                        _state.update { it.copy(isLoading = false, error = "Please enter your name") }
+                        return@launch
+                    }
+                    if (currentState.password.isBlank()) {
+                        _state.update { it.copy(isLoading = false, error = "Please create a password") }
+                        return@launch
+                    }
+                    // Only enforce the confirm-password match when the UI actually collected a
+                    // confirmation value. Otherwise confirmPassword is "" and the check would
+                    // always fail even though the user only ever saw a single password field.
+                    if (currentState.confirmPassword.isNotEmpty() &&
+                        currentState.password != currentState.confirmPassword
+                    ) {
                         _state.update { it.copy(isLoading = false, error = "Passwords do not match") }
                         return@launch
                     }
