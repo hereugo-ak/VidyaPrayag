@@ -95,6 +95,9 @@ kotlin {
             // Provides ContextCompat for runtime location-permission checks
             // (real "use current location" in school onboarding, report §11.2).
             implementation(libs.androidx.core.ktx)
+            // Native Android 12+ SplashScreen API (with compat back to API 24)
+            // — zero white flash before the Compose content draws.
+            implementation(libs.androidx.core.splashscreen)
             implementation(libs.koin.android)
             implementation(libs.koin.androidx.compose)
         }
