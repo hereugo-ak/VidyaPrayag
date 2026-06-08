@@ -957,11 +957,11 @@ CREATE INDEX IF NOT EXISTS ix_messages_conversation
 -- ALL `CREATE TABLE` statements use `IF NOT EXISTS` so this file is safe to
 -- re-run. Run it in Supabase Dashboard → SQL Editor → New Query → paste → Run.
 --
--- ⚠️  PREREQUISITES (run first, in order):
---        1.  /supabase_schema                              (base operational)
---        2.  /docs/backend/sql/01_supplementary_schema.sql (backend extras)
---     This file depends on `schools`, `app_users`, `students`, and
---     `teacher_subject_assignments` already existing.
+-- ⚠️  PREREQUISITES (RA-63): this fragment is already bundled — the earlier
+--     sections of THIS all-in-one file create `schools`, `app_users`,
+--     `students`, and `teacher_subject_assignments`, so just run this file
+--     top-to-bottom. Do NOT use the legacy root "VIDYASETU v2.1" schema
+--     (archived to docs/_archive/...ABANDONED.sql).
 --
 -- SCOPING MODEL
 -- -------------

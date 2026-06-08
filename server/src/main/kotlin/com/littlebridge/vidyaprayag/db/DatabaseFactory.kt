@@ -7,9 +7,16 @@
  *   - LOCAL DEV (default)  : SQLite file `data.db` in CWD
  *
  * IMPORTANT: against Postgres we DO NOT run any schema migration from code.
- * The source of truth is two SQL files run manually in Supabase SQL Editor:
- *     1.  /supabase_schema                              (operational tables)
- *     2.  /docs/backend/sql/01_supplementary_schema.sql (this backend's tables)
+ * The source of truth (RA-63) is the canonical all-in-one, run manually in the
+ * Supabase SQL Editor in this exact order — see docs/db/PROVISION.sql and
+ * scripts/README-RUN-ORDER.md:
+ *     1.  scripts/schema-all-in-one-2026-06-07.sql      (every table; built from
+ *         docs/db/vidyasetu_schema.sql + migration_001/002/003 + patches)
+ *     2.  scripts/seed-2026-06-07.sql                   (test data)
+ *
+ * DO NOT use the legacy root "VIDYASETU v2.1" schema — it has been archived to
+ * docs/_archive/supabase_schema_VIDYASETU_v2.1_ABANDONED.sql and does NOT match
+ * Tables.kt. Nothing in this codebase reads it.
  *
  * Why?  Letting an ORM mutate production schema silently is a recipe for
  * downtime.  All schema changes go through a reviewed SQL migration PR
