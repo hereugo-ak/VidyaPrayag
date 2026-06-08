@@ -10,6 +10,9 @@ interface ParentRepository {
     suspend fun getScholarships(token: String): NetworkResult<ScholarshipsResponse>
     suspend fun getAnnouncements(token: String): NetworkResult<ParentAnnouncementsResponse>
     suspend fun getNotifications(token: String): NetworkResult<ParentNotificationsResponse>
+    /** RA-46: persist read state on the server. */
+    suspend fun markNotificationRead(token: String, id: String): NetworkResult<Unit>
+    suspend fun markAllNotificationsRead(token: String): NetworkResult<Unit>
     suspend fun searchSchools(token: String, query: String): NetworkResult<SchoolSearchResponse>
     suspend fun linkChild(token: String, request: LinkChildRequest): NetworkResult<LinkChildResponse>
 }

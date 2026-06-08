@@ -82,7 +82,11 @@ object DatabaseFactory {
         TeacherPeriodsTable,
         // Parent scholarships (audit §4.2/§5.2 — DB-backed, replaces hardcoded list)
         ScholarshipsTable,
-        ScholarshipApplicationsTable
+        ScholarshipApplicationsTable,
+        // Notification spine + push registry + link approval (audit part-2 RA-41/42/46/48/50)
+        NotificationsTable,
+        DeviceTokensTable,
+        ParentChildLinksTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

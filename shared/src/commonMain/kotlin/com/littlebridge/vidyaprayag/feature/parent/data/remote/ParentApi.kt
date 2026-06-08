@@ -48,9 +48,26 @@ class ParentApi(
         }
     }
 
+    // RA-42/46: point at the role-aware spine endpoint so admin/teacher tokens
+    // get their OWN notifications (the old /parent/notifications returned empty
+    // for non-parents). Response shape is identical (notifications + unread_count).
     suspend fun getNotifications(token: String): NetworkResult<ParentNotificationsResponse> {
         return safeApiCall {
-            client.get(getUrl("api/v1/parent/notifications"))
+            client.get(getUrl("api/v1/notifications"))
+        }
+    }
+
+    /** RA-46: persist a single mark-read on the server. */
+    suspend fun markNotificationRead(token: String, id: String): NetworkResult<Unit> {
+        return safeApiCall {
+            client.patch(getUrl("api/v1/notifications/$id/read"))
+        }
+    }
+
+    /** RA-46: persist mark-all-read on the server. */
+    suspend fun markAllNotificationsRead(token: String): NetworkResult<Unit> {
+        return safeApiCall {
+            client.post(getUrl("api/v1/notifications/read-all"))
         }
     }
 

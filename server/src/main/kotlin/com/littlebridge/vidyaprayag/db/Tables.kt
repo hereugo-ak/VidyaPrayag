@@ -784,3 +784,63 @@ object ScholarshipApplicationsTable : UUIDTable("scholarship_applications", "id"
     val createdAt   = timestamp("created_at")
     val updatedAt   = timestamp("updated_at")
 }
+
+// =====================================================================
+// notifications  (RA-41/42/46/50 — the cross-user notification spine)
+// =====================================================================
+/**
+ * Recipient-scoped notification rows. Every row targets exactly one recipient
+ * (`userId` = the app_users.id the bell belongs to) and carries the originating
+ * `schoolId` for tenant isolation. The Notify helper writes here; the role-aware
+ * GET /notifications reads by `userId = jwt.sub`; /summary returns the unread
+ * count for the portal bells (kills the hardcoded red-dot RA-50 and the
+ * parent-only synth that broke for admins/teachers RA-42).
+ */
+object NotificationsTable : UUIDTable("notifications", "id") {
+    val schoolId   = uuid("school_id").nullable()
+    val userId     = uuid("user_id")                    // recipient app_users.id
+    val category   = varchar("category", 32).default("general") // attendance|marks|homework|announcement|leave|fees|link|general
+    val title      = text("title")
+    val body       = text("body").default("")
+    val deepLink   = text("deep_link").nullable()
+    val actorId    = uuid("actor_id").nullable()        // who triggered it (teacher/admin/parent)
+    val refType    = varchar("ref_type", 32).nullable() // e.g. attendance_record|assessment|homework|announcement|leave_request|fee_record|parent_child_link
+    val refId      = text("ref_id").nullable()
+    val isRead     = bool("is_read").default(false)
+    val createdAt  = timestamp("created_at")
+    val readAt     = timestamp("read_at").nullable()
+}
+
+// =====================================================================
+// device_tokens  (RA-41 push — FCM/APNs registry; dispatch is Phase E)
+// =====================================================================
+object DeviceTokensTable : UUIDTable("device_tokens", "id") {
+    val userId    = uuid("user_id")
+    val token     = text("token")
+    val platform  = varchar("platform", 16).default("android")
+    val isActive  = bool("is_active").default(true)
+    val createdAt = timestamp("created_at")
+    val updatedAt = timestamp("updated_at")
+}
+
+// =====================================================================
+// parent_child_links  (RA-48 — parent→child link approval workflow)
+// =====================================================================
+/**
+ * A pending/approved/rejected request from a parent to link a child. The live
+ * link still materialises in `children` on approval; this table records the
+ * approval state so a school admin can vet roll-number claims (RA-03/RA-48)
+ * before a parent gains read access to a student's academic data.
+ */
+object ParentChildLinksTable : UUIDTable("parent_child_links", "id") {
+    val parentId    = uuid("parent_id")
+    val schoolId    = uuid("school_id").nullable()
+    val studentCode = varchar("student_code", 64).nullable()
+    val rollNumber  = varchar("roll_number", 64).nullable()
+    val childName   = text("child_name").nullable()
+    val childId     = uuid("child_id").nullable()       // children.id once approved
+    val status      = varchar("status", 16).default("pending") // pending | approved | rejected
+    val requestedAt = timestamp("requested_at")
+    val actionedBy  = uuid("actioned_by").nullable()
+    val actionedAt  = timestamp("actioned_at").nullable()
+}

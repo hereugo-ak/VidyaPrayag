@@ -61,6 +61,7 @@ import com.littlebridge.vidyaprayag.feature.config.versionRouting
 import com.littlebridge.vidyaprayag.feature.content.landingRouting
 import com.littlebridge.vidyaprayag.feature.content.supportRouting
 import com.littlebridge.vidyaprayag.feature.media.mediaRouting
+import com.littlebridge.vidyaprayag.feature.notifications.notificationsRouting
 import com.littlebridge.vidyaprayag.feature.onboarding.onboardingRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentDashboardRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentFeesRouting
@@ -240,5 +241,9 @@ fun Application.module() {
 
         // Teacher vertical (master rebuild doc Step 7 / gap G1)
         teacherRouting()             // /api/v1/teacher/{home,classes,profile,attendance,marks,syllabus,homework}
+
+        // Cross-user notification spine (audit part-2 RA-41/42/46/50) — role-aware
+        // inbox replacing the parent-only synth; persisted read state; bell summary.
+        notificationsRouting()       // /api/v1/notifications[/summary,/{id}/read,/read-all,/device-token]
     }
 }

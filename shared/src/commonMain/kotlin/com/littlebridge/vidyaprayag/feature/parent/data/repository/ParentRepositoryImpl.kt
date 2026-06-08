@@ -32,6 +32,14 @@ class ParentRepositoryImpl(
         return api.getNotifications(token)
     }
 
+    override suspend fun markNotificationRead(token: String, id: String): NetworkResult<Unit> {
+        return api.markNotificationRead(token, id)
+    }
+
+    override suspend fun markAllNotificationsRead(token: String): NetworkResult<Unit> {
+        return api.markAllNotificationsRead(token)
+    }
+
     override suspend fun searchSchools(token: String, query: String): NetworkResult<SchoolSearchResponse> {
         return api.searchSchools(token, query)
     }
