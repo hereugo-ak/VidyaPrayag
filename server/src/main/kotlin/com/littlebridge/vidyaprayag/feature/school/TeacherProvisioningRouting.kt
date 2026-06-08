@@ -9,8 +9,9 @@
  * account scoped to the admin's own school.
  *
  * Endpoints (JWT + school-scoped via requireSchoolContext):
- *   POST /api/v1/school/teachers          create a teacher app_users row
- *   GET  /api/v1/school/teachers          list teachers in the admin's school
+ *   POST   /api/v1/school/teachers        create a teacher app_users row
+ *   GET    /api/v1/school/teachers        list active teachers in the admin's school
+ *   DELETE /api/v1/school/teachers/{id}   deactivate (soft-delete) a teacher (RA-22)
  *
  * A teacher created here can then log in via:
  *   - email + password   (if an email + initial_password were supplied), OR
@@ -21,9 +22,11 @@ package com.littlebridge.vidyaprayag.feature.school
 import com.littlebridge.vidyaprayag.core.created
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
+import com.littlebridge.vidyaprayag.core.okMessage
 import com.littlebridge.vidyaprayag.core.requireSchoolContext
 import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
+import com.littlebridge.vidyaprayag.db.UserSessionsTable
 import com.littlebridge.vidyaprayag.feature.auth.hashPassword
 import com.littlebridge.vidyaprayag.feature.auth.normaliseIdentifier
 import io.ktor.http.*
@@ -37,6 +40,7 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.update
 import java.time.Instant
 import java.util.UUID
 
@@ -131,12 +135,16 @@ fun Route.teacherProvisioningRouting() {
                 )
             }
 
-            // ---- list teachers in the admin's school ----
+            // ---- list ACTIVE teachers in the admin's school ----
             get {
                 val ctx = call.requireSchoolContext() ?: return@get
                 val teachers = dbQuery {
                     AppUsersTable.selectAll()
-                        .where { (AppUsersTable.schoolId eq ctx.schoolId) and (AppUsersTable.role eq "teacher") }
+                        .where {
+                            (AppUsersTable.schoolId eq ctx.schoolId) and
+                                (AppUsersTable.role eq "teacher") and
+                                (AppUsersTable.isActive eq true)
+                        }
                         .map {
                             TeacherAccountDto(
                                 id = it[AppUsersTable.id].value.toString(),
@@ -149,6 +157,46 @@ fun Route.teacherProvisioningRouting() {
                         }
                 }
                 call.ok(TeacherListResponse(teachers), message = "Teachers fetched successfully")
+            }
+
+            // ---- deactivate (soft-delete) a teacher (RA-22) ----
+            // IDOR-safe: the UPDATE is constrained to ctx.schoolId, so an admin
+            // can only deactivate teachers belonging to their OWN school. Uses a
+            // soft-delete (is_active=false) which integrates with the RA-34
+            // kill-switch, and revokes the teacher's sessions immediately.
+            delete("/{id}") {
+                val ctx = call.requireSchoolContext() ?: return@delete
+                val teacherId = call.parameters["id"]
+                    ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                    ?: run { call.fail("A valid teacher id is required", HttpStatusCode.BadRequest, "BAD_TEACHER_ID"); return@delete }
+
+                val now = Instant.now()
+                val deactivated = dbQuery {
+                    // Confirm the teacher exists in THIS school first.
+                    val row = AppUsersTable.selectAll()
+                        .where {
+                            (AppUsersTable.id eq teacherId) and
+                                (AppUsersTable.schoolId eq ctx.schoolId) and
+                                (AppUsersTable.role eq "teacher")
+                        }
+                        .firstOrNull() ?: return@dbQuery false
+
+                    AppUsersTable.update({ AppUsersTable.id eq row[AppUsersTable.id] }) {
+                        it[isActive] = false
+                        it[updatedAt] = now
+                    }
+                    // Kill the teacher's live sessions so the removal is immediate.
+                    UserSessionsTable.update({ UserSessionsTable.userId eq teacherId }) {
+                        it[revokedAt] = now
+                    }
+                    true
+                }
+
+                if (!deactivated) {
+                    call.fail("Teacher not found in your school", HttpStatusCode.NotFound, "TEACHER_NOT_FOUND")
+                    return@delete
+                }
+                call.okMessage("Teacher removed")
             }
         }
     }

@@ -12,24 +12,39 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.littlebridge.vidyaprayag.feature.admin.presentation.RiskStudent
+import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolTeachersState
+import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolTeachersViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentAnalyticsState
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentAnalyticsViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.TeacherRosterItem
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
+import com.littlebridge.vidyaprayag.ui.v2.components.VButton
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
+import com.littlebridge.vidyaprayag.ui.v2.components.VConfirmDialog
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
+import com.littlebridge.vidyaprayag.ui.v2.components.VInput
 import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
 import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
 import com.littlebridge.vidyaprayag.ui.v2.components.VStatusDot
@@ -55,18 +70,35 @@ import kotlin.math.roundToInt
 fun SchoolPeopleScreenV2(
     modifier: Modifier = Modifier,
     viewModel: StudentAnalyticsViewModel = koinViewModel(),
+    teachersViewModel: SchoolTeachersViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
-    SchoolPeopleContent(state = state, onRetry = viewModel::load, modifier = modifier)
+    val teachersState by teachersViewModel.state.collectAsStateV2()
+    SchoolPeopleContent(
+        state = state,
+        onRetry = viewModel::load,
+        teachersState = teachersState,
+        onTeachersRetry = teachersViewModel::load,
+        onAddTeacher = teachersViewModel::addTeacher,
+        onRemoveTeacher = teachersViewModel::removeTeacher,
+        modifier = modifier,
+    )
 }
 
 @Composable
 private fun SchoolPeopleContent(
     state: StudentAnalyticsState,
     onRetry: () -> Unit,
+    teachersState: SchoolTeachersState,
+    onTeachersRetry: () -> Unit,
+    onAddTeacher: (name: String, identifier: String, initialPassword: String?, onAdded: (() -> Unit)?) -> Unit,
+    onRemoveTeacher: (teacherId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
+
+    var showAddTeacher by remember { mutableStateOf(false) }
+    var pendingRemoval by remember { mutableStateOf<TeacherRosterItem?>(null) }
 
     Column(
         modifier
@@ -77,6 +109,16 @@ private fun SchoolPeopleContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text("People", style = VTheme.type.h1.colored(c.ink))
+
+        // ── Teacher roster (RA-22) ─────────────────────────────────────────
+        TeacherRosterSection(
+            state = teachersState,
+            onRetry = onTeachersRetry,
+            onAddClick = { showAddTeacher = true },
+            onRemoveClick = { pendingRemoval = it },
+        )
+
+        Text("Cohort analytics", style = VTheme.type.h3.colored(c.ink))
 
         VStateHost(
             loading = state.isLoading,
@@ -164,6 +206,197 @@ private fun SchoolPeopleContent(
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // ── Add-teacher dialog (RA-22) ─────────────────────────────────────────
+    if (showAddTeacher) {
+        AddTeacherDialog(
+            isSubmitting = teachersState.isMutating,
+            onDismiss = { showAddTeacher = false },
+            onSubmit = { name, identifier, password ->
+                onAddTeacher(name, identifier, password) { showAddTeacher = false }
+            },
+        )
+    }
+
+    // ── Remove-teacher confirmation (RA-22) ────────────────────────────────
+    val removal = pendingRemoval
+    VConfirmDialog(
+        visible = removal != null,
+        title = "Remove teacher",
+        message = "Remove ${removal?.name ?: "this teacher"} from your school? " +
+            "They will lose access immediately. This can be reversed by re-adding them.",
+        confirmLabel = "Remove",
+        icon = VIcons.AlertTriangle,
+        onConfirm = {
+            removal?.let { onRemoveTeacher(it.id) }
+            pendingRemoval = null
+        },
+        onDismiss = { pendingRemoval = null },
+    )
+}
+
+/**
+ * RA-22: the teacher roster. Honours LAW (RULE-7) — loading, error, and empty
+ * states all come from [VStateHost]; uses only frozen V* primitives and theme
+ * tokens (no Material defaults, no new tokens).
+ */
+@Composable
+private fun TeacherRosterSection(
+    state: SchoolTeachersState,
+    onRetry: () -> Unit,
+    onAddClick: () -> Unit,
+    onRemoveClick: (TeacherRosterItem) -> Unit,
+) {
+    val c = VTheme.colors
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Teachers", style = VTheme.type.h3.colored(c.ink))
+            VButton(
+                text = "Add teacher",
+                onClick = onAddClick,
+                variant = VButtonVariant.Secondary,
+                size = VButtonSize.Sm,
+                leading = { Icon(VIcons.Plus, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                enabled = !state.isMutating,
+            )
+        }
+
+        VStateHost(
+            loading = state.isLoading,
+            error = state.errorMessage,
+            isEmpty = state.teachers.isEmpty(),
+            emptyTitle = "No teachers yet",
+            emptyBody = "Add your first teacher so they can sign in and manage their classes.",
+            emptyIcon = VIcons.Users,
+            onRetry = onRetry,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                state.teachers.forEach { t ->
+                    TeacherRosterRow(
+                        item = t,
+                        mutating = state.isMutating,
+                        onRemove = { onRemoveClick(t) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TeacherRosterRow(
+    item: TeacherRosterItem,
+    mutating: Boolean,
+    onRemove: () -> Unit,
+) {
+    val c = VTheme.colors
+    VCard {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            VAvatar(name = item.name, size = 42.dp)
+            Column(Modifier.weight(1f)) {
+                Text(item.name, style = VTheme.type.bodyStrong.colored(c.ink))
+                if (item.contact.isNotBlank()) {
+                    Text(item.contact, style = VTheme.type.caption.colored(c.ink2))
+                }
+            }
+            VButton(
+                text = "Remove",
+                onClick = onRemove,
+                variant = VButtonVariant.Ghost,
+                size = VButtonSize.Sm,
+                leading = { Icon(VIcons.Close, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                enabled = !mutating,
+            )
+        }
+    }
+}
+
+/**
+ * RA-22: add-teacher form. A teacher is provisioned by email (with an initial
+ * password) or by phone (OTP login). Frozen primitives only.
+ */
+@Composable
+private fun AddTeacherDialog(
+    isSubmitting: Boolean,
+    onDismiss: () -> Unit,
+    onSubmit: (name: String, identifier: String, initialPassword: String?) -> Unit,
+) {
+    val c = VTheme.colors
+    var name by remember { mutableStateOf("") }
+    var identifier by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+
+    val isEmail = identifier.contains("@")
+    val canSubmit = name.isNotBlank() &&
+        identifier.isNotBlank() &&
+        (!isEmail || password.isNotBlank()) &&
+        !isSubmitting
+
+    Dialog(onDismissRequest = onDismiss) {
+        VCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("Add teacher", style = VTheme.type.h3.colored(c.ink))
+                VInput(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = "Full name",
+                    placeholder = "e.g. Asha Verma",
+                    leadingIcon = VIcons.User,
+                )
+                VInput(
+                    value = identifier,
+                    onValueChange = { identifier = it },
+                    label = "Email or phone",
+                    placeholder = "teacher@school.edu or 98765 43210",
+                    leadingIcon = if (isEmail) VIcons.Mail else VIcons.Phone,
+                    keyboardType = if (isEmail) KeyboardType.Email else KeyboardType.Text,
+                )
+                if (isEmail) {
+                    VInput(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = "Initial password",
+                        placeholder = "Shared with the teacher to sign in",
+                        leadingIcon = VIcons.Lock,
+                        isPassword = true,
+                    )
+                } else {
+                    Text(
+                        "This teacher will sign in with a one-time code sent to their phone.",
+                        style = VTheme.type.caption.colored(c.ink2),
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                VButton(
+                    text = "Add teacher",
+                    onClick = {
+                        onSubmit(name, identifier, password.takeIf { isEmail && it.isNotBlank() })
+                    },
+                    variant = VButtonVariant.Primary,
+                    full = true,
+                    enabled = canSubmit,
+                    loading = isSubmitting,
+                )
+                VButton(
+                    text = "Cancel",
+                    onClick = onDismiss,
+                    variant = VButtonVariant.Ghost,
+                    full = true,
+                    enabled = !isSubmitting,
+                )
             }
         }
     }

@@ -166,6 +166,12 @@ val commonModule = module {
         )
     }
     single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.TeachersApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single {
         com.littlebridge.vidyaprayag.feature.admin.data.remote.PtmApi(
             client = get(),
             baseUrl = AppConfig.schoolBaseUrl
@@ -244,6 +250,9 @@ val commonModule = module {
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AnnouncementsRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.AnnouncementsRepositoryImpl(get())
     }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.TeachersRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.TeachersRepositoryImpl(get())
+    }
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.PtmRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.PtmRepositoryImpl(get())
     }
@@ -306,6 +315,7 @@ val viewModelModule = module {
     factory { InstitutionalProfileViewModel(get(), get(), get()) }
     factory { AdmissionCRMViewModel(get(), get()) }
     factory { SchoolAnnouncementsViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolTeachersViewModel(get(), get()) }
     factory { MessagesViewModel(get(), get()) }
     factory { SchedulePTMViewModel(get(), get()) }
     factory { AcademicCalendarViewModel(get(), get()) }
