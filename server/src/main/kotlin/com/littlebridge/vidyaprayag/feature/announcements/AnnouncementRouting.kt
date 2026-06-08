@@ -32,6 +32,8 @@ package com.littlebridge.vidyaprayag.feature.announcements
 
 import com.littlebridge.vidyaprayag.core.accepted
 import com.littlebridge.vidyaprayag.core.created
+import com.littlebridge.vidyaprayag.feature.notifications.Notify
+import com.littlebridge.vidyaprayag.feature.notifications.NotifyRecipients
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.requireSchoolAdmin
@@ -216,6 +218,25 @@ fun Route.announcementRouting() {
                         it[createdAt] = now
                         it[updatedAt] = now
                     }
+                }
+                // RA-41: an announcement reaches parents + teachers in-app, not
+                // just the WhatsApp sync. Audience-precise (class/student) targeting
+                // is refined in RA-49; here a school announcement fans out to the
+                // school's parents and teachers, scoped to this tenant.
+                val recipients = (NotifyRecipients.parentsInSchool(schoolId) +
+                    NotifyRecipients.teachersInSchool(schoolId)).distinct()
+                if (recipients.isNotEmpty()) {
+                    Notify.toUsers(
+                        userIds = recipients,
+                        category = "announcement",
+                        title = req.title,
+                        body = req.subTitle ?: req.description.take(140),
+                        schoolId = schoolId,
+                        actorId = uid,
+                        deepLink = "announcements/$eventId",
+                        refType = "announcement",
+                        refId = eventId,
+                    )
                 }
                 call.created(
                     AnnouncementDto(

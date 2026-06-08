@@ -23,6 +23,8 @@
 package com.littlebridge.vidyaprayag.feature.teacher
 
 import com.littlebridge.vidyaprayag.core.created
+import com.littlebridge.vidyaprayag.feature.notifications.Notify
+import com.littlebridge.vidyaprayag.feature.notifications.NotifyRecipients
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.okMessage
@@ -280,6 +282,27 @@ fun Route.teacherTaskRoutes() {
                     }
                 }
             }
+
+            // RA-41: alert each affected parent when their child is absent/late.
+            // Recipients resolved per student_code within this school (multi-tenant).
+            val flagged = req.entries.filter { it.status.lowercase() in setOf("absent", "late") }
+            for (e in flagged) {
+                val parents = NotifyRecipients.parentsOfStudent(ctx.schoolId, e.studentId)
+                if (parents.isNotEmpty()) {
+                    val verb = if (e.status.lowercase() == "absent") "marked absent" else "marked late"
+                    Notify.toUsers(
+                        userIds = parents,
+                        category = "attendance",
+                        title = "Attendance update",
+                        body = "Your child was $verb on $date.",
+                        schoolId = ctx.schoolId,
+                        actorId = ctx.userId,
+                        deepLink = "parent/academics/attendance",
+                        refType = "attendance",
+                        refId = e.studentId,
+                    )
+                }
+            }
             call.okMessage("Attendance saved for ${req.entries.size} student(s)")
         }
     }
@@ -416,6 +439,24 @@ fun Route.teacherTaskRoutes() {
                     it[publishedAt] = now
                     it[updatedAt] = now
                 }
+            }
+
+            // RA-41: notify the class parents that a result was published. Scoped
+            // to the owned class within this school (multi-tenant isolation).
+            val examName = assessment[AssessmentsTable.name]
+            val parents = NotifyRecipients.parentsOfClass(ctx.schoolId, asg.className)
+            if (parents.isNotEmpty()) {
+                Notify.toUsers(
+                    userIds = parents,
+                    category = "marks",
+                    title = "Results published",
+                    body = "Marks for \"$examName\" (${asg.subject}) have been published.",
+                    schoolId = ctx.schoolId,
+                    actorId = ctx.userId,
+                    deepLink = "parent/academics/marks",
+                    refType = "assessment",
+                    refId = assessmentId.toString(),
+                )
             }
             call.okMessage("Marks saved for ${req.entries.size} student(s)")
         }
@@ -647,6 +688,22 @@ fun Route.teacherTaskRoutes() {
                     it[createdAt] = now
                     it[updatedAt] = now
                 }
+            }
+
+            // RA-41: notify the class parents that new homework was assigned.
+            val parents = NotifyRecipients.parentsOfClass(ctx.schoolId, asg.className)
+            if (parents.isNotEmpty()) {
+                Notify.toUsers(
+                    userIds = parents,
+                    category = "homework",
+                    title = "New homework",
+                    body = "${asg.subject}: ${req.title} — due ${req.dueDate}.",
+                    schoolId = ctx.schoolId,
+                    actorId = ctx.userId,
+                    deepLink = "parent/academics",
+                    refType = "homework",
+                    refId = newId.toString(),
+                )
             }
             call.created(mapOf("id" to newId.toString()), message = "Homework created")
         }
