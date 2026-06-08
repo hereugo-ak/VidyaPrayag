@@ -47,7 +47,7 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays a portal can push above its tab content (back returns to the tabs). */
-private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, Profile }
+private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, Profile, Leave }
 
 /**
  * ParentPortalV2 — the 4-tab parent shell, a faithful copy of `Parent.tsx → ParentApp`.
@@ -97,6 +97,11 @@ fun ParentPortalV2(
             )
             return
         }
+        ParentOverlay.Leave -> {
+            // RA-44: the parent leg of the leave workflow.
+            ParentLeaveScreenV2(onBack = { overlay = ParentOverlay.None }, modifier = modifier)
+            return
+        }
         ParentOverlay.None -> Unit
     }
 
@@ -124,7 +129,7 @@ fun ParentPortalV2(
         Box(Modifier.fillMaxSize()) {
             when (tab) {
                 "home" -> ParentHomeScreenV2()
-                "academics" -> ParentAcademicsScreenV2()
+                "academics" -> ParentAcademicsScreenV2(onOpenLeave = { overlay = ParentOverlay.Leave })
                 "fees" -> ParentFeesScreenV2()
                 "activity" -> ParentActivityScreenV2()
             }

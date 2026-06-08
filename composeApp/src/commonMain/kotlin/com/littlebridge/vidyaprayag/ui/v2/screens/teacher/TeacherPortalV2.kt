@@ -27,7 +27,7 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.VPortalTone
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 
 /** Full-screen overlays the teacher portal can push above its tab content. */
-private enum class TeacherOverlay { None, Notifications, Calendar }
+private enum class TeacherOverlay { None, Notifications, Calendar, Leave }
 
 /**
  * TeacherPortalV2 — the 4-tab teacher shell, translated from Teacher.tsx.
@@ -79,6 +79,11 @@ fun TeacherPortalV2(
                 AcademicCalendarScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
                 return@VTheme
             }
+            TeacherOverlay.Leave -> {
+                // RA-44: the teacher leg of the leave workflow.
+                TeacherLeaveScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
+                return@VTheme
+            }
             TeacherOverlay.None -> Unit
         }
 
@@ -119,6 +124,8 @@ fun TeacherPortalV2(
                     "home" -> TeacherHomeScreenV2(
                         onOpenNotifications = { overlay = TeacherOverlay.Notifications },
                         onOpenCalendar = { overlay = TeacherOverlay.Calendar },
+                        // RA-44 — open the teacher leave-requests queue.
+                        onOpenLeave = { overlay = TeacherOverlay.Leave },
                         // §7 finding K — tapping the avatar opens the Profile tab (where logout
                         // lives), instead of logging the teacher out outright.
                         onExit = { tab = "profile" },

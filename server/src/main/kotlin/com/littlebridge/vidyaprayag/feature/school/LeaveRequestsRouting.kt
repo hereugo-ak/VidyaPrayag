@@ -29,6 +29,7 @@ import com.littlebridge.vidyaprayag.core.okMessage
 import com.littlebridge.vidyaprayag.core.requireSchoolContext
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.LeaveRequestsTable
+import com.littlebridge.vidyaprayag.feature.notifications.Notify
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.request.*
@@ -233,8 +234,13 @@ fun Route.leaveRequestsRouting() {
                         call.fail("status must be Pending|Approved|Rejected"); return@patch
                     }
                 }
-                // Ownership enforced via school_id in WHERE.
-                val n = dbQuery {
+                // Ownership enforced via school_id in WHERE. We read the row first
+                // so RA-44 can notify the applicant parent + routed teacher on an
+                // admin override, and surface the requester name in the message.
+                val decided = dbQuery {
+                    val row = LeaveRequestsTable.selectAll()
+                        .where { (LeaveRequestsTable.id eq id) and (LeaveRequestsTable.schoolId eq ctx.schoolId) }
+                        .singleOrNull() ?: return@dbQuery null
                     LeaveRequestsTable.update({
                         (LeaveRequestsTable.id eq id) and (LeaveRequestsTable.schoolId eq ctx.schoolId)
                     }) {
@@ -243,10 +249,69 @@ fun Route.leaveRequestsRouting() {
                         it[actionedAt] = Instant.now()
                         it[updatedAt] = Instant.now()
                     }
+                    LeaveDecisionTargets(
+                        parentId = row[LeaveRequestsTable.parentId],
+                        teacherId = row[LeaveRequestsTable.teacherId],
+                        requesterName = row[LeaveRequestsTable.requesterName],
+                    )
                 }
-                if (n == 0) call.fail("Leave request not found", HttpStatusCode.NotFound)
-                else call.okMessage("Leave request status updated")
+                if (decided == null) {
+                    call.fail("Leave request not found", HttpStatusCode.NotFound)
+                } else {
+                    // RA-44: admin override notifies BOTH the applicant parent and the
+                    // routed class teacher so neither is surprised by the decision.
+                    notifyLeaveDecision(
+                        schoolId = ctx.schoolId,
+                        actorId = ctx.userId,
+                        leaveId = id,
+                        status = normalized,
+                        requesterName = decided.requesterName,
+                        recipients = listOfNotNull(decided.parentId, decided.teacherId),
+                        parentDeepLink = "parent/leave",
+                    )
+                    call.okMessage("Leave request status updated")
+                }
             }
         }
     }
+}
+
+/** RA-44: who to notify when a leave request is decided. */
+internal data class LeaveDecisionTargets(
+    val parentId: UUID?,
+    val teacherId: UUID?,
+    val requesterName: String,
+)
+
+/**
+ * RA-44: shared notify for a leave decision. Used by both the admin override
+ * (this file) and the teacher decision (TeacherLeaveRouting.kt). [recipients]
+ * is de-duped by Notify; we only build a human-readable line here.
+ */
+internal suspend fun notifyLeaveDecision(
+    schoolId: UUID,
+    actorId: UUID,
+    leaveId: UUID,
+    status: String,
+    requesterName: String,
+    recipients: List<UUID>,
+    parentDeepLink: String,
+) {
+    if (recipients.isEmpty()) return
+    val verb = when (status.lowercase()) {
+        "approved" -> "approved"
+        "rejected" -> "rejected"
+        else -> "updated"
+    }
+    Notify.toUsers(
+        userIds = recipients,
+        category = "leave",
+        title = "Leave request $verb",
+        body = "$requesterName's leave request was $verb.",
+        schoolId = schoolId,
+        actorId = actorId,
+        deepLink = parentDeepLink,
+        refType = "leave_request",
+        refId = leaveId.toString(),
+    )
 }

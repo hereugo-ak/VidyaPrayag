@@ -47,4 +47,10 @@ class TeacherRepositoryImpl(
 
     override suspend fun createAssessment(token: String, request: CreateAssessmentRequest): NetworkResult<ApiResponse<TeacherAssessmentDto>> =
         api.createAssessment(token, request)
+
+    override suspend fun getLeaveRequests(token: String, status: String?): NetworkResult<TeacherLeaveListResponse> =
+        api.getLeaveRequests(token, status)
+
+    override suspend fun decideLeaveRequest(token: String, id: String, request: TeacherLeaveDecisionRequest): NetworkResult<ApiResponse<Unit>> =
+        api.decideLeaveRequest(token, id, request)
 }

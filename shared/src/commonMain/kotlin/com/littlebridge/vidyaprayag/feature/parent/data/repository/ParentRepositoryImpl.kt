@@ -59,4 +59,12 @@ class ParentRepositoryImpl(
     override suspend fun linkChild(token: String, request: LinkChildRequest): NetworkResult<LinkChildResponse> {
         return api.linkChild(token, request)
     }
+
+    override suspend fun getLeaveRequests(token: String): NetworkResult<ParentLeaveListResponse> {
+        return api.getLeaveRequests(token)
+    }
+
+    override suspend fun applyLeave(token: String, request: CreateParentLeaveRequest): NetworkResult<ParentLeaveCreateResponse> {
+        return api.applyLeave(token, request)
+    }
 }

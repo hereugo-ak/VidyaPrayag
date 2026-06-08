@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,6 +38,7 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VComingSoon
+import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
 import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
 import com.littlebridge.vidyaprayag.ui.v2.components.VTopTabs
@@ -60,6 +63,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun ParentAcademicsScreenV2(
     modifier: Modifier = Modifier,
+    onOpenLeave: () -> Unit = {},
     viewModel: TrackProgressViewModel = koinViewModel(),
     academicsViewModel: ParentAcademicsViewModel = koinViewModel(),
 ) {
@@ -72,6 +76,7 @@ fun ParentAcademicsScreenV2(
         onLoadAttendance = { academicsViewModel.loadAttendance() },
         onLoadMarks = { academicsViewModel.loadMarks() },
         onLoadSyllabus = { academicsViewModel.loadSyllabus() },
+        onOpenLeave = onOpenLeave,
         modifier = modifier,
     )
 }
@@ -85,6 +90,7 @@ private fun ParentAcademicsContent(
     onLoadAttendance: () -> Unit,
     onLoadMarks: () -> Unit,
     onLoadSyllabus: () -> Unit,
+    onOpenLeave: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -112,6 +118,29 @@ private fun ParentAcademicsContent(
             style = VTheme.type.h1.colored(c.ink),
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
         )
+
+        // ── RA-44: apply-for-leave entry ─────────────────────────────────────
+        VCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .clickable(onClick = onOpenLeave),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Apply for leave", style = VTheme.type.bodyStrong.colored(c.ink))
+                    Text(
+                        "Request leave for your child — routed to their class teacher",
+                        style = VTheme.type.caption.colored(c.ink2),
+                    )
+                }
+                Icon(VIcons.ArrowRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
+            }
+        }
+        Spacer(Modifier.height(12.dp))
 
         // RA-56: child switcher — only shown for a multi-child parent. Single-child
         // parents see no chrome; zero children is handled by the empty tabs below.

@@ -512,6 +512,17 @@ object LeaveRequestsTable : UUIDTable("leave_requests", "id") {
     val status        = varchar("status", 16).default("Pending")        // Pending | Approved | Rejected
     val actionedBy    = uuid("actioned_by").nullable()
     val actionedAt    = timestamp("actioned_at").nullable()
+    // RA-44: cross-role leave workflow. A parent applies on behalf of a child;
+    // the request is routed to the child's class teacher(s) (resolved at apply
+    // time from teacher_subject_assignments) and can be decided by that teacher
+    // or overridden by an admin. All nullable so legacy teacher-leave rows and
+    // pre-PATCH-103 data still load.
+    val classId       = uuid("class_id").nullable()                     // FK school_classes.id (the class)
+    val className     = varchar("class_name", 64).nullable()
+    val section       = varchar("section", 16).nullable()
+    val teacherId     = uuid("teacher_id").nullable()                   // FK app_users.id (routed-to teacher)
+    val childId       = uuid("child_id").nullable()                     // FK children.id (the student)
+    val parentId      = uuid("parent_id").nullable()                    // FK app_users.id (the applicant)
     val createdAt     = timestamp("created_at")
     val updatedAt     = timestamp("updated_at")
 }

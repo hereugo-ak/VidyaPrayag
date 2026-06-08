@@ -19,4 +19,7 @@ interface ParentRepository {
     suspend fun getChildSyllabus(token: String, childId: String): NetworkResult<ParentSyllabusResponse>
     suspend fun searchSchools(token: String, query: String): NetworkResult<SchoolSearchResponse>
     suspend fun linkChild(token: String, request: LinkChildRequest): NetworkResult<LinkChildResponse>
+    // RA-44: parent leave workflow.
+    suspend fun getLeaveRequests(token: String): NetworkResult<ParentLeaveListResponse>
+    suspend fun applyLeave(token: String, request: CreateParentLeaveRequest): NetworkResult<ParentLeaveCreateResponse>
 }

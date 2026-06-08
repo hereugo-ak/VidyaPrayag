@@ -83,3 +83,47 @@ data class ParentSyllabusUnitDto(
     @SerialName("is_covered") val isCovered: Boolean,
     @SerialName("covered_on") val coveredOn: String? = null,
 )
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RA-44: parent leave workflow. Mirror server/.../parent/ParentLeaveRouting.kt.
+// A parent applies on behalf of an owned child; the request routes to the
+// child's class teacher and is decided by that teacher or an admin.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class CreateParentLeaveRequest(
+    @SerialName("child_id") val childId: String,
+    @SerialName("date_from") val dateFrom: String, // YYYY-MM-DD
+    @SerialName("date_to") val dateTo: String,      // YYYY-MM-DD
+    val reason: String,
+    @SerialName("image_url") val imageUrl: String? = null,
+)
+
+@Serializable
+data class ParentLeaveDto(
+    val id: String,
+    @SerialName("child_name") val childName: String,
+    @SerialName("date_from") val dateFrom: String,
+    @SerialName("date_to") val dateTo: String,
+    val reason: String,
+    @SerialName("image_url") val imageUrl: String? = null,
+    val status: String,
+)
+
+@Serializable
+data class ParentLeaveListResponse(
+    val success: Boolean = true,
+    val data: ParentLeaveListData = ParentLeaveListData(),
+)
+
+@Serializable
+data class ParentLeaveListData(
+    val requests: List<ParentLeaveDto> = emptyList(),
+)
+
+@Serializable
+data class ParentLeaveCreateResponse(
+    val success: Boolean = true,
+    val data: ParentLeaveDto? = null,
+    val message: String? = null,
+)

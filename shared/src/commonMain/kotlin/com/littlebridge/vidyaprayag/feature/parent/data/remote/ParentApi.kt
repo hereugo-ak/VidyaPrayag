@@ -93,6 +93,25 @@ class ParentApi(
         }
     }
 
+    // ── RA-44: parent leave workflow ─────────────────────────────────────────
+
+    /** List the parent's own submitted leave requests. */
+    suspend fun getLeaveRequests(token: String): NetworkResult<ParentLeaveListResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/leave"))
+        }
+    }
+
+    /** Apply for leave on behalf of an owned child (routes to the class teacher). */
+    suspend fun applyLeave(token: String, request: CreateParentLeaveRequest): NetworkResult<ParentLeaveCreateResponse> {
+        return safeApiCall {
+            client.post(getUrl("api/v1/parent/leave")) {
+                contentType(ContentType.Application.Json)
+                setBody(request)
+            }
+        }
+    }
+
     suspend fun searchSchools(token: String, query: String): NetworkResult<SchoolSearchResponse> {
         return safeApiCall {
             client.get(getUrl("api/v1/parent/schools/search")) {

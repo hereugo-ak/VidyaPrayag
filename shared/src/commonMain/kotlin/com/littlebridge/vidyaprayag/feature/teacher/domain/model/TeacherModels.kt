@@ -289,3 +289,36 @@ data class CreateAssessmentRequest(
     @SerialName("max_marks") val maxMarks: Int? = null,
     @SerialName("exam_date") val examDate: String? = null,
 )
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RA-44: teacher leave workflow. Mirror server/.../teacher/TeacherLeaveRouting.kt.
+// A teacher lists leave requests routed to their classes and approves/rejects.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class TeacherLeaveListResponse(
+    val success: Boolean = true,
+    val data: TeacherLeaveListData = TeacherLeaveListData(),
+)
+
+@Serializable
+data class TeacherLeaveListData(
+    @SerialName("pending_count") val pendingCount: Int = 0,
+    val requests: List<TeacherLeaveDto> = emptyList(),
+)
+
+@Serializable
+data class TeacherLeaveDto(
+    val id: String,
+    @SerialName("student_name") val studentName: String,
+    @SerialName("class_name") val className: String? = null,
+    val section: String? = null,
+    @SerialName("date_from") val dateFrom: String,
+    @SerialName("date_to") val dateTo: String,
+    val reason: String,
+    @SerialName("image_url") val imageUrl: String? = null,
+    val status: String,
+)
+
+@Serializable
+data class TeacherLeaveDecisionRequest(val status: String) // Approved | Rejected

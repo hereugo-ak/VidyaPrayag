@@ -141,4 +141,28 @@ class TeacherApi(
             setBody(request)
         }
     }
+
+    // ── RA-44: teacher leave workflow ─────────────────────────────────────────
+
+    /** Leave requests routed to this teacher's classes (optionally status-filtered). */
+    suspend fun getLeaveRequests(
+        token: String,
+        status: String? = null,
+    ): NetworkResult<TeacherLeaveListResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/leave-requests")) {
+            if (status != null) parameter("status", status)
+        }
+    }
+
+    /** Approve / reject a leave request the teacher owns. */
+    suspend fun decideLeaveRequest(
+        token: String,
+        id: String,
+        request: TeacherLeaveDecisionRequest,
+    ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
+        client.patch(getUrl("api/v1/teacher/leave-requests/$id")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
 }
