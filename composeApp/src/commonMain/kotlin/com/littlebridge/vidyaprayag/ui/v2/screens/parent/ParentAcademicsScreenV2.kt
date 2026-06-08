@@ -260,8 +260,9 @@ private fun MarksTab(academics: ParentAcademicsState, onRetry: () -> Unit) {
                         Text(m.examName, style = VTheme.type.bodyStrong.colored(c.ink))
                         Text(m.subject, style = VTheme.type.caption.colored(c.ink2))
                     }
+                    val marksValue = m.marks
                     Text(
-                        if (m.marks != null) "${m.marks.toInt()} / ${m.maxMarks}" else "—",
+                        if (marksValue != null) "${marksValue.toInt()} / ${m.maxMarks}" else "—",
                         style = VTheme.type.data.colored(c.ink),
                     )
                 }
