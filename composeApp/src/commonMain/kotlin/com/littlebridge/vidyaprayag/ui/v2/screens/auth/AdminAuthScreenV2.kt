@@ -116,51 +116,26 @@ fun AdminAuthScreenV2(
                 )
             }
             AuthStep.SignupDetails -> {
-                // New school admin creating an account (email signup path).
-                VInput(
-                    value = state.name,
-                    onValueChange = viewModel::onNameChanged,
-                    label = "Your name",
-                    placeholder = "Full name",
-                    leadingIcon = VIcons.User,
+                // RA-53 🔴 — Staff accounts are NEVER self-created. The public
+                // /signup route now mints only `parent`, and the only way to
+                // become a school_admin/teacher is server-side provisioning.
+                // So when checkUser reports an unknown staff email, we do NOT
+                // render a "create account" form (which previously drove the
+                // self-service privilege-escalation chain). We render a
+                // not-provisioned notice and send the user back to the email
+                // step. The CTA below is also suppressed for this step.
+                Text(
+                    "No staff account exists for this email.",
+                    style = VTheme.type.bodyStrong.colored(c.ink1),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.height(16.dp))
-                VInput(
-                    value = state.password,
-                    onValueChange = viewModel::onPasswordChanged,
-                    label = "Create password",
-                    placeholder = "••••••••",
-                    leadingIcon = VIcons.Lock,
-                    isPassword = true,
-                    passwordVisible = passwordVisible,
-                    modifier = Modifier.fillMaxWidth(),
-                    trailing = {
-                        Icon(
-                            VIcons.Eye,
-                            contentDescription = if (passwordVisible) "Hide password" else "Show password",
-                            tint = c.ink3,
-                            modifier = Modifier
-                                .size(18.dp)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                ) { passwordVisible = !passwordVisible },
-                        )
-                    },
-                )
-                Spacer(Modifier.height(16.dp))
-                // Account creation needs a confirm field so the VM's password-match check is
-                // meaningful — without it, confirmPassword stays "" and signup always failed
-                // with "Passwords do not match".
-                VInput(
-                    value = state.confirmPassword,
-                    onValueChange = viewModel::onConfirmPasswordChanged,
-                    label = "Confirm password",
-                    placeholder = "••••••••",
-                    leadingIcon = VIcons.Lock,
-                    isPassword = true,
-                    passwordVisible = passwordVisible,
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "School administrator and teacher accounts are created by your " +
+                        "institution, not self-registered. Please contact your school " +
+                        "administrator to be provisioned, then sign in with the credentials " +
+                        "you receive.",
+                    style = VTheme.type.body.colored(c.ink3),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -180,24 +155,37 @@ fun AdminAuthScreenV2(
 
         Spacer(Modifier.height(24.dp))
 
-        val ctaLabel = when (state.step) {
-            AuthStep.Identifier -> "Continue"
-            AuthStep.SignupDetails -> "Create account"
-            else -> "Sign In"
-        }
-        VButton(
-            text = ctaLabel,
-            onClick = { if (state.step == AuthStep.Identifier) viewModel.onContinue() else viewModel.onSubmit() },
-            full = true,
-            size = VButtonSize.Lg,
-            tone = VButtonTone.Teal,
-            loading = state.isLoading,
-            trailing = { Icon(VIcons.ArrowRight, contentDescription = null, modifier = Modifier.size(16.dp)) },
-        )
-
-        if (state.step != AuthStep.Identifier) {
-            Spacer(Modifier.height(8.dp))
-            AuthBackLink(onClick = viewModel::goBack, modifier = Modifier.align(Alignment.CenterHorizontally))
+        // RA-53: the SignupDetails step is now a dead-end notice for staff —
+        // it offers only a "Back to sign in" action and never an account-create
+        // submission, so the public self-signup escalation path is gone.
+        when (state.step) {
+            AuthStep.SignupDetails -> {
+                VButton(
+                    text = "Back to sign in",
+                    onClick = viewModel::goBack,
+                    full = true,
+                    size = VButtonSize.Lg,
+                    tone = VButtonTone.Teal,
+                    loading = state.isLoading,
+                    trailing = { Icon(VIcons.ArrowRight, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                )
+            }
+            else -> {
+                val ctaLabel = if (state.step == AuthStep.Identifier) "Continue" else "Sign In"
+                VButton(
+                    text = ctaLabel,
+                    onClick = { if (state.step == AuthStep.Identifier) viewModel.onContinue() else viewModel.onSubmit() },
+                    full = true,
+                    size = VButtonSize.Lg,
+                    tone = VButtonTone.Teal,
+                    loading = state.isLoading,
+                    trailing = { Icon(VIcons.ArrowRight, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                )
+                if (state.step != AuthStep.Identifier) {
+                    Spacer(Modifier.height(8.dp))
+                    AuthBackLink(onClick = viewModel::goBack, modifier = Modifier.align(Alignment.CenterHorizontally))
+                }
+            }
         }
     }
 }

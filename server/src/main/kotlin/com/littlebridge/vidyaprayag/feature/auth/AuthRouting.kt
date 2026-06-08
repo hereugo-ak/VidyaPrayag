@@ -346,7 +346,26 @@ fun Route.authRouting() {
                 }
             }
 
-            val role = roleNormalised(req.role)
+            // RA-53 🔴 — Public self-service privilege escalation hard-stop.
+            // The public /signup route is the ONLY anonymous account-mint path,
+            // so it must mint EXACTLY a parent. Admin/teacher/super_admin
+            // accounts are *provisioned* server-side (admins via an operator /
+            // invite, teachers via TeacherProvisioningRouting) and never via
+            // anonymous self-signup. We therefore IGNORE req.role entirely here
+            // and force "parent", regardless of what the client sends. This
+            // closes the end-to-end escalation chain where AdminAuthScreenV2
+            // signup → /signup(role=ADMIN) → school_admin tenant creation.
+            val requestedRole = roleNormalised(req.role)
+            if (requestedRole != "parent") {
+                call.fail(
+                    "Self-service signup can only create a parent account. " +
+                        "Staff accounts are provisioned by your administrator.",
+                    HttpStatusCode.Forbidden,
+                    "SIGNUP_ROLE_FORBIDDEN"
+                )
+                return@post
+            }
+            val role = "parent"
             val now = Instant.now()
             val newId = UUID.randomUUID()
             dbQuery {
