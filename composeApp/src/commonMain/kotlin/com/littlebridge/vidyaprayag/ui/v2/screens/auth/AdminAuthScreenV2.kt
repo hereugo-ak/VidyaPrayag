@@ -126,7 +126,7 @@ fun AdminAuthScreenV2(
                 // step. The CTA below is also suppressed for this step.
                 Text(
                     "No staff account exists for this email.",
-                    style = VTheme.type.bodyStrong.colored(c.ink1),
+                    style = VTheme.type.bodyStrong.colored(c.ink),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(8.dp))
