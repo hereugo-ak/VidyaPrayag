@@ -80,7 +80,17 @@ suspend fun ApplicationCall.requireSchoolContext(): SchoolContext? {
         fail("Invalid token", HttpStatusCode.Unauthorized, "UNAUTHORIZED")
         return null
     }
-    val (schoolId, role) = resolveSchoolAndRole(uid)
+    // Read the full row once so we can enforce is_active in the same place we
+    // resolve school_id + role (RA-34: a deactivated user must pass no guard).
+    val userRow = dbQuery {
+        AppUsersTable.selectAll().where { AppUsersTable.id eq uid }.singleOrNull()
+    }
+    if (userRow != null && !userRow[AppUsersTable.isActive]) {
+        fail("This account has been deactivated. Contact your administrator.", HttpStatusCode.Forbidden, "ACCOUNT_DEACTIVATED")
+        return null
+    }
+    val schoolId = userRow?.get(AppUsersTable.schoolId)
+    val role = userRow?.get(AppUsersTable.role)
     val effectiveRole = role ?: "parent"
     if (effectiveRole !in SCHOOL_ROLES) {
         fail("You do not have access to school resources", HttpStatusCode.Forbidden, "FORBIDDEN")

@@ -408,6 +408,14 @@ fun Route.authRouting() {
             val row = dbQuery { lookupUserByIdentifier(id) }
                 ?: run { call.fail("User not found", HttpStatusCode.Unauthorized, "USER_NOT_FOUND"); return@post }
 
+            // RA-34: a deactivated / off-boarded account must never be able to
+            // authenticate. Reject before any credential check so an inactive
+            // user cannot even probe their password/OTP.
+            if (!row[AppUsersTable.isActive]) {
+                call.fail("This account has been deactivated. Contact your administrator.", HttpStatusCode.Forbidden, "ACCOUNT_DEACTIVATED")
+                return@post
+            }
+
             // Email → password.  Phone → OTP.
             if (isEmail(id)) {
                 val stored = row[AppUsersTable.passwordHash]
@@ -493,6 +501,16 @@ fun Route.authRouting() {
             val uid = row[UserSessionsTable.userId]
             val user = dbQuery { AppUsersTable.selectAll().where { AppUsersTable.id eq uid }.singleOrNull() }
                 ?: run { call.fail("User not found", HttpStatusCode.Unauthorized, "USER_NOT_FOUND"); return@post }
+            // RA-34: a deactivated user must not be able to mint fresh tokens via
+            // /refresh. Reject and revoke all of their sessions so the refresh
+            // token is dead immediately (kill-switch on deactivation).
+            if (!user[AppUsersTable.isActive]) {
+                dbQuery {
+                    UserSessionsTable.update({ UserSessionsTable.userId eq uid }) { it[revokedAt] = now }
+                }
+                call.fail("This account has been deactivated. Contact your administrator.", HttpStatusCode.Forbidden, "ACCOUNT_DEACTIVATED")
+                return@post
+            }
             val token = JwtConfig.issueToken(uid.toString(), user[AppUsersTable.role], user[AppUsersTable.fullName])
             dbQuery {
                 UserSessionsTable.update({ UserSessionsTable.id eq row[UserSessionsTable.id] }) {
