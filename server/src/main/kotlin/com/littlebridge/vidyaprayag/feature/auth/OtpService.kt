@@ -122,8 +122,19 @@ object OtpService {
     private val maxResendsPerHour: Int by lazy {
         env("OTP_MAX_RESENDS_PER_HOUR", "5").toInt().coerceIn(1, 20)
     }
+    /**
+     * Whether the plaintext OTP is echoed back in the /send-otp response as
+     * `dev_code`. RA-33: this is a full pre-auth account-takeover primitive if
+     * ever enabled in production, so:
+     *   1) the default is now "false" (opt-in, not opt-out); and
+     *   2) it is hard-gated to non-production — even if OTP_DEV_RETURN_CODE=true
+     *      is set on a prod dyno, the echo is suppressed whenever DATABASE_URL is
+     *      configured (the same prod signal JwtConfig.isProduction uses).
+     */
+    private val isProduction: Boolean
+        get() = System.getenv("DATABASE_URL")?.takeIf { it.isNotBlank() } != null
     private val devReturnCode: Boolean by lazy {
-        env("OTP_DEV_RETURN_CODE", "true").equals("true", true)
+        !isProduction && env("OTP_DEV_RETURN_CODE", "false").equals("true", true)
     }
 
     private val rng = SecureRandom()
