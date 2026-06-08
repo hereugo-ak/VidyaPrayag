@@ -135,7 +135,16 @@ data class AuthTokenResponse(
     @SerialName("user_id") val userId: String,
     val name: String,
     val role: String,
-    @SerialName("profile_completed") val profileCompleted: Boolean
+    @SerialName("profile_completed") val profileCompleted: Boolean,
+    // RA-54: tells the client whether a forced password change is pending
+    // (provisioned teachers on first login). Defaults false for everyone else.
+    @SerialName("must_change_password") val mustChangePassword: Boolean = false
+)
+
+@Serializable
+data class ChangePasswordDto(
+    @SerialName("old_password") val oldPassword: String? = null,
+    @SerialName("new_password") val newPassword: String
 )
 
 @Serializable
@@ -525,7 +534,8 @@ fun Route.authRouting() {
                 AuthTokenResponse(
                     token = token, refreshToken = refresh,
                     userId = userId.toString(), name = name, role = role,
-                    profileCompleted = row[AppUsersTable.profileCompleted]
+                    profileCompleted = row[AppUsersTable.profileCompleted],
+                    mustChangePassword = row[AppUsersTable.mustChangePassword]
                 ),
                 message = "Login successful"
             )
@@ -606,7 +616,8 @@ fun Route.authRouting() {
                     userId = uid.toString(),
                     name = user[AppUsersTable.fullName],
                     role = user[AppUsersTable.role],
-                    profileCompleted = user[AppUsersTable.profileCompleted]
+                    profileCompleted = user[AppUsersTable.profileCompleted],
+                    mustChangePassword = user[AppUsersTable.mustChangePassword]
                 ),
                 message = "Token refreshed"
             )
@@ -618,6 +629,61 @@ fun Route.authRouting() {
     // row so the refresh token cannot be reused for its remaining 30-day life.
     authenticate("jwt") {
         route("/api/v1/auth") {
+            // -------- change-password (RA-54) --------
+            // Authenticated. Verifies the old password (when one exists),
+            // stores a fresh PBKDF2 hash, flips profile_completed=true and
+            // must_change_password=false (resolving the teacher first-login
+            // gate permanently), and revokes all OTHER sessions for the user
+            // so a stolen old-credential session can't continue.
+            post("/change-password") {
+                val uid = call.principalUserId()
+                    ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                    ?: run { call.fail("Invalid token", HttpStatusCode.Unauthorized); return@post }
+                val req = runCatching { call.receive<ChangePasswordDto>() }.getOrNull()
+                    ?: run { call.fail("Invalid body: expected { new_password, old_password? }"); return@post }
+                if (req.newPassword.length < 8) {
+                    call.fail("New password must be at least 8 characters", HttpStatusCode.BadRequest, "PASSWORD_TOO_SHORT")
+                    return@post
+                }
+
+                val user = dbQuery {
+                    AppUsersTable.selectAll().where { AppUsersTable.id eq uid }.singleOrNull()
+                } ?: run { call.fail("User not found", HttpStatusCode.NotFound, "USER_NOT_FOUND"); return@post }
+
+                val stored = user[AppUsersTable.passwordHash]
+                val mustChange = user[AppUsersTable.mustChangePassword]
+                // When the user already has a password AND is not in a forced
+                // first-change flow, the old password is required and must match.
+                // (Forced first-change teachers may set a new password without
+                // re-entering the generated one, since the gate exists precisely
+                // because that generated password is not theirs.)
+                if (!stored.isNullOrBlank() && !mustChange) {
+                    if (req.oldPassword.isNullOrBlank() ||
+                        !PasswordHasher.verify(req.oldPassword, stored)
+                    ) {
+                        call.fail("Current password is incorrect", HttpStatusCode.Unauthorized, "OLD_PASSWORD_INVALID")
+                        return@post
+                    }
+                }
+
+                val now = Instant.now()
+                val newHash = PasswordHasher.hash(req.newPassword)
+                dbQuery {
+                    AppUsersTable.update({ AppUsersTable.id eq uid }) {
+                        it[passwordHash] = newHash
+                        it[profileCompleted] = true
+                        it[mustChangePassword] = false
+                        it[updatedAt] = now
+                    }
+                    // Revoke all sessions; the current client keeps its access
+                    // token until expiry but must re-login for a refresh.
+                    UserSessionsTable.update({ UserSessionsTable.userId eq uid }) {
+                        it[revokedAt] = now
+                    }
+                }
+                call.okMessage("Password changed")
+            }
+
             post("/logout") {
                 val uid = call.principalUserId()
                     ?.let { runCatching { UUID.fromString(it) }.getOrNull() }

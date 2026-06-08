@@ -121,6 +121,25 @@ class AuthRepositoryImpl(
         }
     }
 
+    override suspend fun changePassword(oldPassword: String?, newPassword: String): NetworkResult<Unit> {
+        return when (val result = api.changePassword(
+            com.littlebridge.vidyaprayag.feature.auth.domain.model.ChangePasswordRequest(
+                oldPassword = oldPassword,
+                newPassword = newPassword
+            )
+        )) {
+            is NetworkResult.Success -> {
+                // RA-54: the server flipped profile_completed=true and cleared
+                // must_change_password. Persist the resolved gate locally so the
+                // TeacherFirstLogin gate never reappears on cold start.
+                preferenceRepository.setProfileCompleted(true)
+                NetworkResult.Success(Unit)
+            }
+            is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)
+            is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
+        }
+    }
+
     override suspend fun logout() {
         // Best-effort server-side revocation (audit §3.6) before clearing local
         // state, so the refresh token cannot be reused for 30 days.

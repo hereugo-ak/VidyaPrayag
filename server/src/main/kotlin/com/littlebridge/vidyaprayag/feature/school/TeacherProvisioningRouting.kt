@@ -146,6 +146,11 @@ fun Route.teacherProvisioningRouting() {
                             it[isPhoneVerified] = true
                         }
                         it[profileCompleted] = false
+                        // RA-54: provisioned teachers must change their generated
+                        // initial password on first login. This flag is the
+                        // server-side gate signal NavGraphV2 reads; the
+                        // POST /auth/change-password endpoint clears it.
+                        it[mustChangePassword] = true
                         it[isActive] = true
                         it[createdAt] = now
                         it[updatedAt] = now

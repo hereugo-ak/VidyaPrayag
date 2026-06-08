@@ -166,8 +166,10 @@ private enum class AuthedRoute { Resolving, ParentLinkChild, SchoolOnboarding, T
  * Returning users (valid JWT after an app restart) have no in-memory session cache, so the gate
  * resolves immediately to the portal — which is correct: they've already onboarded/linked. Every
  * gate completion advances to [AuthedRoute.Portal] with no way back into the gate (LAW 4). The
- * change-password gate is local-only until the documented `POST /auth/change-password` +
- * `must_change_password` backend lands (BACKEND_GAPS §5); we never fake a server write.
+ * change-password gate (RA-54) is now backed by a real `POST /auth/change-password` +
+ * `must_change_password` flag: a provisioned teacher logs in with profileCompleted=false, the
+ * gate calls the endpoint, the server flips profile_completed=true, and the gate resolves
+ * permanently across cold starts.
  */
 @Composable
 private fun AuthedFlow(

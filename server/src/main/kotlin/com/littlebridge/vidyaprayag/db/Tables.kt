@@ -56,6 +56,11 @@ object AppUsersTable : UUIDTable("app_users", "id") {
     val isPhoneVerified  = bool("is_phone_verified").default(false)
     val isEmailVerified  = bool("is_email_verified").default(false)
     val profileCompleted = bool("profile_completed").default(false)
+    // RA-54: server-side signal for the teacher first-login "force change initial
+    // password" gate. Provisioned teachers are created with this = true; the
+    // POST /auth/change-password endpoint clears it (and flips profile_completed)
+    // once the teacher sets their own password. NavGraphV2 reads it via login.
+    val mustChangePassword = bool("must_change_password").default(false)
     val isActive         = bool("is_active").default(true)
     val lastLoginAt      = timestamp("last_login_at").nullable()
     val createdAt        = timestamp("created_at")

@@ -19,9 +19,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.littlebridge.vidyaprayag.core.network.NetworkResult
+import com.littlebridge.vidyaprayag.feature.auth.domain.repository.AuthRepository
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
@@ -36,24 +41,26 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.colored
  * TeacherFirstLoginScreenV2 — the one-time "set a new password" gate, translated from
  * `Auth.tsx → TeacherFirstLogin`.
  *
- * **Backend gap (documented in PHASE_PLAN):** there is no change-password / first-login endpoint in
- * the shared `AuthRepository` and no `must_change_password` flag in the auth schema. `AuthViewModel`
- * only supports identifier+password / OTP login and registration. So this screen performs **local
- * validation only** (current password present, new ≥ 8 chars, confirmation matches) and, on success,
- * calls [onDone] to continue. It does NOT persist a new password — per the hard UI rule we never fake
- * a server write. When a `POST /auth/change-password` (+ `must_change_password`) lands, swap the
- * local `validate()` for a real `viewModel.changePassword(...) { onDone() }`.
+ * **RA-54 (resolved):** `POST /api/v1/auth/change-password` now exists and the teacher is
+ * provisioned with `must_change_password=true` / `profile_completed=false`. This screen performs
+ * local validation (new ≥ 8 chars, confirmation matches) AND calls the real
+ * [AuthRepository.changePassword]; on success the server flips `profile_completed=true` and clears
+ * `must_change_password`, the client persists `profileCompleted=true`, and [onDone] advances to the
+ * portal — so the gate never reappears on cold start. No server write is faked.
  */
 @Composable
 fun TeacherFirstLoginScreenV2(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
     teacherName: String? = "Mr. Vikram",
+    authRepository: AuthRepository = koinInject(),
 ) = VTheme(tone = VPortalTone.Night) {
+    val scope = rememberCoroutineScope()
     var current by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    var submitting by remember { mutableStateOf(false) }
 
     Column(
         modifier
@@ -99,9 +106,22 @@ fun TeacherFirstLoginScreenV2(
         Spacer(Modifier.height(VTheme.dimens.xl))
         VButton(
             text = "Update & continue",
+            loading = submitting,
             onClick = {
                 error = validate(current, newPassword, confirm)
-                if (error == null) onDone()
+                if (error == null && !submitting) {
+                    submitting = true
+                    scope.launch {
+                        // The teacher is in the forced first-change flow, so the
+                        // server does not require the (generated) old password to
+                        // match; we still pass it through for audit completeness.
+                        when (val r = authRepository.changePassword(current.ifBlank { null }, newPassword)) {
+                            is NetworkResult.Success -> { submitting = false; onDone() }
+                            is NetworkResult.Error -> { submitting = false; error = r.message }
+                            is NetworkResult.ConnectionError -> { submitting = false; error = "Connection error. Please try again." }
+                        }
+                    }
+                }
             },
             full = true,
             size = VButtonSize.Lg,
@@ -122,9 +142,12 @@ fun TeacherFirstLoginScreenV2(
     }
 }
 
-/** Local-only validation until a real change-password endpoint exists. */
+/**
+ * Client-side pre-validation before the real change-password call. The current
+ * (generated) password is optional in the forced first-change flow — the server
+ * does not require it to match — so we only enforce the new-password rules here.
+ */
 private fun validate(current: String, newPassword: String, confirm: String): String? = when {
-    current.isBlank() -> "Enter your current temporary password."
     newPassword.length < 8 -> "New password must be at least 8 characters."
     newPassword != confirm -> "Passwords don't match."
     else -> null
