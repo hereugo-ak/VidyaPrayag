@@ -137,7 +137,31 @@ fun Application.module() {
     }
 
     install(CORS) {
-        anyHost()
+        // RA-37: open CORS (anyHost) is fine in dev but in production lets any
+        // origin script authenticated cross-origin calls with a captured bearer
+        // token. In prod (DATABASE_URL present) we lock to an explicit allow-list
+        // from CORS_ALLOWED_ORIGINS (comma-separated host[:port], optionally with
+        // scheme). Only dev/local falls back to anyHost().
+        val isProduction = System.getenv("DATABASE_URL")?.isNotBlank() == true
+        val configuredOrigins = System.getenv("CORS_ALLOWED_ORIGINS")
+            ?.split(",")
+            ?.map { it.trim() }
+            ?.filter { it.isNotBlank() }
+            .orEmpty()
+        if (isProduction && configuredOrigins.isNotEmpty()) {
+            configuredOrigins.forEach { origin ->
+                // Accept "https://app.example.com", "app.example.com" or with a port.
+                val withoutScheme = origin.substringAfter("://", origin)
+                val scheme = if (origin.contains("://")) origin.substringBefore("://") else null
+                val host = withoutScheme.substringBefore(":")
+                val schemes = scheme?.let { listOf(it) } ?: listOf("https", "http")
+                allowHost(host, schemes = schemes)
+            }
+        } else {
+            // Dev/local (no DATABASE_URL) or prod without an explicit allow-list:
+            // keep the permissive default so local web + device testing still work.
+            anyHost()
+        }
         allowHeader(HttpHeaders.ContentType)
         allowHeader(HttpHeaders.Authorization)
         allowHeader("App-Version")
