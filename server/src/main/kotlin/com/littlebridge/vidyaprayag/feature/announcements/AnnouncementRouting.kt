@@ -219,12 +219,28 @@ fun Route.announcementRouting() {
                         it[updatedAt] = now
                     }
                 }
-                // RA-41: an announcement reaches parents + teachers in-app, not
-                // just the WhatsApp sync. Audience-precise (class/student) targeting
-                // is refined in RA-49; here a school announcement fans out to the
-                // school's parents and teachers, scoped to this tenant.
-                val recipients = (NotifyRecipients.parentsInSchool(schoolId) +
-                    NotifyRecipients.teachersInSchool(schoolId)).distinct()
+                // RA-41 + RA-49: an announcement reaches parents + teachers
+                // in-app, not just the WhatsApp sync. The IN-APP fan-out now
+                // honours the audience scope (no blasting the whole school when
+                // a post targets one class/subject/student). Parents are resolved
+                // precisely from the audience_filter; teachers receive the post
+                // only when it is school-wide (a class/student-scoped parent
+                // notice isn't relevant to every teacher).
+                val audienceParents = NotifyRecipients.parentsForAudience(
+                    schoolId = schoolId,
+                    audienceType = audienceType,
+                    classNames = audienceStrList(req.audienceFilter, "class_names")
+                        + audienceStr(req.audienceFilter, "class_name"),
+                    subjects = audienceStrList(req.audienceFilter, "subjects")
+                        + audienceStr(req.audienceFilter, "subject"),
+                    studentCodes = audienceStrList(req.audienceFilter, "student_codes")
+                        + audienceStr(req.audienceFilter, "student_code"),
+                )
+                val recipients = if (audienceType == "ALL_SCHOOL") {
+                    (audienceParents + NotifyRecipients.teachersInSchool(schoolId)).distinct()
+                } else {
+                    audienceParents.distinct()
+                }
                 if (recipients.isNotEmpty()) {
                     Notify.toUsers(
                         userIds = recipients,
@@ -364,6 +380,23 @@ fun Route.announcementRouting() {
 }
 
 private val lenientJson = Json { ignoreUnknownKeys = true; isLenient = true }
+
+/**
+ * RA-49 helpers: pull a string list / single string out of the audience_filter
+ * JSON the client sends so the IN-APP notification fan-out can resolve the same
+ * recipients the WhatsApp expansion does. Tolerant of missing keys / shapes.
+ */
+private fun audienceStrList(filter: JsonElement?, key: String): List<String> {
+    val obj = (filter as? JsonObject) ?: return emptyList()
+    return obj[key]?.let {
+        runCatching { it.jsonArray.mapNotNull { e -> e.jsonPrimitive.contentOrNull } }.getOrNull()
+    } ?: emptyList()
+}
+
+private fun audienceStr(filter: JsonElement?, key: String): List<String> {
+    val obj = (filter as? JsonObject) ?: return emptyList()
+    return obj[key]?.jsonPrimitive?.contentOrNull?.let { listOf(it) } ?: emptyList()
+}
 
 private fun org.jetbrains.exposed.sql.ResultRow.toDto(): AnnouncementDto {
     val filterText = this[AnnouncementsTable.audienceFilter]

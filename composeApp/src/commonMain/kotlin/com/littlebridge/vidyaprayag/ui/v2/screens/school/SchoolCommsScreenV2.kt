@@ -73,12 +73,14 @@ fun SchoolCommsScreenV2(
         state = state,
         onRetry = viewModel::loadAnnouncements,
         onSelectCategory = viewModel::setCategoryFilter,
-        onCreate = { type, title, description, date, onCreated ->
+        onCreate = { type, title, description, date, audienceType, audienceValues, onCreated ->
             viewModel.createAnnouncement(
                 type = type,
                 title = title,
                 description = description,
                 date = date,
+                audienceType = audienceType,
+                audienceValues = audienceValues,
                 onCreated = onCreated,
             )
         },
@@ -93,7 +95,7 @@ private fun SchoolCommsContent(
     state: SchoolAnnouncementsState,
     onRetry: () -> Unit,
     onSelectCategory: (String?) -> Unit,
-    onCreate: (type: String, title: String, description: String, date: String, onCreated: (() -> Unit)?) -> Unit,
+    onCreate: (type: String, title: String, description: String, date: String, audienceType: String, audienceValues: List<String>, onCreated: (() -> Unit)?) -> Unit,
     onOpenMessages: () -> Unit,
     onOpenPtm: () -> Unit,
     modifier: Modifier = Modifier,
@@ -176,7 +178,7 @@ private fun AnnouncementsTab(
     onRetry: () -> Unit,
     onSelectCategory: (String?) -> Unit,
     onOpen: (String) -> Unit,
-    onCreate: (type: String, title: String, description: String, date: String, onCreated: (() -> Unit)?) -> Unit,
+    onCreate: (type: String, title: String, description: String, date: String, audienceType: String, audienceValues: List<String>, onCreated: (() -> Unit)?) -> Unit,
 ) {
     val c = VTheme.colors
     var showCompose by remember { mutableStateOf(false) }
@@ -204,8 +206,8 @@ private fun AnnouncementsTab(
         ComposeAnnouncementDialog(
             isCreating = state.isCreating,
             onDismiss = { showCompose = false },
-            onSubmit = { type, title, description, date ->
-                onCreate(type, title, description, date) { showCompose = false }
+            onSubmit = { type, title, description, date, audienceType, audienceValues ->
+                onCreate(type, title, description, date, audienceType, audienceValues) { showCompose = false }
             },
         )
     }
@@ -272,14 +274,32 @@ private fun AnnouncementsTab(
 private fun ComposeAnnouncementDialog(
     isCreating: Boolean,
     onDismiss: () -> Unit,
-    onSubmit: (type: String, title: String, description: String, date: String) -> Unit,
+    onSubmit: (
+        type: String,
+        title: String,
+        description: String,
+        date: String,
+        audienceType: String,
+        audienceValues: List<String>,
+    ) -> Unit,
 ) {
     val c = VTheme.colors
     val categories = listOf("Update", "Holidays", "PTM", "Events", "Reminder")
+    // RA-49 — audience targeting. Labels map to the server's audience_type
+    // contract (ALL_SCHOOL / CLASS / SUBJECT / STUDENT). The free-text targets
+    // field is split on commas into the audience_filter list.
+    val audienceOptions = listOf(
+        "Everyone" to "ALL_SCHOOL",
+        "Class" to "CLASS",
+        "Subject" to "SUBJECT",
+        "Students" to "STUDENT",
+    )
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var date by remember { mutableStateOf("") }
     var category by remember { mutableStateOf(categories.first()) }
+    var audienceType by remember { mutableStateOf("ALL_SCHOOL") }
+    var audienceTargets by remember { mutableStateOf("") }
 
     // Feature 7 — error-shake triggers. Each flips true for one frame on a failed
     // submit attempt of a blank field, then resets, so shakeOnError fires once per
@@ -288,7 +308,19 @@ private fun ComposeAnnouncementDialog(
     var titleError by remember { mutableStateOf(false) }
     var dateError by remember { mutableStateOf(false) }
     var descriptionError by remember { mutableStateOf(false) }
-    val allValid = title.isNotBlank() && description.isNotBlank() && date.isNotBlank()
+    var targetsError by remember { mutableStateOf(false) }
+
+    val needsTargets = audienceType != "ALL_SCHOOL"
+    val targetList = audienceTargets.split(",").map { it.trim() }.filter { it.isNotBlank() }
+    val allValid = title.isNotBlank() && description.isNotBlank() && date.isNotBlank() &&
+        (!needsTargets || targetList.isNotEmpty())
+
+    val targetsHint = when (audienceType) {
+        "CLASS" -> "e.g. Grade 4-A, Grade 5-B"
+        "SUBJECT" -> "e.g. Mathematics, Science"
+        "STUDENT" -> "e.g. DEMO-S001, S-2024-017"
+        else -> ""
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         VCard(modifier = Modifier.fillMaxWidth()) {
@@ -303,6 +335,29 @@ private fun ComposeAnnouncementDialog(
                     categories.forEach { cat ->
                         FilterChip(cat, category.equals(cat, ignoreCase = true)) { category = cat }
                     }
+                }
+
+                // RA-49 — audience selector. Choosing anything other than
+                // "Everyone" reveals the targets field. The chosen scope + the
+                // comma-separated targets become the server audience_filter.
+                Text("Send to", style = VTheme.type.caption.colored(c.ink2))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    audienceOptions.forEach { (label, value) ->
+                        FilterChip(label, audienceType == value) {
+                            audienceType = value
+                            targetsError = false
+                        }
+                    }
+                }
+                if (needsTargets) {
+                    VInput(
+                        value = audienceTargets,
+                        onValueChange = { audienceTargets = it; targetsError = false },
+                        label = "Targets (comma-separated)",
+                        placeholder = targetsHint,
+                        leadingIcon = VIcons.ListChecks,
+                        modifier = Modifier.shakeOnError(targetsError),
+                    )
                 }
 
                 VInput(
@@ -337,7 +392,8 @@ private fun ComposeAnnouncementDialog(
                         titleError = title.isBlank()
                         dateError = date.isBlank()
                         descriptionError = description.isBlank()
-                        if (allValid) onSubmit(category, title, description, date)
+                        targetsError = needsTargets && targetList.isEmpty()
+                        if (allValid) onSubmit(category, title, description, date, audienceType, targetList)
                     },
                     variant = VButtonVariant.Primary,
                     full = true,

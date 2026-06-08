@@ -16,6 +16,7 @@ package com.littlebridge.vidyaprayag.feature.notifications
 import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.ChildrenTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
+import com.littlebridge.vidyaprayag.db.TeacherSubjectAssignmentsTable
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
@@ -68,5 +69,67 @@ object NotifyRecipients {
                 ((AppUsersTable.role eq "school_admin") or (AppUsersTable.role eq "admin")) and
                 (AppUsersTable.isActive eq true)
         }.map { it[AppUsersTable.id].value }.distinct()
+    }
+
+    /**
+     * RA-49: resolve the precise set of parent app_users.id for an announcement's
+     * audience scope, so the IN-APP notification fan-out matches the WhatsApp
+     * expansion (no blasting the whole school when a post targets one class).
+     *
+     * Mirrors AnnouncementRouting.resolveRecipientPhones key shapes:
+     *   ALL_SCHOOL → every parent in school
+     *   CLASS/SECTION → parents whose child's current_grade ∈ class_names
+     *   SUBJECT → parents of children in any class teaching subjects[]
+     *   STUDENT → parents linked to student_codes[]
+     *   CUSTOM → ALL_SCHOOL (phone-only scope has no app_user mapping; fall back)
+     * All scoped to [schoolId]. Always returns DISTINCT ids.
+     */
+    suspend fun parentsForAudience(
+        schoolId: UUID,
+        audienceType: String,
+        classNames: List<String> = emptyList(),
+        subjects: List<String> = emptyList(),
+        studentCodes: List<String> = emptyList(),
+    ): List<UUID> = dbQuery {
+        when (audienceType.uppercase()) {
+            "CLASS", "SECTION" -> {
+                val wanted = classNames.map { it.trim().lowercase() }.toSet()
+                if (wanted.isEmpty()) emptyList()
+                else ChildrenTable.selectAll().where {
+                    (ChildrenTable.schoolId eq schoolId) and (ChildrenTable.isActive eq true)
+                }.filter { (it[ChildrenTable.currentGrade]?.trim()?.lowercase()) in wanted }
+                    .map { it[ChildrenTable.parentId] }.distinct()
+            }
+
+            "SUBJECT" -> {
+                val wanted = subjects.map { it.trim().lowercase() }.toSet()
+                if (wanted.isEmpty()) return@dbQuery emptyList<UUID>()
+                val classes = TeacherSubjectAssignmentsTable.selectAll().where {
+                    (TeacherSubjectAssignmentsTable.schoolId eq schoolId) and
+                        (TeacherSubjectAssignmentsTable.isActive eq true)
+                }.filter { it[TeacherSubjectAssignmentsTable.subject].trim().lowercase() in wanted }
+                    .map { it[TeacherSubjectAssignmentsTable.className].trim().lowercase() }
+                    .toSet()
+                if (classes.isEmpty()) emptyList()
+                else ChildrenTable.selectAll().where {
+                    (ChildrenTable.schoolId eq schoolId) and (ChildrenTable.isActive eq true)
+                }.filter { (it[ChildrenTable.currentGrade]?.trim()?.lowercase()) in classes }
+                    .map { it[ChildrenTable.parentId] }.distinct()
+            }
+
+            "STUDENT" -> {
+                val wanted = studentCodes.map { it.trim() }.filter { it.isNotBlank() }.toSet()
+                if (wanted.isEmpty()) emptyList()
+                else ChildrenTable.selectAll().where {
+                    (ChildrenTable.schoolId eq schoolId) and (ChildrenTable.isActive eq true)
+                }.filter { it[ChildrenTable.studentCode]?.trim() in wanted }
+                    .map { it[ChildrenTable.parentId] }.distinct()
+            }
+
+            // ALL_SCHOOL / CUSTOM / unknown → whole-school parents.
+            else -> ChildrenTable.selectAll().where {
+                (ChildrenTable.schoolId eq schoolId) and (ChildrenTable.isActive eq true)
+            }.map { it[ChildrenTable.parentId] }.distinct()
+        }
     }
 }
