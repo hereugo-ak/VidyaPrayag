@@ -1,14 +1,13 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.auth
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -46,8 +45,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -65,10 +66,6 @@ import com.littlebridge.vidyaprayag.presentation.MainViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VBrandLogo
-import com.littlebridge.vidyaprayag.ui.v2.components.VButton
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
@@ -87,24 +84,27 @@ import vidyaprayag.composeapp.generated.resources.landing_school_2
 import vidyaprayag.composeapp.generated.resources.landing_school_3
 
 /**
- * CommonLandingScreenV2 — the app's flagship, no-session first surface.
+ * CommonLandingScreenV2 — the app's first interactive surface for users with no session.
  *
- * A complete marketing rebuild. The screen now reads as a category-defining product page: a
- * cinematic teal hero with a live campus photograph, a sharp value proposition, a credibility
- * strip, an "intelligence platform" showcase grounded in REAL shipped capability (SRI scores, the
- * PEWS early-warning radar, attendance, two-way messaging, admissions CRM, AI insights), a
- * featured-institutions rail, the two role-entry CTAs (Parent OTP / School onboarding), a portal
- * access rail, a closing call-to-action and the footer.
+ * Rebuilt in the current design language (V* primitives, VColors tokens, VMotion). It carries the
+ * full marketing content of the legacy `CommonLandingScreen` — hero, **Featured Institutions**,
+ * social-proof trust strip, the two role-entry cards, the **Next-Gen Intelligence** showcase and
+ * the **Portal access** rail — but every pixel is rendered with the new theme. The legacy file is
+ * referenced for **content only**; none of its Material-3 chrome survives.
  *
- * Design language: every pixel is the V* system — [VColors] tokens, [VTheme.type] scale, [VMotion]
- * springs, [VCard]/[VButton]/[VBadge]/[VBrandLogo] primitives. Nothing hardcodes a hex except the
- * intentional gradient/scrim stops that don't exist as tokens.
+ * Anatomy:
+ *  • teal hero — [VBrandLogo] + halo, wordmark, value tagline, frosted trust pill.
+ *  • lifted lavender sheet — trust strip, featured-school photo rail, the two role-entry cards
+ *    (Parent → OTP auth, School / Administration → credential auth), the intelligence showcase,
+ *    the portal-access rail and a privacy footnote.
  *
- * Content is CMS-driven ([LandingViewModel] → GET /api/v1/content/landing) with honest, shipped
- * fallbacks so the public screen is never blocked on a network state. Featured schools come from
- * [MainViewModel.schools]; photos use the server `imageUrl`, falling back to bundled professional
- * campus photography. The auth contract is unchanged: Parent CTA → [onParent] (OTP), School CTA →
- * [onAdmin] (credential); teachers sign in through the school's admin-minted credentials.
+ * The two role-entry cards remain the only auth CTAs (teachers sign in through the Admin path —
+ * their credentials are minted inside a school's admin account).
+ *
+ * Content is CMS-driven ([LandingViewModel] → GET /api/v1/content/landing); the hardcoded strings
+ * are graceful fallbacks so a public screen is never blocked on a network state. Featured schools
+ * come from [MainViewModel.schools]; their photos use the server `imageUrl`, falling back to bundled
+ * professional campus photography when the CMS hasn't supplied an image yet.
  */
 @Composable
 fun CommonLandingScreenV2(
@@ -124,39 +124,40 @@ fun CommonLandingScreenV2(
     val schoolsState by mainViewModel.schools.collectAsStateV2()
     val schools: List<School> = (schoolsState as? UiState.Success)?.data ?: emptyList()
 
-    // ── Reveal ladder (Welcome/Splash motion vocabulary) ───────────────────────
-    val logoScale = remember { Animatable(0.82f) }
+    // Reveal ladder (mirrors the Welcome/Splash motion vocabulary).
+    val logoScale = remember { Animatable(0.84f) }
     val logoAlpha = remember { Animatable(0f) }
     val wordAlpha = remember { Animatable(0f) }
-    val wordY = remember { Animatable(14f) }
-    val heroPhotoAlpha = remember { Animatable(0f) }
-    val heroPhotoY = remember { Animatable(20f) }
-    val sheetY = remember { Animatable(72f) }
+    val wordY = remember { Animatable(12f) }
+    val sheetY = remember { Animatable(64f) }
     val sheetAlpha = remember { Animatable(0f) }
     val proofAlpha = remember { Animatable(0f) }
     val cardsAlpha = remember { Animatable(0f) }
-    val cardsY = remember { Animatable(18f) }
+    val cardsY = remember { Animatable(16f) }
 
     LaunchedEffect(Unit) {
         launch { logoScale.animateTo(1f, VMotion.springSoft) }
-        launch { logoAlpha.animateTo(1f, tween(360)) }
-        launch { wordAlpha.animateTo(1f, tween(420, delayMillis = 200)) }
-        launch { wordY.animateTo(0f, tween(420, delayMillis = 200)) }
-        launch { heroPhotoAlpha.animateTo(1f, tween(520, delayMillis = 360)) }
-        launch { heroPhotoY.animateTo(0f, VMotion.springSheet) }
+        launch { logoAlpha.animateTo(1f, tween(380)) }
+        launch { wordAlpha.animateTo(1f, tween(420, delayMillis = 220)) }
+        launch { wordY.animateTo(0f, tween(420, delayMillis = 220)) }
         launch { sheetY.animateTo(0f, VMotion.springSheet) }
-        launch { sheetAlpha.animateTo(1f, tween(340, delayMillis = 160)) }
-        launch { proofAlpha.animateTo(1f, tween(420, delayMillis = 340)) }
-        launch { cardsAlpha.animateTo(1f, tween(460, delayMillis = 440)) }
-        launch { cardsY.animateTo(0f, tween(460, delayMillis = 440)) }
+        launch { sheetAlpha.animateTo(1f, tween(320, delayMillis = 140)) }
+        launch { proofAlpha.animateTo(1f, tween(400, delayMillis = 320)) }
+        launch { cardsAlpha.animateTo(1f, tween(450, delayMillis = 420)) }
+        launch { cardsY.animateTo(0f, tween(450, delayMillis = 420)) }
     }
 
-    // Slow drifting halo behind the bridge mark — premium, never distracting.
-    val halo = androidx.compose.animation.core.rememberInfiniteTransition(label = "land-halo")
-    val haloPulse by halo.animateFloat(
-        initialValue = 0.06f, targetValue = 0.18f,
-        animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing), RepeatMode.Reverse),
-        label = "land-haloPulse",
+    val halo = rememberInfiniteTransition(label = "land-halo")
+    val haloAlpha by halo.animateFloat(
+        initialValue = 0f, targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 2400
+                0f at 0; 0.6f at 1200; 0f at 2400
+            },
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "land-haloAlpha",
     )
 
     Column(
@@ -166,65 +167,44 @@ fun CommonLandingScreenV2(
             .verticalScroll(rememberScrollState())
             .widthIn(max = d.maxContentWidth),
     ) {
-        // ── Cinematic teal hero ────────────────────────────────────────────────
+        // ── Teal hero ─────────────────────────────────────────────────────────────
         Box(
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 460.dp)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(c.tealDeep, c.teal, c.teal.copy(alpha = 0.94f)),
-                    ),
-                )
+                .heightIn(min = 380.dp)
+                .background(c.teal)
                 .drawBehind {
-                    // Soft radial bloom centred on the mark.
                     drawCircle(
                         brush = Brush.radialGradient(
-                            colors = listOf(Color.White.copy(alpha = 0.20f), Color.Transparent),
-                            center = Offset(size.width * 0.5f, size.height * 0.28f),
-                            radius = size.maxDimension * 0.52f,
+                            colors = listOf(Color.White.copy(alpha = 0.22f), Color.Transparent),
+                            center = Offset(size.width * 0.5f, size.height * 0.32f),
+                            radius = size.maxDimension * 0.55f,
                         ),
-                        radius = size.maxDimension * 0.52f,
-                        center = Offset(size.width * 0.5f, size.height * 0.28f),
-                    )
-                    // Subtle corner glow for depth.
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(Color.White.copy(alpha = 0.10f), Color.Transparent),
-                            center = Offset(size.width * 0.92f, size.height * 0.06f),
-                            radius = size.maxDimension * 0.30f,
-                        ),
-                        radius = size.maxDimension * 0.30f,
-                        center = Offset(size.width * 0.92f, size.height * 0.06f),
+                        radius = size.maxDimension * 0.55f,
+                        center = Offset(size.width * 0.5f, size.height * 0.32f),
                     )
                 },
-            contentAlignment = Alignment.TopCenter,
+            contentAlignment = Alignment.Center,
         ) {
+            // Two faint white cloud marks — top-start + bottom-end — exactly as the
+            // splash/Welcome hero (pixel-faithful to the brand reference).
+            LandingCloudMark(
+                Modifier.align(Alignment.TopStart).statusBarsPadding()
+                    .padding(start = 40.dp, top = 16.dp).size(width = 56.dp, height = 38.dp),
+                alpha = 0.30f,
+            )
+            LandingCloudMark(
+                Modifier.align(Alignment.BottomEnd)
+                    .padding(end = 40.dp, bottom = 36.dp).size(width = 46.dp, height = 32.dp),
+                alpha = 0.25f,
+            )
+
             Column(
-                Modifier.statusBarsPadding().padding(top = 52.dp, bottom = 84.dp),
+                Modifier.statusBarsPadding().padding(top = 72.dp, bottom = 84.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // Eyebrow micro-pill — frosted, sets the "platform" framing immediately.
-                Row(
-                    Modifier
-                        .graphicsLayer { alpha = wordAlpha.value }
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(Color.White.copy(alpha = 0.14f))
-                        .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(999.dp))
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Icon(VIcons.Sparkles, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
-                    Text(
-                        "THE INTELLIGENCE LAYER FOR EDUCATION",
-                        style = VTheme.type.label.colored(Color.White)
-                            .copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.10.em, fontSize = 10.sp),
-                    )
-                }
-                Spacer(Modifier.height(22.dp))
                 VBrandLogo(
-                    size = 116.dp,
+                    size = 152.dp,
                     modifier = Modifier
                         .graphicsLayer {
                             scaleX = logoScale.value
@@ -233,103 +213,44 @@ fun CommonLandingScreenV2(
                         }
                         .drawBehind {
                             drawRoundRect(
-                                color = Color.White.copy(alpha = haloPulse * logoAlpha.value),
-                                topLeft = Offset(-14.dp.toPx(), -14.dp.toPx()),
-                                size = Size(size.width + 28.dp.toPx(), size.height + 28.dp.toPx()),
+                                color = Color.White.copy(alpha = (haloAlpha / 0.6f).coerceIn(0f, 1f) * 0.10f),
+                                topLeft = Offset(-12.dp.toPx(), -12.dp.toPx()),
+                                size = Size(size.width + 24.dp.toPx(), size.height + 24.dp.toPx()),
                                 cornerRadius = CornerRadius(40.dp.toPx(), 40.dp.toPx()),
-                                style = Stroke(width = 14.dp.toPx()),
+                                style = Stroke(width = 12.dp.toPx()),
                             )
                         },
                 )
-                Spacer(Modifier.height(22.dp))
+                Spacer(Modifier.height(28.dp))
                 Text(
                     "VidyaSetu",
                     style = VTheme.type.h1.colored(Color.White)
-                        .copy(fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.025).em),
+                        .copy(fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.02).em),
                     textAlign = TextAlign.Center,
                     modifier = Modifier.graphicsLayer {
                         alpha = wordAlpha.value
                         translationY = wordY.value * density
                     },
                 )
-                Spacer(Modifier.height(12.dp))
-                // Headline value statement — two lines, CMS-overridable, no fabricated claims.
+                Spacer(Modifier.height(8.dp))
+                // Brand tagline — exactly the splash/Welcome copy (pixel-faithful).
                 Text(
-                    cms?.topTagline?.takeIf { it.isNotBlank() }
-                        ?: "Where every school runs on insight,",
-                    style = VTheme.type.h2.colored(Color.White)
-                        .copy(fontSize = 19.sp, fontWeight = FontWeight.SemiBold, lineHeight = 26.sp),
+                    "Bridging gaps for a glorious future",
+                    style = VTheme.type.body.colored(Color.White.copy(alpha = 0.92f)).copy(fontSize = 15.sp),
                     textAlign = TextAlign.Center,
                     modifier = Modifier
-                        .widthIn(max = 330.dp)
+                        .widthIn(max = 280.dp)
                         .padding(horizontal = d.lg)
                         .graphicsLayer { alpha = wordAlpha.value },
                 )
-                Text(
-                    cms?.subTagline?.takeIf { it.isNotBlank() }
-                        ?: "and every parent moves with confidence.",
-                    style = VTheme.type.h2.colored(Color.White.copy(alpha = 0.90f))
-                        .copy(fontSize = 19.sp, fontWeight = FontWeight.SemiBold, lineHeight = 26.sp),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .widthIn(max = 330.dp)
-                        .padding(horizontal = d.lg)
-                        .graphicsLayer { alpha = wordAlpha.value },
-                )
-                Spacer(Modifier.height(24.dp))
-                // Live campus photograph — authentic photography on the very first screen,
-                // framed glass-style with a gentle scrim for a premium, editorial finish.
-                Box(
-                    Modifier
-                        .padding(horizontal = 26.dp)
-                        .fillMaxWidth()
-                        .heightIn(min = 168.dp, max = 208.dp)
-                        .clip(RoundedCornerShape(26.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.24f), RoundedCornerShape(26.dp))
-                        .graphicsLayer {
-                            alpha = heroPhotoAlpha.value
-                            translationY = heroPhotoY.value * density
-                        },
-                ) {
-                    Image(
-                        painter = painterResource(fallbackSchoolPhotos.first()),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    Box(
-                        Modifier.fillMaxSize().background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, c.tealDeep.copy(alpha = 0.55f)),
-                            ),
-                        ),
-                    )
-                    // Floating "live data" credibility chip on the photo.
-                    Row(
-                        Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(12.dp)
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(Color.White.copy(alpha = 0.92f))
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Icon(VIcons.ShieldCheck, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(13.dp))
-                        Text(
-                            "Verified institutions, live data",
-                            style = VTheme.type.label.colored(c.ink).copy(fontWeight = FontWeight.SemiBold),
-                        )
-                    }
-                }
             }
         }
 
-        // ── Lifted content sheet ───────────────────────────────────────────────
+        // ── Lifted sheet ──────────────────────────────────────────────────────────
         Column(
             Modifier
                 .fillMaxWidth()
-                .offset(y = (-36).dp)
+                .offset(y = (-32).dp)
                 .graphicsLayer {
                     translationY = sheetY.value * density
                     alpha = sheetAlpha.value
@@ -338,113 +259,91 @@ fun CommonLandingScreenV2(
                     drawRoundRect(
                         color = Color.Black.copy(alpha = 0.06f),
                         topLeft = Offset(0f, -10.dp.toPx()),
-                        size = Size(size.width, 36.dp.toPx()),
-                        cornerRadius = CornerRadius(36.dp.toPx(), 36.dp.toPx()),
+                        size = Size(size.width, 32.dp.toPx()),
+                        cornerRadius = CornerRadius(32.dp.toPx(), 32.dp.toPx()),
                     )
                 }
-                .background(c.background, RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp))
+                .background(c.background, RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
                 .navigationBarsPadding()
-                .padding(top = 28.dp, bottom = 32.dp),
+                .padding(top = 32.dp, bottom = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Grip handle — the sheet reads as a deliberate, pulled-up surface.
-            Box(
-                Modifier
-                    .width(44.dp).height(5.dp)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(c.ink3.copy(alpha = 0.22f)),
-            )
-            Spacer(Modifier.height(22.dp))
-
-            // ── Headline impact stats (credibility, not fabricated metrics) ──
-            ImpactStatsRow(
+            // RA-S20/RA-S13: legacy "Social proof" section carried forward verbatim — the
+            // "TRUSTED BY 500+ INSTITUTIONS" eyebrow + the three partner marquee items
+            // (Academix / GlobalView / EduPulse). This replaces the fabricated
+            // "240+ schools · 38k parents trust us" strip (honesty / LAW 6) with the exact
+            // legacy reference content, re-skinned in the V* system.
+            SocialProofSection(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
                     .graphicsLayer { alpha = proofAlpha.value },
             )
 
+            // ── Featured institutions (real-photo rail) ──
+            if (schools.isNotEmpty()) {
+                Spacer(Modifier.height(28.dp))
+                FeaturedInstitutionsSection(
+                    schools = schools,
+                    onSchoolClick = onParent,
+                    modifier = Modifier.graphicsLayer { alpha = proofAlpha.value },
+                )
+            }
+
+            // ── Entry points (legacy "EntryPointsSection" — Parent + School) ──
+            // RA-S20: the legacy two-card entry section carried forward verbatim. Each card
+            // keeps its exact legacy label, title, description, feature list and CTA label,
+            // CMS-overridable via parentInfo / schoolInfo. Parent CTA → onParent (OTP auth),
+            // School CTA → onAdmin (credential auth) — the Parent/Admin entry contract is preserved.
             Spacer(Modifier.height(28.dp))
-
-            // ── Value proposition: why VidyaSetu ──
-            ValuePropSection(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .graphicsLayer {
-                        alpha = cardsAlpha.value
-                        translationY = cardsY.value * density
-                    },
-            )
-
-            // ── Role-entry CTAs (Parent OTP / School onboarding) ──
-            Spacer(Modifier.height(36.dp))
             Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .graphicsLayer {
-                        alpha = cardsAlpha.value
-                        translationY = cardsY.value * density
-                    },
+                Modifier.fillMaxWidth().padding(horizontal = 24.dp).graphicsLayer {
+                    alpha = cardsAlpha.value
+                    translationY = cardsY.value * density
+                },
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                SectionHeader(
-                    eyebrow = "Choose your door",
-                    title = "Two journeys, one platform",
-                )
                 EntryPointCard(
                     accent = c.teal,
                     accentInk = c.tealDeep,
-                    glyph = VIcons.Users,
                     label = cms?.parentInfo?.topTagline?.takeIf { it.isNotBlank() } ?: "FOR PARENTS",
                     title = cms?.parentInfo?.subTagline?.takeIf { it.isNotBlank() }
-                        ?: "Find the right school. Then never miss a beat.",
-                    description = "Discover verified institutions, then track attendance, results and teacher messages — all in one secure timeline.",
+                        ?: "Find the perfect school for your child's unique journey",
+                    description = "Empowering parents with data-driven insights and verified institutional profiles.",
                     features = cms?.parentInfo?.listOfFeatures?.takeIf { it.isNotEmpty() }
                         ?: listOf(
-                            "Verified institution profiles & SRI scores",
-                            "Live attendance & academics for your child",
-                            "Two-way messaging with teachers",
+                            "Verified institutional profiles",
+                            "Smart Comparison highlights",
+                            "AI Career Paths & Talent ID",
                         ),
-                    buttonText = "Continue as a Parent",
-                    buttonTone = VButtonTone.Teal,
+                    buttonText = "Start Your Search",
                     onButtonClick = onParent,
                 )
                 EntryPointCard(
                     accent = c.warmOrange,
                     accentInk = c.warmOrange,
-                    glyph = VIcons.School,
                     label = cms?.schoolInfo?.topTagline?.takeIf { it.isNotBlank() } ?: "FOR SCHOOLS",
                     title = cms?.schoolInfo?.subTagline?.takeIf { it.isNotBlank() }
-                        ?: "Run the whole institution on intelligence.",
-                    description = "From admissions to early-warning analytics, give administrators and teachers the operating system modern schools deserve.",
+                        ?: "Scale excellence with intelligence.",
+                    description = "Advanced institutional management tools designed for modern educational growth.",
                     features = cms?.schoolInfo?.listOfFeatures?.takeIf { it.isNotEmpty() }
                         ?: listOf(
-                            "Early-warning radar (PEWS) for at-risk students",
-                            "Admissions CRM & staff management",
-                            "Class broadcasts & accountable messaging",
+                            "Full Admissions CRM",
+                            "Teacher Accountability",
+                            "Automated Compliance",
                         ),
                     buttonText = "Onboard Your School",
-                    buttonTone = VButtonTone.Peach,
                     onButtonClick = onAdmin,
                 )
             }
 
-            // ── The intelligence platform showcase ──
-            Spacer(Modifier.height(40.dp))
-            IntelligenceShowcase(
-                cmsOfferings = cms?.listOfOfferings.orEmpty(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .graphicsLayer { alpha = cardsAlpha.value },
-            )
-
-            // ── Featured institutions (real-photo rail) ──
-            if (schools.isNotEmpty()) {
-                Spacer(Modifier.height(40.dp))
-                FeaturedInstitutionsSection(
-                    schools = schools,
-                    onSchoolClick = onParent,
+            // ── Next-Gen Intelligence showcase ──
+            val offerings = cms?.listOfOfferings.orEmpty()
+            if (offerings.isNotEmpty()) {
+                Spacer(Modifier.height(32.dp))
+                ShowcaseSection(
+                    title = "Next-Gen Intelligence",
+                    description = "Proprietary systems powering the ecosystem.",
+                    items = offerings,
                     modifier = Modifier.graphicsLayer { alpha = cardsAlpha.value },
                 )
             }
@@ -452,7 +351,7 @@ fun CommonLandingScreenV2(
             // ── Portal access rail ──
             val portals = cms?.listOfPortals.orEmpty()
             if (portals.isNotEmpty()) {
-                Spacer(Modifier.height(40.dp))
+                Spacer(Modifier.height(32.dp))
                 PortalAccessSection(
                     portals = portals,
                     onLoginClick = onAdmin,
@@ -460,25 +359,14 @@ fun CommonLandingScreenV2(
                 )
             }
 
-            // ── Closing call-to-action band ──
-            Spacer(Modifier.height(40.dp))
-            ClosingCtaBand(
-                onParent = onParent,
-                onAdmin = onAdmin,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .graphicsLayer { alpha = cardsAlpha.value },
-            )
-
-            // ── Footer ──
+            // ── Footer (legacy "FooterSection") ──
             Spacer(Modifier.height(36.dp))
             LandingFooter(
                 onLegal = onLegal,
                 modifier = Modifier.graphicsLayer { alpha = cardsAlpha.value },
             )
 
-            Spacer(Modifier.height(22.dp))
+            Spacer(Modifier.height(24.dp))
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                 horizontalArrangement = Arrangement.Center,
@@ -497,7 +385,10 @@ fun CommonLandingScreenV2(
                         indication = null,
                     ) { onLegal(LegalDoc.Terms) },
                 )
-                Text(" & ", style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))
+                Text(
+                    " & ",
+                    style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
+                )
                 Text(
                     "Privacy Policy",
                     style = VTheme.type.caption.colored(c.tealDeep).copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
@@ -511,198 +402,107 @@ fun CommonLandingScreenV2(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Impact stats — three credibility tiles. Phrased as platform capability, not
-// invented numbers, so the screen stays honest on a public surface.
-// ─────────────────────────────────────────────────────────────────────────────
-
+/**
+ * RA-S20 — legacy "FooterSection", re-skinned in the V* system.
+ *
+ * Carries the legacy footer content verbatim: the brand mark, the institutional copy line,
+ * and the two link groups (PORTALS / SUPPORT). Static marketing copy on a public surface —
+ * no fabricated metrics.
+ */
 @Composable
-private fun ImpactStatsRow(modifier: Modifier = Modifier) {
-    val c = VTheme.colors
-    Row(
-        modifier,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        ImpactStat("3", "roles, one\nunified system", c.tealDeep, Modifier.weight(1f))
-        ImpactStat("24/7", "live academic\nvisibility", c.warmOrange, Modifier.weight(1f))
-        ImpactStat("0", "fabricated data —\nSupabase-backed", c.navy, Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun ImpactStat(value: String, label: String, accent: Color, modifier: Modifier = Modifier) {
-    val c = VTheme.colors
-    VCard(modifier = modifier, padding = 16.dp) {
-        Text(value, style = VTheme.type.dataLg.colored(accent).copy(fontSize = 26.sp, fontWeight = FontWeight.Bold))
-        Spacer(Modifier.height(4.dp))
-        Text(
-            label,
-            style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp, lineHeight = 15.sp),
-        )
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Value proposition — three pillars (Trust / Intelligence / Connection), each a
-// tinted glyph tile + headline + supporting line. The product's whole pitch in
-// one glance.
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun ValuePropSection(modifier: Modifier = Modifier) {
-    val c = VTheme.colors
-    Column(modifier.padding(horizontal = 24.dp)) {
-        SectionHeader(eyebrow = "Why VidyaSetu", title = "Built on trust. Powered by intelligence.")
-        Spacer(Modifier.height(16.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            ValuePropCard(
-                glyph = VIcons.ShieldCheck,
-                accent = c.tealDeep,
-                title = "Verified, not vibes",
-                body = "Every institution is verified and every number is Supabase-backed — what you see is the real record, never a mock.",
-            )
-            ValuePropCard(
-                glyph = VIcons.TrendingUp,
-                accent = c.warmOrange,
-                title = "Intelligence that acts early",
-                body = "SRI school ratings and the PEWS early-warning radar surface what matters before it becomes a problem.",
-            )
-            ValuePropCard(
-                glyph = VIcons.Chat,
-                accent = c.navy,
-                title = "Everyone on the same page",
-                body = "Accountable two-way messaging and class broadcasts keep parents, teachers and admins genuinely connected.",
-            )
-        }
-    }
-}
-
-@Composable
-private fun ValuePropCard(glyph: ImageVector, accent: Color, title: String, body: String) {
-    val c = VTheme.colors
-    VCard(Modifier.fillMaxWidth()) {
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Box(
-                Modifier.size(46.dp).clip(RoundedCornerShape(13.dp)).background(accent.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(glyph, contentDescription = null, tint = accent, modifier = Modifier.size(22.dp))
-            }
-            Column(Modifier.weight(1f)) {
-                Text(title, style = VTheme.type.h3.colored(c.ink))
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    body,
-                    style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 17.sp),
-                )
-            }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Intelligence showcase — the platform's capability grid. Prefers CMS offerings;
-// otherwise renders the REAL shipped feature set as live / coming-soon cards.
-// ─────────────────────────────────────────────────────────────────────────────
-
-private data class ShowcaseFeature(
-    val glyph: ImageVector,
-    val heading: String,
-    val description: String,
-    val isLive: Boolean,
-)
-
-@Composable
-private fun IntelligenceShowcase(
-    cmsOfferings: List<LandingItem>,
+private fun LandingFooter(
+    onLegal: (LegalDoc) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
-    // Honest, shipped capability set (FEATURES_CURRENT_PHASE.md). Coming-soon items are flagged.
-    val fallback = listOf(
-        ShowcaseFeature(VIcons.Star, "SRI School Ratings", "A composite institutional rating that turns reputation into a number you can compare.", true),
-        ShowcaseFeature(VIcons.AlertTriangle, "PEWS Early-Warning Radar", "Surfaces the real at-risk student cohort so schools can intervene early.", true),
-        ShowcaseFeature(VIcons.Calendar, "Live Attendance", "Month-grid calendars with present / late / absent coding, synced from the classroom.", true),
-        ShowcaseFeature(VIcons.Chat, "Accountable Messaging", "Two-way conversations and class broadcasts — immutable, with delivery notifications.", true),
-        ShowcaseFeature(VIcons.ClipboardList, "Admissions CRM", "A pipeline that runs the entire admissions journey for the school office.", true),
-        ShowcaseFeature(VIcons.Sparkles, "AI Report Card", "Narrative academic insight generated from real results.", false),
-    )
-
-    Column(modifier.padding(horizontal = 24.dp)) {
-        SectionHeader(eyebrow = "The platform", title = "One system. Every workflow.")
-        Spacer(Modifier.height(4.dp))
+    Column(
+        modifier
+            .fillMaxWidth()
+            .background(c.cream.copy(alpha = 0.5f))
+            .padding(horizontal = 24.dp, vertical = 28.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(VIcons.School, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(26.dp))
+            Text("VidyaSetu", style = VTheme.type.h3.colored(c.navy).copy(fontWeight = FontWeight.Bold))
+        }
+        Spacer(Modifier.height(14.dp))
         Text(
-            "Proprietary intelligence powering the entire ecosystem.",
-            style = VTheme.type.body.colored(c.ink2).copy(fontSize = 13.sp),
+            "Built for modern institutional excellence and parent-child security. Innovating education through trust.",
+            style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 18.sp),
         )
-        Spacer(Modifier.height(16.dp))
-        if (cmsOfferings.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                cmsOfferings.forEach { item ->
-                    ShowcaseCard(
-                        glyph = VIcons.Sparkles,
-                        heading = item.heading,
-                        description = item.description,
-                        isLive = item.isLive,
-                    )
-                }
-            }
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                fallback.forEach { f ->
-                    ShowcaseCard(f.glyph, f.heading, f.description, f.isLive)
-                }
-            }
+        Spacer(Modifier.height(24.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(40.dp)) {
+            // PORTALS — informational only (the auth CTAs live on the entry cards above).
+            FooterLinkGroup(
+                title = "PORTALS",
+                links = listOf<Pair<String, (() -> Unit)?>>(
+                    "Parent Portal" to null,
+                    "Admin Dashboard" to null,
+                    "Teacher Console" to null,
+                ),
+            )
+            // SUPPORT — live links into the Legal & Support surface.
+            FooterLinkGroup(
+                title = "SUPPORT",
+                links = listOf<Pair<String, (() -> Unit)?>>(
+                    "Privacy Policy" to { onLegal(LegalDoc.Privacy) },
+                    "Terms of Service" to { onLegal(LegalDoc.Terms) },
+                    "Help Desk" to { onLegal(LegalDoc.Help) },
+                ),
+            )
         }
     }
 }
 
 @Composable
-private fun ShowcaseCard(glyph: ImageVector, heading: String, description: String, isLive: Boolean) {
+private fun FooterLinkGroup(title: String, links: List<Pair<String, (() -> Unit)?>>) {
     val c = VTheme.colors
-    VCard(Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Box(
-                Modifier.size(46.dp).clip(RoundedCornerShape(13.dp)).background(c.teal.copy(alpha = 0.14f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(glyph, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(22.dp))
-            }
-            Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(heading, style = VTheme.type.h3.colored(c.ink), maxLines = 1, modifier = Modifier.weight(1f, fill = false))
-                    VBadge(
-                        text = if (isLive) "Live" else "Coming soon",
-                        tone = if (isLive) VBadgeTone.Success else VBadgeTone.Neutral,
-                    )
-                }
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    description,
-                    style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 16.sp),
+    Column {
+        Text(
+            title,
+            style = VTheme.type.label.colored(c.tealDeep).copy(fontWeight = FontWeight.Bold, letterSpacing = 0.10.em),
+        )
+        Spacer(Modifier.height(12.dp))
+        links.forEach { (link, onClick) ->
+            val interaction = remember { MutableInteractionSource() }
+            val base = if (onClick != null) {
+                Modifier.clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    onClick = onClick,
                 )
+            } else {
+                Modifier
             }
+            Text(
+                link,
+                style = VTheme.type.caption.colored(if (onClick != null) c.ink else c.ink2).copy(fontSize = 12.sp),
+                modifier = base,
+            )
+            Spacer(Modifier.height(10.dp))
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Featured institutions — real-photo rail.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Bundled professional campus photography — graceful fallback for schools lacking a CMS image. */
+/** Bundled professional campus photography, used as a graceful fallback for schools lacking a CMS image. */
 private val fallbackSchoolPhotos: List<DrawableResource> = listOf(
     Res.drawable.landing_school_1,
     Res.drawable.landing_school_2,
     Res.drawable.landing_school_3,
 )
 
+/**
+ * Featured-institutions rail — a horizontally scrolling row of real-photo school cards (the legacy
+ * "Featured Institutions" section, re-skinned). Each card shows a campus photo (server `imageUrl`,
+ * falling back to bundled professional photography), the name, the city and an SRI score pill.
+ */
 @Composable
 private fun FeaturedInstitutionsSection(
     schools: List<School>,
     onSchoolClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val c = VTheme.colors
     Column(modifier.fillMaxWidth()) {
         SectionHeader(
             eyebrow = "Trusted campuses",
@@ -737,7 +537,7 @@ private fun FeaturedSchoolCard(
     val interaction = remember { MutableInteractionSource() }
     VCard(
         modifier = Modifier
-            .width(252.dp)
+            .width(248.dp)
             .pressScale(interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick),
         padding = 0.dp,
@@ -745,7 +545,7 @@ private fun FeaturedSchoolCard(
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(142.dp)
+                .height(140.dp)
                 .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
         ) {
             if (school.imageUrl.isNotBlank()) {
@@ -756,16 +556,17 @@ private fun FeaturedSchoolCard(
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {
-                Image(
+                androidx.compose.foundation.Image(
                     painter = painterResource(fallback),
                     contentDescription = school.name,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
+            // Legibility scrim.
             Box(
                 Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.40f))),
+                    Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.38f))),
                 ),
             )
             if (school.isVerified) {
@@ -774,7 +575,7 @@ private fun FeaturedSchoolCard(
                         .align(Alignment.TopStart)
                         .padding(10.dp)
                         .clip(RoundedCornerShape(999.dp))
-                        .background(Color.White.copy(alpha = 0.92f))
+                        .background(Color.White.copy(alpha = 0.90f))
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -800,13 +601,13 @@ private fun FeaturedSchoolCard(
                 Row(
                     Modifier
                         .clip(RoundedCornerShape(999.dp))
-                        .background(c.teal.copy(alpha = 0.14f))
+                        .background(Color(0xFFC8DEFF).copy(alpha = 0.30f))
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Icon(VIcons.Star, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(12.dp))
-                    Text(formatScore(school.sriScore), style = VTheme.type.dataSm.colored(c.tealDeep))
+                    Icon(VIcons.Star, contentDescription = null, tint = Color(0xFF0A3A76), modifier = Modifier.size(12.dp))
+                    Text(formatScore(school.sriScore), style = VTheme.type.dataSm.colored(Color(0xFF0A3A76)))
                     Text("SRI", style = VTheme.type.label.colored(c.ink3))
                 }
             }
@@ -814,10 +615,62 @@ private fun FeaturedSchoolCard(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Portal access rail.
-// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Showcase section — the legacy "Next-Gen Intelligence" moat strip, re-skinned. Renders the CMS
+ * `list_of_offerings` as tinted feature cards, each with a live / coming-soon badge.
+ */
+@Composable
+private fun ShowcaseSection(
+    title: String,
+    description: String,
+    items: List<LandingItem>,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+    Column(modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+        SectionHeader(eyebrow = "The VidyaSetu moat", title = title)
+        Spacer(Modifier.height(4.dp))
+        Text(description, style = VTheme.type.body.colored(c.ink2).copy(fontSize = 13.sp))
+        Spacer(Modifier.height(16.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            items.forEach { item -> OfferingCard(item) }
+        }
+    }
+}
 
+@Composable
+private fun OfferingCard(item: LandingItem) {
+    val c = VTheme.colors
+    VCard(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Box(
+                Modifier.size(46.dp).clip(RoundedCornerShape(13.dp)).background(c.teal.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(VIcons.Sparkles, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(22.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(item.heading, style = VTheme.type.h3.colored(c.ink), maxLines = 1)
+                    VBadge(
+                        text = if (item.isLive) "Live" else "Coming soon",
+                        tone = if (item.isLive) VBadgeTone.Success else VBadgeTone.Neutral,
+                    )
+                }
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    item.description,
+                    style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 16.sp),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Portal-access rail — the legacy "Portal access" section, re-skinned. Lists the CMS
+ * `list_of_portals` as compact entry rows that route to the credential (Admin) sign-in.
+ */
 @Composable
 private fun PortalAccessSection(
     portals: List<LandingItem>,
@@ -826,20 +679,28 @@ private fun PortalAccessSection(
 ) {
     val c = VTheme.colors
     Column(modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+        // RA-S20: legacy "Access Your Portal" header carried forward verbatim.
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Column(Modifier.weight(0.78f)) {
-                SectionHeader(eyebrow = "Already with us", title = "Access your portal")
+            Column(Modifier.weight(0.75f)) {
+                Text("Access Your Portal", style = VTheme.type.h2.colored(c.navy))
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    "Sign in to your existing VidyaSetu workspace.",
+                    "Already part of the VidyaPrayag ecosystem?",
                     style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 12.sp),
                 )
             }
+            Text(
+                "View All Portals",
+                style = VTheme.type.caption.colored(c.tealDeep).copy(fontWeight = FontWeight.SemiBold, fontSize = 12.sp),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(0.25f),
+            )
         }
         Spacer(Modifier.height(14.dp))
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             portals.forEach { portal ->
                 val interaction = remember { MutableInteractionSource() }
+                // Legacy iconography: Parent portals get a family/users glyph, others the admin plate.
                 val portalIcon = if (portal.heading.contains("Parent", ignoreCase = true)) VIcons.Users else VIcons.GraduationCap
                 VCard(
                     modifier = Modifier
@@ -872,145 +733,7 @@ private fun PortalAccessSection(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Closing CTA band — a deep teal call-to-action that re-offers both doors.
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun ClosingCtaBand(
-    onParent: () -> Unit,
-    onAdmin: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier
-            .clip(RoundedCornerShape(28.dp))
-            .background(
-                Brush.linearGradient(listOf(VTheme.colors.tealDeep, VTheme.colors.teal)),
-            )
-            .drawBehind {
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color.White.copy(alpha = 0.14f), Color.Transparent),
-                        center = Offset(size.width * 0.85f, size.height * 0.15f),
-                        radius = size.maxDimension * 0.5f,
-                    ),
-                    radius = size.maxDimension * 0.5f,
-                    center = Offset(size.width * 0.85f, size.height * 0.15f),
-                )
-            }
-            .padding(28.dp),
-    ) {
-        Column(horizontalAlignment = Alignment.Start) {
-            Text(
-                "Ready to move with confidence?",
-                style = VTheme.type.h2.colored(Color.White).copy(fontWeight = FontWeight.ExtraBold),
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "Join the schools and families already running on VidyaSetu.",
-                style = VTheme.type.body.colored(Color.White.copy(alpha = 0.92f)).copy(fontSize = 14.sp, lineHeight = 20.sp),
-            )
-            Spacer(Modifier.height(20.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                VButton(
-                    text = "I'm a Parent",
-                    onClick = onParent,
-                    variant = VButtonVariant.Primary,
-                    tone = VButtonTone.Navy,
-                    size = VButtonSize.Md,
-                    soft = false,
-                    modifier = Modifier.weight(1f),
-                )
-                VButton(
-                    text = "I'm a School",
-                    onClick = onAdmin,
-                    variant = VButtonVariant.Secondary,
-                    size = VButtonSize.Md,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Footer.
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun LandingFooter(
-    onLegal: (LegalDoc) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val c = VTheme.colors
-    Column(
-        modifier
-            .fillMaxWidth()
-            .background(c.cream.copy(alpha = 0.5f))
-            .padding(horizontal = 24.dp, vertical = 28.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(VIcons.School, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(26.dp))
-            Text("VidyaSetu", style = VTheme.type.h3.colored(c.navy).copy(fontWeight = FontWeight.Bold))
-        }
-        Spacer(Modifier.height(14.dp))
-        Text(
-            "The intelligence layer for modern education — uniting parents, teachers and administrators on one trusted, data-backed platform.",
-            style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 18.sp),
-        )
-        Spacer(Modifier.height(24.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(40.dp)) {
-            FooterLinkGroup(
-                title = "PORTALS",
-                links = listOf<Pair<String, (() -> Unit)?>>(
-                    "Parent Portal" to null,
-                    "Admin Dashboard" to null,
-                    "Teacher Console" to null,
-                ),
-            )
-            FooterLinkGroup(
-                title = "SUPPORT",
-                links = listOf<Pair<String, (() -> Unit)?>>(
-                    "Privacy Policy" to { onLegal(LegalDoc.Privacy) },
-                    "Terms of Service" to { onLegal(LegalDoc.Terms) },
-                    "Help Desk" to { onLegal(LegalDoc.Help) },
-                ),
-            )
-        }
-    }
-}
-
-@Composable
-private fun FooterLinkGroup(title: String, links: List<Pair<String, (() -> Unit)?>>) {
-    val c = VTheme.colors
-    Column {
-        Text(
-            title,
-            style = VTheme.type.label.colored(c.tealDeep).copy(fontWeight = FontWeight.Bold, letterSpacing = 0.10.em),
-        )
-        Spacer(Modifier.height(12.dp))
-        links.forEach { (link, onClick) ->
-            val interaction = remember { MutableInteractionSource() }
-            val base = if (onClick != null) {
-                Modifier.clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            } else {
-                Modifier
-            }
-            Text(
-                link,
-                style = VTheme.type.caption.colored(if (onClick != null) c.ink else c.ink2).copy(fontSize = 12.sp),
-                modifier = base,
-            )
-            Spacer(Modifier.height(10.dp))
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared building blocks.
-// ─────────────────────────────────────────────────────────────────────────────
-
+/** Shared section header — a tinted eyebrow over a heading, used across the marketing sections. */
 @Composable
 private fun SectionHeader(eyebrow: String, title: String, modifier: Modifier = Modifier) {
     val c = VTheme.colors
@@ -1024,51 +747,97 @@ private fun SectionHeader(eyebrow: String, title: String, modifier: Modifier = M
     }
 }
 
+/**
+ * RA-S20 — legacy "Social proof" section, re-skinned in the V* system.
+ *
+ * Carries the legacy reference content verbatim: the "TRUSTED BY 500+ INSTITUTIONS" eyebrow
+ * over a three-item partner marquee (Academix / GlobalView / EduPulse). Replaces the fabricated
+ * "240+ schools · 38k parents" strip — these are the legacy partner labels, not invented metrics.
+ */
+@Composable
+private fun SocialProofSection(modifier: Modifier = Modifier) {
+    val c = VTheme.colors
+    Column(
+        modifier
+            .background(c.cream.copy(alpha = 0.5f))
+            .padding(vertical = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            "TRUSTED BY 500+ INSTITUTIONS",
+            style = VTheme.type.label.colored(c.ink3).copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.12.em),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(18.dp))
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            MarqueeItem(VIcons.GraduationCap, "Academix")
+            MarqueeItem(VIcons.Sparkles, "GlobalView")
+            MarqueeItem(VIcons.School, "EduPulse")
+        }
+    }
+}
+
+@Composable
+private fun MarqueeItem(icon: ImageVector, text: String) {
+    val c = VTheme.colors
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        modifier = Modifier.graphicsLayer { alpha = 0.6f },
+    ) {
+        Icon(icon, contentDescription = null, tint = c.ink2, modifier = Modifier.size(16.dp))
+        Text(text, style = VTheme.type.bodyStrong.colored(c.ink2).copy(fontWeight = FontWeight.Bold))
+    }
+}
+
+/**
+ * RA-S20 — legacy "EntryPointCard", re-skinned in the V* system.
+ *
+ * Carries the legacy content verbatim: a tinted label chip, a headline title, a description,
+ * a Verified-icon feature list, and a primary CTA button. Used for the Parent and School
+ * entry points. The CTA routes via [onButtonClick] (Parent → OTP auth, School → credential auth).
+ */
 @Composable
 private fun EntryPointCard(
     accent: Color,
     accentInk: Color,
-    glyph: ImageVector,
     label: String,
     title: String,
     description: String,
     features: List<String>,
     buttonText: String,
-    buttonTone: VButtonTone,
     onButtonClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
     VCard(modifier = modifier.fillMaxWidth(), padding = 0.dp) {
         Column(Modifier.fillMaxWidth()) {
-            // Role-tinted gradient header strip with the role glyph.
+            // Premium accent bar — a thin role-tinted gradient strip seating the card in its colour.
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(5.dp)
+                    .height(4.dp)
                     .background(
-                        Brush.horizontalGradient(listOf(accent.copy(alpha = 0.95f), accent.copy(alpha = 0.40f))),
+                        Brush.horizontalGradient(listOf(accent.copy(alpha = 0.95f), accent.copy(alpha = 0.45f))),
                     ),
             )
             Column(Modifier.fillMaxWidth().padding(24.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(
-                        Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(accent.copy(alpha = 0.14f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(glyph, contentDescription = null, tint = accentInk, modifier = Modifier.size(20.dp))
-                    }
-                    Box(
-                        Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(accent.copy(alpha = 0.12f))
-                            .padding(horizontal = 12.dp, vertical = 5.dp),
-                    ) {
-                        Text(
-                            label.uppercase(),
-                            style = VTheme.type.label.colored(accentInk).copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.06.em),
-                        )
-                    }
+                // Tinted label chip.
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(accent.copy(alpha = 0.14f))
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                ) {
+                    Text(
+                        label.uppercase(),
+                        style = VTheme.type.label.colored(accentInk).copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.06.em),
+                    )
                 }
                 Spacer(Modifier.height(16.dp))
                 Text(title, style = VTheme.type.h2.colored(c.navy))
@@ -1081,36 +850,50 @@ private fun EntryPointCard(
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     features.forEach { feature ->
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Box(
-                                Modifier.size(20.dp).clip(RoundedCornerShape(999.dp)).background(accent.copy(alpha = 0.14f)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(VIcons.Check, contentDescription = null, tint = accentInk, modifier = Modifier.size(13.dp))
-                            }
-                            Text(feature, style = VTheme.type.bodyStrong.colored(c.ink), modifier = Modifier.weight(1f))
+                            Icon(VIcons.ShieldCheck, contentDescription = null, tint = accentInk, modifier = Modifier.size(18.dp))
+                            Text(feature, style = VTheme.type.bodyStrong.colored(c.ink))
                         }
                     }
                 }
                 Spacer(Modifier.height(22.dp))
-                VButton(
+                com.littlebridge.vidyaprayag.ui.v2.components.VButton(
                     text = buttonText,
                     onClick = onButtonClick,
-                    variant = VButtonVariant.Primary,
-                    tone = buttonTone,
-                    size = VButtonSize.Lg,
-                    soft = false,
-                    full = true,
-                    trailing = {
-                        Icon(VIcons.ArrowRight, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                    },
+                    variant = com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant.Primary,
+                    tone = com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone.Navy,
+                    size = com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize.Lg,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
     }
 }
 
-/** Formats an SRI score to one decimal without a platform number formatter. */
+/** Formats an SRI score to one decimal without pulling in a platform number formatter. */
 private fun formatScore(value: Double): String {
     val rounded = (value * 10).toLong()
     return "${rounded / 10}.${rounded % 10}"
+}
+
+/**
+ * LandingCloudMark — a single faint stroked cloud for the teal hero, byte-identical to the
+ * splash/Welcome cloud (SVG `M6 24 Q12 14 22 18 Q28 8 38 14 Q46 14 44 24 Z`) so the landing
+ * hero matches the brand reference exactly.
+ */
+@Composable
+private fun LandingCloudMark(modifier: Modifier, alpha: Float) {
+    Canvas(modifier) {
+        val sx = size.width / 48f
+        val sy = size.height / 32f
+        fun x(v: Float) = v * sx
+        fun y(v: Float) = v * sy
+        val p = Path().apply {
+            moveTo(x(6f), y(24f))
+            quadraticTo(x(12f), y(14f), x(22f), y(18f))
+            quadraticTo(x(28f), y(8f), x(38f), y(14f))
+            quadraticTo(x(46f), y(14f), x(44f), y(24f))
+            close()
+        }
+        drawPath(p, color = Color.White.copy(alpha = alpha), style = Stroke(width = 1.5f * sx))
+    }
 }
