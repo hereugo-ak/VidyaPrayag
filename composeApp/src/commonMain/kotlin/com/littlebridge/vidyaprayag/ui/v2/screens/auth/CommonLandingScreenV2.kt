@@ -245,6 +245,22 @@ fun CommonLandingScreenV2(
                         .padding(horizontal = d.lg)
                         .graphicsLayer { alpha = wordAlpha.value },
                 )
+                Spacer(Modifier.height(26.dp))
+                // RA-S20: premium hero visual — a real campus photo (bundled, not AI-generated)
+                // framed in a rounded card with a soft border, echoing the legacy hero offerings
+                // grid. Reads as authentic photography on the very first screen.
+                androidx.compose.foundation.Image(
+                    painter = painterResource(fallbackSchoolPhotos.first()),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .padding(horizontal = 28.dp)
+                        .fillMaxWidth()
+                        .heightIn(min = 150.dp, max = 190.dp)
+                        .clip(RoundedCornerShape(28.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(28.dp))
+                        .graphicsLayer { alpha = wordAlpha.value },
+                )
             }
         }
 
@@ -361,6 +377,10 @@ fun CommonLandingScreenV2(
                 )
             }
 
+            // ── Footer (legacy "FooterSection") ──
+            Spacer(Modifier.height(36.dp))
+            LandingFooter(modifier = Modifier.graphicsLayer { alpha = cardsAlpha.value })
+
             Spacer(Modifier.height(24.dp))
             Text(
                 text = buildAnnotatedString {
@@ -373,6 +393,55 @@ fun CommonLandingScreenV2(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
             )
+        }
+    }
+}
+
+/**
+ * RA-S20 — legacy "FooterSection", re-skinned in the V* system.
+ *
+ * Carries the legacy footer content verbatim: the brand mark, the institutional copy line,
+ * and the two link groups (PORTALS / SUPPORT). Static marketing copy on a public surface —
+ * no fabricated metrics.
+ */
+@Composable
+private fun LandingFooter(modifier: Modifier = Modifier) {
+    val c = VTheme.colors
+    Column(
+        modifier
+            .fillMaxWidth()
+            .background(c.cream.copy(alpha = 0.5f))
+            .padding(horizontal = 24.dp, vertical = 28.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(VIcons.School, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(26.dp))
+            Text("VidyaSetu", style = VTheme.type.h3.colored(c.navy).copy(fontWeight = FontWeight.Bold))
+        }
+        Spacer(Modifier.height(14.dp))
+        Text(
+            "Built for modern institutional excellence and parent-child security. Innovating education through trust.",
+            style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 18.sp),
+        )
+        Spacer(Modifier.height(24.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(40.dp)) {
+            FooterLinkGroup("PORTALS", listOf("Parent Portal", "Admin Dashboard", "Teacher Console"))
+            FooterLinkGroup("SUPPORT", listOf("Privacy Policy", "Terms of Service", "Help Desk"))
+        }
+    }
+}
+
+@Composable
+private fun FooterLinkGroup(title: String, links: List<String>) {
+    val c = VTheme.colors
+    Column {
+        Text(
+            title,
+            style = VTheme.type.label.colored(c.tealDeep).copy(fontWeight = FontWeight.Bold, letterSpacing = 0.10.em),
+        )
+        Spacer(Modifier.height(12.dp))
+        links.forEach { link ->
+            Text(link, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp))
+            Spacer(Modifier.height(10.dp))
         }
     }
 }
