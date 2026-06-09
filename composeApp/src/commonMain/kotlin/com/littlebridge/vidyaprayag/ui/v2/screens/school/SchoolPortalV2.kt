@@ -10,14 +10,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
+import com.littlebridge.vidyaprayag.feature.admin.presentation.MessagesViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VBottomNav
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VNavItem
 import com.littlebridge.vidyaprayag.ui.v2.components.VScreenScaffold
+import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.discovery.AcademicCalendarScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.notifications.NotificationsScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VPortalTone
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
+import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays the admin portal can push above its tab content. */
 private enum class SchoolOverlay {
@@ -56,6 +59,8 @@ private enum class SchoolOverlay {
 fun SchoolPortalV2(
     onLogout: () -> Unit = {},
     modifier: Modifier = Modifier,
+    // RA-S12 — drives the Comms nav badge from the real unread-thread count.
+    messagesViewModel: MessagesViewModel = koinViewModel(),
 ) {
     // UI_FIDELITY_AUDIT §0.5: Admin.tsx renders under `PhoneFrame dark`, but legacy `dark` == the
     // `.warm` scope, which is a WARM-LIGHT theme (lavender bg, dark ink, white cards) — NOT black.
@@ -68,6 +73,10 @@ fun SchoolPortalV2(
         var selectedTeacherId by remember { mutableStateOf<String?>(null) }
         // RA-S17 — id carried into the non-teaching-staff profile overlay.
         var selectedStaffId by remember { mutableStateOf<String?>(null) }
+        // RA-S12 — the Comms badge counts message threads with unread messages
+        // (GET /school/messages/threads), not a hardcoded literal.
+        val messagesState by messagesViewModel.state.collectAsStateV2()
+        val commsBadge = messagesState.threads.count { it.unreadCount > 0 }
 
         // §11 cross-platform — Android predictive back / iOS edge-swipe pops
         // the full-screen Notifications/Calendar overlay back to the admin tabs
@@ -185,7 +194,7 @@ fun SchoolPortalV2(
             VNavItem("home", "Home", VIcons.Home),
             VNavItem("people", "People", VIcons.Users),
             VNavItem("records", "Records", VIcons.Bookmark),
-            VNavItem("comms", "Comms", VIcons.Megaphone, badge = 2),
+            VNavItem("comms", "Comms", VIcons.Megaphone, badge = commsBadge),
             VNavItem("settings", "Settings", VIcons.Settings),
         )
 
