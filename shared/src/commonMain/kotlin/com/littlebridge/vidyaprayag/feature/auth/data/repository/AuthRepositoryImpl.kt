@@ -88,6 +88,9 @@ class AuthRepositoryImpl(
         preferenceRepository.setUserId(response.userId)
         preferenceRepository.setRefreshToken(response.refreshToken)
         preferenceRepository.setUserRole(response.role)
+        // RA-S03: persist the display name so portal headers/avatars can greet
+        // the real user instead of hardcoding "Parent". Refreshed by getUserDetails.
+        preferenceRepository.setUserName(response.name)
         preferenceRepository.setUserToken(response.token)
     }
 
@@ -100,11 +103,13 @@ class AuthRepositoryImpl(
         val userId = preferenceRepository.getUserId().first() ?: ""
         val role = preferenceRepository.getUserRole().first()
         val profileCompleted = preferenceRepository.getProfileCompleted().first() ?: false
+        // RA-S03: surface the persisted display name (empty string if never set).
+        val name = preferenceRepository.getUserName().first() ?: ""
         return AuthResponse(
             token = token,
             refreshToken = refreshToken,
             userId = userId,
-            name = "",
+            name = name,
             role = role,
             profileCompleted = profileCompleted
         )
@@ -160,6 +165,14 @@ class AuthRepositoryImpl(
     }
 
     override suspend fun getUserDetails(token: String): NetworkResult<UserDetailsResponse> {
-        return api.getUserDetails(token)
+        val result = api.getUserDetails(token)
+        // RA-S03: refresh the persisted display name from the authoritative
+        // profile so headers/avatars stay correct after a name change.
+        if (result is NetworkResult.Success) {
+            result.data.data.personalDetails.name
+                .takeIf { it.isNotBlank() }
+                ?.let { preferenceRepository.setUserName(it) }
+        }
+        return result
     }
 }
