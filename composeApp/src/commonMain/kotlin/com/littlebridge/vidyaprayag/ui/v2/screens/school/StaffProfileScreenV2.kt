@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.StaffDto
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StaffViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
