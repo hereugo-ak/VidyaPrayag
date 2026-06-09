@@ -33,7 +33,10 @@ data class TeacherMarksState(
     val isLoading: Boolean = false,
     val isSubmitting: Boolean = false,
     val submitSuccess: Boolean = false,
-    val error: String? = null,
+    // RA-S18: load errors drive VStateHost (full-screen retry); submit errors are surfaced inline
+    // so a failed save never wipes the marks the teacher is mid-way through entering.
+    val error: String? = null,        // load-path error (VStateHost)
+    val submitError: String? = null,  // submit-path error (inline)
 ) {
     val enteredCount: Int get() = students.count { it.marks != null }
     val allEntered: Boolean get() = students.isNotEmpty() && students.all { it.marks != null }
@@ -82,19 +85,24 @@ class TeacherMarksViewModel(
      * to [0, maxMarks]; pass `null` to clear the field.
      */
     fun setMark(studentId: String, marks: Float?) {
+        // RA-S18: editing a mark after a confirmed save clears the success state so the Save
+        // button re-enables for the new edit (the button's "Saved" check is result-driven).
         _state.update { s ->
             val clamped = marks?.coerceIn(0f, s.maxMarks.toFloat())
-            s.copy(students = s.students.map { if (it.studentId == studentId) it.copy(marks = clamped) else it })
+            s.copy(
+                students = s.students.map { if (it.studentId == studentId) it.copy(marks = clamped) else it },
+                submitSuccess = false,
+            )
         }
     }
 
     fun submit() {
         viewModelScope.launch {
             val current = _state.value
-            _state.update { it.copy(isSubmitting = true, error = null, submitSuccess = false) }
+            _state.update { it.copy(isSubmitting = true, submitError = null, submitSuccess = false) }
             val token = preferenceRepository.getUserToken().first()
             if (token == null) {
-                _state.update { it.copy(isSubmitting = false, error = "Not authenticated") }
+                _state.update { it.copy(isSubmitting = false, submitError = "Not authenticated") }
                 return@launch
             }
             val request = SubmitMarksRequest(
@@ -106,8 +114,8 @@ class TeacherMarksViewModel(
             )
             when (val result = repository.submitMarks(token, request)) {
                 is NetworkResult.Success -> _state.update { it.copy(isSubmitting = false, submitSuccess = true) }
-                is NetworkResult.Error -> _state.update { it.copy(isSubmitting = false, error = result.message) }
-                is NetworkResult.ConnectionError -> _state.update { it.copy(isSubmitting = false, error = "Connection error") }
+                is NetworkResult.Error -> _state.update { it.copy(isSubmitting = false, submitError = result.message) }
+                is NetworkResult.ConnectionError -> _state.update { it.copy(isSubmitting = false, submitError = "Connection error") }
             }
         }
     }

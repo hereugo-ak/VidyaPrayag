@@ -19,6 +19,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.compose.setSingletonImageLoaderFactory
@@ -110,6 +113,31 @@ fun App(
         // Resolve the colors for a lavender (Light) splash before the portal tone is known.
         val splashColors: VColors = vColorsFor(VPortalTone.Light)
 
+        // ── SESSION-BLEED FIX (root cause) ───────────────────────────────────────
+        // This app has NO NavHost / NavController: NavGraphV2 is a hand-rolled
+        // AnimatedContent state machine, so without intervention there would be
+        // exactly ONE ViewModelStoreOwner for the whole app (the platform root).
+        // Every `koinViewModel()` in every portal/screen (SchoolDashboardViewModel,
+        // MessagesViewModel, ParentHomeViewModel, …) is cached in that store keyed
+        // by class, so a `factory{}` Koin registration does NOT yield a fresh
+        // instance across a logout → re-login: AndroidX's ViewModelStore hands back
+        // the SAME cached instance, still holding the previous session's school_id /
+        // data / screen state. That is the real reason an Admin logout → Parent
+        // login renders the Admin dashboard with the Parent's name stuck in skeleton
+        // (the surviving SchoolDashboardViewModel re-fetches admin endpoints with a
+        // parent JWT and silently stalls).
+        //
+        // The fix: give the authenticated graph its own SESSION-SCOPED
+        // ViewModelStoreOwner, keyed by user id. MainViewModel (the app-lifetime
+        // auth/session VM) stays on the ROOT owner and is resolved ABOVE this scope,
+        // so it is never torn down and keeps driving authState reactively. When the
+        // session identity changes (logout clears the user id → new login sets a new
+        // one), the keyed owner is recreated and its predecessor's store is cleared
+        // in onDispose — calling onCleared() on every portal/screen VM from the old
+        // session. The next session therefore builds every VM from scratch: no state
+        // can bleed across a role switch.
+        val isAuthenticated = !authState.token.isNullOrBlank()
+
         Box(modifier = Modifier.fillMaxSize().background(splashColors.background)) {
             // PHASE 2 — Splash shows the brand while the session check (JWT + role) runs in
             // parallel inside MainViewModel.authState. The instant `isLoaded` flips true we
@@ -123,13 +151,25 @@ fun App(
                 if (!loaded) {
                     SplashScreenV2(modifier = Modifier.fillMaxSize())
                 } else {
-                    val isAuthenticated = !authState.token.isNullOrBlank()
-                    NavGraphV2(
-                        role = authState.role,
-                        isAuthenticated = isAuthenticated,
-                        onLogout = { viewModel.logout() },
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    // The session key is the live JWT (unique per login) while
+                    // authenticated, or a constant sentinel while logged out. When it
+                    // changes — logout, or a logout→login role switch — SessionScope
+                    // tears down the previous session's ViewModelStore (onCleared on
+                    // every cached portal/screen VM) and hands the new graph a clean
+                    // store. MainViewModel above is untouched and keeps authState live.
+                    val sessionKey = authState.token?.takeIf { isAuthenticated } ?: "unauthenticated"
+                    SessionScope(sessionKey = sessionKey) {
+                        NavGraphV2(
+                            role = authState.role,
+                            isAuthenticated = isAuthenticated,
+                            // logout() revokes server-side + clears the persisted
+                            // session (prefs); that flips the session key, which
+                            // disposes this scope's store so no session-scoped VM
+                            // survives into the next login.
+                            onLogout = { viewModel.logout() },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
 
@@ -153,5 +193,48 @@ fun App(
                 )
             }
         }
+    }
+}
+
+/**
+ * SessionScope — a per-login [ViewModelStoreOwner] for everything below it.
+ *
+ * WHY THIS EXISTS (session-bleed root cause): NavGraphV2 is a hand-rolled
+ * `AnimatedContent` state machine with no `NavHost`/`NavController`, so every
+ * `koinViewModel()` in every portal and screen would otherwise resolve against the
+ * single app-root ViewModelStore and be cached there for the whole process. A
+ * `factory{}` Koin registration does not help, because `koinViewModel()` layers
+ * AndroidX's ViewModelStore (keyed by class) on top — the same store returns the
+ * same cached instance after a logout → re-login, leaking the previous user's
+ * `school_id` / data / screen state into the next session (Admin dashboard shown
+ * to a freshly-logged-in Parent, name stuck in skeleton).
+ *
+ * By providing a fresh [ViewModelStore] keyed on [sessionKey] (the live JWT, which
+ * is unique per login and becomes a sentinel on logout), the authenticated graph
+ * gets its own store. The instant the key changes, Compose disposes the old scope
+ * and [DisposableEffect.onDispose] calls `store.clear()` — running `onCleared()` on
+ * every session-scoped VM and evicting them — before the new session builds its VMs
+ * from scratch. The app-lifetime [MainViewModel] is resolved ABOVE this scope on the
+ * root owner, so it is never torn down and keeps `authState` reactive across logins.
+ */
+@Composable
+private fun SessionScope(
+    sessionKey: String,
+    content: @Composable () -> Unit,
+) {
+    // A new store per distinct session key. `remember(sessionKey)` rebuilds it the
+    // moment the key changes (logout or role switch), and onDispose clears the
+    // outgoing store so its ViewModels are destroyed deterministically.
+    val store = remember(sessionKey) { ViewModelStore() }
+    val owner = remember(sessionKey) {
+        object : ViewModelStoreOwner {
+            override val viewModelStore: ViewModelStore = store
+        }
+    }
+    DisposableEffect(sessionKey) {
+        onDispose { store.clear() }
+    }
+    CompositionLocalProvider(LocalViewModelStoreOwner provides owner) {
+        content()
     }
 }

@@ -9,8 +9,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -83,6 +86,7 @@ private fun SchoolSettingsContent(
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     // RA-21: logout is destructive — gate it behind a confirmation dialog.
     var showLogoutConfirm by remember { mutableStateOf(false) }
 
@@ -104,6 +108,9 @@ private fun SchoolSettingsContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
+            .statusBarsPadding()
+            .imePadding()
+            .navigationBarsPadding()
             .padding(top = 24.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -170,6 +177,19 @@ private fun SchoolSettingsContent(
                 SettingRow(VIcons.Wallet, "Fee structure", "Edit heads & amounts for next cycle (Coming Soon)"),
                 SettingRow(VIcons.Bell, "Notifications", "Channels & quiet hours (Coming Soon)"),
                 SettingRow(VIcons.Download, "Data export", "CSV / PDF / UDISE (Coming Soon)"),
+                SettingRow(
+                    VIcons.Chat,
+                    "Help & support",
+                    "Email ${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}",
+                    onClick = {
+                        runCatching {
+                            uriHandler.openUri(
+                                "mailto:${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}" +
+                                    "?subject=VidyaSetu%20Support",
+                            )
+                        }
+                    },
+                ),
                 SettingRow(VIcons.Settings, "Account", "Sign out of the admin console", onClick = { showLogoutConfirm = true }),
             )
             Spacer(Modifier.height(0.dp))

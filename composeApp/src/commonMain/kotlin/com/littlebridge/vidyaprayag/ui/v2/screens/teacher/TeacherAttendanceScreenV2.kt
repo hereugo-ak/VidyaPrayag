@@ -142,16 +142,31 @@ private fun TeacherAttendanceContent(
                         VProgressBar(value = pct)
                     }
                     Spacer(Modifier.height(0.dp))
+                    // RA-S18: result-driven Submit. No fake `stateful` timer — the spinner shows
+                    // only while the request is in flight (`isSubmitting`) and the "Submitted" check
+                    // shows only after the VM confirms the write (`submitSuccess`). Disabled while
+                    // submitting or after a confirmed save (re-enables when the roster is edited).
                     VButton(
-                        text = "Submit",
+                        text = if (state.submitSuccess) "Submitted" else "Submit",
                         onClick = onSubmit,
                         size = VButtonSize.Lg,
                         tone = VButtonTone.Lavender,
-                        stateful = true,
                         loading = state.isSubmitting,
+                        success = state.submitSuccess,
+                        enabled = !state.isSubmitting && !state.submitSuccess,
                         successLabel = "Submitted",
                     )
                 }
+            }
+            // RA-S18: surface a submit error inline (the VStateHost error channel covers the
+            // load path; a failed submit must not silently look like nothing happened, nor wipe
+            // the marked roster the teacher is mid-way through).
+            state.submitError?.let { err ->
+                Text(
+                    err,
+                    style = VTheme.type.caption.colored(c.danger),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                )
             }
         }
     }

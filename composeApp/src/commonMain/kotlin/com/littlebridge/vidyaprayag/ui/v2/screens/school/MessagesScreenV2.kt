@@ -30,7 +30,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.Message
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.MessageThread
+import com.littlebridge.vidyaprayag.feature.admin.presentation.ComposeState
 import com.littlebridge.vidyaprayag.feature.admin.presentation.ConversationState
+import com.littlebridge.vidyaprayag.feature.admin.presentation.MessageRecipient
 import com.littlebridge.vidyaprayag.feature.admin.presentation.MessagesState
 import com.littlebridge.vidyaprayag.feature.admin.presentation.MessagesViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
@@ -74,6 +76,19 @@ fun MessagesScreenV2(
     val isLoading by viewModel.isLoading.collectAsStateV2()
     val errorMessage by viewModel.errorMessage.collectAsStateV2()
     val conversation by viewModel.conversation.collectAsStateV2()
+    val compose by viewModel.compose.collectAsStateV2()
+
+    // RA-S07: the compose-new sheet is the topmost layer — back closes it first.
+    if (compose.isOpen) {
+        ComposeNewContent(
+            compose = compose,
+            isSending = state.isSending,
+            onSend = viewModel::composeNew,
+            onClose = viewModel::closeCompose,
+            modifier = modifier.fillMaxSize(),
+        )
+        return
+    }
 
     // If a conversation is open, back closes it first; otherwise back exits the overlay.
     val backHandler: () -> Unit = {
@@ -104,6 +119,7 @@ fun MessagesScreenV2(
                 onOpenThread = viewModel::openConversation,
                 onRetry = viewModel::refresh,
                 onClearError = viewModel::clearError,
+                onCompose = viewModel::openCompose,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -118,6 +134,7 @@ private fun ThreadListContent(
     onOpenThread: (String) -> Unit,
     onRetry: () -> Unit,
     onClearError: () -> Unit,
+    onCompose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -128,6 +145,22 @@ private fun ThreadListContent(
             .padding(top = 16.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // RA-S07: compose-new entry point — admins can now INITIATE a conversation (with a
+        // teacher), not just reply. The recipient picker + send live in the compose sheet.
+        VButton(
+            text = "New message",
+            onClick = onCompose,
+            full = true,
+            size = VButtonSize.Md,
+            tone = VButtonTone.Teal,
+            leading = {
+                androidx.compose.material3.Icon(
+                    VIcons.Chat,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+            },
+        )
         VStateHost(
             loading = isLoading,
             error = error,
@@ -249,6 +282,111 @@ private fun ConversationContent(
                     enabled = reply.isNotBlank() && !conversation.isSending,
                 )
             }
+        }
+    }
+}
+
+/**
+ * RA-S07 — compose-new screen: pick a recipient (a teacher in the school), type a message, send.
+ * `onSend(recipientUserId, body)` starts a real 1:1 conversation via the two-row engine.
+ */
+@Composable
+private fun ComposeNewContent(
+    compose: ComposeState,
+    isSending: Boolean,
+    onSend: (String, String) -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+    var selected by remember { mutableStateOf<MessageRecipient?>(null) }
+    var body by remember { mutableStateOf("") }
+
+    Column(modifier) {
+        VBackHeader(title = "New message", onBack = onClose)
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            VStateHost(
+                loading = compose.isLoadingRecipients,
+                error = compose.error,
+                isEmpty = compose.candidates.isEmpty(),
+                emptyTitle = "No recipients",
+                emptyBody = "Add teachers to your school to start a conversation.",
+                emptyIcon = VIcons.Chat,
+                onRetry = onClose,
+            ) {
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp)
+                        .padding(top = 16.dp, bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text("To", style = VTheme.type.caption.colored(c.ink3))
+                    VCard {
+                        compose.candidates.forEachIndexed { i, r ->
+                            if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(c.border1))
+                            RecipientRow(
+                                recipient = r,
+                                isSelected = selected?.id == r.id,
+                                onClick = { selected = r },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Composer (recipient must be chosen before sending).
+        Box(Modifier.fillMaxWidth().background(c.card).padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(Modifier.weight(1f)) {
+                    VInput(
+                        value = body,
+                        onValueChange = { body = it },
+                        placeholder = if (selected == null) "Pick a recipient above…" else "Message ${selected!!.name}…",
+                        enabled = selected != null && !isSending,
+                    )
+                }
+                VButton(
+                    text = "Send",
+                    onClick = {
+                        val r = selected
+                        if (r != null && body.isNotBlank()) onSend(r.id, body)
+                    },
+                    size = VButtonSize.Md,
+                    tone = VButtonTone.Teal,
+                    loading = isSending,
+                    enabled = selected != null && body.isNotBlank() && !isSending,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecipientRow(recipient: MessageRecipient, isSelected: Boolean, onClick: () -> Unit) {
+    val c = VTheme.colors
+    val interaction = remember { MutableInteractionSource() }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        VAvatar(name = recipient.name.ifBlank { "?" }, size = 40.dp)
+        Column(Modifier.weight(1f)) {
+            Text(recipient.name, style = VTheme.type.bodyStrong.colored(c.ink))
+            Text(recipient.subtitle, style = VTheme.type.caption.colored(c.ink3))
+        }
+        if (isSelected) {
+            VBadge(text = "Selected", tone = VBadgeTone.Arctic)
         }
     }
 }

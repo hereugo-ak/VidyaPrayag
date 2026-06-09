@@ -122,6 +122,9 @@ val commonModule = module {
             }
         }
     }
+    // RA-S01: session-manager wraps the singleton HttpClient so logout can evict
+    // the Ktor Auth plugin's in-memory bearer-token cache (clearToken()).
+    single { com.littlebridge.vidyaprayag.core.network.SessionManager(get()) }
     single { KtorSchoolApi(get(), AppConfig.schoolBaseUrl) }
     single { 
         com.littlebridge.vidyaprayag.feature.content.data.remote.ContentApi(
@@ -181,6 +184,13 @@ val commonModule = module {
     // RA-45: student roster + student/teacher profile detail
     single {
         com.littlebridge.vidyaprayag.feature.admin.data.remote.StudentsApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    // RA-S17: Non-teaching-staff vertical
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.StaffApi(
             client = get(),
             baseUrl = AppConfig.schoolBaseUrl
         )
@@ -261,7 +271,8 @@ val commonModule = module {
         com.littlebridge.vidyaprayag.feature.content.data.repository.ContentRepositoryImpl(get())
     }
     single<com.littlebridge.vidyaprayag.feature.auth.domain.repository.AuthRepository> { 
-        com.littlebridge.vidyaprayag.feature.auth.data.repository.AuthRepositoryImpl(get(), get())
+        // RA-S05: 4th arg = SelectedChildHolder (cleared on logout).
+        com.littlebridge.vidyaprayag.feature.auth.data.repository.AuthRepositoryImpl(get(), get(), get(), get())
     }
     single<com.littlebridge.vidyaprayag.feature.parent.domain.repository.ParentRepository> {
         com.littlebridge.vidyaprayag.feature.parent.data.repository.ParentRepositoryImpl(get())
@@ -288,6 +299,10 @@ val commonModule = module {
     // RA-45
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.StudentsRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.StudentsRepositoryImpl(get())
+    }
+    // RA-S17
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.StaffRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.StaffRepositoryImpl(get())
     }
     // RA-52
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.RecordsRepository> {
@@ -343,16 +358,19 @@ val viewModelModule = module {
     //  ParentSchedulePTM/ParentMessage screens dropped in V2). Their dead factory
     // registrations were removed to keep the Koin graph clean — every remaining
     // registration below is actually consumed via koinViewModel().
-    factory { FeeViewModel(get(), get()) }
+    // RA-S05: a single, app-scoped holder so every parent tab shares the same
+    // selected-child id (switching the child on one tab updates all of them).
+    single { com.littlebridge.vidyaprayag.core.state.SelectedChildHolder() }
+    factory { FeeViewModel(get(), get(), get()) }
     factory { ScholarshipsViewModel(get(), get()) }
     factory { ParentAnnouncementViewModel(get(), get()) }
     factory { NotificationsViewModel(get(), get()) }
     factory { LinkChildViewModel(get(), get()) }
-    factory { ParentHomeViewModel(get(), get()) }
+    factory { ParentHomeViewModel(get(), get(), get()) }
     factory { ParentProfileViewModel(get(), get()) }
     factory { TrackProgressViewModel(get(), get()) }
-    factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentAcademicsViewModel(get(), get()) }
-    factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentLeaveViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentAcademicsViewModel(get(), get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentLeaveViewModel(get(), get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentMessageViewModel(get(), get()) }
     factory { SchoolDashboardViewModel(get(), get()) }
     factory { InstitutionalBasicOBViewModel(get(), get()) }
@@ -362,13 +380,14 @@ val viewModelModule = module {
     factory { InstitutionalProfileViewModel(get(), get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolProfileViewModel(get(), get()) } // RA-47
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.StudentRosterViewModel(get(), get()) } // RA-45
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.StaffViewModel(get(), get()) } // RA-S17
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.StudentProfileViewModel(get(), get()) } // RA-45
-    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.TeacherProfileViewModel(get(), get()) } // RA-45
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.TeacherProfileViewModel(get(), get(), get()) } // RA-45 (+RA-S17 delete-in-profile)
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolRecordsViewModel(get(), get()) } // RA-52
     factory { AdmissionCRMViewModel(get(), get()) }
     factory { SchoolAnnouncementsViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolTeachersViewModel(get(), get()) }
-    factory { MessagesViewModel(get(), get()) }
+    factory { MessagesViewModel(get(), get(), get()) }
     factory { SchedulePTMViewModel(get(), get()) }
     factory { AcademicCalendarViewModel(get(), get()) }
     factory { LeaveRequestsViewModel(get(), get()) }

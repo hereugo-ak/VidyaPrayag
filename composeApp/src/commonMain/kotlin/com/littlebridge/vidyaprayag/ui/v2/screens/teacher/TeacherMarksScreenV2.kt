@@ -144,16 +144,30 @@ private fun TeacherMarksContent(
                     Text(avg?.roundToInt()?.toString() ?: "—", style = VTheme.type.data.colored(c.ink))
                 }
             }
+            // RA-S18: result-driven Save (same fix as teacher attendance). No fake `stateful`
+            // timer — the spinner shows only while in flight (`isSubmitting`) and the "Saved"
+            // check only after the VM confirms the write (`submitSuccess`). Disabled while
+            // submitting or after a confirmed save (re-enables when a mark is edited).
             VButton(
-                text = "Save marks",
+                text = if (state.submitSuccess) "Saved" else "Save marks",
                 onClick = onSubmit,
                 full = true,
                 size = VButtonSize.Lg,
                 tone = VButtonTone.Lavender,
-                stateful = true,
                 loading = state.isSubmitting,
+                success = state.submitSuccess,
+                enabled = !state.isSubmitting && !state.submitSuccess,
                 successLabel = "Saved",
             )
+            // RA-S18: surface a submit error inline (VStateHost owns the load path; a failed save
+            // must not silently look like nothing happened, nor wipe the entered marks).
+            state.submitError?.let { err ->
+                Text(
+                    err,
+                    style = VTheme.type.caption.colored(c.danger),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                )
+            }
         }
     }
 }

@@ -160,13 +160,25 @@ fun Route.schoolStudentsRouting() {
         route("/api/v1/school/students") {
 
             // ---- roster: active students in the caller's school ----
+            // RA-S17: optional `q` (name/roll/code search) and `class` filter,
+            // applied server-side in the school-scoped query. Both are case-
+            // insensitive substring matches done in-memory after the scoped
+            // fetch so the SQL stays Postgres-portable (no ILIKE/lower() drift).
             get {
                 val ctx = call.requireSchoolContext() ?: return@get
+                val q = call.request.queryParameters["q"]?.trim()?.takeIf { it.isNotBlank() }?.lowercase()
+                val classFilter = call.request.queryParameters["class"]?.trim()?.takeIf { it.isNotBlank() }
                 val students = dbQuery {
                     StudentsTable.selectAll()
                         .where { (StudentsTable.schoolId eq ctx.schoolId) and (StudentsTable.isActive eq true) }
                         .orderBy(StudentsTable.className to SortOrder.ASC, StudentsTable.rollNumber to SortOrder.ASC)
                         .map(::studentRowToDto)
+                }.filter { s ->
+                    (classFilter == null || s.className.equals(classFilter, ignoreCase = true)) &&
+                        (q == null ||
+                            s.fullName.lowercase().contains(q) ||
+                            s.rollNumber.lowercase().contains(q) ||
+                            s.studentCode.lowercase().contains(q))
                 }
                 call.ok(StudentListResponse(students), message = "Students fetched")
             }

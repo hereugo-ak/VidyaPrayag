@@ -6,7 +6,7 @@ import com.littlebridge.vidyaprayag.feature.parent.domain.model.*
 interface ParentRepository {
     suspend fun getDashboard(token: String): NetworkResult<ParentDashboardResponse>
     suspend fun getTrackProgress(token: String): NetworkResult<TrackProgressResponse>
-    suspend fun getFees(token: String): NetworkResult<FeeResponse>
+    suspend fun getFees(token: String, childId: String? = null): NetworkResult<FeeResponse>
     suspend fun getScholarships(token: String): NetworkResult<ScholarshipsResponse>
     suspend fun getAnnouncements(token: String): NetworkResult<ParentAnnouncementsResponse>
     suspend fun getNotifications(token: String): NetworkResult<ParentNotificationsResponse>
@@ -26,4 +26,6 @@ interface ParentRepository {
     suspend fun getMessageThreads(token: String): NetworkResult<ParentMessageThreadsResponse>
     suspend fun getThreadMessages(token: String, threadId: String): NetworkResult<ParentThreadMessagesResponse>
     suspend fun sendMessage(token: String, request: ParentSendMessageRequest): NetworkResult<ParentSendMessageResponse>
+    // RA-S07: compose-new — who the parent can start a conversation with.
+    suspend fun getMessageRecipients(token: String): NetworkResult<ParentRecipientsResponse>
 }

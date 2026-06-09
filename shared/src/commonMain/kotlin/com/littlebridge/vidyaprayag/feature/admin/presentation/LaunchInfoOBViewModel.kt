@@ -228,6 +228,11 @@ class LaunchInfoOBViewModel(
                         "OnboardingReview",
                         "Onboarding finalized. complete=${result.data.isOnboardingComplete} redirect=${result.data.redirectToHome}"
                     )
+                    // RA-69: persist completion status locally so the post-login
+                    // gate in NavGraphV2 resolves to Portal on next boot.
+                    if (result.data.isOnboardingComplete) {
+                        preferenceRepository.setProfileCompleted(true)
+                    }
                     _isSubmitting.value = false
                     onSuccess()
                 }

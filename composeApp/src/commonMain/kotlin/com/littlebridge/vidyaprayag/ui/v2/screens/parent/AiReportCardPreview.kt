@@ -2,6 +2,7 @@ package com.littlebridge.vidyaprayag.ui.v2.screens.parent
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,70 +27,70 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 
-private data class Grade(val subj: String, val grade: String, val score: Int, val up: Boolean)
-private data class Insight(val icon: ImageVector, val label: String, val body: String, val tone: Color)
+private data class InsightChrome(val icon: ImageVector, val label: String, val tone: Color)
 
 /**
- * AiReportCardPreview — `mockups.tsx → AIReportCardPreview`. Preview slot for the Parent "AI Report
- * Card" VComingSoon: a navy AI-narrative card, a 2-col grade grid, and three pastel insight cards
- * (Strengths / Focus areas / Study tips).
+ * AiReportCardPreview — a **label-free schematic teaser** for the parent "AI Report Card"
+ * (a `VComingSoon` feature on the Report tab).
+ *
+ * RA-S11 (TIER 0, honesty / LAW 6): the previous implementation rendered **fabricated grades** for an
+ * invented child named "Riya" (Mathematics A 88, Science A- 84, English B+ 78, Hindi A 91), a made-up
+ * AI narrative paragraph, and invented "strengths / focus / study tips" — on a parent's real academics
+ * screen. A parent could mistake the fiction for their child's actual results.
+ *
+ * The real published marks render on the **Marks** tab (`GET /api/v1/parent/child/{id}/marks`). This
+ * preview is now purely illustrative chrome — an abstract narrative bar, a 2-col grade-card grid with
+ * shimmer placeholders (no subjects, no grades, no scores) and three label-only insight chips — that
+ * reads unmistakably as a "coming soon" preview. No invented academic data anywhere.
  */
 @Composable
 fun AiReportCardPreview(modifier: Modifier = Modifier) {
     val c = VTheme.colors
-    val grades = listOf(
-        Grade("Mathematics", "A", 88, true),
-        Grade("Science", "A-", 84, true),
-        Grade("English", "B+", 78, false),
-        Grade("Hindi", "A", 91, true),
-    )
-    val upInk = Color(0xFF155E3A)
     val insights = listOf(
-        Insight(VIcons.Heart, "STRENGTHS", "Number sense · Independent reading · Lab discipline", Color(0xFFA8E6CF).copy(alpha = 0.4f)),
-        Insight(VIcons.Target, "FOCUS AREAS", "English long-form writing · Punctuality in PE", Color(0xFFFFD4A3).copy(alpha = 0.5f)),
-        Insight(VIcons.BookOpen, "STUDY TIPS", "15-min daily journaling · NCERT exemplar Q14–18 weekly", c.teal.copy(alpha = 0.16f)),
+        InsightChrome(VIcons.Heart, "STRENGTHS", Color(0xFFA8E6CF).copy(alpha = 0.4f)),
+        InsightChrome(VIcons.Target, "FOCUS AREAS", Color(0xFFFFD4A3).copy(alpha = 0.5f)),
+        InsightChrome(VIcons.BookOpen, "STUDY TIPS", c.teal.copy(alpha = 0.16f)),
     )
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        // Navy AI-narrative card.
+        // Navy AI-narrative card — header + abstract text bars (no fabricated narrative).
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.navy).padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(VIcons.Sparkles, contentDescription = null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(11.dp))
-                Text("AI NARRATIVE · TERM 2", style = VTheme.type.label.colored(Color.White.copy(alpha = 0.7f)).copy(fontSize = 10.sp, letterSpacing = 0.10.em, fontWeight = FontWeight.Bold))
+                Text("AI NARRATIVE", style = VTheme.type.label.colored(Color.White.copy(alpha = 0.7f)).copy(fontSize = 10.sp, letterSpacing = 0.10.em, fontWeight = FontWeight.Bold))
             }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "\"Riya had a focused term. Her Mathematics is the steadiest it has been all year, and she's now consistently scoring above class average in Hindi. English is holding — short reading sprints will help.\"",
-                style = VTheme.type.caption.colored(Color.White).copy(fontSize = 13.sp, lineHeight = 20.sp),
-            )
+            Spacer(Modifier.height(8.dp))
+            Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.16f)))
+            Spacer(Modifier.height(6.dp))
+            Box(Modifier.fillMaxWidth(0.85f).height(8.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.12f)))
+            Spacer(Modifier.height(6.dp))
+            Box(Modifier.fillMaxWidth(0.6f).height(8.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.10f)))
         }
-        // Grade grid (2 columns).
-        grades.chunked(2).forEach { row ->
+        // Grade grid (2 columns) — placeholder cards, no subjects/grades/scores.
+        repeat(2) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { g ->
-                    Column(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(c.cream).padding(10.dp)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Text(g.subj, style = VTheme.type.label.colored(c.ink2).copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.sp))
-                            Text(if (g.up) "↑" else "→", style = VTheme.type.caption.colored(if (g.up) upInk else c.ink3).copy(fontSize = 11.sp))
-                        }
-                        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 2.dp)) {
-                            Text(g.grade, style = VTheme.type.h2.colored(c.navy).copy(fontSize = 20.sp, fontWeight = FontWeight.ExtraBold))
-                            Text(g.score.toString(), style = VTheme.type.dataSm.colored(c.ink3).copy(fontSize = 11.sp))
-                        }
-                    }
-                }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
+                repeat(2) { GradePlaceholderCard(Modifier.weight(1f)) }
             }
         }
-        // Insight cards.
+        // Insight cards — label only, no fabricated body copy.
         insights.forEach { b ->
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(b.tone).padding(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Icon(b.icon, contentDescription = null, tint = c.ink, modifier = Modifier.size(12.dp))
                     Text(b.label, style = VTheme.type.label.colored(c.ink).copy(fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.06.em))
                 }
-                Text(b.body, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 18.sp), modifier = Modifier.padding(top = 4.dp))
+                Spacer(Modifier.height(6.dp))
+                Box(Modifier.fillMaxWidth(0.7f).height(7.dp).clip(RoundedCornerShape(4.dp)).background(c.ink.copy(alpha = 0.08f)))
             }
         }
+    }
+}
+
+@Composable
+private fun GradePlaceholderCard(modifier: Modifier = Modifier) {
+    val c = VTheme.colors
+    Column(modifier.clip(RoundedCornerShape(10.dp)).background(c.cream).padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.fillMaxWidth(0.55f).height(8.dp).clip(RoundedCornerShape(4.dp)).background(c.ink.copy(alpha = 0.10f)))
+        Box(Modifier.size(width = 34.dp, height = 18.dp).clip(RoundedCornerShape(5.dp)).background(c.navy.copy(alpha = 0.12f)))
     }
 }

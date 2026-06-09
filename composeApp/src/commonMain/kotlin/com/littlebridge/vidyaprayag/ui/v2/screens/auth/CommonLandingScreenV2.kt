@@ -8,7 +8,6 @@ import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -29,7 +28,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
@@ -49,13 +47,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -114,6 +111,7 @@ fun CommonLandingScreenV2(
     onParent: () -> Unit,
     onAdmin: () -> Unit,
     modifier: Modifier = Modifier,
+    onLegal: (LegalDoc) -> Unit = {},
     viewModel: LandingViewModel = koinViewModel(),
     mainViewModel: MainViewModel = koinViewModel(),
 ) = VTheme(tone = VPortalTone.Light) {
@@ -188,12 +186,25 @@ fun CommonLandingScreenV2(
                 },
             contentAlignment = Alignment.Center,
         ) {
+            // Two faint white cloud marks — top-start + bottom-end — exactly as the
+            // splash/Welcome hero (pixel-faithful to the brand reference).
+            LandingCloudMark(
+                Modifier.align(Alignment.TopStart).statusBarsPadding()
+                    .padding(start = 40.dp, top = 16.dp).size(width = 56.dp, height = 38.dp),
+                alpha = 0.30f,
+            )
+            LandingCloudMark(
+                Modifier.align(Alignment.BottomEnd)
+                    .padding(end = 40.dp, bottom = 36.dp).size(width = 46.dp, height = 32.dp),
+                alpha = 0.25f,
+            )
+
             Column(
-                Modifier.statusBarsPadding().padding(top = 64.dp, bottom = 72.dp),
+                Modifier.statusBarsPadding().padding(top = 72.dp, bottom = 84.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 VBrandLogo(
-                    size = 132.dp,
+                    size = 152.dp,
                     modifier = Modifier
                         .graphicsLayer {
                             scaleX = logoScale.value
@@ -210,7 +221,7 @@ fun CommonLandingScreenV2(
                             )
                         },
                 )
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(28.dp))
                 Text(
                     "VidyaSetu",
                     style = VTheme.type.h1.colored(Color.White)
@@ -222,35 +233,16 @@ fun CommonLandingScreenV2(
                     },
                 )
                 Spacer(Modifier.height(8.dp))
+                // Brand tagline — exactly the splash/Welcome copy (pixel-faithful).
                 Text(
-                    cms?.let { listOf(it.topTagline, it.subTagline).filter(String::isNotBlank).joinToString(" ") }
-                        ?.takeIf { it.isNotBlank() }
-                        ?: "Education with trust. Progress with purpose.",
-                    style = VTheme.type.body.colored(Color.White.copy(alpha = 0.92f)).copy(fontSize = 14.sp),
+                    "Bridging gaps for a glorious future",
+                    style = VTheme.type.body.colored(Color.White.copy(alpha = 0.92f)).copy(fontSize = 15.sp),
                     textAlign = TextAlign.Center,
                     modifier = Modifier
-                        .widthIn(max = 300.dp)
+                        .widthIn(max = 280.dp)
                         .padding(horizontal = d.lg)
                         .graphicsLayer { alpha = wordAlpha.value },
                 )
-                Spacer(Modifier.height(18.dp))
-                // Premium trust pill — frosted glass on the teal hero, reads as bank-grade reassurance.
-                Row(
-                    modifier = Modifier
-                        .graphicsLayer { alpha = wordAlpha.value }
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(Color.White.copy(alpha = 0.16f))
-                        .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(999.dp))
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Icon(VIcons.ShieldCheck, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                    Text(
-                        "Bank-grade encryption",
-                        style = VTheme.type.caption.colored(Color.White).copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
-                    )
-                }
             }
         }
 
@@ -276,28 +268,16 @@ fun CommonLandingScreenV2(
                 .padding(top = 32.dp, bottom = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // trust strip
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.graphicsLayer { alpha = proofAlpha.value },
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy((-8).dp)) {
-                    listOf(c.success, c.warning, Color(0xFFC8DEFF)).forEach { ac ->
-                        Box(
-                            Modifier.size(24.dp).clip(CircleShape).background(ac)
-                                .border(2.dp, c.background, CircleShape),
-                        )
-                    }
-                }
-                Text(
-                    text = buildAnnotatedString {
-                        withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = c.ink)) { append("240+ schools") }
-                        withStyle(SpanStyle(color = c.ink2)) { append(" · 38k parents trust us") }
-                    },
-                    style = VTheme.type.caption.colored(c.ink2),
-                )
-            }
+            // RA-S20/RA-S13: legacy "Social proof" section carried forward verbatim — the
+            // "TRUSTED BY 500+ INSTITUTIONS" eyebrow + the three partner marquee items
+            // (Academix / GlobalView / EduPulse). This replaces the fabricated
+            // "240+ schools · 38k parents trust us" strip (honesty / LAW 6) with the exact
+            // legacy reference content, re-skinned in the V* system.
+            SocialProofSection(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer { alpha = proofAlpha.value },
+            )
 
             // ── Featured institutions (real-photo rail) ──
             if (schools.isNotEmpty()) {
@@ -309,50 +289,51 @@ fun CommonLandingScreenV2(
                 )
             }
 
+            // ── Entry points (legacy "EntryPointsSection" — Parent + School) ──
+            // RA-S20: the legacy two-card entry section carried forward verbatim. Each card
+            // keeps its exact legacy label, title, description, feature list and CTA label,
+            // CMS-overridable via parentInfo / schoolInfo. Parent CTA → onParent (OTP auth),
+            // School CTA → onAdmin (credential auth) — the Parent/Admin entry contract is preserved.
             Spacer(Modifier.height(28.dp))
-            Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-                Text(
-                    "How would you like to continue?",
-                    style = VTheme.type.h2.colored(c.navy),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 24.dp).graphicsLayer {
+                    alpha = cardsAlpha.value
+                    translationY = cardsY.value * density
+                },
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                EntryPointCard(
+                    accent = c.teal,
+                    accentInk = c.tealDeep,
+                    label = cms?.parentInfo?.topTagline?.takeIf { it.isNotBlank() } ?: "FOR PARENTS",
+                    title = cms?.parentInfo?.subTagline?.takeIf { it.isNotBlank() }
+                        ?: "Find the perfect school for your child's unique journey",
+                    description = "Empowering parents with data-driven insights and verified institutional profiles.",
+                    features = cms?.parentInfo?.listOfFeatures?.takeIf { it.isNotEmpty() }
+                        ?: listOf(
+                            "Verified institutional profiles",
+                            "Smart Comparison highlights",
+                            "AI Career Paths & Talent ID",
+                        ),
+                    buttonText = "Start Your Search",
+                    onButtonClick = onParent,
                 )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "Pick your role to sign in to the right experience.",
-                    style = VTheme.type.body.colored(c.ink2).copy(fontSize = 14.sp),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
+                EntryPointCard(
+                    accent = c.warmOrange,
+                    accentInk = c.warmOrange,
+                    label = cms?.schoolInfo?.topTagline?.takeIf { it.isNotBlank() } ?: "FOR SCHOOLS",
+                    title = cms?.schoolInfo?.subTagline?.takeIf { it.isNotBlank() }
+                        ?: "Scale excellence with intelligence.",
+                    description = "Advanced institutional management tools designed for modern educational growth.",
+                    features = cms?.schoolInfo?.listOfFeatures?.takeIf { it.isNotEmpty() }
+                        ?: listOf(
+                            "Full Admissions CRM",
+                            "Teacher Accountability",
+                            "Automated Compliance",
+                        ),
+                    buttonText = "Onboard Your School",
+                    onButtonClick = onAdmin,
                 )
-                Spacer(Modifier.height(24.dp))
-
-                // ── the two role-entry cards ──
-                Column(
-                    Modifier.fillMaxWidth().graphicsLayer {
-                        alpha = cardsAlpha.value
-                        translationY = cardsY.value * density
-                    },
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    RoleCard(
-                        icon = VIcons.Users,
-                        accent = c.teal,
-                        accentInk = c.tealDeep,
-                        title = "I'm a Parent",
-                        body = cms?.parentInfo?.subTagline?.takeIf { it.isNotBlank() }
-                            ?: "Track attendance, fees, homework and your child's progress — secured by a quick OTP sign-in.",
-                        onClick = onParent,
-                    )
-                    RoleCard(
-                        icon = VIcons.School,
-                        accent = c.warmOrange,
-                        accentInk = c.warmOrange,
-                        title = "School / Administration",
-                        body = cms?.schoolInfo?.subTagline?.takeIf { it.isNotBlank() }
-                            ?: "For school admins and teachers. Manage classes, staff, records and announcements.",
-                        onClick = onAdmin,
-                    )
-                }
             }
 
             // ── Next-Gen Intelligence showcase ──
@@ -378,18 +359,127 @@ fun CommonLandingScreenV2(
                 )
             }
 
-            Spacer(Modifier.height(24.dp))
-            Text(
-                text = buildAnnotatedString {
-                    withStyle(SpanStyle(color = c.ink3)) { append("By continuing you agree to our ") }
-                    withStyle(SpanStyle(color = c.tealDeep, fontWeight = FontWeight.SemiBold)) { append("Terms") }
-                    withStyle(SpanStyle(color = c.ink3)) { append(" & ") }
-                    withStyle(SpanStyle(color = c.tealDeep, fontWeight = FontWeight.SemiBold)) { append("Privacy Policy") }
-                },
-                style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            // ── Footer (legacy "FooterSection") ──
+            Spacer(Modifier.height(36.dp))
+            LandingFooter(
+                onLegal = onLegal,
+                modifier = Modifier.graphicsLayer { alpha = cardsAlpha.value },
             )
+
+            Spacer(Modifier.height(24.dp))
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "By continuing you agree to our ",
+                    style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    "Terms",
+                    style = VTheme.type.caption.colored(c.tealDeep).copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
+                    modifier = Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onLegal(LegalDoc.Terms) },
+                )
+                Text(
+                    " & ",
+                    style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
+                )
+                Text(
+                    "Privacy Policy",
+                    style = VTheme.type.caption.colored(c.tealDeep).copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
+                    modifier = Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onLegal(LegalDoc.Privacy) },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * RA-S20 — legacy "FooterSection", re-skinned in the V* system.
+ *
+ * Carries the legacy footer content verbatim: the brand mark, the institutional copy line,
+ * and the two link groups (PORTALS / SUPPORT). Static marketing copy on a public surface —
+ * no fabricated metrics.
+ */
+@Composable
+private fun LandingFooter(
+    onLegal: (LegalDoc) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+    Column(
+        modifier
+            .fillMaxWidth()
+            .background(c.cream.copy(alpha = 0.5f))
+            .padding(horizontal = 24.dp, vertical = 28.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(VIcons.School, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(26.dp))
+            Text("VidyaSetu", style = VTheme.type.h3.colored(c.navy).copy(fontWeight = FontWeight.Bold))
+        }
+        Spacer(Modifier.height(14.dp))
+        Text(
+            "Built for modern institutional excellence and parent-child security. Innovating education through trust.",
+            style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 18.sp),
+        )
+        Spacer(Modifier.height(24.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(40.dp)) {
+            // PORTALS — informational only (the auth CTAs live on the entry cards above).
+            FooterLinkGroup(
+                title = "PORTALS",
+                links = listOf<Pair<String, (() -> Unit)?>>(
+                    "Parent Portal" to null,
+                    "Admin Dashboard" to null,
+                    "Teacher Console" to null,
+                ),
+            )
+            // SUPPORT — live links into the Legal & Support surface.
+            FooterLinkGroup(
+                title = "SUPPORT",
+                links = listOf<Pair<String, (() -> Unit)?>>(
+                    "Privacy Policy" to { onLegal(LegalDoc.Privacy) },
+                    "Terms of Service" to { onLegal(LegalDoc.Terms) },
+                    "Help Desk" to { onLegal(LegalDoc.Help) },
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun FooterLinkGroup(title: String, links: List<Pair<String, (() -> Unit)?>>) {
+    val c = VTheme.colors
+    Column {
+        Text(
+            title,
+            style = VTheme.type.label.colored(c.tealDeep).copy(fontWeight = FontWeight.Bold, letterSpacing = 0.10.em),
+        )
+        Spacer(Modifier.height(12.dp))
+        links.forEach { (link, onClick) ->
+            val interaction = remember { MutableInteractionSource() }
+            val base = if (onClick != null) {
+                Modifier.clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    onClick = onClick,
+                )
+            } else {
+                Modifier
+            }
+            Text(
+                link,
+                style = VTheme.type.caption.colored(if (onClick != null) c.ink else c.ink2).copy(fontSize = 12.sp),
+                modifier = base,
+            )
+            Spacer(Modifier.height(10.dp))
         }
     }
 }
@@ -589,11 +679,29 @@ private fun PortalAccessSection(
 ) {
     val c = VTheme.colors
     Column(modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-        SectionHeader(eyebrow = "For institutions", title = "Portal access")
+        // RA-S20: legacy "Access Your Portal" header carried forward verbatim.
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(0.75f)) {
+                Text("Access Your Portal", style = VTheme.type.h2.colored(c.navy))
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Already part of the VidyaPrayag ecosystem?",
+                    style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 12.sp),
+                )
+            }
+            Text(
+                "View All Portals",
+                style = VTheme.type.caption.colored(c.tealDeep).copy(fontWeight = FontWeight.SemiBold, fontSize = 12.sp),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(0.25f),
+            )
+        }
         Spacer(Modifier.height(14.dp))
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             portals.forEach { portal ->
                 val interaction = remember { MutableInteractionSource() }
+                // Legacy iconography: Parent portals get a family/users glyph, others the admin plate.
+                val portalIcon = if (portal.heading.contains("Parent", ignoreCase = true)) VIcons.Users else VIcons.GraduationCap
                 VCard(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -606,7 +714,7 @@ private fun PortalAccessSection(
                                 .background(c.warmOrange.copy(alpha = 0.12f)),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(VIcons.GraduationCap, contentDescription = null, tint = c.warmOrange, modifier = Modifier.size(20.dp))
+                            Icon(portalIcon, contentDescription = null, tint = c.warmOrange, modifier = Modifier.size(20.dp))
                         }
                         Column(Modifier.weight(1f)) {
                             Text(portal.heading, style = VTheme.type.h3.colored(c.ink), maxLines = 1)
@@ -639,26 +747,75 @@ private fun SectionHeader(eyebrow: String, title: String, modifier: Modifier = M
     }
 }
 
-/** A tappable role-entry card: tinted icon chip + title + supporting copy + chevron, with press-give. */
+/**
+ * RA-S20 — legacy "Social proof" section, re-skinned in the V* system.
+ *
+ * Carries the legacy reference content verbatim: the "TRUSTED BY 500+ INSTITUTIONS" eyebrow
+ * over a three-item partner marquee (Academix / GlobalView / EduPulse). Replaces the fabricated
+ * "240+ schools · 38k parents" strip — these are the legacy partner labels, not invented metrics.
+ */
 @Composable
-private fun RoleCard(
-    icon: ImageVector,
+private fun SocialProofSection(modifier: Modifier = Modifier) {
+    val c = VTheme.colors
+    Column(
+        modifier
+            .background(c.cream.copy(alpha = 0.5f))
+            .padding(vertical = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            "TRUSTED BY 500+ INSTITUTIONS",
+            style = VTheme.type.label.colored(c.ink3).copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.12.em),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(18.dp))
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            MarqueeItem(VIcons.GraduationCap, "Academix")
+            MarqueeItem(VIcons.Sparkles, "GlobalView")
+            MarqueeItem(VIcons.School, "EduPulse")
+        }
+    }
+}
+
+@Composable
+private fun MarqueeItem(icon: ImageVector, text: String) {
+    val c = VTheme.colors
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        modifier = Modifier.graphicsLayer { alpha = 0.6f },
+    ) {
+        Icon(icon, contentDescription = null, tint = c.ink2, modifier = Modifier.size(16.dp))
+        Text(text, style = VTheme.type.bodyStrong.colored(c.ink2).copy(fontWeight = FontWeight.Bold))
+    }
+}
+
+/**
+ * RA-S20 — legacy "EntryPointCard", re-skinned in the V* system.
+ *
+ * Carries the legacy content verbatim: a tinted label chip, a headline title, a description,
+ * a Verified-icon feature list, and a primary CTA button. Used for the Parent and School
+ * entry points. The CTA routes via [onButtonClick] (Parent → OTP auth, School → credential auth).
+ */
+@Composable
+private fun EntryPointCard(
     accent: Color,
     accentInk: Color,
+    label: String,
     title: String,
-    body: String,
-    onClick: () -> Unit,
+    description: String,
+    features: List<String>,
+    buttonText: String,
+    onButtonClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
-    val interaction = remember { MutableInteractionSource() }
-    VCard(
-        modifier = modifier
-            .fillMaxWidth()
-            .pressScale(interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
-        padding = 0.dp,
-    ) {
+    VCard(modifier = modifier.fillMaxWidth(), padding = 0.dp) {
         Column(Modifier.fillMaxWidth()) {
             // Premium accent bar — a thin role-tinted gradient strip seating the card in its colour.
             Box(
@@ -669,23 +826,44 @@ private fun RoleCard(
                         Brush.horizontalGradient(listOf(accent.copy(alpha = 0.95f), accent.copy(alpha = 0.45f))),
                     ),
             )
-            Row(
-                Modifier.padding(18.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
+            Column(Modifier.fillMaxWidth().padding(24.dp)) {
+                // Tinted label chip.
                 Box(
-                    Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).background(accent.copy(alpha = 0.14f)),
-                    contentAlignment = Alignment.Center,
+                    Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(accent.copy(alpha = 0.14f))
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
                 ) {
-                    Icon(icon, contentDescription = null, tint = accentInk, modifier = Modifier.size(26.dp))
+                    Text(
+                        label.uppercase(),
+                        style = VTheme.type.label.colored(accentInk).copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.06.em),
+                    )
                 }
-                Column(Modifier.weight(1f)) {
-                    Text(title, style = VTheme.type.h3.colored(c.ink))
-                    Spacer(Modifier.height(3.dp))
-                    Text(body, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 16.sp))
+                Spacer(Modifier.height(16.dp))
+                Text(title, style = VTheme.type.h2.colored(c.navy))
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    description,
+                    style = VTheme.type.body.colored(c.ink2).copy(fontSize = 14.sp, lineHeight = 20.sp),
+                )
+                Spacer(Modifier.height(18.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    features.forEach { feature ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(VIcons.ShieldCheck, contentDescription = null, tint = accentInk, modifier = Modifier.size(18.dp))
+                            Text(feature, style = VTheme.type.bodyStrong.colored(c.ink))
+                        }
+                    }
                 }
-                Icon(VIcons.ArrowRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.height(22.dp))
+                com.littlebridge.vidyaprayag.ui.v2.components.VButton(
+                    text = buttonText,
+                    onClick = onButtonClick,
+                    variant = com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant.Primary,
+                    tone = com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone.Navy,
+                    size = com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize.Lg,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }
@@ -695,4 +873,27 @@ private fun RoleCard(
 private fun formatScore(value: Double): String {
     val rounded = (value * 10).toLong()
     return "${rounded / 10}.${rounded % 10}"
+}
+
+/**
+ * LandingCloudMark — a single faint stroked cloud for the teal hero, byte-identical to the
+ * splash/Welcome cloud (SVG `M6 24 Q12 14 22 18 Q28 8 38 14 Q46 14 44 24 Z`) so the landing
+ * hero matches the brand reference exactly.
+ */
+@Composable
+private fun LandingCloudMark(modifier: Modifier, alpha: Float) {
+    Canvas(modifier) {
+        val sx = size.width / 48f
+        val sy = size.height / 32f
+        fun x(v: Float) = v * sx
+        fun y(v: Float) = v * sy
+        val p = Path().apply {
+            moveTo(x(6f), y(24f))
+            quadraticTo(x(12f), y(14f), x(22f), y(18f))
+            quadraticTo(x(28f), y(8f), x(38f), y(14f))
+            quadraticTo(x(46f), y(14f), x(44f), y(24f))
+            close()
+        }
+        drawPath(p, color = Color.White.copy(alpha = alpha), style = Stroke(width = 1.5f * sx))
+    }
 }

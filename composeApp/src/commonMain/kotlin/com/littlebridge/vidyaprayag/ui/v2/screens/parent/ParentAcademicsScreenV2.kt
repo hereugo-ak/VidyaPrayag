@@ -222,21 +222,9 @@ private fun AttendanceTab(academics: ParentAcademicsState, onRetry: () -> Unit) 
                     Text("Absent ${data.absentDays}", style = VTheme.type.caption.colored(c.ink2))
                 }
             }
-            data.records.take(30).forEach { rec ->
-                VCard {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text(rec.date, style = VTheme.type.body.colored(c.ink))
-                        VBadge(
-                            text = rec.status.replaceFirstChar { it.uppercase() },
-                            tone = when (rec.status) {
-                                "present" -> VBadgeTone.Success
-                                "late" -> VBadgeTone.Arctic
-                                else -> VBadgeTone.Danger
-                            },
-                        )
-                    }
-                }
-            }
+            // RA-S19: month-grid calendar (was a flat list of date rows). Each day cell
+            // is colour-coded by status; the month can be paged. See ParentAttendanceCalendar.
+            ParentAttendanceCalendar(records = data.records)
         }
     }
 }

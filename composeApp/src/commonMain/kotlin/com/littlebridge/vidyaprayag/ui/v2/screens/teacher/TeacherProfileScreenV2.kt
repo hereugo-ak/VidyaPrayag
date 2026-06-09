@@ -7,8 +7,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
@@ -69,6 +72,7 @@ private fun TeacherProfileContent(
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     // RA-21: logout is destructive — gate it behind a confirmation dialog.
     var showLogoutConfirm by remember { mutableStateOf(false) }
 
@@ -90,7 +94,11 @@ private fun TeacherProfileContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
+            .statusBarsPadding()
+            .imePadding()
+            .navigationBarsPadding()
             .padding(top = 24.dp, bottom = 24.dp),
+
     ) {
         VStateHost(
             loading = state.isLoading,
@@ -104,38 +112,91 @@ private fun TeacherProfileContent(
         ) {
             val me = state.profile!!
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                VAvatar(name = me.name, src = me.photoUrl, size = 88.dp)
-                Text(me.name, style = VTheme.type.h2.colored(c.ink), modifier = Modifier.padding(top = 12.dp))
-                Text(me.username, style = VTheme.type.dataSm.colored(c.ink2).copy(fontSize = 12.sp))
-                if (me.schoolName.isNotBlank()) {
-                    Text(me.schoolName, style = VTheme.type.caption.colored(c.ink3))
-                }
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    me.subjects.forEach { VBadge(text = it, tone = VBadgeTone.Arctic) }
-                }
-            }
-            Spacer(Modifier.height(24.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                val rows = listOfNotNull(
-                    ("Personal details" to listOfNotNull(me.phone.ifBlank { null }, me.email.ifBlank { null }).joinToString(" • ").ifBlank { "Mobile, email, photo" }),
-                    ("Classes" to me.classes.joinToString(", ").ifBlank { "—" }).takeIf { me.classes.isNotEmpty() },
-                    ("Notification preferences" to "Push, WhatsApp, quiet hours"),
-                    ("Change password" to "Keep your account secure"),
-                    ("Help & support" to "Contact VidyaSetu"),
-                )
-                rows.forEach { (title, sub) ->
-                    VCard {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                            Column(Modifier.weight(1f)) {
-                                Text(title, style = VTheme.type.bodyStrong.colored(c.ink))
-                                Text(sub, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp))
-                            }
-                            Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(16.dp))
-                        }
+                Column(
+                    Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    VAvatar(name = me.name, src = me.photoUrl, size = 88.dp)
+                    Text(
+                        me.name,
+                        style = VTheme.type.h2.colored(c.ink),
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
+                    Text(
+                        me.username,
+                        style = VTheme.type.dataSm.colored(c.ink2).copy(fontSize = 12.sp)
+                    )
+                    if (me.schoolName.isNotBlank()) {
+                        Text(me.schoolName, style = VTheme.type.caption.colored(c.ink3))
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        me.subjects.forEach { VBadge(text = it, tone = VBadgeTone.Arctic) }
                     }
                 }
-                VButton(text = "Log out", onClick = { showLogoutConfirm = true }, full = true, variant = VButtonVariant.Ghost)
+                Spacer(Modifier.height(24.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    data class ProfileRow(val title: String, val sub: String, val onClick: (() -> Unit)?)
+                    val rows = listOfNotNull(
+                        ProfileRow(
+                            "Personal details",
+                            listOfNotNull(
+                                me.phone.ifBlank { null },
+                                me.email.ifBlank { null },
+                            ).joinToString(" • ").ifBlank { "Mobile, email, photo" },
+                            null,
+                        ),
+                        ProfileRow(
+                            "Classes",
+                            me.classes.joinToString(", ").ifBlank { "—" },
+                            null,
+                        ).takeIf { me.classes.isNotEmpty() },
+                        ProfileRow("Notification preferences", "Push, WhatsApp, quiet hours", null),
+                        ProfileRow("Change password", "Keep your account secure", null),
+                        ProfileRow(
+                            "Help & support",
+                            "Email ${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}",
+                            {
+                                runCatching {
+                                    uriHandler.openUri(
+                                        "mailto:${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}" +
+                                            "?subject=VidyaSetu%20Support",
+                                    )
+                                }
+                            },
+                        ),
+                    )
+                    rows.forEach { row ->
+                        VCard(onClick = row.onClick) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(row.title, style = VTheme.type.bodyStrong.colored(c.ink))
+                                    Text(
+                                        row.sub,
+                                        style = VTheme.type.caption.colored(c.ink2)
+                                            .copy(fontSize = 11.sp)
+                                    )
+                                }
+                                Icon(
+                                    VIcons.ChevronRight,
+                                    contentDescription = null,
+                                    tint = c.ink3,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                    VButton(
+                        text = "Log out",
+                        onClick = { showLogoutConfirm = true },
+                        full = true,
+                        variant = VButtonVariant.Ghost
+                    )
+                }
             }
         }
     }

@@ -16,8 +16,8 @@ class ParentRepositoryImpl(
         return api.getTrackProgress(token)
     }
 
-    override suspend fun getFees(token: String): NetworkResult<FeeResponse> {
-        return api.getFees(token)
+    override suspend fun getFees(token: String, childId: String?): NetworkResult<FeeResponse> {
+        return api.getFees(token, childId)
     }
 
     override suspend fun getScholarships(token: String): NetworkResult<ScholarshipsResponse> {
@@ -78,5 +78,9 @@ class ParentRepositoryImpl(
 
     override suspend fun sendMessage(token: String, request: ParentSendMessageRequest): NetworkResult<ParentSendMessageResponse> {
         return api.sendMessage(token, request)
+    }
+
+    override suspend fun getMessageRecipients(token: String): NetworkResult<ParentRecipientsResponse> {
+        return api.getMessageRecipients(token)
     }
 }

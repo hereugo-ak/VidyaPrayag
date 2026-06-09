@@ -868,3 +868,27 @@ object ParentChildLinksTable : UUIDTable("parent_child_links", "id") {
     val actionedBy  = uuid("actioned_by").nullable()
     val actionedAt  = timestamp("actioned_at").nullable()
 }
+
+// =====================================================================
+// non_teaching_staff  (RA-S17 — Admin People "Non-teaching staff" vertical)
+// =====================================================================
+/**
+ * RA-S17: a school's NON-teaching staff (admin office, accountant, librarian,
+ * support, security, transport, etc.). These are *not* `app_users` — they do
+ * not log in; they are roster records the admin manages alongside Teachers and
+ * Students on the People tab. School-scoped and soft-deletable, mirroring the
+ * `students` pattern. Deletion is performed from the staff profile behind a
+ * confirm dialog (never a direct list-row button).
+ */
+object NonTeachingStaffTable : UUIDTable("non_teaching_staff", "id") {
+    val schoolId    = uuid("school_id")                         // FK schools.id — tenant scope
+    val fullName    = text("full_name")
+    val role        = text("role")                              // e.g. "Accountant", "Librarian"
+    val department  = text("department").nullable()             // e.g. "Office", "Transport"
+    val phone       = varchar("phone", 32).nullable()
+    val email       = text("email").nullable()
+    val photoUrl    = text("photo_url").nullable()
+    val isActive    = bool("is_active").default(true)           // soft-delete flag
+    val createdAt   = timestamp("created_at")
+    val updatedAt   = timestamp("updated_at")
+}

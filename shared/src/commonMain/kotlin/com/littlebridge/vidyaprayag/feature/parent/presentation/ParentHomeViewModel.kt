@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.core.state.SelectedChildHolder
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.DashboardAlertDto
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.DashboardChildSummary
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.FeaturedSchoolDto
@@ -46,12 +47,23 @@ data class ParentHomeState(
 class ParentHomeViewModel(
     private val repository: ParentRepository,
     private val preferenceRepository: PreferenceRepository,
+    // RA-S05: shared selected-child source of truth across all parent tabs.
+    private val selectedChildHolder: SelectedChildHolder,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ParentHomeState())
     val state: StateFlow<ParentHomeState> = _state.asStateFlow()
 
     init {
         load()
+        // RA-S05: mirror the shared selection into local state so a child picked
+        // on another tab (Academics/Fees) is reflected in the Home hero too.
+        viewModelScope.launch {
+            selectedChildHolder.selectedChildId.collect { shared ->
+                if (shared != null && shared != _state.value.selectedChildId) {
+                    _state.update { it.copy(selectedChildId = shared) }
+                }
+            }
+        }
     }
 
     fun load() {
@@ -71,12 +83,20 @@ class ParentHomeViewModel(
                     _state.update {
                         // Preserve the current selection if it's still present,
                         // otherwise default to the first child.
-                        val keepSelected = it.selectedChildId?.takeIf { id -> children.any { c -> c.id == id } }
+                        // RA-S05: prefer the shared selection, then the local one,
+                        // then default to the first child — and publish the result
+                        // back to the shared holder so the other tabs converge.
+                        val sharedSel = selectedChildHolder.selectedChildId.value
+                            ?.takeIf { id -> children.any { c -> c.id == id } }
+                        val keepSelected = sharedSel
+                            ?: it.selectedChildId?.takeIf { id -> children.any { c -> c.id == id } }
+                        val resolved = keepSelected ?: children.firstOrNull()?.id
+                        selectedChildHolder.selectIfUnset(resolved)
                         it.copy(
                             isLoading = false,
                             greeting = data.greeting,
                             children = children,
-                            selectedChildId = keepSelected ?: children.firstOrNull()?.id,
+                            selectedChildId = resolved,
                             alerts = data.alerts,
                             featuredSchools = data.featuredSchools,
                             curationLogic = data.curationLogic,
@@ -94,5 +114,7 @@ class ParentHomeViewModel(
     /** RA-31: switch the child shown in the hero (no network round-trip). */
     fun selectChild(childId: String) {
         _state.update { it.copy(selectedChildId = childId) }
+        // RA-S05: broadcast so Academics/Fees/Leave follow this selection.
+        selectedChildHolder.select(childId)
     }
 }

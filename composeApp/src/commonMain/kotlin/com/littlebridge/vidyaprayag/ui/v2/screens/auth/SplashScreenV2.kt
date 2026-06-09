@@ -7,6 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +29,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
@@ -119,6 +121,19 @@ fun SplashScreenV2(modifier: Modifier = Modifier) = VTheme(tone = VPortalTone.Li
             },
         contentAlignment = Alignment.Center,
     ) {
+        // Two faint white cloud marks — top-start + bottom-end — exactly as the
+        // brand reference (pixel-faithful to the splash design).
+        SplashCloudMark(
+            Modifier.align(Alignment.TopStart)
+                .padding(start = 40.dp, top = 64.dp).size(width = 56.dp, height = 38.dp),
+            alpha = 0.30f,
+        )
+        SplashCloudMark(
+            Modifier.align(Alignment.BottomEnd)
+                .padding(end = 40.dp, bottom = 120.dp).size(width = 46.dp, height = 32.dp),
+            alpha = 0.25f,
+        )
+
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             VBrandLogo(
                 size = 152.dp,
@@ -178,5 +193,28 @@ fun SplashScreenV2(modifier: Modifier = Modifier) = VTheme(tone = VPortalTone.Li
                 )
             }
         }
+    }
+}
+
+/**
+ * SplashCloudMark — a single faint stroked cloud for the teal hero, byte-identical to the
+ * landing/Welcome cloud (SVG `M6 24 Q12 14 22 18 Q28 8 38 14 Q46 14 44 24 Z`) so every brand
+ * surface matches the reference exactly.
+ */
+@Composable
+private fun SplashCloudMark(modifier: Modifier, alpha: Float) {
+    Canvas(modifier) {
+        val sx = size.width / 48f
+        val sy = size.height / 32f
+        fun x(v: Float) = v * sx
+        fun y(v: Float) = v * sy
+        val p = Path().apply {
+            moveTo(x(6f), y(24f))
+            quadraticTo(x(12f), y(14f), x(22f), y(18f))
+            quadraticTo(x(28f), y(8f), x(38f), y(14f))
+            quadraticTo(x(46f), y(14f), x(44f), y(24f))
+            close()
+        }
+        drawPath(p, color = Color.White.copy(alpha = alpha), style = Stroke(width = 1.5f * sx))
     }
 }

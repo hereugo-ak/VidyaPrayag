@@ -34,6 +34,7 @@ class LocalStoragePreferenceManager : PreferenceRepository {
     private val userId = MutableStateFlow(read(KEY_USER_ID))
     private val refreshToken = MutableStateFlow(read(KEY_REFRESH))
     private val profileCompleted = MutableStateFlow(read(KEY_PROFILE)?.toBooleanStrictOrNull())
+    private val userName = MutableStateFlow(read(KEY_USER_NAME))
 
     override fun getThemeName(): Flow<String> = themeName
     override suspend fun setThemeName(name: String) {
@@ -71,17 +72,26 @@ class LocalStoragePreferenceManager : PreferenceRepository {
         write(KEY_PROFILE, completed?.toString())
     }
 
+    override fun getUserName(): Flow<String?> = userName
+    override suspend fun setUserName(name: String?) {
+        val v = name?.takeIf { it.isNotBlank() }
+        userName.value = v
+        write(KEY_USER_NAME, v)
+    }
+
     override suspend fun clearSession() {
         userRole.value = "GUEST"
         userToken.value = null
         userId.value = null
         refreshToken.value = null
         profileCompleted.value = null
+        userName.value = null
         write(KEY_ROLE, "GUEST")
         write(KEY_TOKEN, null)
         write(KEY_USER_ID, null)
         write(KEY_REFRESH, null)
         write(KEY_PROFILE, null)
+        write(KEY_USER_NAME, null)
     }
 
     private companion object {
@@ -91,5 +101,6 @@ class LocalStoragePreferenceManager : PreferenceRepository {
         const val KEY_USER_ID = "vp.userId"
         const val KEY_REFRESH = "vp.refreshToken"
         const val KEY_PROFILE = "vp.profileCompleted"
+        const val KEY_USER_NAME = "vp.userName"
     }
 }

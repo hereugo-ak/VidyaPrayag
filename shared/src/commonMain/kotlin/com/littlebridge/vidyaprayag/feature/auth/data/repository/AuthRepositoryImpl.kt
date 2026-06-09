@@ -1,7 +1,9 @@
 package com.littlebridge.vidyaprayag.feature.auth.data.repository
 
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
+import com.littlebridge.vidyaprayag.core.network.SessionManager
 import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.core.state.SelectedChildHolder
 import com.littlebridge.vidyaprayag.feature.auth.data.remote.AuthApi
 import com.littlebridge.vidyaprayag.feature.auth.domain.model.*
 import com.littlebridge.vidyaprayag.feature.auth.domain.repository.AuthRepository
@@ -9,7 +11,12 @@ import kotlinx.coroutines.flow.first
 
 class AuthRepositoryImpl(
     private val api: AuthApi,
-    private val preferenceRepository: PreferenceRepository
+    private val preferenceRepository: PreferenceRepository,
+    // RA-S01: needed to evict the Ktor Auth plugin's cached bearer token on logout.
+    private val sessionManager: SessionManager,
+    // RA-S05: reset the shared selected-child on logout so a re-login as a
+    // different parent does not inherit the previous parent's child selection.
+    private val selectedChildHolder: SelectedChildHolder,
 ) : AuthRepository {
     // RA-29: there is NO in-memory session cache. `prefs` is the single source
     // of truth — the same store the Ktor `Auth` plugin's `refreshTokens` writes
@@ -77,15 +84,18 @@ class AuthRepositoryImpl(
     }
 
     override suspend fun saveSession(response: AuthResponse) {
-        // Persist the FULL session so it survives an app restart (audit §3.4).
-        // Previously only token+role were stored and userId/refreshToken/
-        // profileCompleted lived only in the in-memory cache → unrecoverable
-        // after a cold start, and the server's refresh route was unreachable.
-        preferenceRepository.setUserToken(response.token)
-        preferenceRepository.setUserRole(response.role)
+        // RA-69: re-order writes so profileCompleted is in place BEFORE the
+        // token/role. isAuthenticated in App.kt/NavGraphV2 reacts to the token,
+        // so writing profileCompleted first ensures the post-login gate reads
+        // the correct value on its first resolution.
+        preferenceRepository.setProfileCompleted(response.profileCompleted)
         preferenceRepository.setUserId(response.userId)
         preferenceRepository.setRefreshToken(response.refreshToken)
-        preferenceRepository.setProfileCompleted(response.profileCompleted)
+        preferenceRepository.setUserRole(response.role)
+        // RA-S03: persist the display name so portal headers/avatars can greet
+        // the real user instead of hardcoding "Parent". Refreshed by getUserDetails.
+        preferenceRepository.setUserName(response.name)
+        preferenceRepository.setUserToken(response.token)
     }
 
     override suspend fun getSession(): AuthResponse? {
@@ -97,11 +107,13 @@ class AuthRepositoryImpl(
         val userId = preferenceRepository.getUserId().first() ?: ""
         val role = preferenceRepository.getUserRole().first()
         val profileCompleted = preferenceRepository.getProfileCompleted().first() ?: false
+        // RA-S03: surface the persisted display name (empty string if never set).
+        val name = preferenceRepository.getUserName().first() ?: ""
         return AuthResponse(
             token = token,
             refreshToken = refreshToken,
             userId = userId,
-            name = "",
+            name = name,
             role = role,
             profileCompleted = profileCompleted
         )
@@ -148,10 +160,25 @@ class AuthRepositoryImpl(
         if (token != null) {
             runCatching { api.logout(token, refreshToken) }
         }
+        // Clear the persisted session FIRST so loadTokens() reads null on the next request…
         preferenceRepository.clearSession()
+        // …then evict the Ktor Auth plugin's in-memory bearer cache (RA-S01). Without this the
+        // singleton HttpClient keeps serving the previous user's cached token until a 401 forces
+        // a refresh, leaking a stale session across a logout → re-login (esp. a role switch).
+        sessionManager.clearAuthCache()
+        // RA-S05: drop the shared selected-child (a Koin single survives logout).
+        selectedChildHolder.clear()
     }
 
     override suspend fun getUserDetails(token: String): NetworkResult<UserDetailsResponse> {
-        return api.getUserDetails(token)
+        val result = api.getUserDetails(token)
+        // RA-S03: refresh the persisted display name from the authoritative
+        // profile so headers/avatars stay correct after a name change.
+        if (result is NetworkResult.Success) {
+            result.data.data.personalDetails.name
+                .takeIf { it.isNotBlank() }
+                ?.let { preferenceRepository.setUserName(it) }
+        }
+        return result
     }
 }

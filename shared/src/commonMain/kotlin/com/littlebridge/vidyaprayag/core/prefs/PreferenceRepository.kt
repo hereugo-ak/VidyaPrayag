@@ -25,5 +25,12 @@ interface PreferenceRepository {
     fun getProfileCompleted(): Flow<Boolean?>
     suspend fun setProfileCompleted(completed: Boolean?)
 
+    // RA-S03: the user's display name, persisted at sign-in and refreshed from
+    // GET /user/details, so the portal headers/avatars can greet the real user
+    // instead of hardcoding "Parent". (school_id is intentionally NOT persisted
+    // — the server authoritatively derives it from the JWT.)
+    fun getUserName(): Flow<String?>
+    suspend fun setUserName(name: String?)
+
     suspend fun clearSession()
 }
