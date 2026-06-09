@@ -371,7 +371,7 @@ val viewModelModule = module {
     factory { AdmissionCRMViewModel(get(), get()) }
     factory { SchoolAnnouncementsViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolTeachersViewModel(get(), get()) }
-    factory { MessagesViewModel(get(), get()) }
+    factory { MessagesViewModel(get(), get(), get()) }
     factory { SchedulePTMViewModel(get(), get()) }
     factory { AcademicCalendarViewModel(get(), get()) }
     factory { LeaveRequestsViewModel(get(), get()) }
