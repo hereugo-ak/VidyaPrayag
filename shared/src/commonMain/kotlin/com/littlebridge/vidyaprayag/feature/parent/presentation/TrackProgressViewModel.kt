@@ -34,6 +34,10 @@ data class PlayIndicator(
 
 data class TrackProgressState(
     val childName: String = "",
+    // RA-S06: the logged-in parent's own display name (persisted at sign-in,
+    // RA-S03), used for the account avatar in the portal header instead of the
+    // hardcoded literal "Parent". Empty until resolved.
+    val accountName: String = "",
     val overallProgress: Float = 0f,
     val currentLevel: Int = 0,
     val journeyDescription: String = "",
@@ -54,6 +58,18 @@ class TrackProgressViewModel(
 
     init {
         loadTrackProgress()
+        observeAccountName()
+    }
+
+    // RA-S06: keep the parent's own display name in state so the header avatar
+    // greets the real user. Read reactively so a profile refresh (which
+    // re-persists the name via getUserDetails) updates the header live.
+    private fun observeAccountName() {
+        viewModelScope.launch {
+            preferenceRepository.getUserName().collect { name ->
+                _state.update { it.copy(accountName = name ?: "") }
+            }
+        }
     }
 
     private fun loadTrackProgress() {

@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingStep
 import com.littlebridge.vidyaprayag.feature.admin.presentation.DashboardOnboardingStatus
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolDashboardViewModel
+import com.littlebridge.vidyaprayag.feature.parent.presentation.NotificationsViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
@@ -67,8 +68,12 @@ fun SchoolHomeScreenV2(
     onOpenPews: () -> Unit = {},
     onExit: () -> Unit = {},
     viewModel: SchoolDashboardViewModel = koinViewModel(),
+    // RA-S06: account-level notifications feed (GET /api/v1/notifications is
+    // JWT-scoped, role-agnostic) drives the header bell's unread dot.
+    notificationsViewModel: NotificationsViewModel = koinViewModel(),
 ) {
     val adminName by viewModel.adminName.collectAsStateV2()
+    val notifications by notificationsViewModel.state.collectAsStateV2()
     val progress by viewModel.progress.collectAsStateV2()
     val steps by viewModel.steps.collectAsStateV2()
     val onboardingStatus by viewModel.onboardingStatus.collectAsStateV2()
@@ -82,6 +87,7 @@ fun SchoolHomeScreenV2(
         onboardingStatus = onboardingStatus,
         isLoading = isLoading,
         errorMessage = errorMessage,
+        unreadCount = notifications.unreadCount,
         onRetry = viewModel::refresh,
         onOpenNotifications = onOpenNotifications,
         onOpenCalendar = onOpenCalendar,
@@ -100,6 +106,7 @@ private fun SchoolHomeContent(
     onboardingStatus: DashboardOnboardingStatus,
     isLoading: Boolean,
     errorMessage: String?,
+    unreadCount: Int,
     onRetry: () -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenCalendar: () -> Unit,
@@ -140,7 +147,11 @@ private fun SchoolHomeContent(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(VIcons.Bell, contentDescription = "Notifications", tint = c.ink, modifier = Modifier.size(18.dp))
-                    Box(Modifier.align(Alignment.TopEnd).padding(8.dp).size(6.dp).clip(CircleShape).background(c.danger))
+                    // RA-S06: show the unread dot only when there is actually
+                    // something unread — not a permanent always-on indicator.
+                    if (unreadCount > 0) {
+                        Box(Modifier.align(Alignment.TopEnd).padding(8.dp).size(6.dp).clip(CircleShape).background(c.danger))
+                    }
                 }
                 Box(Modifier.clickable { onExit() }) { VAvatar(name = adminName, size = 36.dp) }
             }

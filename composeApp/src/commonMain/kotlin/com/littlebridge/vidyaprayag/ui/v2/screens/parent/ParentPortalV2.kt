@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.littlebridge.vidyaprayag.feature.parent.presentation.NotificationsViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.TrackProgressViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBottomNav
@@ -64,10 +65,13 @@ fun ParentPortalV2(
     onLogout: () -> Unit = {},
     modifier: Modifier = Modifier,
     headerViewModel: TrackProgressViewModel = koinViewModel(),
+    // RA-S06: drives the header bell's unread dot from the real notifications feed.
+    notificationsViewModel: NotificationsViewModel = koinViewModel(),
 ) {
     var tab by remember { mutableStateOf("home") }
     var overlay by remember { mutableStateOf(ParentOverlay.None) }
     val progress by headerViewModel.state.collectAsStateV2()
+    val notifications by notificationsViewModel.state.collectAsStateV2()
 
     // §11 cross-platform — predictive back / edge-swipe dismisses the full-screen overlay back to
     // the tabs, not the portal.
@@ -138,6 +142,9 @@ fun ParentPortalV2(
             ParentHeader(
                 childName = progress.childName,
                 childSubline = progress.journeyDescription.ifBlank { "Level ${progress.currentLevel}" },
+                // RA-S06: real account name (RA-S03 pref) + real unread count.
+                accountName = progress.accountName,
+                unreadCount = notifications.unreadCount,
                 onOpenNotifications = { overlay = ParentOverlay.Notifications },
                 onOpenMessages = { overlay = ParentOverlay.Messages },
                 onExit = { overlay = ParentOverlay.Profile },
@@ -168,6 +175,8 @@ fun ParentPortalV2(
 private fun ParentHeader(
     childName: String,
     childSubline: String,
+    accountName: String,
+    unreadCount: Int,
     onOpenNotifications: () -> Unit,
     onOpenMessages: () -> Unit,
     onExit: () -> Unit,
@@ -233,11 +242,17 @@ private fun ParentHeader(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(VIcons.Bell, contentDescription = "Notifications", tint = c.ink, modifier = Modifier.size(16.dp))
-                    VStatusDot(color = c.dangerInk, size = 6.dp, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
+                    // RA-S06: only show the red unread dot when there is actually
+                    // something unread — no more permanent cry-wolf indicator.
+                    if (unreadCount > 0) {
+                        VStatusDot(color = c.dangerInk, size = 6.dp, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
+                    }
                 }
                 val exitInteraction = remember { MutableInteractionSource() }
                 Box(Modifier.clickable(interactionSource = exitInteraction, indication = null) { onExit() }) {
-                    VAvatar(name = "Parent", size = 32.dp)
+                    // RA-S06: greet the real signed-in parent (RA-S03 persisted name);
+                    // fall back to "Parent" only until the name resolves.
+                    VAvatar(name = accountName.ifBlank { "Parent" }, size = 32.dp)
                 }
             }
         }
