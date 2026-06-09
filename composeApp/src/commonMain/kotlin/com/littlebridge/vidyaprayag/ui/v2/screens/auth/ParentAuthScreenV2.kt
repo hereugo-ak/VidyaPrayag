@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.littlebridge.vidyaprayag.feature.auth.domain.model.AuthFlow
 import com.littlebridge.vidyaprayag.feature.auth.presentation.AuthStep
 import com.littlebridge.vidyaprayag.feature.auth.presentation.AuthViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
@@ -86,17 +87,20 @@ fun ParentAuthScreenV2(
                 )
             }
             AuthStep.Otp -> {
-                // Phone signup needs a name alongside the OTP; show it inline for new families.
-                // (For an existing-user login the field stays empty and is ignored by the VM.)
-                VInput(
-                    value = state.name,
-                    onValueChange = viewModel::onNameChanged,
-                    label = "Your name",
-                    placeholder = "Full name",
-                    leadingIcon = VIcons.User,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(16.dp))
+                // RA-S02: the name field is for NEW families only. A returning parent
+                // (AuthFlow.LOGIN_PHONE) already has a name on file, so asking for it at the
+                // OTP step is wrong — show it ONLY when the resolved flow is SIGNUP_PHONE.
+                if (state.flow == AuthFlow.SIGNUP_PHONE) {
+                    VInput(
+                        value = state.name,
+                        onValueChange = viewModel::onNameChanged,
+                        label = "Your name",
+                        placeholder = "Full name",
+                        leadingIcon = VIcons.User,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(16.dp))
+                }
                 VInput(
                     value = state.otp,
                     onValueChange = viewModel::onOtpChanged,
