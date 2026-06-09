@@ -102,6 +102,11 @@ private data class ResolvedChild(
     val studentCode: String?,
     val grade: String?,
     val section: String,
+    // RA-S19: true only when `section` came from a linked `students` row. When the
+    // child is linked but the students row is missing/mismatched we fall back to
+    // "A" — a section filter on that fallback silently hides marks. Callers MUST
+    // relax the section filter to class-level when this is false.
+    val sectionResolved: Boolean,
 )
 
 /**
@@ -131,12 +136,14 @@ private suspend fun ApplicationCall.requireOwnedChild(): ResolvedChild? {
     val student = if (studentCode != null) dbQuery {
         StudentsTable.selectAll().where { StudentsTable.studentCode eq studentCode }.singleOrNull()
     } else null
+    val linkedSection = student?.get(StudentsTable.section)
     return ResolvedChild(
         childName = row[ChildrenTable.childName],
         schoolId = row[ChildrenTable.schoolId],
         studentCode = studentCode,
         grade = student?.get(StudentsTable.className) ?: row[ChildrenTable.currentGrade],
-        section = student?.get(StudentsTable.section) ?: "A",
+        section = linkedSection ?: "A",
+        sectionResolved = linkedSection != null,
     )
 }
 
@@ -198,13 +205,21 @@ fun Route.parentAcademicsRouting() {
                     return@get
                 }
                 val results = dbQuery {
-                    // Only PUBLISHED assessments for the child's class+section are parent-visible (RA-43).
+                    // Only PUBLISHED assessments for the child's class are parent-visible (RA-43).
+                    // RA-S19: the section filter is applied ONLY when the section came from a
+                    // linked `students` row. When section is the "A" fallback (child linked but
+                    // students row missing/mismatched), filtering on it silently hides every
+                    // mark; we relax to class-level so the parent still sees their child's
+                    // published results instead of an empty screen.
                     val assessments = AssessmentsTable.selectAll().where {
-                        (AssessmentsTable.schoolId eq child.schoolId) and
+                        var cond = (AssessmentsTable.schoolId eq child.schoolId) and
                             (AssessmentsTable.className eq (child.grade ?: "")) and
-                            (AssessmentsTable.section eq child.section) and
                             (AssessmentsTable.isPublished eq true) and
                             (AssessmentsTable.isActive eq true)
+                        if (child.sectionResolved) {
+                            cond = cond and (AssessmentsTable.section eq child.section)
+                        }
+                        cond
                     }.orderBy(AssessmentsTable.createdAt, SortOrder.DESC).toList()
 
                     assessments.map { a ->
@@ -233,10 +248,15 @@ fun Route.parentAcademicsRouting() {
                     return@get
                 }
                 val subjects = dbQuery {
+                    // RA-S19: same section-fallback hardening as the marks join — only filter
+                    // on section when it came from a linked student row, else relax to class.
                     val units = SyllabusUnitsTable.selectAll().where {
-                        (SyllabusUnitsTable.schoolId eq child.schoolId) and
-                            (SyllabusUnitsTable.className eq child.grade) and
-                            (SyllabusUnitsTable.section eq child.section)
+                        var cond = (SyllabusUnitsTable.schoolId eq child.schoolId) and
+                            (SyllabusUnitsTable.className eq child.grade)
+                        if (child.sectionResolved) {
+                            cond = cond and (SyllabusUnitsTable.section eq child.section)
+                        }
+                        cond
                     }.orderBy(SyllabusUnitsTable.position, SortOrder.ASC).toList()
 
                     units.groupBy { it[SyllabusUnitsTable.subject] }.map { (subject, list) ->
