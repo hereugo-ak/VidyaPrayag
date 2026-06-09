@@ -40,6 +40,7 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VNavItem
 import com.littlebridge.vidyaprayag.ui.v2.components.VScreenScaffold
 import com.littlebridge.vidyaprayag.ui.v2.components.VStatusDot
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.auth.ParentLinkChildScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.discovery.AcademicCalendarScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.notifications.NotificationsScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
@@ -47,7 +48,7 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays a portal can push above its tab content (back returns to the tabs). */
-private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, Profile, Leave, Messages }
+private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, Profile, Leave, Messages, LinkChild }
 
 /**
  * ParentPortalV2 — the 4-tab parent shell, a faithful copy of `Parent.tsx → ParentApp`.
@@ -90,9 +91,23 @@ fun ParentPortalV2(
         ParentOverlay.Profile -> {
             // §7 finding K — the avatar opens the real profile screen; logout now lives
             // on an explicit button inside it (no more "tap your photo = logout").
+            // RA-S04 (directive): linking a child is opt-in from the profile, never forced
+            // after signup/login — the "Linked children" row opens the link flow as an overlay.
             ParentProfileScreenV2(
                 onBack = { overlay = ParentOverlay.None },
                 onLogout = onLogout,
+                onLinkChild = { overlay = ParentOverlay.LinkChild },
+                modifier = modifier,
+            )
+            return
+        }
+        ParentOverlay.LinkChild -> {
+            // RA-S04 (directive): parent-initiated child linking — reached only from the
+            // Profile screen, never pushed automatically after auth. Done/back both return
+            // to the tabs (the link request is a PENDING admin approval server-side).
+            ParentLinkChildScreenV2(
+                onDone = { overlay = ParentOverlay.None },
+                onBack = { overlay = ParentOverlay.Profile },
                 modifier = modifier,
             )
             return

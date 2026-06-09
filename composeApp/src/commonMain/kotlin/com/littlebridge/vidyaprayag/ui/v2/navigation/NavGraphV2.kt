@@ -194,7 +194,12 @@ private fun AuthedFlow(
         val profileCompleted = runCatching { authRepository.getSession()?.profileCompleted }
             .getOrNull() ?: true // null session (returning user / restart) → treat as completed
         route = when (role) {
-            EntryRole.Parent -> AuthedRoute.Portal // if (profileCompleted) AuthedRoute.Portal else AuthedRoute.ParentLinkChild
+            // RA-S04 (per product directive): a parent is NEVER pushed into the child-link
+            // flow after signup/login. They land straight on their portal and can link a
+            // child whenever they choose, from their Profile (ParentLinkChildScreenV2 is
+            // reachable from the profile, not forced here). This avoids dead-ending new
+            // families on a "link your child" wall before they've even seen the app.
+            EntryRole.Parent -> AuthedRoute.Portal
             // super_admin shares the school-admin operator surface (see RolePortal below)
             // and therefore shares its first-login gate too.
             EntryRole.SchoolAdmin,
