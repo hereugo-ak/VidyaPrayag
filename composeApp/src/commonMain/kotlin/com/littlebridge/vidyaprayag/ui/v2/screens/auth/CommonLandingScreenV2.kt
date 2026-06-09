@@ -51,11 +51,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -114,6 +111,7 @@ fun CommonLandingScreenV2(
     onParent: () -> Unit,
     onAdmin: () -> Unit,
     modifier: Modifier = Modifier,
+    onLegal: (LegalDoc) -> Unit = {},
     viewModel: LandingViewModel = koinViewModel(),
     mainViewModel: MainViewModel = koinViewModel(),
 ) = VTheme(tone = VPortalTone.Light) {
@@ -379,20 +377,43 @@ fun CommonLandingScreenV2(
 
             // ── Footer (legacy "FooterSection") ──
             Spacer(Modifier.height(36.dp))
-            LandingFooter(modifier = Modifier.graphicsLayer { alpha = cardsAlpha.value })
+            LandingFooter(
+                onLegal = onLegal,
+                modifier = Modifier.graphicsLayer { alpha = cardsAlpha.value },
+            )
 
             Spacer(Modifier.height(24.dp))
-            Text(
-                text = buildAnnotatedString {
-                    withStyle(SpanStyle(color = c.ink3)) { append("By continuing you agree to our ") }
-                    withStyle(SpanStyle(color = c.tealDeep, fontWeight = FontWeight.SemiBold)) { append("Terms") }
-                    withStyle(SpanStyle(color = c.ink3)) { append(" & ") }
-                    withStyle(SpanStyle(color = c.tealDeep, fontWeight = FontWeight.SemiBold)) { append("Privacy Policy") }
-                },
-                style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-            )
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "By continuing you agree to our ",
+                    style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    "Terms",
+                    style = VTheme.type.caption.colored(c.tealDeep).copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
+                    modifier = Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onLegal(LegalDoc.Terms) },
+                )
+                Text(
+                    " & ",
+                    style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
+                )
+                Text(
+                    "Privacy Policy",
+                    style = VTheme.type.caption.colored(c.tealDeep).copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
+                    modifier = Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onLegal(LegalDoc.Privacy) },
+                )
+            }
         }
     }
 }
@@ -405,7 +426,10 @@ fun CommonLandingScreenV2(
  * no fabricated metrics.
  */
 @Composable
-private fun LandingFooter(modifier: Modifier = Modifier) {
+private fun LandingFooter(
+    onLegal: (LegalDoc) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val c = VTheme.colors
     Column(
         modifier
@@ -424,14 +448,30 @@ private fun LandingFooter(modifier: Modifier = Modifier) {
         )
         Spacer(Modifier.height(24.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(40.dp)) {
-            FooterLinkGroup("PORTALS", listOf("Parent Portal", "Admin Dashboard", "Teacher Console"))
-            FooterLinkGroup("SUPPORT", listOf("Privacy Policy", "Terms of Service", "Help Desk"))
+            // PORTALS — informational only (the auth CTAs live on the entry cards above).
+            FooterLinkGroup(
+                title = "PORTALS",
+                links = listOf<Pair<String, (() -> Unit)?>>(
+                    "Parent Portal" to null,
+                    "Admin Dashboard" to null,
+                    "Teacher Console" to null,
+                ),
+            )
+            // SUPPORT — live links into the Legal & Support surface.
+            FooterLinkGroup(
+                title = "SUPPORT",
+                links = listOf<Pair<String, (() -> Unit)?>>(
+                    "Privacy Policy" to { onLegal(LegalDoc.Privacy) },
+                    "Terms of Service" to { onLegal(LegalDoc.Terms) },
+                    "Help Desk" to { onLegal(LegalDoc.Help) },
+                ),
+            )
         }
     }
 }
 
 @Composable
-private fun FooterLinkGroup(title: String, links: List<String>) {
+private fun FooterLinkGroup(title: String, links: List<Pair<String, (() -> Unit)?>>) {
     val c = VTheme.colors
     Column {
         Text(
@@ -439,8 +479,22 @@ private fun FooterLinkGroup(title: String, links: List<String>) {
             style = VTheme.type.label.colored(c.tealDeep).copy(fontWeight = FontWeight.Bold, letterSpacing = 0.10.em),
         )
         Spacer(Modifier.height(12.dp))
-        links.forEach { link ->
-            Text(link, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp))
+        links.forEach { (link, onClick) ->
+            val interaction = remember { MutableInteractionSource() }
+            val base = if (onClick != null) {
+                Modifier.clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    onClick = onClick,
+                )
+            } else {
+                Modifier
+            }
+            Text(
+                link,
+                style = VTheme.type.caption.colored(if (onClick != null) c.ink else c.ink2).copy(fontSize = 12.sp),
+                modifier = base,
+            )
             Spacer(Modifier.height(10.dp))
         }
     }
