@@ -16,6 +16,7 @@ class PreferenceManager(
     private val USER_ID_KEY = stringPreferencesKey("user_id")
     private val REFRESH_TOKEN_KEY = stringPreferencesKey("refresh_token")
     private val PROFILE_COMPLETED_KEY = booleanPreferencesKey("profile_completed")
+    private val USER_NAME_KEY = stringPreferencesKey("user_name")
 
     override fun getThemeName(): Flow<String> {
         return dataStore.data.map { preferences ->
@@ -96,6 +97,19 @@ class PreferenceManager(
         }
     }
 
+    override fun getUserName(): Flow<String?> {
+        return dataStore.data.map { preferences ->
+            preferences[USER_NAME_KEY]
+        }
+    }
+
+    override suspend fun setUserName(name: String?) {
+        dataStore.edit { preferences ->
+            if (name.isNullOrBlank()) preferences.remove(USER_NAME_KEY)
+            else preferences[USER_NAME_KEY] = name
+        }
+    }
+
     override suspend fun clearSession() {
         dataStore.edit { preferences ->
             preferences.remove(USER_ROLE_KEY)
@@ -103,6 +117,7 @@ class PreferenceManager(
             preferences.remove(USER_ID_KEY)
             preferences.remove(REFRESH_TOKEN_KEY)
             preferences.remove(PROFILE_COMPLETED_KEY)
+            preferences.remove(USER_NAME_KEY)
         }
     }
 }

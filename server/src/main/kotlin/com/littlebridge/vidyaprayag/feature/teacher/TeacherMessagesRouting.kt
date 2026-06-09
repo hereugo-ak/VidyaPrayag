@@ -34,6 +34,7 @@ import com.littlebridge.vidyaprayag.db.MessagesTable
 import com.littlebridge.vidyaprayag.db.StudentsTable
 import com.littlebridge.vidyaprayag.feature.notifications.Notify
 import com.littlebridge.vidyaprayag.feature.school.conversationMessagesFor
+import com.littlebridge.vidyaprayag.feature.school.notifyMessageRecipient
 import com.littlebridge.vidyaprayag.feature.school.resolveMessagingUser
 import com.littlebridge.vidyaprayag.feature.school.sendInConversation
 import io.ktor.http.*
@@ -268,7 +269,9 @@ fun Route.teacherMessagesRouting() {
                 if (result == null) {
                     call.fail("Thread not found", HttpStatusCode.NotFound)
                 } else {
-                    notifyMessageRecipient(recipientId, ctx.schoolId, ctx.userId, ctx.fullName, result.senderThreadId)
+                    // RA-S08: shared helper; use the peer the engine resolved (works for
+                    // new-thread and append sends alike) and include the message body.
+                    notifyMessageRecipient(result.recipientId, ctx.schoolId, ctx.userId, ctx.fullName, result.senderThreadId, req.body)
                     call.created(
                         TeacherSendMessageResponse(result.senderThreadId.toString(), result.messageId.toString()),
                         message = "Message sent",
@@ -335,24 +338,6 @@ fun Route.teacherMessagesRouting() {
     }
 }
 
-/** Notify a single 1:1 recipient of a new message (best-effort). */
-private suspend fun notifyMessageRecipient(
-    recipientId: UUID?,
-    schoolId: UUID,
-    actorId: UUID,
-    actorName: String,
-    threadId: UUID,
-) {
-    if (recipientId == null || recipientId == actorId) return
-    Notify.toUser(
-        userId = recipientId,
-        category = "message",
-        title = "Message from ${actorName.ifBlank { "your child's teacher" }}",
-        body = "",
-        schoolId = schoolId,
-        actorId = actorId,
-        deepLink = "parent/messages",
-        refType = "message",
-        refId = threadId.toString(),
-    )
-}
+// RA-S08: the per-recipient message notification now lives in the shared MessagingCore
+// (notifyMessageRecipient) so the admin and teacher send paths can't drift. The teacher
+// broadcast-to-class path still uses Notify.toUsers directly above.

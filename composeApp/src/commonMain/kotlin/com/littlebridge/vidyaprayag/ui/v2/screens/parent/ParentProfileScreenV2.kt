@@ -58,6 +58,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun ParentProfileScreenV2(
     onBack: () -> Unit = {},
     onLogout: () -> Unit = {},
+    onLinkChild: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ParentProfileViewModel = koinViewModel(),
 ) {
@@ -66,6 +67,7 @@ fun ParentProfileScreenV2(
         state = state,
         onBack = onBack,
         onLogout = onLogout,
+        onLinkChild = onLinkChild,
         onRetry = viewModel::load,
         modifier = modifier,
     )
@@ -76,10 +78,12 @@ private fun ParentProfileContent(
     state: ParentProfileState,
     onBack: () -> Unit,
     onLogout: () -> Unit,
+    onLinkChild: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     // RA-21: logout is destructive — gate it behind a confirmation dialog.
     var showLogoutConfirm by remember { mutableStateOf(false) }
 
@@ -139,28 +143,44 @@ private fun ParentProfileContent(
                     }
                     Spacer(Modifier.height(24.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // RA-S04 (directive): the "Linked children" row is the ONLY place a
+                        // parent links a child — opt-in from the profile, never forced after
+                        // signup/login. Tapping it opens ParentLinkChildScreenV2.
+                        data class ProfileRow(val title: String, val sub: String, val onClick: (() -> Unit)?)
                         val rows = listOf(
-                            "Personal details" to listOf(
-                                me.phone,
-                                me.email
-                            ).filter { it.isNotBlank() }
-                                .joinToString(" • ").ifBlank { "Mobile, email, photo" },
-                            "Linked children" to "Manage who you follow",
-                            "Notification preferences" to "Push, WhatsApp, quiet hours",
-                            "Change password" to "Keep your account secure",
-                            "Help & support" to "Contact VidyaPrayag",
+                            ProfileRow(
+                                "Personal details",
+                                listOf(me.phone, me.email).filter { it.isNotBlank() }
+                                    .joinToString(" • ").ifBlank { "Mobile, email, photo" },
+                                null,
+                            ),
+                            ProfileRow("Linked children", "Link a child or manage who you follow", onLinkChild),
+                            ProfileRow("Notification preferences", "Push, WhatsApp, quiet hours", null),
+                            ProfileRow("Change password", "Keep your account secure", null),
+                            ProfileRow(
+                                "Help & support",
+                                "Email ${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}",
+                                {
+                                    runCatching {
+                                        uriHandler.openUri(
+                                            "mailto:${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}" +
+                                                "?subject=VidyaSetu%20Support",
+                                        )
+                                    }
+                                },
+                            ),
                         )
-                        rows.forEach { (title, sub) ->
-                            VCard {
+                        rows.forEach { row ->
+                            VCard(onClick = row.onClick) {
                                 Row(
                                     Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                 ) {
                                     Column(Modifier.weight(1f)) {
-                                        Text(title, style = VTheme.type.bodyStrong.colored(c.ink))
+                                        Text(row.title, style = VTheme.type.bodyStrong.colored(c.ink))
                                         Text(
-                                            sub,
+                                            row.sub,
                                             style = VTheme.type.caption.colored(c.ink2)
                                                 .copy(fontSize = 11.sp)
                                         )

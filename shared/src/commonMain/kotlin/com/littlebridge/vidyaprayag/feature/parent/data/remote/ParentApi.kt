@@ -30,9 +30,12 @@ class ParentApi(
         }
     }
 
-    suspend fun getFees(token: String): NetworkResult<FeeResponse> {
+    suspend fun getFees(token: String, childId: String? = null): NetworkResult<FeeResponse> {
         return safeApiCall {
-            client.get(getUrl("api/v1/parent/fees"))
+            client.get(getUrl("api/v1/parent/fees")) {
+                // RA-S05: scope the fee stats to the active child when one is selected.
+                childId?.takeIf { it.isNotBlank() }?.let { parameter("child_id", it) }
+            }
         }
     }
 
@@ -149,6 +152,13 @@ class ParentApi(
                 contentType(ContentType.Application.Json)
                 setBody(request)
             }
+        }
+    }
+
+    // RA-S07: people the parent can start a conversation with (child's class teacher(s) + admin desk).
+    suspend fun getMessageRecipients(token: String): NetworkResult<ParentRecipientsResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/messages/recipients"))
         }
     }
 }

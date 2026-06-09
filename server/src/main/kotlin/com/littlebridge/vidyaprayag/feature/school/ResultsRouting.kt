@@ -45,6 +45,8 @@ import com.littlebridge.vidyaprayag.db.AppConfigTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.ExamResultsTable
 import com.littlebridge.vidyaprayag.db.StudentsTable
+import com.littlebridge.vidyaprayag.feature.notifications.Notify
+import com.littlebridge.vidyaprayag.feature.notifications.NotifyRecipients
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.request.*
@@ -382,6 +384,27 @@ fun Route.resultsRouting() {
                     }
                     count
                 }
+
+                // RA-S09: notify the affected class parents that results were published — parity
+                // with the teacher marks-submit path (TeacherRoutingTasks.kt). Scoped to this
+                // school for multi-tenant isolation; best-effort, never fails the publish.
+                runCatching {
+                    val parents = NotifyRecipients.parentsOfClass(schoolId, req.className)
+                    if (parents.isNotEmpty()) {
+                        Notify.toUsers(
+                            userIds = parents,
+                            category = "marks",
+                            title = "Results published",
+                            body = "Marks for \"${req.test}\" (${req.subject}) have been published.",
+                            schoolId = schoolId,
+                            actorId = ctx.userId,
+                            deepLink = "parent/academics/marks",
+                            refType = "assessment",
+                            refId = req.test,
+                        )
+                    }
+                }
+
                 call.created(PublishResultsResponse(upserted), message = "Results published")
             }
         }

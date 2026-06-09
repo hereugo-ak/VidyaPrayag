@@ -10,6 +10,7 @@ class InMemoryPreferenceManager : PreferenceRepository {
     private val userId = MutableStateFlow<String?>(null)
     private val refreshToken = MutableStateFlow<String?>(null)
     private val profileCompleted = MutableStateFlow<Boolean?>(null)
+    private val userName = MutableStateFlow<String?>(null)
 
     override fun getThemeName(): Flow<String> {
         return themeName
@@ -44,11 +45,15 @@ class InMemoryPreferenceManager : PreferenceRepository {
     override fun getProfileCompleted(): Flow<Boolean?> = profileCompleted
     override suspend fun setProfileCompleted(completed: Boolean?) { profileCompleted.value = completed }
 
+    override fun getUserName(): Flow<String?> = userName
+    override suspend fun setUserName(name: String?) { userName.value = name?.takeIf { it.isNotBlank() } }
+
     override suspend fun clearSession() {
         userRole.value = "GUEST"
         userToken.value = null
         userId.value = null
         refreshToken.value = null
         profileCompleted.value = null
+        userName.value = null
     }
 }

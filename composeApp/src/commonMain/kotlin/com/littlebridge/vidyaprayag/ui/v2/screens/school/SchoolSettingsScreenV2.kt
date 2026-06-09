@@ -86,6 +86,7 @@ private fun SchoolSettingsContent(
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     // RA-21: logout is destructive — gate it behind a confirmation dialog.
     var showLogoutConfirm by remember { mutableStateOf(false) }
 
@@ -176,6 +177,19 @@ private fun SchoolSettingsContent(
                 SettingRow(VIcons.Wallet, "Fee structure", "Edit heads & amounts for next cycle (Coming Soon)"),
                 SettingRow(VIcons.Bell, "Notifications", "Channels & quiet hours (Coming Soon)"),
                 SettingRow(VIcons.Download, "Data export", "CSV / PDF / UDISE (Coming Soon)"),
+                SettingRow(
+                    VIcons.Chat,
+                    "Help & support",
+                    "Email ${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}",
+                    onClick = {
+                        runCatching {
+                            uriHandler.openUri(
+                                "mailto:${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}" +
+                                    "?subject=VidyaSetu%20Support",
+                            )
+                        }
+                    },
+                ),
                 SettingRow(VIcons.Settings, "Account", "Sign out of the admin console", onClick = { showLogoutConfirm = true }),
             )
             Spacer(Modifier.height(0.dp))

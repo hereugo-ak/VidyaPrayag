@@ -13,6 +13,8 @@ import androidx.compose.ui.backhandler.BackHandler
 import com.littlebridge.vidyaprayag.feature.auth.domain.repository.AuthRepository
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.AdminAuthScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.CommonLandingScreenV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.auth.LegalDoc
+import com.littlebridge.vidyaprayag.ui.v2.screens.auth.LegalInfoScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.ParentAuthScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.ParentLinkChildScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.SchoolOnboardingScreenV2
@@ -91,12 +93,14 @@ enum class EntryRole {
 // Unauthenticated funnel:  CommonLanding → Parent/Admin auth (+ discovery/link/onboard branches)
 // ─────────────────────────────────────────────────────────────────────────────
 
-private enum class UnauthRoute { Landing, ParentAuth, AdminAuth, Discovery, ParentLinkChild, SchoolOnboarding }
+private enum class UnauthRoute { Landing, ParentAuth, AdminAuth, Discovery, ParentLinkChild, SchoolOnboarding, Legal }
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun UnauthFlow(modifier: Modifier = Modifier) {
     var route by remember { mutableStateOf(UnauthRoute.Landing) }
+    // Which legal/info document the Legal route opens on (Privacy / Terms / Help Desk).
+    var legalDoc by remember { mutableStateOf(LegalDoc.Privacy) }
 
     // System back: collapse the funnel toward the landing screen (never exit from a leaf).
     BackHandler(enabled = route != UnauthRoute.Landing) {
@@ -106,6 +110,8 @@ private fun UnauthFlow(modifier: Modifier = Modifier) {
             UnauthRoute.Discovery -> UnauthRoute.ParentAuth
             UnauthRoute.ParentLinkChild -> UnauthRoute.Discovery
             UnauthRoute.SchoolOnboarding -> UnauthRoute.AdminAuth
+            // Legal/Support is a leaf reachable from the landing footer — back returns there.
+            UnauthRoute.Legal -> UnauthRoute.Landing
             UnauthRoute.Landing -> UnauthRoute.Landing
         }
     }
@@ -129,6 +135,12 @@ private fun UnauthFlow(modifier: Modifier = Modifier) {
             UnauthRoute.Landing -> CommonLandingScreenV2(
                 onParent = { route = UnauthRoute.ParentAuth },
                 onAdmin = { route = UnauthRoute.AdminAuth },
+                // Footer "Privacy Policy / Terms of Service / Help Desk" + the continue-footnote
+                // open the public Legal & Support surface on the requested document.
+                onLegal = { doc ->
+                    legalDoc = doc
+                    route = UnauthRoute.Legal
+                },
             )
             UnauthRoute.ParentAuth -> ParentAuthScreenV2(
                 // On success the persisted session flips isAuthenticated=true and NavGraphV2
@@ -152,6 +164,12 @@ private fun UnauthFlow(modifier: Modifier = Modifier) {
             UnauthRoute.SchoolOnboarding -> SchoolOnboardingScreenV2(
                 onComplete = { route = UnauthRoute.AdminAuth },
                 onBack = { route = UnauthRoute.AdminAuth },
+            )
+            // Public Privacy Policy / Terms of Service / Help Desk surface (minimal, honest copy +
+            // live support email). Opens on the document the footer link requested.
+            UnauthRoute.Legal -> LegalInfoScreenV2(
+                onBack = { route = UnauthRoute.Landing },
+                initial = legalDoc,
             )
         }
     }
@@ -194,7 +212,12 @@ private fun AuthedFlow(
         val profileCompleted = runCatching { authRepository.getSession()?.profileCompleted }
             .getOrNull() ?: true // null session (returning user / restart) → treat as completed
         route = when (role) {
-            EntryRole.Parent -> AuthedRoute.Portal // if (profileCompleted) AuthedRoute.Portal else AuthedRoute.ParentLinkChild
+            // RA-S04 (per product directive): a parent is NEVER pushed into the child-link
+            // flow after signup/login. They land straight on their portal and can link a
+            // child whenever they choose, from their Profile (ParentLinkChildScreenV2 is
+            // reachable from the profile, not forced here). This avoids dead-ending new
+            // families on a "link your child" wall before they've even seen the app.
+            EntryRole.Parent -> AuthedRoute.Portal
             // super_admin shares the school-admin operator surface (see RolePortal below)
             // and therefore shares its first-login gate too.
             EntryRole.SchoolAdmin,

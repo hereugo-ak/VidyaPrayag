@@ -93,7 +93,9 @@ object DatabaseFactory {
         // Notification spine + push registry + link approval (audit part-2 RA-41/42/46/48/50)
         NotificationsTable,
         DeviceTokensTable,
-        ParentChildLinksTable
+        ParentChildLinksTable,
+        // Non-teaching staff vertical (RA-S17 — Admin People sub-tabs)
+        NonTeachingStaffTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

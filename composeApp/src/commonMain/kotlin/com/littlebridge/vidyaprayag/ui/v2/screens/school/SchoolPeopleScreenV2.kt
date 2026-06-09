@@ -31,11 +31,17 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.StaffDto
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.StudentDto
 import com.littlebridge.vidyaprayag.feature.admin.presentation.RiskStudent
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolTeachersState
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolTeachersViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.StaffRosterState
+import com.littlebridge.vidyaprayag.feature.admin.presentation.StaffViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentAnalyticsState
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentAnalyticsViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentRosterState
+import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentRosterViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.TeacherRosterItem
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
@@ -44,12 +50,12 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
-import com.littlebridge.vidyaprayag.ui.v2.components.VConfirmDialog
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VInput
 import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
 import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
 import com.littlebridge.vidyaprayag.ui.v2.components.VStatusDot
+import com.littlebridge.vidyaprayag.ui.v2.components.VTopTabs
 import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
@@ -59,73 +65,94 @@ import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.roundToInt
 
 /**
- * SchoolPeopleScreenV2 — wired to the real [StudentAnalyticsViewModel]
- * (`AnalyticsApi` → `GET /api/v1/student-cohort`).
+ * SchoolPeopleScreenV2 — RA-S17 rebuild.
  *
- * The backend's people endpoint is a **cohort-analytics** feed (risk distribution,
- * at-risk students, subject engagement, cohort comparison) — not a flat student/teacher
- * roster. So this screen renders the analytics it actually returns rather than the old
- * mock roster + per-student detail (which had no backing endpoint). RA-45 now adds the
- * real student roster + student/teacher profile screens (`GET /school/students`,
- * `/students/{id}`, `/teachers/{id}`), reachable from the entry cards / tappable teacher
- * rows here. No MockV2 in production; the three UI states come from [VStateHost] (LAW 2/3/6).
+ * The People tab is now a [VTopTabs]-driven 3-sub-tab surface — **Teachers /
+ * Students / Non-teaching staff** — each with a search field and tappable,
+ * DB-backed rows that open the person's profile. Deletion has been removed from
+ * the rows entirely: it now lives inside each profile behind a confirm dialog
+ * (RA-S17 directive). The parent→child link-request queue stays as a top entry.
+ *
+ * Data: teachers via [SchoolTeachersViewModel] (`/school/teachers`), students via
+ * [StudentRosterViewModel] (`/school/students?q=&class=`), staff via [StaffViewModel]
+ * (`/school/staff?q=&department=`), cohort analytics via [StudentAnalyticsViewModel]
+ * (`/student-cohort`). All three states come from [VStateHost] (LAW 2/3/6); no MockV2.
  */
 @Composable
 fun SchoolPeopleScreenV2(
     modifier: Modifier = Modifier,
     onOpenLinkRequests: () -> Unit = {},
-    // RA-45 — open the live student roster + a single teacher's profile.
-    onOpenStudentRoster: () -> Unit = {},
+    onOpenStudent: (String) -> Unit = {},
     onOpenTeacher: (String) -> Unit = {},
+    onOpenStaff: (String) -> Unit = {},
     viewModel: StudentAnalyticsViewModel = koinViewModel(),
     teachersViewModel: SchoolTeachersViewModel = koinViewModel(),
+    studentsViewModel: StudentRosterViewModel = koinViewModel(),
+    staffViewModel: StaffViewModel = koinViewModel(),
 ) {
-    val state by viewModel.state.collectAsStateV2()
+    val analyticsState by viewModel.state.collectAsStateV2()
     val teachersState by teachersViewModel.state.collectAsStateV2()
+    val studentsState by studentsViewModel.state.collectAsStateV2()
+    val staffState by staffViewModel.state.collectAsStateV2()
+
     SchoolPeopleContent(
-        state = state,
-        onRetry = viewModel::load,
+        analyticsState = analyticsState,
+        onAnalyticsRetry = viewModel::load,
         teachersState = teachersState,
         onTeachersRetry = teachersViewModel::load,
         onAddTeacher = teachersViewModel::addTeacher,
-        onRemoveTeacher = teachersViewModel::removeTeacher,
+        studentsState = studentsState,
+        onStudentsRetry = studentsViewModel::load,
+        onStudentSearch = { studentsViewModel.load() }, // students VM reloads full list; client-side filter below
+        staffState = staffState,
+        onStaffRetry = staffViewModel::load,
+        onStaffSearch = staffViewModel::onQueryChange,
+        onAddStaff = staffViewModel::addStaff,
         onOpenLinkRequests = onOpenLinkRequests,
-        onOpenStudentRoster = onOpenStudentRoster,
+        onOpenStudent = onOpenStudent,
         onOpenTeacher = onOpenTeacher,
+        onOpenStaff = onOpenStaff,
         modifier = modifier,
     )
 }
 
 @Composable
 private fun SchoolPeopleContent(
-    state: StudentAnalyticsState,
-    onRetry: () -> Unit,
+    analyticsState: StudentAnalyticsState,
+    onAnalyticsRetry: () -> Unit,
     teachersState: SchoolTeachersState,
     onTeachersRetry: () -> Unit,
     onAddTeacher: (name: String, identifier: String, initialPassword: String?, onAdded: (() -> Unit)?) -> Unit,
-    onRemoveTeacher: (teacherId: String) -> Unit,
+    studentsState: StudentRosterState,
+    onStudentsRetry: () -> Unit,
+    onStudentSearch: (String) -> Unit,
+    staffState: StaffRosterState,
+    onStaffRetry: () -> Unit,
+    onStaffSearch: (String) -> Unit,
+    onAddStaff: (name: String, role: String, department: String, phone: String, email: String) -> Unit,
     onOpenLinkRequests: () -> Unit,
-    onOpenStudentRoster: () -> Unit,
+    onOpenStudent: (String) -> Unit,
     onOpenTeacher: (String) -> Unit,
+    onOpenStaff: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
 
+    var subTab by remember { mutableStateOf("Teachers") }
     var showAddTeacher by remember { mutableStateOf(false) }
-    var pendingRemoval by remember { mutableStateOf<TeacherRosterItem?>(null) }
+    var showAddStaff by remember { mutableStateOf(false) }
 
     Column(
         modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
             .padding(top = 24.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("People", style = VTheme.type.h1.colored(c.ink))
+        Text("People", style = VTheme.type.h1.colored(c.ink), modifier = Modifier.padding(horizontal = 20.dp))
 
         // ── RA-48: parent→child link approval queue entry ──────────────────
-        VCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenLinkRequests)) {
+        VCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).clickable(onClick = onOpenLinkRequests)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Child link requests", style = VTheme.type.bodyStrong.colored(c.ink))
@@ -138,118 +165,38 @@ private fun SchoolPeopleContent(
             }
         }
 
-        // ── RA-45: student roster entry ────────────────────────────────────
-        VCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenStudentRoster)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Student roster", style = VTheme.type.bodyStrong.colored(c.ink))
-                    Text(
-                        "View, add or remove students; open a student's full record",
-                        style = VTheme.type.caption.colored(c.ink2),
-                    )
-                }
-                Icon(VIcons.ArrowRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
-            }
-        }
-
-        // ── Teacher roster (RA-22) ─────────────────────────────────────────
-        TeacherRosterSection(
-            state = teachersState,
-            onRetry = onTeachersRetry,
-            onAddClick = { showAddTeacher = true },
-            onRemoveClick = { pendingRemoval = it },
-            onOpenTeacher = onOpenTeacher,
+        // ── RA-S17: sub-tabs ─────────────────────────────────────────────────
+        VTopTabs(
+            tabs = listOf("Teachers", "Students", "Non-teaching staff"),
+            selected = subTab,
+            onSelect = { subTab = it },
         )
 
-        Text("Cohort analytics", style = VTheme.type.h3.colored(c.ink))
-
-        VStateHost(
-            loading = state.isLoading,
-            error = state.errorMessage,
-            isEmpty = state.atRiskStudents.isEmpty() &&
-                state.subjectEngagements.isEmpty() &&
-                state.criticalRiskCount == 0 &&
-                state.mediumRiskCount == 0 &&
-                state.lowRiskCount == 0,
-            emptyTitle = "No cohort data yet",
-            emptyBody = "Student risk and engagement analytics appear here once attendance and marks start flowing in.",
-            emptyIcon = VIcons.Users,
-            onRetry = onRetry,
-            skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonList(rows = 6) },
+        Column(
+            Modifier.padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                // ── Risk distribution ─────────────────────────────────────────
-                VCard {
-                    VLabel("Student risk distribution")
-                    Spacer(Modifier.height(12.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        RiskTile("Critical", state.criticalRiskCount, c.dangerInk, Modifier.weight(1f))
-                        RiskTile("Medium", state.mediumRiskCount, c.warningInk, Modifier.weight(1f))
-                        RiskTile("Low", state.lowRiskCount, c.successInk, Modifier.weight(1f))
-                    }
-                }
-
-                // ── At-risk students ──────────────────────────────────────────
-                if (state.atRiskStudents.isNotEmpty()) {
-                    Column {
-                        Text("At-risk students", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            state.atRiskStudents.forEach { RiskStudentRow(it) }
-                        }
-                    }
-                }
-
-                // ── Subject engagement ────────────────────────────────────────
-                if (state.subjectEngagements.isNotEmpty()) {
-                    VCard {
-                        Text("Subject engagement", style = VTheme.type.h3.colored(c.ink))
-                        Spacer(Modifier.height(12.dp))
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            state.subjectEngagements.forEach { e ->
-                                Column {
-                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text(e.name, style = VTheme.type.body.colored(c.ink))
-                                        Text("${e.percentage.roundToInt()}%", style = VTheme.type.dataSm.colored(c.ink2))
-                                    }
-                                    Spacer(Modifier.height(4.dp))
-                                    VProgressBar(
-                                        value = e.percentage,
-                                        tone = if (e.percentage < 60f) VBadgeTone.Warning else VBadgeTone.Arctic,
-                                    )
-                                    // Capture into a local val so Kotlin can smart-cast — the
-                                    // public `status: String?` on `SubjectEngagement` lives in
-                                    // the `shared/` module and cannot be smart-cast directly
-                                    // through `!e.status.isNullOrBlank()`.
-                                    val status = e.status
-                                    if (!status.isNullOrBlank()) {
-                                        Text(status, style = VTheme.type.label.colored(c.ink3))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // ── Cohort comparison ─────────────────────────────────────────
-                if (state.cohortComparison.isNotEmpty()) {
-                    VCard {
-                        Text("Cohort comparison", style = VTheme.type.h3.colored(c.ink))
-                        Spacer(Modifier.height(12.dp))
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            state.cohortComparison.forEachIndexed { i, v ->
-                                val label = state.cohortLabels.getOrNull(i) ?: "Grade ${i + 1}"
-                                Column {
-                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text(label, style = VTheme.type.body.colored(c.ink))
-                                        Text("${v.roundToInt()}%", style = VTheme.type.dataSm.colored(c.ink2))
-                                    }
-                                    Spacer(Modifier.height(4.dp))
-                                    VProgressBar(value = v, tone = VBadgeTone.Arctic)
-                                }
-                            }
-                        }
-                    }
-                }
+            when (subTab) {
+                "Teachers" -> TeachersSubTab(
+                    state = teachersState,
+                    onRetry = onTeachersRetry,
+                    onAddClick = { showAddTeacher = true },
+                    onOpenTeacher = onOpenTeacher,
+                )
+                "Students" -> StudentsSubTab(
+                    state = studentsState,
+                    onRetry = onStudentsRetry,
+                    onOpenStudent = onOpenStudent,
+                    analyticsState = analyticsState,
+                    onAnalyticsRetry = onAnalyticsRetry,
+                )
+                "Non-teaching staff" -> StaffSubTab(
+                    state = staffState,
+                    onRetry = onStaffRetry,
+                    onSearch = onStaffSearch,
+                    onAddClick = { showAddStaff = true },
+                    onOpenStaff = onOpenStaff,
+                )
             }
         }
     }
@@ -265,79 +212,222 @@ private fun SchoolPeopleContent(
         )
     }
 
-    // ── Remove-teacher confirmation (RA-22) ────────────────────────────────
-    val removal = pendingRemoval
-    VConfirmDialog(
-        visible = removal != null,
-        title = "Remove teacher",
-        message = "Remove ${removal?.name ?: "this teacher"} from your school? " +
-            "They will lose access immediately. This can be reversed by re-adding them.",
-        confirmLabel = "Remove",
-        icon = VIcons.AlertTriangle,
-        onConfirm = {
-            removal?.let { onRemoveTeacher(it.id) }
-            pendingRemoval = null
-        },
-        onDismiss = { pendingRemoval = null },
-    )
+    // ── Add-staff dialog (RA-S17) ──────────────────────────────────────────
+    if (showAddStaff) {
+        AddStaffDialog(
+            isSubmitting = staffState.isSaving,
+            onDismiss = { showAddStaff = false },
+            onSubmit = { name, role, dept, phone, email ->
+                onAddStaff(name, role, dept, phone, email)
+                showAddStaff = false
+            },
+        )
+    }
 }
 
-/**
- * RA-22: the teacher roster. Honours LAW (RULE-7) — loading, error, and empty
- * states all come from [VStateHost]; uses only frozen V* primitives and theme
- * tokens (no Material defaults, no new tokens).
- */
+// ───────────────────────── Teachers sub-tab ─────────────────────────
+
 @Composable
-private fun TeacherRosterSection(
+private fun TeachersSubTab(
     state: SchoolTeachersState,
     onRetry: () -> Unit,
     onAddClick: () -> Unit,
-    onRemoveClick: (TeacherRosterItem) -> Unit,
     onOpenTeacher: (String) -> Unit,
 ) {
     val c = VTheme.colors
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Teachers", style = VTheme.type.h3.colored(c.ink))
-            VButton(
-                text = "Add teacher",
-                onClick = onAddClick,
-                variant = VButtonVariant.Secondary,
-                size = VButtonSize.Sm,
-                leading = { Icon(VIcons.Plus, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                enabled = !state.isMutating,
-            )
-        }
+    var query by remember { mutableStateOf("") }
 
-        VStateHost(
-            loading = state.isLoading,
-            error = state.errorMessage,
-            isEmpty = state.teachers.isEmpty(),
-            emptyTitle = "No teachers yet",
-            emptyBody = "Add your first teacher so they can sign in and manage their classes.",
-            emptyIcon = VIcons.Users,
-            onRetry = onRetry,
-            skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonList(rows = 5) },
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Feature 5 — staggered list entrance after the skeleton → content
-                // transition. `trigger` is the "list is loaded and non-empty"
-                // condition; it does NOT flip back on refresh so the entrance
-                // runs ONCE per data-load. RULE-2: the modifier only animates
-                // alpha + translationY via graphicsLayer — no layout shift.
-                val ready = state.teachers.isNotEmpty() && !state.isLoading
-                state.teachers.forEachIndexed { index, t ->
-                    Box(modifier = Modifier.staggeredItemEntrance(index = index, trigger = ready)) {
-                        TeacherRosterRow(
-                            item = t,
-                            mutating = state.isMutating,
-                            onRemove = { onRemoveClick(t) },
-                            onClick = { onOpenTeacher(t.id) },
-                        )
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text("Teachers", style = VTheme.type.h3.colored(c.ink))
+        VButton(
+            text = "Add teacher",
+            onClick = onAddClick,
+            variant = VButtonVariant.Secondary,
+            size = VButtonSize.Sm,
+            leading = { Icon(VIcons.Plus, contentDescription = null, modifier = Modifier.size(14.dp)) },
+            enabled = !state.isMutating,
+        )
+    }
+    VInput(
+        value = query,
+        onValueChange = { query = it },
+        label = "",
+        placeholder = "Search by name or contact",
+        leadingIcon = VIcons.Search,
+        modifier = Modifier.fillMaxWidth(),
+    )
+
+    val filtered = state.teachers.filter {
+        query.isBlank() ||
+            it.name.contains(query, ignoreCase = true) ||
+            it.contact.contains(query, ignoreCase = true)
+    }
+
+    VStateHost(
+        loading = state.isLoading,
+        error = state.errorMessage,
+        isEmpty = filtered.isEmpty(),
+        emptyTitle = if (state.teachers.isEmpty()) "No teachers yet" else "No matches",
+        emptyBody = if (state.teachers.isEmpty())
+            "Add your first teacher so they can sign in and manage their classes."
+        else "No teacher matches \"$query\".",
+        emptyIcon = VIcons.Users,
+        onRetry = onRetry,
+        skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonList(rows = 5) },
+    ) {
+        val ready = filtered.isNotEmpty() && !state.isLoading
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            filtered.forEachIndexed { index, t ->
+                Box(modifier = Modifier.staggeredItemEntrance(index = index, trigger = ready)) {
+                    PersonRow(
+                        name = t.name,
+                        subtitle = t.contact.ifBlank { "Teacher" },
+                        onClick = { onOpenTeacher(t.id) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ───────────────────────── Students sub-tab ─────────────────────────
+
+@Composable
+private fun StudentsSubTab(
+    state: StudentRosterState,
+    onRetry: () -> Unit,
+    onOpenStudent: (String) -> Unit,
+    analyticsState: StudentAnalyticsState,
+    onAnalyticsRetry: () -> Unit,
+) {
+    val c = VTheme.colors
+    var query by remember { mutableStateOf("") }
+
+    Text("Students", style = VTheme.type.h3.colored(c.ink))
+    VInput(
+        value = query,
+        onValueChange = { query = it },
+        label = "",
+        placeholder = "Search by name, roll no. or code",
+        leadingIcon = VIcons.Search,
+        modifier = Modifier.fillMaxWidth(),
+    )
+
+    val filtered = state.students.filter {
+        query.isBlank() ||
+            it.fullName.contains(query, ignoreCase = true) ||
+            it.rollNumber.contains(query, ignoreCase = true) ||
+            it.studentCode.contains(query, ignoreCase = true) ||
+            it.className.contains(query, ignoreCase = true)
+    }
+
+    VStateHost(
+        loading = state.isLoading,
+        error = state.error,
+        isEmpty = filtered.isEmpty(),
+        emptyTitle = if (state.students.isEmpty()) "No students yet" else "No matches",
+        emptyBody = if (state.students.isEmpty())
+            "Students appear here once they are enrolled in your school."
+        else "No student matches \"$query\".",
+        emptyIcon = VIcons.Users,
+        onRetry = onRetry,
+        skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonList(rows = 6) },
+    ) {
+        val ready = filtered.isNotEmpty() && !state.isLoading
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            filtered.forEachIndexed { index, s ->
+                Box(modifier = Modifier.staggeredItemEntrance(index = index, trigger = ready)) {
+                    PersonRow(
+                        name = s.fullName,
+                        subtitle = "${s.className} · Sec ${s.section} · Roll ${s.rollNumber}",
+                        src = s.profilePhotoUrl,
+                        onClick = { onOpenStudent(s.id) },
+                    )
+                }
+            }
+        }
+    }
+
+    // ── Cohort analytics (kept under Students) ──────────────────────────────
+    Spacer(Modifier.height(8.dp))
+    Text("Cohort analytics", style = VTheme.type.h3.colored(c.ink))
+    VStateHost(
+        loading = analyticsState.isLoading,
+        error = analyticsState.errorMessage,
+        isEmpty = analyticsState.atRiskStudents.isEmpty() &&
+            analyticsState.subjectEngagements.isEmpty() &&
+            analyticsState.criticalRiskCount == 0 &&
+            analyticsState.mediumRiskCount == 0 &&
+            analyticsState.lowRiskCount == 0,
+        emptyTitle = "No cohort data yet",
+        emptyBody = "Student risk and engagement analytics appear here once attendance and marks start flowing in.",
+        emptyIcon = VIcons.Users,
+        onRetry = onAnalyticsRetry,
+        skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonList(rows = 4) },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            VCard {
+                VLabel("Student risk distribution")
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    RiskTile("Critical", analyticsState.criticalRiskCount, c.dangerInk, Modifier.weight(1f))
+                    RiskTile("Medium", analyticsState.mediumRiskCount, c.warningInk, Modifier.weight(1f))
+                    RiskTile("Low", analyticsState.lowRiskCount, c.successInk, Modifier.weight(1f))
+                }
+            }
+            if (analyticsState.atRiskStudents.isNotEmpty()) {
+                Column {
+                    Text("At-risk students", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        analyticsState.atRiskStudents.forEach { RiskStudentRow(it) }
+                    }
+                }
+            }
+            if (analyticsState.subjectEngagements.isNotEmpty()) {
+                VCard {
+                    Text("Subject engagement", style = VTheme.type.h3.colored(c.ink))
+                    Spacer(Modifier.height(12.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        analyticsState.subjectEngagements.forEach { e ->
+                            Column {
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(e.name, style = VTheme.type.body.colored(c.ink))
+                                    Text("${e.percentage.roundToInt()}%", style = VTheme.type.dataSm.colored(c.ink2))
+                                }
+                                Spacer(Modifier.height(4.dp))
+                                VProgressBar(
+                                    value = e.percentage,
+                                    tone = if (e.percentage < 60f) VBadgeTone.Warning else VBadgeTone.Arctic,
+                                )
+                                val status = e.status
+                                if (!status.isNullOrBlank()) {
+                                    Text(status, style = VTheme.type.label.colored(c.ink3))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (analyticsState.cohortComparison.isNotEmpty()) {
+                VCard {
+                    Text("Cohort comparison", style = VTheme.type.h3.colored(c.ink))
+                    Spacer(Modifier.height(12.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        analyticsState.cohortComparison.forEachIndexed { i, v ->
+                            val label = analyticsState.cohortLabels.getOrNull(i) ?: "Grade ${i + 1}"
+                            Column {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(label, style = VTheme.type.body.colored(c.ink))
+                                    Text("${v.roundToInt()}%", style = VTheme.type.dataSm.colored(c.ink2))
+                                }
+                                Spacer(Modifier.height(4.dp))
+                                VProgressBar(value = v, tone = VBadgeTone.Arctic)
+                            }
+                        }
                     }
                 }
             }
@@ -345,11 +435,81 @@ private fun TeacherRosterSection(
     }
 }
 
+// ─────────────────────── Non-teaching-staff sub-tab ───────────────────────
+
 @Composable
-private fun TeacherRosterRow(
-    item: TeacherRosterItem,
-    mutating: Boolean,
-    onRemove: () -> Unit,
+private fun StaffSubTab(
+    state: StaffRosterState,
+    onRetry: () -> Unit,
+    onSearch: (String) -> Unit,
+    onAddClick: () -> Unit,
+    onOpenStaff: (String) -> Unit,
+) {
+    val c = VTheme.colors
+
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text("Non-teaching staff", style = VTheme.type.h3.colored(c.ink))
+        VButton(
+            text = "Add staff",
+            onClick = onAddClick,
+            variant = VButtonVariant.Secondary,
+            size = VButtonSize.Sm,
+            leading = { Icon(VIcons.Plus, contentDescription = null, modifier = Modifier.size(14.dp)) },
+            enabled = !state.isSaving,
+        )
+    }
+    VInput(
+        value = state.query,
+        onValueChange = onSearch,
+        label = "",
+        placeholder = "Search by name, role or department",
+        leadingIcon = VIcons.Search,
+        modifier = Modifier.fillMaxWidth(),
+    )
+
+    VStateHost(
+        loading = state.isLoading,
+        error = state.error,
+        isEmpty = state.staff.isEmpty(),
+        emptyTitle = if (state.query.isBlank()) "No staff yet" else "No matches",
+        emptyBody = if (state.query.isBlank())
+            "Add office, accounts, library, transport or support staff so they appear here."
+        else "No staff matches \"${state.query}\".",
+        emptyIcon = VIcons.Users,
+        onRetry = onRetry,
+        skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonList(rows = 5) },
+    ) {
+        val ready = state.staff.isNotEmpty() && !state.isLoading
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            state.staff.forEachIndexed { index, s ->
+                Box(modifier = Modifier.staggeredItemEntrance(index = index, trigger = ready)) {
+                    PersonRow(
+                        name = s.fullName,
+                        subtitle = listOfNotNull(s.role, s.department?.takeIf { it.isNotBlank() }).joinToString(" · "),
+                        src = s.photoUrl,
+                        onClick = { onOpenStaff(s.id) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ───────────────────────────── shared row ─────────────────────────────
+
+/**
+ * RA-S17: a tap-to-open person row. There is intentionally **no** delete button
+ * here — deletion lives inside the profile behind a confirm dialog.
+ */
+@Composable
+private fun PersonRow(
+    name: String,
+    subtitle: String,
+    src: String? = null,
     onClick: () -> Unit,
 ) {
     val c = VTheme.colors
@@ -358,24 +518,19 @@ private fun TeacherRosterRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            VAvatar(name = item.name, size = 42.dp)
+            VAvatar(name = name, src = src, size = 42.dp)
             Column(Modifier.weight(1f)) {
-                Text(item.name, style = VTheme.type.bodyStrong.colored(c.ink))
-                if (item.contact.isNotBlank()) {
-                    Text(item.contact, style = VTheme.type.caption.colored(c.ink2))
+                Text(name, style = VTheme.type.bodyStrong.colored(c.ink))
+                if (subtitle.isNotBlank()) {
+                    Text(subtitle, style = VTheme.type.caption.colored(c.ink2))
                 }
             }
-            VButton(
-                text = "Remove",
-                onClick = onRemove,
-                variant = VButtonVariant.Ghost,
-                size = VButtonSize.Sm,
-                leading = { Icon(VIcons.Close, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                enabled = !mutating,
-            )
+            Icon(VIcons.ArrowRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
         }
     }
 }
+
+// ───────────────────────────── dialogs ─────────────────────────────
 
 /**
  * RA-22: add-teacher form. A teacher is provisioned by email (with an initial
@@ -457,6 +612,92 @@ private fun AddTeacherDialog(
         }
     }
 }
+
+/**
+ * RA-S17: add-staff form for a non-teaching-staff member. Name + role required;
+ * department / phone / email optional. Frozen primitives only.
+ */
+@Composable
+private fun AddStaffDialog(
+    isSubmitting: Boolean,
+    onDismiss: () -> Unit,
+    onSubmit: (name: String, role: String, department: String, phone: String, email: String) -> Unit,
+) {
+    val c = VTheme.colors
+    var name by remember { mutableStateOf("") }
+    var role by remember { mutableStateOf("") }
+    var department by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+
+    val canSubmit = name.isNotBlank() && role.isNotBlank() && !isSubmitting
+
+    Dialog(onDismissRequest = onDismiss) {
+        VCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("Add staff member", style = VTheme.type.h3.colored(c.ink))
+                VInput(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = "Full name",
+                    placeholder = "e.g. Ramesh Kumar",
+                    leadingIcon = VIcons.User,
+                )
+                VInput(
+                    value = role,
+                    onValueChange = { role = it },
+                    label = "Role",
+                    placeholder = "e.g. Accountant, Librarian, Security",
+                    leadingIcon = VIcons.User,
+                )
+                VInput(
+                    value = department,
+                    onValueChange = { department = it },
+                    label = "Department (optional)",
+                    placeholder = "e.g. Office, Transport",
+                    leadingIcon = VIcons.Bookmark,
+                )
+                VInput(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = "Phone (optional)",
+                    placeholder = "98765 43210",
+                    leadingIcon = VIcons.Phone,
+                    keyboardType = KeyboardType.Phone,
+                )
+                VInput(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = "Email (optional)",
+                    placeholder = "staff@school.edu",
+                    leadingIcon = VIcons.Mail,
+                    keyboardType = KeyboardType.Email,
+                )
+                Spacer(Modifier.height(4.dp))
+                VButton(
+                    text = "Add staff",
+                    onClick = { onSubmit(name, role, department, phone, email) },
+                    variant = VButtonVariant.Primary,
+                    full = true,
+                    enabled = canSubmit,
+                    loading = isSubmitting,
+                )
+                VButton(
+                    text = "Cancel",
+                    onClick = onDismiss,
+                    variant = VButtonVariant.Ghost,
+                    full = true,
+                    enabled = !isSubmitting,
+                )
+            }
+        }
+    }
+}
+
+// ───────────────────────────── analytics bits ─────────────────────────────
 
 @Composable
 private fun RiskTile(label: String, count: Int, tone: Color, modifier: Modifier = Modifier) {

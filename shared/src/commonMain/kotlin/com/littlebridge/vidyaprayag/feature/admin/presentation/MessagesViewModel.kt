@@ -23,6 +23,7 @@ import com.littlebridge.vidyaprayag.feature.admin.domain.model.Message
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.MessageThread
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.SendMessageRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.repository.MessagesRepository
+import com.littlebridge.vidyaprayag.feature.admin.domain.repository.TeachersRepository
 import com.littlebridge.vidyaprayag.util.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -59,13 +60,36 @@ data class ConversationState(
     val error: String? = null
 )
 
+/**
+ * RA-S07 — compose-new state. A recipient candidate is any teacher in the admin's school
+ * (`GET /api/v1/school/messages` accepts `recipient_user_id`; `TeacherAccountDto.id` IS the
+ * recipient's app_users id). `isOpen` drives the compose sheet; `candidates` is the picker list.
+ */
+data class ComposeState(
+    val isOpen: Boolean = false,
+    val isLoadingRecipients: Boolean = false,
+    val candidates: List<MessageRecipient> = emptyList(),
+    val error: String? = null,
+)
+
+/** A pickable recipient for compose-new (id = app_users id used as recipient_user_id). */
+data class MessageRecipient(
+    val id: String,
+    val name: String,
+    val subtitle: String,
+)
+
 class MessagesViewModel(
     private val messagesRepository: MessagesRepository,
-    private val preferenceRepository: PreferenceRepository
+    private val preferenceRepository: PreferenceRepository,
+    private val teachersRepository: TeachersRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(MessagesState())
     val state: StateFlow<MessagesState> = _state.asStateFlow()
+
+    private val _compose = MutableStateFlow(ComposeState())
+    val compose: StateFlow<ComposeState> = _compose.asStateFlow()
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -161,6 +185,7 @@ class MessagesViewModel(
     fun sendMessage(
         body: String,
         threadId: String? = null,
+        recipientUserId: String? = null,
         onSent: (() -> Unit)? = null
     ) {
         if (body.isBlank()) {
@@ -179,7 +204,14 @@ class MessagesViewModel(
                 return@launch
             }
 
-            val request = SendMessageRequest(threadId = threadId, body = body)
+            // RA-S07: pass recipient_user_id so a NULL thread starts a real 1:1 conversation
+            // (compose-new), not a self/system thread. The two-row engine + server already
+            // support this; only the UI/VM wiring was missing.
+            val request = SendMessageRequest(
+                threadId = threadId,
+                recipientUserId = recipientUserId,
+                body = body,
+            )
             when (val result = messagesRepository.sendMessage(token, request)) {
                 is NetworkResult.Success -> {
                     AppLogger.d(
@@ -335,6 +367,53 @@ class MessagesViewModel(
     /** Closes the conversation view and resets its state. */
     fun closeConversation() {
         _conversation.value = ConversationState()
+    }
+
+    /**
+     * RA-S07 — open the compose-new sheet and load recipient candidates (the school's teachers).
+     * Reuses the existing teachers roster endpoint; `TeacherAccountDto.id` is the recipient's
+     * app_users id, which is exactly what the messaging engine needs as `recipient_user_id`.
+     */
+    fun openCompose() {
+        _compose.value = ComposeState(isOpen = true, isLoadingRecipients = true)
+        viewModelScope.launch {
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _compose.value = _compose.value.copy(isLoadingRecipients = false, error = "Not signed in")
+                return@launch
+            }
+            when (val result = teachersRepository.getTeachers(token)) {
+                is NetworkResult.Success -> {
+                    val candidates = result.data.data?.teachers.orEmpty().map {
+                        MessageRecipient(
+                            id = it.id,
+                            name = it.name,
+                            subtitle = it.role.replaceFirstChar { ch -> ch.uppercase() },
+                        )
+                    }
+                    _compose.value = _compose.value.copy(isLoadingRecipients = false, candidates = candidates, error = null)
+                }
+                is NetworkResult.Error -> _compose.value = _compose.value.copy(isLoadingRecipients = false, error = result.message)
+                is NetworkResult.ConnectionError -> _compose.value = _compose.value.copy(isLoadingRecipients = false, error = "Connection error")
+            }
+        }
+    }
+
+    /** RA-S07 — dismiss the compose sheet. */
+    fun closeCompose() {
+        _compose.value = ComposeState()
+    }
+
+    /**
+     * RA-S07 — start a NEW 1:1 conversation with [recipientUserId]. On success the compose sheet
+     * closes, threads refresh, and we open the freshly-created thread so the admin lands in it.
+     */
+    fun composeNew(recipientUserId: String, body: String) {
+        if (recipientUserId.isBlank()) { _compose.value = _compose.value.copy(error = "Pick a recipient"); return }
+        if (body.isBlank()) { _compose.value = _compose.value.copy(error = "Message cannot be empty"); return }
+        sendMessage(body = body, threadId = null, recipientUserId = recipientUserId) {
+            closeCompose()
+        }
     }
 
     /** Dismisses an inline error inside the conversation view. */

@@ -72,6 +72,7 @@ private fun TeacherProfileContent(
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     // RA-21: logout is destructive — gate it behind a confirmation dialog.
     var showLogoutConfirm by remember { mutableStateOf(false) }
 
@@ -135,28 +136,47 @@ private fun TeacherProfileContent(
                 }
                 Spacer(Modifier.height(24.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    data class ProfileRow(val title: String, val sub: String, val onClick: (() -> Unit)?)
                     val rows = listOfNotNull(
-                        ("Personal details" to listOfNotNull(
-                            me.phone.ifBlank { null },
-                            me.email.ifBlank { null }).joinToString(" • ")
-                            .ifBlank { "Mobile, email, photo" }),
-                        ("Classes" to me.classes.joinToString(", ")
-                            .ifBlank { "—" }).takeIf { me.classes.isNotEmpty() },
-                        ("Notification preferences" to "Push, WhatsApp, quiet hours"),
-                        ("Change password" to "Keep your account secure"),
-                        ("Help & support" to "Contact VidyaSetu"),
+                        ProfileRow(
+                            "Personal details",
+                            listOfNotNull(
+                                me.phone.ifBlank { null },
+                                me.email.ifBlank { null },
+                            ).joinToString(" • ").ifBlank { "Mobile, email, photo" },
+                            null,
+                        ),
+                        ProfileRow(
+                            "Classes",
+                            me.classes.joinToString(", ").ifBlank { "—" },
+                            null,
+                        ).takeIf { me.classes.isNotEmpty() },
+                        ProfileRow("Notification preferences", "Push, WhatsApp, quiet hours", null),
+                        ProfileRow("Change password", "Keep your account secure", null),
+                        ProfileRow(
+                            "Help & support",
+                            "Email ${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}",
+                            {
+                                runCatching {
+                                    uriHandler.openUri(
+                                        "mailto:${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}" +
+                                            "?subject=VidyaSetu%20Support",
+                                    )
+                                }
+                            },
+                        ),
                     )
-                    rows.forEach { (title, sub) ->
-                        VCard {
+                    rows.forEach { row ->
+                        VCard(onClick = row.onClick) {
                             Row(
                                 Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Column(Modifier.weight(1f)) {
-                                    Text(title, style = VTheme.type.bodyStrong.colored(c.ink))
+                                    Text(row.title, style = VTheme.type.bodyStrong.colored(c.ink))
                                     Text(
-                                        sub,
+                                        row.sub,
                                         style = VTheme.type.caption.colored(c.ink2)
                                             .copy(fontSize = 11.sp)
                                     )

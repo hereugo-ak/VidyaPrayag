@@ -116,6 +116,7 @@ fun VButton(
     enabled: Boolean = true,
     stateful: Boolean = false,
     loading: Boolean = false,
+    success: Boolean = false,
     successLabel: String = "Done",
     successDurationMs: Long = 1400L,
     leading: (@Composable () -> Unit)? = null,
@@ -134,14 +135,21 @@ fun VButton(
     val iconSize = if (size == VButtonSize.Sm) 14.dp else 18.dp
 
     // Phase state machine.
+    //
+    // RA-S18: `stateful = true` is the legacy fire-and-forget timer (idle→loading→success→idle on
+    // a delay), which animates a FABRICATED "success" with no coupling to the network result.
+    // Result-driven callers must instead pass `stateful = false` with real `loading` (spinner while
+    // the request is in flight) and real `success` (check + successLabel once the VM confirms the
+    // write). External `success` always wins over `loading` so the confirmation can't be masked.
     var phase by remember { mutableStateOf(VButtonPhase.Idle) }
     val activePhase = when {
         stateful -> phase
+        success -> VButtonPhase.Success
         loading -> VButtonPhase.Loading
         else -> VButtonPhase.Idle
     }
     LaunchedEffect(phase) {
-        if (phase == VButtonPhase.Loading) {
+        if (stateful && phase == VButtonPhase.Loading) {
             delay(650)
             phase = VButtonPhase.Success
             delay(successDurationMs)

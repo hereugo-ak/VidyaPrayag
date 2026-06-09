@@ -92,10 +92,25 @@ fun Route.parentFeesRouting() {
                     call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
                 }
 
+                // RA-S05: optional ?child_id= scopes the fee aggregation to a
+                // single child. Parsed defensively (a malformed id is ignored,
+                // not an error). Filtering is applied in-memory after the
+                // parent-scoped fetch to stay Postgres-portable (no extra WHERE
+                // that would need an index) and to keep tenancy on parentId.
+                val childIdFilter = call.request.queryParameters["child_id"]
+                    ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+
                 val response = dbQuery {
                     val rows = FeeRecordsTable.selectAll()
                         .where { FeeRecordsTable.parentId eq uid }
                         .toList()
+                        // RA-S05: when a child is selected, only that child's records
+                        // count toward the stats. Records with a null child_id
+                        // (school-wide / unassigned) are excluded from a per-child view.
+                        .let { all ->
+                            if (childIdFilter == null) all
+                            else all.filter { it[FeeRecordsTable.childId] == childIdFilter }
+                        }
 
                     // RA-25: fall back to INR (India-first) when the parent has no
                     // fee record yet, instead of USD.

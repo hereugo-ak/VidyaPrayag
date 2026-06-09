@@ -90,3 +90,28 @@ data class ParentSendMessageResponse(
     val message: String? = null,
     val data: ParentSendMessageData? = null,
 )
+
+/**
+ * RA-S07 — a person the parent can START a conversation with (a teacher or admin
+ * in the child's school). `id` is the recipient's app_users id, usable directly as
+ * `recipient_user_id` on POST /api/v1/parent/messages.
+ * Server: GET /api/v1/parent/messages/recipients.
+ */
+@Serializable
+data class ParentRecipientDto(
+    val id: String,
+    val name: String,
+    val role: String = "",
+    val subtitle: String = "",
+    @SerialName("image_url") val imageUrl: String? = null,
+    @SerialName("is_class_teacher") val isClassTeacher: Boolean = false,
+)
+
+@Serializable
+data class ParentRecipientsData(val recipients: List<ParentRecipientDto> = emptyList())
+
+@Serializable
+data class ParentRecipientsResponse(
+    val success: Boolean = false,
+    val data: ParentRecipientsData? = null,
+)

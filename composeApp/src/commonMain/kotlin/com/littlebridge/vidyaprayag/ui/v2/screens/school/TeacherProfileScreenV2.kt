@@ -10,12 +10,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherProfileDto
 import com.littlebridge.vidyaprayag.feature.admin.presentation.TeacherProfileUiState
@@ -24,7 +29,10 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBackHeader
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
+import com.littlebridge.vidyaprayag.ui.v2.components.VButton
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
+import com.littlebridge.vidyaprayag.ui.v2.components.VConfirmDialog
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.screens.VSectionHeader
 import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
@@ -43,17 +51,23 @@ import org.koin.compose.viewmodel.koinViewModel
 fun TeacherProfileScreenV2(
     teacherId: String,
     onBack: () -> Unit = {},
+    // RA-S17: called after a successful soft-delete so the host can pop back to
+    // People and refresh the roster.
+    onRemoved: () -> Unit = onBack,
     modifier: Modifier = Modifier,
     viewModel: TeacherProfileViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
     LaunchedEffect(teacherId) { viewModel.load(teacherId) }
+    // RA-S17: when the VM confirms removal, leave the profile.
+    LaunchedEffect(state.removed) { if (state.removed) onRemoved() }
 
     Column(modifier.fillMaxSize()) {
         VBackHeader(title = "Teacher", onBack = onBack)
         TeacherProfileContent(
             state = state,
             onRetry = viewModel::retry,
+            onRemove = { viewModel.remove(teacherId) },
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -63,8 +77,12 @@ fun TeacherProfileScreenV2(
 private fun TeacherProfileContent(
     state: TeacherProfileUiState,
     onRetry: () -> Unit,
+    onRemove: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val c = VTheme.colors
+    var confirmRemove by remember { mutableStateOf(false) }
+
     Column(
         modifier
             .verticalScroll(rememberScrollState())
@@ -83,8 +101,36 @@ private fun TeacherProfileContent(
         ) {
             val p = state.profile ?: return@VStateHost
             TeacherProfileBody(p)
+
+            // RA-S17: destructive action lives INSIDE the profile (not as a
+            // direct list-row button), behind a confirm dialog.
+            Spacer(Modifier.height(12.dp))
+            state.removeError?.let { err ->
+                Text(err, style = VTheme.type.caption.colored(c.danger))
+                Spacer(Modifier.height(8.dp))
+            }
+            VButton(
+                text = "Remove from school",
+                onClick = { confirmRemove = true },
+                variant = VButtonVariant.Destructive,
+                full = true,
+                enabled = !state.isRemoving,
+                loading = state.isRemoving,
+                leading = { Icon(VIcons.Close, contentDescription = null, modifier = Modifier.size(16.dp)) },
+            )
         }
     }
+
+    VConfirmDialog(
+        visible = confirmRemove,
+        title = "Remove teacher",
+        message = "Remove ${state.profile?.name ?: "this teacher"} from your school? " +
+            "They will lose access immediately. This can be reversed by re-adding them.",
+        confirmLabel = "Remove",
+        icon = VIcons.AlertTriangle,
+        onConfirm = { confirmRemove = false; onRemove() },
+        onDismiss = { confirmRemove = false },
+    )
 }
 
 @Composable

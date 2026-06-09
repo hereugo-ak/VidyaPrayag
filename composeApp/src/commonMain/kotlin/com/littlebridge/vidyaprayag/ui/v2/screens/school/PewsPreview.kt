@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -25,11 +26,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -39,44 +36,42 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 
 /**
- * PewsPreview — a pixel-faithful copy of `mockups.tsx → PEWSPreview`.
+ * PewsPreview — a **label-free schematic teaser** for the PEWS (Predictive Early Warning System)
+ * entry card on the admin home.
  *
- * The rich preview body shown inside the AdminHome "PEWS — Predictive Early Warning" [VComingSoon]
- * (Admin.tsx:168). Renders: a "RISK BAND • TODAY" card with a 3-tile Low/Watch/High grid, a
- * "HIGHEST PRIORITY" at-risk list (per-student score chip color-coded by threshold), and a dashed
- * "SUGGESTED INTERVENTION" box. All colors are the exact React literals.
+ * RA-S10 (TIER 0, honesty / LAW 6): the previous implementation rendered **fabricated, named
+ * "at-risk" students** ("Aman Verma 9-B 78", "Ishita Roy 10-A 64", …) and invented risk counts
+ * ("180 students scored", Low 142 / Watch 27 / High 11) plus a fabricated "SUGGESTED INTERVENTION"
+ * sentence directly on the live admin home — an admin could mistake fiction for signal and act on a
+ * student who does not exist.
+ *
+ * The *real* at-risk cohort is served by `GET /api/v1/student-cohort` and rendered on the People tab
+ * (opened via `onOpenPews`), so this preview must never invent data. It is now a purely illustrative
+ * chrome — abstract risk-band bars, shimmer placeholder rows, no names, no numbers — that reads
+ * unmistakably as "feature preview". All real numbers live one tap away on the cohort screen.
  */
 @Composable
 fun PewsPreview(modifier: Modifier = Modifier) {
     val c = VTheme.colors
-    val atRisk = listOf(
-        Triple("Aman Verma", "9-B", 78) to "Attendance ↓ 22%, Maths −18 pts",
-        Triple("Ishita Roy", "10-A", 64) to "Late submissions, mood dip flagged",
-        Triple("Karan Singh", "9-A", 52) to "Fee overdue, syllabus gap",
-    )
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        // ── Risk band card ───────────────────────────────────────────────────────
+        // ── Risk-band schematic (no counts) ──────────────────────────────────────
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.cream).padding(12.dp),
         ) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                // 11 / 700 / ink-3 / 0.08em
-                Text(
-                    "RISK BAND • TODAY",
-                    style = VTheme.type.label.colored(c.ink3).copy(fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 0.08.em),
-                )
-                Text("180 students scored", style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 10.sp))
-            }
+            Text(
+                "RISK BAND",
+                style = VTheme.type.label.colored(c.ink3).copy(fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 0.08.em),
+            )
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                RiskTile("Low", 142, Color(0xFFA8E6CF), Color(0xFF155E3A), Modifier.weight(1f))
-                RiskTile("Watch", 27, Color(0xFFFFD4A3), Color(0xFF7A3F00), Modifier.weight(1f))
-                RiskTile("High", 11, Color(0xFFFFADA8), Color(0xFF7A1C18), Modifier.weight(1f))
+                RiskBandTile("Low", Color(0xFFA8E6CF), Color(0xFF155E3A), Modifier.weight(1f))
+                RiskBandTile("Watch", Color(0xFFFFD4A3), Color(0xFF7A3F00), Modifier.weight(1f))
+                RiskBandTile("High", Color(0xFFFFADA8), Color(0xFF7A1C18), Modifier.weight(1f))
             }
         }
 
-        // ── Highest priority ──────────────────────────────────────────────────────
+        // ── Highest-priority placeholder rows (no names, no scores) ──────────────
         Column {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(VIcons.AlertTriangle, contentDescription = null, tint = Color(0xFF7A1C18), modifier = Modifier.size(13.dp))
@@ -87,42 +82,11 @@ fun PewsPreview(modifier: Modifier = Modifier) {
             }
             Spacer(Modifier.height(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                atRisk.forEach { (who, drivers) ->
-                    val (name, cls, score) = who
-                    // § §mockups score chip: >70 rose / >55 peach / else #FFE7B0; fg >70 #7a1c18 else #7a3f00.
-                    val chipBg = when {
-                        score > 70 -> Color(0xFFFFADA8)
-                        score > 55 -> Color(0xFFFFD4A3)
-                        else -> Color(0xFFFFE7B0)
-                    }
-                    val chipFg = if (score > 70) Color(0xFF7A1C18) else Color(0xFF7A3F00)
-                    Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(c.cream).padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Box(
-                            Modifier.width(40.dp).clip(RoundedCornerShape(6.dp)).background(chipBg).padding(vertical = 4.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(score.toString(), style = VTheme.type.dataSm.colored(chipFg).copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold))
-                        }
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                buildAnnotatedString {
-                                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(name) }
-                                    withStyle(SpanStyle(color = c.ink3, fontWeight = FontWeight.Medium)) { append(" · $cls") }
-                                },
-                                style = VTheme.type.caption.colored(c.ink).copy(fontSize = 12.sp),
-                            )
-                            Text(drivers, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp), maxLines = 1)
-                        }
-                    }
-                }
+                repeat(3) { PlaceholderRow() }
             }
         }
 
-        // ── Suggested intervention (dashed teal box) ───────────────────────────────
+        // ── Suggested intervention (generic, dashed teal box) ────────────────────
         Column(
             Modifier
                 .fillMaxWidth()
@@ -140,21 +104,41 @@ fun PewsPreview(modifier: Modifier = Modifier) {
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                "Schedule a parent call for the 3 high-risk students this week. Recommend remedial Maths slot Tue/Thu.",
+                "Open the cohort to see this week's at-risk students and recommended actions.",
                 style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 18.sp),
             )
         }
     }
 }
 
+/** A band tile showing only its colour + label — no count, since the real number lives on the cohort screen. */
 @Composable
-private fun RiskTile(label: String, n: Int, bg: Color, fg: Color, modifier: Modifier = Modifier) {
+private fun RiskBandTile(label: String, bg: Color, fg: Color, modifier: Modifier = Modifier) {
     Column(
-        modifier.clip(RoundedCornerShape(10.dp)).background(bg).padding(8.dp),
+        modifier.clip(RoundedCornerShape(10.dp)).background(bg).padding(vertical = 14.dp, horizontal = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(n.toString(), style = VTheme.type.dataLg.colored(fg).copy(fontSize = 18.sp, fontWeight = FontWeight.SemiBold), textAlign = TextAlign.Center)
-        Text(label, style = VTheme.type.caption.colored(fg).copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold), textAlign = TextAlign.Center)
+        // Abstract "value" bar instead of an invented number.
+        Box(Modifier.width(22.dp).height(6.dp).clip(RoundedCornerShape(3.dp)).background(fg.copy(alpha = 0.55f)))
+        Spacer(Modifier.height(8.dp))
+        Text(label, style = VTheme.type.caption.colored(fg).copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold))
+    }
+}
+
+/** A neutral placeholder row — avatar dot + two grey bars — that reads as "preview", never as a real student. */
+@Composable
+private fun PlaceholderRow() {
+    val c = VTheme.colors
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(c.cream).padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(Modifier.size(28.dp).clip(CircleShape).background(c.ink.copy(alpha = 0.08f)))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(Modifier.fillMaxWidth(0.55f).height(8.dp).clip(RoundedCornerShape(4.dp)).background(c.ink.copy(alpha = 0.10f)))
+            Box(Modifier.fillMaxWidth(0.8f).height(7.dp).clip(RoundedCornerShape(4.dp)).background(c.ink.copy(alpha = 0.06f)))
+        }
     }
 }
 
