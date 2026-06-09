@@ -378,7 +378,7 @@ val viewModelModule = module {
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.StudentRosterViewModel(get(), get()) } // RA-45
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.StaffViewModel(get(), get()) } // RA-S17
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.StudentProfileViewModel(get(), get()) } // RA-45
-    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.TeacherProfileViewModel(get(), get()) } // RA-45
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.TeacherProfileViewModel(get(), get(), get()) } // RA-45 (+RA-S17 delete-in-profile)
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolRecordsViewModel(get(), get()) } // RA-52
     factory { AdmissionCRMViewModel(get(), get()) }
     factory { SchoolAnnouncementsViewModel(get(), get()) }
