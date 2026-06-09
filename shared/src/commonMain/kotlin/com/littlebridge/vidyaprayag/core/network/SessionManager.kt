@@ -1,9 +1,8 @@
 package com.littlebridge.vidyaprayag.core.network
 
 import io.ktor.client.HttpClient
-import io.ktor.client.plugins.auth.Auth
+import io.ktor.client.plugins.auth.authProviders
 import io.ktor.client.plugins.auth.providers.BearerAuthProvider
-import io.ktor.client.plugins.plugin
 
 /**
  * RA-S01 (TIER -1, SECURITY) — clears the Ktor [Auth] plugin's in-memory bearer-token cache.
@@ -26,11 +25,14 @@ class SessionManager(
 ) {
     /** Evict every cached bearer token so the next request re-resolves from the (now-cleared) store. */
     fun clearAuthCache() {
+        // Ktor 3.x: the installed `Auth` plugin instance returned by `client.plugin(Auth)` does NOT
+        // expose its providers publicly — only `AuthConfig.providers` (the config block) does, which
+        // is not accessible post-install. The public, supported way to reach the live providers is the
+        // `HttpClient.authProviders` extension property (snapshot list stored in client attributes).
         runCatching {
-            client.plugin(Auth)
-                .providers
+            client.authProviders
                 .filterIsInstance<BearerAuthProvider>()
-                .forEach { it.clearToken() }
+                .forEach { provider -> provider.clearToken() }
         }
     }
 }
