@@ -26,10 +26,12 @@ import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.okMessage
 import com.littlebridge.vidyaprayag.core.principalUserUuid
+import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.ChildrenTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.MessageThreadsTable
 import com.littlebridge.vidyaprayag.db.MessagesTable
+import com.littlebridge.vidyaprayag.db.TeacherPeriodsTable
 import com.littlebridge.vidyaprayag.feature.school.conversationMessagesFor
 import com.littlebridge.vidyaprayag.feature.school.resolveMessagingUser
 import com.littlebridge.vidyaprayag.feature.school.notifyMessageRecipient
@@ -43,6 +45,7 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import java.time.Instant
@@ -103,6 +106,26 @@ data class ParentSendMessageResponse(
     @SerialName("message_id") val messageId: String
 )
 
+/**
+ * RA-S07 — a person a parent can START a conversation with: a teacher or admin in
+ * the parent's child's school. `id` is the recipient's `app_users.id`, which is
+ * exactly what `POST /api/v1/parent/messages` accepts as `recipient_user_id`.
+ * `isClassTeacher` flags teachers who teach one of the child's grades (resolved via
+ * the school timetable) so the client can surface them first / label them.
+ */
+@Serializable
+data class ParentRecipientDto(
+    val id: String,
+    val name: String,
+    val role: String,
+    val subtitle: String,
+    @SerialName("image_url") val imageUrl: String? = null,
+    @SerialName("is_class_teacher") val isClassTeacher: Boolean = false,
+)
+
+@Serializable
+data class ParentRecipientsResponse(val recipients: List<ParentRecipientDto>)
+
 // ---------------- helpers ----------------
 
 private fun fmtParentTime(ts: Instant): String {
@@ -149,6 +172,75 @@ fun Route.parentMessagesRouting() {
                     ParentMessageThreadsResponse(rows)
                 }
                 call.ok(payload, message = "Threads fetched successfully")
+            }
+
+            // -------- RECIPIENTS (RA-S07: compose-new picker) --------
+            // Who can the parent START a conversation with? Every active teacher and
+            // admin in the parent's child's school. Teachers who teach one of the
+            // child's grades (per the school timetable) are flagged + sorted first.
+            // The school is derived from the child (NEVER the body / a user id).
+            get("/recipients") {
+                val uid = call.principalUserUuid() ?: run { call.fail("Unauthorized", HttpStatusCode.Unauthorized); return@get }
+
+                val payload = dbQuery {
+                    val schoolId = resolveParentSchoolId(uid) ?: resolveMessagingUser(uid)?.schoolId
+                        ?: return@dbQuery ParentRecipientsResponse(emptyList())
+
+                    // The child's grade(s) — used to flag the class teacher(s).
+                    val childGrades = ChildrenTable.selectAll()
+                        .where { (ChildrenTable.parentId eq uid) and (ChildrenTable.isActive eq true) }
+                        .mapNotNull { it[ChildrenTable.currentGrade]?.takeIf { g -> g.isNotBlank() } }
+                        .toSet()
+
+                    // Teacher ids who teach one of those grades (timetable-driven; empty if no
+                    // timetable). Filter the grade match in-memory (portable, set-based) to stay
+                    // consistent with the project's Exposed-version-safe approach (no `inList`).
+                    val classTeacherIds: Set<UUID> = if (childGrades.isEmpty()) emptySet() else
+                        TeacherPeriodsTable.selectAll()
+                            .where { TeacherPeriodsTable.schoolId eq schoolId }
+                            .filter { it[TeacherPeriodsTable.className] in childGrades }
+                            .map { it[TeacherPeriodsTable.teacherId] }
+                            .toSet()
+
+                    // All active teachers + admins in the school (the addressable desk).
+                    // Portable OR-reduce instead of `inList` (Exposed-version-safe, see
+                    // AnnouncementRouting / TeacherMessagesRouting).
+                    val roleFilter = listOf("teacher", "admin", "school_admin")
+                        .map { r -> AppUsersTable.role eq r }
+                        .reduce { acc, op -> acc or op }
+                    val recipients = AppUsersTable.selectAll()
+                        .where {
+                            (AppUsersTable.schoolId eq schoolId) and
+                                (AppUsersTable.isActive eq true) and
+                                roleFilter
+                        }
+                        .map { row ->
+                            val id = row[AppUsersTable.id].value
+                            val role = row[AppUsersTable.role]
+                            val isClassTeacher = id in classTeacherIds
+                            ParentRecipientDto(
+                                id = id.toString(),
+                                name = row[AppUsersTable.fullName],
+                                role = role,
+                                subtitle = when {
+                                    isClassTeacher -> "Class teacher"
+                                    role == "teacher" -> "Teacher"
+                                    else -> "School office"
+                                },
+                                imageUrl = row[AppUsersTable.profilePicUrl],
+                                isClassTeacher = isClassTeacher,
+                            )
+                        }
+                        // Class teachers first, then teachers, then admins; alphabetical within a band.
+                        .sortedWith(
+                            compareByDescending<ParentRecipientDto> { it.isClassTeacher }
+                                .thenByDescending { it.role == "teacher" }
+                                .thenBy { it.name.lowercase() }
+                        )
+
+                    ParentRecipientsResponse(recipients)
+                }
+                call.ok(payload, message = "Recipients fetched")
             }
 
             // -------- CONVERSATION --------

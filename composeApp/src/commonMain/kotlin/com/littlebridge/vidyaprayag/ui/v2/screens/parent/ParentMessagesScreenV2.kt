@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.ParentMessageDto
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.ParentMessageThreadDto
+import com.littlebridge.vidyaprayag.feature.parent.domain.model.ParentRecipientDto
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentMessageViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBackHeader
@@ -64,35 +66,61 @@ fun ParentMessagesScreenV2(
 
     androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.loadThreads() }
 
+    // Back peels layers in order: compose-new → open conversation → exit.
     val backHandler: () -> Unit = {
-        if (state.openThreadId != null) viewModel.closeThread() else onBack()
+        when {
+            state.composeOpen -> viewModel.closeCompose()
+            state.openThreadId != null -> viewModel.closeThread()
+            else -> onBack()
+        }
     }
-    val title = if (state.openThreadId != null) state.openThreadName.ifBlank { "Conversation" } else "Messages"
+    val title = when {
+        state.composeOpen -> "New message"
+        state.openThreadId != null -> state.openThreadName.ifBlank { "Conversation" }
+        else -> "Messages"
+    }
 
     Column(modifier.fillMaxSize()) {
         VBackHeader(title = title, onBack = backHandler)
 
-        if (state.openThreadId != null) {
-            ParentConversationContent(
-                messages = state.messages,
-                loading = state.conversationLoading,
-                error = state.conversationError,
-                isEmpty = state.conversationEmpty,
-                sending = state.sending,
-                onSend = viewModel::reply,
-                onRetry = { state.openThreadId?.let { viewModel.openThread(it, state.openThreadName) } },
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            ParentThreadListContent(
-                threads = state.threads,
-                loading = state.loading,
-                error = state.error,
-                isEmpty = state.isEmpty,
-                onOpenThread = { t -> viewModel.openThread(t.id, t.senderName) },
-                onRetry = viewModel::loadThreads,
-                modifier = Modifier.fillMaxSize(),
-            )
+        when {
+            // RA-S07: compose-new is the topmost layer (back closes it first).
+            state.composeOpen -> {
+                ParentComposeNewContent(
+                    recipients = state.composeRecipients,
+                    loading = state.composeLoadingRecipients,
+                    error = state.composeError,
+                    isEmpty = state.composeEmpty,
+                    sending = state.sending,
+                    onSend = viewModel::composeNew,
+                    onRetry = viewModel::openCompose,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            state.openThreadId != null -> {
+                ParentConversationContent(
+                    messages = state.messages,
+                    loading = state.conversationLoading,
+                    error = state.conversationError,
+                    isEmpty = state.conversationEmpty,
+                    sending = state.sending,
+                    onSend = viewModel::reply,
+                    onRetry = { state.openThreadId?.let { viewModel.openThread(it, state.openThreadName) } },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            else -> {
+                ParentThreadListContent(
+                    threads = state.threads,
+                    loading = state.loading,
+                    error = state.error,
+                    isEmpty = state.isEmpty,
+                    onOpenThread = { t -> viewModel.openThread(t.id, t.senderName) },
+                    onCompose = viewModel::openCompose,
+                    onRetry = viewModel::loadThreads,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
     }
 }
@@ -104,6 +132,7 @@ private fun ParentThreadListContent(
     error: String?,
     isEmpty: Boolean,
     onOpenThread: (ParentMessageThreadDto) -> Unit,
+    onCompose: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -115,6 +144,22 @@ private fun ParentThreadListContent(
             .padding(top = 16.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // RA-S07: compose-new entry point — parents can now INITIATE a conversation
+        // with their child's teacher / the school office, not just reply.
+        VButton(
+            text = "New message",
+            onClick = onCompose,
+            full = true,
+            size = VButtonSize.Md,
+            tone = VButtonTone.Teal,
+            leading = {
+                androidx.compose.material3.Icon(
+                    VIcons.Chat,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+            },
+        )
         VStateHost(
             loading = loading,
             error = error,
@@ -165,6 +210,112 @@ private fun ParentThreadRow(thread: ParentMessageThreadDto, onClick: () -> Unit)
         }
         if (thread.unreadCount > 0) {
             VBadge(text = thread.unreadCount.toString(), tone = VBadgeTone.Arctic)
+        }
+    }
+}
+
+/**
+ * RA-S07 — parent compose-NEW: pick a recipient (the child's class teacher / school office),
+ * type a message, send. `onSend(recipientUserId, body)` starts a real 1:1 conversation.
+ */
+@Composable
+private fun ParentComposeNewContent(
+    recipients: List<ParentRecipientDto>,
+    loading: Boolean,
+    error: String?,
+    isEmpty: Boolean,
+    sending: Boolean,
+    onSend: (String, String) -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+    var selected by remember { mutableStateOf<ParentRecipientDto?>(null) }
+    var body by remember { mutableStateOf("") }
+
+    Column(modifier) {
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            VStateHost(
+                loading = loading,
+                error = error,
+                isEmpty = isEmpty,
+                emptyTitle = "No one to message yet",
+                emptyBody = "Link your child to a school to message their teachers and the office.",
+                emptyIcon = VIcons.Chat,
+                onRetry = onRetry,
+            ) {
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp)
+                        .padding(top = 16.dp, bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text("To", style = VTheme.type.caption.colored(c.ink3))
+                    VCard {
+                        recipients.forEachIndexed { i, r ->
+                            if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(c.border1))
+                            ParentRecipientRow(
+                                recipient = r,
+                                isSelected = selected?.id == r.id,
+                                onClick = { selected = r },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Box(Modifier.fillMaxWidth().background(c.card).padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(Modifier.weight(1f)) {
+                    VInput(
+                        value = body,
+                        onValueChange = { body = it },
+                        placeholder = if (selected == null) "Pick a recipient above…" else "Message ${selected!!.name}…",
+                        enabled = selected != null && !sending,
+                    )
+                }
+                VButton(
+                    text = "Send",
+                    onClick = {
+                        val r = selected
+                        if (r != null && body.isNotBlank()) onSend(r.id, body)
+                    },
+                    size = VButtonSize.Md,
+                    tone = VButtonTone.Teal,
+                    loading = sending,
+                    enabled = selected != null && body.isNotBlank() && !sending,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ParentRecipientRow(recipient: ParentRecipientDto, isSelected: Boolean, onClick: () -> Unit) {
+    val c = VTheme.colors
+    val interaction = remember { MutableInteractionSource() }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        VAvatar(name = recipient.name.ifBlank { "?" }, src = recipient.imageUrl, size = 40.dp)
+        Column(Modifier.weight(1f)) {
+            Text(recipient.name, style = VTheme.type.bodyStrong.colored(c.ink))
+            Text(recipient.subtitle, style = VTheme.type.caption.colored(c.ink3))
+        }
+        if (isSelected) {
+            VBadge(text = "Selected", tone = VBadgeTone.Arctic)
         }
     }
 }

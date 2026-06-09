@@ -6,6 +6,7 @@ import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.ParentMessageDto
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.ParentMessageThreadDto
+import com.littlebridge.vidyaprayag.feature.parent.domain.model.ParentRecipientDto
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.ParentSendMessageRequest
 import com.littlebridge.vidyaprayag.feature.parent.domain.repository.ParentRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,13 +38,21 @@ data class ParentMessageState(
     val conversationLoading: Boolean = false,
     val conversationError: String? = null,
 
-    // compose
+    // compose (reply)
     val sending: Boolean = false,
     val sendError: String? = null,
+
+    // RA-S07 — compose-NEW (start a conversation with a teacher/admin)
+    val composeOpen: Boolean = false,
+    val composeLoadingRecipients: Boolean = false,
+    val composeRecipients: List<ParentRecipientDto> = emptyList(),
+    val composeError: String? = null,
 ) {
     val isEmpty: Boolean get() = !loading && error == null && threads.isEmpty()
     val conversationEmpty: Boolean
         get() = !conversationLoading && conversationError == null && messages.isEmpty()
+    val composeEmpty: Boolean
+        get() = !composeLoadingRecipients && composeError == null && composeRecipients.isEmpty()
 }
 
 class ParentMessageViewModel(
@@ -137,6 +146,79 @@ class ParentMessageViewModel(
                     _state.update { it.copy(sending = false, sendError = r.message) }
                 is NetworkResult.ConnectionError ->
                     _state.update { it.copy(sending = false, sendError = "Connection error") }
+            }
+        }
+    }
+
+    /**
+     * RA-S07 — open the compose-NEW sheet and load recipient candidates (the child's class
+     * teacher(s) + the school's admin desk). The parent can now INITIATE contact, not just reply.
+     */
+    fun openCompose() {
+        _state.update {
+            it.copy(composeOpen = true, composeLoadingRecipients = true, composeError = null, composeRecipients = emptyList())
+        }
+        viewModelScope.launch {
+            val token = token() ?: run {
+                _state.update { it.copy(composeLoadingRecipients = false, composeError = "Not signed in") }
+                return@launch
+            }
+            when (val r = repository.getMessageRecipients(token)) {
+                is NetworkResult.Success ->
+                    _state.update {
+                        it.copy(
+                            composeLoadingRecipients = false,
+                            composeRecipients = r.data.data?.recipients ?: emptyList(),
+                        )
+                    }
+                is NetworkResult.Error ->
+                    _state.update { it.copy(composeLoadingRecipients = false, composeError = r.message) }
+                is NetworkResult.ConnectionError ->
+                    _state.update { it.copy(composeLoadingRecipients = false, composeError = "Connection error") }
+            }
+        }
+    }
+
+    /** RA-S07 — dismiss the compose-new sheet. */
+    fun closeCompose() {
+        _state.update {
+            it.copy(composeOpen = false, composeLoadingRecipients = false, composeRecipients = emptyList(), composeError = null)
+        }
+    }
+
+    /**
+     * RA-S07 — start a NEW conversation with [recipientUserId]. On success we close the sheet,
+     * refresh the inbox, and open the freshly-created thread so the parent lands inside it.
+     */
+    fun composeNew(recipientUserId: String, body: String) {
+        if (recipientUserId.isBlank()) { _state.update { it.copy(composeError = "Pick a recipient") }; return }
+        if (body.isBlank()) { _state.update { it.copy(composeError = "Message cannot be empty") }; return }
+        viewModelScope.launch {
+            _state.update { it.copy(sending = true, composeError = null) }
+            val token = token() ?: run {
+                _state.update { it.copy(sending = false, composeError = "Not signed in") }
+                return@launch
+            }
+            val req = ParentSendMessageRequest(recipientUserId = recipientUserId, body = body.trim())
+            when (val r = repository.sendMessage(token, req)) {
+                is NetworkResult.Success -> {
+                    val newThreadId = r.data.data?.threadId
+                    val recipientName = _state.value.composeRecipients.firstOrNull { it.id == recipientUserId }?.name ?: ""
+                    _state.update {
+                        it.copy(
+                            sending = false,
+                            composeOpen = false,
+                            composeRecipients = emptyList(),
+                            composeError = null,
+                        )
+                    }
+                    loadThreads()
+                    if (newThreadId != null) openThread(newThreadId, recipientName)
+                }
+                is NetworkResult.Error ->
+                    _state.update { it.copy(sending = false, composeError = r.message) }
+                is NetworkResult.ConnectionError ->
+                    _state.update { it.copy(sending = false, composeError = "Connection error") }
             }
         }
     }

@@ -79,4 +79,8 @@ class ParentRepositoryImpl(
     override suspend fun sendMessage(token: String, request: ParentSendMessageRequest): NetworkResult<ParentSendMessageResponse> {
         return api.sendMessage(token, request)
     }
+
+    override suspend fun getMessageRecipients(token: String): NetworkResult<ParentRecipientsResponse> {
+        return api.getMessageRecipients(token)
+    }
 }

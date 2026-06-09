@@ -151,4 +151,11 @@ class ParentApi(
             }
         }
     }
+
+    // RA-S07: people the parent can start a conversation with (child's class teacher(s) + admin desk).
+    suspend fun getMessageRecipients(token: String): NetworkResult<ParentRecipientsResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/messages/recipients"))
+        }
+    }
 }
