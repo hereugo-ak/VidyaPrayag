@@ -83,6 +83,7 @@ private fun ParentProfileContent(
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     // RA-21: logout is destructive — gate it behind a confirmation dialog.
     var showLogoutConfirm by remember { mutableStateOf(false) }
 
@@ -156,7 +157,18 @@ private fun ParentProfileContent(
                             ProfileRow("Linked children", "Link a child or manage who you follow", onLinkChild),
                             ProfileRow("Notification preferences", "Push, WhatsApp, quiet hours", null),
                             ProfileRow("Change password", "Keep your account secure", null),
-                            ProfileRow("Help & support", "Contact VidyaPrayag", null),
+                            ProfileRow(
+                                "Help & support",
+                                "Email ${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}",
+                                {
+                                    runCatching {
+                                        uriHandler.openUri(
+                                            "mailto:${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}" +
+                                                "?subject=VidyaSetu%20Support",
+                                        )
+                                    }
+                                },
+                            ),
                         )
                         rows.forEach { row ->
                             VCard(onClick = row.onClick) {
