@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.core.state.SelectedChildHolder
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.CreateParentLeaveRequest
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.DashboardChildSummary
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.ParentLeaveDto
@@ -43,12 +44,24 @@ data class ParentLeaveState(
 class ParentLeaveViewModel(
     private val repository: ParentRepository,
     private val preferenceRepository: PreferenceRepository,
+    // RA-S05: shared selected-child source of truth across all parent tabs.
+    private val selectedChildHolder: SelectedChildHolder,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ParentLeaveState())
     val state: StateFlow<ParentLeaveState> = _state.asStateFlow()
 
     init {
         load()
+        // RA-S05: adopt a child selection made on another tab (no data reload
+        // needed here — the leave list is parent-wide; only the apply-form
+        // selector follows the shared child).
+        viewModelScope.launch {
+            selectedChildHolder.selectedChildId.collect { shared ->
+                if (shared != null && shared != _state.value.selectedChildId) {
+                    _state.update { it.copy(selectedChildId = shared) }
+                }
+            }
+        }
     }
 
     private suspend fun token(): String? = preferenceRepository.getUserToken().first()
@@ -67,9 +80,14 @@ class ParentLeaveViewModel(
                     val data = dash.data.data
                     val children = data.children.ifEmpty { listOfNotNull(data.childSummary) }
                     _state.update {
-                        val keep = it.selectedChildId?.takeIf { id -> children.any { c -> c.id == id } }
+                        // RA-S05: prefer the shared selection, then local, then first.
+                        val sharedSel = selectedChildHolder.selectedChildId.value
+                            ?.takeIf { id -> children.any { c -> c.id == id } }
+                        val keep = sharedSel
+                            ?: it.selectedChildId?.takeIf { id -> children.any { c -> c.id == id } }
                         it.copy(children = children, selectedChildId = keep ?: children.firstOrNull()?.id)
                     }
+                    selectedChildHolder.selectIfUnset(_state.value.selectedChildId)
                 }
                 else -> { /* keep going; the request list is the primary content */ }
             }
@@ -87,6 +105,8 @@ class ParentLeaveViewModel(
 
     fun selectChild(childId: String) {
         _state.update { it.copy(selectedChildId = childId) }
+        // RA-S05: broadcast so Home/Academics/Fees follow this selection.
+        selectedChildHolder.select(childId)
     }
 
     /** Submit a leave application for the selected child. */

@@ -271,7 +271,8 @@ val commonModule = module {
         com.littlebridge.vidyaprayag.feature.content.data.repository.ContentRepositoryImpl(get())
     }
     single<com.littlebridge.vidyaprayag.feature.auth.domain.repository.AuthRepository> { 
-        com.littlebridge.vidyaprayag.feature.auth.data.repository.AuthRepositoryImpl(get(), get(), get())
+        // RA-S05: 4th arg = SelectedChildHolder (cleared on logout).
+        com.littlebridge.vidyaprayag.feature.auth.data.repository.AuthRepositoryImpl(get(), get(), get(), get())
     }
     single<com.littlebridge.vidyaprayag.feature.parent.domain.repository.ParentRepository> {
         com.littlebridge.vidyaprayag.feature.parent.data.repository.ParentRepositoryImpl(get())
@@ -357,16 +358,19 @@ val viewModelModule = module {
     //  ParentSchedulePTM/ParentMessage screens dropped in V2). Their dead factory
     // registrations were removed to keep the Koin graph clean — every remaining
     // registration below is actually consumed via koinViewModel().
-    factory { FeeViewModel(get(), get()) }
+    // RA-S05: a single, app-scoped holder so every parent tab shares the same
+    // selected-child id (switching the child on one tab updates all of them).
+    single { com.littlebridge.vidyaprayag.core.state.SelectedChildHolder() }
+    factory { FeeViewModel(get(), get(), get()) }
     factory { ScholarshipsViewModel(get(), get()) }
     factory { ParentAnnouncementViewModel(get(), get()) }
     factory { NotificationsViewModel(get(), get()) }
     factory { LinkChildViewModel(get(), get()) }
-    factory { ParentHomeViewModel(get(), get()) }
+    factory { ParentHomeViewModel(get(), get(), get()) }
     factory { ParentProfileViewModel(get(), get()) }
     factory { TrackProgressViewModel(get(), get()) }
-    factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentAcademicsViewModel(get(), get()) }
-    factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentLeaveViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentAcademicsViewModel(get(), get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentLeaveViewModel(get(), get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentMessageViewModel(get(), get()) }
     factory { SchoolDashboardViewModel(get(), get()) }
     factory { InstitutionalBasicOBViewModel(get(), get()) }

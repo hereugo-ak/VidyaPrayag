@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.core.state.SelectedChildHolder
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.DashboardChildSummary
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.ParentAttendanceData
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.ParentMarksData
@@ -47,12 +48,34 @@ data class ParentAcademicsState(
 class ParentAcademicsViewModel(
     private val repository: ParentRepository,
     private val preferenceRepository: PreferenceRepository,
+    // RA-S05: shared selected-child source of truth across all parent tabs.
+    private val selectedChildHolder: SelectedChildHolder,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ParentAcademicsState())
     val state: StateFlow<ParentAcademicsState> = _state.asStateFlow()
 
     init {
         loadChildren()
+        // RA-S05: when another tab switches the child, reflect it here and
+        // refresh this tab's datasets for the newly-selected child.
+        viewModelScope.launch {
+            selectedChildHolder.selectedChildId.collect { shared ->
+                if (shared != null && shared != _state.value.selectedChildId) {
+                    applyExternalSelection(shared)
+                }
+            }
+        }
+    }
+
+    /** RA-S05: adopt a child selection that originated on another tab. */
+    private fun applyExternalSelection(childId: String) {
+        _state.update {
+            it.copy(
+                selectedChildId = childId,
+                attendance = null, marks = null, syllabus = null,
+            )
+        }
+        loadAttendance(childId)
     }
 
     private suspend fun token(): String? = preferenceRepository.getUserToken().first()
@@ -70,13 +93,20 @@ class ParentAcademicsViewModel(
                     val data = result.data.data
                     val children = data.children.ifEmpty { listOfNotNull(data.childSummary) }
                     _state.update {
-                        val keep = it.selectedChildId?.takeIf { id -> children.any { c -> c.id == id } }
+                        // RA-S05: prefer the shared selection (set by whichever tab
+                        // loaded first), then the local one, then the first child.
+                        val sharedSel = selectedChildHolder.selectedChildId.value
+                            ?.takeIf { id -> children.any { c -> c.id == id } }
+                        val keep = sharedSel
+                            ?: it.selectedChildId?.takeIf { id -> children.any { c -> c.id == id } }
                         it.copy(
                             childrenLoading = false,
                             children = children,
                             selectedChildId = keep ?: children.firstOrNull()?.id,
                         )
                     }
+                    // RA-S05: seed the shared holder so other tabs converge.
+                    selectedChildHolder.selectIfUnset(_state.value.selectedChildId)
                     // Eagerly load the first tab the parent is most likely to open.
                     _state.value.selectedChild?.id?.let { loadAttendance(it) }
                 }
@@ -96,6 +126,8 @@ class ParentAcademicsViewModel(
                 attendance = null, marks = null, syllabus = null,
             )
         }
+        // RA-S05: broadcast so Home/Fees/Leave follow this selection.
+        selectedChildHolder.select(childId)
         loadAttendance(childId)
     }
 

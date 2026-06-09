@@ -3,6 +3,7 @@ package com.littlebridge.vidyaprayag.feature.auth.data.repository
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.network.SessionManager
 import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.core.state.SelectedChildHolder
 import com.littlebridge.vidyaprayag.feature.auth.data.remote.AuthApi
 import com.littlebridge.vidyaprayag.feature.auth.domain.model.*
 import com.littlebridge.vidyaprayag.feature.auth.domain.repository.AuthRepository
@@ -12,7 +13,10 @@ class AuthRepositoryImpl(
     private val api: AuthApi,
     private val preferenceRepository: PreferenceRepository,
     // RA-S01: needed to evict the Ktor Auth plugin's cached bearer token on logout.
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    // RA-S05: reset the shared selected-child on logout so a re-login as a
+    // different parent does not inherit the previous parent's child selection.
+    private val selectedChildHolder: SelectedChildHolder,
 ) : AuthRepository {
     // RA-29: there is NO in-memory session cache. `prefs` is the single source
     // of truth — the same store the Ktor `Auth` plugin's `refreshTokens` writes
@@ -162,6 +166,8 @@ class AuthRepositoryImpl(
         // singleton HttpClient keeps serving the previous user's cached token until a 401 forces
         // a refresh, leaking a stale session across a logout → re-login (esp. a role switch).
         sessionManager.clearAuthCache()
+        // RA-S05: drop the shared selected-child (a Koin single survives logout).
+        selectedChildHolder.clear()
     }
 
     override suspend fun getUserDetails(token: String): NetworkResult<UserDetailsResponse> {

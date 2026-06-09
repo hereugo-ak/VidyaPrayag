@@ -30,9 +30,12 @@ class ParentApi(
         }
     }
 
-    suspend fun getFees(token: String): NetworkResult<FeeResponse> {
+    suspend fun getFees(token: String, childId: String? = null): NetworkResult<FeeResponse> {
         return safeApiCall {
-            client.get(getUrl("api/v1/parent/fees"))
+            client.get(getUrl("api/v1/parent/fees")) {
+                // RA-S05: scope the fee stats to the active child when one is selected.
+                childId?.takeIf { it.isNotBlank() }?.let { parameter("child_id", it) }
+            }
         }
     }
 

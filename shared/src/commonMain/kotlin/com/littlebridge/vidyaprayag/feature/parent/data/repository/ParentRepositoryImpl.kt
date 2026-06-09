@@ -16,8 +16,8 @@ class ParentRepositoryImpl(
         return api.getTrackProgress(token)
     }
 
-    override suspend fun getFees(token: String): NetworkResult<FeeResponse> {
-        return api.getFees(token)
+    override suspend fun getFees(token: String, childId: String?): NetworkResult<FeeResponse> {
+        return api.getFees(token, childId)
     }
 
     override suspend fun getScholarships(token: String): NetworkResult<ScholarshipsResponse> {
