@@ -10,12 +10,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.StudentProfileDto
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentProfileUiState
@@ -24,7 +29,10 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBackHeader
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
+import com.littlebridge.vidyaprayag.ui.v2.components.VButton
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
+import com.littlebridge.vidyaprayag.ui.v2.components.VConfirmDialog
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
 import com.littlebridge.vidyaprayag.ui.v2.screens.VSectionHeader
@@ -44,17 +52,22 @@ import org.koin.compose.viewmodel.koinViewModel
 fun StudentProfileScreenV2(
     studentId: String,
     onBack: () -> Unit = {},
+    // RA-S17: called after a successful soft-delete so the host can pop back to
+    // the roster and refresh it.
+    onRemoved: () -> Unit = onBack,
     modifier: Modifier = Modifier,
     viewModel: StudentProfileViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
     LaunchedEffect(studentId) { viewModel.load(studentId) }
+    LaunchedEffect(state.removed) { if (state.removed) onRemoved() }
 
     Column(modifier.fillMaxSize()) {
         VBackHeader(title = "Student", onBack = onBack)
         StudentProfileContent(
             state = state,
             onRetry = viewModel::retry,
+            onRemove = { viewModel.remove(studentId) },
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -64,9 +77,11 @@ fun StudentProfileScreenV2(
 private fun StudentProfileContent(
     state: StudentProfileUiState,
     onRetry: () -> Unit,
+    onRemove: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
+    var confirmRemove by remember { mutableStateOf(false) }
     Column(
         modifier
             .verticalScroll(rememberScrollState())
@@ -85,8 +100,36 @@ private fun StudentProfileContent(
         ) {
             val p = state.profile ?: return@VStateHost
             StudentProfileBody(p)
+
+            // RA-S17: destructive action lives INSIDE the profile, behind a
+            // confirm dialog (never a direct roster-row button).
+            Spacer(Modifier.height(12.dp))
+            state.removeError?.let { err ->
+                Text(err, style = VTheme.type.caption.colored(c.danger))
+                Spacer(Modifier.height(8.dp))
+            }
+            VButton(
+                text = "Remove from school",
+                onClick = { confirmRemove = true },
+                variant = VButtonVariant.Destructive,
+                full = true,
+                enabled = !state.isRemoving,
+                loading = state.isRemoving,
+                leading = { Icon(VIcons.Close, contentDescription = null, modifier = Modifier.size(16.dp)) },
+            )
         }
     }
+
+    VConfirmDialog(
+        visible = confirmRemove,
+        title = "Remove student",
+        message = "Remove ${state.profile?.student?.fullName ?: "this student"} from your school? " +
+            "Their records will be hidden. This can be reversed by re-adding them.",
+        confirmLabel = "Remove",
+        icon = VIcons.AlertTriangle,
+        onConfirm = { confirmRemove = false; onRemove() },
+        onDismiss = { confirmRemove = false },
+    )
 }
 
 @Composable
