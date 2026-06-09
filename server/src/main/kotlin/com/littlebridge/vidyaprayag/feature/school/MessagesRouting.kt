@@ -251,6 +251,8 @@ fun Route.messagesRouting() {
                 // RA-51: one shared engine handles append / two-party / self.
                 val recipientId = req.recipientUserId
                     ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                // Resolve the admin's display name once so we can reuse it for the notification.
+                val actorName = req.senderName ?: dbQuery { resolveMessagingUser(uid)?.fullName } ?: "Admin Desk"
                 val result = dbQuery {
                     sendInConversation(
                         senderId = uid,
@@ -258,7 +260,7 @@ fun Route.messagesRouting() {
                         body = req.body,
                         threadId = req.threadId?.let { UUID.fromString(it) },
                         recipientId = recipientId,
-                        senderName = req.senderName ?: resolveMessagingUser(uid)?.fullName ?: "Admin Desk",
+                        senderName = actorName,
                         senderRole = req.senderRole ?: "Admin",
                         senderImageUrl = req.senderImageUrl,
                         iconName = req.iconName,
@@ -268,6 +270,16 @@ fun Route.messagesRouting() {
                 if (result == null) {
                     call.fail("Thread not found", HttpStatusCode.NotFound)
                 } else {
+                    // RA-S08: notify the recipient (parity with the teacher send path). Uses the
+                    // peer resolved by the engine, so it works for both new-thread and append sends.
+                    notifyMessageRecipient(
+                        recipientId = result.recipientId,
+                        schoolId = schoolId,
+                        actorId = uid,
+                        actorName = actorName,
+                        threadId = result.senderThreadId,
+                        body = req.body,
+                    )
                     call.created(
                         SendMessageResponse(result.senderThreadId.toString(), result.messageId.toString()),
                         message = "Message sent"

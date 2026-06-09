@@ -25,6 +25,7 @@ package com.littlebridge.vidyaprayag.feature.school
 import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.MessageThreadsTable
 import com.littlebridge.vidyaprayag.db.MessagesTable
+import com.littlebridge.vidyaprayag.feature.notifications.Notify
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -85,6 +86,10 @@ internal data class SendResult(
     val senderThreadId: UUID,
     val messageId: UUID,
     val conversationId: UUID,
+    // RA-S08: the resolved peer (recipient) of this send, regardless of whether the caller
+    // passed `recipientId` explicitly or appended to an existing thread (peer read off the row).
+    // null only for self/system threads. Lets every send-path notify the recipient uniformly.
+    val recipientId: UUID? = null,
 )
 
 /**
@@ -135,7 +140,8 @@ internal fun sendInConversation(
             bumpPeerRow(convId, peer, preview, now)
         }
         val msgId = insertMessage(threadId, convId, senderId, body, now)
-        return SendResult(threadId, msgId, convId)
+        // RA-S08: peer read off the existing thread row (null for a self/system thread).
+        return SendResult(threadId, msgId, convId, recipientId = peer)
     }
 
     // ---- Case 3: self / system thread ----
@@ -160,7 +166,8 @@ internal fun sendInConversation(
             it[updatedAt] = now
         }
         val msgId = insertMessage(newThread, convId, senderId, body, now)
-        return SendResult(newThread, msgId, convId)
+        // RA-S08: self/system thread has no peer to notify.
+        return SendResult(newThread, msgId, convId, recipientId = null)
     }
 
     // ---- Case 2: real two-party conversation ----
@@ -200,7 +207,7 @@ internal fun sendInConversation(
     )
 
     val msgId = insertMessage(senderThread, convId, senderId, body, now)
-    return SendResult(senderThread, msgId, convId)
+    return SendResult(senderThread, msgId, convId, recipientId = recipientId)
 }
 
 /** Insert one message row, keyed by both the owning thread and the conversation. */
@@ -306,4 +313,36 @@ internal fun conversationMessagesFor(threadId: UUID, ownerId: UUID): Pair<UUID, 
         (MessagesTable.conversationId eq convId) or (MessagesTable.threadId eq threadId)
     }.orderBy(MessagesTable.createdAt, SortOrder.ASC).toList()
     return convId to rows
+}
+
+/**
+ * RA-S08 — the SHARED "notify the recipient of a 1:1 message" helper, used by both the admin
+ * (MessagesRouting) and teacher (TeacherMessagesRouting) send paths so they can't drift apart.
+ *
+ * Best-effort: a notification failure must never fail the send. No-ops for a self/system thread
+ * (recipientId == null) or a message to oneself. The deep link targets the recipient's Messages
+ * surface; the body is the (truncated) message text so the push/notification is actually useful.
+ */
+internal suspend fun notifyMessageRecipient(
+    recipientId: UUID?,
+    schoolId: UUID,
+    actorId: UUID,
+    actorName: String,
+    threadId: UUID,
+    body: String,
+) {
+    if (recipientId == null || recipientId == actorId) return
+    runCatching {
+        Notify.toUser(
+            userId = recipientId,
+            category = "message",
+            title = "Message from ${actorName.ifBlank { "your child's school" }}",
+            body = body.take(120),
+            schoolId = schoolId,
+            actorId = actorId,
+            deepLink = "parent/messages",
+            refType = "message",
+            refId = threadId.toString(),
+        )
+    }
 }

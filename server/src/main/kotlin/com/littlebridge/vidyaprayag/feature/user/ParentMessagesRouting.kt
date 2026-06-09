@@ -32,6 +32,7 @@ import com.littlebridge.vidyaprayag.db.MessageThreadsTable
 import com.littlebridge.vidyaprayag.db.MessagesTable
 import com.littlebridge.vidyaprayag.feature.school.conversationMessagesFor
 import com.littlebridge.vidyaprayag.feature.school.resolveMessagingUser
+import com.littlebridge.vidyaprayag.feature.school.notifyMessageRecipient
 import com.littlebridge.vidyaprayag.feature.school.sendInConversation
 import io.ktor.http.*
 import io.ktor.server.auth.*
@@ -245,6 +246,7 @@ fun Route.parentMessagesRouting() {
                 // app_users.school_id) — never a user id (the old `schoolId ?: uid`
                 // corrupted the school_id column).
                 val parentSchoolId = dbQuery { resolveParentSchoolId(uid) ?: resolveMessagingUser(uid)?.schoolId }
+                val actorName = req.senderName ?: dbQuery { resolveMessagingUser(uid)?.fullName } ?: "Parent"
 
                 // A new conversation (not a reply to an owned thread) needs a school.
                 if (req.threadId == null && parentSchoolId == null) {
@@ -261,7 +263,7 @@ fun Route.parentMessagesRouting() {
                         body = req.body,
                         threadId = req.threadId?.let { UUID.fromString(it) },
                         recipientId = recipientId,
-                        senderName = req.senderName ?: resolveMessagingUser(uid)?.fullName ?: "Parent",
+                        senderName = actorName,
                         senderRole = req.senderRole ?: "Parent",
                         senderImageUrl = req.senderImageUrl,
                         iconName = req.iconName,
@@ -271,6 +273,16 @@ fun Route.parentMessagesRouting() {
                 if (result == null) {
                     call.fail("Thread not found", HttpStatusCode.NotFound)
                 } else {
+                    // RA-S08: notify the recipient (teacher/admin) of the parent's message — parity
+                    // with the admin/teacher send paths via the shared helper. Best-effort.
+                    notifyMessageRecipient(
+                        recipientId = result.recipientId,
+                        schoolId = parentSchoolId ?: uid,
+                        actorId = uid,
+                        actorName = actorName,
+                        threadId = result.senderThreadId,
+                        body = req.body,
+                    )
                     call.created(
                         ParentSendMessageResponse(result.senderThreadId.toString(), result.messageId.toString()),
                         message = "Message sent"
