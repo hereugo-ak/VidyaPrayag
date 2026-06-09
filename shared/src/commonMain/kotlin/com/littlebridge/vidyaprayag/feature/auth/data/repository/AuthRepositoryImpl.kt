@@ -1,6 +1,7 @@
 package com.littlebridge.vidyaprayag.feature.auth.data.repository
 
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
+import com.littlebridge.vidyaprayag.core.network.SessionManager
 import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
 import com.littlebridge.vidyaprayag.feature.auth.data.remote.AuthApi
 import com.littlebridge.vidyaprayag.feature.auth.domain.model.*
@@ -9,7 +10,9 @@ import kotlinx.coroutines.flow.first
 
 class AuthRepositoryImpl(
     private val api: AuthApi,
-    private val preferenceRepository: PreferenceRepository
+    private val preferenceRepository: PreferenceRepository,
+    // RA-S01: needed to evict the Ktor Auth plugin's cached bearer token on logout.
+    private val sessionManager: SessionManager
 ) : AuthRepository {
     // RA-29: there is NO in-memory session cache. `prefs` is the single source
     // of truth — the same store the Ktor `Auth` plugin's `refreshTokens` writes
@@ -148,7 +151,12 @@ class AuthRepositoryImpl(
         if (token != null) {
             runCatching { api.logout(token, refreshToken) }
         }
+        // Clear the persisted session FIRST so loadTokens() reads null on the next request…
         preferenceRepository.clearSession()
+        // …then evict the Ktor Auth plugin's in-memory bearer cache (RA-S01). Without this the
+        // singleton HttpClient keeps serving the previous user's cached token until a 401 forces
+        // a refresh, leaking a stale session across a logout → re-login (esp. a role switch).
+        sessionManager.clearAuthCache()
     }
 
     override suspend fun getUserDetails(token: String): NetworkResult<UserDetailsResponse> {

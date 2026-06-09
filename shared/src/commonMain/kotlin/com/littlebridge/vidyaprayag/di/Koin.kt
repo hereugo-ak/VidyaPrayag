@@ -122,6 +122,9 @@ val commonModule = module {
             }
         }
     }
+    // RA-S01: session-manager wraps the singleton HttpClient so logout can evict
+    // the Ktor Auth plugin's in-memory bearer-token cache (clearToken()).
+    single { com.littlebridge.vidyaprayag.core.network.SessionManager(get()) }
     single { KtorSchoolApi(get(), AppConfig.schoolBaseUrl) }
     single { 
         com.littlebridge.vidyaprayag.feature.content.data.remote.ContentApi(
@@ -261,7 +264,7 @@ val commonModule = module {
         com.littlebridge.vidyaprayag.feature.content.data.repository.ContentRepositoryImpl(get())
     }
     single<com.littlebridge.vidyaprayag.feature.auth.domain.repository.AuthRepository> { 
-        com.littlebridge.vidyaprayag.feature.auth.data.repository.AuthRepositoryImpl(get(), get())
+        com.littlebridge.vidyaprayag.feature.auth.data.repository.AuthRepositoryImpl(get(), get(), get())
     }
     single<com.littlebridge.vidyaprayag.feature.parent.domain.repository.ParentRepository> {
         com.littlebridge.vidyaprayag.feature.parent.data.repository.ParentRepositoryImpl(get())
