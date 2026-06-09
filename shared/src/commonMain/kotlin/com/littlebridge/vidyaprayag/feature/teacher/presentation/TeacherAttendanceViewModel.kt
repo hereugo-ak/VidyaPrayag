@@ -37,7 +37,10 @@ data class TeacherAttendanceState(
     val isLoading: Boolean = false,
     val isSubmitting: Boolean = false,
     val submitSuccess: Boolean = false,
-    val error: String? = null,
+    // RA-S18: load errors drive VStateHost (full-screen retry); submit errors are surfaced inline
+    // so a failed save never wipes the marked roster the teacher is mid-way through.
+    val error: String? = null,        // load-path error (VStateHost)
+    val submitError: String? = null,  // submit-path error (inline)
 ) {
     val presentCount: Int get() = students.count { it.status == AttendanceStatus.PRESENT }
     val absentCount: Int get() = students.count { it.status == AttendanceStatus.ABSENT }
@@ -82,23 +85,28 @@ class TeacherAttendanceViewModel(
 
     /** Local edit — update a single student's status without a network call. */
     fun setStatus(studentId: String, status: String) {
+        // RA-S18: editing the roster after a confirmed submit clears the success state so the
+        // Submit button re-enables for the new edit (the button's "Submitted" check is result-driven).
         _state.update { s ->
-            s.copy(students = s.students.map { if (it.studentId == studentId) it.copy(status = status) else it })
+            s.copy(
+                students = s.students.map { if (it.studentId == studentId) it.copy(status = status) else it },
+                submitSuccess = false,
+            )
         }
     }
 
     /** Bulk helper used by "Mark all present". */
     fun markAll(status: String) {
-        _state.update { s -> s.copy(students = s.students.map { it.copy(status = status) }) }
+        _state.update { s -> s.copy(students = s.students.map { it.copy(status = status) }, submitSuccess = false) }
     }
 
     fun submit() {
         viewModelScope.launch {
             val current = _state.value
-            _state.update { it.copy(isSubmitting = true, error = null, submitSuccess = false) }
+            _state.update { it.copy(isSubmitting = true, submitError = null, submitSuccess = false) }
             val token = preferenceRepository.getUserToken().first()
             if (token == null) {
-                _state.update { it.copy(isSubmitting = false, error = "Not authenticated") }
+                _state.update { it.copy(isSubmitting = false, submitError = "Not authenticated") }
                 return@launch
             }
             val request = SubmitAttendanceRequest(
@@ -108,8 +116,8 @@ class TeacherAttendanceViewModel(
             )
             when (val result = repository.submitAttendance(token, request)) {
                 is NetworkResult.Success -> _state.update { it.copy(isSubmitting = false, submitSuccess = true) }
-                is NetworkResult.Error -> _state.update { it.copy(isSubmitting = false, error = result.message) }
-                is NetworkResult.ConnectionError -> _state.update { it.copy(isSubmitting = false, error = "Connection error") }
+                is NetworkResult.Error -> _state.update { it.copy(isSubmitting = false, submitError = result.message) }
+                is NetworkResult.ConnectionError -> _state.update { it.copy(isSubmitting = false, submitError = "Connection error") }
             }
         }
     }
