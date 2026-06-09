@@ -53,17 +53,20 @@ class MainActivity : ComponentActivity() {
 
         // Exit animation: the splash icon fades and scales up slightly as the first
         // screen enters, then the splash view is removed (FEATURE 1 requirement).
-        splashScreen.setOnExitAnimationListener { provider ->
-            val iconView = runCatching { provider.iconView }.getOrNull()
-
-            if (iconView == null) {
-                provider.remove()
-                return@setOnExitAnimationListener
+        splashScreen.setOnExitAnimationListener { splashScreenViewProvider ->
+            // BUGFIX (RA-65): some devices (API 31+) throw NPE when accessing iconView
+            // if the system didn't attach it to the SplashScreenView. We catch it
+            // and fallback to animating the entire splash view instead.
+            val iconView = try {
+                splashScreenViewProvider.iconView
+            } catch (_: Exception) {
+                null
             }
 
-            val fade = ObjectAnimator.ofFloat(iconView, View.ALPHA, 1f, 0f)
-            val scaleX = ObjectAnimator.ofFloat(iconView, View.SCALE_X, 1f, 1.12f)
-            val scaleY = ObjectAnimator.ofFloat(iconView, View.SCALE_Y, 1f, 1.12f)
+            val targetView = iconView ?: splashScreenViewProvider.view
+            val fade = ObjectAnimator.ofFloat(targetView, View.ALPHA, 1f, 0f)
+            val scaleX = ObjectAnimator.ofFloat(targetView, View.SCALE_X, 1f, 1.12f)
+            val scaleY = ObjectAnimator.ofFloat(targetView, View.SCALE_Y, 1f, 1.12f)
 
             listOf(fade, scaleX, scaleY).forEach {
                 it.interpolator = AnticipateInterpolator()
