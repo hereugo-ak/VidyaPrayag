@@ -38,6 +38,7 @@ private enum class SchoolOverlay {
     StudentRoster,
     StudentProfile,
     TeacherProfile,
+    Staff,
 }
 
 /**
@@ -65,6 +66,8 @@ fun SchoolPortalV2(
         // RA-45 — id carried into the student/teacher profile overlays.
         var selectedStudentId by remember { mutableStateOf<String?>(null) }
         var selectedTeacherId by remember { mutableStateOf<String?>(null) }
+        // RA-S17 — id carried into the non-teaching-staff profile overlay.
+        var selectedStaffId by remember { mutableStateOf<String?>(null) }
 
         // §11 cross-platform — Android predictive back / iOS edge-swipe pops
         // the full-screen Notifications/Calendar overlay back to the admin tabs
@@ -139,11 +142,14 @@ fun SchoolPortalV2(
             }
             SchoolOverlay.StudentProfile -> {
                 // RA-45 — single student record (attendance/marks/leave/fees).
+                // RA-S17 — reached from the People→Students sub-tab; back pops to
+                // the People tab. `onRemoved` also pops back so the roster refreshes.
                 val id = selectedStudentId
-                if (id == null) { overlay = SchoolOverlay.StudentRoster; return@VTheme }
+                if (id == null) { overlay = SchoolOverlay.None; return@VTheme }
                 StudentProfileScreenV2(
                     studentId = id,
-                    onBack = { overlay = SchoolOverlay.StudentRoster },
+                    onBack = { overlay = SchoolOverlay.None },
+                    onRemoved = { overlay = SchoolOverlay.None },
                     modifier = modifier,
                 )
                 return@VTheme
@@ -155,6 +161,19 @@ fun SchoolPortalV2(
                 TeacherProfileScreenV2(
                     teacherId = id,
                     onBack = { overlay = SchoolOverlay.None },
+                    onRemoved = { overlay = SchoolOverlay.None },
+                    modifier = modifier,
+                )
+                return@VTheme
+            }
+            SchoolOverlay.Staff -> {
+                // RA-S17 — single non-teaching-staff record; delete-in-profile.
+                val id = selectedStaffId
+                if (id == null) { overlay = SchoolOverlay.None; return@VTheme }
+                StaffProfileScreenV2(
+                    staffId = id,
+                    onBack = { overlay = SchoolOverlay.None },
+                    onRemoved = { overlay = SchoolOverlay.None },
                     modifier = modifier,
                 )
                 return@VTheme
@@ -193,9 +212,11 @@ fun SchoolPortalV2(
                     "people" -> SchoolPeopleScreenV2(
                         // RA-48 — open the parent→child link approval queue.
                         onOpenLinkRequests = { overlay = SchoolOverlay.LinkRequests },
-                        // RA-45 — open the live student roster + teacher profile.
-                        onOpenStudentRoster = { overlay = SchoolOverlay.StudentRoster },
+                        // RA-S17 — People is now a 3-sub-tab roster; rows open the
+                        // matching profile overlay (delete-in-profile lives there).
+                        onOpenStudent = { id -> selectedStudentId = id; overlay = SchoolOverlay.StudentProfile },
                         onOpenTeacher = { id -> selectedTeacherId = id; overlay = SchoolOverlay.TeacherProfile },
+                        onOpenStaff = { id -> selectedStaffId = id; overlay = SchoolOverlay.Staff },
                     )
                     "records" -> SchoolRecordsScreenV2()
                     "comms" -> SchoolCommsScreenV2(
