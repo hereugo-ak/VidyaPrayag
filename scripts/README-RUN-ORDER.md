@@ -2,14 +2,21 @@
 
 If you only read one file, read this one.
 
-You're going to run **TWO** files in the Supabase SQL Editor, in this order:
+You're going to run these files in the Supabase SQL Editor, in this order:
 
 | Step | File | What it does |
 |------|------|--------------|
 | 1 | `scripts/schema-all-in-one-2026-06-07.sql` | Creates every table the backend + seed need (39 CREATE TABLE IF NOT EXISTS). |
-| 2 | `scripts/seed-2026-06-07.sql` | Inserts 2 schools + ~15 users + filler data. |
+| 2 | `scripts/schema-patch-2026-06-08-part2.sql` | Adds `children.student_code` (required by the expansion seed). |
+| 3 | `scripts/seed-2026-06-07.sql` | Inserts 2 schools + ~15 users + filler data. |
+| 4 | `scripts/seed-expansion-2026-06-09.sql` | **(new 2026-06-09)** Recovers the original parents, expands schools 1 & 2, and adds a **complete School 3** (Holy Trinity Convent: 6 classes / 9 sections / 10 teachers / ~36 students / 12 parents). Idempotent + additive. |
 
 That's it. Don't run `PROVISION.sql` — it's documentation only. Don't run the 5 individual schema files one-by-one — they're already bundled into the all-in-one above.
+
+> **Step 4 is idempotent and additive** — every INSERT uses `ON CONFLICT DO NOTHING`,
+> wrapped in `BEGIN; ... COMMIT;`. Run it as many times as you like; it never
+> touches an existing row. If a teammate ever deletes the parent rows again, just
+> re-run step 4 to restore them (same deterministic UUIDs).
 
 ---
 
@@ -108,7 +115,13 @@ Quick summary:
 |------|-------|----------|
 | Sunrise admin | `admin@sunrise.edu.in` | `Sunrise@2026` |
 | Greenfield admin | `admin@greenfield.edu.in` | `Greenfield@2026` |
+| Holy Trinity admin (School 3, step 4) | `admin@holytrinity.edu.in` | `Trinity@2026` |
 | All seeded teachers | see file | `Teacher@2026` |
 | All seeded parents | OTP only (phones in file) | — |
 
-For parent OTP login, make sure `OTP_DEV_RETURN_CODE=true` on Render so the dev code is returned in the API response (and visible in Render logs).
+For parent OTP login, set `OTP_DEV_RETURN_CODE=true` on Render (non-production env)
+so the dev code is returned in the `/send-otp` API response — it is also printed
+to the Render logs by `ConsoleProvider`. **The code cannot be read from the
+Supabase `auth_otps` table** (it is stored hashed). See the *§ Retrieving the
+parent OTP while testing* section in `seed-credentials-2026-06-07.md` for the
+full step-by-step.
