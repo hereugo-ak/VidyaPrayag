@@ -7,9 +7,16 @@
  *   - LOCAL DEV (default)  : SQLite file `data.db` in CWD
  *
  * IMPORTANT: against Postgres we DO NOT run any schema migration from code.
- * The source of truth is two SQL files run manually in Supabase SQL Editor:
- *     1.  /supabase_schema                              (operational tables)
- *     2.  /docs/backend/sql/01_supplementary_schema.sql (this backend's tables)
+ * The source of truth (RA-63) is the canonical all-in-one, run manually in the
+ * Supabase SQL Editor in this exact order — see docs/db/PROVISION.sql and
+ * scripts/README-RUN-ORDER.md:
+ *     1.  scripts/schema-all-in-one-2026-06-07.sql      (every table; built from
+ *         docs/db/vidyasetu_schema.sql + migration_001/002/003 + patches)
+ *     2.  scripts/seed-2026-06-07.sql                   (test data)
+ *
+ * DO NOT use the legacy root "VIDYASETU v2.1" schema — it has been archived to
+ * docs/_archive/supabase_schema_VIDYASETU_v2.1_ABANDONED.sql and does NOT match
+ * Tables.kt. Nothing in this codebase reads it.
  *
  * Why?  Letting an ORM mutate production schema silently is a recipe for
  * downtime.  All schema changes go through a reviewed SQL migration PR
@@ -52,6 +59,7 @@ object DatabaseFactory {
         OnboardingDraftsTable,
         SchoolClassesTable,
         SchoolSubjectsTable,
+        TeacherSubjectAssignmentsTable,
         AnnouncementsTable,
         WhatsappLogsTable,
         AdmissionEnquiriesTable,
@@ -62,7 +70,32 @@ object DatabaseFactory {
         HolidayListTable,
         FacultyTable,
         AttendanceRecordsTable,
-        StudentsTable
+        StudentsTable,
+        ChildrenTable,
+        FeeRecordsTable,
+        // School ecosystem (school_api_spec.artifact.md)
+        LeaveRequestsTable,
+        PtmEventsTable,
+        PtmClassProgressTable,
+        MessageThreadsTable,
+        MessagesTable,
+        ExamResultsTable,
+        // Teacher vertical (master doc Step 7 / gap G1)
+        AssessmentsTable,
+        AssessmentMarksTable,
+        SyllabusUnitsTable,
+        HomeworkTable,
+        HomeworkSubmissionsTable,
+        TeacherPeriodsTable,
+        // Parent scholarships (audit §4.2/§5.2 — DB-backed, replaces hardcoded list)
+        ScholarshipsTable,
+        ScholarshipApplicationsTable,
+        // Notification spine + push registry + link approval (audit part-2 RA-41/42/46/48/50)
+        NotificationsTable,
+        DeviceTokensTable,
+        ParentChildLinksTable,
+        // Non-teaching staff vertical (RA-S17 — Admin People sub-tabs)
+        NonTeachingStaffTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */
@@ -115,6 +148,12 @@ object DatabaseFactory {
             println("DB_INIT: Skipping auto-creation (AUTO_CREATE_TABLES is not 'true').")
         }
 
+        // Boot-time schema completeness validation (audit finding A). In
+        // Postgres without auto-create, a missing table means a guessed/
+        // incomplete provisioning recipe was used and dependent routes would
+        // 500 at runtime. We surface that loudly at boot instead.
+        validateSchema(autoCreate)
+
         // CMS seed (landing + app_config). Always idempotent — only inserts
         // missing keys; never overwrites operator-edited values.
         val seedCms = (dotenv["APP_SEED_CMS"] ?: System.getenv("APP_SEED_CMS") ?: "true")
@@ -138,6 +177,71 @@ object DatabaseFactory {
                 }
             }
         }
+
+        // Operational demo seed (audit finding B): one working credential per
+        // profile type + minimal operational data, so a fresh deploy is
+        // immediately loginable instead of empty/unlogin-able. Idempotent.
+        val seedDemo = (dotenv["APP_SEED_DEMO"] ?: System.getenv("APP_SEED_DEMO") ?: "true")
+            .equals("true", ignoreCase = true)
+
+        if (seedDemo) {
+            println("DB_INIT: Running operational demo seed...")
+            try {
+                DemoSeed.ensureDemoData()
+                println("DB_INIT: Demo seed completed successfully.")
+            } catch (e: Exception) {
+                val msg = e.message ?: ""
+                if (msg.contains("relation", ignoreCase = true) && msg.contains("does not exist", ignoreCase = true)) {
+                    System.err.println("DB_INIT_WARNING: Demo seeding skipped because tables are missing.")
+                    System.err.println("DB_INIT_TIP: Set AUTO_CREATE_TABLES=true on Render to create tables automatically.")
+                } else {
+                    System.err.println("DB_INIT_ERROR: Demo seeding failed with unexpected error!")
+                    e.printStackTrace()
+                    // Non-fatal: CMS + schema are already in place; don't crash-loop.
+                }
+            }
+        }
+    }
+
+    /**
+     * Audit finding A: verify every one of the 36 registered tables exists.
+     * In Postgres without auto-create, any missing table means an incomplete
+     * provisioning recipe was used (see docs/db/PROVISION.sql for the only
+     * complete one) and dependent routes would 500 at runtime — so we refuse
+     * to boot. In SQLite/dev or when AUTO_CREATE_TABLES handled creation, we
+     * only warn.
+     */
+    private fun validateSchema(autoCreate: Boolean) {
+        try {
+            val existing = transaction {
+                SchemaUtils.listTables().map { it.substringAfterLast('.').lowercase().trim('"') }.toSet()
+            }
+            val missing = allTables
+                .map { it.tableName.substringAfterLast('.').lowercase().trim('"') }
+                .filter { it !in existing }
+
+            if (missing.isEmpty()) {
+                println("DB_INIT: Schema validation OK — all ${allTables.size} tables present.")
+                return
+            }
+
+            val msg = "DB_INIT: Schema validation FOUND ${missing.size} MISSING table(s): ${missing.sorted()}"
+            if (isPostgres && !autoCreate) {
+                System.err.println(msg)
+                System.err.println("DB_INIT_TIP: Provision with docs/db/PROVISION.sql (the only complete recipe) " +
+                    "or set AUTO_CREATE_TABLES=true.")
+                throw IllegalStateException(
+                    "Refusing to boot: Postgres schema is incomplete (missing ${missing.size} tables). " +
+                    "See docs/db/PROVISION.sql."
+                )
+            } else {
+                System.err.println("$msg (non-fatal: SQLite/dev or auto-create enabled).")
+            }
+        } catch (e: IllegalStateException) {
+            throw e
+        } catch (e: Exception) {
+            System.err.println("DB_INIT_WARNING: Schema validation could not run: ${e.message}")
+        }
     }
 
     private fun createPostgresDataSource(
@@ -158,13 +262,25 @@ object DatabaseFactory {
             else -> "jdbc:postgresql://$databaseUrl"
         }
 
-        // Auto-append SSL mode if missing and we are talking to Supabase/Render
-        val finalJdbcUrl = if (!jdbcUrl.contains("sslmode=") && isPostgres) {
+        // Auto-append SSL mode and PgBouncer threshold if missing
+        val finalJdbcUrl = buildString {
+            append(jdbcUrl)
             val separator = if (jdbcUrl.contains("?")) "&" else "?"
-            jdbcUrl + separator + "sslmode=require"
-        } else {
-            jdbcUrl
+            
+            if (!jdbcUrl.contains("sslmode=") && isPostgres) {
+                append(separator).append("sslmode=require")
+            }
+            
+            if (!contains("prepareThreshold=")) {
+                append(if (contains("?")) "&" else "?").append("prepareThreshold=0")
+            }
+            
+            if (!contains("currentSchema=")) {
+                append(if (contains("?")) "&" else "?").append("currentSchema=public")
+            }
         }
+
+        println("DB_INIT: Connecting to $finalJdbcUrl")
 
         val config = HikariConfig().apply {
             driverClassName = "org.postgresql.Driver"

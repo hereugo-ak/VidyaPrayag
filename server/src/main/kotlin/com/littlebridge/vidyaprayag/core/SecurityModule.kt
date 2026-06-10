@@ -17,11 +17,16 @@
  */
 package com.littlebridge.vidyaprayag.core
 
+import com.littlebridge.vidyaprayag.db.AppUsersTable
+import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.response.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.selectAll
+import java.util.UUID
 
 /** Apply to `install(Authentication) { configureJwt() }`. */
 fun AuthenticationConfig.configureJwt(name: String = "jwt") {
@@ -29,8 +34,20 @@ fun AuthenticationConfig.configureJwt(name: String = "jwt") {
         realm = JwtConfig.realm
         verifier(JwtConfig.verifier)
         validate { credential ->
-            if (credential.payload.subject.isNullOrBlank()) null
-            else JWTPrincipal(credential.payload)
+            val sub = credential.payload.subject
+            if (sub.isNullOrBlank()) return@validate null
+            // RA-34: enforce is_active on EVERY authenticated request — this is the
+            // single root kill-switch covering all roles, including parent routes
+            // that read principalUserId() directly without a school/teacher guard.
+            // Deactivating a user (is_active=false) instantly invalidates every
+            // already-issued access token on its next use.
+            val uid = runCatching { UUID.fromString(sub) }.getOrNull() ?: return@validate null
+            val active = dbQuery {
+                AppUsersTable.selectAll().where { AppUsersTable.id eq uid }
+                    .singleOrNull()?.get(AppUsersTable.isActive)
+            }
+            // Unknown user (no row) or deactivated → reject the principal.
+            if (active != true) null else JWTPrincipal(credential.payload)
         }
         challenge { _, _ ->
             call.respond(

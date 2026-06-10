@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+        FEATURE 1 — native Android 12+ SplashScreen API (androidx.core:core-splashscreen).
+
+        Theme.VidyaPrayag.Splash is the *launch* theme set on the application/activity.
+        The compat library reads these attributes to render the system splash window:
+          • windowSplashScreenBackground       — full-bleed brand teal (matches VColors.teal
+                                                  and SplashScreenV2's Compose background, so
+                                                  there is no colour seam at hand-off).
+          • windowSplashScreenAnimatedIcon      — the white "Setu" bridge mark (same geometry
+                                                  as VBrandLogo), centred by the system.
+          • postSplashScreenTheme               — the theme the activity switches to via
+                                                  installSplashScreen() once content is ready.
+
+        On Android 11 and below the compat library synthesises the same splash from these
+        attributes, so the experience degrades gracefully (FEATURE 1 fallback requirement).
+
+        windowBackground on the post-splash theme is ALSO the brand teal: that is what kills
+        the white flash between the splash exiting and the first Compose frame drawing
+        (SplashScreenV2 also paints teal, so every layer in the hand-off is the same colour).
+    -->
+    <style name="Theme.VidyaPrayag" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/vp_splash_background</item>
+        <item name="android:statusBarColor">@color/vp_splash_background</item>
+        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="o_mr1">shortEdges</item>
+    </style>
+
+    <style name="Theme.VidyaPrayag.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/vp_splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.VidyaPrayag</item>
+    </style>
+
+</resources>

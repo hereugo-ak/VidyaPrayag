@@ -155,6 +155,301 @@ object CmsSeed {
                     }
                 }
             }
+
+            // -------------------------------------------------------------
+            // Parent ecosystem CMS defaults (parent_api_spec.artifact.md).
+            //
+            // All UI strings, statistics, and configurations for the Parent
+            // module are backend-driven. The keys below match what the
+            // routes in feature.parent / feature.content.SupportRouting
+            // look up at runtime; defaults are used as fallbacks if a key
+            // is ever missing in production.
+            //
+            // Idempotent: inserted only when the key does not already exist.
+            // -------------------------------------------------------------
+            val parentDefaults = mapOf(
+                // Onboarding Step 1
+                "parent_onboarding_step1_screen_config" to """
+                    {
+                      "header_title": "Let's build a profile for your child.",
+                      "header_subtitle": "We use this information to curate the best learning path.",
+                      "progress_label": "Step 1 of 3",
+                      "progress_value": 0.33
+                    }
+                """.trimIndent(),
+                "parent_available_grades" to """["Grade 1","Grade 2","Grade 3","Nursery","KG"]""",
+                "parent_available_interests" to """["Music","Art","STEM","Sports","Languages"]""",
+                "parent_onboarding_footer_text" to "\"Your data is encrypted and secure.\"",
+
+                // Onboarding Step 2
+                "parent_available_boards" to """["CBSE","ICSE","IB","State Board"]""",
+                "parent_available_focus_areas" to """
+                    [
+                      {"id":"acad","title":"Academics","icon":"school"},
+                      {"id":"sports","title":"Sports","icon":"sports_soccer"}
+                    ]
+                """.trimIndent(),
+                "parent_budget_config" to """
+                    {
+                      "min_value": 0,
+                      "max_value": 10000,
+                      "default_range": [2000, 5000],
+                      "currency_symbol": "₹"
+                    }
+                """.trimIndent(),
+
+                // Dashboard
+                "parent_dashboard_curation_logic" to "\"Curation aligned with NEP 2020 developmental milestones.\"",
+                "parent_dashboard_info_alerts" to """
+                    [
+                      {"id":"ptm_upcoming","title":"Upcoming PTM","value":"Nov 25","type":"INFO"}
+                    ]
+                """.trimIndent(),
+
+                // Track Progress
+                "parent_track_journey_description" to "\"On track for next grade transition\"",
+                "parent_track_academic_label" to "\"NEP ALIGNED\"",
+                "parent_track_badges" to """
+                    [
+                      {"title":"Social Star","icon":"workspace_premium","is_locked":false,"colors":["#B6C7EB","#006C49"]},
+                      {"title":"Math Whiz","icon":"calculate","is_locked":true,"colors":["#FFD580","#B26A00"]}
+                    ]
+                """.trimIndent(),
+                "parent_track_academic_competencies" to """
+                    [
+                      {"title":"Literacy","progress":0.85,"icon":"translate"},
+                      {"title":"Numeracy","progress":0.78,"icon":"calculate"},
+                      {"title":"Creativity","progress":0.72,"icon":"palette"}
+                    ]
+                """.trimIndent(),
+                "parent_track_ei_description" to "\"Significant growth in Social Interaction this month.\"",
+                "parent_track_ei_metrics" to """{"Empathy":0.8,"Resilience":0.7,"Social":0.9}""",
+                "parent_track_play_discovery" to """
+                    [
+                      {"title":"Agility","description":"Gross motor met","status":"MET"},
+                      {"title":"Curiosity","description":"Exploration in progress","status":"IN_PROGRESS"}
+                    ]
+                """.trimIndent(),
+
+                // Fees CMS
+                "parent_fees_announcements" to """
+                    [
+                      {"id":"f1","title":"Deadline","time":"2h ago","desc":"Submit Q3 fees.","type":"Payment"}
+                    ]
+                """.trimIndent(),
+
+                // Support / Drawer
+                "parent_support_config" to """
+                    {
+                      "support_contact": "+91-9876543210",
+                      "categories": ["TECHNICAL","ACADEMIC","ADMISSIONS","FEES"],
+                      "help_center_url": "https://vidyaprayag.com/help"
+                    }
+                """.trimIndent()
+            )
+
+            val existingCfg2 = AppConfigTable
+                .selectAll()
+                .map { it[AppConfigTable.key] }
+                .toSet()
+            parentDefaults.forEach { (k, v) ->
+                if (k !in existingCfg2) {
+                    AppConfigTable.insert {
+                        it[key] = k
+                        it[value] = v
+                        it[updatedAt] = Instant.now()
+                    }
+                }
+            }
+
+            // -------------------------------------------------------------
+            // School ecosystem CMS defaults (school_api_spec.artifact.md).
+            //
+            // Same philosophy as the parent ecosystem block: every UI string,
+            // statistic, and reference list is backend-driven and idempotently
+            // seeded.  Operators can edit any of these rows in Supabase →
+            // app_config without redeploying the backend.
+            // -------------------------------------------------------------
+            val schoolDefaults = mapOf(
+                // ---------------- School Dashboard (home) ----------------
+                "school_dashboard_welcome" to """
+                    {
+                      "title": "Welcome, Admin",
+                      "subtitle": "Your institutional setup is ready to begin. Let's build your digital campus.",
+                      "cta_label": "Start Onboarding"
+                    }
+                """.trimIndent(),
+                "school_dashboard_steps" to """
+                    [
+                      {"id":1,"title":"Institutional Basics","description":"School name, location, and IDs.","icon_url":"https://assets.vidyaprayag.com/icons/ic_basics.png"},
+                      {"id":2,"title":"Branding & Identity","description":"Upload logos and color themes.","icon_url":"https://assets.vidyaprayag.com/icons/ic_branding.png"},
+                      {"id":3,"title":"Academic Setup","description":"Classes, subjects, and teachers.","icon_url":"https://assets.vidyaprayag.com/icons/ic_academic.png"},
+                      {"id":4,"title":"Final Launch","description":"Verify and go live.","icon_url":null}
+                    ]
+                """.trimIndent(),
+                "school_dashboard_support" to """
+                    {
+                      "title": "Need help? Chat with an expert",
+                      "subtitle": "Available 24/7 for institutions",
+                      "action_label": "CHAT",
+                      "video_label": "Watch Onboarding Video",
+                      "video_url": "https://vidyaprayag.com/onboarding/intro.mp4"
+                    }
+                """.trimIndent(),
+
+                // ---------------- Analytics Overview ---------------------
+                "school_analytics_overview" to """
+                    {
+                      "performance_trend": [0.4, 0.55, 0.48, 0.85, 0.65, 0.75],
+                      "current_growth": "+4.2%"
+                    }
+                """.trimIndent(),
+                "school_analytics_cards_template" to """
+                    [
+                      {"title":"Student Tracking","value":"94%","sub_value":"Avg Attendance","icon_url":"https://assets.vidyaprayag.com/icons/ic_attendance.png","trend":null},
+                      {"title":"Syllabus Coverage","value":"78%","sub_value":"Logged Progress","icon_url":"https://assets.vidyaprayag.com/icons/ic_syllabus.png","trend":null},
+                      {"title":"Teacher Accountability","value":"4.8","sub_value":"Avg Rating","icon_url":"https://assets.vidyaprayag.com/icons/ic_teacher.png","trend":null},
+                      {"title":"Class Performance","value":"82%","sub_value":"Proficiency","icon_url":"https://assets.vidyaprayag.com/icons/ic_class.png","trend":null}
+                    ]
+                """.trimIndent(),
+                "school_analytics_insights" to """
+                    [
+                      {"title":"Attendance Peak","description":"Class 10-A reached 99% attendance","icon_name":"trending_up","icon_color":"#10B981"},
+                      {"title":"Syllabus Alert","description":"Mathematics Grade 8 is 5% behind","icon_name":"warning","icon_color":"#F59E0B"},
+                      {"title":"Top Performer","description":"Dr. Jenkins: 5.0 Engagement Rating","icon_name":"stars","icon_color":"#8B5CF6"}
+                    ]
+                """.trimIndent(),
+
+                // ---------------- Class Performance ----------------------
+                // RA-59: grade_distribution / subject_matrix / subject_engagements
+                // / by_class are now computed at request time from real
+                // exam_results in SchoolAnalyticsRouting./class-performance and
+                // overlaid onto this template. summary.active_students is overlaid
+                // from the real students count. The empty defaults below are the
+                // honest "no real data yet" state — no fabricated bars/people.
+                "school_class_performance" to """
+                    {
+                      "grade_distribution": [],
+                      "summary": {"avg_proficiency":"","active_students":0,"median_grade":""},
+                      "subject_matrix": [],
+                      "subject_engagements": [],
+                      "by_class": [],
+                      "risk": {"critical_count":0,"moderate_count":0,"proficiency_target_reach":75},
+                      "top_performer": null,
+                      "recent_progress": []
+                    }
+                """.trimIndent(),
+                // NOTE (audit §5.1): `top_performer` and `recent_progress` are NO
+                // LONGER fabricated people. They are computed at request time from
+                // real `exam_results` rows in SchoolAnalyticsRouting./class-performance
+                // and overlaid onto this template. The empty defaults above are the
+                // honest "no real data yet" state.
+
+                // ---------------- Student Analytics Cohort ---------------
+                // Cohort-level view consumed by StudentAnalyticsScreen.
+                // The per-student template is `school_student_analytics_template`
+                // (above); this blob is the school-wide rollup.
+                //
+                // NOTE (audit §5.1): `at_risk_students`, `risk` counts and
+                // `daily_volatility` are NO LONGER fabricated. They are computed at
+                // request time from real `exam_results` / `attendance_records` in
+                // SchoolAnalyticsRouting./student-cohort and overlaid onto this
+                // template. The empty defaults below are the honest "no data" state.
+                // RA-59: subject_engagements + cohort_comparison are now computed
+                // at request time from real exam_results in
+                // SchoolAnalyticsRouting./student-cohort and overlaid here. Empty
+                // defaults are the honest "no data" state (no fabricated subjects).
+                "school_student_analytics_cohort" to """
+                    {
+                      "daily_volatility": [],
+                      "risk": {"critical_count":0,"medium_count":0,"low_count":0},
+                      "at_risk_students": [],
+                      "subject_engagements": [],
+                      "cohort_comparison": []
+                    }
+                """.trimIndent(),
+
+                // ---------------- Teacher Performance --------------------
+                // NOTE (audit §5.1): `accountability_matrix` is NO LONGER fabricated
+                // people. It is computed at request time from the real `faculty`
+                // table + 30-day attendance in SchoolAnalyticsRouting./teacher-performance
+                // and overlaid onto this template. The empty default is the honest
+                // "no faculty yet" state. (`star_faculty` was already real.)
+                // RA-59: every metric here is now computed at request time from
+                // real tables in SchoolAnalyticsRouting (dept_efficiencies from
+                // faculty+attendance; accountability_matrix from faculty;
+                // aggregate_compliance/compliance_trend/syllabus_update_trend have
+                // no backing table and are returned as honest empty states by the
+                // route). The seed is reduced to empty defaults so NO fabricated
+                // value can ever leak if a future route path forgets to overlay.
+                "school_teacher_performance" to """
+                    {
+                      "aggregate_compliance": "",
+                      "compliance_trend": "",
+                      "syllabus_update_trend": [],
+                      "accountability_matrix": [],
+                      "dept_efficiencies": []
+                    }
+                """.trimIndent(),
+
+                // ---------------- Student Analytics ---------------------
+                "school_student_analytics_template" to """
+                    {
+                      "kpi": {"attendance":"92%","average":"78.4%","rank":7},
+                      "subjects": [
+                        {"name":"Mathematics","score":92,"trend":"up"},
+                        {"name":"Science","score":85,"trend":"up"},
+                        {"name":"Literature","score":74,"trend":"flat"}
+                      ],
+                      "milestones": [
+                        {"title":"Quarter 3 honors list","date":"2025-09-01","is_unlocked":true},
+                        {"title":"Top 5 in Math","date":"2025-11-15","is_unlocked":false}
+                      ]
+                    }
+                """.trimIndent(),
+                "school_student_analytics_narrative" to "\"Strong rebound in numeracy this quarter; literacy steady.\"",
+
+                // ---------------- Syllabus Coverage ----------------------
+                // RA-59: overall/by_subject/by_class/aggregate_compliance are
+                // computed at request time from real exam_results in
+                // SchoolAnalyticsRouting./syllabus-coverage. alerts/milestones/
+                // compliance_trend/syllabus_update_trend have NO backing table
+                // (no curriculum-schedule/compliance-audit log server-side) and
+                // are returned as honest empty states by the route. Seed reduced
+                // to empty defaults so no fabricated value can leak.
+                "school_syllabus_coverage" to """
+                    {
+                      "overall": {"percentage":0,"trend":""},
+                      "by_subject": [],
+                      "by_class": [],
+                      "alerts": [],
+                      "milestones": []
+                    }
+                """.trimIndent(),
+
+                // ---------------- Results filter metadata ----------------
+                "school_results_filters" to """
+                    {
+                      "available_tests": ["Unit Test I","Unit Test II","Mid Term","Final"],
+                      "available_classes": ["Grade 10-A","Grade 10-B","Grade 11-A","Grade 11-B"],
+                      "available_subjects": ["Mathematics","Science","Literature","History","Chemistry","Physics"]
+                    }
+                """.trimIndent()
+            )
+
+            val existingCfg3 = AppConfigTable
+                .selectAll()
+                .map { it[AppConfigTable.key] }
+                .toSet()
+            schoolDefaults.forEach { (k, v) ->
+                if (k !in existingCfg3) {
+                    AppConfigTable.insert {
+                        it[key] = k
+                        it[value] = v
+                        it[updatedAt] = Instant.now()
+                    }
+                }
+            }
         }
     }
 }

@@ -1,9 +1,23 @@
 package com.littlebridge.vidyaprayag.feature.admin.presentation
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.littlebridge.vidyaprayag.core.network.NetworkResult
+import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.AnnouncementDto
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.CreateAnnouncementRequest
+import com.littlebridge.vidyaprayag.feature.admin.domain.repository.AnnouncementsRepository
+import com.littlebridge.vidyaprayag.util.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 data class Announcement(
     val id: String,
@@ -17,54 +31,239 @@ data class Announcement(
 )
 
 data class SchoolAnnouncementsState(
-    val announcements: List<Announcement> = listOf(
-        Announcement(
-            id = "1",
-            title = "Diwali Semester Break Announcement",
-            description = "The school will remain closed for the Diwali break. Students are encouraged to complete their mid-term projects during this period. School will resume regular classes from November 1st.",
-            category = "Holidays",
-            date = "Oct 24 - Oct 31",
-            imageUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuAPYTkxRqlhcsjmV_2jmsXHheVy4hGOSnuKTouRW1gEmU1pF0ICGwHeVvKPesr8Y7pw4h7DpUWNW_lZEaDgW7vYWMLWaopYbe8g2Ufl0BTXNZLNbLlgstpBsUPT09iT1vgIAzmeEDT8KlVVjDWHOfXK2phbCnpvzeFa8cWuj3vc9NVlSX2qPcistFf_lUUhAoFtvWTGTCZF-zahmGwCzZKd9D5rmKM79o2_iimlycoHRUCj7iCLC0WH9kjK2p87ziImPbuYnT2_PtOW",
-            isFeatured = true
-        ),
-        Announcement(
-            id = "2",
-            title = "Grade 5 Parent Teacher Meet",
-            description = "Individual feedback sessions with class teachers to discuss the Q3 performance report.",
-            category = "PTM",
-            date = "Saturday, Oct 12 • 09:00 AM"
-        ),
-        Announcement(
-            id = "3",
-            title = "Annual Sports Day 2024",
-            description = "Nov 15 • Olympic Stadium",
-            category = "Events",
-            date = "Nov 15",
-            participants = listOf("1", "2", "3")
-        ),
-        Announcement(
-            id = "4",
-            title = "New Bus Route: Sector 42",
-            description = "The school has introduced a new dedicated bus route for Sector 42 and adjoining areas to reduce transit time.",
-            category = "Update",
-            date = "Effective from Oct 01"
-        ),
-        Announcement(
-            id = "5",
-            title = "Fee Submission",
-            description = "Third quarter fee payment portal is now open. Last date: Oct 10.",
-            category = "Reminder",
-            date = "Last date: Oct 10"
-        )
-    ),
-    val isWhatsAppSyncEnabled: Boolean = true
+    /** Filtered list shown in the UI (after category + search). */
+    val announcements: List<Announcement> = emptyList(),
+    /**
+     * Unfiltered cache so we can re-derive [announcements] without re-hitting
+     * the network when the user toggles a category chip.
+     */
+    val allAnnouncements: List<Announcement> = emptyList(),
+    /** null = "All" (show everything). */
+    val selectedCategory: String? = null,
+    val isWhatsAppSyncEnabled: Boolean = true,
+    val isLoading: Boolean = false,
+    val isCreating: Boolean = false,
+    val errorMessage: String? = null,
+    val infoMessage: String? = null
 )
 
-class SchoolAnnouncementsViewModel : ViewModel() {
+class SchoolAnnouncementsViewModel(
+    private val announcementsRepository: AnnouncementsRepository,
+    private val preferenceRepository: PreferenceRepository
+) : ViewModel() {
+
     private val _state = MutableStateFlow(SchoolAnnouncementsState())
     val state: StateFlow<SchoolAnnouncementsState> = _state.asStateFlow()
 
+    init {
+        loadAnnouncements()
+    }
+
+    fun loadAnnouncements() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isLoading = true, errorMessage = null)
+
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                AppLogger.d("SchoolAnnouncementsVM", "No auth token; skipping load")
+                _state.value = _state.value.copy(isLoading = false)
+                return@launch
+            }
+
+            when (val result = announcementsRepository.getAnnouncements(token)) {
+                is NetworkResult.Success -> {
+                    val all = result.data.data?.announcements.orEmpty().map { it.toUiModel() }
+                    _state.value = _state.value.copy(
+                        allAnnouncements = all,
+                        announcements = applyCategoryFilter(all, _state.value.selectedCategory),
+                        isLoading = false
+                    )
+                }
+                is NetworkResult.Error -> {
+                    AppLogger.e("SchoolAnnouncementsVM", "getAnnouncements error: ${result.message}")
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        errorMessage = result.message
+                    )
+                }
+                is NetworkResult.ConnectionError -> {
+                    AppLogger.e("SchoolAnnouncementsVM", "getAnnouncements connection error")
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        errorMessage = "Connection error. Check your internet."
+                    )
+                }
+            }
+        }
+    }
+
+    fun searchAnnouncements(query: String) {
+        if (query.isBlank()) {
+            loadAnnouncements()
+            return
+        }
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isLoading = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first() ?: return@launch
+            when (val result = announcementsRepository.searchAnnouncements(token, query)) {
+                is NetworkResult.Success -> {
+                    val all = result.data.data?.announcements.orEmpty().map { it.toUiModel() }
+                    _state.value = _state.value.copy(
+                        allAnnouncements = all,
+                        announcements = applyCategoryFilter(all, _state.value.selectedCategory),
+                        isLoading = false
+                    )
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(isLoading = false, errorMessage = result.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(isLoading = false, errorMessage = "Connection error.")
+                }
+            }
+        }
+    }
+
+    /**
+     * Switch the active category filter. Pass null (or "All") to clear the
+     * filter. Operates on the cached [SchoolAnnouncementsState.allAnnouncements]
+     * to avoid an extra network round-trip.
+     */
+    fun setCategoryFilter(category: String?) {
+        val normalized = category?.takeIf { it.isNotBlank() && !it.equals("All", ignoreCase = true) }
+        val filtered = applyCategoryFilter(_state.value.allAnnouncements, normalized)
+        _state.value = _state.value.copy(
+            selectedCategory = normalized,
+            announcements = filtered
+        )
+    }
+
+    private fun applyCategoryFilter(
+        items: List<Announcement>,
+        category: String?
+    ): List<Announcement> {
+        if (category.isNullOrBlank()) return items
+        return items.filter { it.category.equals(category, ignoreCase = true) }
+    }
+
+    /**
+     * Create a new announcement and refresh the list on success. The screen
+     * passes [onCreated] to dismiss the dialog only after the server
+     * round-trip succeeds — preventing a stale local copy from sticking
+     * around if the request fails.
+     */
+    fun createAnnouncement(
+        type: String,
+        title: String,
+        description: String,
+        date: String,
+        subTitle: String? = null,
+        eventImage: String? = null,
+        // RA-49: audience targeting. audienceType defaults to ALL_SCHOOL.
+        // For CLASS/SECTION/SUBJECT/STUDENT, audienceValues holds the raw
+        // user-entered class names / subjects / student codes (comma-separated
+        // is split by the caller). For ALL_SCHOOL the list is ignored.
+        audienceType: String = "ALL_SCHOOL",
+        audienceValues: List<String> = emptyList(),
+        onCreated: (() -> Unit)? = null
+    ) {
+        if (title.isBlank() || description.isBlank() || date.isBlank()) {
+            _state.value = _state.value.copy(errorMessage = "Title, description and date are required.")
+            return
+        }
+        val normalizedAudience = audienceType.trim().uppercase().ifBlank { "ALL_SCHOOL" }
+        val cleanValues = audienceValues.map { it.trim() }.filter { it.isNotBlank() }
+        if (normalizedAudience != "ALL_SCHOOL" && cleanValues.isEmpty()) {
+            _state.value = _state.value.copy(
+                errorMessage = "Add at least one target for a $normalizedAudience announcement."
+            )
+            return
+        }
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isCreating = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isCreating = false, errorMessage = "Not signed in")
+                return@launch
+            }
+            val filter = buildAudienceFilter(normalizedAudience, cleanValues)
+            val body = CreateAnnouncementRequest(
+                type = type.ifBlank { "Update" },
+                title = title.trim(),
+                subTitle = subTitle?.trim()?.takeIf { it.isNotBlank() },
+                description = description.trim(),
+                eventImage = eventImage?.trim()?.takeIf { it.isNotBlank() },
+                date = date.trim(),
+                audienceType = normalizedAudience,
+                audienceFilter = filter
+            )
+            when (val r = announcementsRepository.createAnnouncement(token, body)) {
+                is NetworkResult.Success -> {
+                    _state.value = _state.value.copy(
+                        isCreating = false,
+                        infoMessage = "Announcement created"
+                    )
+                    onCreated?.invoke()
+                    loadAnnouncements()
+                }
+                is NetworkResult.Error -> {
+                    AppLogger.e("SchoolAnnouncementsVM", "createAnnouncement error: ${r.message}")
+                    _state.value = _state.value.copy(isCreating = false, errorMessage = r.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(
+                        isCreating = false,
+                        errorMessage = "Connection error. Check your internet."
+                    )
+                }
+            }
+        }
+    }
+
+    fun clearMessages() {
+        _state.value = _state.value.copy(errorMessage = null, infoMessage = null)
+    }
+
     fun toggleWhatsAppSync(enabled: Boolean) {
         _state.value = _state.value.copy(isWhatsAppSyncEnabled = enabled)
+        if (enabled) {
+            viewModelScope.launch {
+                val token = preferenceRepository.getUserToken().first() ?: return@launch
+                announcementsRepository.syncWhatsApp(token)
+            }
+        }
     }
+
+    /**
+     * RA-49: turn a chosen audience scope + the admin's free-text targets into
+     * the JSON `audience_filter` the server's [resolveRecipientPhones] /
+     * [NotifyRecipients] expand. Key shapes mirror the server contract:
+     *   CLASS / SECTION → {"class_names":[...]}
+     *   SUBJECT         → {"subjects":[...]}
+     *   STUDENT         → {"student_codes":[...]}
+     *   CUSTOM          → {"phones":[...]}
+     * ALL_SCHOOL needs no filter (null).
+     */
+    private fun buildAudienceFilter(audienceType: String, values: List<String>): JsonElement? {
+        if (audienceType == "ALL_SCHOOL" || values.isEmpty()) return null
+        val arr = JsonArray(values.map { JsonPrimitive(it) })
+        val key = when (audienceType) {
+            "CLASS", "SECTION" -> "class_names"
+            "SUBJECT" -> "subjects"
+            "STUDENT" -> "student_codes"
+            "CUSTOM" -> "phones"
+            else -> "class_names"
+        }
+        return buildJsonObject { put(key, arr) }
+    }
+
+    private fun AnnouncementDto.toUiModel() = Announcement(
+        id = eventId,
+        title = title,
+        description = description,
+        category = type,
+        date = date,
+        imageUrl = eventImage,
+        isFeatured = false
+    )
 }

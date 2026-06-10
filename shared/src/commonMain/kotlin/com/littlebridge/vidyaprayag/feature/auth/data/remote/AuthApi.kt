@@ -65,8 +65,45 @@ class AuthApi(
 
     suspend fun getUserDetails(token: String): NetworkResult<UserDetailsResponse> {
         return safeApiCall {
-            client.get(getUrl("api/v1/user/details")) {
-                header(HttpHeaders.Authorization, "Bearer $token")
+            client.get(getUrl("api/v1/user/details"))
+        }
+    }
+
+    /**
+     * Exchange a refresh token for a fresh access token (audit §3.4, finding F).
+     * The server's /refresh route was previously unreachable because no client
+     * method called it.
+     */
+    suspend fun refresh(refreshToken: String): NetworkResult<ApiResponse<AuthResponse>> {
+        return safeApiCall {
+            client.post(getUrl("api/v1/auth/refresh")) {
+                contentType(ContentType.Application.Json)
+                setBody(RefreshRequest(refreshToken))
+            }
+        }
+    }
+
+    /**
+     * RA-54: change the authenticated user's password. The bearer token is
+     * attached automatically by the Ktor Auth plugin. On success the server
+     * flips profile_completed=true and must_change_password=false, resolving
+     * the teacher first-login gate permanently.
+     */
+    suspend fun changePassword(request: ChangePasswordRequest): NetworkResult<ApiResponse<Unit>> {
+        return safeApiCall {
+            client.post(getUrl("api/v1/auth/change-password")) {
+                contentType(ContentType.Application.Json)
+                setBody(request)
+            }
+        }
+    }
+
+    /** Revoke the current session server-side (audit §3.6). */
+    suspend fun logout(token: String, refreshToken: String?): NetworkResult<ApiResponse<Unit>> {
+        return safeApiCall {
+            client.post(getUrl("api/v1/auth/logout")) {
+                contentType(ContentType.Application.Json)
+                setBody(LogoutRequest(refreshToken))
             }
         }
     }

@@ -27,8 +27,7 @@ import com.littlebridge.vidyaprayag.core.principalUserId
 import com.littlebridge.vidyaprayag.db.AppConfigTable
 import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
-import com.littlebridge.vidyaprayag.db.SchoolClassesTable
-import com.littlebridge.vidyaprayag.db.SchoolsTable
+import com.littlebridge.vidyaprayag.feature.onboarding.computeOnboardingStatus
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
@@ -130,6 +129,10 @@ fun Route.userDetailsRouting() {
                     call.fail("Malformed token subject", HttpStatusCode.Unauthorized); return@get
                 }
 
+                // Single source of truth for onboarding completion (shared with
+                // SchoolDashboard). Derived strictly from persisted school data.
+                val status = computeOnboardingStatus(userUuid)
+
                 val payload = dbQuery {
                     val u = AppUsersTable.selectAll()
                         .where { AppUsersTable.id eq userUuid }
@@ -145,22 +148,10 @@ fun Route.userDetailsRouting() {
                         mobile = u[AppUsersTable.phone]
                     )
 
-                    // Resolve the school the user belongs to (admin or teacher).
-                    val schoolId = u[AppUsersTable.schoolId]
-                    val school = schoolId?.let {
-                        SchoolsTable.selectAll().where { SchoolsTable.id eq it }.singleOrNull()
-                    }
-
-                    val basicsDone = school != null &&
-                        school[SchoolsTable.name].isNotBlank() &&
-                        (school[SchoolsTable.contactEmail] != null || school[SchoolsTable.contactPhone] != null)
-                    val brandingDone = school?.get(SchoolsTable.logoUrl)?.isNotBlank() == true
-                    val academicDone = schoolId?.let {
-                        SchoolClassesTable.selectAll()
-                            .where { SchoolClassesTable.schoolId eq it }
-                            .count() > 0L
-                    } ?: false
-                    val finalDone = school?.get(SchoolsTable.onboardedAt) != null
+                    val basicsDone = status.basicsDone
+                    val brandingDone = status.brandingDone
+                    val academicDone = status.academicDone
+                    val finalDone = status.finalDone
 
                     fun statusFor(done: Boolean, prevDone: Boolean) = when {
                         done -> "COMPLETED"
@@ -179,11 +170,7 @@ fun Route.userDetailsRouting() {
                             statusFor(finalDone, academicDone), "rocket_launch", academicDone, true)
                     )
 
-                    val overall = when {
-                        finalDone -> "COMPLETED"
-                        basicsDone || brandingDone || academicDone -> "IN_PROGRESS"
-                        else -> "NOT_STARTED"
-                    }
+                    val overall = status.overallStatus
 
                     // Menu features come from app_config.flags.
                     val flagsRaw = AppConfigTable.selectAll()
