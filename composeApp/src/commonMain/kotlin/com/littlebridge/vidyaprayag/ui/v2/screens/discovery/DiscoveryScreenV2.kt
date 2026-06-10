@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -56,7 +57,7 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Internal view state for the discovery flow (mirrors React `DiscoveryApp` view union). */
-private enum class DiscoveryView { List, Profile }
+private enum class DiscoveryView { List, Profile, Compare }
 
 // React SRI pills use a fixed navy-blue ink (#0a3a76) on an arctic-blue (#C8DEFF) tint —
 // independent of the warm/night remap. §8 / charts.tsx SRI styling.
@@ -79,6 +80,9 @@ private val SriBg = Color(0xFFC8DEFF)
 fun DiscoveryScreenV2(
     modifier: Modifier = Modifier,
     onOpenSchool: (String) -> Unit = {},
+    // When set (e.g. parent-portal overlay host), the header "Exit" pops the overlay
+    // instead of routing through [onOpenSchool] (the unauth NavGraphV2 path).
+    onExit: (() -> Unit)? = null,
     viewModel: SchoolDiscoveryViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
@@ -99,9 +103,10 @@ fun DiscoveryScreenV2(
                 compare = if (id in compare) compare - id else if (compare.size < 3) compare + id else compare
             },
             onOpen = { s -> active = s; view = DiscoveryView.Profile },
-            // Header "Exit" sends the user out of the marketplace; no specific school selected,
-            // so we pass an empty id to the host (NavGraphV2 only routes off non-empty ids).
-            onExit = { onOpenSchool(active?.id.orEmpty()) },
+            onCompare = { if (compare.isNotEmpty()) view = DiscoveryView.Compare },
+            // Header "Exit" sends the user out of the marketplace; in the unauth flow we pass
+            // an empty id to the host, in the parent portal the dedicated [onExit] pops the overlay.
+            onExit = { onExit?.invoke() ?: onOpenSchool(active?.id.orEmpty()) },
         )
         DiscoveryView.Profile -> {
             // Smart-cast guard: `active` is a `var` in this scope, so we capture into a local.
@@ -111,10 +116,14 @@ fun DiscoveryScreenV2(
                     modifier = modifier,
                     school = s,
                     onBack = { view = DiscoveryView.List },
-                    onEnquire = { onOpenSchool(s.id) },
                 )
             }
         }
+        DiscoveryView.Compare -> SchoolCompare(
+            modifier = modifier,
+            items = state.schools.filter { it.id in compare },
+            onBack = { view = DiscoveryView.List },
+        )
     }
 }
 
@@ -127,6 +136,7 @@ private fun DiscoveryList(
     compare: Set<String>,
     onToggleCompare: (String) -> Unit,
     onOpen: (DiscoveredSchool) -> Unit,
+    onCompare: () -> Unit,
     onExit: () -> Unit,
 ) {
     val c = VTheme.colors
@@ -234,7 +244,7 @@ private fun DiscoveryList(
                     style = VTheme.type.caption.colored(Color.White),
                     modifier = Modifier.weight(1f),
                 )
-                VButton(text = "Compare now", onClick = {}, size = VButtonSize.Sm, tone = VButtonTone.Sky, soft = false)
+                VButton(text = "Compare now", onClick = onCompare, size = VButtonSize.Sm, tone = VButtonTone.Sky, soft = false)
             }
         }
     }
@@ -289,10 +299,15 @@ private fun SchoolCard(
             Column(Modifier.weight(1f)) {
                 Text(s.name, style = VTheme.type.h3.colored(c.ink))
                 Spacer(Modifier.height(6.dp))
-                // Board/type badges were MockV2-only fields. The backend will surface them
-                // in a follow-up — until then we show the city only, which we DO have.
+                // React card badges: board (arctic) + type/location (neutral). Board + medium
+                // are now real `schools` columns surfaced by the discover endpoint.
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    s.board?.let { VBadge(text = it, tone = VBadgeTone.Arctic) }
                     VBadge(text = s.location, tone = VBadgeTone.Neutral)
+                }
+                s.medium?.let { med ->
+                    Spacer(Modifier.height(6.dp))
+                    Text("$med medium", style = VTheme.type.caption.colored(c.ink2))
                 }
             }
             Column(horizontalAlignment = Alignment.End) {
@@ -343,10 +358,12 @@ private fun SchoolProfile(
     modifier: Modifier,
     school: DiscoveredSchool,
     onBack: () -> Unit,
-    onEnquire: () -> Unit,
 ) {
     val c = VTheme.colors
-    Column(modifier.fillMaxSize().background(c.background)) {
+    // React `SchoolProfile` — the "Enquire now" button opens a bottom-sheet enquiry form.
+    var enquireOpen by remember { mutableStateOf(false) }
+    Box(modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().background(c.background)) {
         VBackHeader(title = "School profile", onBack = onBack, action = {
             Icon(VIcons.Share, contentDescription = "Share", tint = c.ink2, modifier = Modifier.size(18.dp))
         })
@@ -365,6 +382,7 @@ private fun SchoolProfile(
                     Text(school.name, style = VTheme.type.h2.colored(c.ink))
                     Spacer(Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        school.board?.let { VBadge(text = it, tone = VBadgeTone.Arctic) }
                         VBadge(text = school.location, tone = VBadgeTone.Neutral)
                         // Dedicated SRI pill (real `rating` from the endpoint).
                         Row(
@@ -384,7 +402,7 @@ private fun SchoolProfile(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     VButton(text = "♡", onClick = {}, variant = VButtonVariant.Secondary, size = VButtonSize.Sm, tone = VButtonTone.Navy)
                     VButton(text = "Compare", onClick = {}, variant = VButtonVariant.Secondary, size = VButtonSize.Sm, tone = VButtonTone.Navy, full = true, modifier = Modifier.weight(1f))
-                    VButton(text = "Enquire now", onClick = onEnquire, size = VButtonSize.Sm, tone = VButtonTone.Sky, soft = false, full = true, modifier = Modifier.weight(1f))
+                    VButton(text = "Enquire now", onClick = { enquireOpen = true }, size = VButtonSize.Sm, tone = VButtonTone.Sky, soft = false, full = true, modifier = Modifier.weight(1f))
                 }
 
                 // About / academics / fees / reviews / location need richer endpoints
@@ -396,11 +414,16 @@ private fun SchoolProfile(
                         description = "Rich school descriptions and tags will appear here once schools complete their public profile in the admin portal.",
                     )
                 }
+                // Academics — board / medium / co-ed are now REAL columns surfaced by the
+                // discover endpoint; fields the backend still lacks stay "Coming Soon" (LAW 6).
                 ProfileSection("Academics") {
-                    VComingSoon(
-                        title = "Academics",
-                        description = "Board, classes offered, medium, ratios — these will populate from each school's institutional profile.",
-                    )
+                    VCard {
+                        ProfileRow("Board", school.board ?: "—")
+                        ProfileRow("Medium", school.medium?.let { "$it medium" } ?: "—")
+                        ProfileRow("Co-ed", coEdLabel(school.schoolGender))
+                        ProfileRow("Classes offered", "Coming Soon")
+                        ProfileRow("Teacher–student ratio", "Coming Soon")
+                    }
                 }
                 ProfileSection("Fee structure") {
                     VComingSoon(
@@ -422,13 +445,215 @@ private fun SchoolProfile(
                     )
                 }
                 ProfileSection("Location") {
-                    VComingSoon(
-                        title = "On the map",
-                        description = "Map embedding ships with the upcoming Maps integration. City: ${school.location}.",
-                    )
+                    // Capture into a local — `address` lives in the shared module, so a direct
+                    // smart cast across the module boundary is not permitted by the compiler.
+                    val address = school.address
+                    if (address.isNullOrBlank()) {
+                        VComingSoon(
+                            title = "On the map",
+                            description = "Map embedding ships with the upcoming Maps integration. City: ${school.location}.",
+                        )
+                    } else {
+                        VCard {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(VIcons.MapPin, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(16.dp))
+                                Text(address, style = VTheme.type.caption.colored(c.ink))
+                            }
+                        }
+                    }
                 }
                 Spacer(Modifier.height(16.dp))
             }
+        }
+    }
+    // ── Enquiry bottom sheet (React `SchoolProfile → enquireOpen`) ──────────────
+    if (enquireOpen) {
+        EnquirySheet(onDismiss = { enquireOpen = false })
+    }
+    }
+}
+
+/**
+ * EnquirySheet — faithful copy of the React enquiry modal (Discovery.tsx lines 194-214):
+ * scrim + bottom card with name / child / class inputs and a stateful "Submit enquiry"
+ * button (successLabel "Sent"). The dedicated parent-enquiry endpoint ships in a later
+ * phase; like the React reference, submission is a stateful UI confirmation for now.
+ */
+@Composable
+private fun EnquirySheet(onDismiss: () -> Unit) {
+    val c = VTheme.colors
+    var name by remember { mutableStateOf("") }
+    var childName by remember { mutableStateOf("") }
+    var currentClass by remember { mutableStateOf("") }
+    var applyClass by remember { mutableStateOf("") }
+    var message by remember { mutableStateOf("") }
+
+    val scrimInteraction = remember { MutableInteractionSource() }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color(0xFF080808).copy(alpha = 0.45f))
+            .clickable(interactionSource = scrimInteraction, indication = null) { onDismiss() },
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        val sheetInteraction = remember { MutableInteractionSource() }
+        Column(
+            Modifier
+                .fillMaxWidth()
+                // consume taps so the scrim's dismiss doesn't fire through the sheet
+                .clickable(interactionSource = sheetInteraction, indication = null) {}
+                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .background(c.card)
+                .padding(horizontal = 20.dp, vertical = 24.dp)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            Text("Send enquiry", style = VTheme.type.h3.colored(c.ink))
+            Text(
+                "The admissions team will respond within 2 working days.",
+                style = VTheme.type.caption.colored(c.ink2),
+                modifier = Modifier.padding(top = 2.dp),
+            )
+            Spacer(Modifier.height(16.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                VInput(value = name, onValueChange = { name = it }, label = "Your name")
+                VInput(value = childName, onValueChange = { childName = it }, label = "Child's name")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    VInput(value = currentClass, onValueChange = { currentClass = it }, label = "Current class", placeholder = "—", modifier = Modifier.weight(1f))
+                    VInput(value = applyClass, onValueChange = { applyClass = it }, label = "Apply for class", placeholder = "—", modifier = Modifier.weight(1f))
+                }
+                VInput(value = message, onValueChange = { message = it }, label = "Message (optional)", placeholder = "Any specific question?")
+            }
+            Spacer(Modifier.height(20.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                VButton(text = "Cancel", onClick = onDismiss, variant = VButtonVariant.Ghost, full = true, modifier = Modifier.weight(1f))
+                VButton(
+                    text = "Submit enquiry",
+                    onClick = onDismiss,
+                    tone = VButtonTone.Sky,
+                    soft = false,
+                    full = true,
+                    stateful = true,
+                    successLabel = "Sent",
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * SchoolCompare — faithful copy of the React compare table (Discovery.tsx lines 237-282):
+ * avatar header per school, then label/value rows. The SRI-score row highlights the best
+ * value with the arctic tint. Fields the discover endpoint does not yet send (board, type,
+ * medium, fee range, board result, co-ed) render as "—" — LAW 6, no fabricated data.
+ */
+@Composable
+private fun SchoolCompare(
+    modifier: Modifier,
+    items: List<DiscoveredSchool>,
+    onBack: () -> Unit,
+) {
+    val c = VTheme.colors
+    data class CompareRow(val label: String, val pick: (DiscoveredSchool) -> String)
+    val rows = listOf(
+        CompareRow("Board") { it.board ?: "—" },
+        CompareRow("City") { it.location },
+        CompareRow("Medium") { it.medium ?: "—" },
+        CompareRow("Fee range") { "—" },
+        CompareRow("SRI score") { formatRating(it.rating) },
+        CompareRow("Distance") { it.distanceLabel ?: "—" },
+        CompareRow("Board result") { "—" },
+        CompareRow("Co-ed") { coEdLabel(it.schoolGender) },
+    )
+    val bestSri = items.maxOfOrNull { it.rating } ?: 0.0
+
+    Column(modifier.fillMaxSize().background(c.background)) {
+        VBackHeader(title = "Compare schools", onBack = onBack)
+        Column(
+            Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 16.dp),
+        ) {
+            // ── School avatar header ───────────────────────────────────────────
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Spacer(Modifier.width(96.dp))
+                items.forEach { s ->
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(c.card)
+                            .padding(8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Box(
+                            Modifier.size(40.dp).clip(RoundedCornerShape(999.dp)).background(SriBg),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(VIcons.GraduationCap, contentDescription = null, tint = c.ink, modifier = Modifier.size(18.dp))
+                        }
+                        Text(
+                            s.name,
+                            style = VTheme.type.caption.colored(c.ink).copy(fontWeight = FontWeight.SemiBold),
+                            modifier = Modifier.padding(top = 4.dp),
+                            maxLines = 2,
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            // ── Comparison table ───────────────────────────────────────────────
+            VCard {
+                rows.forEachIndexed { i, r ->
+                    if (i > 0) VDivider()
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            r.label.uppercase(),
+                            style = VTheme.type.label.colored(c.ink2),
+                            modifier = Modifier.width(96.dp),
+                        )
+                        items.forEach { s ->
+                            val v = r.pick(s)
+                            val isBest = r.label == "SRI score" && s.rating == bestSri && bestSri > 0.0
+                            Box(
+                                Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isBest) SriBg.copy(alpha = 0.30f) else Color.Transparent)
+                                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(v, style = VTheme.type.caption.colored(c.ink).copy(fontWeight = FontWeight.SemiBold))
+                            }
+                        }
+                    }
+                }
+            }
+            // Honest footnote — these columns fill in as schools complete their public profile.
+            Text(
+                "Fee range and board results populate once schools publish their fee plan.",
+                style = VTheme.type.caption.colored(c.ink3),
+                modifier = Modifier.padding(top = 8.dp, start = 8.dp, end = 8.dp),
+            )
+            Spacer(Modifier.height(16.dp))
+            VButton(
+                text = "Enquire to all selected",
+                onClick = {},
+                size = VButtonSize.Lg,
+                tone = VButtonTone.Sky,
+                soft = false,
+                full = true,
+                stateful = true,
+                successLabel = "Enquiries sent",
+            )
         }
     }
 }
@@ -442,7 +667,6 @@ private fun ProfileSection(title: String, content: @Composable () -> Unit) {
     }
 }
 
-@Suppress("unused")
 @Composable
 private fun ProfileRow(k: String, v: String) {
     val c = VTheme.colors
@@ -457,6 +681,14 @@ private fun ProfileRow(k: String, v: String) {
         }
         VDivider()
     }
+}
+
+/** "co_ed" → "Yes", "girls" → "Girls only", "boys" → "Boys only" (React `coed` row). */
+private fun coEdLabel(gender: String?): String = when (gender?.lowercase()) {
+    "co_ed", "coed", "co-ed" -> "Yes"
+    "girls" -> "Girls only"
+    "boys" -> "Boys only"
+    else -> "—"
 }
 
 /** "8.4" / "9.0" — server sends a Double rating; format to one decimal. */

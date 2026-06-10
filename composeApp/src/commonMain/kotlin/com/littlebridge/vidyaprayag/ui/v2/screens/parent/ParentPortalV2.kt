@@ -43,13 +43,14 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VStatusDot
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.ParentLinkChildScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.discovery.AcademicCalendarScreenV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.discovery.DiscoveryScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.notifications.NotificationsScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays a portal can push above its tab content (back returns to the tabs). */
-private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, Profile, Leave, Messages, LinkChild }
+private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, Profile, Leave, Messages, LinkChild, Discovery }
 
 /**
  * ParentPortalV2 — the 4-tab parent shell, a faithful copy of `Parent.tsx → ParentApp`.
@@ -101,6 +102,7 @@ fun ParentPortalV2(
                 onBack = { overlay = ParentOverlay.None },
                 onLogout = onLogout,
                 onLinkChild = { overlay = ParentOverlay.LinkChild },
+                onDiscoverSchools = { overlay = ParentOverlay.Discovery },
                 modifier = modifier,
             )
             return
@@ -124,6 +126,17 @@ fun ParentPortalV2(
         ParentOverlay.Messages -> {
             // RA-51: parent ↔ teacher/admin messaging.
             ParentMessagesScreenV2(onBack = { overlay = ParentOverlay.None }, modifier = modifier)
+            return
+        }
+        ParentOverlay.Discovery -> {
+            // Marketplace browsing for AUTHENTICATED parents — the same DiscoveryScreenV2 that
+            // serves the unauth flow, hosted as a portal overlay. Reached from the Profile's
+            // "Discover schools" row and Home's "View all" featured-schools link. The header
+            // "Exit" + system back both pop the overlay back to the tabs.
+            DiscoveryScreenV2(
+                onExit = { overlay = ParentOverlay.None },
+                modifier = modifier,
+            )
             return
         }
         ParentOverlay.None -> Unit
@@ -156,7 +169,7 @@ fun ParentPortalV2(
     ) { _ ->
         Box(Modifier.fillMaxSize()) {
             when (tab) {
-                "home" -> ParentHomeScreenV2()
+                "home" -> ParentHomeScreenV2(onDiscoverSchools = { overlay = ParentOverlay.Discovery })
                 "academics" -> ParentAcademicsScreenV2(onOpenLeave = { overlay = ParentOverlay.Leave })
                 "fees" -> ParentFeesScreenV2()
                 "activity" -> ParentActivityScreenV2()

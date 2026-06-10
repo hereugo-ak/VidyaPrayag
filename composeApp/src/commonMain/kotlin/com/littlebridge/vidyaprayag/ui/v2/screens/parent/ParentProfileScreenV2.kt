@@ -59,6 +59,7 @@ fun ParentProfileScreenV2(
     onBack: () -> Unit = {},
     onLogout: () -> Unit = {},
     onLinkChild: () -> Unit = {},
+    onDiscoverSchools: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ParentProfileViewModel = koinViewModel(),
 ) {
@@ -68,6 +69,7 @@ fun ParentProfileScreenV2(
         onBack = onBack,
         onLogout = onLogout,
         onLinkChild = onLinkChild,
+        onDiscoverSchools = onDiscoverSchools,
         onRetry = viewModel::load,
         modifier = modifier,
     )
@@ -79,6 +81,7 @@ private fun ParentProfileContent(
     onBack: () -> Unit,
     onLogout: () -> Unit,
     onLinkChild: () -> Unit,
+    onDiscoverSchools: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -155,6 +158,9 @@ private fun ParentProfileContent(
                                 null,
                             ),
                             ProfileRow("Linked children", "Link a child or manage who you follow", onLinkChild),
+                            // Marketplace entry for signed-in parents — browse every school on
+                            // VidyaPrayag and open full school profiles (Discovery overlay).
+                            ProfileRow("Discover schools", "Browse all schools on VidyaPrayag", onDiscoverSchools),
                             ProfileRow("Notification preferences", "Push, WhatsApp, quiet hours", null),
                             ProfileRow("Change password", "Keep your account secure", null),
                             ProfileRow(
