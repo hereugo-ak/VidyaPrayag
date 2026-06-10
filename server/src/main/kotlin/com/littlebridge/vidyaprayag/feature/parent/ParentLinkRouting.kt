@@ -182,15 +182,53 @@ fun Route.parentLinkRouting() {
                         return@dbQuery LinkResult.Throttled
                     }
 
-                    // 2) Resolve the canonical student by (school, roll). We DO resolve
-                    // here so an invalid roll fails fast, but we DON'T link yet.
-                    val studentRow = StudentsTable.selectAll()
+                    // 2) Resolve the canonical student by (school, roll/admission no.).
+                    // FIX (link-child 404): the previous implementation did an exact
+                    // text `rollNumber eq input` + `singleOrNull()`. That failed for
+                    // EVERY input because (a) rolls are stored as plain digits ('1')
+                    // so '001'/'01' never matched, (b) the admission/student code
+                    // (e.g. 'S1-G3A-001') was never checked, and (c) `singleOrNull()`
+                    // silently returns null when SEVERAL classes share the same roll
+                    // number (roll '1' exists in 3-A, 3-B, 5-A, 8-A…) — so even the
+                    // correct plain roll resolved to "not found".
+                    //
+                    // Resolution order now:
+                    //   1. exact admission/student code match (unique — always wins);
+                    //   2. roll-number match with numeric normalisation ('001' ≡ '1');
+                    //      if it is ambiguous across classes we tell the parent to use
+                    //      the full admission number instead of lying with a 404.
+                    // School rosters are small (≤ a few hundred rows), so the scoped
+                    // fetch + in-memory normalisation mirrors the SchoolStudentsRouting
+                    // search style and stays Postgres/SQLite-portable.
+                    val rollInput = req.rollNumber.trim()
+                    val roster = StudentsTable.selectAll()
                         .where {
                             (StudentsTable.schoolId eq schoolUuid) and
-                                (StudentsTable.rollNumber eq req.rollNumber) and
                                 (StudentsTable.isActive eq true)
                         }
-                        .singleOrNull() ?: return@dbQuery LinkResult.StudentNotFound
+                        .toList()
+
+                    fun normaliseRoll(v: String): String {
+                        val t = v.trim()
+                        // strip leading zeros for purely numeric rolls: '001' → '1'
+                        return if (t.all { it.isDigit() } && t.isNotEmpty()) {
+                            t.trimStart('0').ifEmpty { "0" }
+                        } else t.lowercase()
+                    }
+
+                    val byCode = roster.filter {
+                        it[StudentsTable.studentCode].equals(rollInput, ignoreCase = true)
+                    }
+                    val matches = if (byCode.isNotEmpty()) byCode else {
+                        val wanted = normaliseRoll(rollInput)
+                        roster.filter { normaliseRoll(it[StudentsTable.rollNumber]) == wanted }
+                    }
+
+                    val studentRow = when {
+                        matches.isEmpty() -> return@dbQuery LinkResult.StudentNotFound
+                        matches.size > 1 -> return@dbQuery LinkResult.AmbiguousRoll(matches.size)
+                        else -> matches.single()
+                    }
 
                     val studentCodeVal = studentRow[StudentsTable.studentCode]
                     val childNameVal = studentRow[StudentsTable.fullName]
@@ -214,8 +252,11 @@ fun Route.parentLinkRouting() {
                             it[id] = newId
                             it[parentId] = uid
                             it[schoolId] = schoolUuid
+                            // Store the school's CANONICAL roll (not the raw parent
+                            // input like '001' / 'S1-G3A-001') so the admin queue
+                            // displays exactly what the roster shows.
+                            it[rollNumber] = studentRow[StudentsTable.rollNumber]
                             it[studentCode] = studentCodeVal
-                            it[rollNumber] = req.rollNumber
                             it[childName] = childNameVal
                             it[status] = "pending"
                             it[requestedAt] = now
@@ -229,7 +270,7 @@ fun Route.parentLinkRouting() {
                             childId = "",                 // no child row until approved
                             childName = childNameVal,
                             className = classNameVal,
-                            roll = req.rollNumber,
+                            roll = studentRow[StudentsTable.rollNumber],
                             schoolName = schoolNameVal,
                             profilePhotoUrl = photoVal,
                             status = "pending",
@@ -240,7 +281,18 @@ fun Route.parentLinkRouting() {
                 when (result) {
                     is LinkResult.SchoolNotFound -> call.fail("School not found", HttpStatusCode.NotFound)
                     is LinkResult.StudentNotFound ->
-                        call.fail("No student found with that roll/admission number at this school", HttpStatusCode.NotFound)
+                        call.fail(
+                            "No student found with that roll/admission number at this school. " +
+                                "Try the full admission number printed on the school ID (e.g. S1-G3A-001).",
+                            HttpStatusCode.NotFound
+                        )
+                    is LinkResult.AmbiguousRoll ->
+                        call.fail(
+                            "${result.count} students at this school share that roll number across different classes. " +
+                                "Please enter the full admission number instead (e.g. S1-G3A-001).",
+                            HttpStatusCode.Conflict,
+                            "ROLL_AMBIGUOUS"
+                        )
                     is LinkResult.Throttled ->
                         call.fail("You have too many pending link requests for this school. Please wait for them to be reviewed.", HttpStatusCode.TooManyRequests, "LINK_THROTTLED")
                     is LinkResult.Pending -> {
@@ -507,6 +559,8 @@ private sealed interface DecisionResult {
 private sealed interface LinkResult {
     data object SchoolNotFound : LinkResult
     data object StudentNotFound : LinkResult
+    /** Several classes share this roll number — the parent must use the unique admission code. */
+    data class AmbiguousRoll(val count: Int) : LinkResult
     data object Throttled : LinkResult
     data class Pending(val linkId: UUID, val child: LinkedChildDto) : LinkResult
 }

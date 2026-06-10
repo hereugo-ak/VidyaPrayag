@@ -34,8 +34,11 @@ import com.littlebridge.vidyaprayag.db.AssessmentsTable
 import com.littlebridge.vidyaprayag.db.AttendanceRecordsTable
 import com.littlebridge.vidyaprayag.db.ChildrenTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
+import com.littlebridge.vidyaprayag.db.ExamResultsTable
 import com.littlebridge.vidyaprayag.db.FeeRecordsTable
+import com.littlebridge.vidyaprayag.db.HomeworkSubmissionsTable
 import com.littlebridge.vidyaprayag.db.LeaveRequestsTable
+import com.littlebridge.vidyaprayag.db.ParentChildLinksTable
 import com.littlebridge.vidyaprayag.db.StudentsTable
 import com.littlebridge.vidyaprayag.db.TeacherSubjectAssignmentsTable
 import io.ktor.http.*
@@ -47,6 +50,7 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
@@ -222,17 +226,55 @@ fun Route.schoolStudentsRouting() {
                 call.created(dto, message = "Student added")
             }
 
-            // ---- soft-delete a student (school-admin) ----
+            // ---- HARD-delete a student (school-admin) ----
+            // FIX (admin remove leaves Supabase rows behind): this used to flip
+            // is_active=false, so "removed" students stayed in the database
+            // forever and reappeared in any query that forgot the isActive
+            // filter. Admin removal is now a real DELETE. Because the academic
+            // tables join on the TEXT student_code (no FK → the DB cannot
+            // cascade for us), we explicitly purge the dependents in the same
+            // transaction: attendance, exam results, assessment marks, homework
+            // submissions and any pending parent link requests. Parent-side
+            // `children` rows are deactivated (not deleted — they belong to the
+            // parent's account history).
             delete("{id}") {
                 val ctx = call.requireSchoolAdmin() ?: return@delete
                 val id = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                     ?: run { call.fail("Invalid student id"); return@delete }
-                val n = dbQuery {
-                    StudentsTable.update({
+                val removed = dbQuery {
+                    val row = StudentsTable.selectAll()
+                        .where { (StudentsTable.id eq id) and (StudentsTable.schoolId eq ctx.schoolId) }
+                        .firstOrNull() ?: return@dbQuery false
+                    val code = row[StudentsTable.studentCode]   // globally unique
+
+                    AttendanceRecordsTable.deleteWhere {
+                        (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
+                            (AttendanceRecordsTable.type eq "student") and
+                            (AttendanceRecordsTable.personId eq code)
+                    }
+                    ExamResultsTable.deleteWhere {
+                        (ExamResultsTable.schoolId eq ctx.schoolId) and (ExamResultsTable.studentId eq code)
+                    }
+                    AssessmentMarksTable.deleteWhere { AssessmentMarksTable.studentId eq code }
+                    HomeworkSubmissionsTable.deleteWhere { HomeworkSubmissionsTable.studentId eq code }
+                    ParentChildLinksTable.deleteWhere {
+                        (ParentChildLinksTable.schoolId eq ctx.schoolId) and
+                            (ParentChildLinksTable.studentCode eq code)
+                    }
+                    // Unlink (deactivate) parent-side children rows pointing at this student.
+                    ChildrenTable.update({
+                        (ChildrenTable.schoolId eq ctx.schoolId) and (ChildrenTable.studentCode eq code)
+                    }) {
+                        it[isActive] = false
+                        it[updatedAt] = Instant.now()
+                    }
+
+                    StudentsTable.deleteWhere {
                         (StudentsTable.id eq id) and (StudentsTable.schoolId eq ctx.schoolId)
-                    }) { it[isActive] = false }
+                    }
+                    true
                 }
-                if (n == 0) {
+                if (!removed) {
                     call.fail("Student not found in your school", HttpStatusCode.NotFound, "STUDENT_NOT_FOUND")
                     return@delete
                 }
