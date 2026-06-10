@@ -190,7 +190,19 @@ private fun ParentHomeContent(
             // ── Featured schools ────────────────────────────────────────────────
             if (state.featuredSchools.isNotEmpty()) {
                 VCard {
-                    VLabel("Featured schools")
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        VLabel("Featured schools")
+                        // Opens the full Discovery marketplace as a portal overlay.
+                        Text(
+                            "View all ›",
+                            style = VTheme.type.caption.colored(c.tealDeep).copy(fontWeight = FontWeight.SemiBold),
+                            modifier = Modifier.clickable { onDiscoverSchools() },
+                        )
+                    }
                     Spacer(Modifier.height(8.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         state.featuredSchools.forEach { s ->

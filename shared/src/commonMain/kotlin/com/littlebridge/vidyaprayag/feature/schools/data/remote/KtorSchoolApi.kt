@@ -131,6 +131,12 @@ data class DiscoveredSchoolDto(
     val latitude: Double? = null,
     val longitude: Double? = null,
     @SerialName("distance_km") val distanceKm: Double? = null,
+    // Public-profile fields (board badge, medium chip, co-ed flag, address) —
+    // nullable so the client also deserialises responses from older servers.
+    val board: String? = null,
+    val medium: String? = null,
+    @SerialName("school_gender") val schoolGender: String? = null,
+    val address: String? = null,
 )
 
 @Serializable

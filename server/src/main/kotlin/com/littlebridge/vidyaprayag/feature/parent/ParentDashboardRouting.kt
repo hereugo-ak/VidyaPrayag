@@ -90,7 +90,14 @@ data class DiscoveredSchool(
     val image: String? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
-    @SerialName("distance_km") val distanceKm: Double? = null
+    @SerialName("distance_km") val distanceKm: Double? = null,
+    // Public-profile fields the marketplace cards need (board badge, medium chip,
+    // co-ed flag, full address on the profile screen). All real columns on
+    // `schools` — nullable so old clients deserialise unchanged.
+    val board: String? = null,
+    val medium: String? = null,
+    @SerialName("school_gender") val schoolGender: String? = null,
+    val address: String? = null
 )
 
 @Serializable
@@ -277,7 +284,11 @@ fun Route.parentDashboardRouting() {
                             image = row[SchoolsTable.logoUrl],
                             latitude = sLat,
                             longitude = sLng,
-                            distanceKm = dist?.let { kotlin.math.round(it * 100) / 100.0 }
+                            distanceKm = dist?.let { kotlin.math.round(it * 100) / 100.0 },
+                            board = row[SchoolsTable.board].takeIf { it.isNotBlank() },
+                            medium = row[SchoolsTable.medium].takeIf { it.isNotBlank() },
+                            schoolGender = row[SchoolsTable.schoolGender].takeIf { it.isNotBlank() },
+                            address = row[SchoolsTable.fullAddress]
                         )
                     }
 

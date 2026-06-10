@@ -27,6 +27,14 @@ data class DiscoveredSchool(
     val image: String?,
     /** Pre-formatted "1.8 km" string when the server gave us a `distance_km`, else `null`. */
     val distanceLabel: String?,
+    /** "CBSE" / "ICSE" / "UP Board" — real `schools.board` column; null on older servers. */
+    val board: String? = null,
+    /** "English" / "Hindi" — real `schools.medium` column. */
+    val medium: String? = null,
+    /** "co_ed" / "boys" / "girls" — real `schools.school_gender` column. */
+    val schoolGender: String? = null,
+    /** Full street address for the profile Location card; null when the school hasn't set one. */
+    val address: String? = null,
 )
 
 data class SchoolDiscoveryState(
@@ -119,4 +127,8 @@ private fun DiscoveredSchoolDto.toUi(): DiscoveredSchool = DiscoveredSchool(
     rating = rating,
     image = image,
     distanceLabel = distanceKm?.let { "${it} km" },
+    board = board,
+    medium = medium,
+    schoolGender = schoolGender,
+    address = address,
 )
