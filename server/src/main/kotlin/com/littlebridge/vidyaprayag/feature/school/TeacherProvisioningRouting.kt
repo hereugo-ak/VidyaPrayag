@@ -28,6 +28,9 @@ import com.littlebridge.vidyaprayag.core.requireSchoolAdmin
 import com.littlebridge.vidyaprayag.core.requireSchoolContext
 import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
+import com.littlebridge.vidyaprayag.db.DeviceTokensTable
+import com.littlebridge.vidyaprayag.db.NotificationsTable
+import com.littlebridge.vidyaprayag.db.TeacherSubjectAssignmentsTable
 import com.littlebridge.vidyaprayag.db.UserSessionsTable
 import com.littlebridge.vidyaprayag.feature.auth.hashPassword
 import com.littlebridge.vidyaprayag.feature.auth.normaliseIdentifier
@@ -39,6 +42,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
@@ -194,11 +198,19 @@ fun Route.teacherProvisioningRouting() {
                 call.ok(TeacherListResponse(teachers), message = "Teachers fetched successfully")
             }
 
-            // ---- deactivate (soft-delete) a teacher (RA-22) ----
-            // IDOR-safe: the UPDATE is constrained to ctx.schoolId, so an admin
-            // can only deactivate teachers belonging to their OWN school. Uses a
-            // soft-delete (is_active=false) which integrates with the RA-34
-            // kill-switch, and revokes the teacher's sessions immediately.
+            // ---- HARD-delete a teacher (RA-22) ----
+            // FIX (admin remove leaves Supabase rows behind): previously this
+            // only flipped is_active=false, so the app_users row (and the
+            // teacher's sessions/tokens/assignments) stayed in Supabase forever.
+            // Admin removal now performs a real DELETE inside one transaction:
+            //   - sessions + device tokens + class/subject assignments are
+            //     purged here (no DB-level FK exists for them);
+            //   - authored content (assessments / homework / syllabus / marks)
+            //     is PRESERVED — the DB FKs are ON DELETE SET NULL, so school
+            //     academic history survives with the author cleared;
+            //   - teacher_periods rows cascade away via their FK.
+            // IDOR-safe: every statement is constrained to ctx.schoolId, so an
+            // admin can only delete teachers belonging to their OWN school.
             delete("/{id}") {
                 val ctx = call.requireSchoolAdmin() ?: return@delete   // privileged: RA-39
                 val teacherId = call.parameters["id"]
@@ -206,7 +218,7 @@ fun Route.teacherProvisioningRouting() {
                     ?: run { call.fail("A valid teacher id is required", HttpStatusCode.BadRequest, "BAD_TEACHER_ID"); return@delete }
 
                 val now = Instant.now()
-                val deactivated = dbQuery {
+                val deleted = dbQuery {
                     // Confirm the teacher exists in THIS school first.
                     val row = AppUsersTable.selectAll()
                         .where {
@@ -216,18 +228,36 @@ fun Route.teacherProvisioningRouting() {
                         }
                         .firstOrNull() ?: return@dbQuery false
 
-                    AppUsersTable.update({ AppUsersTable.id eq row[AppUsersTable.id] }) {
-                        it[isActive] = false
-                        it[updatedAt] = now
-                    }
-                    // Kill the teacher's live sessions so the removal is immediate.
+                    // Kill the teacher's live sessions FIRST (immediate lockout even
+                    // if a later statement fails), then purge auth artefacts.
                     UserSessionsTable.update({ UserSessionsTable.userId eq teacherId }) {
                         it[revokedAt] = now
+                    }
+                    UserSessionsTable.deleteWhere { UserSessionsTable.userId eq teacherId }
+                    DeviceTokensTable.deleteWhere { DeviceTokensTable.userId eq teacherId }
+                    // The teacher's personal notification inbox is meaningless once
+                    // the account is gone — purge it so no orphan rows linger.
+                    NotificationsTable.deleteWhere { NotificationsTable.userId eq teacherId }
+
+                    // Remove the teacher's class/subject assignments (no DB FK — must
+                    // be cleaned manually or they linger as orphans in Supabase).
+                    TeacherSubjectAssignmentsTable.deleteWhere {
+                        (TeacherSubjectAssignmentsTable.schoolId eq ctx.schoolId) and
+                            (TeacherSubjectAssignmentsTable.teacherId eq teacherId)
+                    }
+
+                    // Finally the account row itself. Tables with real FKs to
+                    // app_users (assessments / homework / syllabus_units → SET NULL,
+                    // teacher_periods → CASCADE) are handled by Postgres.
+                    AppUsersTable.deleteWhere {
+                        (AppUsersTable.id eq teacherId) and
+                            (AppUsersTable.schoolId eq ctx.schoolId) and
+                            (AppUsersTable.role eq "teacher")
                     }
                     true
                 }
 
-                if (!deactivated) {
+                if (!deleted) {
                     call.fail("Teacher not found in your school", HttpStatusCode.NotFound, "TEACHER_NOT_FOUND")
                     return@delete
                 }

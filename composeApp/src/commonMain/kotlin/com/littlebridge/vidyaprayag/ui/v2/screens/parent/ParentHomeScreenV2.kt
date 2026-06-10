@@ -56,6 +56,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun ParentHomeScreenV2(
     modifier: Modifier = Modifier,
+    onDiscoverSchools: () -> Unit = {},
     viewModel: ParentHomeViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
@@ -63,6 +64,7 @@ fun ParentHomeScreenV2(
         state = state,
         onRetry = viewModel::load,
         onSelectChild = viewModel::selectChild,
+        onDiscoverSchools = onDiscoverSchools,
         modifier = modifier,
     )
 }
@@ -73,6 +75,7 @@ private fun ParentHomeContent(
     state: ParentHomeState,
     onRetry: () -> Unit,
     onSelectChild: (String) -> Unit,
+    onDiscoverSchools: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -190,7 +193,19 @@ private fun ParentHomeContent(
             // ── Featured schools ────────────────────────────────────────────────
             if (state.featuredSchools.isNotEmpty()) {
                 VCard {
-                    VLabel("Featured schools")
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        VLabel("Featured schools")
+                        // Opens the full Discovery marketplace as a portal overlay.
+                        Text(
+                            "View all ›",
+                            style = VTheme.type.caption.colored(c.tealDeep).copy(fontWeight = FontWeight.SemiBold),
+                            modifier = Modifier.clickable { onDiscoverSchools() },
+                        )
+                    }
                     Spacer(Modifier.height(8.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         state.featuredSchools.forEach { s ->

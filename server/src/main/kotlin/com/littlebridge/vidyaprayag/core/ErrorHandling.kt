@@ -99,7 +99,17 @@ fun StatusPagesConfig.configureErrorHandling() {
     // a misleading "endpoint not found" when the real cause is a missing Bearer
     // token, sniff the Authorization header on `/api/v1/...` paths and emit a
     // 401 with an actionable message instead.
+    //
+    // CRITICAL FIX (link-child "Endpoint not found" bug): StatusPages' status()
+    // hook fires for EVERY 404 response — including ones a route handler sent
+    // deliberately via call.fail("No student found…", NotFound). That clobbered
+    // every legitimate 404 body in the API with "Endpoint not found: <uri>",
+    // which is exactly what parents saw on POST /api/v1/parent/link-child even
+    // though the route exists and ran. Route handlers now stamp
+    // [RouteHandledResponseKey] inside call.fail(); when the marker is present
+    // we step aside and let the handler's own envelope through untouched.
     status(HttpStatusCode.NotFound) { call, _ ->
+        if (call.attributes.contains(RouteHandledResponseKey)) return@status
         val uri = call.request.uri
         val hasBearer = call.request.header(HttpHeaders.Authorization)?.startsWith("Bearer ") == true
         if (uri.startsWith("/api/v1/") && !hasBearer) {
