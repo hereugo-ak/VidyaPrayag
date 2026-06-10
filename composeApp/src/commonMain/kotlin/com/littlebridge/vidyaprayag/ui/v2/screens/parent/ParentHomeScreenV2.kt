@@ -56,6 +56,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun ParentHomeScreenV2(
     modifier: Modifier = Modifier,
+    onDiscoverSchools: () -> Unit = {},
     viewModel: ParentHomeViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
@@ -63,6 +64,7 @@ fun ParentHomeScreenV2(
         state = state,
         onRetry = viewModel::load,
         onSelectChild = viewModel::selectChild,
+        onDiscoverSchools = onDiscoverSchools,
         modifier = modifier,
     )
 }
@@ -73,6 +75,7 @@ private fun ParentHomeContent(
     state: ParentHomeState,
     onRetry: () -> Unit,
     onSelectChild: (String) -> Unit,
+    onDiscoverSchools: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
