@@ -161,10 +161,10 @@ android {
     flavorDimensions += "environment"
     productFlavors {
         create("dev") {
-    dimension = "environment"
-    buildConfigField("String", "AUTH_BASE_URL", "\"http://10.210.83.54:8080\"")
-    buildConfigField("String", "SCHOOL_BASE_URL", "\"http://10.210.83.54:8080\"")
-}
+            dimension = "environment"
+            buildConfigField("String", "AUTH_BASE_URL", "\"$devBaseUrl\"")
+            buildConfigField("String", "SCHOOL_BASE_URL", "\"$devBaseUrl\"")
+        }
         create("staging") {
             dimension = "environment"
             buildConfigField("String", "AUTH_BASE_URL", "\"https://vidyaprayag-1.onrender.com\"")
