@@ -403,9 +403,20 @@ private fun persistAcademicStructure(schoolId: UUID, payload: JsonObject) {
  *              (best-effort; never blocks completion).
  *   - ACADEMIC done when the school has at least one class.
  *   - REVIEW   done when `schools.onboarded_at` is stamped (final submit).
+ *
+ * IMPORTANT (the wrong-state bug): `is_complete` is NOT taken from a single
+ * `onboarded_at` timestamp alone. That column can be hand-set on a manually
+ * inserted row or carried by a seed (`DemoSeed`/`profile_completed=true`), which
+ * previously made a school with NO classes and NO real setup report as fully
+ * onboarded — the admin then landed on an empty dashboard with the wizard wrongly
+ * skipped. Completion now requires the SUBSTANTIVE steps to genuinely exist
+ * (a named school + at least one class) IN ADDITION TO the final stamp. If the
+ * stamp is set but the substantive data is missing, the school is reported
+ * incomplete and `resume_step` points at the first real step still missing.
+ *
  * Completion percent is derived from the four steps; `resume_step` is the first
- * step that is not yet done (or REVIEW when only the final stamp is missing).
- * Must be called inside a dbQuery {} via [DatabaseFactory.dbQuery] by the caller.
+ * step that is not yet done (BRANDING is best-effort and never blocks). Must be
+ * called inside a dbQuery {} via [DatabaseFactory.dbQuery] by the caller.
  */
 private suspend fun computeOnboardingStatus(uid: UUID): OnboardingStatusResponse = dbQuery {
     val sid = AppUsersTable.selectAll().where { AppUsersTable.id eq uid }
@@ -422,7 +433,13 @@ private suspend fun computeOnboardingStatus(uid: UUID): OnboardingStatusResponse
         )
     val academicDone = schoolId != null &&
         SchoolClassesTable.selectAll().where { SchoolClassesTable.schoolId eq schoolId }.count() > 0L
-    val reviewDone = schoolRow?.get(SchoolsTable.onboardedAt) != null
+    val stampPresent = schoolRow?.get(SchoolsTable.onboardedAt) != null
+
+    // The final REVIEW step only reads as done when the school was ACTUALLY taken
+    // through onboarding: the stamp must be backed by the substantive prerequisite
+    // data (a named school + at least one class). A bare stamp on an otherwise
+    // empty row is treated as stale and does NOT mark the step done.
+    val reviewDone = stampPresent && basicDone && academicDone
 
     val steps = listOf(
         OnboardingStepStatus("BASIC", 1, basicDone),
@@ -431,11 +448,23 @@ private suspend fun computeOnboardingStatus(uid: UUID): OnboardingStatusResponse
         OnboardingStepStatus("REVIEW", 4, reviewDone)
     )
     val doneCount = steps.count { it.isDone }
-    val resume = steps.firstOrNull { !it.isDone }?.step ?: "REVIEW"
+
+    // Completion requires the substantive steps to genuinely exist, not just the
+    // timestamp. BRANDING is best-effort (logo/brand color), so it never blocks.
+    val isComplete = basicDone && academicDone && reviewDone
+
+    // Resume at the first NON-branding step that is still missing; if only the
+    // final stamp is missing, resume at REVIEW.
+    val resume = when {
+        !basicDone -> "BASIC"
+        !academicDone -> "ACADEMIC"
+        !reviewDone -> "REVIEW"
+        else -> "REVIEW"
+    }
 
     OnboardingStatusResponse(
         schoolId = schoolId?.toString(),
-        isComplete = reviewDone,
+        isComplete = isComplete,
         completionPercent = (doneCount * 100) / steps.size,
         resumeStep = resume,
         totalStepCount = steps.size,
