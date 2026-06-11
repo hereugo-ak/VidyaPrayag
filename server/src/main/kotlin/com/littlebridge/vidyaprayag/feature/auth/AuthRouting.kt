@@ -43,6 +43,7 @@ import com.littlebridge.vidyaprayag.core.principalUserId
 import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.AuthOtpsTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
+import com.littlebridge.vidyaprayag.db.SchoolsTable
 import com.littlebridge.vidyaprayag.db.UserSessionsTable
 import io.ktor.http.*
 import io.ktor.server.auth.*
@@ -149,6 +150,38 @@ data class ChangePasswordDto(
 
 @Serializable
 data class RefreshDto(@SerialName("refresh_token") val refreshToken: String)
+
+// ============================================================
+// School self-registration (Onboard your school)
+// ------------------------------------------------------------
+// The ONLY sanctioned way to self-mint a school_admin. Unlike the
+// anonymous /signup route (which is hard-locked to `parent` to close the
+// RA-53 privilege-escalation chain), this endpoint atomically:
+//   1. creates the school_admin app_users row (profile_completed=false),
+//   2. creates the owning `schools` row with onboarded_at=NULL
+//      (i.e. onboarding_status = 'pending' — NOT active),
+//   3. links app_users.school_id → the new school,
+//   4. returns a JWT carrying role=school_admin.
+// The existing onboarding wizard then fills in the school's details; the
+// final REVIEW submit stamps schools.onboarded_at (status → active) and
+// flips app_users.profile_completed = true. So a freshly registered school
+// ALWAYS lands on the onboarding wizard, never the dashboard.
+// ============================================================
+@Serializable
+data class SchoolRegisterDto(
+    // Admin account
+    val name: String,                 // admin / principal contact name
+    val identifier: String,           // email (password path) — staff use email
+    val password: String,
+    // School seed (kept minimal — the wizard collects the rest)
+    @SerialName("school_name") val schoolName: String,
+    val board: String? = null,        // CBSE | ICSE | UP State | Other
+    @SerialName("school_type") val schoolType: String? = null,
+    val city: String? = null,
+    val state: String? = null,
+    @SerialName("contact_phone") val contactPhone: String? = null,
+    @SerialName("device_info") val deviceInfo: DeviceInfo? = null,
+)
 
 @Serializable
 data class LogoutDto(@SerialName("refresh_token") val refreshToken: String? = null)
@@ -416,6 +449,101 @@ fun Route.authRouting() {
                     role = role, profileCompleted = false
                 ),
                 message = "Account created successfully"
+            )
+        }
+
+        // -------- register-school (Onboard your school) --------
+        // Public, email+password only. Creates a school_admin + an empty
+        // `schools` row (onboarded_at=NULL → pending) and returns a JWT.
+        post("/register-school") {
+            val req = runCatching { call.receive<SchoolRegisterDto>() }.getOrNull()
+                ?: run { call.fail("Invalid body"); return@post }
+
+            val id = normaliseIdentifier(req.identifier)
+            if (id.isBlank() || req.name.isBlank() || req.schoolName.isBlank()) {
+                call.fail("name, identifier and school_name are required"); return@post
+            }
+            // Staff register with email+password (no OTP path here).
+            if (!isEmail(id)) {
+                call.fail("School registration requires a valid email address", HttpStatusCode.BadRequest, "EMAIL_REQUIRED")
+                return@post
+            }
+            if (req.password.isBlank() || req.password.length < 8) {
+                call.fail("Password must be at least 8 characters", HttpStatusCode.BadRequest, "PASSWORD_TOO_SHORT")
+                return@post
+            }
+
+            val existing = dbQuery { lookupUserByIdentifier(id) }
+            if (existing != null) {
+                call.fail("An account already exists for this email. Please sign in.", HttpStatusCode.Conflict, "USER_EXISTS")
+                return@post
+            }
+
+            val now = Instant.now()
+            val newUserId = UUID.randomUUID()
+            val newSchoolId = UUID.randomUUID()
+            val cleanName = req.schoolName.trim()
+            val slugBase = cleanName.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
+            val slug = (slugBase.ifBlank { "school" }) + "-" + newSchoolId.toString().take(6)
+
+            dbQuery {
+                // 1) Create the owning school row in a 'pending' onboarding state
+                //    (onboarded_at left NULL). Only the seed fields are written;
+                //    the wizard fills the rest. NOT-NULL columns get sensible
+                //    placeholders the wizard overwrites (city/district).
+                SchoolsTable.insert {
+                    it[SchoolsTable.id] = newSchoolId
+                    it[name] = cleanName
+                    it[SchoolsTable.slug] = slug
+                    it[board] = req.board?.takeIf { b -> b.isNotBlank() } ?: "CBSE"
+                    it[medium] = "English"
+                    it[schoolGender] = "co_ed"
+                    it[contactEmail] = id
+                    it[contactPhone] = req.contactPhone?.takeIf { p -> p.isNotBlank() }
+                    it[principalName] = req.name.trim()
+                    it[city] = req.city?.takeIf { c -> c.isNotBlank() } ?: "Unknown"
+                    it[district] = req.city?.takeIf { c -> c.isNotBlank() } ?: "Unknown"
+                    it[state] = req.state?.takeIf { s -> s.isNotBlank() } ?: "Uttar Pradesh"
+                    it[isActive] = true
+                    it[onboardedAt] = null   // explicit: onboarding NOT complete
+                    it[createdAt] = now
+                    it[updatedAt] = now
+                }
+                // 2) Create the school_admin account linked to the new school.
+                AppUsersTable.insert {
+                    it[AppUsersTable.id] = newUserId
+                    it[fullName] = req.name.trim()
+                    it[role] = "school_admin"
+                    it[email] = id
+                    it[passwordHash] = hashPassword(req.password)
+                    it[isEmailVerified] = true
+                    it[schoolId] = newSchoolId
+                    it[profileCompleted] = false   // gate → onboarding wizard
+                    it[mustChangePassword] = false
+                    it[isActive] = true
+                    it[createdAt] = now
+                    it[updatedAt] = now
+                }
+            }
+
+            val token = JwtConfig.issueToken(newUserId.toString(), "school_admin", req.name.trim())
+            val refresh = JwtConfig.issueRefreshToken(newUserId.toString())
+            persistSession(
+                userId = newUserId,
+                refreshToken = refresh,
+                deviceId = req.deviceInfo?.deviceId,
+                platform = req.deviceInfo?.platform,
+                ip = call.request.origin.remoteHost,
+                ua = call.request.headers["User-Agent"]
+            )
+
+            call.created(
+                AuthTokenResponse(
+                    token = token, refreshToken = refresh,
+                    userId = newUserId.toString(), name = req.name.trim(),
+                    role = "school_admin", profileCompleted = false
+                ),
+                message = "School registered. Continue with onboarding."
             )
         }
 

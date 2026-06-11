@@ -217,7 +217,13 @@ private fun AuthedFlow(
     var onboardingResumeStep by remember(role) { mutableStateOf(com.littlebridge.vidyaprayag.feature.admin.domain.model.ObStepType.BASIC) }
 
     // For school roles, the decision is made by the server-truth gate VM below
-    // (it sets `route`). For the other roles we resolve locally as before.
+    // (it sets `route`). The gate is AUTHORITATIVE: OnboardingGateViewModel reads
+    // the server /onboarding/status (derived from real persisted school data, not
+    // the local profile_completed flag) and yields both the Dashboard/Onboarding
+    // decision AND the first incomplete step so a partial/manually-seeded admin
+    // RESUMES at the right place instead of being wrongly dropped on an empty
+    // dashboard ("shows onboarding completed" bug). For the other roles we resolve
+    // locally as before.
     val isSchoolRole = role == EntryRole.SchoolAdmin || role == EntryRole.SuperAdmin
 
     if (isSchoolRole) {
@@ -236,12 +242,16 @@ private fun AuthedFlow(
     } else {
         // Resolve the gate exactly once per authenticated session.
         LaunchedEffect(role) {
-            val profileCompleted = runCatching { authRepository.getSession()?.profileCompleted }
-                .getOrNull() ?: true // null session (returning user / restart) → treat as completed
+            // Local cached flag (set at login from the server's profile_completed).
+            // We do NOT default a missing flag to `true` — a missing/false flag
+            // means "not completed".
+            val localProfileCompleted = runCatching { authRepository.getSession()?.profileCompleted }
+                .getOrNull() ?: false
             route = when (role) {
                 // RA-S04: a parent is NEVER pushed into the child-link flow after signup/login.
                 EntryRole.Parent -> AuthedRoute.Portal
-                EntryRole.Teacher -> if (profileCompleted) AuthedRoute.Portal else AuthedRoute.TeacherFirstLogin
+                EntryRole.Teacher -> if (localProfileCompleted) AuthedRoute.Portal else AuthedRoute.TeacherFirstLogin
+                EntryRole.Unknown -> AuthedRoute.Portal
                 else -> AuthedRoute.Portal
             }
         }

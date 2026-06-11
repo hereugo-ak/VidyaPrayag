@@ -27,7 +27,15 @@ data class AuthUiState(
     val role: String = "PARENT", // "ADMIN" | "TEACHER" | "PARENT"
     val isLoading: Boolean = false,
     val error: String? = null,
-    val isAuthSuccessful: Boolean = false
+    val isAuthSuccessful: Boolean = false,
+    // ── "Onboard your school" self-registration ─────────────────────────────
+    // When true, the Admin auth screen shows the school-registration form
+    // instead of the "contact your administrator" notice.
+    val isRegisterSchool: Boolean = false,
+    val schoolName: String = "",
+    val board: String = "CBSE",      // CBSE | ICSE | UP State | Other
+    val schoolType: String = "Private Unaided",
+    val city: String = "",
 )
 
 class AuthViewModel(
@@ -43,6 +51,63 @@ class AuthViewModel(
     fun onConfirmPasswordChanged(value: String) = _state.update { it.copy(confirmPassword = value) }
     fun onOtpChanged(value: String) = _state.update { it.copy(otp = value) }
     fun onRoleChanged(value: String) = _state.update { it.copy(role = value) }
+
+    // ── School self-registration field mutations ────────────────────────────
+    fun onSchoolNameChanged(value: String) = _state.update { it.copy(schoolName = value, error = null) }
+    fun onBoardChanged(value: String) = _state.update { it.copy(board = value) }
+    fun onSchoolTypeChanged(value: String) = _state.update { it.copy(schoolType = value) }
+    fun onCityChanged(value: String) = _state.update { it.copy(city = value) }
+
+    /** Reveal the school-registration form (from the staff "no account" notice). */
+    fun startRegisterSchool() = _state.update {
+        it.copy(isRegisterSchool = true, error = null, name = "", password = "", confirmPassword = "")
+    }
+
+    /** Return from the registration form back to the notice / sign-in. */
+    fun cancelRegisterSchool() = _state.update {
+        it.copy(isRegisterSchool = false, error = null)
+    }
+
+    /**
+     * "Onboard your school" — validates the form and calls the public
+     * /auth/register-school endpoint. On success the session is persisted with
+     * profile_completed=false so the post-auth gate routes into the wizard.
+     */
+    fun registerSchool() {
+        val s = _state.value
+        when {
+            s.name.isBlank() -> { _state.update { it.copy(error = "Please enter your name") }; return }
+            s.identifier.isBlank() || !s.identifier.contains("@") ->
+                { _state.update { it.copy(error = "Please enter a valid email") }; return }
+            s.schoolName.isBlank() -> { _state.update { it.copy(error = "Please enter your school's name") }; return }
+            s.password.length < 8 -> { _state.update { it.copy(error = "Password must be at least 8 characters") }; return }
+            s.confirmPassword.isNotEmpty() && s.password != s.confirmPassword ->
+                { _state.update { it.copy(error = "Passwords do not match") }; return }
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null) }
+            val result = repository.registerSchool(
+                SchoolRegisterRequest(
+                    name = s.name.trim(),
+                    identifier = s.identifier.trim(),
+                    password = s.password,
+                    schoolName = s.schoolName.trim(),
+                    board = s.board,
+                    schoolType = s.schoolType,
+                    city = s.city.trim().ifBlank { null },
+                )
+            )
+            when (result) {
+                is NetworkResult.Success -> _state.update { it.copy(isLoading = false, isAuthSuccessful = true) }
+                is NetworkResult.Error -> {
+                    AppLogger.e("AuthViewModel", "registerSchool error: ${result.message}")
+                    _state.update { it.copy(isLoading = false, error = result.message) }
+                }
+                is NetworkResult.ConnectionError ->
+                    _state.update { it.copy(isLoading = false, error = "Connection error. Please try again.") }
+            }
+        }
+    }
 
     fun onContinue() {
         val currentState = _state.value
