@@ -169,6 +169,21 @@ fun AdminAuthScreenV2(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(Modifier.height(12.dp))
+                    // Email/identifier — REQUIRED. Without this the form validated
+                    // an empty identifier and failed with "enter a valid email"
+                    // even though there was nowhere to type one (the user reached
+                    // this form directly from the first step's "Onboard with us
+                    // now" CTA, bypassing the Identifier input).
+                    VInput(
+                        value = state.identifier,
+                        onValueChange = viewModel::onIdentifierChanged,
+                        label = "Work email",
+                        placeholder = "office@svm.edu.in",
+                        leadingIcon = VIcons.Mail,
+                        keyboardType = KeyboardType.Email,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(12.dp))
                     VInput(
                         value = state.schoolName,
                         onValueChange = viewModel::onSchoolNameChanged,
