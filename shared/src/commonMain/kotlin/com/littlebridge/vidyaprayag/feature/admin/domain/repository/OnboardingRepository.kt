@@ -2,6 +2,8 @@ package com.littlebridge.vidyaprayag.feature.admin.domain.repository
 
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.ClassDetailsResponse
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingCompletionResponse
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingStatusResponse
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingStepResponse
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingSubmitRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingSubmitResponse
@@ -44,4 +46,14 @@ interface OnboardingRepository {
         token: String,
         classId: String
     ): NetworkResult<ClassDetailsResponse>
+
+    /**
+     * Server-truth onboarding status (derived from REAL data, not a local flag).
+     * Used by the post-login gate to decide dashboard vs onboarding and to
+     * resume a returning admin at the first incomplete step.
+     */
+    suspend fun getStatus(token: String): NetworkResult<OnboardingStatusResponse>
+
+    /** Idempotently finalizes onboarding (status → active, profile_completed=true). */
+    suspend fun completeOnboarding(token: String): NetworkResult<OnboardingCompletionResponse>
 }

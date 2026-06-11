@@ -100,6 +100,10 @@ fun SchoolOnboardingScreenV2(
     onComplete: () -> Unit,
     modifier: Modifier = Modifier,
     onBack: () -> Unit = {},
+    // Server step (BASIC|BRANDING|ACADEMIC|REVIEW) the wizard should resume on
+    // for a returning/partially-onboarded admin. Mapped to the local 6-step
+    // wizard index below. Defaults to BASIC (fresh start at step 1).
+    resumeStep: String = "BASIC",
     basicVm: InstitutionalBasicOBViewModel = koinViewModel(),
     brandingVm: BrandingInfoOBViewModel = koinViewModel(),
     academicVm: AcademicInfoOBViewModel = koinViewModel(),
@@ -110,7 +114,17 @@ fun SchoolOnboardingScreenV2(
         val d = VTheme.dimens
         val titles = listOf("School identity", "Academic year", "Classes & sections", "Subjects", "Teachers", "Students")
 
-        var step by remember { mutableIntStateOf(1) }
+        // Map the server's onboarding step to this wizard's 1-based step index.
+        // BASIC→1, BRANDING→2 (academic-year UI), ACADEMIC→3 (classes), REVIEW→6.
+        val initialStep = remember(resumeStep) {
+            when (resumeStep.uppercase()) {
+                "BRANDING" -> 2
+                "ACADEMIC" -> 3
+                "REVIEW" -> 6
+                else -> 1
+            }
+        }
+        var step by remember { mutableIntStateOf(initialStep) }
 
         // ── Step 1 — Identity inputs lifted to parent so we can submit BASIC ────
         var legalName by remember { mutableStateOf("") }

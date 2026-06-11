@@ -4,6 +4,8 @@ import com.littlebridge.vidyaprayag.core.model.ApiResponse
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.network.safeApiCall
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.ClassDetailsResponse
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingCompletionResponse
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingStatusResponse
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingStepResponse
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingSubmitRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingSubmitResponse
@@ -80,6 +82,37 @@ class OnboardingApi(
             client.get(getUrl("api/v1/onboarding/academic/class-details")) {
                 parameter("classId", classId)
             }
+        }
+    }
+
+    /**
+     * GET /api/v1/onboarding/status
+     *
+     * Server-truth onboarding completion derived from REAL persisted data
+     * (school row, branding, classes, onboarded_at) — NOT a local flag. The
+     * post-login gate reads this so a stale/manually-set profile_completed
+     * cannot wrongly skip onboarding, and so a returning admin resumes at the
+     * first incomplete step.
+     */
+    suspend fun getStatus(
+        token: String
+    ): NetworkResult<ApiResponse<OnboardingStatusResponse>> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/onboarding/status"))
+        }
+    }
+
+    /**
+     * POST /api/v1/onboarding/complete
+     *
+     * Idempotently finalizes onboarding (ensures school, seeds default academics
+     * if skipped, stamps onboarded_at + profile_completed=true + status=active).
+     */
+    suspend fun completeOnboarding(
+        token: String
+    ): NetworkResult<ApiResponse<OnboardingCompletionResponse>> {
+        return safeApiCall {
+            client.post(getUrl("api/v1/onboarding/complete"))
         }
     }
 }

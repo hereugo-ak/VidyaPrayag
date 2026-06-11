@@ -377,6 +377,7 @@ val viewModelModule = module {
     factory { BrandingInfoOBViewModel(get(), get(), get()) }
     factory { AcademicInfoOBViewModel(get(), get()) }
     factory { LaunchInfoOBViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.OnboardingGateViewModel(get(), get()) }
     factory { InstitutionalProfileViewModel(get(), get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolProfileViewModel(get(), get()) } // RA-47
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.StudentRosterViewModel(get(), get()) } // RA-45
