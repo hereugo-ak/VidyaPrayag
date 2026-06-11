@@ -196,6 +196,21 @@ object SchoolsTable : UUIDTable("schools", "id") {
     val longitude      = double("longitude").nullable()
     val isActive       = bool("is_active").default(true)
     val onboardedAt    = timestamp("onboarded_at").nullable()
+    // Explicit onboarding lifecycle mirror of onboarded_at: 'pending' until the
+    // admin completes onboarding, then 'active'. Kept in lock-step by the server
+    // (REVIEW final submit + POST /onboarding/complete). See
+    // docs/db/schema-patch-school-onboarding.sql.
+    val onboardingStatus = varchar("onboarding_status", 16).default("pending")
+    // Richer onboarding fields the wizard collects (all nullable; promoted from
+    // school_onboarding_drafts so the dashboard can read them directly).
+    val schoolType         = text("school_type").nullable()
+    val affiliationNumber  = text("affiliation_number").nullable()
+    val yearEstablished    = integer("year_established").nullable()
+    val website            = text("website").nullable()
+    val totalStudents      = integer("total_students").nullable()
+    val totalClasses       = integer("total_classes").nullable()
+    val academicYearStartMonth = text("academic_year_start_month").nullable()
+    val gradingSystem      = text("grading_system").nullable()
     val createdAt      = timestamp("created_at")
     val updatedAt      = timestamp("updated_at")
 }

@@ -681,6 +681,7 @@ fun Route.onboardingRouting() {
                                 val now = Instant.now()
                                 SchoolsTable.update({ SchoolsTable.id eq sid }) {
                                     it[onboardedAt] = now
+                                    it[onboardingStatus] = "active"
                                     it[updatedAt] = now
                                 }
                                 AppUsersTable.update({ AppUsersTable.id eq uid }) {
@@ -735,6 +736,7 @@ fun Route.onboardingRouting() {
                     val now = Instant.now()
                     SchoolsTable.update({ SchoolsTable.id eq schoolId }) {
                         it[onboardedAt] = now
+                        it[onboardingStatus] = "active"
                         it[updatedAt] = now
                     }
                     AppUsersTable.update({ AppUsersTable.id eq uid }) {
