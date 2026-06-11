@@ -133,6 +133,41 @@ data class SubmitResponse(
     @SerialName("redirect_to_home") val redirectToHome: Boolean
 )
 
+/**
+ * Per-step completion flag for the status endpoint. A step reads as `done`
+ * when its backing REAL data exists (not merely when a draft row was saved),
+ * so the client can resume a returning admin at the first incomplete step.
+ */
+@Serializable
+data class OnboardingStepStatus(
+    @SerialName("step") val step: String,                 // BASIC|BRANDING|ACADEMIC|REVIEW
+    @SerialName("current_step_count") val currentStepCount: Int,
+    @SerialName("is_done") val isDone: Boolean
+)
+
+/**
+ * Server-truth onboarding status for the calling admin. The client gate
+ * (NavGraphV2 AuthedFlow) reads this on every login to decide dashboard vs
+ * onboarding, and `resume_step` lets it drop a returning admin at the first
+ * incomplete step instead of always restarting at BASIC.
+ */
+@Serializable
+data class OnboardingStatusResponse(
+    @SerialName("school_id") val schoolId: String? = null,
+    @SerialName("is_complete") val isComplete: Boolean,
+    @SerialName("completion_percent") val completionPercent: Int,
+    @SerialName("resume_step") val resumeStep: String,    // first incomplete step
+    @SerialName("total_step_count") val totalStepCount: Int,
+    @SerialName("steps") val steps: List<OnboardingStepStatus>
+)
+
+@Serializable
+data class CompletionResponse(
+    @SerialName("school_id") val schoolId: String,
+    @SerialName("is_complete") val isComplete: Boolean,
+    @SerialName("onboarding_status") val onboardingStatus: String  // "active" once complete
+)
+
 // ---------- Field schemas per step ----------
 private val BASIC_FIELDS = listOf(
     Triple("school_name", "SchoolName", "line"),
@@ -359,6 +394,53 @@ private fun persistAcademicStructure(schoolId: UUID, payload: JsonObject) {
             }
         }
     }
+}
+
+/**
+ * Computes server-truth onboarding status for [uid] from REAL persisted data:
+ *   - BASIC    done when a `schools` row exists for the user (name persisted).
+ *   - BRANDING done when the school has a logo OR a non-default brand color
+ *              (best-effort; never blocks completion).
+ *   - ACADEMIC done when the school has at least one class.
+ *   - REVIEW   done when `schools.onboarded_at` is stamped (final submit).
+ * Completion percent is derived from the four steps; `resume_step` is the first
+ * step that is not yet done (or REVIEW when only the final stamp is missing).
+ * Must be called inside a dbQuery {} via [DatabaseFactory.dbQuery] by the caller.
+ */
+private suspend fun computeOnboardingStatus(uid: UUID): OnboardingStatusResponse = dbQuery {
+    val sid = AppUsersTable.selectAll().where { AppUsersTable.id eq uid }
+        .singleOrNull()?.get(AppUsersTable.schoolId)
+    val schoolRow = sid?.let {
+        SchoolsTable.selectAll().where { SchoolsTable.id eq it }.singleOrNull()
+    }
+
+    val schoolId = schoolRow?.get(SchoolsTable.id)?.value
+    val basicDone = schoolRow != null && schoolRow[SchoolsTable.name].isNotBlank()
+    val brandingDone = schoolRow != null && (
+        !schoolRow[SchoolsTable.logoUrl].isNullOrBlank() ||
+            schoolRow[SchoolsTable.brandColor] != "#2563EB"
+        )
+    val academicDone = schoolId != null &&
+        SchoolClassesTable.selectAll().where { SchoolClassesTable.schoolId eq schoolId }.count() > 0L
+    val reviewDone = schoolRow?.get(SchoolsTable.onboardedAt) != null
+
+    val steps = listOf(
+        OnboardingStepStatus("BASIC", 1, basicDone),
+        OnboardingStepStatus("BRANDING", 2, brandingDone),
+        OnboardingStepStatus("ACADEMIC", 3, academicDone),
+        OnboardingStepStatus("REVIEW", 4, reviewDone)
+    )
+    val doneCount = steps.count { it.isDone }
+    val resume = steps.firstOrNull { !it.isDone }?.step ?: "REVIEW"
+
+    OnboardingStatusResponse(
+        schoolId = schoolId?.toString(),
+        isComplete = reviewDone,
+        completionPercent = (doneCount * 100) / steps.size,
+        resumeStep = resume,
+        totalStepCount = steps.size,
+        steps = steps
+    )
 }
 
 // ---------- Routing ----------
@@ -617,6 +699,57 @@ fun Route.onboardingRouting() {
                         redirectToHome = complete
                     ),
                     message = if (complete) "Onboarding completed" else "Step processed successfully"
+                )
+            }
+
+            // -------- GET /status --------
+            // Server-truth onboarding state for the calling admin. The client
+            // post-login gate reads this to decide dashboard vs onboarding and
+            // to resume a returning admin at the first incomplete step. Honest:
+            // an account that has not created a school yet reads as 0% with
+            // resume_step = BASIC (no fabricated progress).
+            get("/status") {
+                val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
+                    call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
+                }
+                call.ok(computeOnboardingStatus(uid), message = "Onboarding status fetched")
+            }
+
+            // -------- POST /complete --------
+            // Idempotently finalizes onboarding: ensures the school exists, seeds
+            // a default academic structure if the admin skipped it, stamps
+            // schools.onboarded_at and app_users.profile_completed=true so the
+            // gate resolves to the dashboard permanently. Mirrors the REVIEW
+            // final-submit path so a client can complete from either entry point.
+            post("/complete") {
+                val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
+                    call.fail("Invalid token", HttpStatusCode.Unauthorized); return@post
+                }
+                val sid = dbQuery {
+                    val schoolId = ensureSchoolForUser(uid)
+                    syncSchoolBasics(schoolId, uid)
+                    val hasClasses = SchoolClassesTable.selectAll()
+                        .where { SchoolClassesTable.schoolId eq schoolId }
+                        .count() > 0L
+                    if (!hasClasses) persistAcademicStructure(schoolId, JsonObject(emptyMap()))
+                    val now = Instant.now()
+                    SchoolsTable.update({ SchoolsTable.id eq schoolId }) {
+                        it[onboardedAt] = now
+                        it[updatedAt] = now
+                    }
+                    AppUsersTable.update({ AppUsersTable.id eq uid }) {
+                        it[profileCompleted] = true
+                        it[updatedAt] = now
+                    }
+                    schoolId
+                }
+                call.ok(
+                    CompletionResponse(
+                        schoolId = sid.toString(),
+                        isComplete = true,
+                        onboardingStatus = "active"
+                    ),
+                    message = "Onboarding completed"
                 )
             }
         }
