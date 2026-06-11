@@ -28,6 +28,8 @@ import com.littlebridge.vidyaprayag.feature.auth.presentation.AuthViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
+import com.littlebridge.vidyaprayag.ui.v2.components.VDivider
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VInput
 import com.littlebridge.vidyaprayag.ui.v2.components.VTag
@@ -87,6 +89,37 @@ fun AdminAuthScreenV2(
                     leadingIcon = VIcons.Mail,
                     keyboardType = KeyboardType.Email,
                     modifier = Modifier.fillMaxWidth(),
+                )
+
+                // ── Always-visible self-onboarding entry point ──────────────────
+                // A brand-new school never has to type a throwaway email to
+                // *discover* onboarding — the call-to-action lives right here on
+                // the first step. Tapping it jumps straight to the registration
+                // form via the dedicated /auth/register-school path (RA-53 safe).
+                Spacer(Modifier.height(18.dp))
+                VDivider()
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    "Haven't registered your school yet?",
+                    style = VTheme.type.bodyStrong.colored(c.ink),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Set it up in a few quick steps — create your administrator " +
+                        "account and bring your school onto VidyaPrayag.",
+                    style = VTheme.type.caption.colored(c.ink3),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(12.dp))
+                VButton(
+                    text = "Onboard with us now",
+                    onClick = viewModel::startRegisterSchoolDirect,
+                    full = true,
+                    size = VButtonSize.Lg,
+                    variant = VButtonVariant.Secondary,
+                    tone = VButtonTone.Teal,
+                    leading = { Icon(VIcons.School, contentDescription = null, modifier = Modifier.size(16.dp)) },
                 )
             }
             AuthStep.LoginPassword -> {

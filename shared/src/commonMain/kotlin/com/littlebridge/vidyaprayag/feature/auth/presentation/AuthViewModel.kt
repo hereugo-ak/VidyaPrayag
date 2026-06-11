@@ -63,9 +63,31 @@ class AuthViewModel(
         it.copy(isRegisterSchool = true, error = null, name = "", password = "", confirmPassword = "")
     }
 
+    /**
+     * Jump STRAIGHT into the school-registration form from the very first
+     * (Identifier) step — this powers the always-visible "Haven't registered?
+     * Onboard with us now" link on the School Administration login page, so a
+     * brand-new admin never has to type a throwaway email and hit a dead-end to
+     * discover onboarding. Moves the step machine to [AuthStep.SignupDetails] and
+     * flips the form into register mode in one shot.
+     */
+    fun startRegisterSchoolDirect() = _state.update {
+        it.copy(
+            step = AuthStep.SignupDetails,
+            isRegisterSchool = true,
+            error = null,
+            name = "",
+            password = "",
+            confirmPassword = "",
+        )
+    }
+
     /** Return from the registration form back to the notice / sign-in. */
     fun cancelRegisterSchool() = _state.update {
-        it.copy(isRegisterSchool = false, error = null)
+        // If we entered the form directly from the Identifier step (no flow was
+        // ever resolved), go back to Identifier; otherwise stay on the notice.
+        if (it.flow == null) it.copy(isRegisterSchool = false, step = AuthStep.Identifier, error = null)
+        else it.copy(isRegisterSchool = false, error = null)
     }
 
     /**
