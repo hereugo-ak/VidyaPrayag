@@ -376,6 +376,9 @@ val viewModelModule = module {
     factory { InstitutionalBasicOBViewModel(get(), get()) }
     factory { BrandingInfoOBViewModel(get(), get(), get()) }
     factory { AcademicInfoOBViewModel(get(), get()) }
+    // Onboarding-time teacher provisioning (creates REAL loginable teacher
+    // accounts via TeachersRepository → POST /school/teachers).
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.TeacherProvisioningOBViewModel(get(), get()) }
     factory { LaunchInfoOBViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.OnboardingGateViewModel(get(), get()) }
     factory { InstitutionalProfileViewModel(get(), get(), get()) }

@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -53,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -78,6 +77,8 @@ import com.littlebridge.vidyaprayag.feature.admin.presentation.AcademicInfoOBVie
 import com.littlebridge.vidyaprayag.feature.admin.presentation.BrandingInfoOBViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.InstitutionalBasicOBViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.LaunchInfoOBViewModel
+import com.littlebridge.vidyaprayag.feature.admin.presentation.OnboardingTeacherInput
+import com.littlebridge.vidyaprayag.feature.admin.presentation.TeacherProvisioningOBViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -108,6 +109,7 @@ fun SchoolOnboardingScreenV2(
     brandingVm: BrandingInfoOBViewModel = koinViewModel(),
     academicVm: AcademicInfoOBViewModel = koinViewModel(),
     launchVm: LaunchInfoOBViewModel = koinViewModel(),
+    teacherProvisionVm: TeacherProvisioningOBViewModel = koinViewModel(),
 ) {
     VTheme(tone = VPortalTone.Warm) {
         val c = VTheme.colors
@@ -157,13 +159,12 @@ fun SchoolOnboardingScreenV2(
         }
 
         // ── Teachers ───────────────────────────────────────────────────────────────
-        val teachers = remember {
-            mutableStateListOf(
-                OBTeacher("t1", "Dr. Ramesh Sharma", "+91 98100 12121", "SVM.T01", mutableStateListOf()),
-                OBTeacher("t2", "Mrs. Priya Iyer", "+91 98100 13131", "SVM.T02", mutableStateListOf()),
-                OBTeacher("t3", "Mr. Arjun Mehta", "+91 98100 14141", "SVM.T03", mutableStateListOf()),
-            )
-        }
+        // Start EMPTY — no fabricated staff. Admins add their teachers here (or skip
+        // and provision them later from the dashboard). The matrix shows a zero-state
+        // until a teacher is added, so we never persist invented teacher identities.
+        val teachers = remember { mutableStateListOf<OBTeacher>() }
+        var newTeacherName by remember { mutableStateOf("") }
+        var newTeacherEmail by remember { mutableStateOf("") }
 
         // ── Backend state (per-step submit flags + errors) ─────────────────────────
         val basicSubmitting by basicVm.isSubmitting.collectAsStateV2()
@@ -194,15 +195,11 @@ fun SchoolOnboardingScreenV2(
             when (step) {
                 1 -> {
                     // Push the lifted identity inputs into the BASIC VM and submit.
+                    // NOTE: Step 1 collects no email — we do NOT synthesise a fake
+                    // one (that would overwrite the real contact email captured at
+                    // registration). Only the values the admin actually typed go up.
                     basicVm.updateSchoolName(legalName)
                     basicVm.updateBoard(board)
-                    // The wizard's Step 1 only collects principal phone, not an email,
-                    // so we synthesise a placeholder address keyed to the school name.
-                    // The server validates non-blank, not RFC compliance.
-                    val emailGuess = if (legalName.isNotBlank())
-                        "${legalName.lowercase().replace(Regex("[^a-z0-9]+"), ".").trim('.').take(40)}@school.local"
-                    else "contact@school.local"
-                    basicVm.updateEmail(emailGuess)
                     basicVm.updateContact(principalMobile.replace(Regex("[^0-9]"), "").take(10))
                     basicVm.submit(onSuccess = { step++ })
                 }
@@ -217,11 +214,39 @@ fun SchoolOnboardingScreenV2(
                     step++
                 }
                 5 -> {
-                    // Teachers step done — submit the consolidated ACADEMIC payload.
-                    // (The VM builds it from its own state; it loads class/subject
-                    // data from the server, so this submission is best-effort and
-                    // its failure should NOT block the wizard reaching step 6.)
-                    academicVm.submit(onSuccess = { step++ })
+                    // Teachers step done. TWO real persistence actions happen here:
+                    //
+                    // 1) Provision a REAL `role=teacher` account for every teacher the
+                    //    admin entered with an email (POST /school/teachers). This is
+                    //    what makes the teacher able to LOG IN — the assignment matrix
+                    //    alone never created an account. Best-effort + non-blocking:
+                    //    a duplicate/failure for one teacher won't stop onboarding.
+                    //
+                    // 2) Persist the REAL class/section/subject structure (+ teacher
+                    //    name on each assigned subject) via the ACADEMIC step.
+                    val builtClasses: List<Pair<String, List<String>>> =
+                        classesBuilt.map { it.name to it.sections.toList() }
+                    val builtSubjects: List<Pair<String, String>> =
+                        subjects.map { it.name to it.code }
+                    // "subjectName|classCode" -> teacher name, from the assignment matrix.
+                    val teacherMap: Map<String, String> = buildMap {
+                        teachers.forEach { t ->
+                            t.assignments.forEach { (subjName, classCode) ->
+                                put("$subjName|$classCode", t.name)
+                            }
+                        }
+                    }
+                    // Real teacher accounts to create (only those given an email/phone).
+                    val toProvision = teachers
+                        .filter { it.identifier.isNotBlank() }
+                        .map { OnboardingTeacherInput(name = it.name, identifier = it.identifier) }
+
+                    teacherProvisionVm.provisionAll(toProvision) {
+                        // Whether or not staff were provisioned, persist the academic
+                        // structure and advance only when the server accepts it.
+                        academicVm.applyBuiltStructure(builtClasses, builtSubjects, teacherMap)
+                        academicVm.submit(onSuccess = { step++ })
+                    }
                 }
                 6 -> {
                     // Final REVIEW submit with is_final_submission=true.
@@ -232,7 +257,20 @@ fun SchoolOnboardingScreenV2(
 
         // ── Completion screen ────────────────────────────────────────────────────
         if (step > 6) {
-            CompletionScreen(onComplete = onComplete)
+            // Real school name from the server's REVIEW step (no hardcoding). Fall
+            // back to the name the admin typed in Step 1 if the server hasn't echoed
+            // it yet, then to a neutral label — never a sample school.
+            val launchState by launchVm.state.collectAsStateV2()
+            val provisionState by teacherProvisionVm.state.collectAsStateV2()
+            val resolvedName = launchState.schoolName
+                .takeIf { it.isNotBlank() && it != "—" }
+                ?: legalName.takeIf { it.isNotBlank() }
+                ?: "Your school"
+            CompletionScreen(
+                schoolName = resolvedName,
+                provisionedTeachers = provisionState.results,
+                onComplete = onComplete,
+            )
             return@VTheme
         }
 
@@ -318,7 +356,31 @@ fun SchoolOnboardingScreenV2(
                         2 -> AcademicYearStep()
                         3 -> ClassesStep(classesBuilt)
                         4 -> SubjectsStep(subjects, classCodes)
-                        5 -> TeachersStep(teachers, subjects, classCodes)
+                        5 -> TeachersStep(
+                            teachers, subjects, classCodes,
+                            newTeacherName = newTeacherName,
+                            onNewTeacherNameChange = { newTeacherName = it },
+                            newTeacherEmail = newTeacherEmail,
+                            onNewTeacherEmailChange = { newTeacherEmail = it },
+                            onAddTeacher = {
+                                val nm = newTeacherName.trim()
+                                val em = newTeacherEmail.trim()
+                                if (nm.isNotBlank()) {
+                                    teachers.add(
+                                        OBTeacher(
+                                            id = "t${teachers.size + 1}",
+                                            name = nm,
+                                            identifier = em,        // email → real login account on submit
+                                            mobile = "",
+                                            username = em,          // show the email as the meta line
+                                            assignments = mutableStateListOf(),
+                                        )
+                                    )
+                                    newTeacherName = ""
+                                    newTeacherEmail = ""
+                                }
+                            },
+                        )
                         else -> StudentsStep()
                     }
                     // Inline backend error for the current step (LAW 3 — Error leg).
@@ -547,9 +609,75 @@ private fun SubjectsStep(subjects: MutableList<OBSubject>, classCodes: List<Stri
 // ═══ Step 5 — Teachers (coverage + matrix) ══════════════════════════════════════
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TeachersStep(teachers: MutableList<OBTeacher>, subjects: List<OBSubject>, classCodes: List<String>) {
+private fun TeachersStep(
+    teachers: MutableList<OBTeacher>,
+    subjects: List<OBSubject>,
+    classCodes: List<String>,
+    newTeacherName: String,
+    onNewTeacherNameChange: (String) -> Unit,
+    newTeacherEmail: String,
+    onNewTeacherEmailChange: (String) -> Unit,
+    onAddTeacher: () -> Unit,
+) {
     val c = VTheme.colors
     val d = VTheme.dimens
+
+    // ── Add teacher (real input only — nothing pre-filled) ──────────────────
+    // Adding a teacher WITH a work email creates a real login account on the
+    // next step: the teacher gets a generated initial password and signs in via
+    // School Administration → email + password (forced to reset on first login).
+    // Name-only entries are still usable for subject assignment but create no
+    // login — those teachers can be provisioned later from the dashboard.
+    VCard(modifier = Modifier.fillMaxWidth()) {
+        Text("ADD A TEACHER", style = VTheme.type.labelStrong.colored(c.ink3))
+        Text(
+            "Enter a work email to create the teacher's login account now — they'll " +
+                "get a one-time password to sign in. Name only? You can add their " +
+                "login later from the dashboard.",
+            style = VTheme.type.caption.colored(c.ink3),
+            modifier = Modifier.padding(top = 2.dp),
+        )
+        Spacer(Modifier.height(d.sm))
+        VInput(
+            newTeacherName,
+            onNewTeacherNameChange,
+            label = "Full name",
+            placeholder = "Mrs. Kavita Nair",
+            leadingIcon = VIcons.User,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(d.sm))
+        Row(horizontalArrangement = Arrangement.spacedBy(d.sm), verticalAlignment = Alignment.Bottom) {
+            VInput(
+                newTeacherEmail,
+                onNewTeacherEmailChange,
+                label = "Work email (optional)",
+                placeholder = "kavita@svm.edu.in",
+                leadingIcon = VIcons.Mail,
+                keyboardType = KeyboardType.Email,
+                modifier = Modifier.weight(1f),
+            )
+            VButton(
+                text = "Add",
+                onClick = onAddTeacher,
+                tone = VButtonTone.Teal,
+                size = VButtonSize.Lg,
+                enabled = newTeacherName.isNotBlank(),
+            )
+        }
+    }
+
+    if (teachers.isEmpty()) {
+        VCard(modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth().padding(vertical = d.md), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(VIcons.User, contentDescription = null, tint = c.ink3, modifier = Modifier.size(28.dp))
+                Spacer(Modifier.height(d.xs))
+                Text("No teachers added yet", style = VTheme.type.bodyStrong.colored(c.ink))
+                Text("Add a teacher above to assign subjects, or continue and do it later.", style = VTheme.type.caption.colored(c.ink3), textAlign = TextAlign.Center)
+            }
+        }
+        return
+    }
 
     val allSlots = subjects.flatMap { s -> s.classes.map { s.name to it } }
     val assignedSlots = teachers.flatMap { it.assignments }
@@ -583,7 +711,10 @@ private fun TeachersStep(teachers: MutableList<OBTeacher>, subjects: List<OBSubj
                 Spacer(Modifier.width(d.md))
                 Column(Modifier.weight(1f)) {
                     Text(t.name, style = VTheme.type.bodyStrong.colored(c.ink))
-                    Text("${t.username} · ${t.mobile}", style = VTheme.type.dataSm.colored(c.ink3))
+                    val meta = listOf(t.username, t.mobile).filter { it.isNotBlank() }.joinToString(" · ")
+                    if (meta.isNotBlank()) {
+                        Text(meta, style = VTheme.type.dataSm.colored(c.ink3))
+                    }
                 }
                 VBadge(text = "${t.assignments.size} slots", tone = if (t.assignments.isNotEmpty()) VBadgeTone.Arctic else VBadgeTone.Neutral)
             }
@@ -729,28 +860,25 @@ private fun StudentsStep() {
     }
     VCard(modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Preview: 347 rows detected", style = VTheme.type.bodyStrong.colored(c.ink), modifier = Modifier.weight(1f))
-            VBadge(text = "Validated", tone = VBadgeTone.Success)
+            Text("No roster imported yet", style = VTheme.type.bodyStrong.colored(c.ink), modifier = Modifier.weight(1f))
+            VBadge(text = "Optional", tone = VBadgeTone.Neutral)
         }
         Spacer(Modifier.height(d.sm))
-        StatLine("Valid records", "344", c.ink2)
-        StatLine("Duplicate roll numbers", "3", c.dangerInk)
-        StatLine("Parent accounts to create", "312", c.ink2)
-    }
-}
-
-@Composable
-private fun StatLine(label: String, value: String, valueColor: Color) {
-    val c = VTheme.colors
-    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-        Text(label, style = VTheme.type.caption.colored(c.ink2), modifier = Modifier.weight(1f))
-        Text(value, style = VTheme.type.dataSm.colored(valueColor))
+        Text(
+            "Importing students now is optional — you can finish setup and add students " +
+                "anytime from your dashboard. Validation results will appear here once a CSV is uploaded.",
+            style = VTheme.type.caption.colored(c.ink3),
+        )
     }
 }
 
 // ═══ Completion screen ══════════════════════════════════════════════════════════
 @Composable
-private fun CompletionScreen(onComplete: () -> Unit) {
+private fun CompletionScreen(
+    schoolName: String,
+    provisionedTeachers: List<com.littlebridge.vidyaprayag.feature.admin.presentation.ProvisionedTeacher> = emptyList(),
+    onComplete: () -> Unit,
+) {
     val c = VTheme.colors
     val d = VTheme.dimens
 
@@ -804,36 +932,87 @@ private fun CompletionScreen(onComplete: () -> Unit) {
                     textAlign = TextAlign.Center,
                 )
                 Spacer(Modifier.height(6.dp))
-                Text("Saraswati Vidya Mandir is live on VidyaSetu.", style = VTheme.type.body.colored(Color.White.copy(alpha = 0.88f)), textAlign = TextAlign.Center)
+                Text("$schoolName is live on VidyaPrayag.", style = VTheme.type.body.colored(Color.White.copy(alpha = 0.88f)), textAlign = TextAlign.Center)
             }
         }
 
         // Body
         Column(Modifier.fillMaxWidth().padding(d.lg), verticalArrangement = Arrangement.spacedBy(d.md)) {
+            // Honest confirmation card (no fabricated counts — those live on the
+            // dashboard once real students/teachers exist).
             VCard(modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
-                    val cells = listOf("6" to "Classes", "8" to "Teachers", "180" to "Students", "156" to "Parents")
-                    cells.forEachIndexed { i, (n, l) ->
-                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(n, style = VTheme.type.dataLg.colored(c.navy).copy(fontSize = 22.sp, fontWeight = FontWeight.Bold, lineHeight = 22.sp))
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                l.uppercase(),
-                                style = VTheme.type.labelStrong.colored(c.ink3).copy(fontSize = 10.sp, letterSpacing = 0.06.em),
-                            )
-                        }
-                        if (i < cells.size - 1) {
-                            Box(Modifier.width(1.dp).fillMaxHeight().background(c.shadowTint.copy(alpha = 0.06f)))
-                        }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFDCF2EF)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(VIcons.Check, contentDescription = null, tint = Color(0xFF006A60), modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(Modifier.width(d.md))
+                    Column(Modifier.weight(1f)) {
+                        Text("Onboarding complete", style = VTheme.type.bodyStrong.colored(c.ink))
+                        Text(
+                            "Your school profile is set up. Add teachers, students and parents from your dashboard.",
+                            style = VTheme.type.caption.colored(c.ink3),
+                        )
                     }
                 }
             }
 
-            Text("GET STARTED", style = VTheme.type.labelStrong.colored(c.ink3))
+            // ── Provisioned teacher logins (one-time passwords) ──────────────────
+            // Show the credentials we just created so the admin can hand them
+            // over. These are REAL accounts (POST /school/teachers); the teacher
+            // signs in via School Administration → email + password and is forced
+            // to reset it on first login. Shown ONCE — not stored in plaintext.
+            val created = provisionedTeachers.filter { it.created && !it.initialPassword.isNullOrBlank() }
+            if (created.isNotEmpty()) {
+                Text("TEACHER LOGINS CREATED", style = VTheme.type.labelStrong.colored(c.ink3))
+                VCard(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "Share these one-time passwords with your teachers. They'll be " +
+                            "asked to set their own password on first sign-in. You won't " +
+                            "see these again — reset anytime from the dashboard.",
+                        style = VTheme.type.caption.colored(c.ink3),
+                    )
+                    created.forEach { t ->
+                        Spacer(Modifier.height(d.sm))
+                        VDivider()
+                        Spacer(Modifier.height(d.sm))
+                        Text(t.name, style = VTheme.type.bodyStrong.colored(c.ink))
+                        Text(t.identifier, style = VTheme.type.dataSm.colored(c.ink3))
+                        Spacer(Modifier.height(2.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Password: ", style = VTheme.type.caption.colored(c.ink3))
+                            Text(
+                                t.initialPassword.orEmpty(),
+                                style = VTheme.type.dataSm.colored(c.tealDeep).copy(fontWeight = FontWeight.Bold),
+                            )
+                        }
+                    }
+                }
+            }
+            // Surface any teacher accounts that could NOT be created (e.g. the
+            // email already exists) so the admin isn't misled into thinking they
+            // were provisioned. Honest, not silent.
+            val failed = provisionedTeachers.filter { !it.created }
+            if (failed.isNotEmpty()) {
+                VCard(modifier = Modifier.fillMaxWidth()) {
+                    Text("Couldn't create some logins", style = VTheme.type.bodyStrong.colored(c.warningInk))
+                    failed.forEach { t ->
+                        Text(
+                            "${t.name} (${t.identifier}) — ${t.message ?: "failed"}. Add them later from the dashboard.",
+                            style = VTheme.type.caption.colored(c.ink3),
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
+                }
+            }
+
+            Text("NEXT STEPS", style = VTheme.type.labelStrong.colored(c.ink3))
             listOf(
-                Triple(VIcons.Mail, "Email teachers their credentials", "8 invites · sent in one tap"),
-                Triple(VIcons.Upload, "Download parent invite pack", "Personalised PDF · 156 parents"),
-                Triple(VIcons.ShieldCheck, "Review attendance permissions", "Class teachers only by default"),
+                Triple(VIcons.User, "Add your teachers", "Provision staff accounts from Settings"),
+                Triple(VIcons.Upload, "Import your students", "Upload a roster CSV to create records"),
+                Triple(VIcons.ShieldCheck, "Review permissions", "Class teachers only by default"),
             ).forEach { (icon, title, sub) ->
                 VCard(modifier = Modifier.fillMaxWidth(), onClick = {}) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -884,6 +1063,10 @@ private class OBSubject(
 private class OBTeacher(
     val id: String,
     val name: String,
+    // Email/phone the teacher will sign in with. When set (email), the wizard
+    // provisions a REAL `role=teacher` account on submit so the teacher can log
+    // in. Blank = name-only (cosmetic assignment matrix; no login created).
+    val identifier: String,
     val mobile: String,
     val username: String,
     val assignments: androidx.compose.runtime.snapshots.SnapshotStateList<Pair<String, String>>,

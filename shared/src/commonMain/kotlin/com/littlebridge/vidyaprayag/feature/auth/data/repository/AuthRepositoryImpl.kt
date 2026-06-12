@@ -55,6 +55,20 @@ class AuthRepositoryImpl(
         }
     }
 
+    override suspend fun registerSchool(request: SchoolRegisterRequest): NetworkResult<AuthResponse> {
+        return when (val result = api.registerSchool(request)) {
+            is NetworkResult.Success -> {
+                val data = result.data.data ?: return NetworkResult.Error("No data in response")
+                // Persists profileCompleted=false → the post-auth gate routes the
+                // new admin into the onboarding wizard.
+                saveSession(data)
+                NetworkResult.Success(data)
+            }
+            is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)
+            is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
+        }
+    }
+
     override suspend fun login(request: LoginRequest): NetworkResult<AuthResponse> {
         return when (val result = api.login(request)) {
             is NetworkResult.Success -> {

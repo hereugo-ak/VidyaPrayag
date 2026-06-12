@@ -123,13 +123,14 @@ class InstitutionalBasicOBViewModel(
                 buildMap {
                     put(ObPayloadKeys.SCHOOL_NAME, JsonPrimitive(current.schoolName.trim()))
                     put(ObPayloadKeys.BOARD, JsonPrimitive(current.boardAffiliation.trim()))
-                    put(ObPayloadKeys.CONTACT_EMAIL, JsonPrimitive(current.officialEmail.trim()))
-                    put(
-                        ObPayloadKeys.CONTACT_PHONE,
-                        JsonPrimitive(
-                            "${current.countryCode}${current.contactNumber}".trim()
-                        )
-                    )
+                    // Only send the email when the admin actually entered one, so a
+                    // blank Step-1 form never overwrites the real contact email that
+                    // was captured at school registration.
+                    current.officialEmail.trim().takeIf { it.isNotBlank() }
+                        ?.let { put(ObPayloadKeys.CONTACT_EMAIL, JsonPrimitive(it)) }
+                    val phone = "${current.countryCode}${current.contactNumber}".trim()
+                    phone.takeIf { current.contactNumber.isNotBlank() }
+                        ?.let { put(ObPayloadKeys.CONTACT_PHONE, JsonPrimitive(it)) }
                     // The screen currently shows the address as a static string; we
                     // still send whatever is in state so the backend has *something*.
                     put(ObPayloadKeys.FULL_ADDRESS, JsonPrimitive(current.address.trim()))

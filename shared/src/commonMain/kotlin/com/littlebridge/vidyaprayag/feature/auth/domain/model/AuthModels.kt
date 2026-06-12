@@ -40,6 +40,25 @@ data class SignupRequest(
     val role: String
 )
 
+/**
+ * Body for POST /api/v1/auth/register-school — the "Onboard your school"
+ * self-registration. Creates a school_admin + an owning (pending) school in
+ * one call and returns an [AuthResponse] (profile_completed = false), which
+ * routes the new admin straight into the onboarding wizard.
+ */
+@Serializable
+data class SchoolRegisterRequest(
+    val name: String,                 // admin / principal contact name
+    val identifier: String,           // email
+    val password: String,
+    @SerialName("school_name") val schoolName: String,
+    val board: String? = null,
+    @SerialName("school_type") val schoolType: String? = null,
+    val city: String? = null,
+    val state: String? = null,
+    @SerialName("contact_phone") val contactPhone: String? = null,
+)
+
 @Serializable
 data class AuthResponse(
     val token: String,

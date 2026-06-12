@@ -2,7 +2,10 @@ package com.littlebridge.vidyaprayag.ui.v2.screens.auth
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,8 +28,11 @@ import com.littlebridge.vidyaprayag.feature.auth.presentation.AuthViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
+import com.littlebridge.vidyaprayag.ui.v2.components.VDivider
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VInput
+import com.littlebridge.vidyaprayag.ui.v2.components.VTag
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
@@ -45,6 +51,7 @@ import org.koin.compose.viewmodel.koinViewModel
  * advances to the password step; `onSubmit()` performs the login. The actual landing role
  * (SCHOOL_ADMIN vs TEACHER) is then decided by NavGraphV2 from the persisted JWT role (PHASE 7).
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AdminAuthScreenV2(
     onAuthSuccess: () -> Unit,
@@ -83,6 +90,37 @@ fun AdminAuthScreenV2(
                     keyboardType = KeyboardType.Email,
                     modifier = Modifier.fillMaxWidth(),
                 )
+
+                // ── Always-visible self-onboarding entry point ──────────────────
+                // A brand-new school never has to type a throwaway email to
+                // *discover* onboarding — the call-to-action lives right here on
+                // the first step. Tapping it jumps straight to the registration
+                // form via the dedicated /auth/register-school path (RA-53 safe).
+                Spacer(Modifier.height(18.dp))
+                VDivider()
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    "Haven't registered your school yet?",
+                    style = VTheme.type.bodyStrong.colored(c.ink),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Set it up in a few quick steps — create your administrator " +
+                        "account and bring your school onto VidyaPrayag.",
+                    style = VTheme.type.caption.colored(c.ink3),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(12.dp))
+                VButton(
+                    text = "Onboard with us now",
+                    onClick = viewModel::startRegisterSchoolDirect,
+                    full = true,
+                    size = VButtonSize.Lg,
+                    variant = VButtonVariant.Secondary,
+                    tone = VButtonTone.Teal,
+                    leading = { Icon(VIcons.School, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                )
             }
             AuthStep.LoginPassword -> {
                 VInput(
@@ -116,28 +154,107 @@ fun AdminAuthScreenV2(
                 )
             }
             AuthStep.SignupDetails -> {
-                // RA-53 🔴 — Staff accounts are NEVER self-created. The public
-                // /signup route now mints only `parent`, and the only way to
-                // become a school_admin/teacher is server-side provisioning.
-                // So when checkUser reports an unknown staff email, we do NOT
-                // render a "create account" form (which previously drove the
-                // self-service privilege-escalation chain). We render a
-                // not-provisioned notice and send the user back to the email
-                // step. The CTA below is also suppressed for this step.
-                Text(
-                    "No staff account exists for this email.",
-                    style = VTheme.type.bodyStrong.colored(c.ink),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "School administrator and teacher accounts are created by your " +
-                        "institution, not self-registered. Please contact your school " +
-                        "administrator to be provisioned, then sign in with the credentials " +
-                        "you receive.",
-                    style = VTheme.type.body.colored(c.ink3),
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                if (state.isRegisterSchool) {
+                    // ── "Onboard your school" — self-registration form ──────────
+                    // RA-53 is preserved: this does NOT hit the anonymous /signup
+                    // (which is locked to `parent`). It calls the dedicated
+                    // /auth/register-school endpoint that mints a school_admin +
+                    // a *pending* school, then routes into the onboarding wizard.
+                    VInput(
+                        value = state.name,
+                        onValueChange = viewModel::onNameChanged,
+                        label = "Your name",
+                        placeholder = "Dr. Anita Verma",
+                        leadingIcon = VIcons.User,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    // Email/identifier — REQUIRED. Without this the form validated
+                    // an empty identifier and failed with "enter a valid email"
+                    // even though there was nowhere to type one (the user reached
+                    // this form directly from the first step's "Onboard with us
+                    // now" CTA, bypassing the Identifier input).
+                    VInput(
+                        value = state.identifier,
+                        onValueChange = viewModel::onIdentifierChanged,
+                        label = "Work email",
+                        placeholder = "office@svm.edu.in",
+                        leadingIcon = VIcons.Mail,
+                        keyboardType = KeyboardType.Email,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    VInput(
+                        value = state.schoolName,
+                        onValueChange = viewModel::onSchoolNameChanged,
+                        label = "School name",
+                        placeholder = "Saraswati Vidya Mandir",
+                        leadingIcon = VIcons.School,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text("BOARD", style = VTheme.type.labelStrong.colored(c.ink3))
+                    Spacer(Modifier.height(6.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        listOf("CBSE", "ICSE", "UP State", "Other").forEach { b ->
+                            VTag(text = b, active = state.board == b, onClick = { viewModel.onBoardChanged(b) })
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    VInput(
+                        value = state.city,
+                        onValueChange = viewModel::onCityChanged,
+                        label = "City (optional)",
+                        placeholder = "Lucknow",
+                        leadingIcon = VIcons.MapPin,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    VInput(
+                        value = state.password,
+                        onValueChange = viewModel::onPasswordChanged,
+                        label = "Create a password",
+                        placeholder = "At least 8 characters",
+                        leadingIcon = VIcons.Lock,
+                        isPassword = true,
+                        passwordVisible = passwordVisible,
+                        modifier = Modifier.fillMaxWidth(),
+                        trailing = {
+                            Icon(
+                                VIcons.Eye,
+                                contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                tint = c.ink3,
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                    ) { passwordVisible = !passwordVisible },
+                            )
+                        },
+                    )
+                } else {
+                    // RA-53 🔴 — No anonymous staff account creation. We offer the
+                    // sanctioned "Onboard your school" path (creates a school_admin
+                    // + a pending school) and otherwise direct provisioned staff to
+                    // their administrator.
+                    Text(
+                        "No account exists for this email.",
+                        style = VTheme.type.bodyStrong.colored(c.ink),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "New to VidyaPrayag? Register your school below to set it up and " +
+                            "create your administrator account. Teachers and additional staff " +
+                            "are added by your school administrator after onboarding.",
+                        style = VTheme.type.body.colored(c.ink3),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
             // Staff never use OTP — keep the branch exhaustive but safe.
             AuthStep.Otp -> {
@@ -155,20 +272,37 @@ fun AdminAuthScreenV2(
 
         Spacer(Modifier.height(24.dp))
 
-        // RA-53: the SignupDetails step is now a dead-end notice for staff —
-        // it offers only a "Back to sign in" action and never an account-create
-        // submission, so the public self-signup escalation path is gone.
+        // The SignupDetails step is no longer a dead-end: it offers the
+        // sanctioned "Onboard your school" registration (school_admin + pending
+        // school) — never the anonymous /signup escalation path (RA-53).
         when (state.step) {
             AuthStep.SignupDetails -> {
-                VButton(
-                    text = "Back to sign in",
-                    onClick = viewModel::goBack,
-                    full = true,
-                    size = VButtonSize.Lg,
-                    tone = VButtonTone.Teal,
-                    loading = state.isLoading,
-                    trailing = { Icon(VIcons.ArrowRight, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                )
+                if (state.isRegisterSchool) {
+                    VButton(
+                        text = "Register & continue",
+                        onClick = viewModel::registerSchool,
+                        full = true,
+                        size = VButtonSize.Lg,
+                        tone = VButtonTone.Teal,
+                        loading = state.isLoading,
+                        enabled = !state.isLoading,
+                        trailing = { Icon(VIcons.ArrowRight, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    AuthBackLink(onClick = viewModel::cancelRegisterSchool, modifier = Modifier.align(Alignment.CenterHorizontally))
+                } else {
+                    VButton(
+                        text = "Onboard your school",
+                        onClick = viewModel::startRegisterSchool,
+                        full = true,
+                        size = VButtonSize.Lg,
+                        tone = VButtonTone.Teal,
+                        loading = state.isLoading,
+                        leading = { Icon(VIcons.School, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    AuthBackLink(onClick = viewModel::goBack, modifier = Modifier.align(Alignment.CenterHorizontally))
+                }
             }
             else -> {
                 val ctaLabel = if (state.step == AuthStep.Identifier) "Continue" else "Sign In"

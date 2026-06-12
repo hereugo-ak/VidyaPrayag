@@ -36,6 +36,15 @@ class AuthApi(
         }
     }
 
+    suspend fun registerSchool(request: SchoolRegisterRequest): NetworkResult<ApiResponse<AuthResponse>> {
+        return safeApiCall {
+            client.post(getUrl("api/v1/auth/register-school")) {
+                contentType(ContentType.Application.Json)
+                setBody(request)
+            }
+        }
+    }
+
     suspend fun login(request: LoginRequest): NetworkResult<ApiResponse<AuthResponse>> {
         return safeApiCall {
             client.post(getUrl("api/v1/auth/login")) {
