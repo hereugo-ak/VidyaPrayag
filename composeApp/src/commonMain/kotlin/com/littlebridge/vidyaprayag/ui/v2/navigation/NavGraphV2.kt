@@ -10,6 +10,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
+import com.littlebridge.vidyaprayag.feature.admin.presentation.OnboardingGate
+import com.littlebridge.vidyaprayag.feature.admin.presentation.OnboardingGateViewModel
 import com.littlebridge.vidyaprayag.feature.auth.domain.repository.AuthRepository
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.AdminAuthScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.CommonLandingScreenV2
@@ -19,6 +21,7 @@ import com.littlebridge.vidyaprayag.ui.v2.screens.auth.ParentAuthScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.ParentLinkChildScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.SchoolOnboardingScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.auth.TeacherFirstLoginScreenV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.discovery.DiscoveryScreenV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.parent.ParentPortalV2
 import com.littlebridge.vidyaprayag.ui.v2.screens.school.SchoolPortalV2
@@ -184,18 +187,21 @@ private enum class AuthedRoute { Resolving, ParentLinkChild, SchoolOnboarding, T
 /**
  * AuthedFlow — runs the one-time post-login gate before handing control to the role portal.
  *
- * Decision inputs come from the **live session** read via [AuthRepository.getSession]:
- *  • PARENT      — `profileCompleted == false` → child-link flow (Discovery + LinkChild), else portal.
- *  • SCHOOL_ADMIN— `profileCompleted == false` → school-onboarding wizard, else portal.
- *  • TEACHER     — `profileCompleted == false` → first-login change-password gate, else portal.
+ * Decision inputs:
+ *  • PARENT       — lands straight on the portal (child-link is opt-in, not forced).
+ *  • SCHOOL_ADMIN — decided by SERVER TRUTH via `GET /api/v1/onboarding/status`
+ *                   (see [OnboardingGateViewModel]). NOT the local `profile_completed`
+ *                   flag. This fixes the class of bug where a manually-inserted /
+ *                   hand-edited admin row reported onboarding as complete while its
+ *                   `schools` row / classes did not actually exist — the admin would
+ *                   land on an empty dashboard with onboarding wrongly skipped. The
+ *                   status endpoint derives completion from real persisted data, and
+ *                   also yields the first incomplete step so a partially-onboarded
+ *                   admin RESUMES at the right place.
+ *  • TEACHER      — `profileCompleted == false` → first-login change-password gate, else portal.
  *
- * Returning users (valid JWT after an app restart) have no in-memory session cache, so the gate
- * resolves immediately to the portal — which is correct: they've already onboarded/linked. Every
- * gate completion advances to [AuthedRoute.Portal] with no way back into the gate (LAW 4). The
- * change-password gate (RA-54) is now backed by a real `POST /auth/change-password` +
- * `must_change_password` flag: a provisioned teacher logs in with profileCompleted=false, the
- * gate calls the endpoint, the server flips profile_completed=true, and the gate resolves
- * permanently across cold starts.
+ * The change-password gate (RA-54) is backed by a real `POST /auth/change-password` +
+ * `must_change_password` flag.
  */
 @Composable
 private fun AuthedFlow(
@@ -206,24 +212,48 @@ private fun AuthedFlow(
     val authRepository = koinInject<AuthRepository>()
 
     var route by remember(role) { mutableStateOf(AuthedRoute.Resolving) }
+    // The step the school-onboarding wizard should open on, resolved from the
+    // server status (first incomplete step) for a returning/partial admin.
+    var onboardingResumeStep by remember(role) { mutableStateOf(com.littlebridge.vidyaprayag.feature.admin.domain.model.ObStepType.BASIC) }
 
-    // Resolve the gate exactly once per authenticated session.
-    LaunchedEffect(role) {
-        val profileCompleted = runCatching { authRepository.getSession()?.profileCompleted }
-            .getOrNull() ?: true // null session (returning user / restart) → treat as completed
-        route = when (role) {
-            // RA-S04 (per product directive): a parent is NEVER pushed into the child-link
-            // flow after signup/login. They land straight on their portal and can link a
-            // child whenever they choose, from their Profile (ParentLinkChildScreenV2 is
-            // reachable from the profile, not forced here). This avoids dead-ending new
-            // families on a "link your child" wall before they've even seen the app.
-            EntryRole.Parent -> AuthedRoute.Portal
-            // super_admin shares the school-admin operator surface (see RolePortal below)
-            // and therefore shares its first-login gate too.
-            EntryRole.SchoolAdmin,
-            EntryRole.SuperAdmin -> if (profileCompleted) AuthedRoute.Portal else AuthedRoute.SchoolOnboarding
-            EntryRole.Teacher -> if (profileCompleted) AuthedRoute.Portal else AuthedRoute.TeacherFirstLogin
-            EntryRole.Unknown -> AuthedRoute.Portal
+    // For school roles, the decision is made by the server-truth gate VM below
+    // (it sets `route`). The gate is AUTHORITATIVE: OnboardingGateViewModel reads
+    // the server /onboarding/status (derived from real persisted school data, not
+    // the local profile_completed flag) and yields both the Dashboard/Onboarding
+    // decision AND the first incomplete step so a partial/manually-seeded admin
+    // RESUMES at the right place instead of being wrongly dropped on an empty
+    // dashboard ("shows onboarding completed" bug). For the other roles we resolve
+    // locally as before.
+    val isSchoolRole = role == EntryRole.SchoolAdmin || role == EntryRole.SuperAdmin
+
+    if (isSchoolRole) {
+        val gateVm: OnboardingGateViewModel = org.koin.compose.viewmodel.koinViewModel()
+        val gate by gateVm.gate.collectAsStateV2()
+        LaunchedEffect(gate) {
+            when (val g = gate) {
+                is OnboardingGate.Resolving -> route = AuthedRoute.Resolving
+                is OnboardingGate.Onboarding -> {
+                    onboardingResumeStep = g.resumeStep
+                    route = AuthedRoute.SchoolOnboarding
+                }
+                is OnboardingGate.Dashboard -> route = AuthedRoute.Portal
+            }
+        }
+    } else {
+        // Resolve the gate exactly once per authenticated session.
+        LaunchedEffect(role) {
+            // Local cached flag (set at login from the server's profile_completed).
+            // We do NOT default a missing flag to `true` — a missing/false flag
+            // means "not completed".
+            val localProfileCompleted = runCatching { authRepository.getSession()?.profileCompleted }
+                .getOrNull() ?: false
+            route = when (role) {
+                // RA-S04: a parent is NEVER pushed into the child-link flow after signup/login.
+                EntryRole.Parent -> AuthedRoute.Portal
+                EntryRole.Teacher -> if (localProfileCompleted) AuthedRoute.Portal else AuthedRoute.TeacherFirstLogin
+                EntryRole.Unknown -> AuthedRoute.Portal
+                else -> AuthedRoute.Portal
+            }
         }
     }
 
@@ -256,6 +286,7 @@ private fun AuthedFlow(
                 onBack = { route = AuthedRoute.Portal },
             )
             AuthedRoute.SchoolOnboarding -> SchoolOnboardingScreenV2(
+                resumeStep = onboardingResumeStep,
                 onComplete = { route = AuthedRoute.Portal },
                 onBack = { route = AuthedRoute.Portal },
             )

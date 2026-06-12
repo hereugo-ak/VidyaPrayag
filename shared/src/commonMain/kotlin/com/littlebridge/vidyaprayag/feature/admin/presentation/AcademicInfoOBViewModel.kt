@@ -203,6 +203,44 @@ class AcademicInfoOBViewModel(
     }
 
     /**
+     * Replace the academic structure with what the admin actually built in the
+     * wizard (Steps 3-5) so [submit] persists REAL classes/sections/subjects +
+     * teacher assignments — never the sample defaults. Called by the screen on
+     * the Teachers → submit transition.
+     *
+     * @param classes   ordered list of (className, sections) the admin configured
+     * @param subjects  ordered list of (name, code) offered
+     * @param teacherBySubjectClass map of "subjectName|classCode" -> teacher name
+     */
+    fun applyBuiltStructure(
+        classes: List<Pair<String, List<String>>>,
+        subjects: List<Pair<String, String>>,
+        teacherBySubjectClass: Map<String, String> = emptyMap(),
+    ) {
+        // Persist the section map + teacher map for buildAcademicPayload to use.
+        builtClasses = classes
+        builtSubjects = subjects
+        builtTeacherBySubjectClass = teacherBySubjectClass
+        // Reflect the class names into visible state so the screen/back-nav stays
+        // consistent if it re-reads the VM.
+        if (classes.isNotEmpty()) {
+            val names = classes.map { it.first }
+            _state.value = _state.value.copy(
+                availableClasses = names,
+                selectedClass = _state.value.selectedClass.takeIf { it in names } ?: names.first(),
+                subjects = subjects.mapIndexed { idx, (name, code) ->
+                    Subject(id = code.ifBlank { (idx + 1).toString() }, name = name, iconName = iconForSubject(name))
+                }
+            )
+        }
+    }
+
+    // Real structure built by the admin in the wizard (null until applied).
+    private var builtClasses: List<Pair<String, List<String>>>? = null
+    private var builtSubjects: List<Pair<String, String>>? = null
+    private var builtTeacherBySubjectClass: Map<String, String> = emptyMap()
+
+    /**
      * Builds the ACADEMIC `data_payload` from the current UI state so the server
      * persists REAL school_classes + school_subjects rows (instead of seeding
      * defaults). Contract:
@@ -211,15 +249,52 @@ class AcademicInfoOBViewModel(
      * Every available class is sent with the configured subject set; the section
      * list defaults to ["A"] when unknown.
      */
+    private fun slug(name: String) = name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
+
     private fun buildAcademicPayload(): JsonObject {
+        // Prefer the REAL structure the admin built in the wizard. Only when the
+        // screen never pushed anything (defensive) do we fall back to VM state.
+        val built = builtClasses
+        if (built != null && built.isNotEmpty()) {
+            val subjects = builtSubjects.orEmpty()
+            return buildJsonObject {
+                put("classes", buildJsonArray {
+                    built.forEach { (className, sections) ->
+                        val classCode = classCodeByName[className] ?: slug(className)
+                        add(buildJsonObject {
+                            put("code", classCode)
+                            put("name", className)
+                            put("sections", buildJsonArray {
+                                (sections.ifEmpty { listOf("A") }).forEach { add(JsonPrimitive(it)) }
+                            })
+                            put("subjects", buildJsonArray {
+                                subjects.forEach { (subName, subCode) ->
+                                    add(buildJsonObject {
+                                        put("sub_name", subName)
+                                        put("sub_code", subCode)
+                                        // Teacher comes ONLY from explicit assignments — no fabricated names.
+                                        val teacher = builtTeacherBySubjectClass["$subName|$classCode"]
+                                            ?: builtTeacherBySubjectClass["$subName|$className"]
+                                        if (teacher.isNullOrBlank()) put("teacher_assigned", JsonNull)
+                                        else put("teacher_assigned", teacher)
+                                    })
+                                }
+                            })
+                        })
+                    }
+                })
+            }
+        }
+
+        // Fallback (screen didn't push a structure): use whatever the VM holds,
+        // but DROP the sample teacher names so we never persist fabricated staff.
         val s = _state.value
         val subjectsArray: JsonArray = buildJsonArray {
             s.subjects.forEach { subj ->
                 add(buildJsonObject {
                     put("sub_name", subj.name)
                     put("sub_code", subj.id)
-                    if (subj.teacherName.isNullOrBlank()) put("teacher_assigned", JsonNull)
-                    else put("teacher_assigned", subj.teacherName)
+                    put("teacher_assigned", JsonNull)
                 })
             }
         }
@@ -227,7 +302,7 @@ class AcademicInfoOBViewModel(
             put("classes", buildJsonArray {
                 s.availableClasses.forEach { className ->
                     add(buildJsonObject {
-                        put("code", classCodeByName[className] ?: className.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-'))
+                        put("code", classCodeByName[className] ?: slug(className))
                         put("name", className)
                         put("sections", buildJsonArray { add(JsonPrimitive("A")) })
                         put("subjects", subjectsArray)

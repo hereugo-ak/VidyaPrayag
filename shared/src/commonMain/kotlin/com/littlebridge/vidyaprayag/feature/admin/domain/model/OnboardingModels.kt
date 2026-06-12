@@ -108,6 +108,32 @@ data class ClassDetailsResponse(
     @SerialName("list_of_subjects") val listOfSubjects: List<SubjectDetailDto> = emptyList()
 )
 
+// ---------- GET /status DTOs ----------
+@Serializable
+data class OnboardingStepStatus(
+    @SerialName("step") val step: String,
+    @SerialName("current_step_count") val currentStepCount: Int = 0,
+    @SerialName("is_done") val isDone: Boolean = false
+)
+
+@Serializable
+data class OnboardingStatusResponse(
+    @SerialName("school_id") val schoolId: String? = null,
+    @SerialName("is_complete") val isComplete: Boolean = false,
+    @SerialName("completion_percent") val completionPercent: Int = 0,
+    @SerialName("resume_step") val resumeStep: String = ObStepType.BASIC,
+    @SerialName("total_step_count") val totalStepCount: Int = 4,
+    @SerialName("steps") val steps: List<OnboardingStepStatus> = emptyList()
+)
+
+// ---------- POST /complete response ----------
+@Serializable
+data class OnboardingCompletionResponse(
+    @SerialName("school_id") val schoolId: String,
+    @SerialName("is_complete") val isComplete: Boolean = true,
+    @SerialName("onboarding_status") val onboardingStatus: String = "active"
+)
+
 // ---------- Payload key constants (matches server field schemas) ----------
 object ObPayloadKeys {
     // BASIC step

@@ -3,6 +3,8 @@ package com.littlebridge.vidyaprayag.feature.admin.data.repository
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.feature.admin.data.remote.OnboardingApi
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.ClassDetailsResponse
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingCompletionResponse
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingStatusResponse
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingStepResponse
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingSubmitRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingSubmitResponse
@@ -72,6 +74,46 @@ class OnboardingRepositoryImpl(
                 when {
                     !envelope.success -> NetworkResult.Error(
                         envelope.message.ifBlank { "Failed to fetch class details" }
+                    )
+                    data == null -> NetworkResult.Error("No data in response")
+                    else -> NetworkResult.Success(data)
+                }
+            }
+            is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)
+            is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
+        }
+    }
+
+    override suspend fun getStatus(
+        token: String
+    ): NetworkResult<OnboardingStatusResponse> {
+        return when (val result = api.getStatus(token)) {
+            is NetworkResult.Success -> {
+                val envelope = result.data
+                val data = envelope.data
+                when {
+                    !envelope.success -> NetworkResult.Error(
+                        envelope.message.ifBlank { "Failed to fetch onboarding status" }
+                    )
+                    data == null -> NetworkResult.Error("No data in response")
+                    else -> NetworkResult.Success(data)
+                }
+            }
+            is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)
+            is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
+        }
+    }
+
+    override suspend fun completeOnboarding(
+        token: String
+    ): NetworkResult<OnboardingCompletionResponse> {
+        return when (val result = api.completeOnboarding(token)) {
+            is NetworkResult.Success -> {
+                val envelope = result.data
+                val data = envelope.data
+                when {
+                    !envelope.success -> NetworkResult.Error(
+                        envelope.message.ifBlank { "Failed to complete onboarding" }
                     )
                     data == null -> NetworkResult.Error("No data in response")
                     else -> NetworkResult.Success(data)

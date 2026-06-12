@@ -45,6 +45,10 @@
 --   6. scripts/schema-patch-2026-06-07.sql
 --        Scholarships + scholarship_applications (RE-AUDIT RA-05).
 --
+--   7. docs/db/schema-patch-school-onboarding.sql
+--        schools.onboarding_status + richer onboarding identity/academic
+--        columns the setup wizard collects (all ADD COLUMN IF NOT EXISTS).
+--
 -- ALL CREATE TABLE statements use IF NOT EXISTS, so it is safe to re-run.
 --
 -- ----------------------------------------------------------------------------
@@ -58,6 +62,7 @@
 --     \i docs/db/migration_003_leave_workflow_and_two_party_messaging.sql
 --     \i docs/backend/sql/02_teacher_schema.sql
 --     \i scripts/schema-patch-2026-06-07.sql
+--     \i docs/db/schema-patch-school-onboarding.sql
 --     \i scripts/seed-2026-06-07.sql
 --
 -- ----------------------------------------------------------------------------
