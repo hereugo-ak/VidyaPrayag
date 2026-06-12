@@ -24,6 +24,7 @@
     <style name="Theme.VidyaPrayag" parent="@android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/vp_splash_background</item>
         <item name="android:statusBarColor">@color/vp_splash_background</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="o_mr1">shortEdges</item>
     </style>
 

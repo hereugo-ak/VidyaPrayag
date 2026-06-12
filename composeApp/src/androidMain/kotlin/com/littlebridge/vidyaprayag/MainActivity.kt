@@ -41,7 +41,12 @@ class MainActivity : ComponentActivity() {
                     android.graphics.Color.TRANSPARENT,
                     android.graphics.Color.TRANSPARENT
                 )
-            }
+
+            },
+            navigationBarStyle = SystemBarStyle.light(
+                android.graphics.Color.WHITE, // navigation bar background
+                android.graphics.Color.WHITE
+            )
         )
         super.onCreate(savedInstanceState)
 
@@ -73,7 +78,7 @@ class MainActivity : ComponentActivity() {
                 it.duration = 280L
             }
 
-            fade.doOnEnd { provider.remove() }
+            fade.doOnEnd { splashScreenViewProvider.remove() }
 
             fade.start()
             scaleX.start()

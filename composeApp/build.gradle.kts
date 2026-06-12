@@ -39,13 +39,6 @@ if (devBaseUrl == renderFallbackUrl) {
 }
 
 kotlin {
-    // Project-wide opt-in to the experimental cross-platform BackHandler API
-    // (androidx.compose.ui.backhandler.BackHandler is annotated
-    // @ExperimentalComposeUiApi). Declared as a real `-opt-in` compiler arg on
-    // EVERY Kotlin compilation (not just languageSettings, which can fail to
-    // propagate to the Android Kotlin compile task) so the experimental-API
-    // diagnostic ("This API is experimental and is likely to change in the
-    // future") is silenced consistently across android/ios/js/wasmJs/jvm.
     compilerOptions {
         optIn.add("androidx.compose.ui.ExperimentalComposeUiApi")
     }
@@ -80,12 +73,6 @@ kotlin {
     }
     
     sourceSets {
-        // Opt in to the experimental cross-platform BackHandler API
-        // (androidx.compose.ui.backhandler.BackHandler is marked
-        // @ExperimentalComposeUiApi). Declared at the source-set level so every
-        // portal/nav composable that wires the system back gesture compiles
-        // without a per-function @OptIn. Mirrors the opt-in already used in
-        // webMain/main.kt.
         all {
             languageSettings.optIn("androidx.compose.ui.ExperimentalComposeUiApi")
         }
@@ -106,10 +93,6 @@ kotlin {
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)
             implementation(libs.compose.ui)
-            // Cross-platform BackHandler (Android predictive back / iOS edge-swipe).
-            // androidx.compose.ui.backhandler.BackHandler lives in this separate
-            // artifact — not bundled with compose-ui — so it must be declared
-            // explicitly or every BackHandler reference fails to resolve.
             implementation(libs.compose.ui.backhandler)
             implementation(libs.compose.components.resources)
             implementation(libs.compose.uiToolingPreview)
@@ -142,14 +125,6 @@ android {
         applicationId = "com.littlebridge.vidyaprayag"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        // versionCode bumped to 2 (was 1) on 2026-06-08 alongside the upgraded
-        // CommonLandingScreenV2 (commit 78c33bf). The previous symptom — a fresh
-        // build still appearing to ship the OLD landing — turned out to be the
-        // Android device refusing to re-install when packageName + versionCode +
-        // signature were all unchanged, leaving the cached old APK on the phone.
-        // Bumping the version guarantees a true install on every push, in addition
-        // to the build-cache disable in gradle.properties (commit 22c9ed0) and the
-        // forced re-run of the Compose-Multiplatform resource generator below.
         versionCode = 2
         versionName = "1.1"
     }
