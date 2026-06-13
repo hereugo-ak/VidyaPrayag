@@ -3,6 +3,8 @@ package com.littlebridge.vidyaprayag.feature.admin.data.repository
 import com.littlebridge.vidyaprayag.core.model.ApiResponse
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.feature.admin.data.remote.StudentsApi
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.BulkImportStudentsRequest
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.BulkImportStudentsResponse
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.CreateStudentRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.StudentDto
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.StudentListResponse
@@ -19,6 +21,9 @@ class StudentsRepositoryImpl(
 
     override suspend fun createStudent(token: String, request: CreateStudentRequest): NetworkResult<ApiResponse<StudentDto>> =
         api.createStudent(token, request)
+
+    override suspend fun importStudents(token: String, request: BulkImportStudentsRequest): NetworkResult<ApiResponse<BulkImportStudentsResponse>> =
+        api.importStudents(token, request)
 
     override suspend fun deleteStudent(token: String, studentId: String): NetworkResult<ApiResponse<Unit>> =
         api.deleteStudent(token, studentId)

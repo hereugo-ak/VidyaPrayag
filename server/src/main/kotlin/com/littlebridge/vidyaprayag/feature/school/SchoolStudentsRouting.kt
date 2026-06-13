@@ -12,6 +12,7 @@
  * Endpoints (JWT + school-scoped; school_id resolved from JWT, never the body):
  *   GET    /api/v1/school/students                list active students in caller's school
  *   POST   /api/v1/school/students                add a student (school-admin)
+ *   POST   /api/v1/school/students/import         bulk import (JSON array OR CSV text, school-admin)
  *   DELETE /api/v1/school/students/{id}           soft-delete a student (school-admin)
  *   GET    /api/v1/school/students/{id}           full student profile (attendance/marks/leave/fees)
  *   GET    /api/v1/school/teachers/{id}           teacher profile detail (assignments/coverage)
@@ -80,6 +81,28 @@ data class CreateStudentRequest(
     val section: String? = null,
     @SerialName("roll_number") val rollNumber: String,
     @SerialName("student_code") val studentCode: String? = null  // optional; auto-generated when blank
+)
+
+@Serializable
+data class BulkImportStudentsRequest(
+    val students: List<CreateStudentRequest>? = null,
+    val csv: String? = null
+)
+
+@Serializable
+data class BulkImportRowResult(
+    val row: Int,
+    val success: Boolean,
+    @SerialName("student_code") val studentCode: String? = null,
+    val error: String? = null
+)
+
+@Serializable
+data class BulkImportStudentsResponse(
+    val total: Int,
+    val inserted: Int,
+    val failed: Int,
+    val results: List<BulkImportRowResult>
 )
 
 @Serializable
@@ -156,6 +179,72 @@ private fun studentRowToDto(row: org.jetbrains.exposed.sql.ResultRow): StudentDt
         profilePhotoUrl = row[StudentsTable.profilePhotoUrl]
     )
 
+/**
+ * Parse CSV text into CreateStudentRequest rows.
+ *
+ * Expected header (case-insensitive, order-independent; extra columns ignored):
+ *   full_name, class_name, roll_number, section, student_code
+ * `section` and `student_code` are optional. Common header aliases
+ * (name, class, roll, roll_no) are accepted so a teacher-exported sheet
+ * doesn't need exact column names. Quoted fields and embedded commas are
+ * handled by a small RFC-4180-style splitter.
+ */
+private fun parseStudentCsv(csv: String): List<CreateStudentRequest> {
+    val lines = csv.split('\n').map { it.trimEnd('\r') }.filter { it.isNotBlank() }
+    if (lines.isEmpty()) return emptyList()
+
+    fun splitCsvLine(line: String): List<String> {
+        val out = mutableListOf<String>()
+        val sb = StringBuilder()
+        var inQuotes = false
+        var i = 0
+        while (i < line.length) {
+            val c = line[i]
+            when {
+                c == '"' && inQuotes && i + 1 < line.length && line[i + 1] == '"' -> { sb.append('"'); i++ }
+                c == '"' -> inQuotes = !inQuotes
+                c == ',' && !inQuotes -> { out.add(sb.toString()); sb.setLength(0) }
+                else -> sb.append(c)
+            }
+            i++
+        }
+        out.add(sb.toString())
+        return out.map { it.trim() }
+    }
+
+    fun norm(s: String) = s.trim().lowercase().replace(" ", "_")
+    val header = splitCsvLine(lines.first()).map(::norm)
+
+    fun indexOfAny(vararg names: String): Int =
+        names.firstNotNullOfOrNull { n -> header.indexOf(n).takeIf { it >= 0 } } ?: -1
+
+    val iName = indexOfAny("full_name", "name", "student_name")
+    val iClass = indexOfAny("class_name", "class", "grade")
+    val iRoll = indexOfAny("roll_number", "roll", "roll_no", "rollno")
+    val iSection = indexOfAny("section", "sec")
+    val iCode = indexOfAny("student_code", "code", "admission_no", "admission_number")
+
+    fun cell(cols: List<String>, idx: Int): String? =
+        if (idx in cols.indices) cols[idx].takeIf { it.isNotBlank() } else null
+
+    return lines.drop(1).mapNotNull { line ->
+        val cols = splitCsvLine(line)
+        val name = cell(cols, iName)
+        val klass = cell(cols, iClass)
+        val roll = cell(cols, iRoll)
+        // Skip completely empty rows; keep partial rows so the endpoint can
+        // report a meaningful per-row validation error.
+        if (name == null && klass == null && roll == null) return@mapNotNull null
+        CreateStudentRequest(
+            fullName = name ?: "",
+            className = klass ?: "",
+            section = cell(cols, iSection),
+            rollNumber = roll ?: "",
+            studentCode = cell(cols, iCode)
+        )
+    }
+}
+
 // ─────────────────────────── routing ────────────────────────────
 
 fun Route.schoolStudentsRouting() {
@@ -224,6 +313,73 @@ fun Route.schoolStudentsRouting() {
                     return@post
                 }
                 call.created(dto, message = "Student added")
+            }
+
+            // ---- bulk import students (school-admin) ----
+            // Accepts EITHER:
+            //   a) a JSON array of student objects     -> { "students": [ {...}, {...} ] }
+            //   b) raw CSV text                        -> { "csv": "full_name,class_name,roll_number,section,student_code\n..." }
+            // Both manual multi-add and CSV upload from the People → Students tab
+            // funnel here. Each row is validated independently; the response
+            // reports per-row success/failure so a partial CSV still imports the
+            // good rows instead of failing the whole batch.
+            post("/import") {
+                val ctx = call.requireSchoolAdmin() ?: return@post
+                val req = runCatching { call.receive<BulkImportStudentsRequest>() }.getOrNull()
+                    ?: run { call.fail("Invalid body"); return@post }
+
+                val rows: List<CreateStudentRequest> = when {
+                    !req.students.isNullOrEmpty() -> req.students
+                    !req.csv.isNullOrBlank() -> parseStudentCsv(req.csv)
+                    else -> emptyList()
+                }
+                if (rows.isEmpty()) {
+                    call.fail("No rows to import. Provide `students` array or `csv` text.")
+                    return@post
+                }
+
+                val results = mutableListOf<BulkImportRowResult>()
+                var inserted = 0
+                dbQuery {
+                    rows.forEachIndexed { index, r ->
+                        val rowNo = index + 1
+                        if (r.fullName.isBlank() || r.className.isBlank() || r.rollNumber.isBlank()) {
+                            results += BulkImportRowResult(rowNo, false, null, "Name, class and roll number are required.")
+                            return@forEachIndexed
+                        }
+                        val code = r.studentCode?.takeIf { it.isNotBlank() }
+                            ?: "S-${System.currentTimeMillis().toString(36).uppercase()}-$rowNo"
+
+                        val clash = StudentsTable.selectAll()
+                            .where { StudentsTable.studentCode eq code }
+                            .firstOrNull()
+                        if (clash != null) {
+                            results += BulkImportRowResult(rowNo, false, code, "Student code already exists.")
+                            return@forEachIndexed
+                        }
+                        StudentsTable.insert {
+                            it[schoolId] = ctx.schoolId
+                            it[studentCode] = code
+                            it[fullName] = r.fullName.trim()
+                            it[className] = r.className.trim()
+                            it[section] = r.section?.takeIf { s -> s.isNotBlank() }?.trim() ?: "A"
+                            it[rollNumber] = r.rollNumber.trim()
+                            it[isActive] = true
+                            it[createdAt] = Instant.now()
+                        }
+                        inserted++
+                        results += BulkImportRowResult(rowNo, true, code, null)
+                    }
+                }
+                call.ok(
+                    BulkImportStudentsResponse(
+                        total = rows.size,
+                        inserted = inserted,
+                        failed = rows.size - inserted,
+                        results = results
+                    ),
+                    message = "Imported $inserted of ${rows.size} students"
+                )
             }
 
             // ---- HARD-delete a student (school-admin) ----

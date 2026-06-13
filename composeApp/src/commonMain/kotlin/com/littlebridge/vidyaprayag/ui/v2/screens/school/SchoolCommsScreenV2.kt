@@ -40,6 +40,7 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VComingSoon
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
+import com.littlebridge.vidyaprayag.ui.v2.components.VDatePicker
 import com.littlebridge.vidyaprayag.ui.v2.components.VInput
 import com.littlebridge.vidyaprayag.ui.v2.components.VPullRefresh
 import com.littlebridge.vidyaprayag.ui.v2.components.VTopTabs
@@ -368,12 +369,12 @@ private fun ComposeAnnouncementDialog(
                     leadingIcon = VIcons.Megaphone,
                     modifier = Modifier.shakeOnError(titleError),
                 )
-                VInput(
+                VDatePicker(
                     value = date,
                     onValueChange = { date = it; dateError = false },
                     label = "Date",
-                    placeholder = "e.g. 2026-06-20",
-                    leadingIcon = VIcons.Calendar,
+                    placeholder = "Select date",
+                    isError = dateError,
                     modifier = Modifier.shakeOnError(dateError),
                 )
                 VInput(

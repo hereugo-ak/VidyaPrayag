@@ -17,6 +17,8 @@ package com.littlebridge.vidyaprayag.feature.admin.data.remote
 import com.littlebridge.vidyaprayag.core.model.ApiResponse
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.network.safeApiCall
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.BulkImportStudentsRequest
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.BulkImportStudentsResponse
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.CreateStudentRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.StudentDto
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.StudentListResponse
@@ -52,6 +54,16 @@ class StudentsApi(
         request: CreateStudentRequest
     ): NetworkResult<ApiResponse<StudentDto>> = safeApiCall {
         client.post(getUrl("api/v1/school/students")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    suspend fun importStudents(
+        token: String,
+        request: BulkImportStudentsRequest
+    ): NetworkResult<ApiResponse<BulkImportStudentsResponse>> = safeApiCall {
+        client.post(getUrl("api/v1/school/students/import")) {
             contentType(ContentType.Application.Json)
             setBody(request)
         }

@@ -66,6 +66,7 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VDivider
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
+import com.littlebridge.vidyaprayag.ui.v2.components.VDatePicker
 import com.littlebridge.vidyaprayag.ui.v2.components.VInput
 import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
 import com.littlebridge.vidyaprayag.ui.v2.components.VTag
@@ -488,8 +489,8 @@ private fun AcademicYearStep() {
         listOf("2025-26", "2026-27").forEach { y -> VTag(text = y, active = year == y, onClick = { year = y }) }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(d.sm)) {
-        VInput(starts, { starts = it }, label = "Year starts", placeholder = "01 Apr 2025", modifier = Modifier.weight(1f))
-        VInput(ends, { ends = it }, label = "Year ends", placeholder = "31 Mar 2026", modifier = Modifier.weight(1f))
+        VDatePicker(starts, { starts = it }, label = "Year starts", placeholder = "Start date", modifier = Modifier.weight(1f))
+        VDatePicker(ends, { ends = it }, label = "Year ends", placeholder = "End date", modifier = Modifier.weight(1f))
     }
     Text("WORKING DAYS", style = VTheme.type.labelStrong.colored(c.ink3))
     Row(horizontalArrangement = Arrangement.spacedBy(d.sm)) {

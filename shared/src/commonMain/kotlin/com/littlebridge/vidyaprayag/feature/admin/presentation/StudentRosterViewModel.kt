@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.BulkImportStudentsRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.CreateStudentRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.StudentDto
 import com.littlebridge.vidyaprayag.feature.admin.domain.repository.StudentsRepository
@@ -31,7 +32,10 @@ data class StudentRosterState(
     val isSaving: Boolean = false,
     val addError: String? = null,
     val infoMessage: String? = null,
-    val removingIds: Set<String> = emptySet()
+    val removingIds: Set<String> = emptySet(),
+    // bulk import dialog (manual multi-add + CSV)
+    val isImporting: Boolean = false,
+    val importError: String? = null
 )
 
 class StudentRosterViewModel(
@@ -101,6 +105,44 @@ class StudentRosterViewModel(
         }
     }
 
+    /**
+     * Bulk import via CSV text. The server parses the header and reports a
+     * per-row result; we surface a concise summary in [StudentRosterState.infoMessage]
+     * and reload the roster so imported students appear immediately.
+     */
+    fun importStudentsCsv(csv: String) {
+        if (csv.isBlank()) {
+            _state.value = _state.value.copy(importError = "Paste or upload CSV content first.")
+            return
+        }
+        viewModelScope.launch {
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(importError = "You are not signed in. Please log in again.")
+                return@launch
+            }
+            _state.value = _state.value.copy(isImporting = true, importError = null, infoMessage = null)
+            when (val r = repository.importStudents(token, BulkImportStudentsRequest(csv = csv))) {
+                is NetworkResult.Success -> {
+                    val res = r.data.data
+                    val summary = if (res != null) {
+                        if (res.failed == 0) "Imported ${res.inserted} students"
+                        else "Imported ${res.inserted} of ${res.total} (${res.failed} skipped)"
+                    } else "Students imported"
+                    _state.value = _state.value.copy(isImporting = false, infoMessage = summary)
+                    load()
+                }
+                is NetworkResult.Error -> {
+                    AppLogger.e("StudentRosterVM", "importStudents error: ${r.message}")
+                    _state.value = _state.value.copy(isImporting = false, importError = r.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(isImporting = false, importError = "Connection error. Check your internet.")
+                }
+            }
+        }
+    }
+
     fun removeStudent(studentId: String) {
         viewModelScope.launch {
             val token = preferenceRepository.getUserToken().first()
@@ -129,6 +171,6 @@ class StudentRosterViewModel(
     }
 
     fun clearMessages() {
-        _state.value = _state.value.copy(addError = null, infoMessage = null)
+        _state.value = _state.value.copy(addError = null, infoMessage = null, importError = null)
     }
 }

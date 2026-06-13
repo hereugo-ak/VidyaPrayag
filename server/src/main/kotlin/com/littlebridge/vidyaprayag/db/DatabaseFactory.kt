@@ -44,8 +44,67 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.io.File
+import java.util.Properties
 
 object DatabaseFactory {
+
+    /**
+     * Config resolution order for a given key (first non-blank wins):
+     *   1. .env file (via dotenv) — the documented production path
+     *   2. OS environment variable (Render / Docker / shell export)
+     *   3. local.properties at the repo root — DX convenience so devs who keep
+     *      DATABASE_URL/USER/PASSWORD in local.properties (the same file Android
+     *      Studio uses) don't silently fall back to SQLite. local.properties is
+     *      git-ignored, so it's a safe place for laptop secrets.
+     *
+     * Without (3), a developer who put DB creds only in local.properties would
+     * see isPostgres=false and have all their writes land in a local SQLite
+     * data.db instead of Supabase — exactly the "nothing shows up in the DB"
+     * symptom this resolver prevents.
+     */
+    private val localProps: Properties by lazy {
+        val props = Properties()
+        // Search the working dir and a couple of parents — `./gradlew :server:run`
+        // runs with CWD = repo root, but be forgiving about where it's launched.
+        val candidates = listOf(
+            File("local.properties"),
+            File("../local.properties"),
+            File(System.getProperty("user.dir"), "local.properties")
+        )
+        candidates.firstOrNull { it.isFile }?.let { f ->
+            runCatching { f.inputStream().use(props::load) }
+                .onSuccess { println("DB_INIT: Loaded fallback config from ${f.absolutePath}") }
+                .onFailure { System.err.println("DB_INIT: Could not read ${f.absolutePath}: ${it.message}") }
+        }
+        props
+    }
+
+    private fun resolve(dotenv: io.github.cdimascio.dotenv.Dotenv, key: String): String? =
+        (dotenv[key] ?: System.getenv(key) ?: localProps.getProperty(key))
+            ?.let(::sanitizeConfigValue)
+            ?.takeIf { it.isNotBlank() }
+
+    /**
+     * Java .properties / some .env editors keep the surrounding quotes as part of
+     * the value (e.g. DATABASE_URL="jdbc:postgresql://..."). If we feed that raw
+     * value with quotes into the JDBC URL builder, it no longer starts with
+     * "jdbc:" / "postgresql://", falls into the else-branch, and we end up with a
+     * doubled, broken URL like:
+     *     jdbc:postgresql://"jdbc:postgresql://host:5432/db?..."
+     * Strip leading/trailing whitespace and a single pair of matching quotes so
+     * the value is always clean regardless of how the dev wrote it.
+     */
+    private fun sanitizeConfigValue(raw: String): String {
+        var v = raw.trim()
+        if (v.length >= 2 &&
+            ((v.startsWith("\"") && v.endsWith("\"")) ||
+                (v.startsWith("'") && v.endsWith("'")))
+        ) {
+            v = v.substring(1, v.length - 1).trim()
+        }
+        return v
+    }
 
     /** All tables the backend reads/writes. Order matters for SQLite FKs. */
     private val allTables = arrayOf(
@@ -108,25 +167,28 @@ object DatabaseFactory {
             ignoreIfMissing = true
         }
 
-        val databaseUrl = (dotenv["DATABASE_URL"] ?: System.getenv("DATABASE_URL"))
-            ?.takeIf { it.isNotBlank() }
+        val databaseUrl = resolve(dotenv, "DATABASE_URL")
 
         val dataSource = if (databaseUrl != null) {
             isPostgres = true
             createPostgresDataSource(
                 databaseUrl,
-                user = dotenv["DATABASE_USER"] ?: System.getenv("DATABASE_USER"),
-                password = dotenv["DATABASE_PASSWORD"] ?: System.getenv("DATABASE_PASSWORD"),
-                poolSize = (dotenv["DB_POOL_SIZE"] ?: System.getenv("DB_POOL_SIZE"))
-                    ?.toIntOrNull() ?: 5
+                user = resolve(dotenv, "DATABASE_USER"),
+                password = resolve(dotenv, "DATABASE_PASSWORD"),
+                poolSize = resolve(dotenv, "DB_POOL_SIZE")?.toIntOrNull() ?: 5
             )
         } else {
+            System.err.println(
+                "DB_INIT: No DATABASE_URL found in .env, environment, or local.properties — " +
+                    "falling back to LOCAL SQLite (data.db). Writes will NOT reach Supabase! " +
+                    "Set DATABASE_URL (+ DATABASE_USER / DATABASE_PASSWORD) to use Postgres."
+            )
             createSqliteDataSource()
         }
 
         Database.connect(dataSource)
 
-        val autoCreateRaw = (dotenv["AUTO_CREATE_TABLES"] ?: System.getenv("AUTO_CREATE_TABLES"))
+        val autoCreateRaw = resolve(dotenv, "AUTO_CREATE_TABLES")
         val autoCreate = autoCreateRaw.equals("true", ignoreCase = true)
 
         println("DB_INIT: isPostgres=$isPostgres, AUTO_CREATE_TABLES='$autoCreateRaw' -> $autoCreate")
@@ -156,7 +218,7 @@ object DatabaseFactory {
 
         // CMS seed (landing + app_config). Always idempotent — only inserts
         // missing keys; never overwrites operator-edited values.
-        val seedCms = (dotenv["APP_SEED_CMS"] ?: System.getenv("APP_SEED_CMS") ?: "true")
+        val seedCms = (resolve(dotenv, "APP_SEED_CMS") ?: "true")
             .equals("true", ignoreCase = true)
         
         if (seedCms) {
@@ -181,7 +243,7 @@ object DatabaseFactory {
         // Operational demo seed (audit finding B): one working credential per
         // profile type + minimal operational data, so a fresh deploy is
         // immediately loginable instead of empty/unlogin-able. Idempotent.
-        val seedDemo = (dotenv["APP_SEED_DEMO"] ?: System.getenv("APP_SEED_DEMO") ?: "true")
+        val seedDemo = (resolve(dotenv, "APP_SEED_DEMO") ?: "true")
             .equals("true", ignoreCase = true)
 
         if (seedDemo) {
@@ -250,16 +312,22 @@ object DatabaseFactory {
         password: String?,
         poolSize: Int
     ): HikariDataSource {
+        // Defensively strip any surrounding quotes/whitespace that may have slipped
+        // through (e.g. a value read straight from a .properties file). Without this
+        // a quoted value would not match the prefixes below and we'd double-prefix it
+        // into jdbc:postgresql://"jdbc:postgresql://..." (the classic broken URL).
+        val cleanUrl = sanitizeConfigValue(databaseUrl)
+
         // Accept both forms:
         //   postgresql://USER:PASS@HOST:5432/DB?sslmode=require
         //   jdbc:postgresql://HOST:5432/DB?sslmode=require
         //   postgres://USER:PASS@HOST:5432/DB
         val jdbcUrl = when {
-            databaseUrl.startsWith("jdbc:") -> databaseUrl
-            databaseUrl.startsWith("postgres://") ->
-                "jdbc:" + databaseUrl.replaceFirst("postgres://", "postgresql://")
-            databaseUrl.startsWith("postgresql://") -> "jdbc:$databaseUrl"
-            else -> "jdbc:postgresql://$databaseUrl"
+            cleanUrl.startsWith("jdbc:") -> cleanUrl
+            cleanUrl.startsWith("postgres://") ->
+                "jdbc:" + cleanUrl.replaceFirst("postgres://", "postgresql://")
+            cleanUrl.startsWith("postgresql://") -> "jdbc:$cleanUrl"
+            else -> "jdbc:postgresql://$cleanUrl"
         }
 
         // Auto-append SSL mode and PgBouncer threshold if missing
