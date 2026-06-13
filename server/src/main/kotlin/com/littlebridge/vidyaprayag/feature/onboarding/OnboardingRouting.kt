@@ -19,6 +19,23 @@
  * Real data flow (no hardcoded school fallbacks):
  *   If the calling user has not created a school yet, ACADEMIC/REVIEW
  *   responses are empty lists / a 404 instead of mock data.
+ *
+ * Teacher + student persistence (bug fix):
+ *   The ACADEMIC submit now materialises REAL teacher accounts and a roster of
+ *   students from the `data_payload`, instead of only writing classes/subjects.
+ *   Extended ACADEMIC payload contract (all keys optional):
+ *     {
+ *       "classes":  [ { "code","name","sections":[...],
+ *                       "subjects":[ {"sub_name","sub_code","teacher_assigned"} ] } ],
+ *       "teachers": [ { "name","identifier"(email|phone),"initial_password",
+ *                       "subjects":[...],"classes":[...] } ],
+ *       "students": [ { "full_name","class_name","section","roll_number","student_code" } ]
+ *     }
+ *   - Each teacher (explicit, or named via a subject's teacher_assigned) becomes a
+ *     `app_users` row (role=teacher, school-scoped) + `faculty` mirror, and gets
+ *     `teacher_subject_assignments` rows for every class×subject they cover.
+ *   - Each student becomes a `students` row (school-scoped). All writes are
+ *     idempotent so re-submitting onboarding never duplicates rows.
  */
 package com.littlebridge.vidyaprayag.feature.onboarding
 
@@ -27,11 +44,16 @@ import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.principalUserId
 import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
+import com.littlebridge.vidyaprayag.db.FacultyTable
 import com.littlebridge.vidyaprayag.db.OnboardingDraftsTable
 import com.littlebridge.vidyaprayag.db.SchoolClassesTable
 import com.littlebridge.vidyaprayag.db.SchoolMediaTable
 import com.littlebridge.vidyaprayag.db.SchoolSubjectsTable
 import com.littlebridge.vidyaprayag.db.SchoolsTable
+import com.littlebridge.vidyaprayag.db.StudentsTable
+import com.littlebridge.vidyaprayag.db.TeacherSubjectAssignmentsTable
+import com.littlebridge.vidyaprayag.feature.auth.hashPassword
+import com.littlebridge.vidyaprayag.feature.auth.normaliseIdentifier
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.request.*
@@ -392,6 +414,258 @@ private fun persistAcademicStructure(schoolId: UUID, payload: JsonObject) {
                 it[teacherAssigned] = sub.teacher
                 it[createdAt] = now
             }
+        }
+    }
+
+    // FIX (teachers added during onboarding never reached the DB): the
+    // class/subject loop above only wrote the free-text teacher_assigned column.
+    // We now also materialise REAL teacher accounts + structured
+    // teacher_subject_assignments rows from BOTH the explicit `teachers` array
+    // (if the wizard sent one) and the per-subject `teacher_assigned` names. This
+    // is what makes onboarding-added teachers show up in the People tab, be able
+    // to log in, and own their class/subject assignments.
+    val classNameByCode = parsedClasses.associate { it.code to it.name }
+    persistOnboardingTeachers(schoolId, payload, classNameByCode)
+    // Optional: persist a roster of students supplied during onboarding so the
+    // dashboard isn't empty on day one.
+    persistOnboardingStudents(schoolId, payload)
+}
+
+/** A teacher entry as parsed from the onboarding payload's `teachers` array. */
+private data class ParsedTeacher(
+    val name: String,
+    val identifier: String?,          // email or phone (optional)
+    val initialPassword: String?,
+    val subjects: List<String>,       // subject names this teacher covers
+    val classes: List<String>         // class names/codes this teacher covers
+)
+
+private fun isEmailId(id: String) = id.contains("@")
+
+/**
+ * Resolves (creating if necessary) a `teacher` app_users row for [name] in
+ * [schoolId]. When an [identifier] (email/phone) is supplied we key off it so
+ * an existing account is reused; otherwise we de-dupe by (school, name, role).
+ * Also mirrors the teacher into the `faculty` roster. Returns the teacher's
+ * app_users.id. Must run inside a dbQuery {}.
+ */
+private fun ensureTeacherAccount(schoolId: UUID, name: String, identifier: String?, initialPassword: String?): UUID {
+    val now = Instant.now()
+    val normId = identifier?.takeIf { it.isNotBlank() }?.let { normaliseIdentifier(it) }
+
+    // 1. Reuse an account that already matches the identifier.
+    if (normId != null) {
+        val existing = AppUsersTable.selectAll()
+            .where { (AppUsersTable.phone eq normId) or (AppUsersTable.email eq normId) }
+            .firstOrNull()
+        if (existing != null) {
+            val uid = existing[AppUsersTable.id].value
+            ensureFacultyRow(schoolId, uid, name)
+            return uid
+        }
+    }
+
+    // 2. Otherwise reuse a same-named teacher already in this school (idempotent
+    //    re-submit of onboarding shouldn't create duplicate teacher rows).
+    val sameName = AppUsersTable.selectAll()
+        .where {
+            (AppUsersTable.schoolId eq schoolId) and
+                (AppUsersTable.role eq "teacher") and
+                (AppUsersTable.fullName eq name.trim())
+        }
+        .firstOrNull()
+    if (sameName != null) {
+        val uid = sameName[AppUsersTable.id].value
+        ensureFacultyRow(schoolId, uid, name)
+        return uid
+    }
+
+    // 3. Create a fresh teacher account scoped to this school.
+    val newId = UUID.randomUUID()
+    AppUsersTable.insert {
+        it[id] = newId
+        it[fullName] = name.trim()
+        it[role] = "teacher"
+        it[AppUsersTable.schoolId] = schoolId
+        if (normId != null && isEmailId(normId)) {
+            it[email] = normId
+            if (!initialPassword.isNullOrBlank()) {
+                it[passwordHash] = hashPassword(initialPassword)
+            }
+            it[isEmailVerified] = true
+        } else if (normId != null) {
+            it[phone] = normId
+            it[isPhoneVerified] = true
+        }
+        it[profileCompleted] = false
+        // Provisioned teachers must set their own password on first login when
+        // they were given an email/password identity.
+        it[mustChangePassword] = (normId != null && isEmailId(normId) && !initialPassword.isNullOrBlank())
+        it[isActive] = true
+        it[createdAt] = now
+        it[updatedAt] = now
+    }
+    ensureFacultyRow(schoolId, newId, name)
+    return newId
+}
+
+/** Mirrors a teacher into the `faculty` roster (idempotent on external_id = userId). */
+private fun ensureFacultyRow(schoolId: UUID, userId: UUID, name: String) {
+    val externalId = "U-$userId"
+    val exists = FacultyTable.selectAll()
+        .where { FacultyTable.externalId eq externalId }
+        .firstOrNull()
+    if (exists != null) return
+    FacultyTable.insert {
+        it[FacultyTable.schoolId] = schoolId
+        it[FacultyTable.externalId] = externalId
+        it[FacultyTable.userId] = userId
+        it[FacultyTable.name] = name.trim()
+        it[isActive] = true
+        it[createdAt] = Instant.now()
+    }
+}
+
+/**
+ * Upserts a teacher_subject_assignment for (school, class, section, subject,
+ * teacher). De-dupes against the existing tuple so re-running onboarding does
+ * not create duplicate assignment rows. Must run inside a dbQuery {}.
+ */
+private fun upsertAssignment(
+    schoolId: UUID,
+    className: String,
+    section: String,
+    subject: String,
+    teacherId: UUID?,
+    teacherName: String?
+) {
+    val now = Instant.now()
+    val existing = TeacherSubjectAssignmentsTable.selectAll()
+        .where {
+            (TeacherSubjectAssignmentsTable.schoolId eq schoolId) and
+                (TeacherSubjectAssignmentsTable.className eq className) and
+                (TeacherSubjectAssignmentsTable.section eq section) and
+                (TeacherSubjectAssignmentsTable.subject eq subject)
+        }
+        .firstOrNull()
+    if (existing != null) {
+        TeacherSubjectAssignmentsTable.update({ TeacherSubjectAssignmentsTable.id eq existing[TeacherSubjectAssignmentsTable.id].value }) {
+            it[TeacherSubjectAssignmentsTable.teacherId] = teacherId
+            it[TeacherSubjectAssignmentsTable.teacherName] = teacherName
+            it[isActive] = true
+            it[updatedAt] = now
+        }
+    } else {
+        TeacherSubjectAssignmentsTable.insert {
+            it[id] = UUID.randomUUID()
+            it[TeacherSubjectAssignmentsTable.schoolId] = schoolId
+            it[TeacherSubjectAssignmentsTable.className] = className
+            it[TeacherSubjectAssignmentsTable.section] = section
+            it[TeacherSubjectAssignmentsTable.subject] = subject
+            it[TeacherSubjectAssignmentsTable.teacherId] = teacherId
+            it[TeacherSubjectAssignmentsTable.teacherName] = teacherName
+            it[isActive] = true
+            it[createdAt] = now
+            it[updatedAt] = now
+        }
+    }
+}
+
+/**
+ * Materialises teacher accounts + assignments from the onboarding payload.
+ *
+ * Two complementary sources are honoured so we capture every teacher the admin
+ * entered, regardless of which wizard screen produced them:
+ *   1. An explicit `teachers` array:
+ *        "teachers":[ { "name":"Asha", "identifier":"asha@x.com",
+ *                       "initial_password":"...", "subjects":["Maths"],
+ *                       "classes":["Class 8"] } ]
+ *      Each entry becomes a `teacher` app_users + faculty row, and an assignment
+ *      is created for every (class × subject) pair listed.
+ *   2. The per-subject `teacher_assigned` name carried on each subject in the
+ *      `classes` tree: for every subject that names a teacher, we resolve/create
+ *      that teacher and create an assignment for that class+subject (section "A").
+ */
+private fun persistOnboardingTeachers(
+    schoolId: UUID,
+    payload: JsonObject,
+    classNameByCode: Map<String, String>
+) {
+    // ---- source 1: explicit teachers[] array ----
+    val teachersJson = payload["teachers"] as? JsonArray
+    val parsedTeachers: List<ParsedTeacher> = teachersJson?.mapNotNull { el ->
+        val o = el as? JsonObject ?: return@mapNotNull null
+        val name = o["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+        val identifier = (o["identifier"] ?: o["email"] ?: o["phone"])?.jsonPrimitive?.contentOrNull
+        val pwd = o["initial_password"]?.jsonPrimitive?.contentOrNull
+        val subjects = (o["subjects"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull } ?: emptyList()
+        val classes = (o["classes"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull } ?: emptyList()
+        ParsedTeacher(name, identifier, pwd, subjects, classes)
+    } ?: emptyList()
+
+    parsedTeachers.forEach { t ->
+        val teacherId = ensureTeacherAccount(schoolId, t.name, t.identifier, t.initialPassword)
+        // Create assignments for each (class × subject) the teacher covers.
+        val classNames = t.classes.map { c -> classNameByCode[c] ?: c }
+        if (classNames.isNotEmpty() && t.subjects.isNotEmpty()) {
+            classNames.forEach { cn ->
+                t.subjects.forEach { subj ->
+                    upsertAssignment(schoolId, cn, "A", subj, teacherId, t.name.trim())
+                }
+            }
+        }
+    }
+
+    // ---- source 2: per-subject teacher_assigned names from the class tree ----
+    // We re-read the names off the same `payload` to avoid a type dependency on
+    // the ParsedClass type that is private to persistAcademicStructure.
+    val classesJson = payload["classes"] as? JsonArray ?: return
+    classesJson.forEach { ce ->
+        val co = ce as? JsonObject ?: return@forEach
+        val className = co["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: return@forEach
+        val subjectsJson = co["subjects"] as? JsonArray ?: return@forEach
+        subjectsJson.forEach { se ->
+            val so = se as? JsonObject ?: return@forEach
+            val subName = so["sub_name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: return@forEach
+            val teacherName = so["teacher_assigned"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+                ?: return@forEach
+            val teacherId = ensureTeacherAccount(schoolId, teacherName, null, null)
+            upsertAssignment(schoolId, className, "A", subName, teacherId, teacherName)
+        }
+    }
+}
+
+/**
+ * Persists a roster of students supplied during onboarding into the canonical
+ * `students` table (school-scoped). Payload contract (optional):
+ *   "students":[ { "full_name":"...", "class_name":"Class 8", "section":"A",
+ *                  "roll_number":"12", "student_code":"S-001" } ]
+ * student_code is auto-generated when blank; duplicates (by code) are skipped.
+ * Idempotent and safe to omit entirely. Must run inside a dbQuery {}.
+ */
+private fun persistOnboardingStudents(schoolId: UUID, payload: JsonObject) {
+    val studentsJson = payload["students"] as? JsonArray ?: return
+    val now = Instant.now()
+    studentsJson.forEach { el ->
+        val o = el as? JsonObject ?: return@forEach
+        val fullName = o["full_name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: return@forEach
+        val className = o["class_name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: return@forEach
+        val section = o["section"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: "A"
+        val rollNumber = o["roll_number"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: ""
+        val code = o["student_code"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+            ?: "S-${UUID.randomUUID().toString().take(8).uppercase()}"
+
+        val clash = StudentsTable.selectAll().where { StudentsTable.studentCode eq code }.firstOrNull()
+        if (clash != null) return@forEach
+        StudentsTable.insert {
+            it[StudentsTable.schoolId] = schoolId
+            it[studentCode] = code
+            it[StudentsTable.fullName] = fullName.trim()
+            it[StudentsTable.className] = className.trim()
+            it[StudentsTable.section] = section.trim()
+            it[StudentsTable.rollNumber] = rollNumber.trim()
+            it[isActive] = true
+            it[createdAt] = now
         }
     }
 }

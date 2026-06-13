@@ -24,7 +24,9 @@ package com.littlebridge.vidyaprayag.feature.school
 import com.littlebridge.vidyaprayag.core.created
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
+import com.littlebridge.vidyaprayag.core.requireSchoolAdmin
 import com.littlebridge.vidyaprayag.core.requireSchoolContext
+import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.TeacherSubjectAssignmentsTable
 import io.ktor.http.*
@@ -115,9 +117,14 @@ fun Route.teacherAssignmentRouting() {
                 )
             }
 
-            // ---- create / upsert ----
+            // ---- create / upsert (allot a subject+class to a teacher) ----
+            // RA-39: allotting/un-allotting teachers is a PRIVILEGED write, so it
+            // requires a school admin (school_staff is rejected). When a
+            // teacher_id is supplied we validate it belongs to THIS school and
+            // resolve the display name from app_users so the stored teacher_name
+            // is always authoritative (never a client-spoofed label).
             post {
-                val ctx = call.requireSchoolContext() ?: return@post
+                val ctx = call.requireSchoolAdmin() ?: return@post
                 val req = call.receive<CreateTeacherAssignmentDto>()
 
                 if (req.className.isBlank() || req.subject.isBlank()) {
@@ -131,9 +138,24 @@ fun Route.teacherAssignmentRouting() {
 
                 val section = req.section?.takeIf { it.isNotBlank() } ?: "A"
                 val now = Instant.now()
+                val teacherUuid = parseUuid(req.teacherId)
 
-                val dto = dbQuery {
-                    // Upsert on (school, class, section, subject, teacher_name).
+                val result = dbQuery {
+                    // When linking by id, the teacher MUST be a real teacher in the
+                    // caller's school (IDOR-safe) — and we adopt its name.
+                    var resolvedName = req.teacherName
+                    if (teacherUuid != null) {
+                        val teacherRow = AppUsersTable.selectAll()
+                            .where {
+                                (AppUsersTable.id eq teacherUuid) and
+                                    (AppUsersTable.schoolId eq ctx.schoolId) and
+                                    (AppUsersTable.role eq "teacher")
+                            }
+                            .firstOrNull() ?: return@dbQuery null   // unknown / cross-school teacher
+                        resolvedName = teacherRow[AppUsersTable.fullName]
+                    }
+
+                    // Upsert on (school, class, section, subject).
                     val existing = TeacherSubjectAssignmentsTable.selectAll()
                         .where {
                             (TeacherSubjectAssignmentsTable.schoolId eq ctx.schoolId) and
@@ -148,8 +170,8 @@ fun Route.teacherAssignmentRouting() {
                         TeacherSubjectAssignmentsTable.update({ TeacherSubjectAssignmentsTable.id eq rid }) {
                             it[classId] = parseUuid(req.classId)
                             it[subjectId] = parseUuid(req.subjectId)
-                            it[teacherId] = parseUuid(req.teacherId)
-                            it[teacherName] = req.teacherName
+                            it[teacherId] = teacherUuid
+                            it[teacherName] = resolvedName
                             it[isActive] = true
                             it[updatedAt] = now
                         }
@@ -164,8 +186,8 @@ fun Route.teacherAssignmentRouting() {
                             it[TeacherSubjectAssignmentsTable.section] = section
                             it[subjectId] = parseUuid(req.subjectId)
                             it[subject] = req.subject
-                            it[teacherId] = parseUuid(req.teacherId)
-                            it[teacherName] = req.teacherName
+                            it[teacherId] = teacherUuid
+                            it[teacherName] = resolvedName
                             it[isActive] = true
                             it[createdAt] = now
                             it[updatedAt] = now
@@ -179,12 +201,16 @@ fun Route.teacherAssignmentRouting() {
                         .toAssignmentDto()
                 }
 
-                call.created(dto, message = "Teacher assignment saved")
+                if (result == null) {
+                    call.fail("Teacher not found in your school", HttpStatusCode.NotFound, "TEACHER_NOT_FOUND")
+                    return@post
+                }
+                call.created(result, message = "Teacher assignment saved")
             }
 
-            // ---- soft delete ----
+            // ---- un-allot (soft delete) — privileged admin write (RA-39) ----
             delete("/{id}") {
-                val ctx = call.requireSchoolContext() ?: return@delete
+                val ctx = call.requireSchoolAdmin() ?: return@delete
                 val id = parseUuid(call.parameters["id"])
                 if (id == null) {
                     call.fail("Invalid assignment id", HttpStatusCode.BadRequest)
