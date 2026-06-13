@@ -18,6 +18,15 @@
  *
  * PATCH semantics: every field on the request DTO is nullable; only non-null
  * fields are written, so a partial body never blanks unspecified columns.
+ *
+ * RA-47b: the editable surface now ALSO covers the geo coordinates
+ * (latitude/longitude) and the richer institutional columns the onboarding
+ * wizard can collect — school_type, affiliation_number, year_established,
+ * website, total_students, total_classes, academic_year_start_month,
+ * grading_system. These already existed on `schools` but had no read/write
+ * path post-onboarding, so an admin who left them blank during onboarding
+ * could never fill them in. They are surfaced in both GET and PUT here and
+ * persist straight to Supabase.
  */
 package com.littlebridge.vidyaprayag.feature.school
 
@@ -56,7 +65,21 @@ data class SchoolProfileDto(
     val state: String,
     val pincode: String? = null,
     @SerialName("logo_url") val logoUrl: String? = null,
-    @SerialName("brand_color") val brandColor: String
+    @SerialName("brand_color") val brandColor: String,
+    // RA-47b: geo + richer institutional fields the onboarding wizard collects.
+    // They live on `schools` but were previously read-only/unfillable post-
+    // onboarding — surfaced here so an admin who left them blank can complete
+    // them later from Settings and have it persist to Supabase.
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    @SerialName("school_type") val schoolType: String? = null,
+    @SerialName("affiliation_number") val affiliationNumber: String? = null,
+    @SerialName("year_established") val yearEstablished: Int? = null,
+    val website: String? = null,
+    @SerialName("total_students") val totalStudents: Int? = null,
+    @SerialName("total_classes") val totalClasses: Int? = null,
+    @SerialName("academic_year_start_month") val academicYearStartMonth: String? = null,
+    @SerialName("grading_system") val gradingSystem: String? = null
 )
 
 /**
@@ -82,7 +105,20 @@ data class UpdateSchoolProfileRequest(
     val state: String? = null,
     val pincode: String? = null,
     @SerialName("logo_url") val logoUrl: String? = null,
-    @SerialName("brand_color") val brandColor: String? = null
+    @SerialName("brand_color") val brandColor: String? = null,
+    // Geo + richer institutional fields (all nullable → PATCH semantics). These
+    // map to nullable columns, so a supplied blank string clears them and a null
+    // leaves them untouched. Numeric fields are written as-is when present.
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    @SerialName("school_type") val schoolType: String? = null,
+    @SerialName("affiliation_number") val affiliationNumber: String? = null,
+    @SerialName("year_established") val yearEstablished: Int? = null,
+    val website: String? = null,
+    @SerialName("total_students") val totalStudents: Int? = null,
+    @SerialName("total_classes") val totalClasses: Int? = null,
+    @SerialName("academic_year_start_month") val academicYearStartMonth: String? = null,
+    @SerialName("grading_system") val gradingSystem: String? = null
 )
 
 private fun rowToDto(row: org.jetbrains.exposed.sql.ResultRow): SchoolProfileDto =
@@ -103,7 +139,17 @@ private fun rowToDto(row: org.jetbrains.exposed.sql.ResultRow): SchoolProfileDto
         state = row[SchoolsTable.state],
         pincode = row[SchoolsTable.pincode],
         logoUrl = row[SchoolsTable.logoUrl],
-        brandColor = row[SchoolsTable.brandColor]
+        brandColor = row[SchoolsTable.brandColor],
+        latitude = row[SchoolsTable.latitude],
+        longitude = row[SchoolsTable.longitude],
+        schoolType = row[SchoolsTable.schoolType],
+        affiliationNumber = row[SchoolsTable.affiliationNumber],
+        yearEstablished = row[SchoolsTable.yearEstablished],
+        website = row[SchoolsTable.website],
+        totalStudents = row[SchoolsTable.totalStudents],
+        totalClasses = row[SchoolsTable.totalClasses],
+        academicYearStartMonth = row[SchoolsTable.academicYearStartMonth],
+        gradingSystem = row[SchoolsTable.gradingSystem]
     )
 
 fun Route.schoolProfileRouting() {
@@ -156,6 +202,19 @@ fun Route.schoolProfileRouting() {
                         req.fullAddress?.let { v -> it[fullAddress] = v.ifBlank { null } }
                         req.pincode?.let { v -> it[pincode] = v.ifBlank { null } }
                         req.logoUrl?.let { v -> it[logoUrl] = v.ifBlank { null } }
+                        // Geo + richer institutional columns (all nullable).
+                        // Numeric coords/values are written whenever supplied;
+                        // text fields treat a blank string as "clear".
+                        req.latitude?.let { v -> it[latitude] = v }
+                        req.longitude?.let { v -> it[longitude] = v }
+                        req.schoolType?.let { v -> it[schoolType] = v.ifBlank { null } }
+                        req.affiliationNumber?.let { v -> it[affiliationNumber] = v.ifBlank { null } }
+                        req.yearEstablished?.let { v -> it[yearEstablished] = v }
+                        req.website?.let { v -> it[website] = v.ifBlank { null } }
+                        req.totalStudents?.let { v -> it[totalStudents] = v }
+                        req.totalClasses?.let { v -> it[totalClasses] = v }
+                        req.academicYearStartMonth?.let { v -> it[academicYearStartMonth] = v.ifBlank { null } }
+                        req.gradingSystem?.let { v -> it[gradingSystem] = v.ifBlank { null } }
                         it[updatedAt] = Instant.now()
                     }
 

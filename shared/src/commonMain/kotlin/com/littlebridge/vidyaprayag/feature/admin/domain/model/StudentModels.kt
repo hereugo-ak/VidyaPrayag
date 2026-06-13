@@ -40,6 +40,33 @@ data class CreateStudentRequest(
     @SerialName("student_code") val studentCode: String? = null
 )
 
+/**
+ * Bulk import request. Send EITHER a parsed [students] list (manual multi-add)
+ * OR raw [csv] text (file upload / paste). Mirrors server
+ * feature.school.SchoolStudentsRouting.BulkImportStudentsRequest.
+ */
+@Serializable
+data class BulkImportStudentsRequest(
+    val students: List<CreateStudentRequest>? = null,
+    val csv: String? = null
+)
+
+@Serializable
+data class BulkImportRowResult(
+    val row: Int,
+    val success: Boolean,
+    @SerialName("student_code") val studentCode: String? = null,
+    val error: String? = null
+)
+
+@Serializable
+data class BulkImportStudentsResponse(
+    val total: Int,
+    val inserted: Int,
+    val failed: Int,
+    val results: List<BulkImportRowResult> = emptyList()
+)
+
 @Serializable
 data class AttendanceDayDto(val date: String, val status: String)
 

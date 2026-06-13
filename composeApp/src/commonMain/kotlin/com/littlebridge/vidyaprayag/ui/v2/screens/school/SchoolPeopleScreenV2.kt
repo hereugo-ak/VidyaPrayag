@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -104,6 +105,9 @@ fun SchoolPeopleScreenV2(
         studentsState = studentsState,
         onStudentsRetry = studentsViewModel::load,
         onStudentSearch = { studentsViewModel.load() }, // students VM reloads full list; client-side filter below
+        onAddStudent = studentsViewModel::addStudent,
+        onImportStudentsCsv = studentsViewModel::importStudentsCsv,
+        onClearStudentMessages = studentsViewModel::clearMessages,
         staffState = staffState,
         onStaffRetry = staffViewModel::load,
         onStaffSearch = staffViewModel::onQueryChange,
@@ -126,6 +130,9 @@ private fun SchoolPeopleContent(
     studentsState: StudentRosterState,
     onStudentsRetry: () -> Unit,
     onStudentSearch: (String) -> Unit,
+    onAddStudent: (name: String, className: String, section: String, rollNumber: String) -> Unit,
+    onImportStudentsCsv: (String) -> Unit,
+    onClearStudentMessages: () -> Unit,
     staffState: StaffRosterState,
     onStaffRetry: () -> Unit,
     onStaffSearch: (String) -> Unit,
@@ -141,6 +148,18 @@ private fun SchoolPeopleContent(
     var subTab by remember { mutableStateOf("Teachers") }
     var showAddTeacher by remember { mutableStateOf(false) }
     var showAddStaff by remember { mutableStateOf(false) }
+    var showAddStudent by remember { mutableStateOf(false) }
+    var showImportStudents by remember { mutableStateOf(false) }
+
+    // Auto-close the student dialogs once the VM confirms success.
+    LaunchedEffect(studentsState.infoMessage) {
+        val msg = studentsState.infoMessage
+        if (msg != null && (msg == "Student added" || msg.startsWith("Imported"))) {
+            showAddStudent = false
+            showImportStudents = false
+            onClearStudentMessages()
+        }
+    }
 
     Column(
         modifier
@@ -187,6 +206,8 @@ private fun SchoolPeopleContent(
                     state = studentsState,
                     onRetry = onStudentsRetry,
                     onOpenStudent = onOpenStudent,
+                    onAddClick = { showAddStudent = true },
+                    onImportClick = { showImportStudents = true },
                     analyticsState = analyticsState,
                     onAnalyticsRetry = onAnalyticsRetry,
                 )
@@ -221,6 +242,26 @@ private fun SchoolPeopleContent(
                 onAddStaff(name, role, dept, phone, email)
                 showAddStaff = false
             },
+        )
+    }
+
+    // ── Add-student dialog (manual single add) ─────────────────────────────
+    if (showAddStudent) {
+        AddStudentPeopleDialog(
+            isSubmitting = studentsState.isSaving,
+            error = studentsState.addError,
+            onDismiss = { showAddStudent = false; onClearStudentMessages() },
+            onSubmit = { name, cls, sec, roll -> onAddStudent(name, cls, sec, roll) },
+        )
+    }
+
+    // ── Import-students dialog (CSV / paste) ───────────────────────────────
+    if (showImportStudents) {
+        ImportStudentsDialog(
+            isSubmitting = studentsState.isImporting,
+            error = studentsState.importError,
+            onDismiss = { showImportStudents = false; onClearStudentMessages() },
+            onSubmit = { csv -> onImportStudentsCsv(csv) },
         )
     }
 }
@@ -301,13 +342,39 @@ private fun StudentsSubTab(
     state: StudentRosterState,
     onRetry: () -> Unit,
     onOpenStudent: (String) -> Unit,
+    onAddClick: () -> Unit,
+    onImportClick: () -> Unit,
     analyticsState: StudentAnalyticsState,
     onAnalyticsRetry: () -> Unit,
 ) {
     val c = VTheme.colors
     var query by remember { mutableStateOf("") }
 
-    Text("Students", style = VTheme.type.h3.colored(c.ink))
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text("Students", style = VTheme.type.h3.colored(c.ink))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            VButton(
+                text = "Import CSV",
+                onClick = onImportClick,
+                variant = VButtonVariant.Ghost,
+                size = VButtonSize.Sm,
+                leading = { Icon(VIcons.Upload, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                enabled = !state.isImporting && !state.isSaving,
+            )
+            VButton(
+                text = "Add student",
+                onClick = onAddClick,
+                variant = VButtonVariant.Secondary,
+                size = VButtonSize.Sm,
+                leading = { Icon(VIcons.Plus, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                enabled = !state.isSaving && !state.isImporting,
+            )
+        }
+    }
     VInput(
         value = query,
         onValueChange = { query = it },
@@ -680,6 +747,117 @@ private fun AddStaffDialog(
                 VButton(
                     text = "Add staff",
                     onClick = { onSubmit(name, role, department, phone, email) },
+                    variant = VButtonVariant.Primary,
+                    full = true,
+                    enabled = canSubmit,
+                    loading = isSubmitting,
+                )
+                VButton(
+                    text = "Cancel",
+                    onClick = onDismiss,
+                    variant = VButtonVariant.Ghost,
+                    full = true,
+                    enabled = !isSubmitting,
+                )
+            }
+        }
+    }
+}
+
+// ───────────────────────── Student add / import dialogs ─────────────────────
+
+/** Manual single-student add from the People → Students sub-tab. */
+@Composable
+private fun AddStudentPeopleDialog(
+    isSubmitting: Boolean,
+    error: String?,
+    onDismiss: () -> Unit,
+    onSubmit: (name: String, className: String, section: String, rollNumber: String) -> Unit,
+) {
+    val c = VTheme.colors
+    var name by remember { mutableStateOf("") }
+    var className by remember { mutableStateOf("") }
+    var section by remember { mutableStateOf("") }
+    var roll by remember { mutableStateOf("") }
+
+    val canSubmit = name.isNotBlank() && className.isNotBlank() && roll.isNotBlank() && !isSubmitting
+
+    Dialog(onDismissRequest = onDismiss) {
+        VCard(modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Add student", style = VTheme.type.h3.colored(c.ink))
+                VInput(name, { name = it }, label = "Full name", placeholder = "e.g. Aarav Sharma", leadingIcon = VIcons.User)
+                VInput(className, { className = it }, label = "Class", placeholder = "e.g. Grade 4")
+                VInput(section, { section = it }, label = "Section", placeholder = "A")
+                VInput(roll, { roll = it }, label = "Roll number", placeholder = "e.g. 12", keyboardType = KeyboardType.Number)
+                if (error != null) {
+                    Text(error, style = VTheme.type.body.colored(c.dangerInk))
+                }
+                Spacer(Modifier.height(2.dp))
+                VButton(
+                    text = "Add student",
+                    onClick = { onSubmit(name, className, section, roll) },
+                    variant = VButtonVariant.Primary,
+                    full = true,
+                    enabled = canSubmit,
+                    loading = isSubmitting,
+                )
+                VButton(
+                    text = "Cancel",
+                    onClick = onDismiss,
+                    variant = VButtonVariant.Ghost,
+                    full = true,
+                    enabled = !isSubmitting,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Bulk CSV import. The admin pastes (or, on platforms with a file picker,
+ * loads) CSV rows. The first line must be a header; accepted columns:
+ *   full_name, class_name, roll_number, section, student_code
+ * `section` and `student_code` are optional. Sent verbatim to
+ * POST /api/v1/school/students/import, which parses + validates each row.
+ */
+@Composable
+private fun ImportStudentsDialog(
+    isSubmitting: Boolean,
+    error: String?,
+    onDismiss: () -> Unit,
+    onSubmit: (csv: String) -> Unit,
+) {
+    val c = VTheme.colors
+    var csv by remember {
+        mutableStateOf("full_name,class_name,section,roll_number\n")
+    }
+    val canSubmit = csv.lineSequence().drop(1).any { it.isNotBlank() } && !isSubmitting
+
+    Dialog(onDismissRequest = onDismiss) {
+        VCard(modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Import students (CSV)", style = VTheme.type.h3.colored(c.ink))
+                Text(
+                    "First row must be the header. Columns: full_name, class_name, " +
+                        "roll_number (required); section, student_code (optional).",
+                    style = VTheme.type.caption.colored(c.ink2),
+                )
+                VInput(
+                    value = csv,
+                    onValueChange = { csv = it },
+                    label = "CSV content",
+                    placeholder = "full_name,class_name,section,roll_number\nAarav Sharma,Grade 4,A,12",
+                    singleLine = false,
+                    modifier = Modifier.fillMaxWidth().height(180.dp),
+                )
+                if (error != null) {
+                    Text(error, style = VTheme.type.body.colored(c.dangerInk))
+                }
+                Spacer(Modifier.height(2.dp))
+                VButton(
+                    text = "Import",
+                    onClick = { onSubmit(csv) },
                     variant = VButtonVariant.Primary,
                     full = true,
                     enabled = canSubmit,
