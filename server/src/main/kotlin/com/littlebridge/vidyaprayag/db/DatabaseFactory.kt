@@ -82,7 +82,29 @@ object DatabaseFactory {
 
     private fun resolve(dotenv: io.github.cdimascio.dotenv.Dotenv, key: String): String? =
         (dotenv[key] ?: System.getenv(key) ?: localProps.getProperty(key))
+            ?.let(::sanitizeConfigValue)
             ?.takeIf { it.isNotBlank() }
+
+    /**
+     * Java .properties / some .env editors keep the surrounding quotes as part of
+     * the value (e.g. DATABASE_URL="jdbc:postgresql://..."). If we feed that raw
+     * value with quotes into the JDBC URL builder, it no longer starts with
+     * "jdbc:" / "postgresql://", falls into the else-branch, and we end up with a
+     * doubled, broken URL like:
+     *     jdbc:postgresql://"jdbc:postgresql://host:5432/db?..."
+     * Strip leading/trailing whitespace and a single pair of matching quotes so
+     * the value is always clean regardless of how the dev wrote it.
+     */
+    private fun sanitizeConfigValue(raw: String): String {
+        var v = raw.trim()
+        if (v.length >= 2 &&
+            ((v.startsWith("\"") && v.endsWith("\"")) ||
+                (v.startsWith("'") && v.endsWith("'")))
+        ) {
+            v = v.substring(1, v.length - 1).trim()
+        }
+        return v
+    }
 
     /** All tables the backend reads/writes. Order matters for SQLite FKs. */
     private val allTables = arrayOf(
@@ -290,16 +312,22 @@ object DatabaseFactory {
         password: String?,
         poolSize: Int
     ): HikariDataSource {
+        // Defensively strip any surrounding quotes/whitespace that may have slipped
+        // through (e.g. a value read straight from a .properties file). Without this
+        // a quoted value would not match the prefixes below and we'd double-prefix it
+        // into jdbc:postgresql://"jdbc:postgresql://..." (the classic broken URL).
+        val cleanUrl = sanitizeConfigValue(databaseUrl)
+
         // Accept both forms:
         //   postgresql://USER:PASS@HOST:5432/DB?sslmode=require
         //   jdbc:postgresql://HOST:5432/DB?sslmode=require
         //   postgres://USER:PASS@HOST:5432/DB
         val jdbcUrl = when {
-            databaseUrl.startsWith("jdbc:") -> databaseUrl
-            databaseUrl.startsWith("postgres://") ->
-                "jdbc:" + databaseUrl.replaceFirst("postgres://", "postgresql://")
-            databaseUrl.startsWith("postgresql://") -> "jdbc:$databaseUrl"
-            else -> "jdbc:postgresql://$databaseUrl"
+            cleanUrl.startsWith("jdbc:") -> cleanUrl
+            cleanUrl.startsWith("postgres://") ->
+                "jdbc:" + cleanUrl.replaceFirst("postgres://", "postgresql://")
+            cleanUrl.startsWith("postgresql://") -> "jdbc:$cleanUrl"
+            else -> "jdbc:postgresql://$cleanUrl"
         }
 
         // Auto-append SSL mode and PgBouncer threshold if missing
