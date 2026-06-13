@@ -32,6 +32,7 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
+import com.littlebridge.vidyaprayag.ui.v2.components.VDatePicker
 import com.littlebridge.vidyaprayag.ui.v2.components.VInput
 import com.littlebridge.vidyaprayag.ui.v2.components.VTag
 import com.littlebridge.vidyaprayag.ui.v2.screens.VSectionHeader
@@ -119,19 +120,19 @@ private fun ParentLeaveContent(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Box(Modifier.weight(1f)) {
-                        VInput(
+                        VDatePicker(
                             value = dateFrom,
                             onValueChange = { dateFrom = it },
                             label = "From",
-                            placeholder = "YYYY-MM-DD",
+                            placeholder = "Start date",
                         )
                     }
                     Box(Modifier.weight(1f)) {
-                        VInput(
+                        VDatePicker(
                             value = dateTo,
                             onValueChange = { dateTo = it },
                             label = "To",
-                            placeholder = "YYYY-MM-DD",
+                            placeholder = "End date",
                         )
                     }
                 }

@@ -38,6 +38,7 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
+import com.littlebridge.vidyaprayag.ui.v2.components.VDatePicker
 import com.littlebridge.vidyaprayag.ui.v2.components.VInput
 import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
 import com.littlebridge.vidyaprayag.ui.v2.screens.VSectionHeader
@@ -121,7 +122,7 @@ private fun SchedulePtmContent(
                     Spacer(Modifier.height(12.dp))
                     VInput(value = title, onValueChange = { title = it }, label = "Title", placeholder = "e.g. Term 1 PTM")
                     Spacer(Modifier.height(8.dp))
-                    VInput(value = date, onValueChange = { date = it }, label = "Date", placeholder = "YYYY-MM-DD")
+                    VDatePicker(value = date, onValueChange = { date = it }, label = "Date", placeholder = "Select PTM date")
                     Spacer(Modifier.height(8.dp))
                     VInput(value = slot, onValueChange = { slot = it }, label = "Slot", placeholder = "10:00 AM - 1:00 PM")
                     val info = state.infoMessage
