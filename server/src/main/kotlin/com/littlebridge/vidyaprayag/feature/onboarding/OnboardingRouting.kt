@@ -418,7 +418,7 @@ private fun persistAcademicStructure(schoolId: UUID, payload: JsonObject) {
  * step that is not yet done (BRANDING is best-effort and never blocks). Must be
  * called inside a dbQuery {} via [DatabaseFactory.dbQuery] by the caller.
  */
-private suspend fun computeOnboardingStatus(uid: UUID): OnboardingStatusResponse = dbQuery {
+private suspend fun computeOnboardingStatusResponse(uid: UUID): OnboardingStatusResponse = dbQuery {
     val sid = AppUsersTable.selectAll().where { AppUsersTable.id eq uid }
         .singleOrNull()?.get(AppUsersTable.schoolId)
     val schoolRow = sid?.let {
@@ -742,7 +742,7 @@ fun Route.onboardingRouting() {
                 val uid = call.principalUserId()?.let { UUID.fromString(it) } ?: run {
                     call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
                 }
-                call.ok(computeOnboardingStatus(uid), message = "Onboarding status fetched")
+                call.ok(computeOnboardingStatusResponse(uid), message = "Onboarding status fetched")
             }
 
             // -------- POST /complete --------

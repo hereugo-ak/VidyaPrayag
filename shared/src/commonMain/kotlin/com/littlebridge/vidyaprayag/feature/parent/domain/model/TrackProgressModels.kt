@@ -25,9 +25,9 @@ data class TrackProgressData(
 @Serializable
 data class AchievementBadgeData(
     val title: String,
-    @SerialName("icon_name") val iconName: String,
-    @SerialName("is_locked") val isLocked: Boolean,
-    @SerialName("gradient_colors") val gradientColors: List<Long>
+    @SerialName("icon_name") val iconName: String="",
+    @SerialName("is_locked") val isLocked: Boolean=false,
+    @SerialName("gradient_colors") val gradientColors: List<Long> = emptyList()
 )
 
 @Serializable

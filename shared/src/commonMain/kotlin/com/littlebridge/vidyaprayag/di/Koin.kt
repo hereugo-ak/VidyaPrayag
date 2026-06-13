@@ -35,21 +35,14 @@ import com.littlebridge.vidyaprayag.feature.admin.presentation.SyllabusCoverageV
 import com.littlebridge.vidyaprayag.feature.admin.presentation.ResultsViewModel
 import com.littlebridge.vidyaprayag.util.AppConfig
 import com.littlebridge.vidyaprayag.util.AppLogger
+import com.littlebridge.vidyaprayag.core.network.buildRefreshClient
+import com.littlebridge.vidyaprayag.core.network.clearBearerCache
+import com.littlebridge.vidyaprayag.core.network.installTokenAuth
 import io.ktor.client.*
-import io.ktor.client.engine.*
 import io.ktor.client.plugins.*
-import io.ktor.client.plugins.auth.*
-import io.ktor.client.plugins.auth.providers.*
 import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.contentOrNull
 import org.koin.core.context.startKoin
 import org.koin.core.module.Module
 import org.koin.dsl.KoinAppDeclaration
@@ -61,11 +54,14 @@ val commonModule = module {
         val prefs: PreferenceRepository = get()
         // Plain client (NO Auth plugin) used solely to perform the refresh-token
         // exchange, so the bearer refresh path never recurses through itself.
-        val refreshClient = HttpClient(get()) {
-            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
-        }
+        val refreshClient = buildRefreshClient(get())
 
-        HttpClient(get()) {
+        // Forward reference to the authenticated client so the refresh-failure
+        // logout path can evict its in-memory bearer-token cache. Assigned right
+        // after the client is built, before any request can run.
+        lateinit var authedClient: HttpClient
+
+        authedClient = HttpClient(get()) {
             install(ContentNegotiation) {
                 json(Json { ignoreUnknownKeys = true })
             }
@@ -82,45 +78,25 @@ val commonModule = module {
 
             // Auth: attach the stored access token to every request and, on a
             // 401, automatically exchange the persisted refresh token for a new
-            // access token (audit §3.4, finding F). Previously the client had
-            // no Auth/401 handling so an expired token surfaced as a generic
-            // error and the server's /refresh route was dead code.
-            install(Auth) {
-                bearer {
-                    loadTokens {
-                        val access = prefs.getUserToken().first()
-                        val refresh = prefs.getRefreshToken().first()
-                        if (access != null) BearerTokens(access, refresh ?: "") else null
-                    }
-                    refreshTokens {
-                        val refresh = prefs.getRefreshToken().first()
-                            ?: return@refreshTokens null
-                        val resp = runCatching {
-                            refreshClient.post(AppConfig.authBaseUrl.trimEnd('/') + "/api/v1/auth/refresh") {
-                                contentType(ContentType.Application.Json)
-                                setBody(mapOf("refresh_token" to refresh))
-                            }
-                        }.getOrNull() ?: return@refreshTokens null
-                        if (!resp.status.isSuccess()) return@refreshTokens null
-                        // Parse { success, message, data: { token, refresh_token, ... } }
-                        val bodyText = runCatching { resp.bodyAsText() }.getOrNull()
-                            ?: return@refreshTokens null
-                        val data = runCatching {
-                            Json { ignoreUnknownKeys = true }
-                                .parseToJsonElement(bodyText)
-                                .jsonObject["data"]?.jsonObject
-                        }.getOrNull() ?: return@refreshTokens null
-                        val newAccess = data["token"]?.jsonPrimitive?.contentOrNull
-                            ?: return@refreshTokens null
-                        val newRefresh = data["refresh_token"]?.jsonPrimitive?.contentOrNull
-                            ?: refresh
-                        prefs.setUserToken(newAccess)
-                        prefs.setRefreshToken(newRefresh)
-                        BearerTokens(newAccess, newRefresh)
-                    }
-                }
-            }
+            // access token (audit §3.4, finding F). On refresh failure the user
+            // is logged out cleanly. Implemented in TokenAuthenticator.kt — this
+            // call is the only wiring needed; every API call through this client
+            // gets transparent 401 refresh + retry.
+            installTokenAuth(
+                prefs = prefs,
+                refreshClient = refreshClient,
+                onRefreshFailed = {
+                    // Reuse the existing logout primitives: clear the persisted
+                    // session FIRST so loadTokens() reads null on the next request,
+                    // then evict the Auth plugin's cached bearer token. The
+                    // reactive authState (App.kt observes getUserToken()) sees the
+                    // null token and navigates back to landing.
+                    prefs.clearSession()
+                    authedClient.clearBearerCache()
+                },
+            )
         }
+        authedClient
     }
     // RA-S01: session-manager wraps the singleton HttpClient so logout can evict
     // the Ktor Auth plugin's in-memory bearer-token cache (clearToken()).
