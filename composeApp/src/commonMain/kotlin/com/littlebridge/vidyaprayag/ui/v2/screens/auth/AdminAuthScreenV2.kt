@@ -1,17 +1,24 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.auth
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -20,8 +27,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.feature.auth.presentation.AuthStep
 import com.littlebridge.vidyaprayag.feature.auth.presentation.AuthViewModel
@@ -89,37 +98,6 @@ fun AdminAuthScreenV2(
                     leadingIcon = VIcons.Mail,
                     keyboardType = KeyboardType.Email,
                     modifier = Modifier.fillMaxWidth(),
-                )
-
-                // ── Always-visible self-onboarding entry point ──────────────────
-                // A brand-new school never has to type a throwaway email to
-                // *discover* onboarding — the call-to-action lives right here on
-                // the first step. Tapping it jumps straight to the registration
-                // form via the dedicated /auth/register-school path (RA-53 safe).
-                Spacer(Modifier.height(18.dp))
-                VDivider()
-                Spacer(Modifier.height(14.dp))
-                Text(
-                    "Haven't registered your school yet?",
-                    style = VTheme.type.bodyStrong.colored(c.ink),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Set it up in a few quick steps — create your administrator " +
-                        "account and bring your school onto VidyaPrayag.",
-                    style = VTheme.type.caption.colored(c.ink3),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(12.dp))
-                VButton(
-                    text = "Onboard with us now",
-                    onClick = viewModel::startRegisterSchoolDirect,
-                    full = true,
-                    size = VButtonSize.Lg,
-                    variant = VButtonVariant.Secondary,
-                    tone = VButtonTone.Teal,
-                    leading = { Icon(VIcons.School, contentDescription = null, modifier = Modifier.size(16.dp)) },
                 )
             }
             AuthStep.LoginPassword -> {
@@ -319,6 +297,101 @@ fun AdminAuthScreenV2(
                     Spacer(Modifier.height(8.dp))
                     AuthBackLink(onClick = viewModel::goBack, modifier = Modifier.align(Alignment.CenterHorizontally))
                 }
+            }
+        }
+
+        if (state.step is AuthStep.Identifier) {
+            SchoolRegistrationPrompt(
+                onRegisterSchool = viewModel::startRegisterSchoolDirect
+            )
+
+        }
+    }
+}
+
+
+
+@Composable
+fun SchoolRegistrationPrompt(
+    onRegisterSchool: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+
+        Spacer(Modifier.height(18.dp))
+
+        VDivider()
+
+        Spacer(Modifier.height(16.dp))
+
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(c.card)
+                .border(
+                    width = 1.dp,
+                    color = c.ink3.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(c.teal.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = VIcons.School,
+                    contentDescription = null,
+                    tint = c.tealDeep,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+
+            Spacer(Modifier.height(10.dp))
+
+
+            Text(
+                text = "Are you setting up a school?",
+                style = VTheme.type.bodyStrong.colored(c.ink),
+                textAlign = TextAlign.Center
+            )
+
+
+            Spacer(Modifier.height(5.dp))
+
+
+            Text(
+                text = "Create your administrator account and bring your school onto VidyaPrayag.",
+                style = VTheme.type.caption.colored(c.ink3),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+
+            Spacer(Modifier.height(12.dp))
+
+
+            TextButton(
+                onClick = onRegisterSchool
+            ) {
+                Text(
+                    text = "Register my school →",
+                    style = VTheme.type.bodyStrong.colored(c.tealDeep)
+                )
             }
         }
     }

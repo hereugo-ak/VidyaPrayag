@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -70,7 +73,9 @@ fun SchedulePtmScreenV2(
     viewModel: SchedulePTMViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
-    Column(modifier.fillMaxSize()) {
+    Column(modifier.fillMaxSize().statusBarsPadding()
+        .imePadding()
+        .navigationBarsPadding()) {
         VBackHeader(title = "Schedule PTM", onBack = onBack)
         SchedulePtmContent(
             state = state,

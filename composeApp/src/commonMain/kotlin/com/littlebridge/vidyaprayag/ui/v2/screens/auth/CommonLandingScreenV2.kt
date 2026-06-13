@@ -1,6 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.auth
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -59,6 +60,11 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.scaleIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.collectAsState
 import com.littlebridge.vidyaprayag.ui.v2.components.ShimmerBox
 import com.littlebridge.vidyaprayag.ui.v2.components.VBrandLogo
@@ -70,9 +76,11 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.theme.VPortalTone
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
 import vidyaprayag.composeapp.generated.resources.Res
 import vidyaprayag.composeapp.generated.resources.landing_school_1
 import vidyaprayag.composeapp.generated.resources.landing_school_2
@@ -153,11 +161,11 @@ fun CommonLandingScreenV2(
                     Modifier
                         .fillMaxWidth()
                         .background(c.teal)
-                        .statusBarsPadding()
-                        .padding(top = 28.dp, bottom = 28.dp),
+                        .statusBarsPadding(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Row(
+                    AnimatedBrandHeader()
+                    /*Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.graphicsLayer {
@@ -167,11 +175,11 @@ fun CommonLandingScreenV2(
                     ) {
                         VBrandLogo(size = 44.dp, cornerRadius = 13.dp)
                         Text(
-                            "VidyaSetu",
+                            "EnRoll+",
                             style = VTheme.type.h2.colored(Color.White)
                                 .copy(fontWeight = FontWeight.ExtraBold),
                         )
-                    }
+                    }*/
                 }
 
                 // 2 ── Hero headline + sub ──────────────────────────────────────────────────
@@ -190,7 +198,9 @@ fun CommonLandingScreenV2(
                             )
                             Spacer(Modifier.height(12.dp))
                             Text(
-                                if (t == 0)
+                                minLines = 3,
+                                maxLines = 3,
+                                text = if (t == 0)
                                     "Attendance, admissions, results, fees and parent messaging — one platform your staff actually want to use."
                                 else
                                     "Attendance, marks, fees and messages from the school — clear, instant, and always up to date.",
@@ -373,7 +383,7 @@ private fun TabSwitcher(
             ),
             label = "tab-pill",
         )
-
+        val safeOffset = pillOffset.coerceAtLeast(0.dp)
         Box(
             Modifier
                 .fillMaxWidth()
@@ -382,7 +392,7 @@ private fun TabSwitcher(
             // Indicator pill — the single use of the primary colour in this control.
             Box(
                 Modifier
-                    .padding(start = pillOffset)
+                    .padding(start = safeOffset)
                     .width(trackWidth / 2f)
                     .height(40.dp)
                     .clip(RoundedCornerShape(999.dp))
@@ -579,7 +589,10 @@ private fun CtaDock(
             transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) },
             label = "cta-swap",
         ) { t ->
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 if (t == 0) {
                     VButton(
                         text = "Get Started — Schools",
@@ -589,8 +602,15 @@ private fun CtaDock(
                         soft = false,
                         size = VButtonSize.Lg,
                         full = true,
+                        modifier = Modifier.weight(0.7f)
                     )
-                    OutlinedCta(text = "For Parents", onClick = onParent)
+
+                    OutlinedCta(
+                        text = "For Parents",
+                        onClick = onParent,
+                        modifier = Modifier.weight(0.3f)
+                    )
+
                 } else {
                     VButton(
                         text = "Get Started — Parents",
@@ -600,8 +620,14 @@ private fun CtaDock(
                         soft = false,
                         size = VButtonSize.Lg,
                         full = true,
+                        modifier = Modifier.weight(0.7f)
                     )
-                    OutlinedCta(text = "For Schools", onClick = onAdmin)
+
+                    OutlinedCta(
+                        text = "For Schools",
+                        onClick = onAdmin,
+                        modifier = Modifier.weight(0.3f)
+                    )
                 }
             }
         }
@@ -644,21 +670,35 @@ private fun CtaDock(
  * path reads as the same teal family as the primary, just unfilled — the two-choice contract.
  */
 @Composable
-private fun OutlinedCta(text: String, onClick: () -> Unit) {
+private fun OutlinedCta(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val c = VTheme.colors
     val interaction = remember { MutableInteractionSource() }
+
     Box(
-        Modifier
+        modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .border(BorderStroke(1.5.dp, c.tealDeep), RoundedCornerShape(12.dp))
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .border(
+                BorderStroke(1.5.dp, c.tealDeep),
+                RoundedCornerShape(12.dp)
+            )
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = onClick
+            )
             .padding(vertical = 14.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text,
-            style = VTheme.type.h4.colored(c.tealDeep).copy(fontWeight = FontWeight.SemiBold),
+            style = VTheme.type.h4
+                .colored(c.tealDeep)
+                .copy(fontWeight = FontWeight.SemiBold),
         )
     }
 }
@@ -683,3 +723,121 @@ private fun tabSlide(target: Int, previous: Int): ContentTransform =
         (slideInHorizontally(tween(280, easing = EaseOutCubic)) { -it / 6 } + fadeIn(tween(280))) togetherWith
             (slideOutHorizontally(tween(280, easing = EaseOutCubic)) { it / 6 } + fadeOut(tween(280)))
     }
+
+
+@Composable
+fun AnimatedBrandHeader(
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+
+    var expandLogo by remember { mutableStateOf(false) }
+    var showText by remember { mutableStateOf(false) }
+
+
+    val logoScale by animateFloatAsState(
+        targetValue = if (expandLogo) 1.5f else 1f,
+        animationSpec = tween(
+            durationMillis = 900,
+            easing = FastOutSlowInEasing
+        ),
+        label = "logo-scale"
+    )
+
+
+    val logoTranslationX by animateDpAsState(
+        targetValue = if (showText) (-5).dp else 0.dp,
+        animationSpec = tween(
+            durationMillis = 650,
+            easing = FastOutSlowInEasing
+        ),
+        label = "logo-slide"
+    )
+
+
+    LaunchedEffect(Unit) {
+        // Logo expansion
+        expandLogo = true
+
+        // Wait for logo settle
+        delay(1100)
+
+        // Reveal text + move logo
+        showText = true
+    }
+
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(c.teal)
+            .statusBarsPadding()
+            .padding(
+                top = 28.dp,
+                bottom = 28.dp
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+
+
+            // Fixed size container prevents clipping
+            Box(
+                modifier = Modifier
+                    .size(75.dp)
+                    .graphicsLayer {
+                        scaleX = logoScale
+                        scaleY = logoScale
+                        translationX = logoTranslationX.toPx()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+
+                VBrandLogo(
+                    size = 50.dp,
+                    cornerRadius = 13.dp
+                )
+            }
+
+
+
+            AnimatedVisibility(
+                visible = showText,
+
+                enter =
+                    fadeIn(
+                        animationSpec = tween(
+                            durationMillis = 700
+                        )
+                    )
+                            +
+                            slideInHorizontally(
+                                initialOffsetX = {
+                                    it / 2
+                                },
+                                animationSpec = tween(
+                                    durationMillis = 700,
+                                    easing = FastOutSlowInEasing
+                                )
+                            ),
+
+                exit = fadeOut()
+            ) {
+
+                Text(
+                    text = "EnRoll+",
+                    style = VTheme.type.h1
+                        .colored(Color.White)
+                        .copy(
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                )
+            }
+        }
+    }
+}

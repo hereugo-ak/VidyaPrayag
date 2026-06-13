@@ -9,7 +9,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -63,7 +66,9 @@ fun AdmissionsCrmScreenV2(
     val isLoading by viewModel.isLoading.collectAsStateV2()
     val errorMessage by viewModel.errorMessage.collectAsStateV2()
 
-    Column(modifier.fillMaxSize()) {
+    Column(modifier.fillMaxSize().statusBarsPadding()
+        .imePadding()
+        .navigationBarsPadding()) {
         VBackHeader(title = "Admissions CRM", onBack = onBack)
         AdmissionsCrmContent(
             state = state,

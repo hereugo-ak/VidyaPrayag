@@ -90,7 +90,9 @@ fun NotificationsScreenV2(
         onMarkAll = viewModel::markAllRead,
         onMarkRead = viewModel::markRead,
         onRetry = viewModel::load,
-        modifier = modifier,
+        modifier = modifier.statusBarsPadding()
+            .imePadding()
+            .navigationBarsPadding(),
     )
 }
 

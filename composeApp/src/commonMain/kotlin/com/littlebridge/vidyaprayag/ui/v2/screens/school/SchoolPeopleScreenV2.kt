@@ -10,11 +10,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,8 +35,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.littlebridge.vidyaprayag.feature.admin.domain.model.StaffDto
-import com.littlebridge.vidyaprayag.feature.admin.domain.model.StudentDto
 import com.littlebridge.vidyaprayag.feature.admin.presentation.RiskStudent
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolTeachersState
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolTeachersViewModel
@@ -43,7 +44,6 @@ import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentAnalyticsS
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentAnalyticsViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentRosterState
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentRosterViewModel
-import com.littlebridge.vidyaprayag.feature.admin.presentation.TeacherRosterItem
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
@@ -90,12 +90,20 @@ fun SchoolPeopleScreenV2(
     teachersViewModel: SchoolTeachersViewModel = koinViewModel(),
     studentsViewModel: StudentRosterViewModel = koinViewModel(),
     staffViewModel: StaffViewModel = koinViewModel(),
+    teacherRefreshKey: Int,
+    studentRefreshKey: Int,
 ) {
     val analyticsState by viewModel.state.collectAsStateV2()
     val teachersState by teachersViewModel.state.collectAsStateV2()
     val studentsState by studentsViewModel.state.collectAsStateV2()
     val staffState by staffViewModel.state.collectAsStateV2()
 
+    LaunchedEffect(teacherRefreshKey){
+        teachersViewModel.load()
+    }
+    LaunchedEffect(studentRefreshKey){
+        studentsViewModel.load()
+    }
     SchoolPeopleContent(
         analyticsState = analyticsState,
         onAnalyticsRetry = viewModel::load,
@@ -165,6 +173,9 @@ private fun SchoolPeopleContent(
         modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            .statusBarsPadding()
+            .imePadding()
+            .navigationBarsPadding()
             .padding(top = 24.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {

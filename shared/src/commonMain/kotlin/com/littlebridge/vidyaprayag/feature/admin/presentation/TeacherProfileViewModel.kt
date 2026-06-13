@@ -82,8 +82,10 @@ class TeacherProfileViewModel(
             }
             _state.value = _state.value.copy(isRemoving = true, removeError = null)
             when (val r = teachersRepository.deleteTeacher(token, teacherId)) {
-                is NetworkResult.Success ->
+                is NetworkResult.Success -> {
                     _state.value = _state.value.copy(isRemoving = false, removed = true)
+                    //load()
+                }
                 is NetworkResult.Error -> {
                     AppLogger.e("TeacherProfileVM", "deleteTeacher error: ${r.message}")
                     _state.value = _state.value.copy(isRemoving = false, removeError = r.message)

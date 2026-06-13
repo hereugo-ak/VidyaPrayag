@@ -12,8 +12,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -94,7 +97,9 @@ fun DiscoveryScreenV2(
     val effectiveView = if (view == DiscoveryView.Profile && active == null) DiscoveryView.List else view
     when (effectiveView) {
         DiscoveryView.List -> DiscoveryList(
-            modifier = modifier,
+            modifier = modifier.statusBarsPadding()
+                .imePadding()
+                .navigationBarsPadding(),
             state = state,
             onQuery = viewModel::setQuery,
             onRetry = viewModel::load,
@@ -113,14 +118,18 @@ fun DiscoveryScreenV2(
             val s = active
             if (s != null) {
                 SchoolProfile(
-                    modifier = modifier,
+                    modifier = modifier.statusBarsPadding()
+                        .imePadding()
+                        .navigationBarsPadding(),
                     school = s,
                     onBack = { view = DiscoveryView.List },
                 )
             }
         }
         DiscoveryView.Compare -> SchoolCompare(
-            modifier = modifier,
+            modifier = modifier.statusBarsPadding()
+                .imePadding()
+                .navigationBarsPadding(),
             items = state.schools.filter { it.id in compare },
             onBack = { view = DiscoveryView.List },
         )

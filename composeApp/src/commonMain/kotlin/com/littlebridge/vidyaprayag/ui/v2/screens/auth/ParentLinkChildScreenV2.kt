@@ -85,7 +85,9 @@ fun ParentLinkChildScreenV2(
         onRollNumberChange = viewModel::onRollNumberChange,
         onSearch = viewModel::searchSchools,
         onLink = viewModel::linkChild,
-        modifier = modifier,
+        modifier = modifier.statusBarsPadding()
+            .imePadding()
+            .navigationBarsPadding(),
     )
 }
 

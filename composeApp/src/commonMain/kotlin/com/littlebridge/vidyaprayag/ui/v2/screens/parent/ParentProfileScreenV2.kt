@@ -71,7 +71,9 @@ fun ParentProfileScreenV2(
         onLinkChild = onLinkChild,
         onDiscoverSchools = onDiscoverSchools,
         onRetry = viewModel::load,
-        modifier = modifier,
+        modifier = modifier.statusBarsPadding()
+            .imePadding()
+            .navigationBarsPadding(),
     )
 }
 

@@ -8,7 +8,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -53,7 +56,10 @@ fun LinkRequestsScreenV2(
 ) {
     val state by viewModel.state.collectAsStateV2()
 
-    Column(modifier.fillMaxSize()) {
+    Column(modifier.fillMaxSize()
+        .statusBarsPadding()
+        .imePadding()
+        .navigationBarsPadding()) {
         VBackHeader(title = "Child Link Requests", onBack = onBack)
         LinkRequestsContent(
             state = state,
@@ -78,6 +84,9 @@ private fun LinkRequestsContent(
         modifier
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
+            .statusBarsPadding()
+            .imePadding()
+            .navigationBarsPadding()
             .padding(top = 16.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {

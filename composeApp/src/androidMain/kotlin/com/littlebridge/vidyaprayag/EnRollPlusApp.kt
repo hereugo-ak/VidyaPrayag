@@ -6,9 +6,9 @@ import com.littlebridge.vidyaprayag.di.initKoin
 import com.littlebridge.vidyaprayag.util.AppConfig
 import org.koin.android.ext.koin.androidContext
 
-class VidyaPrayagApp : Application() {
+class EnRollPlusApp : Application() {
     companion object {
-        lateinit var instance: VidyaPrayagApp
+        lateinit var instance: EnRollPlusApp
             private set
     }
 
@@ -24,7 +24,7 @@ class VidyaPrayagApp : Application() {
         )
 
         initKoin {
-            androidContext(this@VidyaPrayagApp)
+            androidContext(this@EnRollPlusApp)
         }
     }
 }

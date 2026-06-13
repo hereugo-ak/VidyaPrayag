@@ -1,6 +1,9 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.auth
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -32,7 +35,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -50,9 +55,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -939,32 +946,7 @@ private fun CompletionScreen(
 
         // Body
         Column(Modifier.fillMaxWidth().padding(d.lg), verticalArrangement = Arrangement.spacedBy(d.md)) {
-            // Honest confirmation card (no fabricated counts — those live on the
-            // dashboard once real students/teachers exist).
-            VCard(modifier = Modifier.fillMaxWidth()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFDCF2EF)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(VIcons.Check, contentDescription = null, tint = Color(0xFF006A60), modifier = Modifier.size(18.dp))
-                    }
-                    Spacer(Modifier.width(d.md))
-                    Column(Modifier.weight(1f)) {
-                        Text("Onboarding complete", style = VTheme.type.bodyStrong.colored(c.ink))
-                        Text(
-                            "Your school profile is set up. Add teachers, students and parents from your dashboard.",
-                            style = VTheme.type.caption.colored(c.ink3),
-                        )
-                    }
-                }
-            }
-
-            // ── Provisioned teacher logins (one-time passwords) ──────────────────
-            // Show the credentials we just created so the admin can hand them
-            // over. These are REAL accounts (POST /school/teachers); the teacher
-            // signs in via School Administration → email + password and is forced
-            // to reset it on first login. Shown ONCE — not stored in plaintext.
+            OnboardingCompletedCard()
             val created = provisionedTeachers.filter { it.created && !it.initialPassword.isNullOrBlank() }
             if (created.isNotEmpty()) {
                 Text("TEACHER LOGINS CREATED", style = VTheme.type.labelStrong.colored(c.ink3))
@@ -1009,7 +991,7 @@ private fun CompletionScreen(
                 }
             }
 
-            Text("NEXT STEPS", style = VTheme.type.labelStrong.colored(c.ink3))
+            /*Text("NEXT STEPS", style = VTheme.type.labelStrong.colored(c.ink3))
             listOf(
                 Triple(VIcons.User, "Add your teachers", "Provision staff accounts from Settings"),
                 Triple(VIcons.Upload, "Import your students", "Upload a roster CSV to create records"),
@@ -1031,7 +1013,7 @@ private fun CompletionScreen(
                         Icon(VIcons.ArrowRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(16.dp))
                     }
                 }
-            }
+            }*/
 
             Spacer(Modifier.height(d.xs))
             VButton(
@@ -1091,3 +1073,149 @@ private fun Modifier.dashedBorder(color: Color, strokeWidth: androidx.compose.ui
             style = Stroke(width = sw, pathEffect = dash),
         )
     }
+
+
+
+/*@Composable
+fun OnboardingCompleteCard(
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+    val d = VTheme.dimens
+
+    VCard(
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFDCF2EF)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = VIcons.Check,
+                    contentDescription = null,
+                    tint = Color(0xFF006A60),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+
+            Spacer(Modifier.width(d.md))
+
+
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+
+                Text(
+                    text = "Onboarding complete",
+                    style = VTheme.type.bodyStrong.colored(c.ink)
+                )
+
+
+                Spacer(Modifier.height(3.dp))
+
+
+                Text(
+                    text = "Your school profile is set up. Add teachers, students and parents from your dashboard.",
+                    style = VTheme.type.caption.colored(c.ink3)
+                )
+            }
+        }
+    }
+}*/
+
+@Preview
+@Composable
+fun OnboardingCompletedCard(
+    modifier: Modifier = Modifier,
+    onContinue: () -> Unit = {},
+) {
+    val c = VTheme.colors
+
+    var animateSuccess by remember { mutableStateOf(false) }
+
+    val scale by animateFloatAsState(
+        targetValue = if (animateSuccess) 1f else 0.5f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "success-scale"
+    )
+
+    val alpha by animateFloatAsState(
+        targetValue = if (animateSuccess) 1f else 0f,
+        animationSpec = tween(500),
+        label = "success-alpha"
+    )
+
+    LaunchedEffect(Unit) {
+        animateSuccess = true
+    }
+
+
+    VCard(
+        modifier = modifier
+            .fillMaxWidth()
+    ) {
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+
+
+            // Animated success badge
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .graphicsLayer {
+                        var scaleX = scale
+                        scaleY = scale
+                        this.alpha = alpha
+                    }
+                    .clip(CircleShape)
+                    .background(Color(0xFFDCF2EF)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = VIcons.Check,
+                    contentDescription = null,
+                    tint = Color(0xFF006A60),
+                    modifier = Modifier.size(36.dp)
+                )
+            }
+
+
+            Spacer(Modifier.height(16.dp))
+
+
+            Text(
+                text = "Your school is ready 🎉",
+                style = VTheme.type.h3
+                    .colored(c.ink)
+                    .copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Your profile setup is complete. You can now start building your digital campus by adding teachers, students and parents.",
+                style = VTheme.type.body
+                    .colored(c.ink3),
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}

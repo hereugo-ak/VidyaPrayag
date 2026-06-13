@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -77,7 +78,8 @@ fun SchoolPortalV2(
         // (GET /school/messages/threads), not a hardcoded literal.
         val messagesState by messagesViewModel.state.collectAsStateV2()
         val commsBadge = messagesState.threads.count { it.unreadCount > 0 }
-
+        var peopleRefreshKey by remember { mutableIntStateOf(0) }
+        var studentRefreshKey by remember { mutableIntStateOf(0) }
         // §11 cross-platform — Android predictive back / iOS edge-swipe pops
         // the full-screen Notifications/Calendar overlay back to the admin tabs
         // instead of leaving the portal. Mirrors the React `onBack` wiring.
@@ -158,7 +160,9 @@ fun SchoolPortalV2(
                 StudentProfileScreenV2(
                     studentId = id,
                     onBack = { overlay = SchoolOverlay.None },
-                    onRemoved = { overlay = SchoolOverlay.None },
+                    onRemoved = { overlay = SchoolOverlay.None
+                        studentRefreshKey++
+                                },
                     modifier = modifier,
                 )
                 return@VTheme
@@ -170,7 +174,8 @@ fun SchoolPortalV2(
                 TeacherProfileScreenV2(
                     teacherId = id,
                     onBack = { overlay = SchoolOverlay.None },
-                    onRemoved = { overlay = SchoolOverlay.None },
+                    onRemoved = { overlay = SchoolOverlay.None
+                        peopleRefreshKey++ },
                     modifier = modifier,
                 )
                 return@VTheme
@@ -219,6 +224,8 @@ fun SchoolPortalV2(
                         onExit = { tab = "settings" },
                     )
                     "people" -> SchoolPeopleScreenV2(
+                        teacherRefreshKey = peopleRefreshKey,
+                        studentRefreshKey = studentRefreshKey,
                         // RA-48 — open the parent→child link approval queue.
                         onOpenLinkRequests = { overlay = SchoolOverlay.LinkRequests },
                         // RA-S17 — People is now a 3-sub-tab roster; rows open the

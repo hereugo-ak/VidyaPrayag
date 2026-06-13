@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.feature.admin.presentation.InstitutionalProfileState
@@ -72,7 +73,9 @@ fun SchoolSettingsScreenV2(
         onOpenTeachers = onOpenTeachers,
         onOpenProfile = onOpenProfile,
         onRetry = viewModel::load,
-        modifier = modifier,
+        modifier = modifier.statusBarsPadding()
+            .imePadding()
+            .navigationBarsPadding(),
     )
 }
 
@@ -168,19 +171,18 @@ private fun SchoolSettingsContent(
             val rows = listOf(
                 // RA-47 — edit the live schools row (name, board, contact,
                 // principal, address) instead of leaving it read-only.
-                SettingRow(VIcons.School, "Edit institutional profile", "Name, board, contact, principal & address", onClick = onOpenProfile),
-                SettingRow(VIcons.Calendar, "Academic year", "Manage term dates & holidays (Coming Soon)"),
-                SettingRow(VIcons.BookOpen, "Classes & subjects", "Class & subject setup (Coming Soon)"),
-                // RA-24: teacher management is live (RA-22 roster on the People
-                // tab) — open it instead of showing a Coming-Soon label.
-                SettingRow(VIcons.Users, "Teacher management", "Add, view & remove teachers", onClick = onOpenTeachers),
-                SettingRow(VIcons.Wallet, "Fee structure", "Edit heads & amounts for next cycle (Coming Soon)"),
-                SettingRow(VIcons.Bell, "Notifications", "Channels & quiet hours (Coming Soon)"),
-                SettingRow(VIcons.Download, "Data export", "CSV / PDF / UDISE (Coming Soon)"),
+                SettingRow(VIcons.School, "Edit institutional profile", "Name, board, contact, principal & address",false, onClick = onOpenProfile),
+                SettingRow(VIcons.Calendar, "Academic year", "Manage term dates & holidays", true),
+                SettingRow(VIcons.BookOpen, "Classes & subjects", "Class & subject setup", true),
+                SettingRow(VIcons.Users, "Teacher management", "Add, view & remove teachers",false, onClick = onOpenTeachers),
+                SettingRow(VIcons.Wallet, "Fee structure", "Edit heads & amounts for next cycle ", true),
+                SettingRow(VIcons.Bell, "Notifications", "Channels & quiet hours", true),
+                SettingRow(VIcons.Download, "Data export", "CSV / PDF / UDISE", true),
                 SettingRow(
                     VIcons.Chat,
                     "Help & support",
                     "Email ${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}",
+                    false,
                     onClick = {
                         runCatching {
                             uriHandler.openUri(
@@ -190,11 +192,82 @@ private fun SchoolSettingsContent(
                         }
                     },
                 ),
-                SettingRow(VIcons.Settings, "Account", "Sign out of the admin console", onClick = { showLogoutConfirm = true }),
+                SettingRow(VIcons.Settings, "Logout", "Sign out of the admin console",false, onClick = { showLogoutConfirm = true }),
             )
             Spacer(Modifier.height(0.dp))
             rows.forEach { row ->
-                VCard(onClick = row.onClick) {
+                VCard(
+                    onClick = if (row.isComingSoon) null else row.onClick
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+
+                        Box(
+                            Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(c.ink.copy(alpha = 0.06f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                row.icon,
+                                contentDescription = null,
+                                tint = c.ink,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+
+                        Column(
+                            Modifier.weight(1f)
+                        ) {
+                            Text(
+                                row.title,
+                                style = VTheme.type.bodyStrong.colored(c.ink)
+                            )
+
+                            Text(
+                                row.sub,
+                                style = VTheme.type.caption
+                                    .colored(c.ink2)
+                                    .copy(fontSize = 11.sp)
+                            )
+                        }
+
+
+                        if (row.isComingSoon) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(c.teal.copy(alpha = 0.12f))
+                                    .padding(
+                                        horizontal = 10.dp,
+                                        vertical = 5.dp
+                                    )
+                            ) {
+                                Text(
+                                    text = "Coming soon",
+                                    style = VTheme.type.caption
+                                        .colored(c.tealDeep)
+                                        .copy(
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                )
+                            }
+                        } else {
+                            Icon(
+                                VIcons.ChevronRight,
+                                contentDescription = null,
+                                tint = c.ink.copy(alpha = 0.5f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+                /*VCard(onClick = row.onClick) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(c.ink.copy(alpha = 0.06f)), contentAlignment = Alignment.Center) {
                             Icon(row.icon, contentDescription = null, tint = c.ink, modifier = Modifier.size(18.dp))
@@ -205,7 +278,7 @@ private fun SchoolSettingsContent(
                         }
                         Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
                     }
-                }
+                }*/
             }
         }
     }
@@ -215,5 +288,6 @@ private data class SettingRow(
     val icon: ImageVector,
     val title: String,
     val sub: String,
+    val isComingSoon :Boolean,
     val onClick: (() -> Unit)? = null,
 )
