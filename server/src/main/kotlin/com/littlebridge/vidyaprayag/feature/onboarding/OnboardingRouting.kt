@@ -418,7 +418,6 @@ private fun persistAcademicStructure(schoolId: UUID, payload: JsonObject) {
  * step that is not yet done (BRANDING is best-effort and never blocks). Must be
  * called inside a dbQuery {} via [DatabaseFactory.dbQuery] by the caller.
  */
-/*
 private suspend fun computeOnboardingStatusResponse(uid: UUID): OnboardingStatusResponse = dbQuery {
     val sid = AppUsersTable.selectAll().where { AppUsersTable.id eq uid }
         .singleOrNull()?.get(AppUsersTable.schoolId)
@@ -472,7 +471,6 @@ private suspend fun computeOnboardingStatusResponse(uid: UUID): OnboardingStatus
         steps = steps
     )
 }
-*/
 
 // ---------- Routing ----------
 fun Route.onboardingRouting() {
