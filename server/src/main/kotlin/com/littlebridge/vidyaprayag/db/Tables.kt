@@ -211,6 +211,20 @@ object SchoolsTable : UUIDTable("schools", "id") {
     val totalClasses       = integer("total_classes").nullable()
     val academicYearStartMonth = text("academic_year_start_month").nullable()
     val gradingSystem      = text("grading_system").nullable()
+    // EXPLICIT per-wizard-step completion ledger (onboarding redirect fix).
+    //
+    // The bug: self-registration (`POST /auth/register-school`) pre-creates a
+    // fully-named `schools` row at signup. The old status logic inferred
+    // "BASIC step done" purely from "a named school row exists", so a BRAND-NEW
+    // school read as having already finished Step 1 — the wizard then resumed at
+    // ACADEMIC (frontend Step 3) and skipped the required earlier steps.
+    //
+    // We now record which wizard steps the admin ACTUALLY submitted, as a CSV of
+    // step tokens (BASIC,BRANDING,ACADEMIC,REVIEW). It is written ONLY by
+    // `POST /onboarding/submit` (and `/complete`), never by registration, so it
+    // cleanly distinguishes a registration placeholder from genuine step
+    // completion. NULL/empty for a freshly-registered school → resume at BASIC.
+    val onboardingStepsDone = text("onboarding_steps_done").nullable()
     val createdAt      = timestamp("created_at")
     val updatedAt      = timestamp("updated_at")
 }
