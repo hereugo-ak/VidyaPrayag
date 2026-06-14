@@ -104,6 +104,8 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
+import java.io.File
+import java.util.Properties
 
 /**
  * RA-36: max accepted Content-Length for non-multipart (JSON) requests, in bytes.
@@ -113,11 +115,31 @@ import kotlinx.serialization.json.Json
  */
 private const val MAX_JSON_BODY_BYTES = 1L * 1024 * 1024 // 1 MB
 
+private fun loadRootLocalProperties(): Properties {
+    val file = File("local.properties")
+
+    return Properties().apply {
+        if (file.exists()) {
+            file.inputStream().use { load(it) }
+        }
+    }
+}
+
 fun main() {
     DatabaseFactory.init()
-    val port = System.getenv("PORT")?.toIntOrNull() ?: SERVER_PORT
-    embeddedServer(Netty, port = port, host = "0.0.0.0", module = Application::module)
-        .start(wait = true)
+    val props = loadRootLocalProperties()
+
+    val host = props.getProperty("SERVER_HOST") ?: "0.0.0.0"
+    val port = props.getProperty("SERVER_PORT")
+        ?.toIntOrNull()
+        ?: SERVER_PORT
+
+    embeddedServer(
+        Netty,
+        port = port,
+        host = host,
+        module = Application::module
+    ).start(wait = true)
 }
 
 fun Application.module() {
