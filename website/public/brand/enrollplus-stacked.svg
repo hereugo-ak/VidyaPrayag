@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 116" fill="none" role="img" aria-label="Enroll+">
+  <!-- Enroll+ STACKED lockup — "Setu" bridge mark above "Enroll+" wordmark. Mark has no "+". -->
+  <defs>
+    <linearGradient id="ep-span-s" x1="48" y1="36" x2="80" y2="36" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#544AB8"/>
+      <stop offset="0.5" stop-color="#6C5CE0"/>
+      <stop offset="1" stop-color="#544AB8"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(32,0)">
+    <rect x="2" y="2" width="60" height="60" rx="18" fill="#E6E6FA"/>
+    <rect x="2.5" y="2.5" width="59" height="59" rx="17.5" stroke="#26234D" stroke-opacity="0.06"/>
+    <path d="M16 36 Q32 16 48 36" stroke="url(#ep-span-s)" stroke-width="3.4" stroke-linecap="round"/>
+    <path d="M14 44 H50" stroke="#26234D" stroke-width="4" stroke-linecap="round"/>
+    <path d="M22 36 V44" stroke="#26234D" stroke-opacity="0.78" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M32 26 V44" stroke="#26234D" stroke-opacity="0.78" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M42 36 V44" stroke="#26234D" stroke-opacity="0.78" stroke-width="1.8" stroke-linecap="round"/>
+    <circle cx="16" cy="36" r="2.9" fill="#26234D"/>
+    <circle cx="48" cy="36" r="2.9" fill="#26234D"/>
+    <circle cx="32" cy="26" r="3" fill="#6C5CE0"/>
+  </g>
+  <text x="64" y="102" text-anchor="middle"
+        font-family="'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif"
+        font-size="26" font-weight="800" letter-spacing="-0.9" fill="#1A1838">Enroll<tspan fill="#6C5CE0">+</tspan></text>
+</svg>
