@@ -16,17 +16,19 @@ const CURRENCY_SYMBOL: Record<string, string> = {
   GBP: "£",
 };
 
-export function money(amount: number, currency = "INR"): string {
+export function money(amount: number | undefined | null, currency = "INR"): string {
+  const n = amount ?? 0;
   const sym = CURRENCY_SYMBOL[currency] ?? `${currency} `;
-  return `${sym}${amount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+  return `${sym}${n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 }
 
-export function compactMoney(amount: number, currency = "INR"): string {
+export function compactMoney(amount: number | undefined | null, currency = "INR"): string {
+  const n = amount ?? 0;
   const sym = CURRENCY_SYMBOL[currency] ?? `${currency} `;
-  if (amount >= 1_00_00_000) return `${sym}${(amount / 1_00_00_000).toFixed(2)} Cr`;
-  if (amount >= 1_00_000) return `${sym}${(amount / 1_00_000).toFixed(2)} L`;
-  if (amount >= 1_000) return `${sym}${(amount / 1_000).toFixed(1)}k`;
-  return `${sym}${amount.toLocaleString("en-IN")}`;
+  if (n >= 1_00_00_000) return `${sym}${(n / 1_00_00_000).toFixed(2)} Cr`;
+  if (n >= 1_00_000) return `${sym}${(n / 1_00_000).toFixed(2)} L`;
+  if (n >= 1_000) return `${sym}${(n / 1_000).toFixed(1)}k`;
+  return `${sym}${n.toLocaleString("en-IN")}`;
 }
 
 export function pct(n: number): string {
