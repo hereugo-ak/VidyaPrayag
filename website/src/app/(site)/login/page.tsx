@@ -1,21 +1,33 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { loginAdmin, ApiError } from "@/lib/api";
 import { saveAuth } from "@/lib/auth";
+import { writeSession } from "@/lib/admin/session";
 import { TextField } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { Photo } from "@/components/ui/Photo";
 import { PHOTOS } from "@/lib/images";
 
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginInner />
+    </Suspense>
+  );
+}
+
 /**
  * Admin sign-in. Calls /api/v1/auth/login with role: "school_admin".
- * Onboarding (account creation) lives at /onboarding — this is for returning admins.
+ * Onboarded admins land in the web dashboard (/admin/dashboard, honouring a
+ * returnTo). Admins mid-onboarding are routed back into the wizard.
  */
-export default function LoginPage() {
+function LoginInner() {
   const router = useRouter();
+  const params = useSearchParams();
+  const returnTo = params.get("returnTo");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -31,9 +43,15 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       const res = await loginAdmin(email.trim().toLowerCase(), password);
-      saveAuth(res);
-      // If onboarding isn't finished, route them back into the wizard.
-      router.push(res.profile_completed ? "/onboarding/success" : "/onboarding");
+      saveAuth(res); // keeps the onboarding wizard session working
+      writeSession(res); // admin dashboard session (access + refresh)
+      if (!res.profile_completed) {
+        router.push("/onboarding");
+        return;
+      }
+      const safeReturn =
+        returnTo && returnTo.startsWith("/admin") ? returnTo : "/admin/dashboard";
+      router.push(safeReturn);
     } catch (err) {
       setError(
         err instanceof ApiError

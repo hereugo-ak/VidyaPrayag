@@ -1,0 +1,69 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useAdminAuth } from "@/lib/admin/session";
+import { ADMIN_NAV } from "@/lib/admin/nav";
+import { EnrollMark } from "@/components/ui/Logo";
+import { Sidebar } from "./Sidebar";
+import { Topbar } from "./Topbar";
+
+const SCHOOL_ROLES = new Set(["school_admin", "school_staff", "admin"]);
+
+function titleForPath(pathname: string): string {
+  const match = ADMIN_NAV.find(
+    (i) => pathname === i.href || pathname.startsWith(i.href + "/")
+  );
+  return match?.label ?? "Admin";
+}
+
+/**
+ * The protected admin shell. Every /admin route renders inside this.
+ *  - Unauthenticated → redirect to /login (with a returnTo).
+ *  - Authenticated but wrong role → redirect to /login.
+ *  - Authenticated school role → render the dashboard chrome.
+ */
+export function AdminShell({ children }: { children: React.ReactNode }) {
+  const { session, ready } = useAdminAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!ready) return;
+    if (!session) {
+      const returnTo = encodeURIComponent(pathname);
+      router.replace(`/login?returnTo=${returnTo}`);
+      return;
+    }
+    if (!SCHOOL_ROLES.has(session.role)) {
+      router.replace("/login");
+    }
+  }, [ready, session, router, pathname]);
+
+  // Close the drawer on route change.
+  useEffect(() => setMenuOpen(false), [pathname]);
+
+  if (!ready || !session || !SCHOOL_ROLES.has(session.role)) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-lavender-soft">
+        <div className="flex flex-col items-center gap-3">
+          <EnrollMark className="h-12 w-12 animate-pulse" />
+          <p className="text-sm font-medium text-ink-3">Loading your dashboard…</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-lavender-soft">
+      <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <div className="lg:pl-[264px]">
+        <Topbar title={titleForPath(pathname)} onMenu={() => setMenuOpen(true)} />
+        <div className="mx-auto w-full max-w-[1320px] px-4 py-6 md:px-6 md:py-8">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
