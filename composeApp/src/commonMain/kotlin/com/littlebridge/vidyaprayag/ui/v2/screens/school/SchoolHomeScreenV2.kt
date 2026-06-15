@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -27,7 +25,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.ui.v2.theme.VElevationLevel
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingStep
@@ -121,7 +118,7 @@ private fun SchoolHomeContent(
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
-    val completed = onboardingStatus == DashboardOnboardingStatus.COMPLETED
+    val isOnboardingCompleted = onboardingStatus == DashboardOnboardingStatus.COMPLETED
 
     Column(
         modifier
@@ -134,7 +131,7 @@ private fun SchoolHomeContent(
     ) {
         FloatingSchoolHomeHeader(
             adminName = adminName,
-            completed = completed,
+            completed = isOnboardingCompleted,
             unreadCount = unreadCount,
             onOpenNotifications = onOpenNotifications,
             onExit = onExit,
@@ -154,25 +151,25 @@ private fun SchoolHomeContent(
                 Column {
                     Text("Welcome, $adminName", style = VTheme.type.h1.colored(c.ink))
                     Text(
-                        if (completed) "Your campus is live. Manage everything from here."
+                        if (isOnboardingCompleted) "Your campus is live. Manage everything from here."
                         else "Let's finish setting up your school.",
                         style = VTheme.type.body.colored(c.ink2),
                     )
                 }
 
-                // ── Onboarding hero (REAL data) ────────────────────────────────
-                VCard {
+                if(!isOnboardingCompleted)
+                    VCard {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                        VLabel(if (completed) "Onboarding complete" else "Onboarding progress")
+                        VLabel(if (isOnboardingCompleted) "Onboarding complete" else "Onboarding progress")
                         VBadge(
                             text = "${(progress * 100).roundToInt()}%",
-                            tone = if (completed) VBadgeTone.Success else VBadgeTone.Arctic,
+                            tone = if (isOnboardingCompleted) VBadgeTone.Success else VBadgeTone.Arctic,
                         )
                     }
                     Spacer(Modifier.height(10.dp))
                     VProgressBar(
                         value = progress * 100f,
-                        tone = if (completed) VBadgeTone.Success else VBadgeTone.Arctic,
+                        tone = if (isOnboardingCompleted) VBadgeTone.Success else VBadgeTone.Arctic,
                     )
                     Spacer(Modifier.height(14.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
