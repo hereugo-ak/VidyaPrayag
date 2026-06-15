@@ -29,7 +29,7 @@ function unsplash(id: string, w = 1600): string {
 export const PHOTOS = {
   // Hero — a real, bright classroom with students; editorial, on-location feel.
   hero: {
-    src: unsplash("1523050854058-8df90110c9f1", 2000), // university hall / students
+    src: unsplash("1541339907198-e08756dedf3f", 2000), // university lecture hall / students
     alt: "Students seated in a bright lecture hall during a class session",
     blur: BLUR_DATA,
   } satisfies Photo,
