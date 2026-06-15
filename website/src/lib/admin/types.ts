@@ -126,6 +126,18 @@ export interface CreateStudentRequest {
   roll_number: string;
   student_code?: string;
 }
+export interface BulkImportRowResult {
+  row: number;
+  success: boolean;
+  student_code?: string | null;
+  error?: string | null;
+}
+export interface BulkImportStudentsResult {
+  total: number;
+  inserted: number;
+  failed: number;
+  results: BulkImportRowResult[];
+}
 
 // ── Teachers (GET/POST/DELETE /api/v1/school/teachers) ───────────────────────
 export interface TeacherAccountDto {

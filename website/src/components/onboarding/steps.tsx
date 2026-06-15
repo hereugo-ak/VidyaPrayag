@@ -1,13 +1,18 @@
 "use client";
 
+import { useMemo, useRef } from "react";
 import {
   BOARD_OPTIONS,
   MEDIUM_OPTIONS,
   GENDER_OPTIONS,
+  STUDENT_CSV_HEADER,
+  STUDENT_CSV_TEMPLATE,
+  parseStudentCsvPreview,
   type RegisterData,
   type BasicData,
   type BrandingData,
   type AcademicData,
+  type StudentsData,
   type ClassRow,
   type WizardState,
   type WizardStep,
@@ -259,6 +264,177 @@ export function AcademicStep({
   );
 }
 
+// ─── STUDENTS (CSV import) ────────────────────────────────────────────────────
+export function StudentsStep({
+  data,
+  onChange,
+}: {
+  data: StudentsData;
+  onChange: (patch: Partial<StudentsData>) => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const preview = useMemo(() => parseStudentCsvPreview(data.csv), [data.csv]);
+  const validCount = preview.rows.filter(
+    (r) => r.full_name && r.class_name && r.roll_number
+  ).length;
+
+  function handleFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result ?? "");
+      onChange({ csv: text, fileName: file.name });
+    };
+    reader.readAsText(file);
+  }
+
+  function downloadTemplate() {
+    const blob = new Blob([STUDENT_CSV_TEMPLATE], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "enrollplus-students-template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div>
+      <StepHead
+        title="Import your students"
+        lede="Optional but recommended. Upload a CSV of your students and we'll create their records the moment your school goes live — you can always add or edit students later inside the dashboard."
+      />
+
+      <div className="grid gap-5">
+        {/* Upload + template */}
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".csv,text/csv,text/plain"
+            className="sr-only"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleFile(f);
+              e.target.value = "";
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="inline-flex items-center gap-2 rounded-full bg-navy-deep px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-navy"
+          >
+            Choose CSV file
+          </button>
+          <button
+            type="button"
+            onClick={downloadTemplate}
+            className="inline-flex items-center gap-2 rounded-full border border-navy/15 bg-white/70 px-4 py-2.5 text-sm font-semibold text-navy-deep transition-colors hover:border-accent hover:text-accent"
+          >
+            Download template
+          </button>
+          {data.fileName && (
+            <span className="text-sm text-ink-3">
+              Loaded <span className="font-medium text-navy-deep">{data.fileName}</span>
+            </span>
+          )}
+        </div>
+
+        <p className="text-xs text-ink-3">
+          Required header:{" "}
+          <code className="rounded bg-navy/6 px-1.5 py-0.5 font-mono text-[11px] text-navy-deep">
+            {STUDENT_CSV_HEADER}
+          </code>{" "}
+          — <span className="font-medium">section</span> and{" "}
+          <span className="font-medium">student_code</span> are optional (we default
+          the section to A and generate a unique code when blank).
+        </p>
+
+        {/* Paste fallback */}
+        <TextArea
+          label="…or paste CSV here"
+          value={data.csv}
+          onChange={(v) => onChange({ csv: v, fileName: data.fileName || "pasted.csv" })}
+          rows={6}
+          placeholder={STUDENT_CSV_TEMPLATE}
+          className="font-mono text-[12.5px]"
+        />
+
+        {/* Live preview */}
+        {data.csv.trim() && (
+          <div className="rounded-xl border border-navy/12 bg-lavender-soft/40 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-bold text-navy-deep">
+                {validCount} student{validCount === 1 ? "" : "s"} ready to import
+              </p>
+              {preview.rows.length > validCount && (
+                <span className="text-xs font-semibold text-warning">
+                  {preview.rows.length - validCount} row(s) need attention
+                </span>
+              )}
+            </div>
+
+            {preview.errors.length > 0 && (
+              <ul className="mb-3 space-y-1">
+                {preview.errors.slice(0, 5).map((e, i) => (
+                  <li key={i} className="text-xs text-danger">
+                    • {e}
+                  </li>
+                ))}
+                {preview.errors.length > 5 && (
+                  <li className="text-xs text-ink-3">
+                    …and {preview.errors.length - 5} more
+                  </li>
+                )}
+              </ul>
+            )}
+
+            {preview.rows.length > 0 && (
+              <div className="max-h-56 overflow-auto rounded-lg border border-navy/8 bg-white/70">
+                <table className="w-full text-left text-[12.5px]">
+                  <thead className="sticky top-0 bg-white/95 backdrop-blur">
+                    <tr className="border-b border-navy/10 text-[10.5px] uppercase tracking-wide text-ink-3">
+                      <th className="px-3 py-2">Name</th>
+                      <th className="px-3 py-2">Class</th>
+                      <th className="px-3 py-2">Roll</th>
+                      <th className="px-3 py-2">Section</th>
+                      <th className="px-3 py-2">Code</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {preview.rows.slice(0, 50).map((r, i) => {
+                      const bad = !r.full_name || !r.class_name || !r.roll_number;
+                      return (
+                        <tr
+                          key={i}
+                          className={`border-b border-navy/5 last:border-0 ${
+                            bad ? "bg-danger/5" : ""
+                          }`}
+                        >
+                          <td className="px-3 py-1.5 text-navy-deep">{r.full_name || "—"}</td>
+                          <td className="px-3 py-1.5">{r.class_name || "—"}</td>
+                          <td className="px-3 py-1.5">{r.roll_number || "—"}</td>
+                          <td className="px-3 py-1.5">{r.section || "A"}</td>
+                          <td className="px-3 py-1.5 text-ink-3">{r.student_code || "auto"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {preview.rows.length > 50 && (
+                  <p className="px-3 py-2 text-[11px] text-ink-3">
+                    Showing first 50 of {preview.rows.length} rows.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── REVIEW ───────────────────────────────────────────────────────────────────
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -301,6 +477,11 @@ export function ReviewStep({
   onJump: (s: WizardStep) => void;
 }) {
   const validClasses = state.academic.classes.filter((c) => c.name.trim());
+  const studentCount = state.students.csv.trim()
+    ? parseStudentCsvPreview(state.students.csv).rows.filter(
+        (r) => r.full_name && r.class_name && r.roll_number
+      ).length
+    : 0;
   return (
     <div>
       <StepHead
@@ -341,6 +522,21 @@ export function ReviewStep({
                 </li>
               ))}
             </ul>
+          )}
+        </Card>
+        <Card title="Students" step="STUDENTS" onJump={onJump}>
+          {studentCount === 0 ? (
+            <p className="text-sm text-ink-3">
+              No CSV uploaded — you can import students any time from the dashboard.
+            </p>
+          ) : (
+            <p className="text-sm text-navy-deep">
+              <span className="font-medium">{studentCount}</span> student
+              {studentCount === 1 ? "" : "s"} ready to import
+              {state.students.fileName ? (
+                <span className="text-ink-3"> · {state.students.fileName}</span>
+              ) : null}
+            </p>
           )}
         </Card>
       </div>

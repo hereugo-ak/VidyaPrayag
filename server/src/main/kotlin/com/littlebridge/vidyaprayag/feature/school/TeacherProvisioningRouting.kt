@@ -29,6 +29,7 @@ import com.littlebridge.vidyaprayag.core.requireSchoolContext
 import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.DeviceTokensTable
+import com.littlebridge.vidyaprayag.db.FacultyTable
 import com.littlebridge.vidyaprayag.db.NotificationsTable
 import com.littlebridge.vidyaprayag.db.TeacherSubjectAssignmentsTable
 import com.littlebridge.vidyaprayag.db.UserSessionsTable
@@ -100,6 +101,35 @@ private fun generateInitialPassword(length: Int = 12): String {
     }
 }
 
+/**
+ * BUGFIX (admin-created teachers were invisible in Supabase `faculty`):
+ * onboarding mirrors every provisioned teacher into the `faculty` roster via the
+ * SAME `external_id = "U-<userId>"` convention (OnboardingRouting.ensureFacultyRow),
+ * but this admin-facing POST /api/v1/school/teachers endpoint only ever wrote an
+ * `app_users` row. As a result:
+ *   - the teacher never appeared in the `faculty` table the admin was looking at, and
+ *   - SchoolAnalyticsRouting (which joins attendance to faculty on external_id) could
+ *     never surface that teacher's accountability/efficiency metrics.
+ *
+ * This helper makes the admin create path mirror onboarding exactly. It is
+ * idempotent on external_id, so re-provisioning is safe. MUST run inside dbQuery {}.
+ */
+private fun ensureFacultyRow(schoolId: UUID, userId: UUID, name: String) {
+    val externalId = "U-$userId"
+    val exists = FacultyTable.selectAll()
+        .where { FacultyTable.externalId eq externalId }
+        .firstOrNull()
+    if (exists != null) return
+    FacultyTable.insert {
+        it[FacultyTable.schoolId] = schoolId
+        it[FacultyTable.externalId] = externalId
+        it[FacultyTable.userId] = userId
+        it[FacultyTable.name] = name.trim()
+        it[isActive] = true
+        it[createdAt] = Instant.now()
+    }
+}
+
 fun Route.teacherProvisioningRouting() {
     authenticate("jwt") {
         route("/api/v1/school/teachers") {
@@ -159,6 +189,10 @@ fun Route.teacherProvisioningRouting() {
                         it[createdAt] = now
                         it[updatedAt] = now
                     }
+                    // BUGFIX: mirror the new teacher into the `faculty` roster so it
+                    // shows up in Supabase and is visible to SchoolAnalyticsRouting
+                    // (which joins attendance → faculty on external_id = "U-<userId>").
+                    ensureFacultyRow(ctx.schoolId, newId, req.name)
                 }
 
                 call.created(
@@ -244,6 +278,15 @@ fun Route.teacherProvisioningRouting() {
                     TeacherSubjectAssignmentsTable.deleteWhere {
                         (TeacherSubjectAssignmentsTable.schoolId eq ctx.schoolId) and
                             (TeacherSubjectAssignmentsTable.teacherId eq teacherId)
+                    }
+
+                    // BUGFIX: remove the mirrored `faculty` row too. It is keyed by
+                    // external_id = "U-<userId>" (set on create / onboarding); without
+                    // this the deleted teacher would linger forever in the faculty
+                    // roster and keep showing up in analytics. School-scoped for IDOR.
+                    FacultyTable.deleteWhere {
+                        (FacultyTable.schoolId eq ctx.schoolId) and
+                            (FacultyTable.externalId eq "U-$teacherId")
                     }
 
                     // Finally the account row itself. Tables with real FKs to

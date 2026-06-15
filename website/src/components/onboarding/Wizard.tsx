@@ -13,6 +13,7 @@ import {
   type BasicData,
   type BrandingData,
   type AcademicData,
+  type StudentsData,
   type ClassRow,
   validateRegister,
   validateBasic,
@@ -21,10 +22,12 @@ import {
   basicPayload,
   brandingPayload,
   academicPayload,
+  parseStudentCsvPreview,
 } from "@/lib/onboarding";
 import {
   registerSchool,
   submitOnboardingStep,
+  importStudentsCsv,
   ApiError,
 } from "@/lib/api";
 import { saveAuth, loadAuth } from "@/lib/auth";
@@ -32,7 +35,14 @@ import { Stepper } from "./Stepper";
 import { Button } from "../ui/Button";
 import { Photo } from "../ui/Photo";
 import { PHOTOS } from "@/lib/images";
-import { RegisterStep, BasicStep, BrandingStep, AcademicStep, ReviewStep } from "./steps";
+import {
+  RegisterStep,
+  BasicStep,
+  BrandingStep,
+  AcademicStep,
+  StudentsStep,
+  ReviewStep,
+} from "./steps";
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
 type Action =
@@ -41,7 +51,8 @@ type Action =
   | { type: "SET_REGISTER"; patch: Partial<RegisterData> }
   | { type: "SET_BASIC"; patch: Partial<BasicData> }
   | { type: "SET_BRANDING"; patch: Partial<BrandingData> }
-  | { type: "SET_ACADEMIC"; classes: ClassRow[] };
+  | { type: "SET_ACADEMIC"; classes: ClassRow[] }
+  | { type: "SET_STUDENTS"; patch: Partial<StudentsData> };
 
 function reducer(state: WizardState, action: Action): WizardState {
   switch (action.type) {
@@ -57,6 +68,8 @@ function reducer(state: WizardState, action: Action): WizardState {
       return { ...state, branding: { ...state.branding, ...action.patch } };
     case "SET_ACADEMIC":
       return { ...state, academic: { classes: action.classes } };
+    case "SET_STUDENTS":
+      return { ...state, students: { ...state.students, ...action.patch } };
     default:
       return state;
   }
@@ -74,6 +87,7 @@ export function Wizard() {
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [showErrors, setShowErrors] = useState(false);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
 
   // ── Hydrate from localStorage once on mount (state persists across refresh) ──
   useEffect(() => {
@@ -104,6 +118,7 @@ export function Wizard() {
   const goTo = (step: WizardStep) => {
     setServerError(null);
     setShowErrors(false);
+    if (step !== "REVIEW") setImportNotice(null);
     dispatch({ type: "GOTO", step });
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -163,6 +178,33 @@ export function Wizard() {
             return;
           }
           if (token) await submitOnboardingStep(token, "ACADEMIC", academicPayload(state.academic));
+          goTo("STUDENTS");
+          break;
+        }
+        case "STUDENTS": {
+          // Importing students is optional — an empty CSV just advances.
+          const csv = state.students.csv.trim();
+          if (csv && token) {
+            // Guard against an obviously malformed sheet (missing columns) so the
+            // server doesn't reject the whole batch; the live preview already
+            // surfaces these, this is the final gate.
+            const { rows, errors } = parseStudentCsvPreview(csv);
+            const importable = rows.filter(
+              (r) => r.full_name && r.class_name && r.roll_number
+            );
+            if (importable.length === 0) {
+              setServerError(
+                errors[0] ??
+                  "No valid students found in the CSV. Check the header row (full_name, class_name, roll_number)."
+              );
+              return;
+            }
+            const res = await importStudentsCsv(token, csv);
+            setImportNotice(
+              `Imported ${res.inserted} of ${res.total} students` +
+                (res.failed > 0 ? ` · ${res.failed} skipped` : "")
+            );
+          }
           goTo("REVIEW");
           break;
         }
@@ -255,6 +297,12 @@ export function Wizard() {
                   onChange={(classes) => dispatch({ type: "SET_ACADEMIC", classes })}
                 />
               )}
+              {state.step === "STUDENTS" && (
+                <StudentsStep
+                  data={state.students}
+                  onChange={(patch) => dispatch({ type: "SET_STUDENTS", patch })}
+                />
+              )}
               {state.step === "REVIEW" && <ReviewStep state={state} onJump={goTo} />}
             </motion.div>
           </AnimatePresence>
@@ -262,6 +310,12 @@ export function Wizard() {
           {serverError && (
             <p className="mt-6 rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm font-medium text-danger">
               {serverError}
+            </p>
+          )}
+
+          {importNotice && !serverError && (
+            <p className="mt-6 rounded-xl border border-teal/30 bg-teal/5 px-4 py-3 text-sm font-medium text-teal-deep">
+              {importNotice}
             </p>
           )}
 
@@ -281,7 +335,11 @@ export function Wizard() {
                   ? "Launch my school"
                   : isFirst
                     ? "Create account & continue"
-                    : "Continue"}
+                    : state.step === "STUDENTS"
+                      ? state.students.csv.trim()
+                        ? "Import & continue"
+                        : "Skip for now"
+                      : "Continue"}
             </Button>
           </div>
         </div>

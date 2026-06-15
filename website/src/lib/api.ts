@@ -165,3 +165,31 @@ export interface OnboardingStatusResponse {
 export function getOnboardingStatus(token: string) {
   return apiRequest<OnboardingStatusResponse>("/api/v1/onboarding/status", { token });
 }
+
+// ─── Student bulk import (onboarding CSV upload) ──────────────────────────────
+// Mirrors server BulkImportStudentsResponse from SchoolStudentsRouting.kt.
+// The /import endpoint accepts EITHER a parsed `students` array OR raw `csv`
+// text; we send the raw CSV so the server's battle-tested parseStudentCsv (which
+// already handles header aliases, quoted fields and per-row validation) is the
+// single source of truth — no duplicate parsing contract to drift.
+export interface BulkImportRowResult {
+  row: number;
+  success: boolean;
+  student_code?: string | null;
+  error?: string | null;
+}
+export interface BulkImportStudentsResponse {
+  total: number;
+  inserted: number;
+  failed: number;
+  results: BulkImportRowResult[];
+}
+
+/** POST /api/v1/school/students/import with raw CSV text (school-admin token). */
+export function importStudentsCsv(token: string, csv: string) {
+  return apiRequest<BulkImportStudentsResponse>("/api/v1/school/students/import", {
+    method: "POST",
+    token,
+    body: { csv },
+  });
+}

@@ -65,12 +65,18 @@ export function TextArea({
   onChange,
   error,
   rows = 3,
+  placeholder,
+  className = "",
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   error?: string;
   rows?: number;
+  /** Custom placeholder (defaults to the floating label text). */
+  placeholder?: string;
+  /** Extra classes merged onto the textarea (e.g. monospace). */
+  className?: string;
 }) {
   const id = useId();
   return (
@@ -81,8 +87,8 @@ export function TextArea({
           rows={rows}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={label}
-          className={`${fieldBase} resize-none ${error ? errBorder : okBorder}`}
+          placeholder={placeholder ?? label}
+          className={`${fieldBase} resize-none ${error ? errBorder : okBorder} ${className}`}
         />
         <label htmlFor={id} className={`${labelBase} ${error ? "text-danger" : "peer-focus:text-accent"}`}>
           {label}

@@ -19,6 +19,7 @@ import type {
   AnnouncementsListResponse,
   AttendanceSummaryDto,
   AuthTokenResponse,
+  BulkImportStudentsResult,
   CreateAnnouncementRequest,
   CreateStudentRequest,
   CreateTeacherRequest,
@@ -162,7 +163,15 @@ export const adminApi = {
   deleteStudent: (id: string) =>
     authRequest<unknown>(`/api/v1/school/students/${id}`, { method: "DELETE" }),
   bulkImportStudents: (students: CreateStudentRequest[]) =>
-    authRequest<unknown>("/api/v1/school/students/import", { method: "POST", body: { students } }),
+    authRequest<BulkImportStudentsResult>("/api/v1/school/students/import", {
+      method: "POST",
+      body: { students },
+    }),
+  importStudentsCsv: (csv: string) =>
+    authRequest<BulkImportStudentsResult>("/api/v1/school/students/import", {
+      method: "POST",
+      body: { csv },
+    }),
 
   // people — teachers
   teachers: () => authRequest<TeacherListResponse>("/api/v1/school/teachers"),

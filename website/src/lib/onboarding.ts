@@ -8,13 +8,20 @@
  * obStepType values and POST /api/v1/onboarding/submit.
  */
 
-export type WizardStep = "REGISTER" | "BASIC" | "BRANDING" | "ACADEMIC" | "REVIEW";
+export type WizardStep =
+  | "REGISTER"
+  | "BASIC"
+  | "BRANDING"
+  | "ACADEMIC"
+  | "STUDENTS"
+  | "REVIEW";
 
 export const WIZARD_STEPS: { id: WizardStep; label: string; short: string }[] = [
   { id: "REGISTER", label: "Create your admin account", short: "Account" },
   { id: "BASIC", label: "Institutional basics", short: "Basics" },
   { id: "BRANDING", label: "Branding & identity", short: "Branding" },
   { id: "ACADEMIC", label: "Academic structure", short: "Academics" },
+  { id: "STUDENTS", label: "Import students", short: "Students" },
   { id: "REVIEW", label: "Review & launch", short: "Launch" },
 ];
 
@@ -78,12 +85,29 @@ export interface AcademicData {
   classes: ClassRow[];
 }
 
+/** One parsed student row, matching the server CreateStudentRequest contract. */
+export interface StudentRow {
+  full_name: string;
+  class_name: string;
+  roll_number: string;
+  section: string;
+  student_code: string;
+}
+
+export interface StudentsData {
+  /** Raw CSV text exactly as uploaded/pasted — this is what we POST to the server. */
+  csv: string;
+  /** File name shown in the UI (informational only). */
+  fileName: string;
+}
+
 export interface WizardState {
   step: WizardStep;
   register: RegisterData;
   basic: BasicData;
   branding: BrandingData;
   academic: AcademicData;
+  students: StudentsData;
 }
 
 export const INITIAL_STATE: WizardState = {
@@ -108,7 +132,104 @@ export const INITIAL_STATE: WizardState = {
       { name: "Grade 2", sections: "A", subjects: "English, Mathematics, EVS" },
     ],
   },
+  students: { csv: "", fileName: "" },
 };
+
+// ─── Student CSV (onboarding import) ──────────────────────────────────────────
+// The canonical header the server's parseStudentCsv understands. `section` and
+// `student_code` are optional (server defaults section "A" and auto-generates a
+// unique code when blank), but we keep all five columns in the template so the
+// downloaded sample is unambiguous and matches STUDENT_CSV_PROMPT.md.
+export const STUDENT_CSV_HEADER = "full_name,class_name,roll_number,section,student_code";
+
+export const STUDENT_CSV_TEMPLATE = `${STUDENT_CSV_HEADER}
+Aarav Sharma,Grade 1,1,A,STU-0001
+Diya Patel,Grade 1,2,A,STU-0002
+Vivaan Gupta,Grade 1,3,B,STU-0003`;
+
+/** RFC-4180-ish split for a single CSV line (handles quoted commas). */
+function splitCsvLine(line: string): string[] {
+  const out: string[] = [];
+  let sb = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"' && inQuotes && line[i + 1] === '"') {
+      sb += '"';
+      i++;
+    } else if (c === '"') {
+      inQuotes = !inQuotes;
+    } else if (c === "," && !inQuotes) {
+      out.push(sb);
+      sb = "";
+    } else {
+      sb += c;
+    }
+  }
+  out.push(sb);
+  return out.map((s) => s.trim());
+}
+
+/**
+ * Client-side preview parser — mirrors the server's header-alias logic so the
+ * wizard can show a live preview + count before upload. The SERVER is still the
+ * source of truth at submit time (we POST raw csv text), so any drift here only
+ * affects the preview, never what's persisted.
+ */
+export function parseStudentCsvPreview(csv: string): {
+  rows: StudentRow[];
+  errors: string[];
+} {
+  const lines = csv
+    .split("\n")
+    .map((l) => l.replace(/\r$/, ""))
+    .filter((l) => l.trim().length > 0);
+  if (lines.length === 0) return { rows: [], errors: [] };
+
+  const norm = (s: string) => s.trim().toLowerCase().replace(/ /g, "_");
+  const header = splitCsvLine(lines[0]).map(norm);
+  const idxOf = (...names: string[]) => {
+    for (const n of names) {
+      const i = header.indexOf(n);
+      if (i >= 0) return i;
+    }
+    return -1;
+  };
+  const iName = idxOf("full_name", "name", "student_name");
+  const iClass = idxOf("class_name", "class", "grade");
+  const iRoll = idxOf("roll_number", "roll", "roll_no", "rollno");
+  const iSection = idxOf("section", "sec");
+  const iCode = idxOf("student_code", "code", "admission_no", "admission_number");
+
+  const errors: string[] = [];
+  if (iName < 0) errors.push("Missing a name column (full_name / name).");
+  if (iClass < 0) errors.push("Missing a class column (class_name / class / grade).");
+  if (iRoll < 0) errors.push("Missing a roll column (roll_number / roll).");
+
+  const cell = (cols: string[], i: number) =>
+    i >= 0 && i < cols.length ? cols[i].trim() : "";
+
+  const rows: StudentRow[] = [];
+  lines.slice(1).forEach((line, idx) => {
+    const cols = splitCsvLine(line);
+    const full_name = cell(cols, iName);
+    const class_name = cell(cols, iClass);
+    const roll_number = cell(cols, iRoll);
+    if (!full_name && !class_name && !roll_number) return; // blank line
+    if (!full_name || !class_name || !roll_number) {
+      errors.push(`Row ${idx + 1}: name, class and roll number are all required.`);
+    }
+    rows.push({
+      full_name,
+      class_name,
+      roll_number,
+      section: cell(cols, iSection),
+      student_code: cell(cols, iCode),
+    });
+  });
+
+  return { rows, errors };
+}
 
 export const STORAGE_KEY = "enrollplus.onboarding.v1";
 

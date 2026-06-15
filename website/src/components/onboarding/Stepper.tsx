@@ -4,8 +4,8 @@ import { motion } from "framer-motion";
 import { WIZARD_STEPS, type WizardStep } from "@/lib/onboarding";
 
 /**
- * Progress indicator for the onboarding wizard. Shows all five steps, the
- * current one highlighted, completed ones ticked. Calm, no looping animation —
+ * Progress indicator for the onboarding wizard. Renders every step in
+ * WIZARD_STEPS, the current one highlighted, completed ones ticked. Calm, no looping animation —
  * just a width transition on the connecting rail.
  */
 export function Stepper({ current }: { current: WizardStep }) {
