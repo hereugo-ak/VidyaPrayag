@@ -33,9 +33,17 @@ You do **not** need the Android SDK or Xcode to work on the website.
 ```bash
 # from repo root
 cd website
-npm install
+npm install            # or: npm run setup
 cp .env.example .env.local
 ```
+
+> **You can no longer get the `Module not found: Can't resolve 'recharts'` crash by
+> forgetting this step.** `node_modules/` is git-ignored, so it must be installed after
+> every clone/branch-switch/pull — but `npm run dev`, `npm run build` and `npm run start`
+> now run an automatic **dependency guard** (`scripts/ensure-deps.js`) first. If any
+> declared dependency (recharts, swr, framer-motion, …) is missing or `node_modules/` is
+> absent, the guard installs it for you before Next.js starts. Worst case it prints exactly
+> what to run.
 
 Then open `.env.local` and point it at a backend:
 
@@ -170,6 +178,7 @@ the affected query. There is **no websocket** — the backend exposes plain REST
 
 | Symptom | Fix |
 | --- | --- |
+| `Module not found: Can't resolve 'recharts'` (or `swr`/`framer-motion`) on `/admin/dashboard` etc. | `node_modules/` is missing/stale. This is now **auto-healed** by the guard that runs before `dev`/`build`/`start`. If it ever still appears, run `cd website && rm -rf node_modules package-lock.json && npm install`. The code is correct — this is always an install/environment issue, never a code bug. |
 | "Cannot reach the server" on submit | Backend not running / wrong `NEXT_PUBLIC_API_BASE_URL`. Start Ktor on `:8080`. |
 | CORS error in console | Ensure the backend allows the website origin (`http://localhost:3000`) in its CORS config. |
 | Email already registered | Use a fresh email — `register-school` enforces a unique email. |

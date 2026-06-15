@@ -4,8 +4,13 @@
   "private": true,
   "description": "Production marketing + onboarding website for Enroll+ — shares the Ktor/Supabase backend with the mobile app.",
   "scripts": {
+    "ensure-deps": "node scripts/ensure-deps.js",
+    "setup": "npm install",
+    "predev": "node scripts/ensure-deps.js",
     "dev": "next dev",
+    "prebuild": "node scripts/ensure-deps.js",
     "build": "next build",
+    "prestart": "node scripts/ensure-deps.js",
     "start": "next start",
     "lint": "next lint"
   },
