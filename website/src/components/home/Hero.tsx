@@ -82,14 +82,6 @@ export function Hero() {
             sizes="(max-width: 1024px) 100vw, 48vw"
             className="shadow-cardHover"
           />
-          {/* Floating data chip — DM Mono, tabular, restrained. */}
-          <div className="absolute -left-4 bottom-8 hidden rounded-2xl border border-navy/8 bg-white/85 p-4 shadow-card backdrop-blur-md sm:block">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">
-              Attendance today
-            </p>
-            <p className="mt-1 font-mono text-2xl font-medium text-navy-deep">96.4%</p>
-            <p className="text-[12px] text-teal-deep">synced to every parent</p>
-          </div>
         </motion.div>
       </div>
     </section>

@@ -63,11 +63,19 @@ function install(reason, mode) {
   const { cmd, args } = detectInstallCommand(mode);
   console.log(`\n[ensure-deps] ${reason}`);
   console.log(`[ensure-deps] Running: ${cmd} ${args.join(" ")} (this happens automatically)\n`);
-  const res = spawnSync(cmd, args, {
-    cwd: ROOT,
-    stdio: "inherit",
-    shell: process.platform === "win32",
-  });
+  // Use a single command string on Windows to avoid DEP0190 deprecation warning
+  // (passing args with shell:true is deprecated because they are concatenated, not escaped).
+  const isWin = process.platform === "win32";
+  const res = isWin
+    ? spawnSync(`${cmd} ${args.join(" ")}`, {
+        cwd: ROOT,
+        stdio: "inherit",
+        shell: true,
+      })
+    : spawnSync(cmd, args, {
+        cwd: ROOT,
+        stdio: "inherit",
+      });
   if (res.status !== 0) {
     console.error(
       "\n[ensure-deps] Dependency install FAILED. Run it manually:\n" +
