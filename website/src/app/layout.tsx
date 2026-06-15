@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -51,6 +49,10 @@ export const metadata: Metadata = {
       "One platform connecting your office, your teachers, and every parent.",
   },
   robots: { index: true, follow: true },
+  icons: {
+    icon: [{ url: "/brand/enrollplus-mark.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/brand/enrollplus-mark-dark.svg" }],
+  },
 };
 
 export const viewport: Viewport = {
@@ -66,11 +68,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${jakarta.variable} ${dmMono.variable}`}>
-      <body>
-        <Header />
-        <main id="main">{children}</main>
-        <Footer />
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

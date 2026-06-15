@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Enroll+ mark">
+  <!-- Enroll+ mark on a navy card — favicon / app-icon / embossed-on-black usage. -->
+  <defs>
+    <linearGradient id="ep-span-d" x1="12" y1="40" x2="52" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8B7EE8"/>
+      <stop offset="0.5" stop-color="#B7AEF5"/>
+      <stop offset="1" stop-color="#8B7EE8"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="64" height="64" rx="16" fill="#1A1838"/>
+  <rect x="0.5" y="0.5" width="63" height="63" rx="15.5" stroke="#ffffff" stroke-opacity="0.08"/>
+  <path d="M14 40 Q32 14 50 40" stroke="url(#ep-span-d)" stroke-width="3.4" stroke-linecap="round"/>
+  <path d="M12 44 H52" stroke="#ffffff" stroke-width="3.6" stroke-linecap="round"/>
+  <path d="M20 36.2 V44" stroke="#ffffff" stroke-opacity="0.5" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M32 27 V44"   stroke="#ffffff" stroke-opacity="0.5" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M44 36.2 V44" stroke="#ffffff" stroke-opacity="0.5" stroke-width="1.8" stroke-linecap="round"/>
+  <circle cx="14" cy="40" r="3" fill="#ffffff"/>
+  <circle cx="50" cy="40" r="3" fill="#ffffff"/>
+  <path d="M32 21.5 V32.5 M26.5 27 H37.5" stroke="#E6E6FA" stroke-width="3.4" stroke-linecap="round"/>
+</svg>

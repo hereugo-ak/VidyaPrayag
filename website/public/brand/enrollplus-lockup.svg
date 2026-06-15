@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 268 64" fill="none" role="img" aria-label="Enroll+">
+  <!-- Enroll+ FULL lockup — mark + wordmark side by side. -->
+  <defs>
+    <linearGradient id="ep-span-f" x1="12" y1="40" x2="52" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#544AB8"/>
+      <stop offset="0.5" stop-color="#6C5CE0"/>
+      <stop offset="1" stop-color="#544AB8"/>
+    </linearGradient>
+  </defs>
+  <!-- mark -->
+  <g>
+    <rect x="2" y="2" width="60" height="60" rx="17" fill="#E6E6FA"/>
+    <rect x="2.5" y="2.5" width="59" height="59" rx="16.5" stroke="#26234D" stroke-opacity="0.06"/>
+    <path d="M14 40 Q32 14 50 40" stroke="url(#ep-span-f)" stroke-width="3.4" stroke-linecap="round"/>
+    <path d="M12 44 H52" stroke="#26234D" stroke-width="3.6" stroke-linecap="round"/>
+    <path d="M20 36.2 V44" stroke="#26234D" stroke-opacity="0.42" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M32 27 V44"   stroke="#26234D" stroke-opacity="0.42" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M44 36.2 V44" stroke="#26234D" stroke-opacity="0.42" stroke-width="1.8" stroke-linecap="round"/>
+    <circle cx="14" cy="40" r="3" fill="#26234D"/>
+    <circle cx="50" cy="40" r="3" fill="#26234D"/>
+    <path d="M32 21.5 V32.5 M26.5 27 H37.5" stroke="#26234D" stroke-width="3.4" stroke-linecap="round"/>
+  </g>
+  <!-- wordmark -->
+  <text x="78" y="42" font-family="'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif"
+        font-size="34" font-weight="800" letter-spacing="-1.2" fill="#1A1838">Enroll<tspan fill="#6C5CE0">+</tspan></text>
+</svg>
