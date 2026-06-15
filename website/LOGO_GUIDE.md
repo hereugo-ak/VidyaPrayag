@@ -1,37 +1,43 @@
-# Enroll+ Logo — Replacement Guide
+# Enroll+ Logo — Website Rebuild Guide
 
-The Enroll+ brand mark was redesigned at the $100M level. This document records
-**what changed**, **why it is an evolution (not a replacement)** of the mobile
-app's existing mark, where the new assets live on the website, and **exactly
-which mobile-app files must be updated** to bring the app in line.
+The website now renders the **exact mobile-app "Setu" bridge mark**, faithfully
+rebuilt from the app's single source of truth and **recoloured** to the website
+UI design system (premium, minimal, $100M-raise level). This document records
+the design, where the assets live, and **exactly which mobile-app files would
+be updated later** to bring the app's *colour* in line — the app geometry is
+already correct.
 
 > No mobile-app (`composeApp/`) files were modified by this change — per the
-> brief, the app touchpoints are only **documented** here.
+> brief, the website is rebuilt first; the app touchpoints are only
+> **documented** here for a later pass.
 
 ---
 
 ## 1. The design
 
-The mobile app's mark is the **"Setu" bridge** — an arc spanning two grounded
-pillars over a deck, with three suspension cables, signalling the connection
-between school and home (see `composeApp/.../ui/v2/components/VLogo.kt` and
-`VBrandLogo.kt`).
+The mobile app's mark is the **"Setu" bridge** — a quadratic arc spanning two
+grounded pillar caps over a deck, with three suspension cables and a solid apex
+node, signalling the connection between school and home. It is defined once in
+`composeApp/.../ui/v2/components/VBrandLogo.kt → drawBridge` (and mirrored in
+`VLogo.kt`) on a **56-unit viewBox**.
 
-The new **"Span"** mark keeps that exact metaphor and geometry family, redrawn
-on a strict **64-unit grid** and elevated to the $100M Series-A level:
+The website mark is **that exact geometry, rebuilt 1:1** — the app's 56-unit
+bridge centred in a 64-unit plate (translate **+4,+4**). Nothing about the shape
+was "evolved"; only the **colour** changed, from the app's teal accent to the
+website's lavender / violet system:
 
-| Element | App mark (old) | Website mark (new) | Rationale |
+| Element | App geometry (56u) | Website (64u, +4,+4) | Colour (website) |
 |---|---|---|---|
-| Span arc | teal quadratic arc `M12 32 Q28 12 44 32` | lavender-violet gradient parabola `M16 42 Q32 16 48 42` | Same bridge silhouette; accent moved from teal → the system lavender `#E6E6FA`/`#6C5CE0` family (brief). |
-| Deck | navy line | navy line `M14 46 H50` | Unchanged in spirit — the grounding baseline. |
-| Cables | 3 vertical cables | 3 cables at x=22/32/42 stepping **up to the apex** | Same count/positions, now lead the eye to the apex node. |
-| Apex node | navy dot (centre) | **navy solid node** at (32,24), `r=3.6` | **No "+" sign in the mark.** The apex is a single clean node — the true terminus of the centre cable, exactly the app's original centre dot. The "+" lives only in the *wordmark text*, never the symbol. |
-| Plate | teal-tinted / glass | restrained lavender `#E6E6FA` plate (or navy card for dark) | Lavender used with restraint per brief; infrastructure, not classroom imagery. |
+| Span arc | `M12 32 Q28 12 44 32` | `M16 36 Q32 16 48 36` | lavender-violet gradient `#544AB8`→`#6C5CE0`→`#544AB8` (app was teal) |
+| Deck | `M10 40 H46` | `M14 44 H50` | navy `#26234D` |
+| Cables (×3) | x=18/28/38, top y=32/22/32 → 40 | x=22/32/42, top y=36/26/36 → 44 | navy `#26234D` @ 0.78 (matches app's 0.78) |
+| Pillar caps | circles `r2.6` at (12,32)/(44,32) | `r2.9` at (16,36)/(48,36) | navy `#26234D` |
+| Apex node | circle `r2.4` at (28,22) | `r3` at (32,26) | accent violet `#6C5CE0` (light) / lavender `#E6E6FA` (dark) |
+| Plate | white-glass on teal hero | rounded square | lavender `#E6E6FA` (light) / navy `#1A1838` (dark) |
 
-> **Design rule (per the latest brief): the graphic mark contains NO "+" symbol.**
-> Earlier drafts built the "+" into the keystone — that has been removed. The
-> mark is now a pure monoline bridge resolving to a solid apex node, which reads
-> as confident infrastructure rather than a literal plus.
+> **Design rule: the graphic mark contains NO "+" symbol.** The apex is the
+> app's single solid centre node — confident infrastructure, not a literal plus.
+> The "+" lives only in the *wordmark text*.
 
 Recognisable at **16×16** (favicon), premium at **400×400** (embossed on a black
 card → use the dark variant).
@@ -57,15 +63,16 @@ The component is the live source for the header (`components/Header.tsx`), foote
 
 ---
 
-## 3. Mobile-app files to update (NOT modified here)
+## 3. Mobile-app files to update later (NOT modified here)
 
-To bring the Compose app in line with the new mark, update these files. The new
-geometry (64-unit viewBox) maps cleanly onto the existing Canvas draw routines.
+The app's bridge **geometry is already correct** — the website matches it. To
+bring the app in line we only need to **recolour** (teal → lavender/violet) and
+refresh the launcher/wordmark in a later pass:
 
 | # | Path | What to change |
 |---|---|---|
-| 1 | `composeApp/src/commonMain/kotlin/com/littlebridge/vidyaprayag/ui/v2/components/VLogo.kt` | Update the `Canvas` geometry to the new 64-unit span: arc `M16 42 Q32 16 48 42`, deck `M14 46 H50`, cables at x=22/32/42 (top y=38.2/26/38.2 → 46), pillar caps at (16,42)/(48,42), and a **solid apex node** at (32,24) `r≈3.6`. **Do NOT draw a "+".** Recolor the arc to the lavender-violet gradient (`#544AB8`→`#6C5CE0`→`#544AB8`); keep deck + node navy. |
-| 2 | `composeApp/src/commonMain/kotlin/com/littlebridge/vidyaprayag/ui/v2/components/VBrandLogo.kt` | Same geometry update in `drawBridge`; for the dark/teal hero plate use white deck/cables + lavender apex node (mirror `enrollplus-mark-dark.svg`). Still **no "+"**. |
+| 1 | `composeApp/src/commonMain/kotlin/com/littlebridge/vidyaprayag/ui/v2/components/VLogo.kt` | Keep the geometry. **Recolour only:** swap the teal arc accent for the lavender-violet gradient (`#544AB8`→`#6C5CE0`→`#544AB8`); keep deck + cables navy; make the centre node accent violet. Plate → lavender `#E6E6FA`. |
+| 2 | `composeApp/src/commonMain/kotlin/com/littlebridge/vidyaprayag/ui/v2/components/VBrandLogo.kt` | Keep `drawBridge` geometry. For the dark/hero plate: white deck/cables + lavender apex node (mirror `enrollplus-mark-dark.svg`). |
 | 3 | `composeApp/src/androidMain/res/drawable-v24/ic_launcher_foreground.xml` | Regenerate from `enrollplus-mark.svg` (vector drawable). The launcher icon should be the **mark only** (no "+"). |
 | 4 | `composeApp/src/androidMain/res/drawable-v24/ic_launcher_monochrome.xml` | Regenerate single-colour silhouette of the new mark (deck + arc + apex node). |
 | 5 | `composeApp/src/androidMain/res/drawable/ic_launcher_background.xml` | Set background to lavender `#E6E6FA` (light) to match the new plate. |
@@ -75,7 +82,8 @@ geometry (64-unit viewBox) maps cleanly onto the existing Canvas draw routines.
 
 > Tip: the SVG `path` data in `website/public/brand/enrollplus-mark.svg` can be
 > pasted almost verbatim into an Android `<vector>`/`<path>` (convert the
-> `viewBox` to `viewportWidth/Height="64"`).
+> `viewBox` to `viewportWidth/Height="64"`). Because the website geometry is the
+> app's geometry +4,+4, recolouring is the only real work on the app side.
 
 ---
 
