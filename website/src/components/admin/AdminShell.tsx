@@ -44,6 +44,16 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   // Close the drawer on route change.
   useEffect(() => setMenuOpen(false), [pathname]);
 
+  // A11y: Escape closes the mobile drawer.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
+
   if (!ready || !session || !SCHOOL_ROLES.has(session.role)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-lavender-soft">
@@ -57,12 +67,18 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-lavender-soft">
+      <a
+        href="#admin-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-navy-deep focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+      >
+        Skip to content
+      </a>
       <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
       <div className="lg:pl-[264px]">
         <Topbar title={titleForPath(pathname)} onMenu={() => setMenuOpen(true)} />
-        <div className="mx-auto w-full max-w-[1320px] px-4 py-6 md:px-6 md:py-8">
+        <main id="admin-content" className="mx-auto w-full max-w-[1320px] px-4 py-6 md:px-6 md:py-8">
           {children}
-        </div>
+        </main>
       </div>
     </div>
   );

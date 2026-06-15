@@ -106,18 +106,30 @@ Walk through this after `npm run dev` (backend running for the starred items ★
 - [ ] All photos load from `images.unsplash.com` with a blur-up, no layout shift.
 
 ### Onboarding (★ backend required)
-- [ ] `/onboarding` shows the 5-step stepper starting on **Account**.
+- [ ] `/onboarding` shows the stepper starting on **Account**.
 - [ ] Fill **Account** with a fresh email + 8+ char password → "Create account & continue".
 - [ ] A real `school_admin` + `school` row is created (check Supabase / server logs).
-- [ ] Continue through **Basics → Branding → Academics**; each "Continue" POSTs to `/api/v1/onboarding/submit`.
+- [ ] Continue through **Basics → Branding → Academics → Students**; each "Continue" POSTs to `/api/v1/onboarding/submit`.
+- [ ] **Students step**: download the template, or upload/paste `sample-students.csv`. The live preview table shows parsed rows + row-level errors. "Import & continue" POSTs the CSV to `/api/v1/school/students/import`; "Skip for now" advances without importing.
 - [ ] **Refresh the page mid-wizard** → your inputs and current step are restored (localStorage key `enrollplus.onboarding.v1`).
 - [ ] Required-field validation blocks progress and shows inline errors.
-- [ ] **Review** lets you jump back to edit any section.
+- [ ] **Review** lets you jump back to edit any section and shows the imported student count.
 - [ ] "Launch my school" → final submission → redirect to `/onboarding/success`, greeted by name.
 
 ### Login (★ backend required)
-- [ ] `/login` with the admin you just created signs in and routes onward.
+- [ ] `/login` with the admin you just created signs in and routes to `/admin/dashboard`.
 - [ ] Wrong credentials show the server's error message inline.
+
+### Admin console (★ backend required)
+- [ ] After login, `/admin/dashboard` loads **real** metrics for your school (no mock data) with charts + a live activity feed.
+- [ ] The sidebar shows your school name + logo (top) and the signed-in user + logout (bottom); the notification bell shows a **real** unread count.
+- [ ] Visiting `/admin/*` while signed out (or after `logout`) redirects to `/login`.
+- [ ] `/admin/people` → **Teachers** tab → add a teacher. Confirm a `faculty` row is created in Supabase (`external_id = "U-<userId>"`), not just an `app_users` row.
+- [ ] `/admin/people` → **Students** tab → **Import** → upload `sample-students.csv`. The response reports `inserted` / `failed`; students appear in the table.
+- [ ] `/admin/attendance`, `/admin/marks`, `/admin/fees`, `/admin/announcements`, `/admin/leave`, `/admin/settings` each render real school-scoped data.
+- [ ] `/admin/leave` → Approve/Reject updates the request without a full page reload (SWR mutate).
+- [ ] Numbers refresh on their own (e.g. unread count / today's attendance ~15s) without manual reload.
+- [ ] **A11y**: `Tab` shows a visible focus ring; the "Skip to content" link appears on first Tab; `Escape` closes the mobile drawer / notification dropdown / any modal.
 
 ### Quality gate
 - [ ] `npm run build` completes with **no type errors**.
@@ -135,10 +147,22 @@ uniform envelope (`{ success, message, data }` / `{ success:false, message, erro
 | Create admin + school | `POST /api/v1/auth/register-school` | Step 1 of onboarding; returns a JWT |
 | Submit each onboarding step | `POST /api/v1/onboarding/submit` | JWT-authed; `ob_step_type` = BASIC / BRANDING / ACADEMIC / REVIEW |
 | Admin sign-in | `POST /api/v1/auth/login` | `role: "school_admin"` |
+| Token refresh | `POST /api/v1/auth/refresh` | Admin client calls this once on a 401 before bouncing to `/login` |
+| Admin data | `GET\|POST\|DELETE /api/v1/school/*` | JWT-authed; `school_id` derived from the token — the client never sends it |
+| Bulk student import | `POST /api/v1/school/students/import` | Body is a JSON array **or** raw `csv`; returns `{ total, inserted, failed, results[] }` |
 | (optional) Resume state | `GET /api/v1/onboarding/status` | Server-truth completion |
 
-The onboarding step order (`REGISTER → BASIC → BRANDING → ACADEMIC → REVIEW`) mirrors the
-server contract in `server/.../feature/onboarding/OnboardingRouting.kt` exactly.
+The onboarding step order (`REGISTER → BASIC → BRANDING → ACADEMIC → STUDENTS → REVIEW`)
+mirrors the server contract in `server/.../feature/onboarding/OnboardingRouting.kt`
+(the `STUDENTS` step is a client-side convenience that posts to the existing
+`/api/v1/school/students/import` endpoint — it is not a server `obStepType`).
+
+### Real-time & data fetching
+
+The admin console uses **SWR per-metric polling** (`src/lib/admin/hooks.ts`) with three
+tiers — `LIVE` (15s: unread count, today's attendance), `NEAR_LIVE` (60s: dashboard tiles,
+fees, leave), `SLOW` (5min: profile/config). Mutations call `mutate(key)` to refresh only
+the affected query. There is **no websocket** — the backend exposes plain REST.
 
 ---
 
@@ -152,6 +176,9 @@ server contract in `server/.../feature/onboarding/OnboardingRouting.kt` exactly.
 | Images don't load | Confirm network access to `images.unsplash.com`; the host is allow-listed in `next.config.mjs`. |
 | Wizard "stuck" with old data | Clear the draft: in DevTools → Application → Local Storage, remove `enrollplus.onboarding.v1`. |
 | Type error on build | Run `npm run build` and fix the reported file; the build is the type gate. |
+| `/admin/*` keeps redirecting to `/login` | Token expired/missing, or the role isn't a school admin. Sign in again; the client auto-refreshes once on a 401 then bounces. |
+| Added a teacher but no `faculty` row | Fixed — `POST /api/v1/school/teachers` now mirrors a `faculty` row (`external_id = "U-<userId>"`). Re-pull the backend if you're on an old build. |
+| CSV import reports `failed` rows | The response's `results[]` carries per-row errors. Check headers (`full_name,class_name,roll_number,section,student_code`) and required fields; partial imports still insert the valid rows. |
 
 ---
 
@@ -161,20 +188,28 @@ server contract in `server/.../feature/onboarding/OnboardingRouting.kt` exactly.
 website/
 ├── ARCHITECTURE.md        ← tech decisions + backend API surface
 ├── LOCAL_DEV.md           ← this file
+├── STUDENT_CSV_PROMPT.md  ← prompt + column contract for a ≥20-student roster
+├── sample-students.csv    ← validated 24-row example roster
 ├── next.config.mjs        ← image hosts, formats
 ├── tailwind.config.ts     ← design tokens (lavender base, navy/accent)
 └── src/
     ├── app/               ← App Router pages
-    │   ├── page.tsx               (/)
-    │   ├── features/ pricing/ privacy/ terms/ login/
-    │   └── onboarding/            (/onboarding + /onboarding/success)
+    │   ├── (site)/                marketing/onboarding shell (Header + Footer)
+    │   │   ├── page.tsx           (/)  + features/ pricing/ privacy/ terms/ login/
+    │   ├── onboarding/            (/onboarding + /onboarding/success)
+    │   └── admin/                 authenticated console (own chrome)
+    │       ├── dashboard/ people/ attendance/ marks/
+    │       └── fees/ announcements/ leave/ settings/
     ├── components/
     │   ├── Header.tsx Footer.tsx
     │   ├── ui/            (Button, Field, Photo, Reveal, SectionHeading, Logo)
     │   ├── home/          (Hero, SocialProof, ForSchools, …, FinalCta)
     │   ├── onboarding/    (Wizard, Stepper, steps)
-    │   └── legal/         (LegalLayout)
-    └── lib/               (api, auth, content, images, motion, onboarding)
+    │   ├── legal/         (LegalLayout)
+    │   └── admin/         (AdminShell, Sidebar, Topbar, DataTable, Toolbar,
+    │                       Primitives, StatTile, charts)
+    └── lib/               (api, auth, content, images, motion, onboarding,
+                            admin/{client,hooks,session,types,format})
 ```
 
 ---

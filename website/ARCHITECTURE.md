@@ -29,6 +29,9 @@ The website integrates with these **already-existing** Ktor routes (read from
 | Onboarding status | `GET /api/v1/onboarding/status` | JWT | Server-truth completion %, `resume_step`. |
 | Finalize (idempotent) | `POST /api/v1/onboarding/complete` | JWT | Mirrors REVIEW final submit. |
 | Landing CMS | `GET /api/v1/content/landing` | public | Tagline/feature copy KV store. |
+| Token refresh | `POST /api/v1/auth/refresh` | refresh JWT | Rotating refresh tokens; the admin client calls this once on a 401 before redirecting to `/login`. |
+| School admin data | `GET\|POST\|DELETE /api/v1/school/*` | JWT (school_admin) | People, attendance, marks, fees, announcements, leave, profile. `school_id` is taken from the JWT (`requireSchoolAdmin()`); the client never sends it. Powers the `/admin/*` console. |
+| Bulk student import | `POST /api/v1/school/students/import` | JWT (school_admin) | Accepts a JSON array **or** raw `csv` text; returns `{ total, inserted, failed, results[] }` for row-level partial-import feedback. |
 
 **Server response envelope** (from `core/ApiResponse.kt` / `ResponseExtensions.kt`):
 ```jsonc
@@ -203,6 +206,8 @@ env handling).
 website/
   ARCHITECTURE.md          ← this file
   LOCAL_DEV.md             ← setup + verification guide
+  STUDENT_CSV_PROMPT.md    ← LLM prompt + column contract for a ≥20-student roster
+  sample-students.csv      ← validated 24-row example roster
   package.json
   next.config.mjs
   tailwind.config.ts
@@ -210,27 +215,38 @@ website/
   .env.example             ← NEXT_PUBLIC_API_BASE_URL
   src/
     app/
-      layout.tsx           ← root layout, fonts, header/footer
-      page.tsx             ← / homepage (SSG)
+      layout.tsx           ← root layout, fonts, metadata
+      globals.css          ← tokens, focus ring, reduced-motion, scroll-padding
+      (site)/              ← public marketing/onboarding shell (Header + Footer)
+        layout.tsx         ← skip-link + <main> + Header/Footer
+        page.tsx           ← / homepage (SSG)
+        features/ pricing/ privacy/ terms/   ← SSG marketing pages
+        login/page.tsx     ← admin login (client)
       onboarding/page.tsx  ← multi-step wizard (client, backend-wired)
-      onboarding/success/page.tsx
-      features/page.tsx
-      pricing/page.tsx
-      privacy/page.tsx     ← reflects real Supabase schema
-      terms/page.tsx
-      login/page.tsx
-      globals.css
+      admin/               ← authenticated console (own chrome, no marketing nav)
+        layout.tsx         ← wraps everything in <AdminShell>
+        dashboard/page.tsx ← metrics, charts, live feed
+        people/page.tsx    ← students + teachers CRUD + CSV import
+        attendance/ marks/ fees/ announcements/ leave/ settings/  ← feature routes
     components/
       Header.tsx Footer.tsx
-      ui/  (Button, SectionHeading, Reveal, Photo, Field, …)
+      ui/  (Button, SectionHeading, Reveal, Photo, Field, Logo)
       home/ (Hero, SocialProof, ForSchools, ForParents, ForTeachers, HowItWorks, Testimonials, FinalCta)
-      onboarding/ (Stepper, steps…)
+      onboarding/ (Stepper, Wizard, steps…)
+      admin/
+        AdminShell.tsx Sidebar.tsx Topbar.tsx     ← chrome (auth gate, nav, bell)
+        Primitives.tsx DataTable.tsx Toolbar.tsx  ← shared building blocks
+        StatTile.tsx + charts (TrendChart/BarsChart/DonutChart over recharts)
     lib/
       api.ts               ← typed fetch wrapper over the Ktor envelope
-      onboarding.ts        ← step schema + payload builders (mirror server keys)
+      onboarding.ts        ← step schema + payload builders + CSV preview parser
       motion.ts            ← shared animation variants (restraint encoded here)
       images.ts            ← curated Unsplash URLs + blurDataURLs
       auth.ts              ← token storage helpers
+      admin/
+        client.ts          ← authenticated REST client (auto-refresh on 401)
+        hooks.ts           ← SWR hooks with LIVE/NEAR_LIVE/SLOW polling tiers
+        session.ts types.ts format.ts
 ```
 
 ---
@@ -251,3 +267,122 @@ website/
 Headings use weight contrast (ExtraBold vs body Regular), tight negative
 tracking; body capped at a readable measure. Accent is rationed — CTAs + one
 highlight per section, never gradients beyond a subtle lavender→white wash.
+
+---
+
+## 10. Admin web platform (`/admin/*`) — authenticated, real-data console
+
+The website hosts **the full admin console** for a school, mirroring every admin
+capability of the Kotlin Multiplatform mobile app on the web. It lives under
+`/admin/*`, completely separate from the public marketing/onboarding chrome.
+
+### 10.1 Auth gate & protected routes
+
+- **Login**: `POST /api/v1/auth/login` (email→password, phone→OTP). On success
+  the access + refresh tokens are persisted via `lib/admin/session.ts`.
+- **Refresh**: a 401 from any admin request triggers a one-shot
+  `POST /api/v1/auth/refresh`; on failure the user is bounced to `/login`.
+- **Route protection**: `AdminShell` reads the decoded session; if there is no
+  session, or the role is not in `SCHOOL_ROLES`, the user is redirected to
+  `/login`. Every admin route is wrapped by this shell, so protection is
+  centralised — no per-page guards.
+- **School scoping**: the JWT carries `school_id`. The backend enforces
+  `requireSchoolContext()` / `requireSchoolAdmin()` on every `/api/v1/school/*`
+  route, so the client never sends a `school_id` — it is derived from the token.
+  **All data is school-scoped server-side; zero hardcoded/mock data.**
+
+### 10.2 Chrome
+
+- **Sidebar** (`Sidebar.tsx`): school name + logo at the top, navigation for
+  every feature route in the middle, the signed-in user + logout at the bottom.
+  Collapses to a drawer on mobile (Escape / scrim / route-change closes it).
+- **Topbar** (`Topbar.tsx`): page title + a **notification bell** showing the
+  **real unread count** (polled), with a dropdown to mark-all-read.
+- **AdminShell** (`AdminShell.tsx`): the layout wrapper — auth gate, skip-to-
+  content link, `<main id="admin-content">` landmark, and the drawer state.
+
+### 10.3 Feature routes (one web route per mobile admin feature)
+
+| Route | Backend source | Highlights |
+|---|---|---|
+| `/admin/dashboard` | aggregate of school metrics | Stat tiles, trend/bar/donut charts, live activity feed; per-metric polling. |
+| `/admin/people` | `/api/v1/school/students`, `/api/v1/school/teachers` | Students + Teachers tabs, search/filter, create modals, **CSV bulk import** modal, delete. |
+| `/admin/attendance` | `/api/v1/school/attendance` | Present-rate tiles, by-class bar chart, sortable register. |
+| `/admin/marks` | `/api/v1/school/assessments` | Assessment list with average % + publish status. |
+| `/admin/fees` | `/api/v1/school/fees` | Collected/due/overdue tiles, donut split, recent ledger. |
+| `/admin/announcements` | `/api/v1/school/announcements` | Card grid + create modal (type/date/audience). |
+| `/admin/leave` | `/api/v1/school/leave` | Approve/Reject with optimistic SWR mutate. |
+| `/admin/settings` | `/api/v1/school/profile` | Editable institutional profile + read-only configuration facts. |
+
+Shared building blocks: `Primitives.tsx` (Card/Badge/Skeleton/EmptyState/
+Avatar/FadeIn), `DataTable.tsx` (generic sortable table), `Toolbar.tsx`
+(Toolbar/Modal/AdminButton/Chip), `StatTile.tsx`, and the chart wrappers
+(`TrendChart`/`BarsChart`/`DonutChart`) over **recharts**.
+
+---
+
+## 11. Real-time strategy — **SWR per-metric polling** (not websockets)
+
+**Decision: SWR with a tiered polling cadence, chosen per data class.** The admin
+console is read-mostly and the backend exposes plain REST, so a websocket layer
+would add server + infra complexity for little gain. Instead `lib/admin/hooks.ts`
+defines three refresh tiers and each hook picks the one that matches how fast the
+underlying data actually changes:
+
+| Tier | Interval | Used for |
+|---|---|---|
+| `LIVE` | 15 s | Notification unread count, today's attendance, live activity feed. |
+| `NEAR_LIVE` | 60 s | Dashboard metric tiles, fees collection, leave queue. |
+| `SLOW` | 5 min | School profile, configuration facts, mostly-static lists. |
+
+SWR also revalidates on focus/reconnect, so a returning admin sees fresh numbers
+immediately. Mutations (create/delete/approve) call `mutate(key)` to refresh the
+exact affected query rather than reloading the page — keeping the UI snappy and
+the request volume low. **Real-time is applied where it matters, not everywhere.**
+
+**Rejected:** websockets/SSE (backend has no push channel; operational overhead
+not justified for a read-mostly console), blanket short polling (wastes requests
+on data that changes hourly — hence the tiered cadence).
+
+---
+
+## 12. CSV bulk import (students)
+
+Schools onboard rosters in bulk, so both the **onboarding wizard** and the
+**admin → people** screen accept a student CSV. The flow has **one source of
+truth — the server parser** (`parseStudentCsv` in `SchoolStudentsRouting.kt`):
+
+- **Endpoint**: `POST /api/v1/school/students/import` accepts either a JSON array
+  of student objects **or** raw `csv` text. It returns
+  `{ total, inserted, failed, results[] }` so partial imports surface row-level
+  errors without aborting the whole batch.
+- **Header contract**: `full_name,class_name,roll_number,section,student_code`.
+  The server accepts common header aliases (`name`/`class`/`grade`/`roll`/`code`)
+  and tolerates missing optional columns (`section` defaults to `A`,
+  `student_code` is auto-generated when blank).
+- **Client preview** (`lib/onboarding.ts → parseStudentCsvPreview`): a
+  lightweight mirror of the server parser used **only** for a live preview table
+  and inline validation — it never becomes the authority. The CSV is always sent
+  verbatim to the server, which re-parses and validates it.
+- **Authoring help**: `STUDENT_CSV_PROMPT.md` documents the column contract and
+  ships a copy-paste LLM prompt that generates a ready-to-upload roster of ≥20
+  students; `sample-students.csv` is a validated 24-row example.
+
+In the wizard the import is wired as an optional `STUDENTS` step (between
+`ACADEMIC` and `REVIEW`); in the admin console it is the **Import** modal on the
+People → Students tab. Both call the same endpoint.
+
+---
+
+## 13. Accessibility & performance baseline (QoL)
+
+- **Keyboard a11y**: a single product-wide `:focus-visible` ring (keyboard-only,
+  never on mouse/touch); skip-to-content links on both the marketing and admin
+  shells; `Escape` closes every overlay (mobile menu, admin drawer, notification
+  bell, modals); semantic `<main>` landmarks.
+- **Motion**: a global `prefers-reduced-motion` block neutralises animations for
+  users who ask for it; all entrance animations play **once** and settle.
+- **Core Web Vitals**: `next/image` (AVIF/WebP, blur placeholder, lazy except the
+  LCP hero which uses `priority`), `next/font` with `display: swap`,
+  per-route code-splitting, and `scroll-padding-top` so anchor jumps clear the
+  fixed header. Animations touch only `opacity`/`transform` → ~zero CLS.

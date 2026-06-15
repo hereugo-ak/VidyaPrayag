@@ -12,6 +12,8 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     scroll-behavior: smooth;
+    /* Header is fixed at 72px — keep anchor jumps from landing under it. */
+    scroll-padding-top: 88px;
   }
 
   body {
@@ -19,6 +21,8 @@
     /* very subtle lavender → near-white wash, the only gradient we allow */
     background-image: linear-gradient(180deg, #e6e6fa 0%, #fcf8ff 38%, #ffffff 100%);
     background-attachment: fixed;
+    /* Calmer tap feedback on touch devices (no grey flash). */
+    -webkit-tap-highlight-color: transparent;
   }
 
   ::selection {
@@ -29,6 +33,26 @@
   h1, h2, h3 {
     @apply text-navy-deep;
     text-wrap: balance;
+  }
+
+  /* Long paragraphs avoid orphaned single words on the last line. */
+  p {
+    text-wrap: pretty;
+  }
+
+  /* A11y: one consistent keyboard focus ring across the whole product.
+     Uses :focus-visible so it never shows on mouse/touch — only keyboard. */
+  :focus-visible {
+    outline: 2px solid #6c5ce0;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  /* Inputs/selects/textarea already style their own focus border, so suppress
+     the double ring there and let the component border do the talking. */
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: none;
   }
 }
 
