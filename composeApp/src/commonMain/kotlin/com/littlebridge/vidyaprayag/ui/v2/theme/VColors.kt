@@ -19,6 +19,7 @@ data class VColors(
     val navy: Color,
     val navyDeep: Color,
     val lavender: Color,   // app background (light/parent)
+    val lavenderLight: Color,   // app background (light/parent)
     val cream: Color,      // secondary / input surface
     val warmOrange: Color,
 
@@ -62,6 +63,7 @@ private object Raw {
     val navy = Color(0xFF26234D)
     val navyDeep = Color(0xFF1A1838)
     val lavender = Color(0xFFFCF8FF)
+    val lavenderLight = Color(0xFFEAE6FA)
     val cream = Color(0xFFF5F5F3)
     val warmOrange = Color(0xFF9E421A)
 
@@ -112,6 +114,7 @@ val LightVColors = VColors(
     navy = Raw.navy,
     navyDeep = Raw.navyDeep,
     lavender = Raw.lavender,
+    lavenderLight = Raw.lavenderLight,
     cream = Raw.cream,
     warmOrange = Raw.warmOrange,
     ink = Raw.ink,
@@ -140,6 +143,7 @@ val NightVColors = VColors(
     navy = Raw.nightNavy,
     navyDeep = Raw.nightNavyDeep,
     lavender = Raw.nightBg,
+    lavenderLight = Raw.lavenderLight,
     cream = Raw.nightTinted,
     warmOrange = Raw.nightWarmOrange,
     ink = Raw.nightInk,

@@ -93,7 +93,7 @@ private fun TeacherHomeContent(
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
-            .padding(top = 24.dp, bottom = 24.dp),
+            .padding(top = 24.dp, bottom = 140.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         // ── Header ──────────────────────────────────────────────────────────

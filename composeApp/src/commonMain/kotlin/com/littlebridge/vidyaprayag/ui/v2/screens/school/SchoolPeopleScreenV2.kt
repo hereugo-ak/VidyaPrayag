@@ -176,7 +176,7 @@ private fun SchoolPeopleContent(
             .statusBarsPadding()
             .imePadding()
             .navigationBarsPadding()
-            .padding(top = 24.dp, bottom = 24.dp),
+            .padding(top = 24.dp, bottom = 140.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text("People", style = VTheme.type.h1.colored(c.ink), modifier = Modifier.padding(horizontal = 20.dp))

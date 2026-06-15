@@ -78,7 +78,7 @@ private fun ParentActivityContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
-            .padding(top = 20.dp, bottom = 24.dp),
+            .padding(top = 20.dp, bottom = 140.dp),
     ) {
         Text("Activity", style = VTheme.type.h1.colored(c.ink), modifier = Modifier.padding(bottom = 12.dp))
 

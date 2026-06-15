@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.littlebridge.vidyaprayag.ui.v2.theme.VElevationLevel
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingStep
 import com.littlebridge.vidyaprayag.feature.admin.presentation.DashboardOnboardingStatus
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolDashboardViewModel
@@ -43,6 +45,7 @@ import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import com.littlebridge.vidyaprayag.ui.v2.theme.vElevation
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.roundToInt
 
@@ -126,38 +129,18 @@ private fun SchoolHomeContent(
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
-            .padding(top = 24.dp, bottom = 24.dp),
+            .padding(top = 24.dp, bottom = 140.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        // ── Header row ────────────────────────────────────────────────────────
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(Modifier.size(40.dp).clip(CircleShape).background(c.teal), contentAlignment = Alignment.Center) {
-                    Icon(VIcons.GraduationCap, contentDescription = null, tint = Color(0xFF080808), modifier = Modifier.size(18.dp))
-                }
-                Column {
-                    Text("School console", style = VTheme.type.h4.colored(c.ink))
-                    Text(
-                        if (completed) "Campus live" else "Setup in progress",
-                        style = VTheme.type.caption.colored(c.ink2),
-                    )
-                }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(
-                    Modifier.size(40.dp).clip(CircleShape).background(c.ink.copy(alpha = 0.06f)).clickable { onOpenNotifications() },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(VIcons.Bell, contentDescription = "Notifications", tint = c.ink, modifier = Modifier.size(18.dp))
-                    // RA-S06: show the unread dot only when there is actually
-                    // something unread — not a permanent always-on indicator.
-                    if (unreadCount > 0) {
-                        Box(Modifier.align(Alignment.TopEnd).padding(8.dp).size(6.dp).clip(CircleShape).background(c.danger))
-                    }
-                }
-                Box(Modifier.clickable { onExit() }) { VAvatar(name = adminName, size = 36.dp) }
-            }
-        }
+        FloatingSchoolHomeHeader(
+            adminName = adminName,
+            completed = completed,
+            unreadCount = unreadCount,
+            onOpenNotifications = onOpenNotifications,
+            onExit = onExit,
+            modifier = Modifier
+                .fillMaxWidth()
+        )
 
         VStateHost(
             loading = isLoading,
@@ -228,6 +211,94 @@ private fun SchoolHomeContent(
             }
         }
     }
+}
+
+
+@Composable
+private fun FloatingSchoolHomeHeader(
+    adminName: String,
+    completed: Boolean,
+    unreadCount: Int,
+    onOpenNotifications: () -> Unit,
+    onExit: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+    Row(
+        modifier
+            .vElevation(VElevationLevel.Card, radius = 28.dp)
+            .clip(RoundedCornerShape(28.dp))
+            .background(c.card.copy(alpha = if (c.isNight) 0.94f else 0.98f))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(c.teal.copy(alpha = if (c.isNight) 0.26f else 0.22f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                VIcons.GraduationCap,
+                contentDescription = null,
+                tint = c.tealDeep,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+
+        Column(Modifier.weight(1f)) {
+            Text("School console", style = VTheme.type.h4.colored(c.ink))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(
+                    Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(if (completed) c.successInk else c.warningInk),
+                )
+                Text(
+                    if (completed) "Campus live" else "Setup in progress",
+                    style = VTheme.type.caption.colored(c.ink2),
+                )
+            }
+        }
+
+        HeaderIconButton(onClick = onOpenNotifications) {
+            Icon(VIcons.Bell, contentDescription = "Notifications", tint = c.ink, modifier = Modifier.size(18.dp))
+            if (unreadCount > 0) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(c.danger),
+                )
+            }
+        }
+
+        Box(Modifier.clip(CircleShape).clickable { onExit() }) {
+            VAvatar(name = adminName, size = 38.dp)
+        }
+    }
+}
+
+@Composable
+private fun HeaderIconButton(
+    onClick: () -> Unit,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val c = VTheme.colors
+    Box(
+        Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(c.ink.copy(alpha = if (c.isNight) 0.12f else 0.06f))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center,
+        content = content,
+    )
 }
 
 /**

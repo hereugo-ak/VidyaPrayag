@@ -113,7 +113,7 @@ private fun TeacherClassesContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
-            .padding(top = 24.dp, bottom = 24.dp),
+            .padding(top = 24.dp, bottom = 140.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text("My Classes", style = VTheme.type.h1.colored(c.ink))

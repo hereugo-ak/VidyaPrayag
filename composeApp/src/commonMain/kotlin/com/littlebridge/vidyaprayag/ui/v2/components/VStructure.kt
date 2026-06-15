@@ -9,9 +9,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -35,7 +38,8 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.colored
  *
  * Translated from primitives.tsx → `PhoneFrame`. Centers a max-440dp column on wide displays
  * (desktop/web), paints the portal background, and stacks an optional [topBar] + scrolling
- * [content] + optional [bottomBar]. The content area fills remaining height.
+ * [content] with an optional floating [bottomBar]. The content area fills remaining height
+ * and receives enough bottom padding to scroll above the floating navigation.
  */
 @Composable
 fun VScreenScaffold(
@@ -45,21 +49,44 @@ fun VScreenScaffold(
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val c = VTheme.colors
+    val d = VTheme.dimens
+    val floatingBottomBarPadding = if (bottomBar != null) {
+        112.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    } else {
+        0.dp
+    }
     Box(
         modifier.fillMaxSize().background(c.background),
         contentAlignment = Alignment.TopCenter,
     ) {
-        Column(
+        Box(
             Modifier
                 .fillMaxSize()
-                .widthIn(max = VTheme.dimens.maxContentWidth)
+                .widthIn(max = d.maxContentWidth)
                 .background(c.background),
         ) {
-            topBar?.invoke()
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                content(PaddingValues(VTheme.dimens.screenPadding))
+            Column(Modifier.fillMaxSize()) {
+                topBar?.invoke()
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    content(
+                        PaddingValues(
+                            start = d.screenPadding,
+                            top = d.screenPadding,
+                            end = d.screenPadding,
+                            bottom = d.screenPadding + floatingBottomBarPadding,
+                        ),
+                    )
+                }
             }
-            bottomBar?.invoke()
+            if (bottomBar != null) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth(),
+                ) {
+                    bottomBar()
+                }
+            }
         }
     }
 }

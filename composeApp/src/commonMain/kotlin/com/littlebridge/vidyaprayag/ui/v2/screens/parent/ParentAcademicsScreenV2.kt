@@ -111,7 +111,7 @@ private fun ParentAcademicsContent(
         modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(bottom = 24.dp),
+            .padding(bottom = 140.dp),
     ) {
         Text(
             "Academics",
