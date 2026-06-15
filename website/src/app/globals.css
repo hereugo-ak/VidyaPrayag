@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-jakarta: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+    --font-dmmono: "DM Mono", ui-monospace, monospace;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-lavender text-ink font-sans antialiased;
+    /* very subtle lavender → near-white wash, the only gradient we allow */
+    background-image: linear-gradient(180deg, #e6e6fa 0%, #fcf8ff 38%, #ffffff 100%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background-color: #6c5ce0;
+    color: #ffffff;
+  }
+
+  h1, h2, h3 {
+    @apply text-navy-deep;
+    text-wrap: balance;
+  }
+}
+
+@layer components {
+  .shell {
+    @apply mx-auto w-full max-w-shell px-6 md:px-8;
+  }
+
+  /* Eyebrow label — 11px, tracked, uppercase (mirrors app `labelStrong`). */
+  .eyebrow {
+    @apply text-[11px] font-bold uppercase tracking-[0.14em] text-accent;
+  }
+
+  .display {
+    @apply font-extrabold tracking-tighter text-navy-deep;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
