@@ -15,15 +15,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-/** A single teacher row for the roster UI. */
-data class TeacherRosterItem(
-    val id: String,
-    val name: String,
-    val contact: String,
-)
 
 data class SchoolTeachersState(
-    val teachers: List<TeacherRosterItem> = emptyList(),
+    val teachers: List<TeacherAccountDto> = emptyList(),
     val isLoading: Boolean = false,
     val isMutating: Boolean = false,
     val errorMessage: String? = null,
@@ -62,7 +56,7 @@ class SchoolTeachersViewModel(
             }
             when (val result = repository.getTeachers(token)) {
                 is NetworkResult.Success -> {
-                    val items = result.data.data?.teachers.orEmpty().map { it.toRosterItem() }
+                    val items = result.data.data?.teachers.orEmpty()
                     _state.value = _state.value.copy(teachers = items, isLoading = false)
                 }
                 is NetworkResult.Error -> {
@@ -191,10 +185,4 @@ class SchoolTeachersViewModel(
     fun clearMessages() {
         _state.value = _state.value.copy(errorMessage = null, infoMessage = null)
     }
-
-    private fun TeacherAccountDto.toRosterItem() = TeacherRosterItem(
-        id = id,
-        name = name,
-        contact = (email ?: phone).orEmpty(),
-    )
 }

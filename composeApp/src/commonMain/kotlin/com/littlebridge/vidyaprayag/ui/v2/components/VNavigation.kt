@@ -32,6 +32,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -77,43 +78,91 @@ fun VTopTabs(
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
-    Column(modifier.fillMaxWidth().background(c.card)) {
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = c.card,
+    ) {
         Row(
-            Modifier
+            modifier = Modifier
+                .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                .padding(
+                    horizontal = 12.dp,
+                    vertical = 8.dp
+                ),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
+
             tabs.forEach { tab ->
+
                 val active = tab == selected
-                val color by animateColorAsState(if (active) c.tealDeep else c.ink3, tween(180), label = "tabColor")
-                val interaction = remember { MutableInteractionSource() }
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
+
+                val bgColor by animateColorAsState(
+                    targetValue = if (active)
+                        c.tealDeep
+                    else
+                        Color.Transparent,
+                    animationSpec = tween(220),
+                    label = "tabBackground"
+                )
+
+                val textColor by animateColorAsState(
+                    targetValue = if (active)
+                        Color.White
+                    else
+                        c.ink3,
+                    animationSpec = tween(220),
+                    label = "tabText"
+                )
+
+                val scale by animateFloatAsState(
+                    targetValue = if (active) 1f else 0.98f,
+                    animationSpec = tween(220),
+                    label = "tabScale"
+                )
+
+
+                Box(
                     modifier = Modifier
-                        .clickable(interactionSource = interaction, indication = null) { onSelect(tab) }
-                        .padding(horizontal = 12.dp),
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        }
+                        .clip(
+                            RoundedCornerShape(50)
+                        )
+                        .background(bgColor)
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember {
+                                MutableInteractionSource()
+                            }
+                        ) {
+                            onSelect(tab)
+                        }
+                        .padding(
+                            horizontal = 18.dp,
+                            vertical = 10.dp
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
+
                     Text(
                         text = tab,
-                        // React VTopTabs: 13 / 600 (not caption's 12). §matrix.
-                        style = VTheme.type.dataSm.colored(color).copy(
+                        style = VTheme.type.dataSm.copy(
                             fontFamily = VTheme.type.uiFamily,
-                            fontWeight = FontWeight.SemiBold,
-                        ),
-                        modifier = Modifier.padding(vertical = 12.dp),
-                    )
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(2.5.dp)
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(if (active) c.tealDeep else Color.Transparent),
+                            fontWeight = if (active)
+                                FontWeight.Bold
+                            else
+                                FontWeight.SemiBold,
+                            color = textColor
+                        )
                     )
                 }
             }
         }
-        VDivider()
     }
 }
 

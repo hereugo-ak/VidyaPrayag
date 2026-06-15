@@ -14,10 +14,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,6 +27,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.ui.v2.theme.VElevationLevel
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingStep
@@ -38,6 +42,7 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
 import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
+import com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonDashboard
 import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
@@ -144,7 +149,7 @@ private fun SchoolHomeContent(
             error = errorMessage,
             isEmpty = false,
             onRetry = onRetry,
-            skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonDashboard() },
+            skeleton = { SkeletonDashboard() },
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
                 // ── Greeting ───────────────────────────────────────────────────
@@ -177,11 +182,55 @@ private fun SchoolHomeContent(
                     }
                 }
 
-                // ── Operational metrics (REAL — opens the Analytics dashboard) ─
-                // RA-24: the /overview, /class-performance, /syllabus-coverage and
-                // /student-cohort aggregates are live and rendered by
-                // AnalyticsDashboardScreenV2, so this is a real entry point, not a
-                // Coming-Soon placeholder.
+                Column(
+                    modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 20.dp)
+                        .statusBarsPadding(),
+
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    DashboardStatsGrid(
+                        teachers = 10,
+                        students = 60,
+                        classes = 1023,
+                        subjects = 123
+                    )
+                    AttentionSection(
+                        pendingRequests = 11,
+                        unassignedTeachers = 0,
+                        onOpenRequests = {}
+                    )
+
+
+                    QuickActionsSection(
+                        onAddTeacher = {  },
+                        onOpenStudents = {}
+                    )
+
+
+                    TeacherSummaryCard(
+                        assigned = 4,
+                        unassigned = 1,
+                        onClick = {  }
+                    )
+
+
+                    RecentActivityCard(
+                        activities = listOf(
+                            ActivityItem(
+                            title = "PTM",
+                            subtitle = "Meet parent",
+                            time ="12May"
+                        ))
+                    )
+
+
+                    Spacer(
+                        Modifier.height(24.dp)
+                    )
+                }
+
                 Column {
                     Text("Today at a glance", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
                     MetricEntryCard(
@@ -192,9 +241,6 @@ private fun SchoolHomeContent(
                     )
                 }
 
-                // ── Early-warning radar (REAL — opens the at-risk cohort) ──────
-                // RA-24: /student-cohort returns real at_risk_students + risk
-                // counts, rendered on the People tab. Tapping opens it.
                 Column {
                     Text("Early-warning radar", style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(bottom = 8.dp))
                     MetricEntryCard(
@@ -305,7 +351,7 @@ private fun HeaderIconButton(
  */
 @Composable
 private fun MetricEntryCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     title: String,
     description: String,
     onClick: () -> Unit,
@@ -356,6 +402,707 @@ private fun OnboardingStepRow(step: OnboardingStep) {
         }
         if (step.isCompleted) {
             VBadge(text = "Done", tone = VBadgeTone.Success)
+        }
+    }
+}
+
+
+@Composable
+fun DashboardStatsGrid(
+    teachers: Int,
+    students: Int,
+    classes: Int,
+    subjects: Int,
+) {
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+
+
+        Row(
+            horizontalArrangement =
+                Arrangement.spacedBy(12.dp)
+        ) {
+
+            DashboardStatCard(
+                modifier = Modifier.weight(1f),
+                title = "Teachers",
+                value = teachers.toString(),
+                icon = VIcons.Users
+            )
+
+
+            DashboardStatCard(
+                modifier = Modifier.weight(1f),
+                title = "Students",
+                value = students.toString(),
+                icon = VIcons.BookOpen
+            )
+        }
+
+
+
+        Row(
+            horizontalArrangement =
+                Arrangement.spacedBy(12.dp)
+        ) {
+
+            DashboardStatCard(
+                modifier = Modifier.weight(1f),
+                title = "Classes",
+                value = classes.toString(),
+                icon = VIcons.School
+            )
+
+
+            DashboardStatCard(
+                modifier = Modifier.weight(1f),
+                title = "Subjects",
+                value = subjects.toString(),
+                icon = VIcons.BookOpen
+            )
+        }
+    }
+}
+
+@Composable
+fun DashboardStatCard(
+    title: String,
+    value: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+) {
+
+    val c = VTheme.colors
+
+
+    VCard(
+        modifier
+    ) {
+
+
+        Column(
+            Modifier.padding(16.dp),
+
+            verticalArrangement =
+                Arrangement.spacedBy(10.dp)
+        ) {
+
+
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = c.tealDeep
+            )
+
+
+            Text(
+                value,
+                style =
+                    VTheme.type.h2.colored(c.ink)
+            )
+
+
+            Text(
+                title,
+                style =
+                    VTheme.type.caption.colored(c.ink2)
+            )
+        }
+    }
+}
+
+@Composable
+fun AttentionSection(
+    pendingRequests: Int,
+    unassignedTeachers: Int,
+    onOpenRequests: () -> Unit,
+) {
+
+    Column(
+        verticalArrangement =
+            Arrangement.spacedBy(12.dp)
+    ) {
+
+
+        SectionTitle(
+            "Needs attention"
+        )
+
+
+        DashboardActionCard(
+            title = "Child link requests",
+            subtitle =
+                "$pendingRequests requests waiting",
+
+            icon = VIcons.Plus,
+
+            onClick = onOpenRequests
+        )
+
+
+        DashboardActionCard(
+            title = "Teacher assignments",
+            subtitle =
+                "$unassignedTeachers teachers need mapping",
+
+            icon = VIcons.Users,
+
+            onClick = {}
+        )
+    }
+}
+
+@Composable
+fun DashboardActionCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    accent: Color? = null,
+) {
+    val c = VTheme.colors
+
+    val iconColor = accent ?: c.tealDeep
+
+
+    VCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(
+                RoundedCornerShape(20.dp)
+            )
+            .clickable(
+                onClick = onClick
+            )
+    ) {
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = 16.dp,
+                    vertical = 14.dp
+                ),
+
+            verticalAlignment =
+                Alignment.CenterVertically
+        ) {
+
+
+            // Icon container
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(
+                        RoundedCornerShape(14.dp)
+                    )
+                    .background(
+                        iconColor.copy(
+                            alpha = 0.12f
+                        )
+                    ),
+
+                contentAlignment =
+                    Alignment.Center
+            ) {
+
+                Icon(
+                    imageVector = icon,
+
+                    contentDescription = null,
+
+                    tint = iconColor,
+
+                    modifier = Modifier
+                        .size(24.dp)
+                )
+            }
+
+
+
+            Spacer(
+                Modifier.width(14.dp)
+            )
+
+
+
+            Column(
+                modifier = Modifier.weight(1f),
+
+                verticalArrangement =
+                    Arrangement.spacedBy(3.dp)
+            ) {
+
+                Text(
+                    text = title,
+
+                    style =
+                        VTheme.type.bodyStrong
+                            .colored(c.ink)
+                )
+
+
+                Text(
+                    text = subtitle,
+
+                    style =
+                        VTheme.type.caption
+                            .colored(c.ink2),
+
+                    maxLines = 2
+                )
+            }
+
+
+
+            // Navigation indicator
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(
+                        c.background.copy(
+                            alpha = 0.8f
+                        )
+                    ),
+
+                contentAlignment =
+                    Alignment.Center
+            ) {
+
+                Icon(
+                    imageVector = VIcons.ArrowRight,
+
+                    contentDescription = null,
+
+                    tint = c.ink3,
+
+                    modifier = Modifier
+                        .size(18.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun QuickActionsSection(
+    onAddTeacher: () -> Unit,
+    onOpenStudents: () -> Unit,
+) {
+
+    Column(
+        verticalArrangement =
+            Arrangement.spacedBy(12.dp)
+    ) {
+
+
+        SectionTitle(
+            "Quick actions"
+        )
+
+
+        Row(
+            horizontalArrangement =
+                Arrangement.spacedBy(12.dp)
+        ) {
+
+
+            QuickActionTile(
+                modifier = Modifier.weight(1f),
+                title = "Teacher",
+                icon = VIcons.Plus,
+                onClick = onAddTeacher
+            )
+
+
+            QuickActionTile(
+                modifier = Modifier.weight(1f),
+                title = "Student",
+                icon = VIcons.BookOpen,
+                onClick = onOpenStudents
+            )
+        }
+    }
+}
+
+@Composable
+fun SectionTitle(
+    text: String
+) {
+
+    Text(
+        text,
+        style =
+            VTheme.type.h1
+                .colored(VTheme.colors.ink)
+    )
+}
+
+@Composable
+fun QuickActionTile(
+    title: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+
+
+    VCard(
+        modifier = modifier
+            .clip(
+                RoundedCornerShape(18.dp)
+            )
+            .clickable(
+                onClick = onClick
+            )
+    ) {
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    vertical = 16.dp,
+                    horizontal = 14.dp
+                ),
+
+            verticalArrangement =
+                Arrangement.spacedBy(12.dp),
+
+            horizontalAlignment =
+                Alignment.CenterHorizontally
+        ) {
+
+
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(
+                        RoundedCornerShape(14.dp)
+                    )
+                    .background(
+                        c.tealDeep.copy(
+                            alpha = 0.12f
+                        )
+                    ),
+
+                contentAlignment =
+                    Alignment.Center
+            ) {
+
+                Icon(
+                    imageVector = icon,
+
+                    contentDescription = title,
+
+                    tint = c.tealDeep,
+
+                    modifier = Modifier
+                        .size(22.dp)
+                )
+            }
+
+
+
+            Text(
+                text = title,
+
+                style =
+                    VTheme.type.bodyStrong
+                        .colored(c.ink),
+
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+fun TeacherSummaryCard(
+    assigned: Int,
+    unassigned: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+
+
+    VCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick)
+    ) {
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+
+            verticalArrangement =
+                Arrangement.spacedBy(14.dp)
+        ) {
+
+
+            Row(
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
+
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(
+                            RoundedCornerShape(14.dp)
+                        )
+                        .background(
+                            c.tealDeep.copy(
+                                alpha = 0.12f
+                            )
+                        ),
+
+                    contentAlignment =
+                        Alignment.Center
+                ) {
+
+                    Icon(
+                        imageVector = VIcons.Users,
+                        contentDescription = null,
+                        tint = c.tealDeep,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+
+                Spacer(
+                    Modifier.width(12.dp)
+                )
+
+
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+
+                    Text(
+                        "Teacher overview",
+                        style =
+                            VTheme.type.bodyStrong
+                                .colored(c.ink)
+                    )
+
+
+                    Text(
+                        "Assignment status",
+                        style =
+                            VTheme.type.caption
+                                .colored(c.ink2)
+                    )
+                }
+
+
+                Icon(
+                    VIcons.ArrowRight,
+                    contentDescription = null,
+                    tint = c.ink3
+                )
+            }
+
+
+
+            HorizontalDivider()
+
+
+
+            Row(
+                horizontalArrangement =
+                    Arrangement.spacedBy(12.dp)
+            ) {
+
+                TeacherStatusItem(
+                    label = "Assigned",
+                    value = assigned,
+                    modifier = Modifier.weight(1f),
+                    color = c.tealDeep
+                )
+
+
+                TeacherStatusItem(
+                    label = "Needs mapping",
+                    value = unassigned,
+                    modifier = Modifier.weight(1f),
+                    color = c.warningInk
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TeacherStatusItem(
+    label: String,
+    value: Int,
+    modifier: Modifier = Modifier,
+    color: Color,
+) {
+    val c = VTheme.colors
+
+
+    Column(
+        modifier = modifier
+            .clip(
+                RoundedCornerShape(14.dp)
+            )
+            .background(
+                color.copy(alpha = 0.08f)
+            )
+            .padding(12.dp)
+    ) {
+
+        Text(
+            value.toString(),
+            style =
+                VTheme.type.h3.colored(color)
+        )
+
+
+        Text(
+            label,
+            style =
+                VTheme.type.caption.colored(c.ink2)
+        )
+    }
+}
+
+
+data class ActivityItem(
+    val title: String,
+    val subtitle: String,
+    val time: String
+)
+
+@Composable
+fun RecentActivityCard(
+    activities: List<ActivityItem>,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+
+
+    VCard(
+        modifier = modifier
+            .fillMaxWidth()
+    ) {
+
+        Column(
+            modifier = Modifier
+                .padding(16.dp),
+
+            verticalArrangement =
+                Arrangement.spacedBy(14.dp)
+        ) {
+
+
+            Text(
+                "Recent activity",
+                style =
+                    VTheme.type.bodyStrong
+                        .colored(c.ink)
+            )
+
+
+
+            if (activities.isEmpty()) {
+
+                Text(
+                    "No recent activity",
+                    style =
+                        VTheme.type.caption
+                            .colored(c.ink2)
+                )
+
+            } else {
+
+
+                activities
+                    .take(5)
+                    .forEachIndexed { index, activity ->
+
+
+                        Row(
+                            verticalAlignment =
+                                Alignment.Top
+                        ) {
+
+
+                            Box(
+                                modifier = Modifier
+                                    .padding(top = 5.dp)
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        c.tealDeep
+                                    )
+                            )
+
+
+                            Spacer(
+                                Modifier.width(12.dp)
+                            )
+
+
+                            Column(
+                                modifier =
+                                    Modifier.weight(1f),
+
+                                verticalArrangement =
+                                    Arrangement.spacedBy(2.dp)
+                            ) {
+
+
+                                Text(
+                                    activity.title,
+
+                                    style =
+                                        VTheme.type.body
+                                            .colored(c.ink)
+                                )
+
+
+                                Text(
+                                    activity.subtitle,
+
+                                    style =
+                                        VTheme.type.caption
+                                            .colored(c.ink2)
+                                )
+
+
+                                Text(
+                                    activity.time,
+
+                                    style =
+                                        VTheme.type.dataSm
+                                            .colored(c.ink3)
+                                )
+                            }
+                        }
+
+
+                        if(index != activities.lastIndex) {
+
+                            HorizontalDivider(
+                                modifier =
+                                    Modifier.padding(
+                                        start = 20.dp
+                                    )
+                            )
+                        }
+                    }
+            }
         }
     }
 }

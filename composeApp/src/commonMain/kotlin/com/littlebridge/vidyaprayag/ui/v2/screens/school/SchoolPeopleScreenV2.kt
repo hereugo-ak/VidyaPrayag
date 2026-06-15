@@ -44,6 +44,7 @@ import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentAnalyticsS
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentAnalyticsViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentRosterState
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentRosterViewModel
+import com.littlebridge.vidyaprayag.ui.v2.components.VActionCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
@@ -181,19 +182,13 @@ private fun SchoolPeopleContent(
     ) {
         Text("People", style = VTheme.type.h1.colored(c.ink), modifier = Modifier.padding(horizontal = 20.dp))
 
-        // ── RA-48: parent→child link approval queue entry ──────────────────
-        VCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).clickable(onClick = onOpenLinkRequests)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Child link requests", style = VTheme.type.bodyStrong.colored(c.ink))
-                    Text(
-                        "Review parents requesting access to a student's records",
-                        style = VTheme.type.caption.colored(c.ink2),
-                    )
-                }
-                Icon(VIcons.ArrowRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
-            }
-        }
+        VActionCard(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            title = "Child link requests",
+            subtitle = "Review parents requesting access to student records",
+            icon = VIcons.Plus,
+            onClick = onOpenLinkRequests,
+        )
 
         // ── RA-S17: sub-tabs ─────────────────────────────────────────────────
         VTopTabs(
@@ -316,7 +311,7 @@ private fun TeachersSubTab(
     val filtered = state.teachers.filter {
         query.isBlank() ||
             it.name.contains(query, ignoreCase = true) ||
-            it.contact.contains(query, ignoreCase = true)
+                it.phone?.contains(query, ignoreCase = true) == true
     }
 
     VStateHost(
@@ -337,7 +332,7 @@ private fun TeachersSubTab(
                 Box(modifier = Modifier.staggeredItemEntrance(index = index, trigger = ready)) {
                     PersonRow(
                         name = t.name,
-                        subtitle = t.contact.ifBlank { "Teacher" },
+                        subtitle = t.phone?:  "Teacher" ,
                         onClick = { onOpenTeacher(t.id) },
                     )
                 }
