@@ -2,16 +2,24 @@
  * File: Tables.kt
  * Module: db
  *
- * Exposed table definitions mapped 1:1 to the real Supabase Postgres schema.
+ * Exposed table definitions mapped 1:1 to the Postgres schema the backend
+ * actually uses (the `vidyasetu_schema.sql` model — NOT the root
+ * /supabase_schema doc, which only covers 2 of these tables).
  *
- * Two source-of-truth SQL files describe what's deployed in Supabase:
- *   - /supabase_schema                            (operational tables, v2.1)
- *   - /docs/backend/sql/01_supplementary_schema.sql  (everything the Ktor
- *                                                    backend additionally needs)
+ * CANONICAL PROVISIONING ORDER (the ONLY complete recipe — see
+ * docs/db/PROVISION.sql which lists these in order):
+ *   1. docs/db/vidyasetu_schema.sql
+ *   2. docs/db/migration_001_faculty_and_holiday_list.sql
+ *   3. docs/db/migration_002_segmentation_geo_assignments.sql   (segmentation + assignments;
+ *      schools lat/long now live in the BASE schema per §1.3, so this only re-asserts them
+ *      via ADD COLUMN IF NOT EXISTS — a harmless no-op)
+ *   4. docs/backend/sql/02_teacher_schema.sql
  *
- * Run BOTH SQL files in Supabase → SQL Editor before pointing the backend
- * at production.  For local-dev SQLite fallback, Exposed auto-creates the
- * tables in the order declared in DatabaseFactory.allTables.
+ * Run all four in Supabase → SQL Editor before pointing the backend at
+ * production. For local-dev SQLite fallback, Exposed auto-creates the tables
+ * in the order declared in DatabaseFactory.allTables. In Postgres, boot-time
+ * validation (DatabaseFactory.validateSchema) logs any of the 38 tables that
+ * are missing and refuses to start when AUTO_CREATE_TABLES is not enabled.
  *
  * IMPORTANT DESIGN CHOICES
  * ------------------------
@@ -19,8 +27,6 @@
  *    flow uses `app_users` for phone-OTP-first signup.  Email-only users
  *    can still be created (password_hash column).
  *  - We use UUIDs everywhere to match Supabase.
- *  - Foreign keys are declared with .references() so SchemaUtils generates
- *    proper FK constraints in SQLite dev too.
  *  - JSONB columns are stored as `text` here; we marshal them with
  *    kotlinx.serialization on the way in/out.
  *
@@ -50,6 +56,11 @@ object AppUsersTable : UUIDTable("app_users", "id") {
     val isPhoneVerified  = bool("is_phone_verified").default(false)
     val isEmailVerified  = bool("is_email_verified").default(false)
     val profileCompleted = bool("profile_completed").default(false)
+    // RA-54: server-side signal for the teacher first-login "force change initial
+    // password" gate. Provisioned teachers are created with this = true; the
+    // POST /auth/change-password endpoint clears it (and flips profile_completed)
+    // once the teacher sets their own password. NavGraphV2 reads it via login.
+    val mustChangePassword = bool("must_change_password").default(false)
     val isActive         = bool("is_active").default(true)
     val lastLoginAt      = timestamp("last_login_at").nullable()
     val createdAt        = timestamp("created_at")
@@ -178,8 +189,28 @@ object SchoolsTable : UUIDTable("schools", "id") {
     val pincode        = text("pincode").nullable()
     val logoUrl        = text("logo_url").nullable()
     val brandColor     = text("brand_color").default("#2563EB")
+    // Geo coordinates persisted during onboarding / profile update so the
+    // parent side can discover onboarded schools by distance ("near me").
+    // Nullable because legacy rows / address-only onboarding may not have them.
+    val latitude       = double("latitude").nullable()
+    val longitude      = double("longitude").nullable()
     val isActive       = bool("is_active").default(true)
     val onboardedAt    = timestamp("onboarded_at").nullable()
+    // Explicit onboarding lifecycle mirror of onboarded_at: 'pending' until the
+    // admin completes onboarding, then 'active'. Kept in lock-step by the server
+    // (REVIEW final submit + POST /onboarding/complete). See
+    // docs/db/schema-patch-school-onboarding.sql.
+    val onboardingStatus = varchar("onboarding_status", 16).default("pending")
+    // Richer onboarding fields the wizard collects (all nullable; promoted from
+    // school_onboarding_drafts so the dashboard can read them directly).
+    val schoolType         = text("school_type").nullable()
+    val affiliationNumber  = text("affiliation_number").nullable()
+    val yearEstablished    = integer("year_established").nullable()
+    val website            = text("website").nullable()
+    val totalStudents      = integer("total_students").nullable()
+    val totalClasses       = integer("total_classes").nullable()
+    val academicYearStartMonth = text("academic_year_start_month").nullable()
+    val gradingSystem      = text("grading_system").nullable()
     val createdAt      = timestamp("created_at")
     val updatedAt      = timestamp("updated_at")
 }
@@ -216,8 +247,42 @@ object SchoolSubjectsTable : UUIDTable("school_subjects", "id") {
     val classId         = uuid("class_id")
     val subName         = text("sub_name")
     val subCode         = text("sub_code")
+    // Legacy free-text teacher name kept for backwards compatibility with rows
+    // written before the structured teacher_subject_assignments model existed.
     val teacherAssigned = text("teacher_assigned").nullable()
     val createdAt       = timestamp("created_at")
+}
+
+// =====================================================================
+// teacher_subject_assignments
+//   Structured replacement for the free-text `school_subjects.teacher_assigned`
+//   column. Defines WHO (faculty/user) teaches WHAT (subject) to WHICH
+//   class+section. This is the assignment graph that enables:
+//     • per-class subject pools (instead of one global subject array)
+//     • teacher broadcasts scoped to the classes/subjects they actually teach
+//     • audience expansion for segmented announcements
+//
+//   Uniqueness: one (school, class, section, subject, teacher) tuple is unique
+//   so re-saving an assignment updates rather than duplicates.
+// =====================================================================
+object TeacherSubjectAssignmentsTable : UUIDTable("teacher_subject_assignments", "id") {
+    val schoolId  = uuid("school_id")
+    val classId   = uuid("class_id").nullable()          // FK school_classes.id (optional pre-migration)
+    val className = text("class_name")                   // denormalised for fast reads / display
+    val section   = varchar("section", 8).default("A")
+    val subjectId = uuid("subject_id").nullable()        // FK school_subjects.id (optional)
+    val subject   = text("subject")                      // denormalised subject name
+    val teacherId = uuid("teacher_id").nullable()        // FK faculty.id / app_users.id
+    val teacherName = text("teacher_name").nullable()    // display fallback when no FK
+    val isActive  = bool("is_active").default(true)
+    val createdAt = timestamp("created_at")
+    val updatedAt = timestamp("updated_at")
+    init {
+        uniqueIndex(
+            "ux_tsa_unique",
+            schoolId, className, section, subject, teacherName
+        )
+    }
 }
 
 // =====================================================================
@@ -232,6 +297,16 @@ object AnnouncementsTable : UUIDTable("announcements", "id") {
     val description = text("description")
     val eventImage  = text("event_image").nullable()
     val date        = varchar("date", 12) // YYYY-MM-DD, mapped from PG DATE
+    // ---- Broadcast audience segmentation ----
+    // audienceType: ALL_SCHOOL | CLASS | SECTION | SUBJECT | STUDENT | CUSTOM
+    // audienceFilter: JSON describing the scope, e.g.
+    //   {"class_name":"Grade 5","section":"A"} or {"subject":"Maths"} or
+    //   {"student_codes":["S001","S002"]}. NULL/ALL_SCHOOL = everyone in school.
+    val audienceType   = varchar("audience_type", 16).default("ALL_SCHOOL")
+    val audienceFilter = text("audience_filter").nullable()
+    // The teacher/admin user that owns this broadcast. For teacher broadcasts the
+    // recipient expansion is constrained to the classes/subjects they teach.
+    val authorRole     = varchar("author_role", 16).default("school_admin")
     val syncedToWa  = bool("synced_to_wa").default(false)
     val createdBy   = uuid("created_by").nullable()
     val createdAt   = timestamp("created_at")
@@ -364,4 +439,471 @@ object StudentsTable : UUIDTable("students", "id") {
     val profilePhotoUrl = text("profile_photo_url").nullable()
     val isActive   = bool("is_active").default(true)
     val createdAt  = timestamp("created_at")
+}
+
+// =====================================================================
+// Parent Ecosystem Tables (spec: parent_api_spec.artifact.md)
+// =====================================================================
+
+/**
+ * Children registered by parents during onboarding (Module: Child Onboarding).
+ * A child belongs to a parent (app_users.role = 'parent') and OPTIONALLY to a
+ * school (set when the parent enrols them somewhere). `interests` and the
+ * holistic progress JSON columns are persisted as plain text and parsed/
+ * encoded with kotlinx.serialization at the route layer.
+ *
+ * Spec ref: parent_api_spec.artifact.md §Module: Child Onboarding
+ *           parent_api_spec.artifact.md §Module: Core Dashboard & Progress
+ */
+object ChildrenTable : UUIDTable("children", "id") {
+    val parentId         = uuid("parent_id")                            // FK app_users.id
+    val schoolId         = uuid("school_id").nullable()                 // FK schools.id (optional)
+    // Links a parent's child to the school's canonical students.student_code so
+    // STUDENT-scoped announcements can target exact students (report §5.6).
+    val studentCode      = text("student_code").nullable()
+    val childName        = text("child_name")
+    val dateOfBirth      = varchar("date_of_birth", 12).nullable()      // YYYY-MM-DD
+    val gender           = varchar("gender", 16).nullable()             // MALE | FEMALE | OTHER
+    val currentGrade     = varchar("current_grade", 32).nullable()      // e.g. "Grade 1"
+    val interests        = text("interests").default("[]")              // JSON array of strings
+    val profilePic       = text("profile_pic").nullable()
+    val overallProgress  = double("overall_progress").default(0.0)      // 0..1
+    val currentLevel     = integer("current_level").default(1)
+    val attendanceStatus = varchar("attendance_status", 16).default("PRESENT")
+    val isActive         = bool("is_active").default(true)
+    val createdAt        = timestamp("created_at")
+    val updatedAt        = timestamp("updated_at")
+}
+
+/**
+ * Parent fee records — driven by GET /api/v1/parent/fees.
+ *
+ * Stores per-line-item fees for a (parent, child) pair.  The aggregate
+ * `stats` block in the response is computed on-the-fly:
+ *   total_collected  = SUM(amount) WHERE status='PAID'
+ *   outstanding      = SUM(amount) WHERE status IN ('DUE','OVERDUE')
+ *   overdue_count    = COUNT(*) WHERE status='OVERDUE'
+ *   progress         = total_collected / (total_collected + outstanding)
+ *
+ * Spec ref: parent_api_spec.artifact.md §Module: School Management §Screen: Fees
+ */
+object FeeRecordsTable : UUIDTable("fee_records", "id") {
+    val parentId    = uuid("parent_id")
+    val childId     = uuid("child_id").nullable()
+    val schoolId    = uuid("school_id").nullable()
+    val title       = text("title")
+    val description = text("description").nullable()
+    val amount      = double("amount").default(0.0)
+    val currency    = varchar("currency", 8).default("INR")             // India-first default (audit §11 L3)
+    val dueDate     = varchar("due_date", 12).nullable()                // YYYY-MM-DD
+    val status      = varchar("status", 16).default("DUE")              // PAID | DUE | OVERDUE
+    val category    = varchar("category", 32).default("Tuition")        // Tuition | Transport | ...
+    val createdAt   = timestamp("created_at")
+    val updatedAt   = timestamp("updated_at")
+}
+
+// =====================================================================
+// School Ecosystem Tables  (spec: school_api_spec.artifact.md)
+// =====================================================================
+
+/**
+ * Leave applications submitted by students or teachers.
+ *
+ * `request_type` is "student" or "teacher" so the same table powers both
+ * tabs on the Leave Requests screen.  `image_url` is the avatar of the
+ * requester (mirrors what the UI shows).
+ *
+ * Spec ref: school_api_spec.artifact.md §Module: Leave Requests
+ */
+object LeaveRequestsTable : UUIDTable("leave_requests", "id") {
+    val schoolId      = uuid("school_id")
+    val requesterId   = uuid("requester_id").nullable()                 // FK app_users.id (optional)
+    val requesterName = text("requester_name")
+    val requesterRole = varchar("requester_role", 16).default("student") // student | teacher
+    val dateFrom      = varchar("date_from", 12)                        // YYYY-MM-DD
+    val dateTo        = varchar("date_to", 12)                          // YYYY-MM-DD
+    val reason        = text("reason")
+    val imageUrl      = text("image_url").nullable()
+    val status        = varchar("status", 16).default("Pending")        // Pending | Approved | Rejected
+    val actionedBy    = uuid("actioned_by").nullable()
+    val actionedAt    = timestamp("actioned_at").nullable()
+    // RA-44: cross-role leave workflow. A parent applies on behalf of a child;
+    // the request is routed to the child's class teacher(s) (resolved at apply
+    // time from teacher_subject_assignments) and can be decided by that teacher
+    // or overridden by an admin. All nullable so legacy teacher-leave rows and
+    // pre-PATCH-103 data still load.
+    val classId       = uuid("class_id").nullable()                     // FK school_classes.id (the class)
+    val className     = varchar("class_name", 64).nullable()
+    val section       = varchar("section", 16).nullable()
+    val teacherId     = uuid("teacher_id").nullable()                   // FK app_users.id (routed-to teacher)
+    val childId       = uuid("child_id").nullable()                     // FK children.id (the student)
+    val parentId      = uuid("parent_id").nullable()                    // FK app_users.id (the applicant)
+    val createdAt     = timestamp("created_at")
+    val updatedAt     = timestamp("updated_at")
+}
+
+/**
+ * Parent-Teacher Meeting events — drives the Schedule PTM screen.
+ * The "active event" is computed at request-time as either the next
+ * upcoming row or, in absence, the most recent past row.
+ *
+ * Spec ref: school_api_spec.artifact.md §Module: PTM
+ */
+object PtmEventsTable : UUIDTable("ptm_events", "id") {
+    val schoolId         = uuid("school_id")
+    val title            = text("title")
+    val date             = varchar("date", 12)                          // YYYY-MM-DD
+    val slot             = text("slot")                                 // e.g. "09:00 - 13:00"
+    val expectedParents  = integer("expected_parents").default(0)
+    val checkedInParents = integer("checked_in_parents").default(0)
+    val invitesDelivered = integer("invites_delivered").default(0)
+    val readReceipts     = integer("read_receipts").default(0)
+    val turnout          = integer("turnout").default(0)                // historical metric for past events
+    val totalMet         = integer("total_met").default(0)
+    val createdBy        = uuid("created_by").nullable()
+    val createdAt        = timestamp("created_at")
+    val updatedAt        = timestamp("updated_at")
+}
+
+/**
+ * Per-class PTM rollup (met_count / total_count) belonging to a PTM event.
+ * Two reasons we keep this as its own table instead of a JSON column:
+ *   - Faculty teams update one row at a time as they hold meetings.
+ *   - We want to index/filter by class_name later.
+ *
+ * Spec ref: school_api_spec.artifact.md §Module: PTM
+ */
+object PtmClassProgressTable : UUIDTable("ptm_class_progress", "id") {
+    val ptmEventId  = uuid("ptm_event_id")                              // FK ptm_events.id
+    val className   = text("class_name")
+    val teacherName = text("teacher_name")
+    val metCount    = integer("met_count").default(0)
+    val totalCount  = integer("total_count").default(0)
+    val updatedAt   = timestamp("updated_at")
+    init {
+        uniqueIndex("ux_ptm_class_progress_unique", ptmEventId, className)
+    }
+}
+
+/**
+ * Admin inbox: a thread is the conversation header (sender / preview /
+ * unread counter), and `MessagesTable` rows are the individual messages.
+ *
+ * Spec ref: school_api_spec.artifact.md §Module: Messages
+ */
+object MessageThreadsTable : UUIDTable("message_threads", "id") {
+    val schoolId       = uuid("school_id")
+    val ownerUserId    = uuid("owner_user_id")                          // this row's inbox holder — JWT.sub
+    // RA-51: a conversation between two users is represented by ONE row per
+    // participant, all sharing the same conversation_id. Each row carries the
+    // owner's view (unread/read), peer_user_id identifies the other party, and
+    // MessagesTable is keyed by conversation_id so both sides see one history.
+    // Legacy/system threads leave conversation_id = their own id and
+    // peer_user_id null (single-owner inbox, e.g. system alerts).
+    val conversationId = uuid("conversation_id").nullable()             // shared key across both participants' rows
+    val peerUserId     = uuid("peer_user_id").nullable()                // the OTHER participant (null = system/self)
+    val senderName     = text("sender_name")                            // display name of the peer, as seen by owner
+    val senderRole     = text("sender_role")
+    val senderImageUrl = text("sender_image_url").nullable()
+    val iconName       = text("icon_name").nullable()                   // when no avatar (e.g. "payments")
+    val lastMessage    = text("last_message").default("")
+    val lastMessageAt  = timestamp("last_message_at")
+    val unreadCount    = integer("unread_count").default(0)
+    val isRead         = bool("is_read").default(true)
+    val createdAt      = timestamp("created_at")
+    val updatedAt      = timestamp("updated_at")
+}
+
+object MessagesTable : UUIDTable("messages", "id") {
+    val threadId       = uuid("thread_id")                              // FK message_threads.id (the sender's owning row)
+    val conversationId = uuid("conversation_id").nullable()             // RA-51: shared key — both participants read by this
+    val senderId       = uuid("sender_id").nullable()                   // null for system messages
+    val body           = text("body")
+    val createdAt      = timestamp("created_at")
+}
+
+/**
+ * Per-student exam results upserted via Results screen.
+ * The (school, test, class, subject, student_id) tuple is unique so
+ * publishing the same test twice updates rather than duplicates.
+ *
+ * Spec ref: school_api_spec.artifact.md §Module: Results
+ */
+object ExamResultsTable : UUIDTable("exam_results", "id") {
+    val schoolId   = uuid("school_id")
+    val test       = text("test")
+    val className  = text("class_name")
+    val subject    = text("subject")
+    val studentId  = text("student_id")                                 // matches students.student_code
+    val studentName = text("student_name")
+    val imageUrl   = text("image_url").nullable()
+    val attendance = varchar("attendance", 8).default("0%")             // e.g. "92%"
+    val score      = varchar("score", 8).default("")                    // string keeps "98", "A+", "Pending"
+    val status     = varchar("status", 16).default("Pending")           // Exceeding | Meeting | Below | Pending
+    val trend      = varchar("trend", 8).default("0%")                  // e.g. "+2.4%"
+    val createdAt  = timestamp("created_at")
+    val updatedAt  = timestamp("updated_at")
+    init {
+        uniqueIndex("ux_exam_results_unique", schoolId, test, className, subject, studentId)
+    }
+}
+
+// =====================================================================
+// Teacher vertical (master doc Step 7 / §9 / gap G1)
+//
+// These tables back the `api/v1/teacher/*` routes consumed by the KMP
+// client's `shared/feature/teacher` data layer. They are scoped through
+// `teacher_subject_assignments` (who teaches what to which class+section)
+// which already exists above. Attendance reuses `attendance_records`
+// (student rows, marked_by = teacher). Marks are normalised here into a
+// proper assessment → marks model (master doc G4: "normalized vs. the
+// freeform academic_records / string-score exam_results").
+//
+// DDL: docs/backend/sql/02_teacher_schema.sql (idempotent, Supabase).
+// =====================================================================
+
+/**
+ * A teacher-authored assessment definition (a "test"/"exam") for one
+ * class+section+subject, with a max-marks denominator. Marks themselves
+ * live in [AssessmentMarksTable]. This is the normalized counterpart to
+ * the school-admin, string-scored [ExamResultsTable] — the teacher portal
+ * needs a numeric max-marks denominator + an `exam_id` to enter scores
+ * against (TeacherMarksData.maxMarks / SubmitMarksRequest.examId).
+ *
+ * `teacherId` is the assignment owner (app_users.id of the teacher).
+ */
+object AssessmentsTable : UUIDTable("assessments", "id") {
+    val schoolId  = uuid("school_id")
+    val teacherId = uuid("teacher_id").nullable()        // FK app_users.id (assessment author)
+    val className = text("class_name")                   // denormalised for fast reads / display
+    val section   = varchar("section", 8).default("A")
+    val subject   = text("subject")
+    val name       = text("name")                        // "Unit Test I", "Mid Term", …
+    val maxMarks  = integer("max_marks").default(100)
+    val examDate  = varchar("exam_date", 12).nullable()  // YYYY-MM-DD
+    val isActive  = bool("is_active").default(true)
+    // RA-43: marks become parent-visible only once published. The teacher
+    // marks-submit can publish; parent reads filter on isPublished = true.
+    val isPublished = bool("is_published").default(false)
+    val publishedAt = timestamp("published_at").nullable()
+    val createdAt = timestamp("created_at")
+    val updatedAt = timestamp("updated_at")
+}
+
+/**
+ * Per-student score for an [AssessmentsTable] row. `marks` is a Double so a
+ * teacher can enter half-marks; the route clamps it to [0, assessment.maxMarks].
+ * One (assessment, student) pair is unique so re-submitting updates in place.
+ */
+object AssessmentMarksTable : UUIDTable("assessment_marks", "id") {
+    val assessmentId = uuid("assessment_id")             // FK assessments.id
+    val studentId    = text("student_id")                // students.student_code
+    val studentName  = text("student_name")
+    val marks        = double("marks").nullable()        // null = not yet entered
+    val enteredBy    = uuid("entered_by").nullable()     // FK app_users.id (teacher)
+    val createdAt    = timestamp("created_at")
+    val updatedAt    = timestamp("updated_at")
+    init {
+        uniqueIndex("ux_assessment_marks_unique", assessmentId, studentId)
+    }
+}
+
+/**
+ * Syllabus unit (chapter/topic) for a class+section+subject, with a covered
+ * flag + the date it was marked covered. Backs TeacherSyllabusData / the
+ * PATCH /teacher/syllabus toggle. `position` orders units within a subject.
+ */
+object SyllabusUnitsTable : UUIDTable("syllabus_units", "id") {
+    val schoolId   = uuid("school_id")
+    val className  = text("class_name")
+    val section    = varchar("section", 8).default("A")
+    val subject    = text("subject")
+    val title      = text("title")
+    val position   = integer("position").default(0)
+    val isCovered  = bool("is_covered").default(false)
+    val coveredOn  = varchar("covered_on", 12).nullable()  // YYYY-MM-DD
+    val coveredBy  = uuid("covered_by").nullable()          // FK app_users.id (teacher)
+    val createdAt  = timestamp("created_at")
+    val updatedAt  = timestamp("updated_at")
+}
+
+/**
+ * A homework/assignment authored by a teacher for one class+section+subject.
+ * `submittedCount` is derived live from [HomeworkSubmissionsTable] at read
+ * time; `totalCount` is the headcount of the target class (computed from
+ * `students`). Backs TeacherHomeworkData / CreateHomeworkRequest.
+ */
+object HomeworkTable : UUIDTable("homework", "id") {
+    val schoolId    = uuid("school_id")
+    val teacherId   = uuid("teacher_id").nullable()     // FK app_users.id (author)
+    val className   = text("class_name")
+    val section     = varchar("section", 8).default("A")
+    val subject     = text("subject")
+    val title       = text("title")
+    val description = text("description").default("")
+    val dueDate     = varchar("due_date", 12)           // YYYY-MM-DD
+    val isActive    = bool("is_active").default(true)
+    val createdAt   = timestamp("created_at")
+    val updatedAt   = timestamp("updated_at")
+}
+
+/**
+ * One student's submission against a [HomeworkTable] row. Used to compute the
+ * submitted/total ratio shown on the teacher's homework cards. Unique on
+ * (homework, student).
+ */
+object HomeworkSubmissionsTable : UUIDTable("homework_submissions", "id") {
+    val homeworkId  = uuid("homework_id")               // FK homework.id
+    val studentId   = text("student_id")                // students.student_code
+    val status      = varchar("status", 16).default("submitted") // submitted | graded | late
+    val submittedAt = timestamp("submitted_at")
+    init {
+        uniqueIndex("ux_homework_submissions_unique", homeworkId, studentId)
+    }
+}
+
+/**
+ * Optional timetable: a teacher's periods on a given weekday. The teacher Home
+ * "today's periods" strip reads this; when a school hasn't entered a timetable
+ * the response is an honest empty list (never fabricated). `weekday` is 1..7
+ * (Mon..Sun) to match java.time.DayOfWeek.value.
+ */
+object TeacherPeriodsTable : UUIDTable("teacher_periods", "id") {
+    val schoolId   = uuid("school_id")
+    val teacherId  = uuid("teacher_id")                 // FK app_users.id
+    val weekday    = integer("weekday")                 // 1=Mon … 7=Sun
+    val startTime  = varchar("start_time", 8)           // "HH:mm"
+    val endTime    = varchar("end_time", 8)             // "HH:mm"
+    val className  = text("class_name")
+    val section    = varchar("section", 8).default("A")
+    val subject    = text("subject")
+    val room       = text("room").default("")
+    val position   = integer("position").default(0)
+    val createdAt  = timestamp("created_at")
+}
+
+// =====================================================================
+// Parent Scholarships (parent_api_spec.artifact.md §Module: Scholarships)
+// =====================================================================
+
+/**
+ * Scholarship opportunities surfaced on the parent Scholarships screen.
+ *
+ * Replaces the hardcoded `"$45,000 STEM Award"` fiction (audit §4.2/§5.2) the
+ * `/scholarships` route used to return. Rows are operator-curated (seeded /
+ * managed) opportunities; the endpoint reads real rows from here so adding or
+ * retiring a scholarship is a DB write, not a redeploy. `isActive=false` hides
+ * a row without deleting it. `position` controls display order.
+ */
+object ScholarshipsTable : UUIDTable("scholarships", "id") {
+    val title       = text("title")
+    val description = text("description")
+    val amount      = text("amount")                    // display string e.g. "₹45,000"
+    val timeLeft    = text("time_left").default("")      // display string e.g. "3d : 12h"
+    val category    = varchar("category", 48).default("Merit Based")
+    val isCritical  = bool("is_critical").default(false)
+    val position    = integer("position").default(0)
+    val isActive    = bool("is_active").default(true)
+    val createdAt   = timestamp("created_at")
+    val updatedAt   = timestamp("updated_at")
+}
+
+/**
+ * A parent's scholarship applications (the "applications" list on the same
+ * screen). Scoped to the applying parent so each parent sees only their own.
+ * `iconName` mirrors the UI's institution glyph.
+ */
+object ScholarshipApplicationsTable : UUIDTable("scholarship_applications", "id") {
+    val parentId    = uuid("parent_id")                 // FK app_users.id
+    val institution = text("institution")
+    val program     = text("program")
+    val status      = varchar("status", 24).default("Received") // Received | Under Review | Shortlisted
+    val iconName    = varchar("icon_name", 32).default("school")
+    val position    = integer("position").default(0)
+    val createdAt   = timestamp("created_at")
+    val updatedAt   = timestamp("updated_at")
+}
+
+// =====================================================================
+// notifications  (RA-41/42/46/50 — the cross-user notification spine)
+// =====================================================================
+/**
+ * Recipient-scoped notification rows. Every row targets exactly one recipient
+ * (`userId` = the app_users.id the bell belongs to) and carries the originating
+ * `schoolId` for tenant isolation. The Notify helper writes here; the role-aware
+ * GET /notifications reads by `userId = jwt.sub`; /summary returns the unread
+ * count for the portal bells (kills the hardcoded red-dot RA-50 and the
+ * parent-only synth that broke for admins/teachers RA-42).
+ */
+object NotificationsTable : UUIDTable("notifications", "id") {
+    val schoolId   = uuid("school_id").nullable()
+    val userId     = uuid("user_id")                    // recipient app_users.id
+    val category   = varchar("category", 32).default("general") // attendance|marks|homework|announcement|leave|fees|link|general
+    val title      = text("title")
+    val body       = text("body").default("")
+    val deepLink   = text("deep_link").nullable()
+    val actorId    = uuid("actor_id").nullable()        // who triggered it (teacher/admin/parent)
+    val refType    = varchar("ref_type", 32).nullable() // e.g. attendance_record|assessment|homework|announcement|leave_request|fee_record|parent_child_link
+    val refId      = text("ref_id").nullable()
+    val isRead     = bool("is_read").default(false)
+    val createdAt  = timestamp("created_at")
+    val readAt     = timestamp("read_at").nullable()
+}
+
+// =====================================================================
+// device_tokens  (RA-41 push — FCM/APNs registry; dispatch is Phase E)
+// =====================================================================
+object DeviceTokensTable : UUIDTable("device_tokens", "id") {
+    val userId    = uuid("user_id")
+    val token     = text("token")
+    val platform  = varchar("platform", 16).default("android")
+    val isActive  = bool("is_active").default(true)
+    val createdAt = timestamp("created_at")
+    val updatedAt = timestamp("updated_at")
+}
+
+// =====================================================================
+// parent_child_links  (RA-48 — parent→child link approval workflow)
+// =====================================================================
+/**
+ * A pending/approved/rejected request from a parent to link a child. The live
+ * link still materialises in `children` on approval; this table records the
+ * approval state so a school admin can vet roll-number claims (RA-03/RA-48)
+ * before a parent gains read access to a student's academic data.
+ */
+object ParentChildLinksTable : UUIDTable("parent_child_links", "id") {
+    val parentId    = uuid("parent_id")
+    val schoolId    = uuid("school_id").nullable()
+    val studentCode = varchar("student_code", 64).nullable()
+    val rollNumber  = varchar("roll_number", 64).nullable()
+    val childName   = text("child_name").nullable()
+    val childId     = uuid("child_id").nullable()       // children.id once approved
+    val status      = varchar("status", 16).default("pending") // pending | approved | rejected
+    val requestedAt = timestamp("requested_at")
+    val actionedBy  = uuid("actioned_by").nullable()
+    val actionedAt  = timestamp("actioned_at").nullable()
+}
+
+// =====================================================================
+// non_teaching_staff  (RA-S17 — Admin People "Non-teaching staff" vertical)
+// =====================================================================
+/**
+ * RA-S17: a school's NON-teaching staff (admin office, accountant, librarian,
+ * support, security, transport, etc.). These are *not* `app_users` — they do
+ * not log in; they are roster records the admin manages alongside Teachers and
+ * Students on the People tab. School-scoped and soft-deletable, mirroring the
+ * `students` pattern. Deletion is performed from the staff profile behind a
+ * confirm dialog (never a direct list-row button).
+ */
+object NonTeachingStaffTable : UUIDTable("non_teaching_staff", "id") {
+    val schoolId    = uuid("school_id")                         // FK schools.id — tenant scope
+    val fullName    = text("full_name")
+    val role        = text("role")                              // e.g. "Accountant", "Librarian"
+    val department  = text("department").nullable()             // e.g. "Office", "Transport"
+    val phone       = varchar("phone", 32).nullable()
+    val email       = text("email").nullable()
+    val photoUrl    = text("photo_url").nullable()
+    val isActive    = bool("is_active").default(true)           // soft-delete flag
+    val createdAt   = timestamp("created_at")
+    val updatedAt   = timestamp("updated_at")
 }

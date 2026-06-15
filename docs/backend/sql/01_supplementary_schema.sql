@@ -2,12 +2,16 @@
 -- VidyaPrayag — SUPPLEMENTARY SCHEMA (additive, idempotent)
 -- Version: 1.0  |  Engine: PostgreSQL (Supabase)
 --
+-- ⚠️  RA-63 NOTE: This file is a HISTORICAL fragment. The canonical, current
+--     provisioning source is scripts/schema-all-in-one-2026-06-07.sql (built
+--     from docs/db/vidyasetu_schema.sql + migration_001/002/003 + patches).
+--     See docs/db/PROVISION.sql / scripts/README-RUN-ORDER.md. Do NOT use the
+--     legacy root schema (archived to docs/_archive/...ABANDONED.sql).
+--
 -- WHAT THIS FILE DOES
 -- -------------------
--- The base file `supabase_schema` (in the repo root) defines all the
--- *operational* tables (schools, students, attendance, fees, etc.).
--- This file adds the tables that the Ktor backend *also* needs but which
--- were missing from v2.1:
+-- This file adds the tables that the Ktor backend needs on top of the base
+-- operational tables (schools, students, attendance, fees, etc.):
 --
 --   1.  app_users               — our own user record (decoupled from
 --                                  auth.users so phone-OTP-only signup works
@@ -35,9 +39,9 @@
 -- file safely after any change. Run it in:
 --   Supabase Dashboard → SQL Editor → New Query → paste → Run
 --
--- ⚠️  PREREQUISITE: run the base file `supabase_schema` FIRST.  This file
---                  only adds extra tables; it does NOT redefine the ones in
---                  v2.1 (schools, students, daily_progress, …).
+-- ⚠️  PREREQUISITE (RA-63): the canonical path bundles this fragment into
+--                  scripts/schema-all-in-one-2026-06-07.sql — run THAT, not
+--                  the legacy root schema. This file only adds extra tables.
 --
 -- AUTOMATIC OTP CLEANUP
 -- ---------------------

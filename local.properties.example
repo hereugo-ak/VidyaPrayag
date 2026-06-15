@@ -1,0 +1,32 @@
+# ---------------------------------------------------------------------------
+# local.properties.example
+#
+# Copy this file to `local.properties` (which is git-ignored) and fill in the
+# values for your machine. Android Studio normally writes `sdk.dir` for you;
+# the important key for VidyaPrayag dev work is `devBaseUrl`.
+# ---------------------------------------------------------------------------
+
+# Android SDK location (Android Studio sets this automatically).
+# sdk.dir=/Users/you/Library/Android/sdk
+
+# ---------------------------------------------------------------------------
+# devBaseUrl — point the `dev` build flavor at your LAPTOP backend instead of
+# the deployed Render server. This is THE fix for:
+#   * "Endpoint not found: /api/v1/school/messages/threads/{id}/messages"
+#   * the calendar 'working_days' error against a stale Render deploy
+#   * the phone not reaching the laptop backend over WiFi
+#
+# HOW TO FIND YOUR LAPTOP LAN IP:
+#   macOS / Linux:  ipconfig getifaddr en0   (or `ip addr` / `hostname -I`)
+#   Windows:        ipconfig  -> IPv4 Address
+#
+# Then start the backend bound to all interfaces (so the phone can reach it):
+#   ./gradlew :server:run            (server binds 0.0.0.0:8080 by default)
+#
+# Set the value below to http://<that-ip>:8080 (NO trailing slash):
+devBaseUrl=http://192.168.1.9:8080
+
+# VERIFY from the PHONE browser (phone + laptop on the SAME WiFi):
+#   http://192.168.1.9:8080/api/v1/config/version
+# The `git_sha` you get back must match your laptop's HEAD. If it shows the old
+# Render SHA or you can't connect, see the checklist in SERVER_QUICKSTART.md.
