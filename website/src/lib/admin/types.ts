@@ -51,6 +51,9 @@ export interface AnalyticsOverviewResponse {
 }
 
 // ── Attendance summary (GET /api/v1/school/attendance/summary) ───────────────
+// Keys are the EXACT wire format kotlinx.serialization emits (@SerialName in
+// SchoolRecordsRouting.kt). The client returns env.data verbatim with no
+// case transform, so these MUST be snake_case to read at runtime.
 export interface AttendanceClassRow {
   grade: string;
   present: number;
@@ -60,29 +63,29 @@ export interface AttendanceClassRow {
   rate: number;
 }
 export interface AttendanceSummaryDto {
-  date: string | null;
+  latest_date: string | null;
   present: number;
   absent: number;
   late: number;
   total: number;
   rate: number;
-  byClass: AttendanceClassRow[];
+  by_class: AttendanceClassRow[];
 }
 
 // ── Marks summary (GET /api/v1/school/marks/summary) ─────────────────────────
 export interface MarksAssessmentRow {
   subject: string;
-  assessmentName: string;
-  className: string;
+  assessment: string;
+  class_name: string;
   average: number;
-  maxMarks: number;
-  gradedCount: number;
-  examDate: string | null;
-  isPublished: boolean;
+  max_marks: number;
+  graded_count: number;
+  exam_date: string | null;
+  is_published: boolean;
 }
 export interface MarksSummaryDto {
-  assessmentCount: number;
-  overallAveragePct: number;
+  assessment_count: number;
+  overall_average_pct: number;
   assessments: MarksAssessmentRow[];
 }
 
@@ -92,16 +95,16 @@ export interface FeeRow {
   amount: number;
   currency: string;
   status: string;
-  dueDate: string | null;
+  due_date: string | null;
   category: string | null;
 }
 export interface FeeLedgerDto {
-  paidTotal: number;
-  dueTotal: number;
-  overdueTotal: number;
-  paidCount: number;
-  dueCount: number;
-  overdueCount: number;
+  paid_total: number;
+  due_total: number;
+  overdue_total: number;
+  paid_count: number;
+  due_count: number;
+  overdue_count: number;
   currency: string;
   recent: FeeRow[];
 }
