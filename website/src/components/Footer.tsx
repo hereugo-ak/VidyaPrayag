@@ -8,7 +8,6 @@ import {
   FOOTER_NAV,
   FOOTER_CONTACT,
   FOOTER_SOCIAL,
-  FOOTER_TAGLINE,
 } from "@/lib/content";
 import { EASE_OUT_CUBIC } from "@/lib/motion";
 
@@ -39,211 +38,185 @@ const SOCIAL_ICON: Record<string, React.ReactNode> = {
 };
 
 /**
- * Footer — rebuilt to a premium "panel" footer in the brand system:
- *   • a deep-navy rounded slab (the travel-reference card pattern, recoloured to
- *     Enroll+ navy/lavender), floating on the lavender canvas;
- *   • a brand + contact column, three nav columns, and an onboarding CTA;
- *   • a giant translucent "Enroll+" wordmark bleeding off the bottom edge
- *     (the Quantum pattern), with the bridge mark + tagline — confident, not loud;
- *   • everything reveals on scroll, once, with the house ease.
+ * Footer — rebuilt LIGHT, so it dissolves into the lavender canvas instead of
+ * sitting on it as a dark slab. The structure follows the Quantum reference
+ * (generous whitespace, clean link columns, a giant low-contrast wordmark
+ * watermark at the very bottom) but everything stays in the Enroll+ light
+ * system: navy ink on lavender, a single hairline separating it from the page.
+ *
+ * Because the homepage no longer has a full-bleed final CTA, the footer also
+ * carries the closing onboarding prompt as a quiet, bordered strip.
  */
 export function Footer() {
   const reduce = useReducedMotion();
   const year = new Date().getFullYear();
 
   return (
-    <footer className="px-4 pb-6 pt-10 sm:px-6 md:pb-8">
-      <motion.div
-        initial={{ opacity: 0, y: reduce ? 0 : 28 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.15 }}
-        transition={{ duration: 0.6, ease: EASE_OUT_CUBIC }}
-        className="relative mx-auto w-full max-w-shell overflow-hidden rounded-[2rem] bg-navy-deep text-white shadow-cta"
-      >
-        {/* Soft corner aurora — the same restrained bloom used on the CTA slab. */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -left-24 -top-24 h-[360px] w-[360px] rounded-full opacity-50"
-          style={{
-            background:
-              "radial-gradient(circle, rgba(108,92,224,0.42) 0%, rgba(108,92,224,0) 68%)",
-          }}
-        />
-        {/* Hairline top edge catches the light. */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-px"
-          style={{
-            background:
-              "linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent)",
-          }}
-        />
-
-        <div className="relative px-6 pt-14 sm:px-10 md:px-14 md:pt-16">
-          <div className="grid gap-12 lg:grid-cols-[1.5fr_repeat(3,1fr)]">
-            {/* Brand + contact column */}
-            <div className="max-w-sm">
-              <Link
-                href="/"
-                aria-label="Enroll+ home"
-                className="group inline-flex items-center gap-2.5"
-              >
-                <EnrollMark
-                  className="h-9 w-9 shrink-0 transition-transform duration-200 ease-out-cubic group-hover:scale-[1.04]"
-                  tone="light"
-                />
-                <span className="text-[19px] font-extrabold tracking-tighter text-white">
-                  Enroll<span className="text-accent-soft">+</span>
-                </span>
-              </Link>
-
-              <p className="mt-5 text-sm leading-relaxed text-white/65">
-                {FOOTER_CONTACT.blurb}
-              </p>
-
-              <div className="mt-6 space-y-2.5 text-sm">
-                <a
-                  href={`mailto:${FOOTER_CONTACT.email}`}
-                  className="flex items-center gap-2.5 text-white/75 transition-colors hover:text-white"
-                >
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/8 text-accent-soft">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-10 6L2 7" /></svg>
-                  </span>
-                  {FOOTER_CONTACT.email}
-                </a>
-                <a
-                  href={`mailto:${FOOTER_CONTACT.support}`}
-                  className="flex items-center gap-2.5 text-white/75 transition-colors hover:text-white"
-                >
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/8 text-accent-soft">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" /></svg>
-                  </span>
-                  {FOOTER_CONTACT.support}
-                </a>
-              </div>
-
-              {/* Social slots — honest placeholders (disabled until real accounts). */}
-              <div className="mt-7 flex gap-2.5" aria-label="Social links">
-                {FOOTER_SOCIAL.map((s) => {
-                  const cls =
-                    "flex h-9 w-9 items-center justify-center rounded-full bg-white/8 text-white/70 transition-colors";
-                  return s.href ? (
-                    <a
-                      key={s.label}
-                      href={s.href}
-                      aria-label={s.label}
-                      className={`${cls} hover:bg-accent hover:text-white`}
-                    >
-                      {SOCIAL_ICON[s.label]}
-                    </a>
-                  ) : (
-                    <span
-                      key={s.label}
-                      aria-label={`${s.label} — coming soon`}
-                      title={`${s.label} — coming soon`}
-                      className={`${cls} cursor-default opacity-50`}
-                    >
-                      {SOCIAL_ICON[s.label]}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Nav columns */}
-            {Object.entries(FOOTER_NAV)
-              .filter(([group]) => group !== "Legal")
-              .map(([group, links]) => (
-                <div key={group}>
-                  <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/45">
-                    {group}
-                  </h3>
-                  <ul className="mt-5 space-y-3.5">
-                    {links.map((l) => {
-                      const external = l.href.startsWith("mailto:");
-                      const klass =
-                        "group inline-flex items-center text-sm text-white/70 transition-colors hover:text-white";
-                      return (
-                        <li key={l.href}>
-                          {external ? (
-                            <a href={l.href} className={klass}>
-                              <span className="bg-gradient-to-r from-accent-soft to-accent-soft bg-[length:0%_1px] bg-left-bottom bg-no-repeat pb-0.5 transition-[background-size] duration-300 ease-out-cubic group-hover:bg-[length:100%_1px]">
-                                {l.label}
-                              </span>
-                            </a>
-                          ) : (
-                            <Link href={l.href} className={klass}>
-                              <span className="bg-gradient-to-r from-accent-soft to-accent-soft bg-[length:0%_1px] bg-left-bottom bg-no-repeat pb-0.5 transition-[background-size] duration-300 ease-out-cubic group-hover:bg-[length:100%_1px]">
-                                {l.label}
-                              </span>
-                            </Link>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ))}
-          </div>
-
-          {/* CTA strip */}
-          <div className="mt-14 flex flex-col gap-5 rounded-2xl border border-white/10 bg-white/[0.04] px-6 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-            <div>
-              <p className="text-lg font-extrabold tracking-tight text-white">
-                Bring your whole school online.
-              </p>
-              <p className="mt-1 text-sm text-white/60">
-                {FOOTER_TAGLINE} · Set up in minutes, no credit card.
-              </p>
-            </div>
-            <Button href="/onboarding" size="md" variant="secondary">
-              Onboard your school
-            </Button>
-          </div>
-
-          {/* Legal + copyright row */}
-          <div className="mt-10 flex flex-col gap-4 border-t border-white/10 pt-7 text-sm text-white/55 sm:flex-row sm:items-center sm:justify-between">
-            <p>© {year} Enroll+. All rights reserved.</p>
-            <div className="flex flex-wrap gap-x-6 gap-y-2">
-              {FOOTER_NAV.Legal.map((l) => (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  className="transition-colors hover:text-white"
-                >
-                  {l.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Quantum-style giant wordmark, bleeding off the bottom edge. Pure
-            type, ultra-low-contrast, masked at the baseline so it reads as a
-            watermark, not a heading. Decorative only (aria-hidden). */}
-        <div
-          aria-hidden
-          className="relative mt-10 select-none overflow-hidden px-4"
+    <footer className="relative mt-12 overflow-hidden border-t border-navy/10">
+      <div className="shell pt-20 md:pt-24">
+        {/* Closing onboarding prompt — quiet, bordered, on-canvas (not a slab). */}
+        <motion.div
+          initial={{ opacity: 0, y: reduce ? 0 : 18 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.55, ease: EASE_OUT_CUBIC }}
+          className="flex flex-col gap-5 rounded-[1.75rem] border border-navy/10 bg-white/55 px-6 py-8 backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-9 sm:py-9"
         >
-          <div className="pointer-events-none flex items-end justify-center">
-            <span
-              className="block w-full text-center font-extrabold leading-[0.78] tracking-tighter text-white/[0.05]"
-              style={{
-                fontSize: "clamp(4rem, 19vw, 17rem)",
-                maskImage:
-                  "linear-gradient(180deg, #000 30%, rgba(0,0,0,0.25) 78%, transparent 100%)",
-                WebkitMaskImage:
-                  "linear-gradient(180deg, #000 30%, rgba(0,0,0,0.25) 78%, transparent 100%)",
-              }}
-            >
-              Enroll<span className="text-accent/[0.14]">+</span>
-            </span>
+          <div>
+            <p className="text-xl font-extrabold tracking-tight text-navy-deep sm:text-2xl">
+              Bring your whole school online.
+            </p>
+            <p className="mt-1.5 text-sm text-ink-2">
+              Set up in minutes — no credit card, no sales call. One source of
+              truth from day one.
+            </p>
           </div>
-          <p className="relative -mt-3 pb-7 text-center text-[10px] font-bold uppercase tracking-[0.3em] text-white/25 sm:-mt-6 md:-mt-10">
-            The operating system for your school
-          </p>
+          <Button href="/onboarding" size="lg">
+            Onboard your school →
+          </Button>
+        </motion.div>
+
+        {/* Link + brand grid */}
+        <div className="mt-16 grid gap-12 lg:grid-cols-[1.5fr_repeat(3,1fr)] md:mt-20">
+          {/* Brand + contact column */}
+          <div className="max-w-sm">
+            <Link
+              href="/"
+              aria-label="Enroll+ home"
+              className="group inline-flex items-center gap-2.5"
+            >
+              <EnrollMark className="h-9 w-9 shrink-0 transition-transform duration-200 ease-out-cubic group-hover:scale-[1.04]" />
+              <span className="text-[19px] font-extrabold tracking-tighter text-navy-deep">
+                Enroll<span className="text-accent">+</span>
+              </span>
+            </Link>
+
+            <p className="mt-5 text-sm leading-relaxed text-ink-2">
+              {FOOTER_CONTACT.blurb}
+            </p>
+
+            <div className="mt-6 space-y-2.5 text-sm">
+              <a
+                href={`mailto:${FOOTER_CONTACT.email}`}
+                className="flex items-center gap-2.5 text-ink-2 transition-colors hover:text-navy-deep"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/10 text-accent-deep">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-10 6L2 7" /></svg>
+                </span>
+                {FOOTER_CONTACT.email}
+              </a>
+              <a
+                href={`mailto:${FOOTER_CONTACT.support}`}
+                className="flex items-center gap-2.5 text-ink-2 transition-colors hover:text-navy-deep"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/10 text-accent-deep">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" /></svg>
+                </span>
+                {FOOTER_CONTACT.support}
+              </a>
+            </div>
+
+            {/* Social slots — honest placeholders (disabled until real accounts). */}
+            <div className="mt-7 flex gap-2.5" aria-label="Social links">
+              {FOOTER_SOCIAL.map((s) => {
+                const cls =
+                  "flex h-9 w-9 items-center justify-center rounded-full border border-navy/10 bg-white/60 text-ink-2 transition-colors";
+                return s.href ? (
+                  <a
+                    key={s.label}
+                    href={s.href}
+                    aria-label={s.label}
+                    className={`${cls} hover:border-accent hover:bg-accent hover:text-white`}
+                  >
+                    {SOCIAL_ICON[s.label]}
+                  </a>
+                ) : (
+                  <span
+                    key={s.label}
+                    aria-label={`${s.label} — coming soon`}
+                    title={`${s.label} — coming soon`}
+                    className={`${cls} cursor-default opacity-45`}
+                  >
+                    {SOCIAL_ICON[s.label]}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Nav columns */}
+          {Object.entries(FOOTER_NAV)
+            .filter(([group]) => group !== "Legal")
+            .map(([group, links]) => (
+              <div key={group}>
+                <h3 className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-3">
+                  {group}
+                </h3>
+                <ul className="mt-5 space-y-3.5">
+                  {links.map((l) => {
+                    const external = l.href.startsWith("mailto:");
+                    const klass =
+                      "group inline-flex items-center text-sm text-ink-2 transition-colors hover:text-navy-deep";
+                    const underline =
+                      "bg-gradient-to-r from-accent to-accent bg-[length:0%_1px] bg-left-bottom bg-no-repeat pb-0.5 transition-[background-size] duration-300 ease-out-cubic group-hover:bg-[length:100%_1px]";
+                    return (
+                      <li key={l.href}>
+                        {external ? (
+                          <a href={l.href} className={klass}>
+                            <span className={underline}>{l.label}</span>
+                          </a>
+                        ) : (
+                          <Link href={l.href} className={klass}>
+                            <span className={underline}>{l.label}</span>
+                          </Link>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
         </div>
-      </motion.div>
+
+        {/* Legal + copyright row — wide-spaced, Quantum-style metadata line. */}
+        <div className="mt-16 flex flex-col gap-4 border-t border-navy/8 pt-7 text-[13px] text-ink-3 sm:flex-row sm:items-center sm:justify-between md:mt-20">
+          <p>© {year} Enroll+. All rights reserved.</p>
+          <div className="flex flex-wrap gap-x-7 gap-y-2">
+            {FOOTER_NAV.Legal.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                className="transition-colors hover:text-navy-deep"
+              >
+                {l.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Quantum-style giant wordmark — ultra-low-contrast navy on the lavender
+          canvas, bleeding off the bottom edge, masked at the baseline. Reads as
+          atmosphere, not a heading. Decorative only (aria-hidden). */}
+      <div aria-hidden className="relative mt-12 select-none overflow-hidden">
+        <div className="pointer-events-none flex items-end justify-center">
+          <span
+            className="block w-full text-center font-extrabold leading-[0.74] tracking-tighter text-navy-deep/[0.05]"
+            style={{
+              fontSize: "clamp(4rem, 19vw, 17rem)",
+              maskImage:
+                "linear-gradient(180deg, #000 28%, rgba(0,0,0,0.22) 76%, transparent 100%)",
+              WebkitMaskImage:
+                "linear-gradient(180deg, #000 28%, rgba(0,0,0,0.22) 76%, transparent 100%)",
+            }}
+          >
+            Enroll<span className="text-accent/[0.18]">+</span>
+          </span>
+        </div>
+        <p className="relative -mt-3 pb-8 text-center text-[10px] font-bold uppercase tracking-[0.34em] text-ink-3/55 sm:-mt-6 md:-mt-10">
+          The operating system for your school
+        </p>
+      </div>
     </footer>
   );
 }

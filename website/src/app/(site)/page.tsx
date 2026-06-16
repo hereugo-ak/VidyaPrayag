@@ -6,7 +6,6 @@ import { ForParents } from "@/components/home/ForParents";
 import { ForTeachers } from "@/components/home/ForTeachers";
 import { HowItWorks } from "@/components/home/HowItWorks";
 import { Testimonials } from "@/components/home/Testimonials";
-import { FinalCta } from "@/components/home/FinalCta";
 
 export const metadata: Metadata = {
   title: "Enroll+ — The operating system for your school",
@@ -18,7 +17,9 @@ export const metadata: Metadata = {
 /**
  * Homepage — hybrid SSG marketing page. Assembled from real-feature sections.
  * Order follows the brief: hero → social proof → for schools/parents/teachers
- * → how it works → testimonials (honest placeholder) → final CTA.
+ * → how it works → testimonials (honest placeholder). The closing conversion
+ * prompt lives in the footer's onboarding strip, so the page no longer carries
+ * a separate full-bleed final-CTA slab.
  */
 export default function HomePage() {
   return (
@@ -30,7 +31,6 @@ export default function HomePage() {
       <ForTeachers />
       <HowItWorks />
       <Testimonials />
-      <FinalCta />
     </>
   );
 }
