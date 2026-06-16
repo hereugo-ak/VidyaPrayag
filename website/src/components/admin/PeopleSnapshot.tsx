@@ -36,7 +36,7 @@ export function PeopleSnapshot({
           </Link>
         }
       />
-      <div className="grid grid-cols-2 gap-px overflow-hidden px-5 pb-5 pt-3">
+      <div className="grid grid-cols-2 gap-3 px-5 pb-5 pt-3">
         {loading ? (
           <>
             <Skeleton className="h-20" />
