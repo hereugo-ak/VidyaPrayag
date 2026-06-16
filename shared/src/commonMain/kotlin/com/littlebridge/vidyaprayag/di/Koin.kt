@@ -215,6 +215,13 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    // Redesigned admin home dashboard (summary / analytics / activity).
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.AdminDashboardApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
     single {
         com.littlebridge.vidyaprayag.feature.admin.data.remote.ResultsApi(
             client = get(),
@@ -303,6 +310,9 @@ val commonModule = module {
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AnalyticsRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.AnalyticsRepositoryImpl(get())
     }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AdminDashboardRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.AdminDashboardRepositoryImpl(get())
+    }
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.ResultsRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.ResultsRepositoryImpl(get())
     }
@@ -348,7 +358,7 @@ val viewModelModule = module {
     factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentAcademicsViewModel(get(), get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentLeaveViewModel(get(), get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentMessageViewModel(get(), get()) }
-    factory { SchoolDashboardViewModel(get(), get()) }
+    factory { SchoolDashboardViewModel(get(), get(), get()) }
     factory { InstitutionalBasicOBViewModel(get(), get()) }
     factory { BrandingInfoOBViewModel(get(), get(), get()) }
     factory { AcademicInfoOBViewModel(get(), get()) }

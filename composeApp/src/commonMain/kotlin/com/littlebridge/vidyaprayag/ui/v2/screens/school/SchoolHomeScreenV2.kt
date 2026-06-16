@@ -34,6 +34,15 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardActivity
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardAnalytics
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardSummary
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.DashboardAlert
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.DashboardAttendanceTrend
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.DashboardCampusHealth
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.DashboardCountTrend
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.DashboardStatistics
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.DashboardTeacherInsight
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingStep
 import com.littlebridge.vidyaprayag.feature.admin.presentation.DashboardOnboardingStatus
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolDashboardViewModel
@@ -84,6 +93,15 @@ fun SchoolHomeScreenV2(
     val notifications by notificationsViewModel.state.collectAsStateV2()
 
 
+    val summary by viewModel.summary.collectAsStateV2()
+
+
+    val analytics by viewModel.analytics.collectAsStateV2()
+
+
+    val activity by viewModel.activity.collectAsStateV2()
+
+
 
     SchoolDashboardContent(
 
@@ -102,6 +120,12 @@ fun SchoolHomeScreenV2(
         loading = loading,
 
         error = error,
+
+        summary = summary,
+
+        analytics = analytics,
+
+        activity = activity,
 
 
         onRetry = {
@@ -143,6 +167,15 @@ private fun SchoolDashboardContent(
 
 
     error: String?,
+
+
+    summary: AdminDashboardSummary?,
+
+
+    analytics: AdminDashboardAnalytics?,
+
+
+    activity: AdminDashboardActivity?,
 
 
     onRetry: () -> Unit,
@@ -225,30 +258,39 @@ private fun SchoolDashboardContent(
 
 
                 /*
+                 ALERTS (server-driven; only shown when present)
+                 */
+                val alerts = activity?.alerts.orEmpty()
+                if (alerts.isNotEmpty()) {
+                    AlertsSection(alerts = alerts)
+                }
+
+
+                /*
                  MAIN HERO
                  */
-                CampusHealthCard()
+                CampusHealthCard(
+                    campusHealth = summary?.campusHealth,
+                    students = summary?.statistics?.students?.total ?: 0,
+                    teachers = summary?.statistics?.teachers?.total ?: 0,
+                    attendanceTrend = analytics?.attendanceTrend?.values.orEmpty(),
+                )
 
 
                 /*
                  FOUR BIG NUMBERS
                  */
                 DashboardMetricGrid(
-
-                    students = 840,
-
-                    teachers = 42,
-
-                    classes = 24,
-
-                    subjects = 36
+                    statistics = summary?.statistics,
                 )
 
 
                 /*
                  ANALYTICS
                  */
-                AttendanceChartCard()
+                AttendanceChartCard(
+                    attendanceTrend = analytics?.attendanceTrend,
+                )
 
 
                 /*
@@ -269,10 +311,7 @@ private fun SchoolDashboardContent(
                  TEACHERS
                  */
                 TeacherInsightCard(
-
-                    assigned = 36,
-
-                    pending = 6
+                    insight = summary?.teacherInsight,
                 )
 
 
@@ -280,19 +319,13 @@ private fun SchoolDashboardContent(
                  ACTIVITY
                  */
                 ActivityTimeline(
-
-                    activities = listOf(
-
+                    activities = activity?.activities.orEmpty().map {
                         ActivityItem(
-                            "New teacher added", "Mathematics department", "10 min ago"
-                        ),
-
-
-                        ActivityItem(
-                            "Attendance synced", "Class 8-A", "1 hour ago"
+                            title = it.title,
+                            subtitle = it.description,
+                            time = it.time,
                         )
-
-                    )
+                    }
                 )
 
 
@@ -612,12 +645,152 @@ private fun NotificationButton(
 }
 
 @Composable
+fun AlertsSection(
+    alerts: List<DashboardAlert>,
+    modifier: Modifier = Modifier
+) {
+
+    if (alerts.isEmpty()) return
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+
+        // Surface the most urgent items first; keep the list short and scannable.
+        val ordered = alerts.sortedBy { priorityRank(it.priority) }
+
+        ordered.take(3).forEach { alert ->
+            AlertCard(alert = alert)
+        }
+
+    }
+
+}
+
+/** Lower rank = higher urgency, used to sort alerts. */
+private fun priorityRank(priority: String): Int = when (priority.uppercase()) {
+    "HIGH" -> 0
+    "MEDIUM" -> 1
+    "LOW" -> 2
+    else -> 3
+}
+
+@Composable
+private fun AlertCard(
+    alert: DashboardAlert
+) {
+
+    val c = VTheme.colors
+
+    /*
+     Colour + icon are driven by the alert type so WARNING / CRITICAL / INFO
+     each read at a glance. Unknown types degrade gracefully to a neutral
+     informational style instead of crashing or showing nothing.
+     */
+    val type = alert.type.uppercase()
+    val accent = when (type) {
+        "CRITICAL" -> c.dangerInk
+        "WARNING" -> c.warningInk
+        else -> c.tealDeep
+    }
+    val icon = when (type) {
+        "CRITICAL" -> VIcons.AlertCircle
+        "WARNING" -> VIcons.AlertTriangle
+        else -> VIcons.Bell
+    }
+
+    VCard(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
+    ) {
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(accent.copy(alpha = .14f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+
+                Text(
+                    text = alert.title.ifBlank { "Action needed" },
+                    style = VTheme.type.bodyStrong.colored(c.ink)
+                )
+
+                if (alert.description.isNotBlank()) {
+                    Text(
+                        text = alert.description,
+                        style = VTheme.type.caption.colored(c.ink2)
+                    )
+                }
+
+            }
+
+        }
+
+    }
+
+}
+
+@Composable
 fun CampusHealthCard(
+    campusHealth: DashboardCampusHealth?,
+    students: Int,
+    teachers: Int,
+    attendanceTrend: List<Int>,
     modifier: Modifier = Modifier
 ) {
 
 
     val c = VTheme.colors
+
+
+    /*
+     The hero "Present" figure is the attendance metric reported by the
+     /summary endpoint (campusHealth.metrics keyed "attendance"). We fall
+     back to any metric whose unit is "%" so a contract tweak still renders,
+     and finally to a neutral "—" when the server has nothing to report.
+     */
+    val attendanceMetric = campusHealth?.metrics?.firstOrNull { it.key == "attendance" }
+        ?: campusHealth?.metrics?.firstOrNull { it.unit.equals("percentage", true) || it.unit == "%" }
+
+    // Normalise the server's unit token ("percentage") into a display suffix.
+    val presentLabel = attendanceMetric?.let { "${it.value}${unitSuffix(it.unit)}" } ?: "—"
+
+    val headerMessage = campusHealth?.message
+        ?.takeIf { it.isNotBlank() }
+        ?: when (campusHealth?.status) {
+            "CRITICAL" -> "Needs attention today"
+            "WATCH" -> "A few things to review"
+            "HEALTHY" -> "Everything looks stable today"
+            else -> "Campus overview"
+        }
+
+    /*
+     Normalise the attendance-trend percentages (0..100) into 0..1 ratios for
+     the mini graph. When the server returns nothing we keep a flat baseline
+     so the card still reads as a calm, intentional empty state.
+     */
+    val graphPoints = if (attendanceTrend.isEmpty()) emptyList()
+    else attendanceTrend.map { (it.coerceIn(0, 100)) / 100f }
 
 
 
@@ -699,7 +872,7 @@ fun CampusHealthCard(
 
                         Text(
 
-                            text = "Everything looks stable today",
+                            text = headerMessage,
 
 
                             style = VTheme.type.caption.colored(
@@ -804,7 +977,7 @@ fun CampusHealthCard(
 
                             Text(
 
-                                "96%",
+                                presentLabel,
 
 
                                 style = VTheme.type.h2.colored(Color.White)
@@ -838,7 +1011,7 @@ fun CampusHealthCard(
 
 
                         HealthMetric(
-                            icon = VIcons.Users, value = "840", label = "Students"
+                            icon = VIcons.Users, value = students.toString(), label = "Students"
                         )
 
 
@@ -848,7 +1021,7 @@ fun CampusHealthCard(
 
 
                         HealthMetric(
-                            icon = VIcons.Users, value = "42", label = "Teachers"
+                            icon = VIcons.Users, value = teachers.toString(), label = "Teachers"
                         )
 
 
@@ -859,11 +1032,13 @@ fun CampusHealthCard(
 
 
                 /*
-                MINI GRAPH
+                MINI GRAPH (only when the server reports a trend)
                  */
 
 
-                AttendanceMiniGraph()
+                if (graphPoints.size >= 2) {
+                    AttendanceMiniGraph(points = graphPoints)
+                }
 
 
             }
@@ -929,8 +1104,12 @@ private fun HealthMetric(
 }
 
 @Composable
-private fun AttendanceMiniGraph() {
+private fun AttendanceMiniGraph(
+    points: List<Float>
+) {
 
+    // Guard: a line needs at least two points; render nothing otherwise.
+    if (points.size < 2) return
 
     Canvas(
 
@@ -943,11 +1122,6 @@ private fun AttendanceMiniGraph() {
     ) {
 
 
-        val points = listOf(
-            0.65f, 0.72f, 0.68f, 0.84f, 0.78f, 0.92f, 0.96f
-        )
-
-
         val path = Path()
 
 
@@ -958,7 +1132,8 @@ private fun AttendanceMiniGraph() {
             val x = size.width * index / (points.size - 1)
 
 
-            val y = size.height - (size.height * value)
+            // Clamp the ratio so an out-of-range value can never draw off-canvas.
+            val y = size.height - (size.height * value.coerceIn(0f, 1f))
 
 
 
@@ -974,11 +1149,18 @@ private fun AttendanceMiniGraph() {
 
 
 
+        // BUGFIX: drawPath defaults to Fill, which rendered the trend as a
+        // solid white wedge instead of a line. Draw it as a rounded stroke.
         drawPath(
 
             path = path,
 
             color = Color.White,
+
+            style = Stroke(
+                width = 3.dp.toPx(),
+                cap = StrokeCap.Round,
+            ),
 
             )
 
@@ -989,10 +1171,20 @@ private fun AttendanceMiniGraph() {
 
 @Composable
 fun DashboardMetricGrid(
-    students: Int, teachers: Int, classes: Int, subjects: Int,
+    statistics: DashboardStatistics?,
 
     modifier: Modifier = Modifier
 ) {
+
+    val students = statistics?.students
+    val teachers = statistics?.teachers
+    val classes = statistics?.classes
+    val subjects = statistics?.subjects
+
+    val studentTotal = students?.total ?: 0
+    val teacherTotal = teachers?.total ?: 0
+    val classTotal = classes?.total ?: 0
+    val subjectTotal = subjects?.total ?: 0
 
 
     Column(
@@ -1017,13 +1209,16 @@ fun DashboardMetricGrid(
 
                 title = "Students",
 
-                value = students.toString(),
+                value = studentTotal.toString(),
 
-                change = "+12%",
+                change = trendLabel(students?.trend),
+
+                changePositive = isPositiveTrend(students?.trend),
 
                 icon = VIcons.Users,
 
-                progress = .82f
+                // Progress reflects the active share of this metric.
+                progress = activeRatio(students?.active, studentTotal)
 
             )
 
@@ -1035,13 +1230,15 @@ fun DashboardMetricGrid(
 
                 title = "Teachers",
 
-                value = teachers.toString(),
+                value = teacherTotal.toString(),
 
-                change = "+4%",
+                change = trendLabel(teachers?.trend),
+
+                changePositive = isPositiveTrend(teachers?.trend),
 
                 icon = VIcons.Users,
 
-                progress = .64f
+                progress = activeRatio(teachers?.active, teacherTotal)
 
             )
 
@@ -1064,13 +1261,15 @@ fun DashboardMetricGrid(
 
                 title = "Classes",
 
-                value = classes.toString(),
+                value = classTotal.toString(),
 
-                change = "+2",
+                change = if ((classes?.active ?: 0) > 0) "${classes?.active} active" else "—",
+
+                changePositive = true,
 
                 icon = VIcons.School,
 
-                progress = .72f
+                progress = activeRatio(classes?.active, classTotal)
 
             )
 
@@ -1083,13 +1282,15 @@ fun DashboardMetricGrid(
 
                 title = "Subjects",
 
-                value = subjects.toString(),
+                value = subjectTotal.toString(),
 
-                change = "Active",
+                change = if ((subjects?.active ?: 0) > 0) "${subjects?.active} active" else "—",
+
+                changePositive = true,
 
                 icon = VIcons.BookOpen,
 
-                progress = .90f
+                progress = activeRatio(subjects?.active, subjectTotal)
 
             )
 
@@ -1100,6 +1301,35 @@ fun DashboardMetricGrid(
 
 }
 
+/** Formats a count trend (e.g. +12% / -3% / flat) into a compact label. */
+private fun trendLabel(trend: DashboardCountTrend?): String {
+    if (trend == null || trend.percentage == 0) return "—"
+    val sign = when (trend.direction) {
+        "up" -> "+"
+        "down" -> "-"
+        else -> ""
+    }
+    return "$sign${trend.percentage}%"
+}
+
+/** A trend is "good" (green) when flat or rising, "bad" (warning) when falling. */
+private fun isPositiveTrend(trend: DashboardCountTrend?): Boolean =
+    trend?.direction != "down"
+
+/** Active-to-total ratio clamped to a sensible visible range for the bar. */
+private fun activeRatio(active: Int?, total: Int): Float {
+    if (total <= 0) return 0f
+    val ratio = (active ?: total).toFloat() / total.toFloat()
+    return ratio.coerceIn(0f, 1f)
+}
+
+/** Maps a server unit token to a compact display suffix (e.g. "percentage" → "%"). */
+private fun unitSuffix(unit: String): String = when (unit.lowercase()) {
+    "percentage", "percent", "%" -> "%"
+    "", "count", "number" -> ""
+    else -> " $unit"
+}
+
 @Composable
 private fun DashboardMetricCard(
     title: String,
@@ -1107,6 +1337,8 @@ private fun DashboardMetricCard(
     value: String,
 
     change: String,
+
+    changePositive: Boolean,
 
     icon: ImageVector,
 
@@ -1165,7 +1397,9 @@ private fun DashboardMetricCard(
                     text = change,
 
 
-                    style = VTheme.type.caption.colored(c.successInk)
+                    style = VTheme.type.caption.colored(
+                        if (changePositive) c.successInk else c.warningInk
+                    )
 
                 )
 
@@ -1335,12 +1569,26 @@ private fun ProgressLine(
 
 @Composable
 fun AttendanceChartCard(
+    attendanceTrend: DashboardAttendanceTrend?,
     modifier: Modifier = Modifier
 ) {
 
 
     val c = VTheme.colors
 
+    val values = attendanceTrend?.values.orEmpty()
+    val labels = attendanceTrend?.labels.orEmpty()
+
+    // Normalise reported percentages (0..100) into 0..1 ratios for the graph.
+    val points = values.map { (it.coerceIn(0, 100)) / 100f }
+
+    /*
+     The badge shows the net change between the first and last reported
+     points (e.g. "+4%"). Hidden when there isn't enough data to compare.
+     */
+    val delta = if (values.size >= 2) values.last() - values.first() else null
+
+    val hasData = points.size >= 2
 
 
     VCard(
@@ -1388,7 +1636,8 @@ fun AttendanceChartCard(
 
                     Text(
 
-                        "Last 7 months performance",
+                        if (hasData) "Last ${values.size} ${attendanceTrend?.period.orEmpty().ifEmpty { "period" }} performance"
+                        else "No attendance data yet",
 
                         style = VTheme.type.caption.colored(c.ink2)
 
@@ -1401,47 +1650,52 @@ fun AttendanceChartCard(
 
 
 
-                BoxPercentage()
+                if (delta != null) {
+                    BoxPercentage(delta = delta)
+                }
 
             }
 
 
 
 
+            if (hasData) {
+
+                AttendanceLineGraph(points = points)
 
 
-            AttendanceLineGraph()
+                Row(
+
+                    modifier = Modifier.fillMaxWidth(),
 
 
+                    horizontalArrangement = Arrangement.SpaceBetween
+
+                ) {
 
 
+                    labels.forEach {
 
 
-            Row(
+                        Text(
 
-                modifier = Modifier.fillMaxWidth(),
+                            text = it,
 
+                            style = VTheme.type.dataSm.colored(c.ink3)
 
-                horizontalArrangement = Arrangement.SpaceBetween
+                        )
 
-            ) {
+                    }
 
-
-                listOf(
-                    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"
-                ).forEach {
-
-
-                    Text(
-
-                        text = it,
-
-                        style = VTheme.type.dataSm.colored(c.ink3)
-
-                    )
 
                 }
 
+            } else {
+
+                Text(
+                    "Attendance trends will appear once daily records are captured.",
+                    style = VTheme.type.caption.colored(c.ink2)
+                )
 
             }
 
@@ -1455,10 +1709,14 @@ fun AttendanceChartCard(
 }
 
 @Composable
-private fun BoxPercentage() {
+private fun BoxPercentage(delta: Int) {
 
 
     val c = VTheme.colors
+
+    val positive = delta >= 0
+    val tint = if (positive) c.successInk else c.warningInk
+    val sign = if (positive) "+" else ""
 
 
     Box(
@@ -1467,7 +1725,7 @@ private fun BoxPercentage() {
 
             .background(
 
-                c.successInk.copy(
+                tint.copy(
                     alpha = .12f
                 ),
 
@@ -1484,9 +1742,9 @@ private fun BoxPercentage() {
 
         Text(
 
-            "+4.2%",
+            "$sign$delta%",
 
-            style = VTheme.type.caption.colored(c.successInk)
+            style = VTheme.type.caption.colored(tint)
 
         )
 
@@ -1497,15 +1755,16 @@ private fun BoxPercentage() {
 }
 
 @Composable
-private fun AttendanceLineGraph() {
+private fun AttendanceLineGraph(
+    points: List<Float>
+) {
 
 
     val c = VTheme.colors
 
 
-    val points = listOf(
-        .78f, .82f, .80f, .87f, .84f, .91f, .96f
-    )
+    // A line/area needs at least two points.
+    if (points.size < 2) return
 
 
 
@@ -1540,7 +1799,7 @@ private fun AttendanceLineGraph() {
             val x = index * widthStep
 
 
-            val y = graphHeight - (graphHeight * value)
+            val y = graphHeight - (graphHeight * value.coerceIn(0f, 1f))
 
 
 
@@ -1627,7 +1886,7 @@ private fun AttendanceLineGraph() {
             val x = index * widthStep
 
 
-            val y = graphHeight - (graphHeight * value)
+            val y = graphHeight - (graphHeight * value.coerceIn(0f, 1f))
 
 
 
@@ -1949,9 +2208,7 @@ private fun IconContainer(
 @Composable
 fun TeacherInsightCard(
 
-    assigned: Int,
-
-    pending: Int,
+    insight: DashboardTeacherInsight?,
 
     modifier: Modifier = Modifier
 
@@ -1961,11 +2218,25 @@ fun TeacherInsightCard(
     val c = VTheme.colors
 
 
-    val total = assigned + pending
+    val assigned = insight?.assignedTeachers ?: 0
+
+    val pending = insight?.pendingAssignment ?: 0
+
+    val total = insight?.totalTeachers ?: (assigned + pending)
 
 
-    val coverage = if (total == 0) 0f
-    else assigned.toFloat() / total
+    /*
+     Prefer the server-computed coverage (already a 0..100 percentage). Fall
+     back to deriving it locally so an older payload still renders sanely.
+     */
+    val coverage = when {
+        insight != null && insight.assignmentCoverage > 0 ->
+            (insight.assignmentCoverage.coerceIn(0, 100)) / 100f
+        total > 0 -> (assigned.toFloat() / total).coerceIn(0f, 1f)
+        else -> 0f
+    }
+
+    val departments = insight?.departments.orEmpty()
 
 
 
@@ -2145,23 +2416,27 @@ fun TeacherInsightCard(
 
 
             /*
-            DEPARTMENT BREAKDOWN
+            DEPARTMENT BREAKDOWN (server-driven; honest empty state)
              */
 
 
-            DepartmentRow(
-                "Mathematics", 8
-            )
+            if (departments.isEmpty()) {
 
+                Text(
+                    "No departments recorded yet",
+                    style = VTheme.type.caption.colored(c.ink2)
+                )
 
-            DepartmentRow(
-                "Science", 6
-            )
+            } else {
 
+                departments.forEach { dept ->
+                    DepartmentRow(
+                        name = dept.name,
+                        count = dept.teacherCount
+                    )
+                }
 
-            DepartmentRow(
-                "English", 5
-            )
+            }
 
 
         }
