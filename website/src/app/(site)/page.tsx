@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Hero } from "@/components/home/Hero";
-import { SocialProof } from "@/components/home/SocialProof";
 import { ForSchools } from "@/components/home/ForSchools";
 import { ForParents } from "@/components/home/ForParents";
 import { ForTeachers } from "@/components/home/ForTeachers";
@@ -16,16 +15,16 @@ export const metadata: Metadata = {
 
 /**
  * Homepage — hybrid SSG marketing page. Assembled from real-feature sections.
- * Order follows the brief: hero → social proof → for schools/parents/teachers
- * → how it works → testimonials (honest placeholder). The closing conversion
- * prompt lives in the footer's onboarding strip, so the page no longer carries
- * a separate full-bleed final-CTA slab.
+ * Order: hero → for schools/parents/teachers → how it works → testimonials
+ * (honest placeholder). The closing conversion prompt lives in the footer's
+ * onboarding strip, so the page carries no separate full-bleed final-CTA slab.
+ * (The standalone platform-stats band was retired — the hero now carries the
+ * platform's credibility through live product chips instead of a vanity row.)
  */
 export default function HomePage() {
   return (
     <>
       <Hero />
-      <SocialProof />
       <ForSchools />
       <ForParents />
       <ForTeachers />

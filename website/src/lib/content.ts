@@ -12,14 +12,6 @@ export const BRAND = {
     "One platform connecting your office, your teachers, and every parent — attendance, results, fees, and messaging, in real time.",
 };
 
-// Sparse social-proof: derived from what the platform actually supports.
-export const SOCIAL_PROOF = [
-  { value: "3", label: "Boards supported", note: "CBSE · ICSE · State" },
-  { value: "4", label: "Connected roles", note: "Admin · Teacher · Parent · Staff" },
-  { value: "20+", label: "Built-in modules", note: "From attendance to analytics" },
-  { value: "1", label: "Source of truth", note: "Web + mobile, one backend" },
-];
-
 // FOR SCHOOLS — from SchoolDashboard, SchoolPeople, SchoolComms, SchoolRecords,
 // AnalyticsDashboard, AdmissionsCrm, SchedulePtm, ResultsPublish, LeaveRequests,
 // LinkRequests, DailyAttendance, StudentRoster, StaffProfile.
