@@ -30,6 +30,7 @@
  *   - parentFeesRouting()                 — /api/v1/parent/fees
  *   - parentLinkRouting()                 — /api/v1/parent/{schools/search, link-child}
  *   - schoolDashboardRouting()            — /api/v1/school/dashboard
+ *   - adminDashboardRouting()             — /api/admin/dashboard/{summary,analytics,activity}
  *   - schoolAnalyticsRouting()            — /api/v1/school/analytics/{overview,class-performance,teacher-performance,student/{id},syllabus-coverage}
  *   - leaveRequestsRouting()              — /api/v1/school/leave-requests[…]
  *   - ptmRouting()                        — /api/v1/school/ptm
@@ -68,6 +69,7 @@ import com.littlebridge.vidyaprayag.feature.parent.parentLeaveRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentLinkRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentAcademicsRouting
 import com.littlebridge.vidyaprayag.feature.parent.trackProgressRouting
+import com.littlebridge.vidyaprayag.feature.school.adminDashboardRouting
 import com.littlebridge.vidyaprayag.feature.school.leaveRequestsRouting
 import com.littlebridge.vidyaprayag.feature.school.messagesRouting
 import com.littlebridge.vidyaprayag.feature.school.ptmRouting
@@ -259,6 +261,7 @@ fun Application.module() {
 
         // School ecosystem (school_api_spec.artifact.md)
         schoolDashboardRouting()     // /api/v1/school/dashboard
+        adminDashboardRouting()      // /api/admin/dashboard/{summary,analytics,activity} — redesigned SchoolHomeScreenV2 data
         schoolAnalyticsRouting()     // /api/v1/school/analytics/{overview,class-performance,teacher-performance,student/{id},syllabus-coverage}
         leaveRequestsRouting()       // /api/v1/school/leave-requests[…]
         ptmRouting()                 // /api/v1/school/ptm
