@@ -31,9 +31,18 @@ export function CommandBar({
           {dateLabel}
           {meta?.academic_week ? ` · Academic week ${meta.academic_week}` : ""}
         </p>
-        <h1 className="mt-1 truncate text-[22px] font-bold tracking-tight md:text-[26px]">
-          {meta?.school_name ?? "Command Center"}
-        </h1>
+        <div className="mt-1 flex items-center gap-2.5">
+          <h1 className="truncate text-[22px] font-bold tracking-tight !text-white md:text-[26px]">
+            {meta?.school_name ?? "Command Center"}
+          </h1>
+          <span className="hidden shrink-0 items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/80 ring-1 ring-inset ring-white/15 sm:inline-flex">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-teal" />
+            </span>
+            Live
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:flex md:gap-2.5">

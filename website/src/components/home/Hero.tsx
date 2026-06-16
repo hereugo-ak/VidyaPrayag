@@ -67,30 +67,15 @@ export function Hero() {
       <div className="shell grid items-center gap-12 lg:grid-cols-[1.08fr_1fr] lg:gap-10">
         {/* ── LEFT: typography-led column ─────────────────────────────────── */}
         <div>
-          {/* Underlined stat badge (Grow+ "20M+ User / Read Our Success Stories"),
-              made honest: the connected roles the platform actually serves. */}
-          <motion.div
+          {/* Eyebrow — the connected roles the platform actually serves. */}
+          <motion.p
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: EASE_OUT_CUBIC }}
-            className="mb-8 inline-flex items-center gap-3"
+            className="mb-7 text-[12px] font-bold uppercase tracking-[0.2em] text-accent"
           >
-            <span className="flex -space-x-1.5">
-              {["bg-navy-deep", "bg-accent", "bg-teal-deep"].map((c, i) => (
-                <span
-                  key={i}
-                  className={`h-6 w-6 rounded-full ring-2 ring-lavender ${c}`}
-                />
-              ))}
-            </span>
-            <span className="text-[13px] leading-tight text-ink-2">
-              <span className="font-extrabold text-navy-deep">One platform</span>{" "}
-              for{" "}
-              <span className="font-semibold text-navy-deep underline decoration-accent/40 decoration-2 underline-offset-[5px]">
-                schools, teachers &amp; parents
-              </span>
-            </span>
-          </motion.div>
+            For schools · teachers · parents
+          </motion.p>
 
           {/* Oversized display headline — the Grow+ scale move, on-brand copy. */}
           <motion.h1
@@ -99,9 +84,13 @@ export function Hero() {
             transition={{ duration: 0.5, ease: EASE_OUT_CUBIC, delay: 0.05 }}
             className="display text-[3.4rem] leading-[0.96] tracking-tightest sm:text-7xl md:text-[5.4rem]"
           >
-            Run the
+            Run your
             <br />
-            whole school<span className="text-accent">.</span>
+            whole school
+            <br />
+            <span className="text-accent">
+              on one platform<span className="tracking-tighter">...</span>
+            </span>
           </motion.h1>
 
           {/* Hairline rule (Grow+ divider) between headline and subhead. */}
@@ -176,102 +165,6 @@ export function Hero() {
               rounded="rounded-[2rem]"
               className="shadow-cardHover"
             />
-          </motion.div>
-
-          {/* Question chip — top-left, offset (Grow+ "How is the fit?"). A real
-              question a parent asks the school, in-app. */}
-          <motion.div
-            initial={{ opacity: 0, y: 14, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.55, ease: EASE_OUT_CUBIC, delay: 0.45 }}
-            className="absolute -left-4 top-10 hidden sm:block md:-left-8"
-          >
-            <motion.div
-              animate={reduce ? undefined : { y: [0, -7, 0] }}
-              transition={reduce ? undefined : { duration: 6, ease: "easeInOut", repeat: Infinity }}
-              className="flex items-center gap-2.5 rounded-full border border-white/70 bg-white/85 py-2 pl-2 pr-4 shadow-[0_2px_6px_rgba(38,35,77,0.05),0_18px_40px_-12px_rgba(38,35,77,0.20)] backdrop-blur-md"
-            >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/12 text-accent-deep">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-              </span>
-              <span className="text-[13px] font-semibold text-navy-deep">
-                Was my child present today?
-              </span>
-            </motion.div>
-          </motion.div>
-
-          {/* Question chip — second, slightly lower & inset (Grow+ "Do you like
-              the design?"). A teacher-side confirmation, in-app. */}
-          <motion.div
-            initial={{ opacity: 0, y: 14, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.55, ease: EASE_OUT_CUBIC, delay: 0.58 }}
-            className="absolute left-6 top-28 hidden sm:block md:left-10"
-          >
-            <motion.div
-              animate={reduce ? undefined : { y: [0, -6, 0] }}
-              transition={reduce ? undefined : { duration: 7, ease: "easeInOut", repeat: Infinity, delay: 0.6 }}
-              className="flex items-center gap-2.5 rounded-full border border-white/70 bg-white/85 py-2 pl-2 pr-4 shadow-[0_2px_6px_rgba(38,35,77,0.05),0_18px_40px_-12px_rgba(38,35,77,0.20)] backdrop-blur-md"
-            >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-teal/15 text-teal-deep">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-              </span>
-              <span className="text-[13px] font-semibold text-navy-deep">
-                Attendance synced to parents
-              </span>
-            </motion.div>
-          </motion.div>
-
-          {/* Frosted stat card — top-right (Grow+ "60% More sales this week"),
-              made honest: the platform's real-time delivery promise. */}
-          <motion.div
-            initial={{ opacity: 0, y: -14, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.55, ease: EASE_OUT_CUBIC, delay: 0.66 }}
-            className="absolute -right-3 top-6 hidden md:block lg:-right-7"
-          >
-            <motion.div
-              animate={reduce ? undefined : { y: [0, 8, 0] }}
-              transition={reduce ? undefined : { duration: 7.5, ease: "easeInOut", repeat: Infinity, delay: 0.4 }}
-              className="w-[182px] rounded-[1.4rem] border border-white/55 bg-white/30 p-5 shadow-[0_2px_6px_rgba(38,35,77,0.05),0_24px_50px_-12px_rgba(38,35,77,0.22)] backdrop-blur-xl"
-            >
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-3">
-                — In real time
-              </p>
-              <p className="mt-2 display text-[2.2rem] leading-none tracking-tighter text-navy-deep">
-                One
-              </p>
-              <p className="mt-2 text-[12.5px] leading-snug text-ink-2">
-                source of truth across web &amp; mobile
-              </p>
-            </motion.div>
-          </motion.div>
-
-          {/* Role card — bottom-right (Grow+ product card). Mirrors the real
-              role model: the connected people the platform links. */}
-          <motion.div
-            initial={{ opacity: 0, y: 16, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.55, ease: EASE_OUT_CUBIC, delay: 0.78 }}
-            className="absolute -bottom-6 right-2 hidden sm:block md:right-6"
-          >
-            <motion.div
-              animate={reduce ? undefined : { y: [0, -6, 0] }}
-              transition={reduce ? undefined : { duration: 6.5, ease: "easeInOut", repeat: Infinity, delay: 1 }}
-              className="flex items-center gap-3.5 rounded-[1.4rem] border border-white/70 bg-white/85 p-3.5 pr-5 shadow-[0_2px_6px_rgba(38,35,77,0.05),0_24px_50px_-12px_rgba(38,35,77,0.22)] backdrop-blur-md"
-            >
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-navy-deep text-white">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-              </span>
-              <div>
-                <p className="text-[13.5px] font-extrabold leading-tight text-navy-deep">
-                  Admin · Teacher · Parent
-                </p>
-                <p className="mt-0.5 text-[11.5px] leading-tight text-ink-3">
-                  Every role, one connected backend
-                </p>
-              </div>
-            </motion.div>
           </motion.div>
         </motion.div>
       </div>
