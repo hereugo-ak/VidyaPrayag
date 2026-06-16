@@ -1,18 +1,19 @@
 import Link from "next/link";
 import { Logo } from "./ui/Logo";
-import { FOOTER_NAV } from "@/lib/content";
+import { FOOTER_NAV, FOOTER_TAGLINE } from "@/lib/content";
 
 export function Footer() {
   const year = new Date().getFullYear();
   return (
     <footer className="border-t border-navy/8 bg-white/40">
       <div className="shell py-16">
-        <div className="grid gap-12 md:grid-cols-[1.4fr_repeat(3,1fr)]">
+        <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-[1.6fr_repeat(4,1fr)]">
+          {/* Brand column — logo + one-line descriptor + social slots */}
           <div className="max-w-xs">
             <Logo />
             <p className="mt-4 text-sm leading-relaxed text-ink-3">
-              The operating system for your school. One platform for your office,
-              your teachers, and every parent.
+              The operating system for your school. One platform for your
+              office, your teachers, and every parent.
             </p>
             {/* Social slots — left intentionally empty until real accounts exist. */}
             <div className="mt-6 flex gap-3" aria-label="Social links">
@@ -34,16 +35,28 @@ export function Footer() {
                 {group}
               </h3>
               <ul className="mt-4 space-y-3">
-                {links.map((l) => (
-                  <li key={l.href}>
-                    <Link
-                      href={l.href}
-                      className="text-sm text-ink-2 transition-colors hover:text-navy-deep"
-                    >
-                      {l.label}
-                    </Link>
-                  </li>
-                ))}
+                {links.map((l) => {
+                  const external = l.href.startsWith("mailto:");
+                  return (
+                    <li key={l.href}>
+                      {external ? (
+                        <a
+                          href={l.href}
+                          className="text-sm text-ink-2 transition-colors duration-150 hover:text-navy-deep"
+                        >
+                          {l.label}
+                        </a>
+                      ) : (
+                        <Link
+                          href={l.href}
+                          className="text-sm text-ink-2 transition-colors duration-150 hover:text-navy-deep"
+                        >
+                          {l.label}
+                        </Link>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}
@@ -51,12 +64,25 @@ export function Footer() {
 
         <div className="mt-14 flex flex-col gap-4 border-t border-navy/8 pt-8 text-sm text-ink-3 sm:flex-row sm:items-center sm:justify-between">
           <p>© {year} Enroll+. All rights reserved.</p>
+          <p className="font-medium text-navy-deep/70">{FOOTER_TAGLINE}</p>
           <div className="flex gap-6">
-            <Link href="/privacy" className="transition-colors hover:text-navy-deep">
+            <Link
+              href="/privacy"
+              className="transition-colors duration-150 hover:text-navy-deep"
+            >
               Privacy
             </Link>
-            <Link href="/terms" className="transition-colors hover:text-navy-deep">
+            <Link
+              href="/terms"
+              className="transition-colors duration-150 hover:text-navy-deep"
+            >
               Terms
+            </Link>
+            <Link
+              href="/cookies"
+              className="transition-colors duration-150 hover:text-navy-deep"
+            >
+              Cookies
             </Link>
           </div>
         </div>

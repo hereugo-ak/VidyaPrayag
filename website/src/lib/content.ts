@@ -131,12 +131,22 @@ export const FOOTER_NAV = {
     { label: "Pricing", href: "/pricing" },
   ],
   Company: [
+    { label: "About us", href: "/about" },
     { label: "How it works", href: "/#how-it-works" },
     { label: "Onboard your school", href: "/onboarding" },
     { label: "Sign in", href: "/login" },
   ],
   Legal: [
-    { label: "Privacy", href: "/privacy" },
-    { label: "Terms", href: "/terms" },
+    { label: "Privacy Policy", href: "/privacy" },
+    { label: "Terms of Service", href: "/terms" },
+    { label: "Cookie Policy", href: "/cookies" },
+  ],
+  Contact: [
+    { label: "hello@enrollplus.app", href: "mailto:hello@enrollplus.app" },
+    { label: "Support", href: "mailto:support@enrollplus.app" },
+    { label: "Onboard your school", href: "/onboarding" },
   ],
 };
+
+// One-line product descriptor + closing line for the footer.
+export const FOOTER_TAGLINE = "Built for schools that move fast.";
