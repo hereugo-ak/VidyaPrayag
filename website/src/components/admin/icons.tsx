@@ -74,3 +74,21 @@ export const IconTrash = (p: P) => (
 export const IconExternal = (p: P) => (
   <svg {...base(p)}><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>
 );
+export const IconWarning = (p: P) => (
+  <svg {...base(p)}><path d="M12 3 2 20h20L12 3Z" /><path d="M12 10v4m0 3h.01" /></svg>
+);
+export const IconPulse = (p: P) => (
+  <svg {...base(p)}><path d="M3 12h4l2-6 4 14 2-8h6" /></svg>
+);
+export const IconCalendar = (p: P) => (
+  <svg {...base(p)}><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>
+);
+export const IconMessage = (p: P) => (
+  <svg {...base(p)}><path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H8l-4 4V6a1 1 0 0 1 1-1Z" /></svg>
+);
+export const IconBolt = (p: P) => (
+  <svg {...base(p)}><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" /></svg>
+);
+export const IconGrid = (p: P) => (
+  <svg {...base(p)}><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>
+);

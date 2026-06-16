@@ -16,40 +16,40 @@ export default function MarksPage() {
     {
       key: "assessment",
       header: "Assessment",
-      accessor: (r) => r.assessmentName,
+      accessor: (r) => r.assessment,
       sortable: true,
       cell: (r) => (
         <div>
-          <p className="font-semibold text-navy-deep">{r.assessmentName}</p>
-          <p className="text-[12px] text-ink-3">{r.className}</p>
+          <p className="font-semibold text-navy-deep">{r.assessment}</p>
+          <p className="text-[12px] text-ink-3">{r.class_name}</p>
         </div>
       ),
     },
     {
       key: "average",
       header: "Average",
-      accessor: (r) => (r.maxMarks > 0 ? (r.average / r.maxMarks) * 100 : 0),
+      accessor: (r) => (r.max_marks > 0 ? (r.average / r.max_marks) * 100 : 0),
       sortable: true,
       align: "right",
       cell: (r) => {
-        const p = r.maxMarks > 0 ? Math.round((r.average / r.maxMarks) * 100) : 0;
+        const p = r.max_marks > 0 ? Math.round((r.average / r.max_marks) * 100) : 0;
         return (
           <span className="nums">
             <Badge tone={p >= 75 ? "success" : p >= 40 ? "warning" : "danger"}>{pct(p)}</Badge>
-            <span className="ml-2 text-ink-3">{r.average.toFixed(1)}/{r.maxMarks}</span>
+            <span className="ml-2 text-ink-3">{r.average.toFixed(1)}/{r.max_marks}</span>
           </span>
         );
       },
     },
-    { key: "graded", header: "Graded", accessor: (r) => r.gradedCount, sortable: true, align: "right" },
+    { key: "graded", header: "Graded", accessor: (r) => r.graded_count, sortable: true, align: "right" },
     {
       key: "status",
       header: "Status",
-      accessor: (r) => (r.isPublished ? "Published" : "Draft"),
+      accessor: (r) => (r.is_published ? "Published" : "Draft"),
       align: "right",
       cell: (r) => (
-        <Badge tone={r.isPublished ? "success" : "neutral"}>
-          {r.isPublished ? "Published" : "Draft"}
+        <Badge tone={r.is_published ? "success" : "neutral"}>
+          {r.is_published ? "Published" : "Draft"}
         </Badge>
       ),
     },
@@ -61,7 +61,7 @@ export default function MarksPage() {
         <FadeIn>
           <StatTile
             label="Assessments"
-            value={(data?.assessmentCount ?? 0).toLocaleString("en-IN")}
+            value={(data?.assessment_count ?? 0).toLocaleString("en-IN")}
             caption="Active this term"
             loading={isLoading && !data}
             accent
@@ -70,7 +70,7 @@ export default function MarksPage() {
         <FadeIn delay={0.04}>
           <StatTile
             label="Overall average"
-            value={pct(data?.overallAveragePct ?? 0)}
+            value={pct(data?.overall_average_pct ?? 0)}
             caption="Across published assessments"
             loading={isLoading && !data}
           />
@@ -78,7 +78,7 @@ export default function MarksPage() {
         <FadeIn delay={0.08}>
           <StatTile
             label="Published"
-            value={(data?.assessments.filter((a) => a.isPublished).length ?? 0).toLocaleString("en-IN")}
+            value={(data?.assessments.filter((a) => a.is_published).length ?? 0).toLocaleString("en-IN")}
             caption="Visible to parents"
             loading={isLoading && !data}
           />
@@ -92,7 +92,7 @@ export default function MarksPage() {
             <DataTable
               columns={columns}
               rows={data?.assessments ?? []}
-              rowKey={(r) => `${r.subject}-${r.assessmentName}-${r.className}`}
+              rowKey={(r) => `${r.subject}-${r.assessment}-${r.class_name}`}
               loading={isLoading && !data}
               initialSort={{ key: "average", dir: "desc" }}
               emptyState={

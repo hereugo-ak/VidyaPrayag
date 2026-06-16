@@ -143,6 +143,11 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     add("kspCommonMainMetadata", libs.androidx.room.compiler)
     add("kspAndroid", libs.androidx.room.compiler)
+    // Desktop/JVM target — without this the Room annotation processor never
+    // runs for the JVM compilation, so `AppDatabase_Impl` is never generated
+    // and `gradlew run` crashes with:
+    //   "Cannot find implementation for AppDatabase. AppDatabase_Impl does not exist."
+    add("kspJvm", libs.androidx.room.compiler)
     add("kspIosSimulatorArm64", libs.androidx.room.compiler)
     add("kspIosArm64", libs.androidx.room.compiler)
 }

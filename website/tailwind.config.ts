@@ -55,6 +55,40 @@ const config: Config = {
         tighter: "-0.02em",
         tight: "-0.01em",
       },
+      /**
+       * Opacity scale — EXTENDED so every value we actually use generates a
+       * utility. Tailwind's default scale (…20,25,30…) omits the fine low-end
+       * steps this design leans on (4, 6, 8, 12, 18, 55, 85). Without these,
+       * classes like `bg-white/85`, `bg-navy/8`, `divide-navy/6`, `bg-accent/12`
+       * and `bg-warning/12` silently render NO colour — which read as missing
+       * card surfaces, invisible dividers, and broken badges across the
+       * dashboard. Defining the full set fixes that distortion at the root.
+       */
+      opacity: {
+        0: "0",
+        4: "0.04",
+        5: "0.05",
+        6: "0.06",
+        8: "0.08",
+        10: "0.10",
+        12: "0.12",
+        15: "0.15",
+        18: "0.18",
+        20: "0.20",
+        25: "0.25",
+        30: "0.30",
+        40: "0.40",
+        50: "0.50",
+        55: "0.55",
+        60: "0.60",
+        70: "0.70",
+        75: "0.75",
+        80: "0.80",
+        85: "0.85",
+        90: "0.90",
+        95: "0.95",
+        100: "1",
+      },
       maxWidth: {
         prose: "68ch",
         shell: "1200px",

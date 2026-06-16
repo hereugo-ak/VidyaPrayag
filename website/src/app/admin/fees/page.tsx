@@ -22,16 +22,16 @@ export default function FeesPage() {
   const { data, isLoading } = useFeeLedger();
   const currency = data?.currency ?? "INR";
 
-  const total = data ? data.paidTotal + data.dueTotal + data.overdueTotal : 0;
-  const collectedPct = data && total > 0 ? Math.round((data.paidTotal / total) * 100) : 0;
+  const total = data ? data.paid_total + data.due_total + data.overdue_total : 0;
+  const collectedPct = data && total > 0 ? Math.round((data.paid_total / total) * 100) : 0;
 
   const slices = useMemo(
     () =>
       data
         ? [
-            { label: "Paid", value: data.paidTotal, color: "#3CB9A9" },
-            { label: "Due", value: data.dueTotal, color: "#6C5CE0" },
-            { label: "Overdue", value: data.overdueTotal, color: "#B3261E" },
+            { label: "Paid", value: data.paid_total, color: "#3CB9A9" },
+            { label: "Due", value: data.due_total, color: "#6C5CE0" },
+            { label: "Overdue", value: data.overdue_total, color: "#B3261E" },
           ]
         : [],
     [data]
@@ -58,7 +58,7 @@ export default function FeesPage() {
       align: "right",
       cell: (r) => <span className="nums font-semibold text-navy-deep">{money(r.amount, r.currency || currency)}</span>,
     },
-    { key: "due", header: "Due date", accessor: (r) => r.dueDate ?? "", sortable: true, cell: (r) => r.dueDate ?? "—" },
+    { key: "due", header: "Due date", accessor: (r) => r.due_date ?? "", sortable: true, cell: (r) => r.due_date ?? "—" },
     {
       key: "status",
       header: "Status",
@@ -72,16 +72,16 @@ export default function FeesPage() {
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <FadeIn>
-          <StatTile label="Collected" value={`${collectedPct}%`} caption={`${data?.paidCount ?? 0} paid`} loading={isLoading && !data} accent />
+          <StatTile label="Collected" value={`${collectedPct}%`} caption={`${data?.paid_count ?? 0} paid`} loading={isLoading && !data} accent />
         </FadeIn>
         <FadeIn delay={0.04}>
-          <StatTile label="Paid" value={compactMoney(data?.paidTotal ?? 0, currency)} loading={isLoading && !data} />
+          <StatTile label="Paid" value={compactMoney(data?.paid_total ?? 0, currency)} loading={isLoading && !data} />
         </FadeIn>
         <FadeIn delay={0.08}>
-          <StatTile label="Due" value={compactMoney(data?.dueTotal ?? 0, currency)} caption={`${data?.dueCount ?? 0} records`} loading={isLoading && !data} />
+          <StatTile label="Due" value={compactMoney(data?.due_total ?? 0, currency)} caption={`${data?.due_count ?? 0} records`} loading={isLoading && !data} />
         </FadeIn>
         <FadeIn delay={0.12}>
-          <StatTile label="Overdue" value={compactMoney(data?.overdueTotal ?? 0, currency)} caption={`${data?.overdueCount ?? 0} records`} deltaTone="down" loading={isLoading && !data} />
+          <StatTile label="Overdue" value={compactMoney(data?.overdue_total ?? 0, currency)} caption={`${data?.overdue_count ?? 0} records`} deltaTone="down" loading={isLoading && !data} />
         </FadeIn>
       </div>
 
@@ -119,7 +119,7 @@ export default function FeesPage() {
               <DataTable
                 columns={columns}
                 rows={data?.recent ?? []}
-                rowKey={(r) => `${r.title}-${r.dueDate}-${r.amount}`}
+                rowKey={(r) => `${r.title}-${r.due_date}-${r.amount}`}
                 loading={isLoading && !data}
                 emptyState={<EmptyState title="No fee items yet" />}
               />

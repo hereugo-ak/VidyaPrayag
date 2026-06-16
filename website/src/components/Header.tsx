@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Logo } from "./ui/Logo";
@@ -8,17 +9,27 @@ import { Button } from "./ui/Button";
 
 const NAV = [
   { label: "Product", href: "/features" },
+  { label: "About", href: "/about" },
   { label: "How it works", href: "/#how-it-works" },
   { label: "Pricing", href: "/pricing" },
 ];
 
+// Active when the current path starts with the link's base path.
+// "/" -segments only — anchor links (/#...) never count as active.
+function isActivePath(pathname: string, href: string): boolean {
+  if (href.includes("#")) return false;
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const pathname = usePathname() ?? "/";
 
-  // Backdrop blur appears AFTER 80px — a subtle reveal, not a jarring swap.
+  // Backdrop blur appears AFTER 60px — a subtle reveal, not a jarring swap.
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 80);
+    const onScroll = () => setScrolled(window.scrollY > 60);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -50,19 +61,43 @@ export function Header() {
         <nav className="shell flex h-[72px] items-center justify-between">
           <Logo />
 
-          <div className="hidden items-center gap-8 md:flex">
-            {NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="text-sm font-medium text-ink-2 transition-colors hover:text-navy-deep"
-              >
-                {item.label}
-              </Link>
-            ))}
+          {/* Centre nav — evenly spaced links with subtle dot separators
+              between them (the Grow+ reference treatment). */}
+          <div className="hidden items-center gap-5 md:flex lg:gap-6">
+            {NAV.map((item, i) => {
+              const active = isActivePath(pathname, item.href);
+              return (
+                <div key={item.href} className="flex items-center gap-5 lg:gap-6">
+                  <Link
+                    href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    className={`group relative text-sm text-navy-deep transition-colors hover:text-navy-deep ${
+                      active ? "font-bold" : "font-medium text-ink-2"
+                    }`}
+                  >
+                    {item.label}
+                    {/* Underline: present (full) when active; otherwise slides
+                        in from the left over 150ms on hover. */}
+                    <span
+                      className={`pointer-events-none absolute -bottom-1 left-0 h-[2px] rounded-full bg-navy-deep transition-[width] duration-150 ease-out-cubic ${
+                        active ? "w-full" : "w-0 group-hover:w-full"
+                      }`}
+                    />
+                  </Link>
+                  {i < NAV.length - 1 && (
+                    <span
+                      aria-hidden
+                      className="h-1 w-1 rounded-full bg-navy/20"
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
 
-          <div className="hidden items-center gap-3 md:flex">
+          <div className="hidden items-center gap-4 md:flex">
+            {/* Vertical separator before the right-side actions (Grow+ pattern). */}
+            <span aria-hidden className="h-5 w-px bg-navy/12" />
             <Link
               href="/login"
               className="text-sm font-semibold text-navy-deep transition-colors hover:text-accent"
@@ -111,22 +146,31 @@ export function Header() {
             className="fixed inset-0 z-40 bg-lavender/95 backdrop-blur-xl md:hidden"
           >
             <div className="shell flex flex-col gap-1 pt-28">
-              {NAV.map((item, i) => (
-                <motion.div
-                  key={item.href}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.04 * i + 0.05, duration: 0.3 }}
-                >
-                  <Link
-                    href={item.href}
-                    onClick={() => setMenuOpen(false)}
-                    className="block border-b border-navy/8 py-4 text-2xl font-bold tracking-tight text-navy-deep"
+              {NAV.map((item, i) => {
+                const active = isActivePath(pathname, item.href);
+                return (
+                  <motion.div
+                    key={item.href}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.04 * i + 0.05, duration: 0.3 }}
                   >
-                    {item.label}
-                  </Link>
-                </motion.div>
-              ))}
+                    <Link
+                      href={item.href}
+                      onClick={() => setMenuOpen(false)}
+                      aria-current={active ? "page" : undefined}
+                      className={`flex items-center gap-3 border-b border-navy/8 py-4 text-2xl tracking-tight text-navy-deep ${
+                        active ? "font-extrabold" : "font-bold"
+                      }`}
+                    >
+                      {active && (
+                        <span className="h-2 w-2 rounded-full bg-accent" />
+                      )}
+                      {item.label}
+                    </Link>
+                  </motion.div>
+                );
+              })}
               <div className="mt-8 flex flex-col gap-3">
                 <Button href="/onboarding" size="lg">
                   Onboard your school

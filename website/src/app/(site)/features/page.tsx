@@ -6,6 +6,7 @@ import {
 } from "@/lib/content";
 import { PHOTOS } from "@/lib/images";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Reveal, RevealGroup, RevealItem } from "@/components/ui/Reveal";
 import { Photo } from "@/components/ui/Photo";
 import { Button } from "@/components/ui/Button";
@@ -19,19 +20,18 @@ export const metadata: Metadata = {
 
 export default function FeaturesPage() {
   return (
-    <div className="pt-28 md:pt-32">
-      {/* Intro */}
-      <section className="shell">
-        <SectionHeading
-          eyebrow="The platform"
-          title={
-            <>
-              One system. <span className="text-accent">Three points of view.</span>
-            </>
-          }
-          lede="Enroll+ models a school the way it actually runs — then gives admins, teachers and parents the exact slice they need. Every capability below maps to a real screen in the product."
-        />
-      </section>
+    <div>
+      {/* Distinct page header */}
+      <PageHeader
+        eyebrow="The platform"
+        crumbs={[{ label: "Home", href: "/" }, { label: "Product" }]}
+        title={
+          <>
+            One system. <span className="text-accent">Three points of view.</span>
+          </>
+        }
+        lede="Enroll+ models a school the way it actually runs — then gives admins, teachers and parents the exact slice they need. Every capability below maps to a real screen in the product."
+      />
 
       {/* For Schools */}
       <section id="schools" className="shell scroll-mt-24 py-20 md:py-28">

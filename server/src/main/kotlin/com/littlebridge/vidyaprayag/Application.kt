@@ -74,6 +74,7 @@ import com.littlebridge.vidyaprayag.feature.school.ptmRouting
 import com.littlebridge.vidyaprayag.feature.school.resultsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolAnalyticsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolDashboardRouting
+import com.littlebridge.vidyaprayag.feature.school.schoolIntelligenceRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolProfileRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRecordsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolStudentsRouting
@@ -237,6 +238,7 @@ fun Application.module() {
 
         // School ecosystem (school_api_spec.artifact.md)
         schoolDashboardRouting()     // /api/v1/school/dashboard
+        schoolIntelligenceRouting()  // /api/v1/school/dashboard/intelligence — Command Center: attendance timeline+anomalies+exam overlay, early-warning students, academic health grid, activity feed (all real-data)
         schoolAnalyticsRouting()     // /api/v1/school/analytics/{overview,class-performance,teacher-performance,student/{id},syllabus-coverage}
         leaveRequestsRouting()       // /api/v1/school/leave-requests[…]
         ptmRouting()                 // /api/v1/school/ptm
