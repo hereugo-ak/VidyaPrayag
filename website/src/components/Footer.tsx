@@ -54,26 +54,46 @@ export function Footer() {
   return (
     <footer className="relative mt-12 overflow-hidden border-t border-navy/10">
       <div className="shell pt-20 md:pt-24">
-        {/* Closing onboarding prompt — quiet, bordered, on-canvas (not a slab). */}
+        {/* Closing onboarding prompt — a premium LIGHT panel (no dark slab).
+            A frosted white card on the lavender canvas, lit with the single
+            sanctioned violet/teal aurora, a hairline ring + soft elevation, and
+            an eyebrow above an oversized display line. Reads as a designed
+            closing moment, not a quiet strip — all on-brand, all light. */}
         <motion.div
           initial={{ opacity: 0, y: reduce ? 0 : 18 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.3 }}
           transition={{ duration: 0.55, ease: EASE_OUT_CUBIC }}
-          className="flex flex-col gap-5 rounded-[1.75rem] border border-navy/10 bg-white/55 px-6 py-8 backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-9 sm:py-9"
+          className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/70 px-7 py-10 shadow-[0_2px_6px_rgba(38,35,77,0.05),0_28px_60px_-24px_rgba(38,35,77,0.20)] ring-1 ring-navy/[0.06] backdrop-blur-xl sm:px-12 sm:py-12"
         >
-          <div>
-            <p className="text-xl font-extrabold tracking-tight text-navy-deep sm:text-2xl">
-              Bring your whole school online.
-            </p>
-            <p className="mt-1.5 text-sm text-ink-2">
-              Set up in minutes — no credit card, no sales call. One source of
-              truth from day one.
-            </p>
+          {/* Soft aurora wash inside the panel — the only glow, low opacity. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 -z-10"
+            style={{
+              background:
+                "radial-gradient(60% 120% at 12% 0%, rgba(108,92,224,0.12) 0%, rgba(108,92,224,0) 60%), radial-gradient(50% 120% at 92% 100%, rgba(60,185,169,0.10) 0%, rgba(60,185,169,0) 60%)",
+            }}
+          />
+
+          <div className="flex flex-col gap-7 sm:flex-row sm:items-end sm:justify-between sm:gap-10">
+            <div className="max-w-xl">
+              <p className="eyebrow">Get started</p>
+              <p className="mt-3 display text-[2rem] leading-[1.05] tracking-tighter text-navy-deep sm:text-[2.6rem]">
+                Bring your whole school
+                <br className="hidden sm:block" /> online<span className="text-accent">.</span>
+              </p>
+              <p className="mt-4 max-w-md text-[15px] leading-relaxed text-ink-2">
+                Set up in minutes — no credit card, no sales call. One source of
+                truth from day one.
+              </p>
+            </div>
+            <div className="shrink-0">
+              <Button href="/onboarding" size="lg">
+                Onboard your school →
+              </Button>
+            </div>
           </div>
-          <Button href="/onboarding" size="lg">
-            Onboard your school →
-          </Button>
         </motion.div>
 
         {/* Link + brand grid */}

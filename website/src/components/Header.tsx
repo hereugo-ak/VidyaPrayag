@@ -61,32 +61,43 @@ export function Header() {
         <nav className="shell flex h-[72px] items-center justify-between">
           <Logo />
 
-          <div className="hidden items-center gap-8 md:flex">
-            {NAV.map((item) => {
+          {/* Centre nav — evenly spaced links with subtle dot separators
+              between them (the Grow+ reference treatment). */}
+          <div className="hidden items-center gap-5 md:flex lg:gap-6">
+            {NAV.map((item, i) => {
               const active = isActivePath(pathname, item.href);
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={active ? "page" : undefined}
-                  className={`group relative text-sm text-navy-deep transition-colors hover:text-navy-deep ${
-                    active ? "font-bold" : "font-medium text-ink-2"
-                  }`}
-                >
-                  {item.label}
-                  {/* Underline: present (full) when active; otherwise slides in
-                      from the left over 150ms on hover. */}
-                  <span
-                    className={`pointer-events-none absolute -bottom-1 left-0 h-[2px] rounded-full bg-navy-deep transition-[width] duration-150 ease-out-cubic ${
-                      active ? "w-full" : "w-0 group-hover:w-full"
+                <div key={item.href} className="flex items-center gap-5 lg:gap-6">
+                  <Link
+                    href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    className={`group relative text-sm text-navy-deep transition-colors hover:text-navy-deep ${
+                      active ? "font-bold" : "font-medium text-ink-2"
                     }`}
-                  />
-                </Link>
+                  >
+                    {item.label}
+                    {/* Underline: present (full) when active; otherwise slides
+                        in from the left over 150ms on hover. */}
+                    <span
+                      className={`pointer-events-none absolute -bottom-1 left-0 h-[2px] rounded-full bg-navy-deep transition-[width] duration-150 ease-out-cubic ${
+                        active ? "w-full" : "w-0 group-hover:w-full"
+                      }`}
+                    />
+                  </Link>
+                  {i < NAV.length - 1 && (
+                    <span
+                      aria-hidden
+                      className="h-1 w-1 rounded-full bg-navy/20"
+                    />
+                  )}
+                </div>
               );
             })}
           </div>
 
-          <div className="hidden items-center gap-3 md:flex">
+          <div className="hidden items-center gap-4 md:flex">
+            {/* Vertical separator before the right-side actions (Grow+ pattern). */}
+            <span aria-hidden className="h-5 w-px bg-navy/12" />
             <Link
               href="/login"
               className="text-sm font-semibold text-navy-deep transition-colors hover:text-accent"
