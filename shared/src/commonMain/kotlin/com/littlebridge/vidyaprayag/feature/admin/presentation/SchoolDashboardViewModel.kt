@@ -99,7 +99,7 @@ class SchoolDashboardViewModel(
     /**
      * Re-fetch everything the home screen needs:
      *   1. `/user/details`             — onboarding progress + greeting (existing)
-     *   2. `/api/admin/dashboard/*`    — summary, analytics, activity (new)
+     *   2. `/api/admin/dashboard/`    — summary, analytics, activity (new)
      *
      * Called on init and any time we want the dashboard to re-sync (screen
      * resume or post-onboarding navigation). The three dashboard reads are
@@ -108,6 +108,7 @@ class SchoolDashboardViewModel(
      * blocking error — onboarding/user-details remains the source of the
      * top-level loading + error state.
      */
+
     fun refresh() {
         viewModelScope.launch {
             _isLoading.value = true

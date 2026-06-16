@@ -70,78 +70,35 @@ fun SchoolHomeScreenV2(
     viewModel: SchoolDashboardViewModel = koinViewModel(),
     notificationsViewModel: NotificationsViewModel = koinViewModel(),
 ) {
-
-
     val adminName by viewModel.adminName.collectAsStateV2()
-
-
     val progress by viewModel.progress.collectAsStateV2()
-
-
     val steps by viewModel.steps.collectAsStateV2()
-
-
     val onboardingStatus by viewModel.onboardingStatus.collectAsStateV2()
-
-
-    val loading by viewModel.isLoading.collectAsStateV2()
-
-
+    val loading by viewModel.isLoading.collectAsStateV2() 
     val error by viewModel.errorMessage.collectAsStateV2()
-
-
-    val notifications by notificationsViewModel.state.collectAsStateV2()
-
-
-    val summary by viewModel.summary.collectAsStateV2()
-
-
-    val analytics by viewModel.analytics.collectAsStateV2()
-
-
+    val notifications by notificationsViewModel.state.collectAsStateV2() 
+    val summary by viewModel.summary.collectAsStateV2() 
+    val analytics by viewModel.analytics.collectAsStateV2() 
     val activity by viewModel.activity.collectAsStateV2()
 
-
-
     SchoolDashboardContent(
-
         modifier = modifier,
-
         adminName = adminName,
-
         progress = progress,
-
         steps = steps,
-
         onboardingStatus = onboardingStatus,
-
         unreadCount = notifications.unreadCount,
-
         loading = loading,
-
         error = error,
-
         summary = summary,
-
         analytics = analytics,
-
         activity = activity,
-
-
         onRetry = {
             viewModel.refresh()
         },
-
-
         onOpenNotifications = onOpenNotifications,
-
-
         onOpenAnalytics = onOpenAnalytics,
-
-
         onOpenPews = onOpenPews,
-
-
         onExit = onExit
     )
 }
@@ -149,175 +106,85 @@ fun SchoolHomeScreenV2(
 @Composable
 private fun SchoolDashboardContent(
     modifier: Modifier = Modifier,
-
     adminName: String,
-
     progress: Float,
-
     steps: List<OnboardingStep>,
-
-
     onboardingStatus: DashboardOnboardingStatus,
-
-
     unreadCount: Int,
-
-
     loading: Boolean,
-
-
     error: String?,
-
-
     summary: AdminDashboardSummary?,
-
-
     analytics: AdminDashboardAnalytics?,
-
-
     activity: AdminDashboardActivity?,
-
-
     onRetry: () -> Unit,
-
-
     onOpenNotifications: () -> Unit,
-
-
     onOpenAnalytics: () -> Unit,
-
-
     onOpenPews: () -> Unit,
-
-
     onExit: () -> Unit,
 ) {
-
-
     val completed = onboardingStatus == DashboardOnboardingStatus.COMPLETED
-
-
-
     Column(
-
         modifier = modifier.fillMaxSize().statusBarsPadding().verticalScroll(
             rememberScrollState()
         ).padding(
             horizontal = 20.dp,
             vertical = 20.dp,
         ).padding(bottom = 140.dp),
-
-
         verticalArrangement = Arrangement.spacedBy(20.dp)
-
     ) {
-
-
         VStateHost(
-
             loading = loading,
-
             error = error,
-
             isEmpty = false,
-
-
             onRetry = onRetry,
-
-
             skeleton = {
                 SkeletonDashboard()
             }
-
         ) {
-
-
             Column(
-
                 verticalArrangement = Arrangement.spacedBy(22.dp)
-
             ) {
-
-
-                /*
-                 HEADER
-                 */
                 AdminHeader(
                     name = adminName,
-
                     completed = completed,
-
                     unreadCount = unreadCount,
-
-
                     onNotifications = onOpenNotifications,
-
-
                     onExit = onExit
                 )
-
-
-                /*
-                 ALERTS (server-driven; only shown when present)
-                 */
                 val alerts = activity?.alerts.orEmpty()
                 if (alerts.isNotEmpty()) {
                     AlertsSection(alerts = alerts)
                 }
-
-
-                /*
-                 MAIN HERO
-                 */
                 CampusHealthCard(
                     campusHealth = summary?.campusHealth,
                     students = summary?.statistics?.students?.total ?: 0,
                     teachers = summary?.statistics?.teachers?.total ?: 0,
                     attendanceTrend = analytics?.attendanceTrend?.values.orEmpty(),
                 )
-
-
-                /*
-                 FOUR BIG NUMBERS
-                 */
                 DashboardMetricGrid(
                     statistics = summary?.statistics,
+                    onStudentClick = onOpenPews,
+                    onTeacherClick = onOpenPews,
+                    onClassesClick ={},
+                    onSubjectClick = {}
                 )
-
-
-                /*
-                 ANALYTICS
-                 */
                 AttendanceChartCard(
                     attendanceTrend = analytics?.attendanceTrend,
                 )
-
-
-                /*
-                 ACTION CENTER
-                 */
+                
                 QuickActionGrid(
-
-                    onAddTeacher = {},
-
-                    onAddStudent = {},
-
+                    onAddTeacher = onOpenPews,
+                    onAddStudent = onOpenPews,
                     onCreateClass = {},
-
-                    onReports = {})
-
-
-                /*
-                 TEACHERS
-                 */
+                    onReports = {}
+                )
                 TeacherInsightCard(
                     insight = summary?.teacherInsight,
+                    modifier = Modifier.clickable(
+                        enabled = true,
+                        onClick = onOpenPews
+                    )
                 )
-
-
-                /*
-                 ACTIVITY
-                 */
                 ActivityTimeline(
                     activities = activity?.activities.orEmpty().map {
                         ActivityItem(
@@ -325,34 +192,21 @@ private fun SchoolDashboardContent(
                             subtitle = it.description,
                             time = it.time,
                         )
-                    }
+                    },
+                    modifier = Modifier.clickable(
+                        enabled = true,
+                        onClick = onOpenPews
+                    )
                 )
-
-
-                /*
-                 EXISTING ANALYTICS
-                 */
                 AnalyticsEntryCard(
-
                     onClick = onOpenAnalytics
                 )
-
-
-
-
-
                 PewsEntryCard(
-
                     onClick = onOpenPews
                 )
-
-
             }
-
         }
-
     }
-
 }
 
 @Composable
@@ -1172,8 +1026,11 @@ private fun AttendanceMiniGraph(
 @Composable
 fun DashboardMetricGrid(
     statistics: DashboardStatistics?,
-
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onStudentClick: () -> Unit,
+    onTeacherClick: () -> Unit,
+    onClassesClick: () -> Unit,
+    onSubjectClick: () -> Unit
 ) {
 
     val students = statistics?.students
@@ -1197,104 +1054,56 @@ fun DashboardMetricGrid(
 
 
         Row(
-
             horizontalArrangement = Arrangement.spacedBy(14.dp)
-
         ) {
-
-
             DashboardMetricCard(
-
                 modifier = Modifier.weight(1f),
-
                 title = "Students",
-
                 value = studentTotal.toString(),
-
                 change = trendLabel(students?.trend),
-
                 changePositive = isPositiveTrend(students?.trend),
-
                 icon = VIcons.Users,
-
                 // Progress reflects the active share of this metric.
-                progress = activeRatio(students?.active, studentTotal)
-
+                progress = activeRatio(students?.active, studentTotal),
+                onClick = onStudentClick
             )
-
-
 
             DashboardMetricCard(
-
                 modifier = Modifier.weight(1f),
-
                 title = "Teachers",
-
                 value = teacherTotal.toString(),
-
                 change = trendLabel(teachers?.trend),
-
                 changePositive = isPositiveTrend(teachers?.trend),
-
                 icon = VIcons.Users,
-
-                progress = activeRatio(teachers?.active, teacherTotal)
-
+                progress = activeRatio(teachers?.active, teacherTotal),
+                onClick = onTeacherClick
             )
-
-
         }
 
-
-
-
         Row(
-
             horizontalArrangement = Arrangement.spacedBy(14.dp)
-
         ) {
-
-
             DashboardMetricCard(
-
                 modifier = Modifier.weight(1f),
-
                 title = "Classes",
-
                 value = classTotal.toString(),
-
                 change = if ((classes?.active ?: 0) > 0) "${classes?.active} active" else "—",
-
                 changePositive = true,
-
                 icon = VIcons.School,
-
-                progress = activeRatio(classes?.active, classTotal)
-
+                progress = activeRatio(classes?.active, classTotal),
+                onClick = onClassesClick
             )
-
-
-
 
             DashboardMetricCard(
-
                 modifier = Modifier.weight(1f),
-
                 title = "Subjects",
-
                 value = subjectTotal.toString(),
-
                 change = if ((subjects?.active ?: 0) > 0) "${subjects?.active} active" else "—",
-
                 changePositive = true,
-
                 icon = VIcons.BookOpen,
-
-                progress = activeRatio(subjects?.active, subjectTotal)
-
+                progress = activeRatio(subjects?.active, subjectTotal),
+                onClick = onSubjectClick
             )
-
-
         }
 
     }
@@ -1333,31 +1142,17 @@ private fun unitSuffix(unit: String): String = when (unit.lowercase()) {
 @Composable
 private fun DashboardMetricCard(
     title: String,
-
     value: String,
-
     change: String,
-
     changePositive: Boolean,
-
     icon: ImageVector,
-
     progress: Float,
-
-
-    modifier: Modifier = Modifier
-
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
 ) {
-
-
     val c = VTheme.colors
-
-
-
     VCard(
-
-        modifier = modifier
-
+        modifier = modifier.clickable { onClick() }
     ) {
 
 
@@ -3008,15 +2803,11 @@ private fun DashboardFeatureCard(
 
 
     VCard(
-
-        modifier = modifier.fillMaxWidth().clip(
-            RoundedCornerShape(26.dp)
-        )
-
-            .background(
-                c.card
-            )
-
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(26.dp))
+            .clickable { onClick() }
+            .background(c.card)
     ) {
 
 
