@@ -236,6 +236,71 @@ export type UpdateSchoolProfileRequest = Partial<
   Omit<SchoolProfileDto, "id">
 >;
 
+// ── Dashboard intelligence (GET /api/v1/school/dashboard/intelligence) ───────
+// Command Center payload. Every field is computed server-side from real tables
+// (see SchoolIntelligenceRouting.kt). Nothing here is fabricated.
+export interface IntelligenceMeta {
+  school_name: string;
+  academic_week: number;
+  today: string;
+  attendance_as_of: string | null;
+}
+export interface AttendancePoint {
+  date: string;
+  rate: number;
+  present: number;
+  absent: number;
+  total: number;
+  is_anomaly: boolean;
+  exam: string | null;
+}
+export interface RiskSignal {
+  kind: "attendance" | "marks" | "leave";
+  label: string;
+  severity: number;
+}
+export interface EarlyWarningStudent {
+  student_code: string;
+  name: string;
+  class_name: string;
+  section: string;
+  attendance_pct: number | null;
+  marks_pct: number | null;
+  leave_count: number;
+  risk_level: "high" | "medium" | "watch";
+  signals: RiskSignal[];
+}
+export interface HealthCell {
+  subject: string;
+  percentage: number;
+  covered_units: number;
+  total_units: number;
+}
+export interface HealthRow {
+  class_name: string;
+  cells: HealthCell[];
+  class_average: number;
+}
+export interface AcademicHealth {
+  subjects: string[];
+  rows: HealthRow[];
+}
+export interface ActivityItem {
+  id: string;
+  category: string;
+  actor: string;
+  action: string;
+  target: string;
+  iso_time: string;
+}
+export interface DashboardIntelligenceDto {
+  meta: IntelligenceMeta;
+  attendance_timeline: AttendancePoint[];
+  early_warning: EarlyWarningStudent[];
+  academic_health: AcademicHealth;
+  activity_feed: ActivityItem[];
+}
+
 // ── Onboarding status (GET /api/v1/onboarding/status) ────────────────────────
 export interface OnboardingStatusResponse {
   school_id: string | null;
