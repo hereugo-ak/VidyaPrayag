@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/privacy" },
 };
 
-const UPDATED = "15 June 2026";
+const UPDATED = "16 June 2026";
 
 export default function PrivacyPage() {
   return (
@@ -62,28 +62,34 @@ export default function PrivacyPage() {
           Schools maintain a student roster (<code>students</code>) containing each student&apos;s
           name, a unique student code, class, section and roll number, and an optional photo.
           Parents may register their child (<code>children</code>) with a name, optional date of
-          birth, gender, current grade and interests; once a parent&apos;s link request is approved
-          (<code>parent_child_links</code>), the child is matched to the school&apos;s canonical
-          student record by roll number.
+          birth, gender, current grade and interests. When a parent requests a connection it is
+          recorded in <code>parent_child_links</code>; once the school approves it, the child is
+          matched to the school&apos;s canonical student record by roll number. A parent only ever
+          sees a child whose link has been approved.
         </p>
       </LegalSection>
 
       <LegalSection title="5. Operational records">
         <p>
           As the school uses the platform, staff create operational records tied to students
-          and classes, including:
+          and classes. Each lives in a specific table, and we store only the fields needed to
+          provide that feature:
         </p>
         <ul>
-          <li>Attendance records, marked by teachers</li>
-          <li>Assessment marks and published exam results</li>
-          <li>A per-child fees ledger (paid / due / overdue line items)</li>
-          <li>Announcements, message threads and WhatsApp delivery logs</li>
-          <li>Leave requests, PTM events, homework and syllabus tracking</li>
-          <li>Admission enquiries in the admissions pipeline</li>
+          <li><strong>Attendance</strong> (<code>attendance_records</code>) — per-student, per-day status marked by teachers.</li>
+          <li><strong>Marks &amp; results</strong> (<code>assessment_marks</code>, <code>assessments</code>, <code>exam_results</code>) — scores entered against an assessment, plus published exam results.</li>
+          <li><strong>Fees</strong> (<code>fee_records</code>) — a per-child ledger of paid, due and overdue line items.</li>
+          <li><strong>Messaging</strong> (<code>messages</code>, <code>message_threads</code>, <code>announcements</code>, <code>whatsapp_logs</code>) — audience-scoped announcements, message threads, and delivery logs.</li>
+          <li><strong>Notifications</strong> (<code>notifications</code>) — in-app alerts generated for you by school activity.</li>
+          <li><strong>Leave, PTMs &amp; coursework</strong> (<code>leave_requests</code>, <code>ptm_events</code>, <code>homework</code>, <code>syllabus_units</code>) — leave applications, parent-teacher meetings, homework and syllabus tracking.</li>
+          <li><strong>Admissions</strong> (<code>admission_enquiries</code>) — prospects in the admissions pipeline.</li>
         </ul>
         <p>
-          Analytics shown in the product are computed from these real entries — we do not
-          fabricate or estimate any figure.
+          Analytics shown in the product — class and teacher performance, per-student trends,
+          syllabus coverage, and the early-warning list of at-risk students — are computed
+          directly from these real entries. We do not fabricate, estimate or invent any figure;
+          where the underlying data is absent, the product says so rather than showing a made-up
+          number.
         </p>
       </LegalSection>
 
@@ -91,8 +97,9 @@ export default function PrivacyPage() {
         <p>
           To keep accounts secure we store session tokens (<code>user_sessions</code>),
           one-time-password records for phone/email verification (<code>auth_otps</code> and
-          delivery attempts), and device push tokens (<code>device_tokens</code>) for
-          notifications. We log request timestamps for security and abuse-prevention purposes.
+          <code> otp_delivery_attempts</code>), and device push tokens (<code>device_tokens</code>)
+          used to deliver the <code>notifications</code> described above. We log request
+          timestamps for security and abuse-prevention purposes.
         </p>
       </LegalSection>
 
@@ -140,7 +147,16 @@ export default function PrivacyPage() {
         </ul>
       </LegalSection>
 
-      <LegalSection title="12. Changes to this policy">
+      <LegalSection title="12. Cookies & local storage">
+        <p>
+          On the website we keep cookies and local storage to a minimum — essentially what is
+          needed to keep you signed in and to remember preferences. We do not run third-party
+          advertising trackers. The full detail lives in our{" "}
+          <a href="/cookies">Cookie Policy</a>.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="13. Changes to this policy">
         <p>
           We may update this policy as the platform evolves. Material changes will be
           communicated through the app or website. The &ldquo;last updated&rdquo; date above
