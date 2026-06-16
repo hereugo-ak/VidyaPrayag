@@ -208,17 +208,36 @@ export const FOOTER_NAV = {
     { label: "Onboard your school", href: "/onboarding" },
     { label: "Sign in", href: "/login" },
   ],
+  Support: [
+    { label: "Help & Support", href: "/support" },
+    { label: "Contact us", href: "mailto:hello@enrollplus.app" },
+    { label: "Status", href: "/support#status" },
+    { label: "Onboard your school", href: "/onboarding" },
+  ],
   Legal: [
     { label: "Privacy Policy", href: "/privacy" },
     { label: "Terms of Service", href: "/terms" },
     { label: "Cookie Policy", href: "/cookies" },
   ],
-  Contact: [
-    { label: "hello@enrollplus.app", href: "mailto:hello@enrollplus.app" },
-    { label: "Support", href: "mailto:support@enrollplus.app" },
-    { label: "Onboard your school", href: "/onboarding" },
-  ],
 };
+
+// Contact block (rendered as its own column in the footer card — addresses,
+// not links). Honest: the support inbox is real; no invented phone/office.
+export const FOOTER_CONTACT = {
+  blurb:
+    "One source of truth for your office, your teachers and every parent. Onboard on the web in minutes — no sales call required.",
+  email: "hello@enrollplus.app",
+  support: "support@enrollplus.app",
+};
+
+// Social slots — left as honest placeholders until real accounts exist; the
+// footer renders them as disabled icons (no dead links to nonexistent pages).
+export const FOOTER_SOCIAL = [
+  { label: "X", href: null },
+  { label: "LinkedIn", href: null },
+  { label: "Instagram", href: null },
+  { label: "GitHub", href: null },
+] as const;
 
 // One-line product descriptor + closing line for the footer.
 export const FOOTER_TAGLINE = "Built for schools that move fast.";

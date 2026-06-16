@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ABOUT } from "@/lib/content";
 import { PHOTOS } from "@/lib/images";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Reveal, RevealGroup, RevealItem } from "@/components/ui/Reveal";
 import { Photo } from "@/components/ui/Photo";
 import { Button } from "@/components/ui/Button";
@@ -15,15 +16,14 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <div className="pt-28 md:pt-32">
-      {/* Hero — editorial opening */}
-      <section className="shell">
-        <SectionHeading
-          eyebrow={ABOUT.hero.eyebrow}
-          title={ABOUT.hero.title}
-          lede={ABOUT.hero.lede}
-        />
-      </section>
+    <div>
+      {/* Distinct page header */}
+      <PageHeader
+        eyebrow={ABOUT.hero.eyebrow}
+        crumbs={[{ label: "Home", href: "/" }, { label: "About" }]}
+        title={ABOUT.hero.title}
+        lede={ABOUT.hero.lede}
+      />
 
       {/* Lead photograph — real institutional imagery */}
       <section className="shell mt-14 md:mt-16">

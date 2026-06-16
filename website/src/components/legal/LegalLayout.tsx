@@ -1,8 +1,10 @@
-import { Reveal } from "../ui/Reveal";
+import { PageHeader } from "../ui/PageHeader";
 
 /**
- * Shared shell for the long-form legal pages (privacy, terms). Keeps measure
- * tight (prose width), typography calm, and headings on the navy ink scale.
+ * Shared shell for the long-form legal pages (privacy, terms, cookies). Each
+ * gets its own distinct PageHeader (eyebrow + breadcrumb + title + "last
+ * updated") then a tight prose body. Typography stays calm; headings on the
+ * navy ink scale.
  */
 export function LegalLayout({
   title,
@@ -14,17 +16,18 @@ export function LegalLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="shell pb-24 pt-28 md:pt-32">
-      <Reveal className="max-w-prose">
-        <p className="eyebrow mb-3">Legal</p>
-        <h1 className="display text-4xl leading-[1.05]">{title}</h1>
-        <p className="mt-3 text-sm text-ink-3">Last updated: {updated}</p>
-      </Reveal>
+    <>
+      <PageHeader
+        eyebrow="Legal"
+        crumbs={[{ label: "Home", href: "/" }, { label: title }]}
+        title={title}
+        lede={`Last updated: ${updated}. Written to reflect exactly what the platform stores — nothing here is boilerplate.`}
+      />
 
-      <div className="legal mt-12 max-w-prose space-y-10 text-ink-2">
-        {children}
+      <div className="shell pb-24 pt-12 md:pt-16">
+        <div className="legal max-w-prose space-y-10 text-ink-2">{children}</div>
       </div>
-    </div>
+    </>
   );
 }
 

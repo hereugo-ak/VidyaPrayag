@@ -1,12 +1,19 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { fadeUp, staggerContainer, viewportOnce } from "@/lib/motion";
 
+// For users who prefer reduced motion: a plain, instant opacity fade with no
+// transform/scale/blur — keeps the page accessible without the "settle".
+const reducedFade = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { duration: 0.2 } },
+} as const;
+
 /**
- * Reveal — fades a block up 22px once when it enters the viewport.
- * `as` lets it render any element; `delay` nudges sequence without a stagger
- * container. Animation plays ONCE and settles (viewport once:true).
+ * Reveal — settles a block into focus once when it enters the viewport
+ * (fade + 22px rise + a whisper of scale & blur, see lib/motion fadeUp).
+ * `delay` nudges sequence without a stagger container. Plays ONCE.
  */
 export function Reveal({
   children,
@@ -17,10 +24,11 @@ export function Reveal({
   className?: string;
   delay?: number;
 }) {
+  const reduce = useReducedMotion();
   return (
     <motion.div
       className={className}
-      variants={fadeUp}
+      variants={reduce ? reducedFade : fadeUp}
       initial="hidden"
       whileInView="show"
       viewport={viewportOnce}
@@ -59,8 +67,9 @@ export function RevealItem({
   children: React.ReactNode;
   className?: string;
 }) {
+  const reduce = useReducedMotion();
   return (
-    <motion.div className={className} variants={fadeUp}>
+    <motion.div className={className} variants={reduce ? reducedFade : fadeUp}>
       {children}
     </motion.div>
   );
