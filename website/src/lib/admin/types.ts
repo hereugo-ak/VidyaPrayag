@@ -51,6 +51,9 @@ export interface AnalyticsOverviewResponse {
 }
 
 // ── Attendance summary (GET /api/v1/school/attendance/summary) ───────────────
+// Keys are the EXACT wire format kotlinx.serialization emits (@SerialName in
+// SchoolRecordsRouting.kt). The client returns env.data verbatim with no
+// case transform, so these MUST be snake_case to read at runtime.
 export interface AttendanceClassRow {
   grade: string;
   present: number;
@@ -60,29 +63,29 @@ export interface AttendanceClassRow {
   rate: number;
 }
 export interface AttendanceSummaryDto {
-  date: string | null;
+  latest_date: string | null;
   present: number;
   absent: number;
   late: number;
   total: number;
   rate: number;
-  byClass: AttendanceClassRow[];
+  by_class: AttendanceClassRow[];
 }
 
 // ── Marks summary (GET /api/v1/school/marks/summary) ─────────────────────────
 export interface MarksAssessmentRow {
   subject: string;
-  assessmentName: string;
-  className: string;
+  assessment: string;
+  class_name: string;
   average: number;
-  maxMarks: number;
-  gradedCount: number;
-  examDate: string | null;
-  isPublished: boolean;
+  max_marks: number;
+  graded_count: number;
+  exam_date: string | null;
+  is_published: boolean;
 }
 export interface MarksSummaryDto {
-  assessmentCount: number;
-  overallAveragePct: number;
+  assessment_count: number;
+  overall_average_pct: number;
   assessments: MarksAssessmentRow[];
 }
 
@@ -92,16 +95,16 @@ export interface FeeRow {
   amount: number;
   currency: string;
   status: string;
-  dueDate: string | null;
+  due_date: string | null;
   category: string | null;
 }
 export interface FeeLedgerDto {
-  paidTotal: number;
-  dueTotal: number;
-  overdueTotal: number;
-  paidCount: number;
-  dueCount: number;
-  overdueCount: number;
+  paid_total: number;
+  due_total: number;
+  overdue_total: number;
+  paid_count: number;
+  due_count: number;
+  overdue_count: number;
   currency: string;
   recent: FeeRow[];
 }
@@ -235,6 +238,71 @@ export interface SchoolProfileDto {
 export type UpdateSchoolProfileRequest = Partial<
   Omit<SchoolProfileDto, "id">
 >;
+
+// ── Dashboard intelligence (GET /api/v1/school/dashboard/intelligence) ───────
+// Command Center payload. Every field is computed server-side from real tables
+// (see SchoolIntelligenceRouting.kt). Nothing here is fabricated.
+export interface IntelligenceMeta {
+  school_name: string;
+  academic_week: number;
+  today: string;
+  attendance_as_of: string | null;
+}
+export interface AttendancePoint {
+  date: string;
+  rate: number;
+  present: number;
+  absent: number;
+  total: number;
+  is_anomaly: boolean;
+  exam: string | null;
+}
+export interface RiskSignal {
+  kind: "attendance" | "marks" | "leave";
+  label: string;
+  severity: number;
+}
+export interface EarlyWarningStudent {
+  student_code: string;
+  name: string;
+  class_name: string;
+  section: string;
+  attendance_pct: number | null;
+  marks_pct: number | null;
+  leave_count: number;
+  risk_level: "high" | "medium" | "watch";
+  signals: RiskSignal[];
+}
+export interface HealthCell {
+  subject: string;
+  percentage: number;
+  covered_units: number;
+  total_units: number;
+}
+export interface HealthRow {
+  class_name: string;
+  cells: HealthCell[];
+  class_average: number;
+}
+export interface AcademicHealth {
+  subjects: string[];
+  rows: HealthRow[];
+}
+export interface ActivityItem {
+  id: string;
+  category: string;
+  actor: string;
+  action: string;
+  target: string;
+  iso_time: string;
+}
+export interface DashboardIntelligenceDto {
+  meta: IntelligenceMeta;
+  attendance_timeline: AttendancePoint[];
+  early_warning: EarlyWarningStudent[];
+  academic_health: AcademicHealth;
+  activity_feed: ActivityItem[];
+}
 
 // ── Onboarding status (GET /api/v1/onboarding/status) ────────────────────────
 export interface OnboardingStatusResponse {

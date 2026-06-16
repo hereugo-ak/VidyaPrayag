@@ -12,14 +12,6 @@ export const BRAND = {
     "One platform connecting your office, your teachers, and every parent — attendance, results, fees, and messaging, in real time.",
 };
 
-// Sparse social-proof: derived from what the platform actually supports.
-export const SOCIAL_PROOF = [
-  { value: "3", label: "Boards supported", note: "CBSE · ICSE · State" },
-  { value: "4", label: "Connected roles", note: "Admin · Teacher · Parent · Staff" },
-  { value: "20+", label: "Built-in modules", note: "From attendance to analytics" },
-  { value: "1", label: "Source of truth", note: "Web + mobile, one backend" },
-];
-
 // FOR SCHOOLS — from SchoolDashboard, SchoolPeople, SchoolComms, SchoolRecords,
 // AnalyticsDashboard, AdmissionsCrm, SchedulePtm, ResultsPublish, LeaveRequests,
 // LinkRequests, DailyAttendance, StudentRoster, StaffProfile.
@@ -123,6 +115,78 @@ export const HOW_IT_WORKS = [
   },
 ];
 
+// ABOUT — editorial, founder-voice copy. Every claim is derived from what the
+// product actually does (see SCHOOL/TEACHER/PARENT_FEATURES and the server
+// routes). Numbers here are honest: capabilities the platform genuinely ships,
+// NOT customer counts or revenue we don't have.
+export const ABOUT = {
+  hero: {
+    eyebrow: "About Enroll+",
+    title: "We built the school office we wished existed.",
+    lede: "Enroll+ started with a simple frustration: a school's most important information — who showed up, how they're doing, what's owed — was scattered across registers, WhatsApp groups, and the memory of whoever sat at the front desk. We thought a school deserved one source of truth. So we built it.",
+  },
+  // The story, told in editorial long-form paragraphs.
+  story: [
+    {
+      heading: "The problem was never the people. It was the plumbing.",
+      paragraphs: [
+        "Walk into most schools and you'll find extraordinary people held back by ordinary tools. A class teacher marks attendance on paper, then someone re-enters it into a spreadsheet, then a parent calls the office to ask whether their child made it in. The same fact travels three times and arrives late every time.",
+        "We didn't want to add another app to the pile. We wanted to remove the re-typing, the phone tag, the twice-a-year report card. The goal was one system where the data a teacher enters on the ground becomes the report an admin reads at their desk and the update a parent sees on their phone — without anyone copying anything by hand.",
+      ],
+    },
+    {
+      heading: "One backend. Three honest points of view.",
+      paragraphs: [
+        "Enroll+ models a school the way it actually runs and then gives each role the exact slice they need. Admins run the whole institution from one desk — people, broadcasts, records, analytics, admissions, PTMs. Teachers see only the classes they teach and mark attendance or enter marks once. Parents get their child's day as it happens: attendance the same morning, published results subject by subject, a clear fees ledger, leave and messages in two taps.",
+        "The web platform and the mobile apps share a single backend. There is no second copy of the truth to keep in sync, no export-import dance at the end of term. What you change in one place is what everyone sees.",
+      ],
+    },
+    {
+      heading: "We refuse to fabricate a single number.",
+      paragraphs: [
+        "Every figure in Enroll+ — class performance, teacher performance, per-student trends, syllabus coverage, the early-warning list that flags at-risk students — is computed from marks and attendance your staff actually recorded. If the data isn't there, we show you that it isn't, rather than inventing a confident-looking chart. A school runs on trust; analytics that lie are worse than no analytics at all.",
+      ],
+    },
+  ],
+  // Honest numbers — capabilities, not vanity metrics.
+  numbers: [
+    { value: "1", label: "Source of truth", note: "Web + mobile, one backend" },
+    { value: "4", label: "Connected roles", note: "Admin · Teacher · Parent · Staff" },
+    { value: "20+", label: "Built-in modules", note: "From attendance to analytics" },
+    { value: "0", label: "Fabricated metrics", note: "Every number comes from real entries" },
+  ],
+  // What we believe — the principles the product is built on.
+  principles: [
+    {
+      title: "Premium by subtraction",
+      body: "The best school software gets out of the way. We earn the screen by removing steps, not adding them.",
+    },
+    {
+      title: "Real-time where it matters",
+      body: "Attendance, messages and dues update when they change. The things a parent worries about shouldn't wait for a nightly batch.",
+    },
+    {
+      title: "One source of truth",
+      body: "The website and the apps speak to the same backend. No reconciliation, no two versions of the same student.",
+    },
+    {
+      title: "Honest data, always",
+      body: "If we can't compute a number from real entries, we don't show one. No placeholder scores, no invented trends.",
+    },
+  ],
+  // Team — placeholder STRUCTURE, clearly labelled as roles to be filled.
+  // No invented names or photos; honest about being early.
+  team: {
+    note: "We're an early, focused team. These are the seats — names go here as we grow in public.",
+    roles: [
+      { role: "Product & Engineering", focus: "The platform, the apps, the backend that ties them together." },
+      { role: "Schools & Onboarding", focus: "Getting institutions live and making sure the first week goes well." },
+      { role: "Design", focus: "The craft — interactions, type, and the calm the product is known for." },
+      { role: "Support", focus: "Real humans, fast answers, for admins, teachers and parents alike." },
+    ],
+  },
+};
+
 export const FOOTER_NAV = {
   Product: [
     { label: "For Schools", href: "/features#schools" },
@@ -131,12 +195,41 @@ export const FOOTER_NAV = {
     { label: "Pricing", href: "/pricing" },
   ],
   Company: [
+    { label: "About us", href: "/about" },
     { label: "How it works", href: "/#how-it-works" },
     { label: "Onboard your school", href: "/onboarding" },
     { label: "Sign in", href: "/login" },
   ],
+  Support: [
+    { label: "Help & Support", href: "/support" },
+    { label: "Contact us", href: "mailto:hello@enrollplus.app" },
+    { label: "Status", href: "/support#status" },
+    { label: "Onboard your school", href: "/onboarding" },
+  ],
   Legal: [
-    { label: "Privacy", href: "/privacy" },
-    { label: "Terms", href: "/terms" },
+    { label: "Privacy Policy", href: "/privacy" },
+    { label: "Terms of Service", href: "/terms" },
+    { label: "Cookie Policy", href: "/cookies" },
   ],
 };
+
+// Contact block (rendered as its own column in the footer card — addresses,
+// not links). Honest: the support inbox is real; no invented phone/office.
+export const FOOTER_CONTACT = {
+  blurb:
+    "One source of truth for your office, your teachers and every parent. Onboard on the web in minutes — no sales call required.",
+  email: "hello@enrollplus.app",
+  support: "support@enrollplus.app",
+};
+
+// Social slots — left as honest placeholders until real accounts exist; the
+// footer renders them as disabled icons (no dead links to nonexistent pages).
+export const FOOTER_SOCIAL = [
+  { label: "X", href: null },
+  { label: "LinkedIn", href: null },
+  { label: "Instagram", href: null },
+  { label: "GitHub", href: null },
+] as const;
+
+// One-line product descriptor + closing line for the footer.
+export const FOOTER_TAGLINE = "Built for schools that move fast.";

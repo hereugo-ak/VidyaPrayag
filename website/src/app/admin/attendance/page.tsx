@@ -15,7 +15,7 @@ export default function AttendancePage() {
 
   const byClass: BarDatum[] = useMemo(
     () =>
-      (data?.byClass ?? []).map((r) => ({
+      (data?.by_class ?? []).map((r) => ({
         label: r.grade,
         value: r.rate,
         meta: `${r.present}/${r.total} present`,
@@ -52,7 +52,7 @@ export default function AttendancePage() {
           <StatTile
             label="Present today"
             value={pct(data?.rate ?? 0)}
-            caption={data?.date ? `As of ${data.date}` : "No record yet"}
+            caption={data?.latest_date ? `As of ${data.latest_date}` : "No record yet"}
             loading={isLoading && !data}
             accent
           />
@@ -93,7 +93,7 @@ export default function AttendancePage() {
           <div className="mt-2">
             <DataTable
               columns={columns}
-              rows={data?.byClass ?? []}
+              rows={data?.by_class ?? []}
               rowKey={(r) => r.grade}
               loading={isLoading && !data}
               initialSort={{ key: "rate", dir: "desc" }}

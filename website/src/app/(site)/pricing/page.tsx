@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { SectionHeading } from "@/components/ui/SectionHeading";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Reveal, RevealGroup, RevealItem } from "@/components/ui/Reveal";
 import { Button } from "@/components/ui/Button";
 
@@ -45,15 +45,14 @@ const TIERS = [
 
 export default function PricingPage() {
   return (
-    <div className="pt-28 md:pt-32">
-      <section className="shell">
-        <SectionHeading
-          eyebrow="Pricing"
-          title="Priced per school, not per headache."
-          lede="We tailor a quote to your size and board so you only pay for what fits. Onboarding, parent access and the full feature set are always included — no per-parent fees, no surprise add-ons."
-          align="center"
-        />
-      </section>
+    <div>
+      <PageHeader
+        eyebrow="Pricing"
+        crumbs={[{ label: "Home", href: "/" }, { label: "Pricing" }]}
+        title="Priced per school, not per headache."
+        lede="We tailor a quote to your size and board so you only pay for what fits. Onboarding, parent access and the full feature set are always included — no per-parent fees, no surprise add-ons."
+        align="center"
+      />
 
       <section className="shell py-16">
         <RevealGroup className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">

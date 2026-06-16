@@ -37,6 +37,7 @@ import type {
   AnnouncementDto,
   LeaveRequestDto,
   StudentDto,
+  DashboardIntelligenceDto,
 } from "./types";
 
 interface Opts {
@@ -141,6 +142,11 @@ export const adminApi = {
   attendanceSummary: () => authRequest<AttendanceSummaryDto>("/api/v1/school/attendance/summary"),
   marksSummary: () => authRequest<MarksSummaryDto>("/api/v1/school/marks/summary"),
   feeLedger: () => authRequest<FeeLedgerDto>("/api/v1/school/fees/ledger"),
+  // Command Center intelligence — one read assembles attendance timeline +
+  // anomalies + exam overlay, early-warning students, academic-health grid,
+  // and the institutional activity feed. All server-computed from real tables.
+  dashboardIntelligence: () =>
+    authRequest<DashboardIntelligenceDto>("/api/v1/school/dashboard/intelligence"),
 
   // notifications (real-time bell + activity feed)
   notifications: () => authRequest<NotificationsDataDto>("/api/v1/notifications"),
