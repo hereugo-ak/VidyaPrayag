@@ -11,8 +11,11 @@ const base =
   "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-colors duration-200 ease-out-cubic focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-lavender disabled:cursor-not-allowed disabled:opacity-60";
 
 const variants: Record<Variant, string> = {
+  // Primary — a subtle top-lit navy gradient + a hairline inner highlight so the
+  // pill reads as a solid, premium object rather than a flat fill. Shadow lifts
+  // on hover (depth, not movement).
   primary:
-    "bg-navy-deep text-white shadow-cta hover:bg-navy hover:shadow-ctaHover",
+    "bg-gradient-to-b from-navy to-navy-deep text-white shadow-cta ring-1 ring-inset ring-white/10 hover:shadow-ctaHover hover:ring-white/[0.18]",
   secondary:
     "bg-white/80 text-navy-deep ring-1 ring-inset ring-navy/15 backdrop-blur hover:bg-white hover:ring-navy/25",
   ghost: "text-navy-deep hover:bg-navy/5",
