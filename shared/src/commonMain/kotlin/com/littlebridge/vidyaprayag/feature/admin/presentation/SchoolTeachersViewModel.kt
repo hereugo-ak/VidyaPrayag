@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.CreateTeacherRequest
-import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherAccountDto
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherCardDto
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherCredentialDto
 import com.littlebridge.vidyaprayag.feature.admin.domain.repository.TeachersRepository
 import com.littlebridge.vidyaprayag.util.AppLogger
@@ -17,16 +17,24 @@ import kotlinx.coroutines.launch
 
 
 data class SchoolTeachersState(
-    val teachers: List<TeacherAccountDto> = emptyList(),
+    val teachers: List<TeacherCardDto> = emptyList(),
     val isLoading: Boolean = false,
+    val isLoadingMore: Boolean = false,
     val isMutating: Boolean = false,
     val errorMessage: String? = null,
     val infoMessage: String? = null,
+    // Pagination: current page, whether the server has another page, and the
+    // total roster size (for a "showing X of N" hint).
+    val page: Int = 1,
+    val hasNext: Boolean = false,
+    val totalRecords: Int = 0,
     // RA-32: a freshly-issued credential, shown ONCE in a dialog after a
     // password reset so the admin can hand it over. Cleared via
     // [dismissIssuedCredential] when the admin closes the dialog.
     val issuedCredential: TeacherCredentialDto? = null,
 )
+
+private const val TEACHERS_PAGE_SIZE = 20
 
 /**
  * RA-22: backs the teacher roster on the People tab — list active teachers in
@@ -46,6 +54,8 @@ class SchoolTeachersViewModel(
         load()
     }
 
+    /** (Re)load the FIRST page, replacing the roster. Used on init and after
+     *  every mutation so the UI never shows a stale local copy. */
     fun load() {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, errorMessage = null)
@@ -54,10 +64,16 @@ class SchoolTeachersViewModel(
                 _state.value = _state.value.copy(isLoading = false, errorMessage = "Not signed in")
                 return@launch
             }
-            when (val result = repository.getTeachers(token)) {
+            when (val result = repository.getTeachers(token, page = 1, pageSize = TEACHERS_PAGE_SIZE)) {
                 is NetworkResult.Success -> {
-                    val items = result.data.data?.teachers.orEmpty()
-                    _state.value = _state.value.copy(teachers = items, isLoading = false)
+                    val body = result.data.data
+                    _state.value = _state.value.copy(
+                        teachers = body?.teachers.orEmpty(),
+                        isLoading = false,
+                        page = body?.pagination?.page ?: 1,
+                        hasNext = body?.pagination?.hasNext ?: false,
+                        totalRecords = body?.pagination?.totalRecords ?: 0
+                    )
                 }
                 is NetworkResult.Error -> {
                     AppLogger.e("SchoolTeachersVM", "getTeachers error: ${result.message}")
@@ -65,6 +81,44 @@ class SchoolTeachersViewModel(
                 }
                 is NetworkResult.ConnectionError -> {
                     _state.value = _state.value.copy(isLoading = false, errorMessage = "Connection error. Check your internet.")
+                }
+            }
+        }
+    }
+
+    /** Append the NEXT page to the current roster (infinite scroll / "load
+     *  more"). No-op when already loading or there is no further page. */
+    fun loadMore() {
+        val current = _state.value
+        if (current.isLoading || current.isLoadingMore || !current.hasNext) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isLoadingMore = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isLoadingMore = false, errorMessage = "Not signed in")
+                return@launch
+            }
+            val nextPage = current.page + 1
+            when (val result = repository.getTeachers(token, page = nextPage, pageSize = TEACHERS_PAGE_SIZE)) {
+                is NetworkResult.Success -> {
+                    val body = result.data.data
+                    // De-dupe by id in case a mutation shifted the page window.
+                    val merged = (current.teachers + body?.teachers.orEmpty())
+                        .distinctBy { it.id }
+                    _state.value = _state.value.copy(
+                        teachers = merged,
+                        isLoadingMore = false,
+                        page = body?.pagination?.page ?: nextPage,
+                        hasNext = body?.pagination?.hasNext ?: false,
+                        totalRecords = body?.pagination?.totalRecords ?: current.totalRecords
+                    )
+                }
+                is NetworkResult.Error -> {
+                    AppLogger.e("SchoolTeachersVM", "getTeachers(loadMore) error: ${result.message}")
+                    _state.value = _state.value.copy(isLoadingMore = false, errorMessage = result.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(isLoadingMore = false, errorMessage = "Connection error. Check your internet.")
                 }
             }
         }

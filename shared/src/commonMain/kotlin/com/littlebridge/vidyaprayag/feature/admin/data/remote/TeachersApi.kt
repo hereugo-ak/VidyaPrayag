@@ -19,11 +19,12 @@ import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.network.safeApiCall
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.CreateTeacherRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherAccountDto
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherCardListResponse
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherCredentialDto
-import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherListResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -40,10 +41,20 @@ class TeachersApi(
         return "$base$cleanPath"
     }
 
+    /**
+     * Fetch one page of teacher summary CARDS (server returns every teacher in
+     * the school — incl. inactive / unassigned — paginated). page/pageSize map
+     * straight onto the server query params.
+     */
     suspend fun getTeachers(
-        token: String
-    ): NetworkResult<ApiResponse<TeacherListResponse>> = safeApiCall {
-        client.get(getUrl("api/v1/school/teachers"))
+        token: String,
+        page: Int = 1,
+        pageSize: Int = 20
+    ): NetworkResult<ApiResponse<TeacherCardListResponse>> = safeApiCall {
+        client.get(getUrl("api/v1/school/teachers")) {
+            parameter("page", page)
+            parameter("pageSize", pageSize)
+        }
     }
 
     suspend fun createTeacher(

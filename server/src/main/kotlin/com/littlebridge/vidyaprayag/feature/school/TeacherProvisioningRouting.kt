@@ -20,6 +20,7 @@
  */
 package com.littlebridge.vidyaprayag.feature.school
 
+import com.littlebridge.vidyaprayag.core.SCHOOL_ADMIN_ROLES
 import com.littlebridge.vidyaprayag.core.created
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
@@ -27,9 +28,12 @@ import com.littlebridge.vidyaprayag.core.okMessage
 import com.littlebridge.vidyaprayag.core.requireSchoolAdmin
 import com.littlebridge.vidyaprayag.core.requireSchoolContext
 import com.littlebridge.vidyaprayag.db.AppUsersTable
+import com.littlebridge.vidyaprayag.db.AttendanceRecordsTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.DeviceTokensTable
+import com.littlebridge.vidyaprayag.db.FacultyTable
 import com.littlebridge.vidyaprayag.db.NotificationsTable
+import com.littlebridge.vidyaprayag.db.StudentsTable
 import com.littlebridge.vidyaprayag.db.TeacherSubjectAssignmentsTable
 import com.littlebridge.vidyaprayag.db.UserSessionsTable
 import com.littlebridge.vidyaprayag.feature.auth.hashPassword
@@ -40,6 +44,7 @@ import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
@@ -49,6 +54,7 @@ import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import java.security.SecureRandom
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 @Serializable
@@ -70,6 +76,70 @@ data class TeacherAccountDto(
 
 @Serializable
 data class TeacherListResponse(val teachers: List<TeacherAccountDto>)
+
+// =====================================================================
+// Teacher CARD contract — drives the redesigned School-Admin teacher list
+// (SchoolPeopleScreenV2 → Teachers sub-tab). Every card is a self-contained
+// admin summary so the list needs no follow-up per-row fetches.
+// GET /api/v1/school/teachers  →  TeacherCardListResponse
+// =====================================================================
+
+@Serializable
+data class TeacherCardProfileDto(
+    val name: String,
+    val avatarUrl: String? = null,
+    val role: String,
+    val status: String                                    // ACTIVE | INACTIVE
+)
+
+@Serializable
+data class TeacherCardAcademicAssignmentDto(
+    val grades: List<String> = emptyList(),
+    val subjects: List<String> = emptyList()
+)
+
+@Serializable
+data class TeacherCardWorkloadDto(
+    val totalClasses: Int = 0,
+    val totalStudents: Int = 0
+)
+
+@Serializable
+data class TeacherCardActivityDto(
+    val attendancePercentage: Int? = null,                // null when no data
+    val lastActiveAt: String? = null                      // ISO-8601 UTC, or null = never
+)
+
+@Serializable
+data class TeacherCardActionsDto(
+    val canViewProfile: Boolean = true,
+    val canAssignClass: Boolean = false,
+    val canDeactivate: Boolean = false
+)
+
+@Serializable
+data class TeacherCardDto(
+    val id: String,
+    val profile: TeacherCardProfileDto,
+    val academicAssignment: TeacherCardAcademicAssignmentDto,
+    val workload: TeacherCardWorkloadDto,
+    val activity: TeacherCardActivityDto,
+    val actions: TeacherCardActionsDto
+)
+
+@Serializable
+data class TeacherCardPaginationDto(
+    val page: Int,
+    val pageSize: Int,
+    val totalRecords: Int,
+    val hasNext: Boolean
+)
+
+@Serializable
+data class TeacherCardListResponse(
+    val teachers: List<TeacherCardDto>,
+    val pagination: TeacherCardPaginationDto
+)
 
 /**
  * RA-32: response for a credential reset. Carries the freshly-generated
@@ -174,28 +244,238 @@ fun Route.teacherProvisioningRouting() {
                 )
             }
 
-            // ---- list ACTIVE teachers in the admin's school ----
+            // ---- list teachers in the admin's school as summary CARDS ----
+            //
+            // Drives the redesigned School-Admin teacher list. Returns EVERY
+            // teacher in the school — including inactive accounts and teachers
+            // with no class/subject assignments yet — so the admin sees the full
+            // roster (an empty card still shows "No grades/subjects assigned").
+            //
+            // Performance (no N+1): exactly FIVE queries total regardless of page
+            // size — (1) the paginated teacher page, (2) its total count, then a
+            // single batched query each for (3) all assignments owned by the
+            // page's teachers, (4) the faculty bridge rows (userId → externalId)
+            // for those teachers, and (5) the 30-day faculty attendance window.
+            // Student workload is derived from a single grouped students query.
+            // Everything else is aggregated in-memory.
+            //
+            // Faculty-attendance bridge: faculty attendance is keyed on
+            // FacultyTable.externalId, but teachers are app_users rows. We join
+            // via FacultyTable.userId == app_users.id; when no faculty row links
+            // a teacher we simply report attendancePercentage = null (the card
+            // renders "—" rather than fabricating a number).
             get {
                 val ctx = call.requireSchoolContext() ?: return@get
-                val teachers = dbQuery {
-                    AppUsersTable.selectAll()
+                val isAdmin = ctx.role in SCHOOL_ADMIN_ROLES
+
+                val page = (call.request.queryParameters["page"]?.toIntOrNull() ?: 1)
+                    .coerceAtLeast(1)
+                val pageSize = (call.request.queryParameters["pageSize"]?.toIntOrNull() ?: 20)
+                    .coerceIn(1, 100)
+                val offset = (page - 1).toLong() * pageSize
+
+                val response = dbQuery {
+                    // (2) total roster size for pagination metadata.
+                    val totalRecords = AppUsersTable.selectAll()
                         .where {
                             (AppUsersTable.schoolId eq ctx.schoolId) and
-                                (AppUsersTable.role eq "teacher") and
-                                (AppUsersTable.isActive eq true)
+                                (AppUsersTable.role eq "teacher")
                         }
-                        .map {
-                            TeacherAccountDto(
-                                id = it[AppUsersTable.id].value.toString(),
-                                name = it[AppUsersTable.fullName],
-                                email = it[AppUsersTable.email],
-                                phone = it[AppUsersTable.phone],
-                                role = it[AppUsersTable.role],
-                                schoolId = ctx.schoolId.toString()
+                        .count()
+
+                    // (1) one page of teachers — NO isActive filter so inactive
+                    // accounts are still listed (card shows an INACTIVE badge).
+                    val teacherRows = AppUsersTable.selectAll()
+                        .where {
+                            (AppUsersTable.schoolId eq ctx.schoolId) and
+                                (AppUsersTable.role eq "teacher")
+                        }
+                        .orderBy(AppUsersTable.fullName, SortOrder.ASC)
+                        .limit(pageSize, offset)
+                        .toList()
+
+                    val teacherIds = teacherRows.map { it[AppUsersTable.id].value }
+
+                    if (teacherIds.isEmpty()) {
+                        return@dbQuery TeacherCardListResponse(
+                            teachers = emptyList(),
+                            pagination = TeacherCardPaginationDto(
+                                page = page,
+                                pageSize = pageSize,
+                                totalRecords = totalRecords.toInt(),
+                                hasNext = false
                             )
+                        )
+                    }
+
+                    // (3) all assignments for the page's teachers in ONE query.
+                    // The codebase avoids `inList`; OR-reduce the teacher ids.
+                    val assignmentPredicate = teacherIds
+                        .map { tid -> TeacherSubjectAssignmentsTable.teacherId eq tid }
+                        .reduce { acc, next -> acc or next }
+                    val assignmentRows = TeacherSubjectAssignmentsTable.selectAll()
+                        .where {
+                            (TeacherSubjectAssignmentsTable.schoolId eq ctx.schoolId) and
+                                (TeacherSubjectAssignmentsTable.isActive eq true) and
+                                assignmentPredicate
                         }
+                        .toList()
+                    val assignmentsByTeacher = assignmentRows.groupBy {
+                        it[TeacherSubjectAssignmentsTable.teacherId]
+                    }
+
+                    // (4) faculty bridge rows (userId → externalId / department)
+                    // for the page's teachers in ONE query, so we can locate
+                    // faculty attendance and label the role more specifically.
+                    val facultyPredicate = teacherIds
+                        .map { tid -> FacultyTable.userId eq tid }
+                        .reduce { acc, next -> acc or next }
+                    val facultyByUserId: Map<UUID, Pair<String, String?>> =
+                        FacultyTable.selectAll()
+                            .where {
+                                (FacultyTable.schoolId eq ctx.schoolId) and facultyPredicate
+                            }
+                            .toList()
+                            .mapNotNull { row ->
+                                row[FacultyTable.userId]?.let { uid ->
+                                    uid to (row[FacultyTable.externalId] to row[FacultyTable.department])
+                                }
+                            }
+                            .toMap()
+                    val externalIdByUserId: Map<UUID, String> =
+                        facultyByUserId.mapValues { it.value.first }
+
+                    // (5) 30-day faculty attendance window, grouped by personId
+                    // (= FacultyTable.externalId). Only fetched when at least one
+                    // teacher on this page actually bridges to a faculty row.
+                    val cutoff = LocalDate.now().minusDays(30)
+                    val attendanceByExternalId: Map<String, List<String>> =
+                        if (externalIdByUserId.isEmpty()) {
+                            emptyMap()
+                        } else {
+                            AttendanceRecordsTable.selectAll()
+                                .where {
+                                    (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
+                                        (AttendanceRecordsTable.type eq "faculty")
+                                }
+                                .toList()
+                                .filter {
+                                    runCatching {
+                                        LocalDate.parse(it[AttendanceRecordsTable.date]).isAfter(cutoff)
+                                    }.getOrDefault(false)
+                                }
+                                .groupBy(
+                                    { it[AttendanceRecordsTable.personId] },
+                                    { it[AttendanceRecordsTable.status] }
+                                )
+                        }
+
+                    // Student workload source: active students grouped by their
+                    // (className|section) bucket, counted ONCE for the whole
+                    // school. totalStudents per teacher = sum over their distinct
+                    // assigned classes (so co-teaching never double-counts within
+                    // a teacher, and an unassigned teacher gets 0).
+                    val studentCountByClass: Map<Pair<String, String>, Int> =
+                        StudentsTable.selectAll()
+                            .where {
+                                (StudentsTable.schoolId eq ctx.schoolId) and
+                                    (StudentsTable.isActive eq true)
+                            }
+                            .toList()
+                            .groupingBy {
+                                it[StudentsTable.className] to it[StudentsTable.section]
+                            }
+                            .eachCount()
+
+                    val cards = teacherRows.map { row ->
+                        val teacherId = row[AppUsersTable.id].value
+                        val assignments = assignmentsByTeacher[teacherId].orEmpty()
+
+                        // grades = distinct class names; subjects = distinct subjects.
+                        val grades = assignments
+                            .map { it[TeacherSubjectAssignmentsTable.className] }
+                            .filter { it.isNotBlank() }
+                            .distinct()
+                        val subjects = assignments
+                            .map { it[TeacherSubjectAssignmentsTable.subject] }
+                            .filter { it.isNotBlank() }
+                            .distinct()
+
+                        // distinct (className, section) classes this teacher owns.
+                        val distinctClasses = assignments
+                            .map {
+                                it[TeacherSubjectAssignmentsTable.className] to
+                                    it[TeacherSubjectAssignmentsTable.section]
+                            }
+                            .distinct()
+                        val totalClasses = distinctClasses.size
+                        val totalStudents = distinctClasses
+                            .sumOf { studentCountByClass[it] ?: 0 }
+
+                        // attendance via the faculty bridge — null when unlinked
+                        // or no records in the window (card shows "—", no guess).
+                        val attendancePercentage = externalIdByUserId[teacherId]
+                            ?.let { ext -> attendanceByExternalId[ext] }
+                            ?.takeIf { it.isNotEmpty() }
+                            ?.let { statuses ->
+                                val present = statuses.count { it.equals("PRESENT", true) }
+                                kotlin.math.round(present * 100.0 / statuses.size).toInt()
+                            }
+
+                        val isActive = row[AppUsersTable.isActive]
+                        // Role label, most-specific first: a bridged faculty
+                        // department (e.g. "Mathematics Teacher"), else the
+                        // teacher's primary assigned subject, else plain "Teacher".
+                        val department = facultyByUserId[teacherId]?.second?.takeIf { it.isNotBlank() }
+                        val roleLabel = when {
+                            department != null -> "$department Teacher"
+                            subjects.isNotEmpty() -> "${subjects.first()} Teacher"
+                            else -> "Teacher"
+                        }
+
+                        TeacherCardDto(
+                            id = teacherId.toString(),
+                            profile = TeacherCardProfileDto(
+                                name = row[AppUsersTable.fullName],
+                                avatarUrl = row[AppUsersTable.profilePicUrl],
+                                role = roleLabel,
+                                status = if (isActive) "ACTIVE" else "INACTIVE"
+                            ),
+                            academicAssignment = TeacherCardAcademicAssignmentDto(
+                                grades = grades,
+                                subjects = subjects
+                            ),
+                            workload = TeacherCardWorkloadDto(
+                                totalClasses = totalClasses,
+                                totalStudents = totalStudents
+                            ),
+                            activity = TeacherCardActivityDto(
+                                attendancePercentage = attendancePercentage,
+                                lastActiveAt = row[AppUsersTable.lastLoginAt]?.toString()
+                            ),
+                            actions = TeacherCardActionsDto(
+                                canViewProfile = true,
+                                // Only privileged school admins may assign classes
+                                // or deactivate; the UI hides these for everyone
+                                // else (and never hardcodes them).
+                                canAssignClass = isAdmin && isActive,
+                                canDeactivate = isAdmin && isActive
+                            )
+                        )
+                    }
+
+                    TeacherCardListResponse(
+                        teachers = cards,
+                        pagination = TeacherCardPaginationDto(
+                            page = page,
+                            pageSize = pageSize,
+                            totalRecords = totalRecords.toInt(),
+                            hasNext = offset + cards.size < totalRecords
+                        )
+                    )
                 }
-                call.ok(TeacherListResponse(teachers), message = "Teachers fetched successfully")
+
+                call.ok(response, message = "Teachers fetched successfully")
             }
 
             // ---- HARD-delete a teacher (RA-22) ----
