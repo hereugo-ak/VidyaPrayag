@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Data hooks — SWR with a per-metric refresh strategy (documented in
+ * Data hooks, SWR with a per-metric refresh strategy (documented in
  * ARCHITECTURE.md §Real-time). The Ktor backend exposes REST aggregates (no
  * Supabase realtime channel is published to the web client), so the right tool
  * is SWR polling tuned per metric type:
@@ -43,13 +43,13 @@ export const useAnalyticsOverview = () =>
   useSWR("analytics/overview", adminApi.analyticsOverview, NEAR_LIVE);
 
 /**
- * Command Center intelligence — NEAR-LIVE (60s poll). This is the right cadence:
+ * Command Center intelligence, NEAR-LIVE (60s poll). This is the right cadence:
  * the attendance timeline, early-warning signals, academic-health grid and
  * activity feed change on the order of minutes (a teacher submits attendance,
  * publishes marks, files leave), not seconds. The genuinely second-by-second
  * metrics (unread bell, students-present-now) ride the separate LIVE hooks
  * (useNotifications / useAttendanceSummary, 15s). No websocket is used because
- * the Ktor backend publishes no Supabase realtime channel to the web client —
+ * the Ktor backend publishes no Supabase realtime channel to the web client,
  * tuned polling is the correct tool (documented in ARCHITECTURE.md §Real-time).
  */
 export const useDashboardIntelligence = () =>

@@ -58,7 +58,7 @@ export default function FeesPage() {
       align: "right",
       cell: (r) => <span className="nums font-semibold text-navy-deep">{money(r.amount, r.currency || currency)}</span>,
     },
-    { key: "due", header: "Due date", accessor: (r) => r.due_date ?? "", sortable: true, cell: (r) => r.due_date ?? "—" },
+    { key: "due", header: "Due date", accessor: (r) => r.due_date ?? "", sortable: true, cell: (r) => r.due_date ?? "-" },
     {
       key: "status",
       header: "Status",

@@ -1,4 +1,4 @@
-/** Minimal stroked icon set — 24px grid, currentColor, no dependency. */
+/** Minimal stroked icon set, 24px grid, currentColor, no dependency. */
 import type { SVGProps } from "react";
 
 type P = SVGProps<SVGSVGElement>;

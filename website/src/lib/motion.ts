@@ -13,7 +13,7 @@ export const revealTransition: Transition = {
 
 /**
  * Content reveals on enter: fades up 22px with a whisper of scale (0.98→1) and a
- * brief blur-to-sharp focus pull. This is the "premium" tell — the eye reads it
+ * brief blur-to-sharp focus pull. This is the "premium" tell, the eye reads it
  * as the content *settling into focus* rather than just sliding. It stays under
  * 650ms, plays once, and the blur is small enough to never feel theatrical.
  * (Reduced-motion users get an instant, no-transform fade via the CSS guard.)
@@ -29,7 +29,7 @@ export const fadeUp: Variants = {
   },
 };
 
-/** Stagger container for lists — children reveal in a calm, slightly slower
+/** Stagger container for lists, children reveal in a calm, slightly slower
     cascade, once. The longer step makes a grid feel deliberate, not snappy. */
 export const staggerContainer: Variants = {
   hidden: {},
@@ -41,7 +41,7 @@ export const staggerContainer: Variants = {
 /** Standard viewport config: animate ONCE when ~18% enters the viewport. */
 export const viewportOnce = { once: true, amount: 0.18 } as const;
 
-/** Page transition — fast, non-theatrical fade. */
+/** Page transition, fast, non-theatrical fade. */
 export const pageFade: Variants = {
   hidden: { opacity: 0 },
   show: { opacity: 1, transition: { duration: 0.2, ease: "easeOut" } },

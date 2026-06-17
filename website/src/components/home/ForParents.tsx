@@ -25,7 +25,7 @@ export function ForParents() {
                 Their school day, <span className="text-accent">in your pocket.</span>
               </>
             }
-            lede="No more end-of-term surprises. Parents see attendance, results, fees and messages the moment they happen — straight from the people who entered them."
+            lede="No more end-of-term surprises. Parents see attendance, results, fees and messages the moment they happen, straight from the people who entered them."
           />
 
           <RevealGroup className="mt-10 grid gap-x-8 gap-y-7 sm:grid-cols-2">

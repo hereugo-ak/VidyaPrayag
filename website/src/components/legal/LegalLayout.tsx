@@ -21,7 +21,7 @@ export function LegalLayout({
         eyebrow="Legal"
         crumbs={[{ label: "Home", href: "/" }, { label: title }]}
         title={title}
-        lede={`Last updated: ${updated}. Written to reflect exactly what the platform stores — nothing here is boilerplate.`}
+        lede={`Last updated: ${updated}. Written to reflect exactly what the platform stores, nothing here is boilerplate.`}
       />
 
       <div className="shell pb-24 pt-12 md:pt-16">

@@ -70,7 +70,7 @@ export default function AttendancePage() {
 
       <FadeIn delay={0.06}>
         <Card className="pb-5">
-          <CardHeader title="Present-rate by class" subtitle="Today — hover a bar for the exact split" />
+          <CardHeader title="Present-rate by class" subtitle="Today, hover a bar for the exact split" />
           <div className="px-2 pt-2">
             {isLoading && !data ? (
               <Skeleton className="mx-3 h-[240px]" />
@@ -89,7 +89,7 @@ export default function AttendancePage() {
 
       <FadeIn delay={0.1}>
         <Card>
-          <CardHeader title="Class register" subtitle="Sortable — click a column header" />
+          <CardHeader title="Class register" subtitle="Sortable, click a column header" />
           <div className="mt-2">
             <DataTable
               columns={columns}

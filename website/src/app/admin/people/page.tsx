@@ -395,7 +395,7 @@ function TeachersTab({ autoOpen }: { autoOpen?: boolean }) {
             {r.phone} <Badge tone="neutral">OTP</Badge>
           </span>
         ) : (
-          <span className="text-ink-3">—</span>
+          <span className="text-ink-3">-</span>
         ),
     },
     {
@@ -445,7 +445,7 @@ function TeachersTab({ autoOpen }: { autoOpen?: boolean }) {
               hint={
                 q
                   ? "Try a different name, email or phone."
-                  : "Add your first teacher — they'll appear in the faculty roster and analytics."
+                  : "Add your first teacher, they'll appear in the faculty roster and analytics."
               }
             />
           }
@@ -539,7 +539,7 @@ function AddTeacherModal({
         <p className="text-[12px] text-ink-3">
           {isEmail
             ? "Email teachers sign in with this password and are asked to change it on first login."
-            : "Phone teachers sign in with a one-time code (OTP) — no password needed."}
+            : "Phone teachers sign in with a one-time code (OTP), no password needed."}
         </p>
         {err && <p className="text-[13px] font-medium text-danger">{err}</p>}
       </div>

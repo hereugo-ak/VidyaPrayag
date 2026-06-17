@@ -8,7 +8,7 @@ import { IconWarning } from "./icons";
 import { adminApi } from "@/lib/admin/client";
 
 /**
- * Early-warning intelligence — students flagged by REAL combined signals
+ * Early-warning intelligence, students flagged by REAL combined signals
  * (attendance < 75%, marks < 40%, ≥3 leave requests), computed server-side
  * from attendance_records + assessment_marks + leave_requests. Each row shows
  * exactly which signals fired (no opaque score). Click a row → drill-down with
@@ -43,10 +43,10 @@ export function EarlyWarning({
     setSending(true);
     try {
       // Posts a real school-wide announcement targeted at the student (STUDENT
-      // audience) — the existing backend create-announcement path. Honest action.
+      // audience), the existing backend create-announcement path. Honest action.
       await adminApi.createAnnouncement({
         type: "Reminder",
-        title: `Attention needed — ${s.name}`,
+        title: `Attention needed, ${s.name}`,
         description: `${s.name} (${s.class_name}-${s.section}) has been flagged: ${s.signals
           .map((x) => x.label)
           .join("; ")}. Please connect with the parent.`,
@@ -136,8 +136,8 @@ export function EarlyWarning({
         {selected && (
           <div className="space-y-5">
             <div className="grid grid-cols-3 gap-3">
-              <Metric label="Attendance" value={selected.attendance_pct != null ? `${selected.attendance_pct}%` : "—"} />
-              <Metric label="Avg marks" value={selected.marks_pct != null ? `${selected.marks_pct}%` : "—"} />
+              <Metric label="Attendance" value={selected.attendance_pct != null ? `${selected.attendance_pct}%` : "-"} />
+              <Metric label="Avg marks" value={selected.marks_pct != null ? `${selected.marks_pct}%` : "-"} />
               <Metric label="Leaves" value={`${selected.leave_count}`} />
             </div>
 

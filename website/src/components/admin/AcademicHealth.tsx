@@ -6,11 +6,11 @@ import { Card, CardHeader, EmptyState, Skeleton } from "./Primitives";
 import { SidePanel } from "./SidePanel";
 
 /**
- * Academic health grid — syllabus coverage heat map. Classes on the Y axis,
+ * Academic health grid, syllabus coverage heat map. Classes on the Y axis,
  * subjects on the X axis, coverage % as colour intensity (from syllabus_units:
  * covered / total). Immediately surfaces which class-subject pairs are behind.
  * Click any cell → drill-down with the covered/total breakdown for that pair.
- * Empty when no syllabus units exist (honest — never a fabricated heat map).
+ * Empty when no syllabus units exist (honest, never a fabricated heat map).
  */
 function cellColor(pct: number, hasData: boolean): { bg: string; fg: string } {
   if (!hasData) return { bg: "#F1EFFB", fg: "#BCC9C6" };
@@ -39,7 +39,7 @@ export function AcademicHealth({
       <Card className="h-full pb-5">
         <CardHeader
           title="Academic health"
-          subtitle="Syllabus coverage by class & subject — click a cell to inspect"
+          subtitle="Syllabus coverage by class & subject, click a cell to inspect"
         />
         <div className="px-5 pt-3">
           {loading && !data ? (
@@ -91,7 +91,7 @@ export function AcademicHealth({
                               }`}
                               title={has ? `${cell.subject}: ${cell.covered_units}/${cell.total_units} units` : "No units"}
                             >
-                              {has ? `${cell.percentage}%` : "—"}
+                              {has ? `${cell.percentage}%` : "-"}
                             </button>
                           </td>
                         );

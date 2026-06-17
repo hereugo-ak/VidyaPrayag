@@ -4,14 +4,14 @@ import { Reveal, RevealGroup, RevealItem } from "@/components/ui/Reveal";
 import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = {
-  title: "Pricing — Enroll+",
+  title: "Pricing | Enroll+",
   description:
-    "Simple, per-school pricing for Enroll+. Talk to us for a quote tailored to your size and board — onboarding and parent access are always included.",
+    "Simple, per-school pricing for Enroll+. Talk to us for a quote tailored to your size and board, onboarding and parent access are always included.",
   alternates: { canonical: "/pricing" },
 };
 
 /**
- * Pricing — honest layout. We do NOT invent price points; the platform's
+ * Pricing, honest layout. We do NOT invent price points; the platform's
  * commercial terms are quoted per school. The page presents what every plan
  * includes and routes commercial questions to a real contact path.
  */
@@ -23,7 +23,7 @@ const INCLUDED = [
   "Analytics on real entries",
   "Admissions pipeline & PTM scheduling",
   "Web onboarding + mobile apps",
-  "One shared backend — no data silos",
+  "One shared backend, no data silos",
 ];
 
 const TIERS = [
@@ -50,7 +50,7 @@ export default function PricingPage() {
         eyebrow="Pricing"
         crumbs={[{ label: "Home", href: "/" }, { label: "Pricing" }]}
         title="Priced per school, not per headache."
-        lede="We tailor a quote to your size and board so you only pay for what fits. Onboarding, parent access and the full feature set are always included — no per-parent fees, no surprise add-ons."
+        lede="We tailor a quote to your size and board so you only pay for what fits. Onboarding, parent access and the full feature set are always included, no per-parent fees, no surprise add-ons."
         align="center"
       />
 

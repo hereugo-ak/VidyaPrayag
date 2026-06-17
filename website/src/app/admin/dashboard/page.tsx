@@ -25,14 +25,14 @@ import { QuickCompose } from "@/components/admin/QuickCompose";
 import { IconChevronRight } from "@/components/admin/icons";
 
 /**
- * Command Center — the school admin home. Every metric is sourced from
+ * Command Center, the school admin home. Every metric is sourced from
  * Supabase via the Ktor backend; nothing is hardcoded. Visual hierarchy:
  *
- *   1. Command bar      — who/when + the four first-reach actions
- *   2. Live pulse strip — second-by-second metrics (LIVE 15s hooks)
- *   3. Attendance intelligence (primary) + Early warning (urgent) — top row
- *   4. Financial pulse + Academic health grid                    — review row
- *   5. Activity feed + People snapshot                           — context row
+ *   1. Command bar: who/when + the four first-reach actions
+ *   2. Live pulse strip: second-by-second metrics (LIVE 15s hooks)
+ *   3. Attendance intelligence (primary) + Early warning (urgent): top row
+ *   4. Financial pulse + Academic health grid: review row
+ *   5. Activity feed + People snapshot: context row
  *
  * Real-time strategy (also documented per-hook in lib/admin/hooks.ts):
  *   • LIVE 15s   : pulse strip (notifications summary + today's attendance)
@@ -78,7 +78,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5">
-      {/* Onboarding nudge (only if incomplete — real status) */}
+      {/* Onboarding nudge (only if incomplete, real status) */}
       {onboarding.data && !onboarding.data.is_complete && (
         <FadeIn>
           <Link
@@ -86,7 +86,7 @@ export default function DashboardPage() {
             className="flex items-center justify-between gap-4 rounded-2xl border border-accent/25 bg-accent/[0.06] px-5 py-3.5 transition-colors hover:bg-accent/[0.1]"
           >
             <p className="text-[13px] font-semibold text-navy-deep">
-              Finish setting up your school — {onboarding.data.completion_percent}% complete
+              Finish setting up your school, {onboarding.data.completion_percent}% complete
             </p>
             <span className="inline-flex items-center gap-1 text-[13px] font-bold text-accent-deep">
               Resume <IconChevronRight width={15} height={15} />

@@ -6,9 +6,9 @@ import { loadAuth, type StoredAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/Button";
 
 /**
- * Onboarding success — confirmation after the REVIEW step's final submission.
+ * Onboarding success, confirmation after the REVIEW step's final submission.
  * The wizard clears the draft and routes here; the auth token remains so we can
- * greet the admin by name. No fake metrics — just a clear next-step path.
+ * greet the admin by name. No fake metrics, just a clear next-step path.
  */
 export default function OnboardingSuccessPage() {
   const [auth, setAuth] = useState<StoredAuth | null>(null);
@@ -44,7 +44,7 @@ export default function OnboardingSuccessPage() {
         </h1>
         <p className="mx-auto mt-5 max-w-md text-lg leading-relaxed text-ink-2">
           Your admin account and school are created. Next, add your teachers and invite
-          parents to connect by roll number — everything flows from there.
+          parents to connect by roll number. Everything flows from there.
         </p>
 
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -57,7 +57,7 @@ export default function OnboardingSuccessPage() {
         </div>
 
         <p className="mt-8 text-sm text-ink-3">
-          Tip: download the Enroll+ mobile app to manage on the go — same login.
+          Tip: download the Enroll+ mobile app to manage on the go with the same login.
         </p>
       </motion.div>
     </div>

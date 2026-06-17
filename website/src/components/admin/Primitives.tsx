@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 
-/** Surface card — the base container for every admin panel. */
+/** Surface card, the base container for every admin panel. */
 export function Card({
   children,
   className = "",
@@ -115,7 +115,7 @@ export function FadeIn({
 }
 
 export function Avatar({ name, size = 36 }: { name: string; size?: number }) {
-  // deterministic, no external image — clean monochrome initials chip
+  // deterministic, no external image, clean monochrome initials chip
   return (
     <span
       className="inline-flex shrink-0 items-center justify-center rounded-full bg-accent/12 font-bold text-accent-deep"

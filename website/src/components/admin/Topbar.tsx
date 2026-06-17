@@ -7,7 +7,7 @@ import { adminApi } from "@/lib/admin/client";
 import { IconBell, IconExternal, IconMenu } from "./icons";
 
 /**
- * Admin top bar — mobile menu toggle, page title, live notification bell
+ * Admin top bar, mobile menu toggle, page title, live notification bell
  * (real unread count from /api/v1/notifications, polled live), Open Site link.
  */
 export function Topbar({

@@ -1,5 +1,5 @@
 /**
- * Admin API types — mirror the Ktor server DTOs verbatim (snake_case keys as
+ * Admin API types, mirror the Ktor server DTOs verbatim (snake_case keys as
  * serialized by kotlinx.serialization @SerialName). Source of truth:
  *   server/src/main/kotlin/.../feature/school/**  +  feature/notifications/**
  *

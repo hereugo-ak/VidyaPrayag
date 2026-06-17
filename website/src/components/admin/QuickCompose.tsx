@@ -5,7 +5,7 @@ import { adminApi } from "@/lib/admin/client";
 import { SidePanel } from "./SidePanel";
 
 /**
- * Quick compose — post an announcement without leaving the dashboard. Submits
+ * Quick compose, post an announcement without leaving the dashboard. Submits
  * to the real POST /api/v1/school/announcements endpoint (school-scoped on the
  * server from the JWT). On success it calls onPosted() so the parent can
  * revalidate the activity feed immediately.

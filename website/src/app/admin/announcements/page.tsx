@@ -50,7 +50,7 @@ function AnnouncementsInner() {
           <EmptyState
             icon={<IconAnnounce width={26} height={26} />}
             title="No announcements yet"
-            hint="Post your first update — it reaches parents and teachers instantly."
+            hint="Post your first update, it reaches parents and teachers instantly."
           />
         </Card>
       ) : (

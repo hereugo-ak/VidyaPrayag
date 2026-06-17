@@ -18,18 +18,18 @@ const config: Config = {
           tint: "#F1EFFB",
         },
         cream: "#F5F5F3",
-        // Brand — navy (primary ink + primary CTA)
+        // Brand, navy (primary ink + primary CTA)
         navy: {
           DEFAULT: "#26234D",
           deep: "#1A1838",
         },
-        // Accent — lavender/violet family, used sparingly for active states
+        // Accent, lavender/violet family, used sparingly for active states
         accent: {
           DEFAULT: "#6C5CE0",
           soft: "#8B7EE8",
           deep: "#544AB8",
         },
-        // Support — teal, one highlight per section max
+        // Support, teal, one highlight per section max
         teal: {
           DEFAULT: "#3CB9A9",
           deep: "#006A60",
@@ -56,11 +56,11 @@ const config: Config = {
         tight: "-0.01em",
       },
       /**
-       * Opacity scale — EXTENDED so every value we actually use generates a
+       * Opacity scale, EXTENDED so every value we actually use generates a
        * utility. Tailwind's default scale (…20,25,30…) omits the fine low-end
        * steps this design leans on (4, 6, 8, 12, 18, 55, 85). Without these,
        * classes like `bg-white/85`, `bg-navy/8`, `divide-navy/6`, `bg-accent/12`
-       * and `bg-warning/12` silently render NO colour — which read as missing
+       * and `bg-warning/12` silently render NO colour, which read as missing
        * card surfaces, invisible dividers, and broken badges across the
        * dashboard. Defining the full set fixes that distortion at the root.
        */

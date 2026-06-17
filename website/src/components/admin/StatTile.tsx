@@ -4,7 +4,7 @@ import { IconArrowDown, IconArrowUp } from "./icons";
 import { Skeleton } from "./Primitives";
 
 /**
- * Live metric tile — big number, optional signed delta, caption. The bar of
+ * Live metric tile, big number, optional signed delta, caption. The bar of
  * these across the top of the dashboard mirrors the reference image's metric
  * row, with clearer hierarchy and real values.
  */

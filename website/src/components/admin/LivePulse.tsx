@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { IconPulse } from "./icons";
 
 /**
- * Live pulse strip — a narrow band of metrics that change through the day.
+ * Live pulse strip, a narrow band of metrics that change through the day.
  * Fed by the LIVE hooks (15s SWR poll: notifications + today's attendance) and
  * the NEAR-LIVE intelligence payload (60s). On each value change the number
  * flashes briefly so a principal glancing at the tab sees movement without a
- * page refresh. No websocket — tuned polling is the right tool here (the Ktor
+ * page refresh. No websocket, tuned polling is the right tool here (the Ktor
  * backend exposes no Supabase realtime channel to the web client).
  */
 export interface PulseMetric {

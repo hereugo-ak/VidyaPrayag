@@ -5,7 +5,7 @@ import type { IntelligenceMeta } from "@/lib/admin/types";
 import { IconAttendance, IconAnnounce, IconLeave, IconPlus } from "./icons";
 
 /**
- * Command bar — the top of the Command Center. Shows the real school name,
+ * Command bar, the top of the Command Center. Shows the real school name,
  * today's date and academic week (from the intelligence payload), and the
  * four contextual one-click actions a principal reaches for first. These are
  * real navigations / action triggers, not decoration.

@@ -11,7 +11,7 @@ const base =
   "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-colors duration-200 ease-out-cubic focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-lavender disabled:cursor-not-allowed disabled:opacity-60";
 
 const variants: Record<Variant, string> = {
-  // Primary — a subtle top-lit navy gradient + a hairline inner highlight so the
+  // Primary, a subtle top-lit navy gradient + a hairline inner highlight so the
   // pill reads as a solid, premium object rather than a flat fill. Shadow lifts
   // on hover (depth, not movement).
   primary:

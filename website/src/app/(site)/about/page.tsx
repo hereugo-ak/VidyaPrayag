@@ -5,10 +5,9 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Reveal, RevealGroup, RevealItem } from "@/components/ui/Reveal";
 import { Photo } from "@/components/ui/Photo";
-import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = {
-  title: "About — Enroll+",
+  title: "About | Enroll+",
   description:
     "Why we built Enroll+: one source of truth for a school's office, teachers and parents. Real-time where it matters, premium by subtraction, and never a fabricated number.",
   alternates: { canonical: "/about" },
@@ -25,7 +24,7 @@ export default function AboutPage() {
         lede={ABOUT.hero.lede}
       />
 
-      {/* Lead photograph — real institutional imagery */}
+      {/* Lead photograph, real institutional imagery */}
       <section className="shell mt-14 md:mt-16">
         <Reveal>
           <Photo
@@ -37,7 +36,7 @@ export default function AboutPage() {
         </Reveal>
       </section>
 
-      {/* Story — long-form, alternating headings */}
+      {/* Story, long-form, alternating headings */}
       <section className="shell py-20 md:py-28">
         <div className="mx-auto max-w-3xl space-y-16">
           {ABOUT.story.map((block) => (
@@ -110,7 +109,7 @@ export default function AboutPage() {
         </RevealGroup>
       </section>
 
-      {/* Team — honest placeholder structure */}
+      {/* Team, honest placeholder structure */}
       <section className="scroll-mt-24 bg-white/40 py-20 md:py-28">
         <div className="shell">
           <SectionHeading
@@ -124,7 +123,7 @@ export default function AboutPage() {
                 key={m.role}
                 className="rounded-xl2 border border-navy/8 bg-white/60 p-7"
               >
-                {/* Neutral avatar placeholder — no invented faces. */}
+                {/* Neutral avatar placeholder, no invented faces. */}
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-lavender-tint ring-1 ring-navy/8">
                   <span className="h-2 w-2 rounded-full bg-accent" />
                 </div>
@@ -138,22 +137,6 @@ export default function AboutPage() {
             ))}
           </RevealGroup>
         </div>
-      </section>
-
-      {/* CTA */}
-      <section className="shell pb-24 pt-20 md:pt-28">
-        <Reveal className="flex flex-col items-center gap-5 rounded-xl2 border border-navy/8 bg-lavender-soft/60 px-6 py-14 text-center">
-          <h2 className="display text-2xl sm:text-3xl">
-            Run your school on one source of truth.
-          </h2>
-          <p className="max-w-md text-ink-2">
-            Onboarding happens on the web and takes minutes. Set it up once and
-            your whole team comes online.
-          </p>
-          <Button href="/onboarding" size="lg">
-            Onboard your school
-          </Button>
-        </Reveal>
       </section>
     </div>
   );

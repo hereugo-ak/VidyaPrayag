@@ -95,7 +95,7 @@ export interface StudentRow {
 }
 
 export interface StudentsData {
-  /** Raw CSV text exactly as uploaded/pasted — this is what we POST to the server. */
+  /** Raw CSV text exactly as uploaded/pasted, this is what we POST to the server. */
   csv: string;
   /** File name shown in the UI (informational only). */
   fileName: string;
@@ -171,7 +171,7 @@ function splitCsvLine(line: string): string[] {
 }
 
 /**
- * Client-side preview parser — mirrors the server's header-alias logic so the
+ * Client-side preview parser, mirrors the server's header-alias logic so the
  * wizard can show a live preview + count before upload. The SERVER is still the
  * source of truth at submit time (we POST raw csv text), so any drift here only
  * affects the preview, never what's persisted.
