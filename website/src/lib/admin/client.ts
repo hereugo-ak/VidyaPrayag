@@ -38,6 +38,9 @@ import type {
   LeaveRequestDto,
   StudentDto,
   DashboardIntelligenceDto,
+  TimetableDto,
+  CalendarResponse,
+  AttendanceDailyResponse,
 } from "./types";
 
 interface Opts {
@@ -147,6 +150,32 @@ export const adminApi = {
   // and the institutional activity feed. All server-computed from real tables.
   dashboardIntelligence: () =>
     authRequest<DashboardIntelligenceDto>("/api/v1/school/dashboard/intelligence"),
+
+  // signature calendar — school-wide weekly schedule (all classes) from the
+  // new GET /api/v1/school/timetable; optional class pre-filter (Control A/B).
+  timetable: (className?: string) => {
+    const qs = className ? `?class=${encodeURIComponent(className)}` : "";
+    return authRequest<TimetableDto>(`/api/v1/school/timetable${qs}`);
+  },
+  // date-specific events/holidays/exams layered onto the recurring timetable.
+  calendar: (date?: string, viewType: "week" | "month" = "week") => {
+    const params = new URLSearchParams();
+    if (date) params.set("date", date);
+    params.set("view_type", viewType);
+    return authRequest<CalendarResponse>(`/api/v1/school/calendar?${params.toString()}`);
+  },
+  // ON-DEMAND read for the calendar slot drill-down: present vs enrolled for a
+  // class on a date, and whether attendance was marked. Not a polling hook —
+  // called directly when a slot panel opens (see CalendarSlotPanel).
+  attendanceDaily: (type: "student" | "faculty", grade: string, date?: string) => {
+    const params = new URLSearchParams();
+    params.set("type", type);
+    if (type === "student") params.set("grade", grade);
+    if (date) params.set("date", date);
+    return authRequest<AttendanceDailyResponse>(
+      `/api/v1/school/attendance/daily?${params.toString()}`
+    );
+  },
 
   // notifications (real-time bell + activity feed)
   notifications: () => authRequest<NotificationsDataDto>("/api/v1/notifications"),
