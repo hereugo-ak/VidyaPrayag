@@ -29,15 +29,25 @@ const RISK_LABEL = {
 export function EarlyWarning({
   data,
   loading,
+  variant = "full",
+  scopeClass = null,
 }: {
   data: EarlyWarningStudent[] | undefined;
   loading: boolean;
+  /** "preview" caps the list to the top 5 with a "view all" footer. */
+  variant?: "preview" | "full";
+  /** When the dashboard is globally scoped, filter the cohort to one class. */
+  scopeClass?: string | null;
 }) {
   const [selected, setSelected] = useState<EarlyWarningStudent | null>(null);
   const [notified, setNotified] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
-  const rows = data ?? [];
+  const all = (data ?? []).filter((s) => !scopeClass || s.class_name === scopeClass);
+  const cap = variant === "preview" && !expanded ? 5 : all.length;
+  const rows = all.slice(0, cap);
+  const hiddenCount = all.length - rows.length;
 
   async function notifyParent(s: EarlyWarningStudent) {
     setSending(true);
@@ -68,7 +78,7 @@ export function EarlyWarning({
         <CardHeader
           title="Early warning"
           subtitle="Students flagged by real attendance, marks & leave signals"
-          action={rows.length > 0 ? <Badge tone="danger">{rows.length} flagged</Badge> : null}
+          action={all.length > 0 ? <Badge tone="danger">{all.length} flagged</Badge> : null}
         />
         <div className="flex-1 overflow-y-auto px-2 pt-2">
           {loading && !data ? (
@@ -125,6 +135,15 @@ export function EarlyWarning({
             </ul>
           )}
         </div>
+        {variant === "preview" && all.length > 5 && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="mx-3 mb-2 mt-1 rounded-2xl px-3 py-2.5 text-[12.5px] font-bold text-accent-deep transition-colors hover:bg-accent/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+          >
+            {expanded ? "Show less" : `View all ${all.length} flagged →`}
+          </button>
+        )}
       </Card>
 
       <SidePanel
