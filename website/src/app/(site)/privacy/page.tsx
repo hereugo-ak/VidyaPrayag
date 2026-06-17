@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LegalLayout, LegalSection } from "@/components/legal/LegalLayout";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Enroll+",
+  title: "Privacy Policy | Enroll+",
   description:
     "How Enroll+ collects, uses and protects the data of schools, administrators, teachers, parents and students. Written to reflect exactly what the platform stores.",
   alternates: { canonical: "/privacy" },
@@ -16,7 +16,7 @@ export default function PrivacyPage() {
       <p>
         This policy explains what information Enroll+ (&ldquo;we&rdquo;, &ldquo;the
         platform&rdquo;) collects, why we collect it, and the choices you have. It is
-        written to reflect the data the platform actually stores — nothing is collected
+        written to reflect the data the platform actually stores, nothing is collected
         that isn&apos;t described here. Enroll+ is operated as a single backend serving both
         the website and the mobile apps; the records below are shared across both.
       </p>
@@ -26,10 +26,10 @@ export default function PrivacyPage() {
           Enroll+ serves four kinds of people, each with a distinct data footprint:
         </p>
         <ul>
-          <li><strong>School administrators</strong> — create the school account and manage it.</li>
-          <li><strong>Teachers</strong> — provisioned by their school; record attendance and marks.</li>
-          <li><strong>Parents</strong> — connect to their child by roll number and view progress.</li>
-          <li><strong>Students &amp; non-teaching staff</strong> — roster records managed by the school (students and non-teaching staff do not log in).</li>
+          <li><strong>School administrators</strong>: create the school account and manage it.</li>
+          <li><strong>Teachers</strong>: provisioned by their school; record attendance and marks.</li>
+          <li><strong>Parents</strong>: connect to their child by roll number and view progress.</li>
+          <li><strong>Students &amp; non-teaching staff</strong>: roster records managed by the school (students and non-teaching staff do not log in).</li>
         </ul>
       </LegalSection>
 
@@ -53,7 +53,7 @@ export default function PrivacyPage() {
           During onboarding the administrator provides institutional details stored in our
           <code> schools</code> and related tables: school name, board, medium, school type,
           contact email and phone, address (city, district, state, pincode), brand colour and
-          logo, and the academic structure — classes, sections and subjects.
+          logo, and the academic structure, classes, sections and subjects.
         </p>
       </LegalSection>
 
@@ -76,17 +76,17 @@ export default function PrivacyPage() {
           provide that feature:
         </p>
         <ul>
-          <li><strong>Attendance</strong> (<code>attendance_records</code>) — per-student, per-day status marked by teachers.</li>
-          <li><strong>Marks &amp; results</strong> (<code>assessment_marks</code>, <code>assessments</code>, <code>exam_results</code>) — scores entered against an assessment, plus published exam results.</li>
-          <li><strong>Fees</strong> (<code>fee_records</code>) — a per-child ledger of paid, due and overdue line items.</li>
-          <li><strong>Messaging</strong> (<code>messages</code>, <code>message_threads</code>, <code>announcements</code>, <code>whatsapp_logs</code>) — audience-scoped announcements, message threads, and delivery logs.</li>
-          <li><strong>Notifications</strong> (<code>notifications</code>) — in-app alerts generated for you by school activity.</li>
-          <li><strong>Leave, PTMs &amp; coursework</strong> (<code>leave_requests</code>, <code>ptm_events</code>, <code>homework</code>, <code>syllabus_units</code>) — leave applications, parent-teacher meetings, homework and syllabus tracking.</li>
-          <li><strong>Admissions</strong> (<code>admission_enquiries</code>) — prospects in the admissions pipeline.</li>
+          <li><strong>Attendance</strong> (<code>attendance_records</code>), per-student, per-day status marked by teachers.</li>
+          <li><strong>Marks &amp; results</strong> (<code>assessment_marks</code>, <code>assessments</code>, <code>exam_results</code>), scores entered against an assessment, plus published exam results.</li>
+          <li><strong>Fees</strong> (<code>fee_records</code>), a per-child ledger of paid, due and overdue line items.</li>
+          <li><strong>Messaging</strong> (<code>messages</code>, <code>message_threads</code>, <code>announcements</code>, <code>whatsapp_logs</code>), audience-scoped announcements, message threads, and delivery logs.</li>
+          <li><strong>Notifications</strong> (<code>notifications</code>), in-app alerts generated for you by school activity.</li>
+          <li><strong>Leave, PTMs &amp; coursework</strong> (<code>leave_requests</code>, <code>ptm_events</code>, <code>homework</code>, <code>syllabus_units</code>), leave applications, parent-teacher meetings, homework and syllabus tracking.</li>
+          <li><strong>Admissions</strong> (<code>admission_enquiries</code>), prospects in the admissions pipeline.</li>
         </ul>
         <p>
-          Analytics shown in the product — class and teacher performance, per-student trends,
-          syllabus coverage, and the early-warning list of at-risk students — are computed
+          Analytics shown in the product, class and teacher performance, per-student trends,
+          syllabus coverage, and the early-warning list of at-risk students, are computed
           directly from these real entries. We do not fabricate, estimate or invent any figure;
           where the underlying data is absent, the product says so rather than showing a made-up
           number.
@@ -105,7 +105,7 @@ export default function PrivacyPage() {
 
       <LegalSection title="7. How we use data">
         <ul>
-          <li>To operate the platform — authenticate you and show the right scoped data.</li>
+          <li>To operate the platform, authenticate you and show the right scoped data.</li>
           <li>To deliver announcements and notifications you or your school configure.</li>
           <li>To compute the analytics and rollups your school relies on.</li>
           <li>To keep accounts secure and prevent misuse.</li>
@@ -134,7 +134,7 @@ export default function PrivacyPage() {
       <LegalSection title="10. Children's privacy">
         <p>
           Student and child records are created and controlled by the responsible school and
-          the linked parent — not by the child directly. Parents control their child&apos;s
+          the linked parent, not by the child directly. Parents control their child&apos;s
           connection and can request its removal at any time.
         </p>
       </LegalSection>
@@ -149,7 +149,7 @@ export default function PrivacyPage() {
 
       <LegalSection title="12. Cookies & local storage">
         <p>
-          On the website we keep cookies and local storage to a minimum — essentially what is
+          On the website we keep cookies and local storage to a minimum, essentially what is
           needed to keep you signed in and to remember preferences. We do not run third-party
           advertising trackers. The full detail lives in our{" "}
           <a href="/cookies">Cookie Policy</a>.

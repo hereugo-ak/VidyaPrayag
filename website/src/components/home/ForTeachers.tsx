@@ -16,7 +16,7 @@ export function ForTeachers() {
                 Less admin. <span className="text-accent">More teaching.</span>
               </>
             }
-            lede="Teachers see only the classes they teach, mark attendance in seconds, enter marks once, and track homework and syllabus — all from a single, focused workspace."
+            lede="Teachers see only the classes they teach, mark attendance in seconds, enter marks once, and track homework and syllabus, all from a single, focused workspace."
           />
 
           <RevealGroup className="mt-10 grid gap-x-8 gap-y-7 sm:grid-cols-2">

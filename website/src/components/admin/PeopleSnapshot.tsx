@@ -5,7 +5,7 @@ import { Card, CardHeader, Skeleton } from "./Primitives";
 import { IconChevronRight, IconPeople } from "./icons";
 
 /**
- * People snapshot — not a table. Headline counts a principal tracks weekly:
+ * People snapshot, not a table. Headline counts a principal tracks weekly:
  * teachers (with this week's attendance rate), students (with today's presence
  * rate), and new students added this month. All counts come from real reads
  * (students/teachers lists + attendance summary). Clicking navigates to the

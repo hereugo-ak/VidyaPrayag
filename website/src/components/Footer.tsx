@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { EnrollMark } from "./ui/Logo";
@@ -9,6 +10,7 @@ import {
   FOOTER_CONTACT,
   FOOTER_SOCIAL,
 } from "@/lib/content";
+import { PHOTOS } from "@/lib/images";
 import { EASE_OUT_CUBIC } from "@/lib/motion";
 
 /* Minimal, hand-drawn social glyphs (no icon dependency, on-brand stroke). */
@@ -38,7 +40,7 @@ const SOCIAL_ICON: Record<string, React.ReactNode> = {
 };
 
 /**
- * Footer — rebuilt LIGHT, so it dissolves into the lavender canvas instead of
+ * Footer, rebuilt LIGHT, so it dissolves into the lavender canvas instead of
  * sitting on it as a dark slab. The structure follows the Quantum reference
  * (generous whitespace, clean link columns, a giant low-contrast wordmark
  * watermark at the very bottom) but everything stays in the Enroll+ light
@@ -54,19 +56,42 @@ export function Footer() {
   return (
     <footer className="relative mt-12 overflow-hidden border-t border-navy/10">
       <div className="shell pt-20 md:pt-24">
-        {/* Closing onboarding prompt — a premium LIGHT panel (no dark slab).
-            A frosted white card on the lavender canvas, lit with the single
-            sanctioned violet/teal aurora, a hairline ring + soft elevation, and
-            an eyebrow above an oversized display line. Reads as a designed
-            closing moment, not a quiet strip — all on-brand, all light. */}
+        {/* Closing onboarding prompt, a premium LIGHT panel (no dark slab).
+            A real, muted campus photograph sits behind the content under a heavy
+            light overlay, so it reads as commissioned atmosphere, not stock. The
+            single sanctioned violet/teal aurora, a hairline ring and soft
+            elevation finish a designed closing moment, all on-brand, all light. */}
         <motion.div
           initial={{ opacity: 0, y: reduce ? 0 : 18 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.3 }}
           transition={{ duration: 0.55, ease: EASE_OUT_CUBIC }}
-          className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/70 px-7 py-10 shadow-[0_2px_6px_rgba(38,35,77,0.05),0_28px_60px_-24px_rgba(38,35,77,0.20)] ring-1 ring-navy/[0.06] backdrop-blur-xl sm:px-12 sm:py-12"
+          className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/55 px-7 py-12 shadow-[0_2px_6px_rgba(38,35,77,0.05),0_28px_60px_-24px_rgba(38,35,77,0.20)] ring-1 ring-navy/[0.06] backdrop-blur-xl sm:px-12 sm:py-16"
         >
-          {/* Soft aurora wash inside the panel — the only glow, low opacity. */}
+          {/* Background photograph, real, light, institutional. Sits furthest
+              back, low intensity, never competing with the copy. */}
+          <Image
+            aria-hidden
+            src={PHOTOS.footerOnboarding.src}
+            alt=""
+            fill
+            sizes="(max-width: 1024px) 100vw, 1100px"
+            placeholder="blur"
+            blurDataURL={PHOTOS.footerOnboarding.blur}
+            className="pointer-events-none absolute inset-0 -z-30 object-cover"
+          />
+          {/* Light legibility overlay, washes the photo into the lavender
+              palette and guarantees text contrast (lighter on the left where the
+              copy sits, a touch more transparent on the right). */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 -z-20"
+            style={{
+              background:
+                "linear-gradient(105deg, rgba(252,248,255,0.94) 0%, rgba(252,248,255,0.90) 42%, rgba(230,230,250,0.78) 100%)",
+            }}
+          />
+          {/* Soft aurora wash inside the panel, the only glow, low opacity. */}
           <div
             aria-hidden
             className="pointer-events-none absolute inset-0 -z-10"
@@ -84,7 +109,7 @@ export function Footer() {
                 <br className="hidden sm:block" /> online<span className="text-accent">.</span>
               </p>
               <p className="mt-4 max-w-md text-[15px] leading-relaxed text-ink-2">
-                Set up in minutes — no credit card, no sales call. One source of
+                Set up in minutes, no credit card, no sales call. One source of
                 truth from day one.
               </p>
             </div>
@@ -136,7 +161,7 @@ export function Footer() {
               </a>
             </div>
 
-            {/* Social slots — honest placeholders (disabled until real accounts). */}
+            {/* Social slots, honest placeholders (disabled until real accounts). */}
             <div className="mt-7 flex gap-2.5" aria-label="Social links">
               {FOOTER_SOCIAL.map((s) => {
                 const cls =
@@ -153,8 +178,8 @@ export function Footer() {
                 ) : (
                   <span
                     key={s.label}
-                    aria-label={`${s.label} — coming soon`}
-                    title={`${s.label} — coming soon`}
+                    aria-label={`${s.label} (coming soon)`}
+                    title={`${s.label} (coming soon)`}
                     className={`${cls} cursor-default opacity-45`}
                   >
                     {SOCIAL_ICON[s.label]}
@@ -198,7 +223,7 @@ export function Footer() {
             ))}
         </div>
 
-        {/* Legal + copyright row — wide-spaced, Quantum-style metadata line. */}
+        {/* Legal + copyright row, wide-spaced, Quantum-style metadata line. */}
         <div className="mt-16 flex flex-col gap-4 border-t border-navy/8 pt-7 text-[13px] text-ink-3 sm:flex-row sm:items-center sm:justify-between md:mt-20">
           <p>© {year} Enroll+. All rights reserved.</p>
           <div className="flex flex-wrap gap-x-7 gap-y-2">
@@ -215,7 +240,7 @@ export function Footer() {
         </div>
       </div>
 
-      {/* Quantum-style giant wordmark — ultra-low-contrast navy on the lavender
+      {/* Quantum-style giant wordmark, ultra-low-contrast navy on the lavender
           canvas, bleeding off the bottom edge, masked at the baseline. Reads as
           atmosphere, not a heading. Decorative only (aria-hidden). */}
       <div aria-hidden className="relative mt-12 select-none overflow-hidden">

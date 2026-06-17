@@ -10,7 +10,7 @@ import { Avatar } from "./Primitives";
 import { IconClose, IconLogout } from "./icons";
 
 /**
- * Admin sidebar — persistent on desktop, drawer on tablet/mobile.
+ * Admin sidebar, persistent on desktop, drawer on tablet/mobile.
  * School name + logo at the top, user + logout at the bottom.
  */
 export function Sidebar({

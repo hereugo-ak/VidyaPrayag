@@ -5,7 +5,7 @@ import type { ActivityItem } from "@/lib/admin/types";
 import { Card, CardHeader, EmptyState, Skeleton } from "./Primitives";
 
 /**
- * Activity feed — real institutional events merged server-side from
+ * Activity feed, real institutional events merged server-side from
  * notifications + leave_requests + announcements (real DB timestamps). Grouped
  * by Today / Yesterday / This week / Earlier. Each item shows actor, action,
  * target and a relative time. NEAR-LIVE via the intelligence poll (60s).

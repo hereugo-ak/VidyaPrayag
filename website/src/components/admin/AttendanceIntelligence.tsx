@@ -17,7 +17,7 @@ import { Card, CardHeader, EmptyState, Skeleton, Badge } from "./Primitives";
 import { SidePanel } from "./SidePanel";
 
 /**
- * Primary intelligence panel — daily attendance present-rate over the last 30
+ * Primary intelligence panel, daily attendance present-rate over the last 30
  * days. Anomaly days (rate below the server's dynamic threshold) are rendered
  * as red dots; exam days (from assessments + academic_calendar) get a vertical
  * marker so the correlation between exams and attendance dips is visible.
@@ -50,7 +50,7 @@ function ChartTooltip({
       </p>
       {p.is_anomaly && (
         <p className="mt-1.5 text-[11px] font-semibold text-danger">
-          ↓ Below normal — click to inspect
+          ↓ Below normal, click to inspect
         </p>
       )}
       {p.exam && (
@@ -159,7 +159,7 @@ export function AttendanceIntelligence({
                       dot={false}
                       activeDot={{ r: 4, fill: "#6C5CE0" }}
                     />
-                    {/* anomaly dots — clickable */}
+                    {/* anomaly dots, clickable */}
                     <Scatter
                       data={anomalies}
                       dataKey="rate"
@@ -227,7 +227,7 @@ export function AttendanceIntelligence({
               <p className="text-[13px] font-semibold text-navy-deep">Why this is flagged</p>
               <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
                 Present-rate of <b>{selected.rate}%</b> fell below the period mean of{" "}
-                <b>{mean}%</b> — {mean - selected.rate} points under normal. {selected.absent} of{" "}
+                <b>{mean}%</b>, {mean - selected.rate} points under normal. {selected.absent} of{" "}
                 {selected.total} students were absent.
               </p>
             </div>
@@ -236,7 +236,7 @@ export function AttendanceIntelligence({
                 <p className="text-[13px] font-semibold text-accent-deep">Exam on this day</p>
                 <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
                   {selected.exam} was scheduled. Attendance dips on exam days are worth a closer
-                  look — confirm whether absences were exam-related.
+                  look, confirm whether absences were exam-related.
                 </p>
               </div>
             ) : (

@@ -3,19 +3,19 @@ import Link from "next/link";
 type Tone = "default" | "light";
 
 /**
- * Enroll+ — the "Setu" bridge mark.
+ * Enroll+, the "Setu" bridge mark.
  *
  * This is the **exact mobile-app mark** rebuilt for the web, faithfully tracing
  * the app's single source of truth (composeApp/.../ui/v2/components/VBrandLogo.kt
  * → `drawBridge`): a quadratic span arcing between two grounded pillar caps over
- * a deck, with three suspension cables and a solid apex node — the connection
+ * a deck, with three suspension cables and a solid apex node, the connection
  * between school and home (infrastructure, not classroom imagery).
  *
  * The geometry is identical to the app, scaled 1:1 from the app's 56-unit
  * viewBox into a centred 64-unit plate (translate +4,+4). Only the *colour* is
  * changed: the teal accent of the app is replaced by the website's lavender /
  * violet system (#6C5CE0 family) on a restrained lavender plate, with navy ink
- * (#26234D) for the deck, cables and pillars — a premium, minimal lockup.
+ * (#26234D) for the deck, cables and pillars, a premium, minimal lockup.
  *
  * The "+" lives only in the "Enroll+" wordmark text, never in the symbol.
  */
@@ -57,7 +57,7 @@ export function EnrollMark({
         </linearGradient>
       </defs>
 
-      {/* Plate — restrained lavender (light) / deep navy card (dark). */}
+      {/* Plate, restrained lavender (light) / deep navy card (dark). */}
       {light ? (
         <>
           <rect x="2" y="2" width="60" height="60" rx="18" fill="#1A1838" />
@@ -125,13 +125,13 @@ export function EnrollMark({
       <circle cx="16" cy="36" r="2.9" fill={ink} />
       <circle cx="48" cy="36" r="2.9" fill={ink} />
 
-      {/* apex node at (28,22) → (32,26) — the accent keystone (no "+") */}
+      {/* apex node at (28,22) → (32,26), the accent keystone (no "+") */}
       <circle cx="32" cy="26" r="3" fill={apex} stroke={accentSolid} strokeWidth="0" />
     </svg>
   );
 }
 
-/** The wordmark text — Enroll with an accent "+". (Unchanged per brief.) */
+/** The wordmark text, Enroll with an accent "+". (Unchanged per brief.) */
 export function EnrollWordmark({
   className = "",
   tone = "default",
@@ -163,11 +163,13 @@ export function Logo({
       className={`group inline-flex items-center gap-2.5 ${className}`}
       aria-label="Enroll+ home"
     >
+      {/* Mark + wordmark scaled +30% from the original 32px / 18px lockup
+          (→ ~42px mark, 23px wordmark) for a more confident header presence. */}
       <EnrollMark
-        className="h-8 w-8 shrink-0 transition-transform duration-200 ease-out-cubic group-hover:scale-[1.04]"
+        className="h-[42px] w-[42px] shrink-0 transition-transform duration-200 ease-out-cubic group-hover:scale-[1.04]"
         tone={tone}
       />
-      <EnrollWordmark className="text-[18px]" tone={tone} />
+      <EnrollWordmark className="text-[23px]" tone={tone} />
     </Link>
   );
 }

@@ -11,7 +11,7 @@ const RATIOS: Record<string, string> = {
 };
 
 /**
- * Photo — enforces an aspect ratio, lazy-loads with a blur placeholder, and
+ * Photo, enforces an aspect ratio, lazy-loads with a blur placeholder, and
  * never stretches the image (object-cover inside a fixed-ratio frame).
  * Always real photography (URLs come from lib/images.ts).
  */

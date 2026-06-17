@@ -111,7 +111,7 @@ export function Wizard() {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
-      /* storage full / disabled — non-fatal */
+      /* storage full / disabled, non-fatal */
     }
   }, [state, hydrated]);
 
@@ -182,7 +182,7 @@ export function Wizard() {
           break;
         }
         case "STUDENTS": {
-          // Importing students is optional — an empty CSV just advances.
+          // Importing students is optional, an empty CSV just advances.
           const csv = state.students.csv.trim();
           if (csv && token) {
             // Guard against an obviously malformed sheet (missing columns) so the
@@ -243,7 +243,7 @@ export function Wizard() {
 
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_minmax(0,2fr)]">
-      {/* Side rail — photo + reassurance, sticky on desktop. */}
+      {/* Side rail, photo + reassurance, sticky on desktop. */}
       <aside className="hidden lg:block">
         <div className="sticky top-28">
           <p className="eyebrow mb-3">Onboarding</p>
@@ -251,7 +251,7 @@ export function Wizard() {
             Set up your school.
           </h1>
           <p className="mt-4 text-sm leading-relaxed text-ink-2">
-            Five short steps. Your progress is saved on this device automatically — close
+            Five short steps. Your progress is saved on this device automatically, close
             the tab and come back any time.
           </p>
           <Photo photo={PHOTOS.onboarding} ratio="4/5" className="mt-8" sizes="33vw" />

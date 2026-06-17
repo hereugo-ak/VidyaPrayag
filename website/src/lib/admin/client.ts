@@ -4,7 +4,7 @@
  * Authenticated admin client over the Ktor backend. Reuses the website's
  * envelope contract ({ success, message, data }). On a 401 it performs a
  * one-shot refresh via /api/v1/auth/refresh (rotating tokens), persists the new
- * pair, and retries once. A second failure clears the session — the route guard
+ * pair, and retries once. A second failure clears the session, the route guard
  * then redirects to /login.
  *
  * Every endpoint here is school_id-scoped on the server from the JWT subject
@@ -142,7 +142,7 @@ export const adminApi = {
   attendanceSummary: () => authRequest<AttendanceSummaryDto>("/api/v1/school/attendance/summary"),
   marksSummary: () => authRequest<MarksSummaryDto>("/api/v1/school/marks/summary"),
   feeLedger: () => authRequest<FeeLedgerDto>("/api/v1/school/fees/ledger"),
-  // Command Center intelligence — one read assembles attendance timeline +
+  // Command Center intelligence, one read assembles attendance timeline +
   // anomalies + exam overlay, early-warning students, academic-health grid,
   // and the institutional activity feed. All server-computed from real tables.
   dashboardIntelligence: () =>
@@ -156,7 +156,7 @@ export const adminApi = {
   markAllNotificationsRead: () =>
     authRequest<unknown>("/api/v1/notifications/read-all", { method: "POST" }),
 
-  // people — students
+  // people, students
   students: (q?: string, klass?: string) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
@@ -179,7 +179,7 @@ export const adminApi = {
       body: { csv },
     }),
 
-  // people — teachers
+  // people, teachers
   teachers: () => authRequest<TeacherListResponse>("/api/v1/school/teachers"),
   createTeacher: (body: CreateTeacherRequest) =>
     authRequest<TeacherAccountDto>("/api/v1/school/teachers", { method: "POST", body }),

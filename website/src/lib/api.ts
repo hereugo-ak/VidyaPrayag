@@ -5,7 +5,7 @@
  *   success:  { "success": true,  "message": "…", "data": {…} }
  *   failure:  { "success": false, "message": "…", "error_code": "…" }
  *
- * No axios — the platform `fetch` covers everything we need (see ARCHITECTURE.md §5).
+ * No axios, the platform `fetch` covers everything we need (see ARCHITECTURE.md §5).
  */
 
 export const API_BASE_URL =
@@ -112,7 +112,7 @@ export interface SchoolRegisterPayload {
   device_info?: { device_id?: string; platform?: string };
 }
 
-/** POST /api/v1/auth/register-school — atomically mints school_admin + school. */
+/** POST /api/v1/auth/register-school, atomically mints school_admin + school. */
 export function registerSchool(payload: SchoolRegisterPayload) {
   return apiRequest<AuthTokenResponse>("/api/v1/auth/register-school", {
     method: "POST",
@@ -120,7 +120,7 @@ export function registerSchool(payload: SchoolRegisterPayload) {
   });
 }
 
-/** POST /api/v1/auth/login — email+password for school admins. */
+/** POST /api/v1/auth/login, email+password for school admins. */
 export function loginAdmin(identifier: string, password: string) {
   return apiRequest<AuthTokenResponse>("/api/v1/auth/login", {
     method: "POST",
@@ -134,7 +134,7 @@ export interface SubmitStepResponse {
   redirect_to_home: boolean;
 }
 
-/** POST /api/v1/onboarding/submit — upserts drafts + persists real rows. */
+/** POST /api/v1/onboarding/submit, upserts drafts + persists real rows. */
 export function submitOnboardingStep(
   token: string,
   obStepType: string,
@@ -161,7 +161,7 @@ export interface OnboardingStatusResponse {
   steps: { step: string; current_step_count: number; is_done: boolean }[];
 }
 
-/** GET /api/v1/onboarding/status — server-truth completion state. */
+/** GET /api/v1/onboarding/status, server-truth completion state. */
 export function getOnboardingStatus(token: string) {
   return apiRequest<OnboardingStatusResponse>("/api/v1/onboarding/status", { token });
 }
@@ -171,7 +171,7 @@ export function getOnboardingStatus(token: string) {
 // The /import endpoint accepts EITHER a parsed `students` array OR raw `csv`
 // text; we send the raw CSV so the server's battle-tested parseStudentCsv (which
 // already handles header aliases, quoted fields and per-row validation) is the
-// single source of truth — no duplicate parsing contract to drift.
+// single source of truth, no duplicate parsing contract to drift.
 export interface BulkImportRowResult {
   row: number;
   success: boolean;

@@ -2,7 +2,7 @@
   "name": "enrollplus-website",
   "version": "1.0.0",
   "private": true,
-  "description": "Production marketing + onboarding website for Enroll+ — shares the Ktor/Supabase backend with the mobile app.",
+  "description": "Production marketing + onboarding website for Enroll+, shares the Ktor/Supabase backend with the mobile app.",
   "scripts": {
     "ensure-deps": "node scripts/ensure-deps.js",
     "setup": "npm install",

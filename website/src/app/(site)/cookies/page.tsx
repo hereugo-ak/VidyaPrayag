@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { LegalLayout, LegalSection } from "@/components/legal/LegalLayout";
 
 export const metadata: Metadata = {
-  title: "Cookie Policy — Enroll+",
+  title: "Cookie Policy | Enroll+",
   description:
-    "How Enroll+ uses cookies and local storage on the website. We keep them to a minimum — essentials for signing in and preferences — and run no third-party advertising trackers.",
+    "How Enroll+ uses cookies and local storage on the website. We keep them to a minimum, essentials for signing in and preferences, and run no third-party advertising trackers.",
   alternates: { canonical: "/cookies" },
 };
 
@@ -24,21 +24,20 @@ export default function CookiesPage() {
       <LegalSection title="1. What cookies are">
         <p>
           Cookies are small text files a website stores in your browser. Related
-          technologies — <code>localStorage</code> and <code>sessionStorage</code> —
-          let a site keep small amounts of data on your device between page loads.
+          technologies, <code>localStorage</code> and <code>sessionStorage</code>, let a site keep small amounts of data on your device between page loads.
           Together they let the site remember things like whether you are signed in.
         </p>
       </LegalSection>
 
       <LegalSection title="2. Essential cookies & storage">
         <p>
-          These are required for the platform to function — you cannot turn them
+          These are required for the platform to function. You cannot turn them
           off without breaking sign-in:
         </p>
         <ul>
-          <li><strong>Session token</strong> — keeps you signed in after you log in, so you don&apos;t re-enter credentials on every page.</li>
-          <li><strong>Security tokens</strong> — protect forms and requests against cross-site forgery.</li>
-          <li><strong>Load balancing</strong> — short-lived cookies set by our infrastructure to route requests reliably.</li>
+          <li><strong>Session token</strong>: keeps you signed in after you log in, so you don&apos;t re-enter credentials on every page.</li>
+          <li><strong>Security tokens</strong>: protect forms and requests against cross-site forgery.</li>
+          <li><strong>Load balancing</strong>: short-lived cookies set by our infrastructure to route requests reliably.</li>
         </ul>
       </LegalSection>
 
@@ -60,7 +59,7 @@ export default function CookiesPage() {
         <ul>
           <li>No third-party advertising or retargeting cookies.</li>
           <li>No cross-site tracking of your browsing elsewhere.</li>
-          <li>No sale of any cookie-derived data — ever.</li>
+          <li>No sale of any cookie-derived data, ever.</li>
         </ul>
       </LegalSection>
 
@@ -76,8 +75,8 @@ export default function CookiesPage() {
       <LegalSection title="6. Relationship to our Privacy Policy">
         <p>
           Cookies are one small part of how we handle data. For the full picture of
-          what the platform stores and why — accounts, school data, attendance,
-          marks, fees, messaging and notifications — see our{" "}
+          what the platform stores and why, accounts, school data, attendance,
+          marks, fees, messaging and notifications, see our{" "}
           <a href="/privacy">Privacy Policy</a>.
         </p>
       </LegalSection>

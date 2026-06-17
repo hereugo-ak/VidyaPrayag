@@ -30,7 +30,7 @@ function DonutTooltip({
 }
 
 /**
- * Donut with a centred KPI. Interactive — hovering a slice shows its formatted
+ * Donut with a centred KPI. Interactive, hovering a slice shows its formatted
  * value. Data is the real fee ledger split (paid/due/overdue).
  */
 export function DonutChart({

@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { IconClose } from "./icons";
 
 /**
- * Drill-down side panel — slides in from the right with no page reload. Used by
+ * Drill-down side panel, slides in from the right with no page reload. Used by
  * the dashboard intelligence panels (anomaly day, class fees, syllabus cell,
  * at-risk student). Locks body scroll, closes on Escape / backdrop click, and
  * is fully keyboard-accessible. State is owned by the caller (which mirrors it

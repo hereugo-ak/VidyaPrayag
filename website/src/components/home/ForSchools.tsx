@@ -7,7 +7,7 @@ import { SectionHeading } from "../ui/SectionHeading";
 import { EASE_OUT_CUBIC } from "@/lib/motion";
 
 /**
- * For Schools — a tabbed deep-dive (not a standard feature grid). The active
+ * For Schools, a tabbed deep-dive (not a standard feature grid). The active
  * feature is revealed on the right with a calm cross-fade; the rail on the left
  * is a vertical index of the real admin modules.
  */
@@ -25,7 +25,7 @@ export function ForSchools() {
               The admin office, <span className="text-accent">rebuilt.</span>
             </>
           }
-          lede="Every module below is something the platform actually does — derived from the dashboard, people, comms, records and analytics surfaces your administrators use daily."
+          lede="Every module below is something the platform actually does, derived from the dashboard, people, comms, records and analytics surfaces your administrators use daily."
         />
 
         <div className="mt-14 grid gap-10 lg:grid-cols-[0.9fr_1.1fr]">

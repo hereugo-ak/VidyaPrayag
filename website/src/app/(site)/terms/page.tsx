@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LegalLayout, LegalSection } from "@/components/legal/LegalLayout";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Enroll+",
+  title: "Terms of Service | Enroll+",
   description:
     "The terms governing the use of Enroll+ by schools, administrators, teachers and parents.",
   alternates: { canonical: "/terms" },

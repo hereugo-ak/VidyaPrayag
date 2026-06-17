@@ -10,7 +10,7 @@ export interface Crumb {
 }
 
 /**
- * PageHeader — the distinct, per-page header band that sits directly under the
+ * PageHeader, the distinct, per-page header band that sits directly under the
  * global nav on every sub-page (Privacy, Terms, Cookies, Support, About,
  * Features, Pricing). It gives each page its own identity while staying 100% in
  * the Enroll+ system:
@@ -63,7 +63,7 @@ export function PageHeader({
         <div className="absolute inset-x-4 inset-y-0 -z-10 rounded-[2rem] bg-navy-deep sm:inset-x-6" />
       )}
 
-      {/* Aurora — the single sanctioned glow, anchored behind the title. */}
+      {/* Aurora, the single sanctioned glow, anchored behind the title. */}
       <div
         aria-hidden
         className="pointer-events-none absolute -top-24 left-1/2 -z-10 h-[420px] w-[760px] -translate-x-1/2 opacity-70"
@@ -159,7 +159,7 @@ export function PageHeader({
         </motion.div>
       </div>
 
-      {/* Hairline baseline — separates header from page body (light tone only). */}
+      {/* Hairline baseline, separates header from page body (light tone only). */}
       {!navy && (
         <div
           aria-hidden

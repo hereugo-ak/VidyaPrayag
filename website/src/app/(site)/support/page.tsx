@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/Button";
 import { FOOTER_CONTACT } from "@/lib/content";
 
 export const metadata: Metadata = {
-  title: "Help & Support — Enroll+",
+  title: "Help & Support | Enroll+",
   description:
-    "Get help with Enroll+ — onboarding, teacher provisioning, parent linking, attendance, marks, fees and messaging. Real humans, fast answers, for admins, teachers and parents alike.",
+    "Get help with Enroll+ onboarding, teacher provisioning, parent linking, attendance, marks, fees and messaging. Real humans, fast answers, for admins, teachers and parents alike.",
   alternates: { canonical: "/support" },
 };
 
-/* Support channels — honest: the inbox is real, the response window is a
+/* Support channels, honest: the inbox is real, the response window is a
    commitment, not a vanity SLA. No invented phone line or chat widget. */
 const CHANNELS = [
   {
@@ -25,7 +25,7 @@ const CHANNELS = [
   },
   {
     title: "Onboarding help",
-    body: "Setting up your school for the first time? The four-step web wizard takes minutes — and if you get stuck on basics, branding or your academic structure, we'll walk you through it.",
+    body: "Setting up your school for the first time? The four-step web wizard takes minutes, and if you get stuck on basics, branding or your academic structure, we'll walk you through it.",
     action: { label: "Onboard your school", href: "/onboarding" },
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5Z" /><path d="m2 17 10 5 10-5M2 12l10 5 10-5" /></svg>
@@ -33,7 +33,7 @@ const CHANNELS = [
   },
   {
     title: "General enquiries",
-    body: "Pricing for a group or trust, a question before you commit, or anything that isn't a live issue — write to us and we'll get back to you.",
+    body: "Pricing for a group or trust, a question before you commit, or anything that isn't a live issue? Write to us and we'll get back to you.",
     action: { label: FOOTER_CONTACT.email, href: `mailto:${FOOTER_CONTACT.email}` },
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" /></svg>
@@ -41,7 +41,7 @@ const CHANNELS = [
   },
 ];
 
-/* FAQs — every answer maps to real product behaviour (see the privacy schema
+/* FAQs, every answer maps to real product behaviour (see the privacy schema
    + onboarding wizard + role scoping). Nothing invented. */
 const FAQS = [
   {
@@ -49,11 +49,11 @@ const FAQS = [
     items: [
       {
         q: "How do I get my school online?",
-        a: "Create your admin account and walk through the four-step web wizard — basics, branding, academic structure, then launch. Your teachers and parents can come online the same day.",
+        a: "Create your admin account and walk through the four-step web wizard, basics, branding, academic structure, then launch. Your teachers and parents can come online the same day.",
       },
       {
         q: "How do teachers get access?",
-        a: "You provision teachers as you set up classes and subjects. Each gets their own login and sees exactly the classes they teach — nothing else.",
+        a: "You provision teachers as you set up classes and subjects. Each gets their own login and sees exactly the classes they teach, nothing else.",
       },
       {
         q: "Is our data isolated from other schools?",
@@ -69,7 +69,7 @@ const FAQS = [
         a: "Your home shows only the classes and subjects assigned to you in the school's structure. Ask your admin to check the assignment if one is missing.",
       },
       {
-        q: "I entered marks once — do parents see them automatically?",
+        q: "I entered marks once. Do parents see them automatically?",
         a: "Yes. Marks you enter against an assessment publish to parents and feed analytics in one step. There are no duplicate registers to keep.",
       },
     ],
@@ -83,7 +83,7 @@ const FAQS = [
       },
       {
         q: "When does attendance show up?",
-        a: "Attendance marked in class appears the same morning — it's the same backend, so there's no overnight sync to wait for.",
+        a: "Attendance marked in class appears the same morning. It's the same backend, so there's no overnight sync to wait for.",
       },
     ],
   },
@@ -96,7 +96,7 @@ export default function SupportPage() {
         eyebrow="Help & Support"
         crumbs={[{ label: "Home", href: "/" }, { label: "Support" }]}
         title="We're here when you need us."
-        lede="Real humans, fast answers — for admins, teachers and parents alike. Most questions are covered below; for anything else, our inbox is genuinely monitored."
+        lede="Real humans, fast answers, for admins, teachers and parents alike. Most questions are covered below; for anything else, our inbox is genuinely monitored."
       >
         <div className="flex flex-col gap-3 sm:flex-row">
           <Button href={`mailto:${FOOTER_CONTACT.support}`} size="md">

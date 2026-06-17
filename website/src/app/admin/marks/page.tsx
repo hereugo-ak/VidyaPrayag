@@ -87,7 +87,7 @@ export default function MarksPage() {
 
       <FadeIn delay={0.06}>
         <Card>
-          <CardHeader title="Assessments" subtitle="Subject averages and publish status — sortable" />
+          <CardHeader title="Assessments" subtitle="Subject averages and publish status, sortable" />
           <div className="mt-2">
             <DataTable
               columns={columns}

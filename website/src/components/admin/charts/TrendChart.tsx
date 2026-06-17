@@ -39,7 +39,7 @@ function TrendTooltip({
 }
 
 /**
- * Interactive performance trend — hover shows exact values. Animates once on
+ * Interactive performance trend, hover shows exact values. Animates once on
  * mount, then static. Data is the real monthly attendance present-rate from
  * /api/v1/school/analytics/overview.
  */

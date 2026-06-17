@@ -9,10 +9,9 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Reveal, RevealGroup, RevealItem } from "@/components/ui/Reveal";
 import { Photo } from "@/components/ui/Photo";
-import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = {
-  title: "Features — Enroll+",
+  title: "Features | Enroll+",
   description:
     "Everything Enroll+ does for schools, teachers and parents: one roster, targeted broadcasts, attendance and marks that roll up automatically, analytics built on real entries, admissions and PTMs.",
   alternates: { canonical: "/features" },
@@ -30,7 +29,7 @@ export default function FeaturesPage() {
             One system. <span className="text-accent">Three points of view.</span>
           </>
         }
-        lede="Enroll+ models a school the way it actually runs — then gives admins, teachers and parents the exact slice they need. Every capability below maps to a real screen in the product."
+        lede="Enroll+ models a school the way it actually runs, then gives admins, teachers and parents the exact slice they need. Every capability below maps to a real screen in the product."
       />
 
       {/* For Schools */}
@@ -95,20 +94,6 @@ export default function FeaturesPage() {
             <Photo photo={PHOTOS.parents} ratio="4/3" />
           </Reveal>
         </div>
-      </section>
-
-      {/* CTA */}
-      <section className="shell pb-24">
-        <Reveal className="flex flex-col items-center gap-5 rounded-xl2 border border-navy/8 bg-lavender-soft/60 px-6 py-14 text-center">
-          <h2 className="display text-2xl sm:text-3xl">Bring it all to your school.</h2>
-          <p className="max-w-md text-ink-2">
-            Onboarding happens on the web and takes minutes. Set it up once and your whole
-            team comes online.
-          </p>
-          <Button href="/onboarding" size="lg">
-            Onboard your school
-          </Button>
-        </Reveal>
       </section>
     </div>
   );

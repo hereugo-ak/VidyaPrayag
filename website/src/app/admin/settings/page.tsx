@@ -153,14 +153,14 @@ export default function SettingsPage() {
       {data && (
         <FadeIn delay={0.06}>
           <Card>
-            <CardHeader title="Configuration" subtitle="Set during onboarding — manage in the mobile admin app." />
+            <CardHeader title="Configuration" subtitle="Set during onboarding, manage in the mobile admin app." />
             <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-b-2xl bg-navy/6 sm:grid-cols-3">
               <Fact label="Board" value={data.board} />
               <Fact label="Medium" value={data.medium} />
               <Fact label="Type" value={data.school_gender?.replace("_", "-")} />
-              <Fact label="Affiliation no." value={data.affiliation_number ?? "—"} />
-              <Fact label="Established" value={data.year_established ? String(data.year_established) : "—"} />
-              <Fact label="Grading" value={data.grading_system ?? "—"} />
+              <Fact label="Affiliation no." value={data.affiliation_number ?? "-"} />
+              <Fact label="Established" value={data.year_established ? String(data.year_established) : "-"} />
+              <Fact label="Grading" value={data.grading_system ?? "-"} />
             </dl>
           </Card>
         </FadeIn>
@@ -173,7 +173,7 @@ function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-white px-5 py-4">
       <dt className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">{label}</dt>
-      <dd className="mt-1 text-[14px] font-semibold text-navy-deep">{value || "—"}</dd>
+      <dd className="mt-1 text-[14px] font-semibold text-navy-deep">{value || "-"}</dd>
     </div>
   );
 }

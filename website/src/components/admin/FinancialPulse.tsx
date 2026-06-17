@@ -8,7 +8,7 @@ import { SidePanel } from "./SidePanel";
 import { compactMoney, money } from "@/lib/admin/format";
 
 /**
- * Financial pulse — real fee_records aggregation (from /fees/ledger):
+ * Financial pulse, real fee_records aggregation (from /fees/ledger):
  *   • collection rate (paid / billed) with paid vs outstanding split
  *   • overdue breakdown (amount + count)
  *   • upcoming due dates in the next 7 days (from recent rows' due_date)
@@ -85,7 +85,7 @@ export function FinancialPulse({
       <Card className="h-full pb-5">
         <CardHeader
           title="Financial pulse"
-          subtitle="Fee collection from real records — click a bar to drill in"
+          subtitle="Fee collection from real records, click a bar to drill in"
           action={
             data ? (
               <Badge tone={rate >= 75 ? "success" : rate >= 50 ? "warning" : "danger"}>
