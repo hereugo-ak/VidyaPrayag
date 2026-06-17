@@ -71,7 +71,7 @@ export const PARENT_FEATURES = [
   },
   {
     title: "Leave and messages, two taps",
-    body: "Apply for your child's leave straight to their class teacher, and message the school without exchanging phone numbers.",
+    body: "Apply for your child's leave straight to their class teacher & School Administration.",
   },
 ];
 
