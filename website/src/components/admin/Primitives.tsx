@@ -25,7 +25,7 @@ export function Card({
   const Comp = as;
   return (
     <Comp
-      className={`rounded-4xl bg-white shadow-card ring-1 ring-navy/[0.04] ${
+      className={`rounded-[28px] bg-white shadow-card ring-1 ring-navy/[0.03] ${
         hover ? "transition-shadow duration-300 ease-out-cubic hover:shadow-cardHover" : ""
       } ${className}`}
     >

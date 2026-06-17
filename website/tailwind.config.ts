@@ -101,28 +101,31 @@ const config: Config = {
       },
       boxShadow: {
         /**
-         * Pillowy elevation system — tuned to the premium reference dashboards.
-         * Cards are borderless and float on a soft canvas using high-blur,
-         * low-opacity navy-tinted shadows (no harsh 1px lines). Two ambient
-         * layers (a tight contact shadow + a wide diffuse halo) give the soft,
-         * expensive "resting on velvet" feel that generic admin panels miss.
+         * Pillowy elevation system — tuned HARD to the premium reference decks.
+         * Cards are borderless and CLEARLY float on the soft canvas: a tight
+         * contact shadow grounds the card, a mid layer reads at a glance, and a
+         * wide diffuse halo gives the soft "resting on velvet" depth. Earlier
+         * values were too timid (heavy negative spread + 3% opacity) so the
+         * elevation vanished on the light lavender canvas and the cards read as
+         * flat squares. These are intentionally stronger and unmistakable.
          */
-        soft: "0 1px 2px rgba(38,35,77,0.03), 0 10px 30px -12px rgba(38,35,77,0.10)",
-        card: "0 1px 2px rgba(38,35,77,0.03), 0 18px 44px -20px rgba(38,35,77,0.16)",
-        cardHover: "0 2px 6px rgba(38,35,77,0.05), 0 30px 60px -24px rgba(38,35,77,0.24)",
-        pillow: "0 2px 4px rgba(38,35,77,0.03), 0 24px 60px -28px rgba(38,35,77,0.22)",
-        float: "0 8px 18px -8px rgba(108,92,224,0.30), 0 24px 48px -20px rgba(108,92,224,0.20)",
-        cta: "0 8px 24px rgba(38,35,77,0.18)",
-        ctaHover: "0 14px 34px rgba(38,35,77,0.26)",
-        // dark high-contrast pill (active segmented tab)
-        pill: "0 6px 16px -6px rgba(26,24,56,0.45)",
+        soft: "0 2px 6px -2px rgba(38,35,77,0.06), 0 12px 28px -10px rgba(38,35,77,0.12)",
+        card: "0 2px 6px -1px rgba(38,35,77,0.07), 0 10px 24px -8px rgba(38,35,77,0.12), 0 28px 56px -24px rgba(38,35,77,0.22)",
+        cardHover: "0 4px 10px -2px rgba(38,35,77,0.10), 0 18px 36px -10px rgba(38,35,77,0.18), 0 40px 72px -28px rgba(38,35,77,0.30)",
+        pillow: "0 3px 8px -2px rgba(38,35,77,0.07), 0 30px 64px -24px rgba(38,35,77,0.26)",
+        float: "0 10px 22px -8px rgba(108,92,224,0.34), 0 28px 56px -22px rgba(108,92,224,0.24)",
+        cta: "0 8px 24px -4px rgba(26,24,56,0.32), 0 2px 6px -1px rgba(26,24,56,0.20)",
+        ctaHover: "0 14px 34px -6px rgba(26,24,56,0.42), 0 4px 10px -2px rgba(26,24,56,0.26)",
+        // dark high-contrast pill (active segmented tab / nav)
+        pill: "0 8px 20px -6px rgba(26,24,56,0.50), 0 2px 6px -1px rgba(26,24,56,0.30)",
         inset: "inset 0 1px 0 0 rgba(255,255,255,0.6)",
       },
       borderRadius: {
         xl2: "1.25rem", // 20px
         "3xl": "1.5rem", // 24px
         "4xl": "1.75rem", // 28px — reference card radius
-        "5xl": "2rem", // 32px — hero / large surfaces
+        "5xl": "2rem", // 32px — large surfaces
+        "6xl": "2.25rem", // 36px — the unified app-surface wrapper
       },
       backgroundImage: {
         // Soft pastel washes lifted from the reference designs (peach/lavender/mint)

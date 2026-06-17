@@ -30,7 +30,7 @@ function PreviewShell() {
       <Sidebar />
       <div
         className={`transition-[padding] duration-300 ease-out-cubic ${
-          collapsed ? "lg:pl-[76px]" : "lg:pl-[264px]"
+          collapsed ? "lg:pl-[88px]" : "lg:pl-[268px]"
         }`}
       >
         <Topbar title="Dashboard" />

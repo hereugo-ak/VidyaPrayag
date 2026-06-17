@@ -44,9 +44,9 @@ export function Sidebar() {
 
       <aside
         data-collapsed={collapsed}
-        className={`group/rail fixed inset-y-0 left-0 z-50 flex flex-col border-r border-navy/[0.05] bg-white/85 backdrop-blur-xl shadow-[10px_0_50px_-30px_rgba(38,35,77,0.4)] transition-[transform,width] duration-300 ease-out-cubic lg:translate-x-0 ${
+        className={`group/rail fixed inset-y-0 left-0 z-50 flex flex-col border-r border-navy/[0.05] bg-white/90 backdrop-blur-xl shadow-[12px_0_44px_-26px_rgba(38,35,77,0.45)] transition-[transform,width] duration-300 ease-out-cubic lg:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
-        } ${collapsed ? "w-[76px]" : "w-[264px]"}`}
+        } ${collapsed ? "w-[88px]" : "w-[268px]"}`}
         aria-label="Admin navigation"
       >
         {/* Brand / school */}
@@ -88,30 +88,59 @@ export function Sidebar() {
 
         {/* Nav */}
         <nav
-          className={`flex-1 space-y-1 overflow-y-auto overflow-x-hidden py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-            collapsed ? "px-2.5" : "px-3"
+          className={`flex-1 overflow-y-auto overflow-x-hidden py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+            collapsed ? "flex flex-col items-center gap-2 px-0" : "space-y-1 px-3"
           }`}
         >
           {ADMIN_NAV.map((item) => {
             const active =
               pathname === item.href || pathname.startsWith(item.href + "/");
             const Icon = item.icon;
+
+            // COLLAPSED — a generous squircle hit-area, centred, with a floating
+            // label tooltip. Active item is a filled navy squircle.
+            if (collapsed) {
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={close}
+                  aria-current={active ? "page" : undefined}
+                  className="group/item relative flex h-12 w-12 items-center justify-center rounded-[18px] transition-all duration-200"
+                >
+                  <span
+                    className={`flex h-12 w-12 items-center justify-center rounded-[18px] transition-all duration-200 ${
+                      active
+                        ? "bg-navy-deep text-white shadow-pill"
+                        : "text-ink-3 hover:bg-navy/[0.06] hover:text-navy-deep"
+                    }`}
+                  >
+                    <Icon />
+                  </span>
+                  {/* Floating tooltip */}
+                  <span
+                    role="tooltip"
+                    className="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 z-50 -translate-y-1/2 origin-left scale-90 whitespace-nowrap rounded-xl bg-navy-deep px-2.5 py-1.5 text-[12px] font-semibold text-white opacity-0 shadow-cardHover transition-all duration-150 group-hover/item:scale-100 group-hover/item:opacity-100"
+                  >
+                    {item.label}
+                  </span>
+                </Link>
+              );
+            }
+
+            // EXPANDED — full labelled pill with an accent edge-marker.
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={close}
                 aria-current={active ? "page" : undefined}
-                title={collapsed ? item.label : undefined}
-                className={`group/item relative flex items-center rounded-2xl text-[14px] font-semibold transition-all duration-200 ${
-                  collapsed ? "justify-center px-0 py-3" : "gap-3 px-3 py-2.5"
-                } ${
+                className={`group/item relative flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[14px] font-semibold transition-all duration-200 ${
                   active
                     ? "bg-navy-deep text-white shadow-pill"
                     : "text-ink-2 hover:bg-navy/[0.05] hover:text-navy-deep"
                 }`}
               >
-                {/* Accent edge-marker for the active item (premium tell). */}
                 {active && (
                   <span
                     className="absolute left-0 top-1/2 h-5 w-[3px] -translate-x-[1px] -translate-y-1/2 rounded-full bg-accent-soft"
@@ -120,48 +149,41 @@ export function Sidebar() {
                 )}
                 <span
                   className={`relative flex h-5 w-5 shrink-0 items-center justify-center ${
-                    active
-                      ? "text-white"
-                      : "text-ink-3 group-hover/item:text-navy-deep"
+                    active ? "text-white" : "text-ink-3 group-hover/item:text-navy-deep"
                   }`}
                 >
                   <Icon />
                 </span>
-                {!collapsed && <span className="truncate">{item.label}</span>}
-
-                {/* Floating tooltip when collapsed */}
-                {collapsed && (
-                  <span
-                    role="tooltip"
-                    className="pointer-events-none absolute left-[calc(100%+10px)] z-50 origin-left scale-90 whitespace-nowrap rounded-xl bg-navy-deep px-2.5 py-1.5 text-[12px] font-semibold text-white opacity-0 shadow-cardHover transition-all duration-150 group-hover/item:scale-100 group-hover/item:opacity-100"
-                  >
-                    {item.label}
-                  </span>
-                )}
+                <span className="truncate">{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
         {/* Collapse toggle (desktop only) */}
-        <div className={`hidden lg:block ${collapsed ? "px-2.5" : "px-3"} pb-1`}>
-          <button
-            onClick={toggleCollapsed}
-            className={`flex w-full items-center rounded-2xl py-2.5 text-[13px] font-semibold text-ink-3 transition-colors hover:bg-navy/[0.05] hover:text-navy-deep ${
-              collapsed ? "justify-center px-0" : "gap-3 px-3"
-            }`}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            title={collapsed ? "Expand" : "Collapse"}
-          >
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-              <IconChevronLeft
-                className={`transition-transform duration-300 ${
-                  collapsed ? "rotate-180" : ""
-                }`}
-              />
-            </span>
-            {!collapsed && <span>Collapse</span>}
-          </button>
+        <div className={`hidden lg:flex ${collapsed ? "justify-center px-0" : "px-3"} pb-1`}>
+          {collapsed ? (
+            <button
+              onClick={toggleCollapsed}
+              className="flex h-12 w-12 items-center justify-center rounded-[18px] text-ink-3 transition-colors hover:bg-navy/[0.06] hover:text-navy-deep"
+              aria-label="Expand sidebar"
+              title="Expand"
+            >
+              <IconChevronLeft className="rotate-180 transition-transform duration-300" />
+            </button>
+          ) : (
+            <button
+              onClick={toggleCollapsed}
+              className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-[13px] font-semibold text-ink-3 transition-colors hover:bg-navy/[0.05] hover:text-navy-deep"
+              aria-label="Collapse sidebar"
+              title="Collapse"
+            >
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                <IconChevronLeft className="transition-transform duration-300" />
+              </span>
+              <span>Collapse</span>
+            </button>
+          )}
         </div>
 
         {/* User */}

@@ -57,7 +57,7 @@ const toneMap: Record<
 export function HeroStatTiles({ tiles }: { tiles: HeroTile[] }) {
   if (!tiles.length) return null;
   return (
-    <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4 lg:gap-4">
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-5">
       {tiles.map((t) => (
         <Tile key={t.key} tile={t} />
       ))}
@@ -83,14 +83,14 @@ function Tile({ tile }: { tile: HeroTile }) {
   const hasSpark = !!tile.spark && tile.spark.length > 1;
 
   const inner = (
-    <div className="group relative flex h-full flex-col gap-3 overflow-hidden rounded-4xl bg-white p-5 shadow-card ring-1 ring-navy/[0.04] transition-all duration-300 ease-out-cubic hover:-translate-y-1 hover:shadow-cardHover">
+    <div className="group relative flex h-full flex-col gap-3 overflow-hidden rounded-[26px] bg-white p-6 shadow-card ring-1 ring-navy/[0.03] transition-all duration-300 ease-out-cubic hover:-translate-y-1 hover:shadow-cardHover">
       {/* hairline top sheen — the quiet 'expensive glass' tell */}
       <div
-        className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-navy/[0.06] to-transparent"
+        className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-navy/[0.07] to-transparent"
         aria-hidden
       />
       <div className="flex items-start justify-between gap-2">
-        <span className={`inline-flex h-9 w-9 items-center justify-center rounded-2xl ${t.chip}`}>
+        <span className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl ${t.chip}`}>
           {tile.icon}
         </span>
         {tile.delta && (
@@ -108,11 +108,11 @@ function Tile({ tile }: { tile: HeroTile }) {
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="nums text-[30px] font-extrabold leading-none tracking-tighter text-navy-deep">
+        <p className="nums text-[32px] font-extrabold leading-none tracking-tighter text-navy-deep">
           {tile.value}
         </p>
-        <p className="mt-2 truncate text-[12.5px] font-semibold text-ink-2">{tile.label}</p>
-        {tile.sub && <p className="truncate text-[11.5px] text-ink-3">{tile.sub}</p>}
+        <p className="mt-2.5 truncate text-[13px] font-semibold text-ink-2">{tile.label}</p>
+        {tile.sub && <p className="mt-0.5 truncate text-[11.5px] text-ink-3">{tile.sub}</p>}
       </div>
 
       {/* Baseline visual — sparkline when we have a series, else a quiet meter,
@@ -132,7 +132,7 @@ function Tile({ tile }: { tile: HeroTile }) {
 
   if (tile.href) {
     return (
-      <a href={tile.href} className="block rounded-4xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+      <a href={tile.href} className="block rounded-[26px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
         {inner}
       </a>
     );

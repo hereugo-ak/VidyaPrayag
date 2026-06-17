@@ -79,17 +79,18 @@
   }
 
   /**
-   * Premium admin canvas — a calm, cool off-white lavender wash with two faint
-   * pastel light-sources in the upper corners (peach left, mint/lavender right).
-   * This is what makes the borderless white cards read as "floating" rather than
-   * boxed-in. Fixed so it never scrolls under the content.
+   * Premium admin canvas — a cool lavender wash with pastel light-sources in
+   * the corners (peach left, violet right, mint lower-right). The base tone is
+   * deepened (#ECEAF6) so the borderless WHITE cards have real contrast to
+   * float against — the earlier near-white canvas let cards blend in and read
+   * as flat squares. Fixed so it never scrolls under the content.
    */
   .admin-canvas {
-    background-color: #f4f3fa;
+    background-color: #eceaf6;
     background-image:
-      radial-gradient(60% 50% at 0% 0%, rgba(255, 173, 140, 0.10) 0%, rgba(255, 173, 140, 0) 60%),
-      radial-gradient(55% 45% at 100% 0%, rgba(108, 92, 224, 0.10) 0%, rgba(108, 92, 224, 0) 60%),
-      radial-gradient(70% 60% at 100% 100%, rgba(60, 185, 169, 0.07) 0%, rgba(60, 185, 169, 0) 60%);
+      radial-gradient(58% 48% at 0% 0%, rgba(255, 173, 140, 0.16) 0%, rgba(255, 173, 140, 0) 60%),
+      radial-gradient(55% 45% at 100% 0%, rgba(108, 92, 224, 0.16) 0%, rgba(108, 92, 224, 0) 60%),
+      radial-gradient(72% 60% at 100% 100%, rgba(60, 185, 169, 0.11) 0%, rgba(60, 185, 169, 0) 60%);
     background-attachment: fixed;
   }
 
