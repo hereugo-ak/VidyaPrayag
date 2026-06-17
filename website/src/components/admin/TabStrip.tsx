@@ -31,7 +31,7 @@ export function TabStrip({
   onTab: (t: TabId) => void;
 }) {
   return (
-    <div className="sticky top-[72px] z-20 -mx-4 px-4 md:mx-0 md:px-0">
+    <div className="sticky top-[64px] z-20 -mx-4 px-4 py-1 md:mx-0 md:px-0">
       <div
         role="tablist"
         aria-label="Dashboard sections"

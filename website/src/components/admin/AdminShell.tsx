@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAdminAuth } from "@/lib/admin/session";
 import { ADMIN_NAV } from "@/lib/admin/nav";
 import { EnrollMark } from "@/components/ui/Logo";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
+import { SidebarProvider, useSidebar } from "./SidebarContext";
 
 const SCHOOL_ROLES = new Set(["school_admin", "school_staff", "admin"]);
 
@@ -24,10 +25,18 @@ function titleForPath(pathname: string): string {
  *  - Authenticated school role → render the dashboard chrome.
  */
 export function AdminShell({ children }: { children: React.ReactNode }) {
+  return (
+    <SidebarProvider>
+      <AdminShellInner>{children}</AdminShellInner>
+    </SidebarProvider>
+  );
+}
+
+function AdminShellInner({ children }: { children: React.ReactNode }) {
   const { session, ready } = useAdminAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const { collapsed, mobileOpen, setMobileOpen } = useSidebar();
 
   useEffect(() => {
     if (!ready) return;
@@ -42,17 +51,17 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }, [ready, session, router, pathname]);
 
   // Close the drawer on route change.
-  useEffect(() => setMenuOpen(false), [pathname]);
+  useEffect(() => setMobileOpen(false), [pathname, setMobileOpen]);
 
   // A11y: Escape closes the mobile drawer.
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!mobileOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMenuOpen(false);
+      if (e.key === "Escape") setMobileOpen(false);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [menuOpen]);
+  }, [mobileOpen, setMobileOpen]);
 
   if (!ready || !session || !SCHOOL_ROLES.has(session.role)) {
     return (
@@ -73,10 +82,17 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       >
         Skip to content
       </a>
-      <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
-      <div className="lg:pl-[264px]">
-        <Topbar title={titleForPath(pathname)} onMenu={() => setMenuOpen(true)} />
-        <main id="admin-content" className="mx-auto w-full max-w-[1340px] px-4 pb-12 pt-5 md:px-8 md:pb-16 md:pt-7">
+      <Sidebar />
+      <div
+        className={`transition-[padding] duration-300 ease-out-cubic ${
+          collapsed ? "lg:pl-[76px]" : "lg:pl-[264px]"
+        }`}
+      >
+        <Topbar title={titleForPath(pathname)} />
+        <main
+          id="admin-content"
+          className="mx-auto w-full max-w-[1340px] px-4 pb-12 pt-5 md:px-8 md:pb-16 md:pt-7"
+        >
           {children}
         </main>
       </div>

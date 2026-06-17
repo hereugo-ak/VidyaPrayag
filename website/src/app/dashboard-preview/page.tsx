@@ -15,8 +15,34 @@ import { SWRConfig } from "swr";
 import { AdminAuthProvider } from "@/lib/admin/session";
 import { Sidebar } from "@/components/admin/Sidebar";
 import { Topbar } from "@/components/admin/Topbar";
+import {
+  SidebarProvider,
+  useSidebar,
+} from "@/components/admin/SidebarContext";
 import { previewFallback } from "@/lib/admin/previewFixtures";
 import { DashboardWorkspace } from "@/components/admin/DashboardWorkspace";
+
+/** Mirrors the real AdminShell layout so the preview matches production chrome. */
+function PreviewShell() {
+  const { collapsed } = useSidebar();
+  return (
+    <div className="admin-canvas min-h-screen">
+      <Sidebar />
+      <div
+        className={`transition-[padding] duration-300 ease-out-cubic ${
+          collapsed ? "lg:pl-[76px]" : "lg:pl-[264px]"
+        }`}
+      >
+        <Topbar title="Dashboard" />
+        <main className="mx-auto w-full max-w-[1340px] px-4 pb-12 pt-5 md:px-8 md:pb-16 md:pt-7">
+          <Suspense fallback={<div className="h-40" />}>
+            <DashboardWorkspace />
+          </Suspense>
+        </main>
+      </div>
+    </div>
+  );
+}
 
 export default function DashboardPreviewPage() {
   const [seeded, setSeeded] = useState(false);
@@ -53,17 +79,9 @@ export default function DashboardPreviewPage() {
       }}
     >
       <AdminAuthProvider>
-        <div className="admin-canvas min-h-screen">
-          <Sidebar open={false} onClose={() => {}} />
-          <div className="lg:pl-[264px]">
-            <Topbar title="Dashboard" onMenu={() => {}} />
-            <main className="mx-auto w-full max-w-[1340px] px-4 pb-12 pt-5 md:px-8 md:pb-16 md:pt-7">
-              <Suspense fallback={<div className="h-40" />}>
-                <DashboardWorkspace />
-              </Suspense>
-            </main>
-          </div>
-        </div>
+        <SidebarProvider>
+          <PreviewShell />
+        </SidebarProvider>
       </AdminAuthProvider>
     </SWRConfig>
   );

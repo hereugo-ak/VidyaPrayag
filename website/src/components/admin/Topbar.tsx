@@ -4,20 +4,20 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useNotifications } from "@/lib/admin/hooks";
 import { adminApi } from "@/lib/admin/client";
-import { IconBell, IconExternal, IconMenu } from "./icons";
+import { useSidebar } from "./SidebarContext";
+import { IconBell, IconExternal, IconMenu, IconPanelLeft } from "./icons";
 
 /**
- * Admin top bar, mobile menu toggle, page title, live notification bell
- * (real unread count from /api/v1/notifications, polled live), Open Site link.
+ * Admin top bar — mobile menu toggle, a desktop sidebar-collapse toggle, the
+ * page title, a live notification bell (real unread count from
+ * /api/v1/notifications, polled live) and an Open Site link.
+ *
+ * Drawer + collapse state are owned by SidebarContext so the bar stays in sync
+ * with the rail without prop-drilling.
  */
-export function Topbar({
-  title,
-  onMenu,
-}: {
-  title: string;
-  onMenu: () => void;
-}) {
+export function Topbar({ title }: { title: string }) {
   const { data, mutate } = useNotifications();
+  const { setMobileOpen, toggleCollapsed } = useSidebar();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -49,16 +49,27 @@ export function Topbar({
   }
 
   return (
-    <header className="glass sticky top-0 z-30 flex h-16 items-center gap-3 px-4 shadow-[0_1px_0_0_rgba(38,35,77,0.04),0_8px_24px_-20px_rgba(38,35,77,0.25)] md:px-8">
+    <header className="glass sticky top-0 z-30 flex h-16 items-center gap-2 px-4 shadow-[0_1px_0_0_rgba(38,35,77,0.04),0_8px_24px_-20px_rgba(38,35,77,0.25)] md:px-8">
+      {/* Mobile drawer toggle */}
       <button
-        onClick={onMenu}
-        className="rounded-lg p-2 text-ink-2 hover:bg-navy/5 lg:hidden"
+        onClick={() => setMobileOpen(true)}
+        className="rounded-xl p-2 text-ink-2 transition-colors hover:bg-navy/5 lg:hidden"
         aria-label="Open menu"
       >
         <IconMenu />
       </button>
 
-      <h1 className="flex-1 truncate text-[17px] font-bold tracking-tight text-navy-deep">
+      {/* Desktop collapse toggle */}
+      <button
+        onClick={toggleCollapsed}
+        className="hidden rounded-xl p-2 text-ink-3 transition-colors hover:bg-navy/5 hover:text-navy-deep lg:inline-flex"
+        aria-label="Toggle sidebar"
+        title="Toggle sidebar"
+      >
+        <IconPanelLeft />
+      </button>
+
+      <h1 className="ml-0.5 flex-1 truncate text-[17px] font-bold tracking-tight text-navy-deep">
         {title}
       </h1>
 
