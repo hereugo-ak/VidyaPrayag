@@ -58,14 +58,19 @@ export function GreetingBar({
   });
 
   return (
-    <div className="relative overflow-hidden rounded-5xl bg-hero-aurora p-6 text-white shadow-pillow md:p-8">
-      {/* faint texture / vignette for depth */}
+    <div className="hero-surface relative isolate overflow-hidden rounded-5xl p-6 text-white shadow-pillow ring-1 ring-inset ring-white/[0.06] md:p-9">
+      {/* faint top sheen for depth (kept above the base, below content) */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.5]"
+        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.6]"
         style={{
           background:
-            "radial-gradient(80% 120% at 50% -20%, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 60%)",
+            "radial-gradient(80% 120% at 50% -20%, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 60%)",
         }}
+        aria-hidden
+      />
+      {/* hairline highlight along the top edge — the 'expensive glass' tell */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent"
         aria-hidden
       />
 
@@ -77,11 +82,14 @@ export function GreetingBar({
               {dateLabel}
               {meta?.academic_week ? ` · Academic week ${meta.academic_week}` : ""}
             </p>
-            <h1 className="mt-2 truncate text-[28px] font-extrabold leading-[1.05] tracking-tighter !text-white md:text-[36px]">
-              {greeting}, {first}
+            <h1 className="mt-2 text-[30px] font-extrabold leading-[1.04] tracking-tighter text-white md:text-[38px]">
+              {greeting},{" "}
+              <span className="bg-gradient-to-r from-white via-white to-[#cdc6ff] bg-clip-text text-transparent">
+                {first}
+              </span>
             </h1>
-            <div className="mt-2.5 flex items-center gap-2.5">
-              <p className="truncate text-[13.5px] font-medium text-white/70">
+            <div className="mt-3 flex flex-wrap items-center gap-2.5">
+              <p className="truncate text-[13.5px] font-medium text-white/75">
                 {meta?.school_name ?? "Your school"}
               </p>
               <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white/85 ring-1 ring-inset ring-white/15">

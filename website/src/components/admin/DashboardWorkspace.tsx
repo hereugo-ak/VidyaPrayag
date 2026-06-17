@@ -427,14 +427,15 @@ function useHeroTiles({
     // Fees — collection rate (school-wide; honest when scoped).
     if (fees.data) {
       const billed = fees.data.paid_total + fees.data.due_total + fees.data.overdue_total;
-      const collected = billed > 0 ? Math.round((fees.data.paid_total / billed) * 100) : 0;
+      const collected = billed > 0 ? fees.data.paid_total / billed : 0;
       tiles.push({
         key: "fees",
         label: scoped ? "Fees collected (school-wide)" : "Fees collected",
         value: compactMoney(fees.data.paid_total, fees.data.currency),
-        sub: `${collected}% of billed`,
+        sub: `${Math.round(collected * 100)}% of billed`,
         tone: "teal",
         icon: <IconFees width={18} height={18} />,
+        meter: collected, // real collection ratio → balanced baseline visual
         href: "/admin/fees",
       });
     }
@@ -443,6 +444,8 @@ function useHeroTiles({
     const warnings = intel.data?.early_warning ?? [];
     const warnCount = scoped ? warnings.filter((w) => w.class_name === scoped).length : warnings.length;
     if (intel.data) {
+      // Real share of the cohort flagged (vs enrolled) → quiet meter.
+      const riskMeter = enrolled && enrolled > 0 ? warnCount / enrolled : 0;
       tiles.push({
         key: "risk",
         label: "Students at risk",
@@ -450,6 +453,7 @@ function useHeroTiles({
         sub: warnCount === 0 ? "All above thresholds" : "Need attention",
         tone: warnCount > 0 ? "warning" : "sky",
         icon: <IconWarning width={18} height={18} />,
+        meter: warnCount === 0 ? 0 : Math.max(riskMeter, 0.06),
       });
     }
 

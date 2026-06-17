@@ -76,7 +76,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
       <div className="lg:pl-[264px]">
         <Topbar title={titleForPath(pathname)} onMenu={() => setMenuOpen(true)} />
-        <main id="admin-content" className="mx-auto w-full max-w-[1340px] px-4 py-6 md:px-8 md:py-9">
+        <main id="admin-content" className="mx-auto w-full max-w-[1340px] px-4 pb-12 pt-5 md:px-8 md:pb-16 md:pt-7">
           {children}
         </main>
       </div>

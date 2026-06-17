@@ -31,11 +31,11 @@ export function TabStrip({
   onTab: (t: TabId) => void;
 }) {
   return (
-    <div className="sticky top-2 z-20 -mx-4 px-4 md:mx-0 md:px-0">
+    <div className="sticky top-[72px] z-20 -mx-4 px-4 md:mx-0 md:px-0">
       <div
         role="tablist"
         aria-label="Dashboard sections"
-        className="inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full bg-white/90 p-1.5 shadow-soft ring-1 ring-navy/[0.04] backdrop-blur-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full bg-white/85 p-1.5 shadow-soft ring-1 ring-navy/[0.05] backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {TABS.map((t) => {
           const active = t.id === tab;

@@ -57,7 +57,7 @@ export default function DashboardPreviewPage() {
           <Sidebar open={false} onClose={() => {}} />
           <div className="lg:pl-[264px]">
             <Topbar title="Dashboard" onMenu={() => {}} />
-            <main className="mx-auto w-full max-w-[1340px] px-4 py-6 md:px-8 md:py-9">
+            <main className="mx-auto w-full max-w-[1340px] px-4 pb-12 pt-5 md:px-8 md:pb-16 md:pt-7">
               <Suspense fallback={<div className="h-40" />}>
                 <DashboardWorkspace />
               </Suspense>
