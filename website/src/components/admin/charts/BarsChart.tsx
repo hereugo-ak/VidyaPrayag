@@ -58,7 +58,7 @@ export function BarsChart({
 }) {
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }} barCategoryGap="34%">
+      <BarChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }} barCategoryGap="28%">
         <defs>
           <linearGradient id="barAccent" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#8B7EE8" />
@@ -91,7 +91,8 @@ export function BarsChart({
         <Tooltip content={<BarTooltip unit={unit} />} cursor={{ fill: "#6C5CE0", fillOpacity: 0.05 }} />
         <Bar
           dataKey="value"
-          radius={[999, 999, 999, 999]}
+          radius={[10, 10, 4, 4]}
+          maxBarSize={48}
           animationDuration={650}
           onClick={(d) => onSelect?.(d as unknown as BarDatum)}
           cursor={onSelect ? "pointer" : "default"}

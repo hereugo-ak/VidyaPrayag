@@ -178,8 +178,13 @@ export const fxFees: FeeLedgerDto = {
     { title: "Term II Tuition — Grade 6", amount: 18500, currency: "INR", status: "paid", due_date: "2026-06-10", category: "Tuition" },
     { title: "Transport — June", amount: 3200, currency: "INR", status: "due", due_date: "2026-06-20", category: "Transport" },
     { title: "Lab Fee — Grade 7", amount: 4500, currency: "INR", status: "overdue", due_date: "2026-06-05", category: "Lab" },
-    { title: "Term II Tuition — Grade 5", amount: 17500, currency: "INR", status: "paid", due_date: "2026-06-10", category: "Tuition" },
+    { title: "Term II Tuition — Grade 5", amount: 17500, currency: "INR", status: "paid", due_date: "2026-05-10", category: "Tuition" },
     { title: "Annual Day — contribution", amount: 1500, currency: "INR", status: "due", due_date: "2026-06-25", category: "Event" },
+    { title: "Term II Tuition — Grade 7", amount: 19500, currency: "INR", status: "paid", due_date: "2026-06-09", category: "Tuition" },
+    { title: "Library Fee — Grade 4", amount: 1200, currency: "INR", status: "paid", due_date: "2026-05-28", category: "Library" },
+    { title: "Exam Fee — Grade 6", amount: 2200, currency: "INR", status: "overdue", due_date: "2026-06-02", category: "Exam" },
+    { title: "Term II Tuition — Grade 4", amount: 16500, currency: "INR", status: "paid", due_date: "2026-04-12", category: "Tuition" },
+    { title: "Sports Fee — Grade 5", amount: 1800, currency: "INR", status: "due", due_date: "2026-06-28", category: "Sports" },
   ],
 };
 
@@ -258,12 +263,15 @@ export const fxOnboarding: OnboardingStatusResponse = {
 };
 
 export const fxMarks: MarksSummaryDto = {
-  assessment_count: 8,
+  assessment_count: 5,
   overall_average_pct: 71,
   assessments: [
-    { subject: "Science", assessment: "Unit Test II", class_name: "Grade 7", average: 68, max_marks: 50, graded_count: 38, exam_date: "2026-06-12", is_published: true },
-    { subject: "Mathematics", assessment: "Unit Test II", class_name: "Grade 6", average: 74, max_marks: 50, graded_count: 41, exam_date: "2026-06-11", is_published: true },
-    { subject: "English", assessment: "Class Test", class_name: "Grade 5", average: 80, max_marks: 25, graded_count: 36, exam_date: "2026-06-09", is_published: false },
+    // average is the mean RAW score (out of max_marks); panel derives the % — so average must be ≤ max_marks.
+    { subject: "Science", assessment: "Unit Test II", class_name: "Grade 7", average: 34, max_marks: 50, graded_count: 38, exam_date: "2026-06-12", is_published: true },
+    { subject: "Mathematics", assessment: "Unit Test II", class_name: "Grade 6", average: 37, max_marks: 50, graded_count: 41, exam_date: "2026-06-11", is_published: true },
+    { subject: "English", assessment: "Class Test", class_name: "Grade 5", average: 20, max_marks: 25, graded_count: 36, exam_date: "2026-06-09", is_published: false },
+    { subject: "Social", assessment: "Project", class_name: "Grade 6", average: 16, max_marks: 20, graded_count: 39, exam_date: "2026-06-07", is_published: true },
+    { subject: "Hindi", assessment: "Class Test", class_name: "Grade 4", average: 21, max_marks: 30, graded_count: 33, exam_date: "2026-06-05", is_published: true },
   ],
 };
 

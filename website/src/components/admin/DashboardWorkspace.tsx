@@ -28,11 +28,11 @@ import { HeroStatTiles, type HeroTile } from "@/components/admin/HeroStatTiles";
 import { AttendanceIntelligence } from "@/components/admin/AttendanceIntelligence";
 import { EarlyWarning } from "@/components/admin/EarlyWarning";
 import { FinancialPulse } from "@/components/admin/FinancialPulse";
+import { FinanceTab } from "@/components/admin/FinanceTab";
 import { AcademicHealth } from "@/components/admin/AcademicHealth";
 import { ActivityFeed } from "@/components/admin/ActivityFeed";
-import { PeopleSnapshot } from "@/components/admin/PeopleSnapshot";
+import { PeopleTab } from "@/components/admin/PeopleTab";
 import { MarksSummaryPanel } from "@/components/admin/MarksSummaryPanel";
-import { RosterPreview } from "@/components/admin/RosterPreview";
 import { QuickCompose } from "@/components/admin/QuickCompose";
 import { SchoolCalendar } from "@/components/admin/calendar/SchoolCalendar";
 import { CalendarSlotPanel } from "@/components/admin/calendar/CalendarSlotPanel";
@@ -255,11 +255,16 @@ function TabContent({
           <FadeIn delay={0.04}>
             <HeroStatTiles tiles={heroTiles} />
           </FadeIn>
+          {/* Fees are school-wide in the current backend — honest note, no fake scoping. */}
+          {scoped && (
+            <FadeIn delay={0.06}>
+              <p className="px-1 text-[12px] font-medium text-ink-3">
+                Showing <span className="font-bold text-navy-deep">school-wide</span> fees — the backend does not segment fees by class.
+              </p>
+            </FadeIn>
+          )}
           <FadeIn delay={0.08}>
-            {/* Fees are school-wide in the current backend — honest note, no fake scoping. */}
-            <Scoped scoped={scoped} note={scoped ? "Fees are school-wide (not class-segmented)" : undefined}>
-              <FinancialPulse data={fees.data} loading={fees.isLoading} />
-            </Scoped>
+            <FinanceTab data={fees.data} loading={fees.isLoading} />
           </FadeIn>
         </div>
       );
@@ -270,19 +275,15 @@ function TabContent({
           <FadeIn delay={0.04}>
             <HeroStatTiles tiles={heroTiles} />
           </FadeIn>
-          <div className="grid gap-5 lg:grid-cols-3">
-            <FadeIn delay={0.06}>
-              <PeopleSnapshot
-                teacherCount={teachers.data?.teachers.length ?? 0}
-                studentCount={students.data?.students.length ?? 0}
-                todayRate={attendance.data ? attendance.data.rate : null}
-                loading={(students.isLoading || teachers.isLoading) && !students.data}
-              />
-            </FadeIn>
-            <FadeIn delay={0.08} className="lg:col-span-2">
-              <RosterPreview data={students.data} loading={students.isLoading} scopeClass={scoped} />
-            </FadeIn>
-          </div>
+          <FadeIn delay={0.06}>
+            <PeopleTab
+              students={students.data}
+              teachers={teachers.data}
+              attendance={attendance.data}
+              loading={(students.isLoading || teachers.isLoading) && !students.data}
+              scopeClass={scoped}
+            />
+          </FadeIn>
           <FadeIn delay={0.1}>
             <Scoped scoped={scoped}>
               <EarlyWarning data={intel.data?.early_warning} loading={intel.isLoading} />

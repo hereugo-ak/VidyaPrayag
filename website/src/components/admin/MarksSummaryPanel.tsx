@@ -54,7 +54,10 @@ export function MarksSummaryPanel({
         ) : (
           <ul className="space-y-2">
             {rows.map((a, i) => {
-              const pctOfMax = a.max_marks > 0 ? Math.round((a.average / a.max_marks) * 100) : 0;
+              // Clamp defensively — a backend row where average > max_marks must
+              // never render >100% or overflow the progress bar.
+              const pctOfMax =
+                a.max_marks > 0 ? Math.min(100, Math.round((a.average / a.max_marks) * 100)) : 0;
               return (
                 <li
                   key={`${a.subject}-${a.assessment}-${a.class_name}-${i}`}
@@ -66,8 +69,7 @@ export function MarksSummaryPanel({
                         {a.subject} · {a.assessment}
                       </p>
                       <p className="truncate text-[12px] text-ink-3">
-                        {a.class_name} · {a.graded_count} graded
-                        {a.exam_date ? ` · ${a.exam_date}` : ""}
+                        {a.class_name} · avg {a.average}/{a.max_marks} · {a.graded_count} graded
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
