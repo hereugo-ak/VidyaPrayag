@@ -70,7 +70,7 @@ export function ActivityFeed({
   }, [data]);
 
   return (
-    <Card className="flex h-full flex-col">
+    <Card className="flex h-full flex-col" hover>
       <CardHeader title="Activity" subtitle="Live across your school" />
       <div className="flex-1 overflow-y-auto px-2 py-2">
         {loading && !data ? (
@@ -85,12 +85,12 @@ export function ActivityFeed({
           <div className="space-y-1">
             {grouped.map(([bucket, items]) => (
               <div key={bucket}>
-                <p className="sticky top-0 z-[1] bg-lavender-soft/95 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-ink-3 backdrop-blur-sm">
+                <p className="sticky top-0 z-[1] bg-white/95 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-ink-3 backdrop-blur-sm">
                   {bucket}
                 </p>
-                <ul>
+                <ul className="space-y-0.5">
                   {items.map((item) => (
-                    <li key={item.id} className="flex gap-3 px-3 py-2.5">
+                    <li key={item.id} className="flex gap-3 rounded-2xl px-3 py-2.5 transition-colors hover:bg-navy/[0.03]">
                       <span
                         className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
                         style={{ background: CATEGORY_DOT[item.category] ?? CATEGORY_DOT.general }}

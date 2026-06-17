@@ -31,11 +31,11 @@ export function TabStrip({
   onTab: (t: TabId) => void;
 }) {
   return (
-    <div className="sticky top-0 z-20 -mx-4 px-4 py-1 md:mx-0 md:px-0">
+    <div className="sticky top-2 z-20 -mx-4 px-4 md:mx-0 md:px-0">
       <div
         role="tablist"
         aria-label="Dashboard sections"
-        className="flex items-center gap-1.5 overflow-x-auto rounded-2xl border border-navy/8 bg-white/85 p-1.5 shadow-card backdrop-blur-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full bg-white/90 p-1.5 shadow-soft ring-1 ring-navy/[0.04] backdrop-blur-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {TABS.map((t) => {
           const active = t.id === tab;
@@ -46,13 +46,13 @@ export function TabStrip({
               role="tab"
               aria-selected={active}
               onClick={() => onTab(t.id)}
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+              className={`group inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-semibold transition-all duration-300 ease-out-cubic focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
                 active
-                  ? "bg-accent text-white shadow-sm"
-                  : "text-ink-2 hover:bg-navy/[0.04] hover:text-navy-deep"
+                  ? "bg-navy-deep text-white shadow-pill"
+                  : "text-ink-2 hover:bg-navy/[0.05] hover:text-navy-deep"
               }`}
             >
-              <Icon className={active ? "text-white" : "text-ink-3"} />
+              <Icon className={active ? "text-white" : "text-ink-3 group-hover:text-navy-deep"} />
               {t.label}
             </button>
           );

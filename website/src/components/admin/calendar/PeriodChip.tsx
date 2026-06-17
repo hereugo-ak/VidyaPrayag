@@ -49,7 +49,7 @@ export function PeriodChip({
       type="button"
       onClick={onOpen}
       aria-label={a11y}
-      className="group relative flex w-full items-stretch gap-2 overflow-hidden rounded-xl border border-navy/8 bg-white px-2.5 py-2 text-left shadow-sm transition-all duration-200 hover:-translate-y-px hover:border-navy/12 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+      className="group relative flex w-full items-stretch gap-2 overflow-hidden rounded-2xl bg-white px-2.5 py-2 text-left shadow-soft ring-1 ring-navy/[0.05] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
       style={{ backgroundColor: c.tintBg }}
     >
       <span

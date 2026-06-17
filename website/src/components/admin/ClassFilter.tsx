@@ -48,11 +48,11 @@ export function ClassFilter({
     };
   }, [open]);
 
-  const pad = size === "sm" ? "px-2.5 py-1.5 text-[12px]" : "px-3 py-2 text-[13px]";
+  const pad = size === "sm" ? "px-3 py-2 text-[12px]" : "px-3.5 py-2.5 text-[13px]";
   const trigger =
     tone === "onDark"
-      ? "bg-white/10 text-white ring-1 ring-inset ring-white/15 hover:bg-white/15"
-      : "bg-white text-navy-deep ring-1 ring-inset ring-navy/10 hover:bg-navy/[0.03]";
+      ? "bg-white/10 text-white ring-1 ring-inset ring-white/15 hover:bg-white/[0.16]"
+      : "bg-white text-navy-deep shadow-soft ring-1 ring-inset ring-navy/[0.06] hover:bg-navy/[0.02]";
   const display = value ?? label;
   const active = value != null;
 
@@ -61,7 +61,7 @@ export function ClassFilter({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`inline-flex items-center gap-1.5 rounded-xl font-semibold transition-colors ${pad} ${trigger} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`}
+        className={`inline-flex items-center gap-1.5 rounded-full font-semibold transition-colors ${pad} ${trigger} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -79,7 +79,7 @@ export function ClassFilter({
       {open && (
         <div
           role="listbox"
-          className="absolute right-0 z-30 mt-2 max-h-[300px] w-[220px] overflow-y-auto rounded-2xl border border-navy/10 bg-white p-1.5 shadow-cardHover"
+          className="absolute right-0 z-30 mt-2 max-h-[300px] w-[220px] overflow-y-auto rounded-3xl bg-white p-1.5 shadow-cardHover ring-1 ring-navy/[0.05]"
         >
           <Option
             label={label}

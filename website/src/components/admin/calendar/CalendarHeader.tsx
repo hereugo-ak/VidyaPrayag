@@ -41,16 +41,16 @@ export function CalendarHeader({
   globalClass: string | null;
 }) {
   return (
-    <div className="flex flex-col gap-3 border-b border-navy/8 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex flex-col gap-3 border-b border-navy/[0.06] px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
       {/* Left: range + navigation */}
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-0.5 rounded-xl border border-navy/10 bg-white p-0.5">
+      <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-0.5 rounded-full bg-navy/[0.04] p-1">
           <NavBtn label="Previous" onClick={onPrev} flip />
           <button
             type="button"
             onClick={onToday}
             disabled={isCurrentRange}
-            className="rounded-lg px-2.5 py-1.5 text-[12px] font-semibold text-ink-2 transition-colors hover:bg-navy/[0.04] hover:text-navy-deep disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
+            className="rounded-full px-3 py-1.5 text-[12px] font-semibold text-ink-2 transition-colors hover:bg-white hover:text-navy-deep disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
           >
             Today
           </button>
@@ -61,7 +61,7 @@ export function CalendarHeader({
 
       {/* Right: view toggle + Control A */}
       <div className="flex flex-wrap items-center gap-2.5">
-        <div className="inline-flex rounded-xl border border-navy/10 bg-white p-0.5" role="tablist" aria-label="Calendar view">
+        <div className="inline-flex rounded-full bg-navy/[0.04] p-1" role="tablist" aria-label="Calendar view">
           <Seg active={view === "week"} onClick={() => onView("week")} label="Week" />
           <Seg active={view === "month"} onClick={() => onView("month")} label="Month" />
         </div>
@@ -104,8 +104,8 @@ function Seg({ active, onClick, label }: { active: boolean; onClick: () => void;
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors ${
-        active ? "bg-accent text-white shadow-sm" : "text-ink-2 hover:text-navy-deep"
+      className={`rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-all duration-300 ${
+        active ? "bg-navy-deep text-white shadow-pill" : "text-ink-2 hover:text-navy-deep"
       }`}
     >
       {label}

@@ -36,7 +36,7 @@ export function Sidebar({
       />
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[264px] flex-col border-r border-navy/8 bg-white/95 backdrop-blur-md transition-transform duration-300 ease-out-cubic lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[264px] flex-col bg-white/95 shadow-[8px_0_40px_-24px_rgba(38,35,77,0.25)] backdrop-blur-md transition-transform duration-300 ease-out-cubic lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
         aria-label="Admin navigation"
@@ -72,20 +72,17 @@ export function Sidebar({
                 href={item.href}
                 onClick={onClose}
                 aria-current={active ? "page" : undefined}
-                className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-semibold transition-colors duration-150 ${
+                className={`group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[14px] font-semibold transition-all duration-200 ${
                   active
-                    ? "bg-accent/10 text-accent-deep"
-                    : "text-ink-2 hover:bg-navy/5 hover:text-navy-deep"
+                    ? "bg-navy-deep text-white shadow-pill"
+                    : "text-ink-2 hover:bg-navy/[0.05] hover:text-navy-deep"
                 }`}
               >
                 <span
                   className={`relative flex h-5 w-5 items-center justify-center ${
-                    active ? "text-accent-deep" : "text-ink-3 group-hover:text-navy-deep"
+                    active ? "text-white" : "text-ink-3 group-hover:text-navy-deep"
                   }`}
                 >
-                  {active && (
-                    <span className="absolute -left-3 h-5 w-1 rounded-full bg-accent" aria-hidden="true" />
-                  )}
                   <Icon />
                 </span>
                 {item.label}
@@ -95,8 +92,8 @@ export function Sidebar({
         </nav>
 
         {/* User */}
-        <div className="border-t border-navy/8 p-3">
-          <div className="flex items-center gap-3 rounded-xl px-2 py-2">
+        <div className="border-t border-navy/[0.06] p-3">
+          <div className="flex items-center gap-3 rounded-2xl bg-navy/[0.03] px-2.5 py-2.5">
             <Avatar name={session?.name ?? "Admin"} size={36} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-semibold text-navy-deep">

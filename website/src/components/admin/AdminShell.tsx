@@ -56,7 +56,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   if (!ready || !session || !SCHOOL_ROLES.has(session.role)) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-lavender-soft">
+      <div className="admin-canvas flex min-h-screen items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <EnrollMark className="h-12 w-12 animate-pulse" />
           <p className="text-sm font-medium text-ink-3">Loading your dashboard…</p>
@@ -66,7 +66,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-lavender-soft">
+    <div className="admin-canvas min-h-screen">
       <a
         href="#admin-content"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-navy-deep focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
@@ -76,7 +76,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
       <div className="lg:pl-[264px]">
         <Topbar title={titleForPath(pathname)} onMenu={() => setMenuOpen(true)} />
-        <main id="admin-content" className="mx-auto w-full max-w-[1320px] px-4 py-6 md:px-6 md:py-8">
+        <main id="admin-content" className="mx-auto w-full max-w-[1340px] px-4 py-6 md:px-8 md:py-9">
           {children}
         </main>
       </div>
