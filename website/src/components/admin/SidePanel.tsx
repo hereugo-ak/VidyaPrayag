@@ -51,13 +51,13 @@ export function SidePanel({
             onClick={onClose}
           />
           <motion.aside
-            className="absolute right-0 top-0 flex h-full w-full max-w-[440px] flex-col border-l border-navy/10 bg-lavender-soft shadow-cardHover"
+            className="absolute right-0 top-0 flex h-full w-full max-w-[460px] flex-col bg-white shadow-cardHover"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
-            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.36, ease: [0.16, 1, 0.3, 1] }}
           >
-            <div className="flex items-start justify-between gap-4 border-b border-navy/8 px-6 py-5">
+            <div className="flex items-start justify-between gap-4 border-b border-navy/[0.06] px-6 py-5">
               <div className="min-w-0">
                 <h2 className="truncate text-[16px] font-bold tracking-tight text-navy-deep">
                   {title}

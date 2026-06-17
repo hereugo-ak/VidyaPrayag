@@ -77,6 +77,28 @@
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";
   }
+
+  /**
+   * Premium admin canvas — a calm, cool off-white lavender wash with two faint
+   * pastel light-sources in the upper corners (peach left, mint/lavender right).
+   * This is what makes the borderless white cards read as "floating" rather than
+   * boxed-in. Fixed so it never scrolls under the content.
+   */
+  .admin-canvas {
+    background-color: #f4f3fa;
+    background-image:
+      radial-gradient(60% 50% at 0% 0%, rgba(255, 173, 140, 0.10) 0%, rgba(255, 173, 140, 0) 60%),
+      radial-gradient(55% 45% at 100% 0%, rgba(108, 92, 224, 0.10) 0%, rgba(108, 92, 224, 0) 60%),
+      radial-gradient(70% 60% at 100% 100%, rgba(60, 185, 169, 0.07) 0%, rgba(60, 185, 169, 0) 60%);
+    background-attachment: fixed;
+  }
+
+  /* Soft glass surface used for the topbar / floating chrome. */
+  .glass {
+    background-color: rgba(255, 255, 255, 0.72);
+    backdrop-filter: saturate(140%) blur(14px);
+    -webkit-backdrop-filter: saturate(140%) blur(14px);
+  }
   /* hide scrollbar on horizontal chip rows while keeping scroll */
   .no-scrollbar {
     -ms-overflow-style: none;

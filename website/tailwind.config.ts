@@ -18,6 +18,12 @@ const config: Config = {
           tint: "#F1EFFB",
         },
         cream: "#F5F5F3",
+        // Soft pastel data fills (sparingly, one per surface — reference language)
+        peach: { DEFAULT: "#FF8A65", soft: "#FFE9E1" },
+        sky: { DEFAULT: "#6C8DF5", soft: "#E6EEFD" },
+        mint: { DEFAULT: "#3CB9A9", soft: "#DFF4EF" },
+        // canvas behind the floating cards (cool off-white lavender)
+        canvas: "#F4F3FA",
         // Brand, navy (primary ink + primary CTA)
         navy: {
           DEFAULT: "#26234D",
@@ -94,14 +100,52 @@ const config: Config = {
         shell: "1200px",
       },
       boxShadow: {
-        // Navy-tinted elevation system (app §13.1)
-        card: "0 1px 2px rgba(38,35,77,0.04), 0 8px 24px rgba(38,35,77,0.06)",
-        cardHover: "0 2px 4px rgba(38,35,77,0.06), 0 18px 40px rgba(38,35,77,0.12)",
+        /**
+         * Pillowy elevation system — tuned to the premium reference dashboards.
+         * Cards are borderless and float on a soft canvas using high-blur,
+         * low-opacity navy-tinted shadows (no harsh 1px lines). Two ambient
+         * layers (a tight contact shadow + a wide diffuse halo) give the soft,
+         * expensive "resting on velvet" feel that generic admin panels miss.
+         */
+        soft: "0 1px 2px rgba(38,35,77,0.03), 0 10px 30px -12px rgba(38,35,77,0.10)",
+        card: "0 1px 2px rgba(38,35,77,0.03), 0 18px 44px -20px rgba(38,35,77,0.16)",
+        cardHover: "0 2px 6px rgba(38,35,77,0.05), 0 30px 60px -24px rgba(38,35,77,0.24)",
+        pillow: "0 2px 4px rgba(38,35,77,0.03), 0 24px 60px -28px rgba(38,35,77,0.22)",
+        float: "0 8px 18px -8px rgba(108,92,224,0.30), 0 24px 48px -20px rgba(108,92,224,0.20)",
         cta: "0 8px 24px rgba(38,35,77,0.18)",
         ctaHover: "0 14px 34px rgba(38,35,77,0.26)",
+        // dark high-contrast pill (active segmented tab)
+        pill: "0 6px 16px -6px rgba(26,24,56,0.45)",
+        inset: "inset 0 1px 0 0 rgba(255,255,255,0.6)",
       },
       borderRadius: {
-        xl2: "1.25rem",
+        xl2: "1.25rem", // 20px
+        "3xl": "1.5rem", // 24px
+        "4xl": "1.75rem", // 28px — reference card radius
+        "5xl": "2rem", // 32px — hero / large surfaces
+      },
+      backgroundImage: {
+        // Soft pastel washes lifted from the reference designs (peach/lavender/mint)
+        "wash-peach": "linear-gradient(135deg, #FFE9E1 0%, #FFD9CE 100%)",
+        "wash-lavender": "linear-gradient(135deg, #ECE9FE 0%, #DDD6FB 100%)",
+        "wash-mint": "linear-gradient(135deg, #DFF4EF 0%, #C9EBE3 100%)",
+        "wash-sky": "linear-gradient(135deg, #E6EEFD 0%, #D6E3FB 100%)",
+        // signature aurora behind the greeting hero
+        "hero-aurora":
+          "radial-gradient(120% 140% at 0% 0%, rgba(108,92,224,0.55) 0%, rgba(108,92,224,0) 55%), radial-gradient(120% 140% at 100% 0%, rgba(60,185,169,0.40) 0%, rgba(60,185,169,0) 55%), linear-gradient(135deg, #211E47 0%, #2B2756 55%, #1A1838 100%)",
+      },
+      keyframes: {
+        shimmer: {
+          "100%": { transform: "translateX(100%)" },
+        },
+        floaty: {
+          "0%,100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-4px)" },
+        },
+      },
+      animation: {
+        shimmer: "shimmer 1.6s infinite",
+        floaty: "floaty 5s ease-in-out infinite",
       },
       transitionTimingFunction: {
         "out-cubic": "cubic-bezier(0.16, 1, 0.3, 1)",

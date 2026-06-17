@@ -114,7 +114,7 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 function TeacherRow({ period }: { period: TimetablePeriod }) {
   return (
     <Section label="Teacher">
-      <div className="flex items-center justify-between gap-2 rounded-xl bg-white/70 px-3.5 py-2.5">
+      <div className="flex items-center justify-between gap-2 rounded-2xl bg-navy/[0.03] px-3.5 py-2.5 ring-1 ring-inset ring-navy/[0.05]">
         <div>
           <p className="text-[14px] font-semibold text-navy-deep">
             {period.teacher_name || "Unassigned"}
@@ -167,7 +167,7 @@ function AttendanceSection({
   if (relation === "future") {
     return (
       <Section label="Students">
-        <div className="rounded-xl bg-white/70 px-3.5 py-3">
+        <div className="rounded-2xl bg-navy/[0.03] px-3.5 py-3 ring-1 ring-inset ring-navy/[0.05]">
           <p className="text-[13px] font-semibold text-navy-deep">Scheduled</p>
           <p className="mt-0.5 text-[12px] text-ink-3">
             {enrolled != null
@@ -204,7 +204,7 @@ function AttendanceSection({
       {state === "ok" &&
         data &&
         (data.total_count > 0 ? (
-          <div className="rounded-xl bg-white/70 px-3.5 py-3">
+          <div className="rounded-2xl bg-navy/[0.03] px-3.5 py-3 ring-1 ring-inset ring-navy/[0.05]">
             <div className="mb-2 flex items-end justify-between">
               <p className="text-[20px] font-bold leading-none text-navy-deep">
                 {data.present_count}
@@ -253,7 +253,7 @@ function SyllabusSection({ period }: { period: TimetablePeriod }) {
       {isLoading ? (
         <Skeleton className="h-12 w-full" />
       ) : cell && cell.total_units > 0 ? (
-        <div className="rounded-xl bg-white/70 px-3.5 py-3">
+        <div className="rounded-2xl bg-navy/[0.03] px-3.5 py-3 ring-1 ring-inset ring-navy/[0.05]">
           <div className="mb-2 flex items-end justify-between">
             <p className="text-[14px] font-semibold text-navy-deep">
               {cell.covered_units}
@@ -269,7 +269,7 @@ function SyllabusSection({ period }: { period: TimetablePeriod }) {
           </div>
         </div>
       ) : (
-        <p className="rounded-xl bg-white/70 px-3.5 py-3 text-[13px] text-ink-3">
+        <p className="rounded-2xl bg-navy/[0.03] px-3.5 py-3 ring-1 ring-inset ring-navy/[0.05] text-[13px] text-ink-3">
           Scheduled, no coverage data yet for {period.subject || "this subject"}.
         </p>
       )}
@@ -281,7 +281,7 @@ function SyllabusSection({ period }: { period: TimetablePeriod }) {
 function NotesSection() {
   return (
     <Section label="Notes">
-      <p className="rounded-xl bg-white/70 px-3.5 py-3 text-[13px] text-ink-3">
+      <p className="rounded-2xl bg-navy/[0.03] px-3.5 py-3 ring-1 ring-inset ring-navy/[0.05] text-[13px] text-ink-3">
         No notes logged for this slot.
       </p>
     </Section>

@@ -64,7 +64,7 @@ export function EarlyWarning({
 
   return (
     <>
-      <Card className="flex h-full flex-col pb-2">
+      <Card className="flex h-full flex-col pb-3" hover>
         <CardHeader
           title="Early warning"
           subtitle="Students flagged by real attendance, marks & leave signals"
@@ -84,12 +84,12 @@ export function EarlyWarning({
               hint="When attendance, marks, or leave signals cross a threshold, flagged students appear here ranked by severity."
             />
           ) : (
-            <ul className="divide-y divide-navy/6">
+            <ul className="space-y-1 px-1.5 pb-1.5">
               {rows.map((s) => (
                 <li key={s.student_code}>
                   <button
                     onClick={() => setSelected(s)}
-                    className="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-navy/4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                    className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition-colors hover:bg-navy/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
                   >
                     <Avatar name={s.name} size={36} />
                     <div className="min-w-0 flex-1">
@@ -147,7 +147,7 @@ export function EarlyWarning({
                 {selected.signals.map((sig) => (
                   <li
                     key={sig.kind}
-                    className="flex items-start gap-3 rounded-xl border border-navy/8 bg-white/70 px-4 py-3"
+                    className="flex items-start gap-3 rounded-2xl bg-navy/[0.03] px-4 py-3 ring-1 ring-inset ring-navy/[0.05]"
                   >
                     <span
                       className="mt-1 h-2 w-2 shrink-0 rounded-full"
@@ -164,7 +164,7 @@ export function EarlyWarning({
             <button
               disabled={sending || notified.has(selected.student_code)}
               onClick={() => notifyParent(selected)}
-              className="w-full rounded-xl bg-navy-deep px-4 py-3 text-[14px] font-semibold text-white transition-all duration-200 hover:bg-navy disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-full bg-navy-deep px-4 py-3.5 text-[14px] font-semibold text-white shadow-pill transition-all duration-200 hover:-translate-y-0.5 hover:bg-navy disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
             >
               {notified.has(selected.student_code)
                 ? "Parent notified ✓"
@@ -181,8 +181,8 @@ export function EarlyWarning({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-navy/8 bg-white/70 px-3 py-3 text-center">
-      <p className="nums text-[18px] font-bold text-navy-deep">{value}</p>
+    <div className="rounded-2xl bg-navy/[0.03] px-3 py-3.5 text-center ring-1 ring-inset ring-navy/[0.05]">
+      <p className="nums text-[19px] font-extrabold text-navy-deep">{value}</p>
       <p className="mt-0.5 text-[11px] text-ink-3">{label}</p>
     </div>
   );

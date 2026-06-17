@@ -82,7 +82,7 @@ export function FinancialPulse({
 
   return (
     <>
-      <Card className="h-full pb-5">
+      <Card className="h-full pb-6" hover>
         <CardHeader
           title="Financial pulse"
           subtitle="Fee collection from real records, click a bar to drill in"
@@ -129,7 +129,7 @@ export function FinancialPulse({
               )}
 
               {upcoming.length > 0 && (
-                <div className="rounded-xl border border-warning/25 bg-warning/[0.06] px-4 py-3">
+                <div className="rounded-2xl bg-wash-peach px-4 py-3.5 shadow-soft">
                   <p className="text-[12px] font-semibold text-warning">
                     {upcoming.length} payment{upcoming.length > 1 ? "s" : ""} due in the next 7 days
                   </p>
@@ -155,7 +155,7 @@ export function FinancialPulse({
               <p className="text-[13px] text-ink-3">No {drill.label.toLowerCase()} records.</p>
             ) : (
               drill.rows.map((r, i) => (
-                <li key={i} className="flex items-center justify-between gap-3 rounded-xl border border-navy/8 bg-white/70 px-4 py-3">
+                <li key={i} className="flex items-center justify-between gap-3 rounded-2xl bg-navy/[0.03] px-4 py-3 ring-1 ring-inset ring-navy/[0.05]">
                   <div className="min-w-0">
                     <p className="truncate text-[13px] font-semibold text-navy-deep">{r.title}</p>
                     <p className="text-[12px] text-ink-3">
@@ -187,12 +187,17 @@ function Tile({
   sub?: string;
   tone: "success" | "warning" | "danger";
 }) {
-  const map = { success: "text-success", warning: "text-warning", danger: "text-danger" } as const;
+  const map = {
+    success: { text: "text-success", wash: "bg-wash-mint" },
+    warning: { text: "text-[#9A5414]", wash: "bg-wash-peach" },
+    danger: { text: "text-danger", wash: "bg-[#FCEAE9]" },
+  } as const;
+  const t = map[tone];
   return (
-    <div className="rounded-xl border border-navy/8 bg-white/70 px-3 py-3">
-      <p className={`nums text-[16px] font-bold ${map[tone]}`}>{value}</p>
-      {sub && <p className="nums text-[11px] text-ink-3">{sub}</p>}
-      <p className="mt-0.5 text-[11px] text-ink-3">{label}</p>
+    <div className={`rounded-2xl ${t.wash} px-3.5 py-4 shadow-soft`}>
+      <p className={`nums text-[17px] font-extrabold leading-tight ${t.text}`}>{value}</p>
+      {sub && <p className="nums text-[11px] text-navy-deep/55">{sub}</p>}
+      <p className="mt-1 text-[11px] font-semibold text-navy-deep/55">{label}</p>
     </div>
   );
 }

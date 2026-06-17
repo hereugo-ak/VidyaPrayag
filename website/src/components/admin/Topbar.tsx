@@ -49,7 +49,7 @@ export function Topbar({
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-navy/8 bg-white/80 px-4 backdrop-blur-md md:px-6">
+    <header className="glass sticky top-0 z-30 flex h-16 items-center gap-3 px-4 shadow-[0_1px_0_0_rgba(38,35,77,0.04),0_8px_24px_-20px_rgba(38,35,77,0.25)] md:px-8">
       <button
         onClick={onMenu}
         className="rounded-lg p-2 text-ink-2 hover:bg-navy/5 lg:hidden"
@@ -64,7 +64,7 @@ export function Topbar({
 
       <Link
         href="/"
-        className="hidden items-center gap-1.5 rounded-full border border-navy/12 bg-white/70 px-3.5 py-1.5 text-[13px] font-semibold text-ink-2 transition-colors hover:border-navy/25 hover:text-navy-deep sm:inline-flex"
+        className="hidden items-center gap-1.5 rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-ink-2 shadow-soft ring-1 ring-navy/[0.06] transition-all hover:-translate-y-0.5 hover:text-navy-deep sm:inline-flex"
       >
         Open site <IconExternal width={14} height={14} />
       </Link>
@@ -86,8 +86,8 @@ export function Topbar({
         </button>
 
         {open && (
-          <div className="absolute right-0 mt-2 w-[340px] overflow-hidden rounded-2xl border border-navy/10 bg-white shadow-cardHover">
-            <div className="flex items-center justify-between border-b border-navy/8 px-4 py-3">
+          <div className="absolute right-0 mt-2 w-[340px] overflow-hidden rounded-3xl bg-white shadow-cardHover ring-1 ring-navy/[0.05]">
+            <div className="flex items-center justify-between border-b border-navy/[0.06] px-4 py-3">
               <p className="text-[14px] font-bold text-navy-deep">Notifications</p>
               {unread > 0 && (
                 <button
