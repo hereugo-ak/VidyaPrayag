@@ -21,7 +21,7 @@ const SITE_URL = "https://enrollplus.app";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Enroll+, The operating system for your school",
+    default: "Enroll+, The OS for your campus",
     template: "%s · Enroll+",
   },
   description:
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     "Enroll+",
   ],
   openGraph: {
-    title: "Enroll+, The operating system for your school",
+    title: "Enroll+, The OS for your campus",
     description:
       "One platform connecting your office, your teachers, and every parent. Onboard your school in minutes.",
     url: SITE_URL,
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Enroll+, The operating system for your school",
+    title: "Enroll+, The OS for your campus",
     description:
       "One platform connecting your office, your teachers, and every parent.",
   },

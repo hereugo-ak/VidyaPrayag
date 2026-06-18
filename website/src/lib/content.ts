@@ -6,7 +6,7 @@
 
 export const BRAND = {
   name: "Enroll+",
-  tagline: "The operating system for your school.",
+  tagline: "The OS for your campus.",
   // Derived from LandingRouting defaults + the product's positioning.
   subtagline:
     "One platform connecting your office, your teachers, and every parent: attendance, results, fees, and messaging, in real time.",
@@ -187,11 +187,76 @@ export const ABOUT = {
   },
 };
 
+// PARENTS PAGE, the dedicated /parents experience. Editorial, on-brand copy
+// derived from the real parent feature set (ParentHome, ParentAcademics,
+// ParentAttendanceCalendar, ParentFees, ParentLeave, ParentMessages). Every
+// promise here maps to a screen/endpoint that actually ships.
+export const PARENTS_PAGE = {
+  hero: {
+    eyebrow: "For parents",
+    title: "Their whole school day,",
+    titleAccent: "in your pocket.",
+    lede:
+      "Enroll+ for parents is the calm, real-time window into your child's school day, attendance the moment it's marked, results the day they're published, fees without the front-office queue, and messages from the people who actually teach your child.",
+  },
+  // Feature pillars, paired with the in-app surface each one lives on.
+  pillars: [
+    {
+      key: "attendance",
+      title: "Attendance, the same morning",
+      body:
+        "When the class teacher marks the register, the update is on your phone within seconds, not at the end of the day, not in a paper diary.",
+      surface: "Attendance",
+      detail: "Marked 8:42 AM · Present",
+    },
+    {
+      key: "results",
+      title: "Results you can actually read",
+      body:
+        "Published results, subject by subject, with a calm term-over-term trend. Not a paper card you see twice a year.",
+      surface: "Maths · Unit test",
+      detail: "Published · Subject breakdown ready",
+    },
+    {
+      key: "fees",
+      title: "Fees without the queue",
+      body:
+        "Exactly what's paid, what's due, what's overdue, with a clean line-item breakdown per child. No more standing at the office window.",
+      surface: "Term fees",
+      detail: "Due Apr 5 · Clear line-item view",
+    },
+    {
+      key: "messages",
+      title: "Leave and messages, two taps",
+      body:
+        "Apply for your child's leave straight to their class teacher and the administration, and read messages from the people who actually teach them.",
+      surface: "Messages",
+      detail: "Class teacher · PTM Saturday 10:30 AM",
+    },
+  ],
+  // App preview band, "the parents portal in Enroll+ app, coming soon".
+  app: {
+    eyebrow: "The parents portal",
+    title: "One tap from your home screen",
+    titleAccent: "to their whole day.",
+    lede:
+      "Open the app and your child's morning is already there, attendance, the latest published result, what fees are due, and any message meant for you. No menus to dig through, no logins to chase.",
+    bullets: [
+      "Attendance, the same morning",
+      "Results you can actually read",
+      "Fees without the queue",
+      "Leave & messages, two taps",
+    ],
+    note:
+      "Parents portal in Enroll+ app, coming soon. We'll let your school know the moment it's live.",
+  },
+} as const;
+
 export const FOOTER_NAV = {
   Product: [
     { label: "For Schools", href: "/features#schools" },
     { label: "For Teachers", href: "/features#teachers" },
-    { label: "For Parents", href: "/features#parents" },
+    { label: "For Parents", href: "/parents" },
     { label: "Pricing", href: "/pricing" },
   ],
   Company: [
