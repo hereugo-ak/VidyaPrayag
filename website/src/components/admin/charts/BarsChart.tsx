@@ -28,13 +28,13 @@ function BarTooltip({
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="rounded-xl border border-navy/10 bg-white px-3 py-2 shadow-cardHover">
-      <p className="text-[12px] font-semibold text-navy-deep">{d.label}</p>
-      <p className="nums text-[15px] font-bold text-accent-deep">
+    <div className="rounded-2xl bg-navy-deep px-3.5 py-2.5 shadow-cardHover">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-white/55">{d.label}</p>
+      <p className="nums text-[15px] font-extrabold text-white">
         {payload[0].value}
         {unit}
       </p>
-      {d.meta && <p className="text-[11px] text-ink-3">{d.meta}</p>}
+      {d.meta && <p className="text-[11px] text-white/55">{d.meta}</p>}
     </div>
   );
 }
@@ -59,6 +59,20 @@ export function BarsChart({
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }} barCategoryGap="28%">
+        <defs>
+          <linearGradient id="barAccent" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#8B7EE8" />
+            <stop offset="100%" stopColor="#6C5CE0" />
+          </linearGradient>
+          <linearGradient id="barTeal" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#5ED0C0" />
+            <stop offset="100%" stopColor="#3CB9A9" />
+          </linearGradient>
+          <linearGradient id="barPeach" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#FFB59B" />
+            <stop offset="100%" stopColor="#FF8A65" />
+          </linearGradient>
+        </defs>
         <XAxis
           dataKey="label"
           tickLine={false}
@@ -69,24 +83,26 @@ export function BarsChart({
         <YAxis
           tickLine={false}
           axisLine={false}
-          tick={{ fontSize: 11, fill: "#6D7A77" }}
+          tick={{ fontSize: 11, fill: "#9AA6A3" }}
           width={42}
           domain={[0, max]}
           tickFormatter={(v) => `${v}${unit}`}
         />
-        <Tooltip content={<BarTooltip unit={unit} />} cursor={{ fill: "#6C5CE0", fillOpacity: 0.06 }} />
+        <Tooltip content={<BarTooltip unit={unit} />} cursor={{ fill: "#6C5CE0", fillOpacity: 0.05 }} />
         <Bar
           dataKey="value"
-          radius={[6, 6, 0, 0]}
-          animationDuration={600}
+          radius={[10, 10, 4, 4]}
+          maxBarSize={48}
+          animationDuration={650}
           onClick={(d) => onSelect?.(d as unknown as BarDatum)}
           cursor={onSelect ? "pointer" : "default"}
         >
           {data.map((d, i) => {
             const ratio = Math.min(1, d.value / max);
-            // teal→accent gradient by value, both from the system palette
-            const color = ratio >= 0.85 ? "#3CB9A9" : ratio >= 0.6 ? "#6C5CE0" : "#B3651A";
-            return <Cell key={i} fill={color} fillOpacity={0.85} />;
+            // soft pastel pill bars — teal (strong) / accent (mid) / peach (low)
+            const fill =
+              ratio >= 0.85 ? "url(#barTeal)" : ratio >= 0.6 ? "url(#barAccent)" : "url(#barPeach)";
+            return <Cell key={i} fill={fill} />;
           })}
         </Bar>
       </BarChart>

@@ -78,6 +78,7 @@ import com.littlebridge.vidyaprayag.feature.school.schoolIntelligenceRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolProfileRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRecordsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolStudentsRouting
+import com.littlebridge.vidyaprayag.feature.school.schoolTimetableRouting
 import com.littlebridge.vidyaprayag.feature.school.nonTeachingStaffRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRouting
 import com.littlebridge.vidyaprayag.feature.school.teacherAssignmentRouting
@@ -250,6 +251,7 @@ fun Application.module() {
         schoolStudentsRouting()      // /api/v1/school/students[…] + teachers/{id} — RA-45 student roster + student/teacher profile (school-scoped)
         nonTeachingStaffRouting()    // /api/v1/school/staff[…] — RA-S17 non-teaching-staff vertical (school-scoped CRUD)
         schoolRecordsRouting()       // /api/v1/school/{attendance/summary,marks/summary,fees/ledger} — RA-52 admin Records rollups (school-scoped reads)
+        schoolTimetableRouting()     // /api/v1/school/timetable — school-wide weekly schedule (all classes) from teacher_periods, for the Command Center calendar (read-only, additive)
         mediaRouting()               // /api/v1/school/media/upload[…] — REAL binary uploads → Supabase Storage (kills URL placeholders)
 
         // Teacher vertical (master rebuild doc Step 7 / gap G1)

@@ -18,6 +18,12 @@ const config: Config = {
           tint: "#F1EFFB",
         },
         cream: "#F5F5F3",
+        // Soft pastel data fills (sparingly, one per surface — reference language)
+        peach: { DEFAULT: "#FF8A65", soft: "#FFE9E1" },
+        sky: { DEFAULT: "#6C8DF5", soft: "#E6EEFD" },
+        mint: { DEFAULT: "#3CB9A9", soft: "#DFF4EF" },
+        // canvas behind the floating cards (cool off-white lavender)
+        canvas: "#F4F3FA",
         // Brand, navy (primary ink + primary CTA)
         navy: {
           DEFAULT: "#26234D",
@@ -94,14 +100,55 @@ const config: Config = {
         shell: "1200px",
       },
       boxShadow: {
-        // Navy-tinted elevation system (app §13.1)
-        card: "0 1px 2px rgba(38,35,77,0.04), 0 8px 24px rgba(38,35,77,0.06)",
-        cardHover: "0 2px 4px rgba(38,35,77,0.06), 0 18px 40px rgba(38,35,77,0.12)",
-        cta: "0 8px 24px rgba(38,35,77,0.18)",
-        ctaHover: "0 14px 34px rgba(38,35,77,0.26)",
+        /**
+         * Pillowy elevation system — tuned HARD to the premium reference decks.
+         * Cards are borderless and CLEARLY float on the soft canvas: a tight
+         * contact shadow grounds the card, a mid layer reads at a glance, and a
+         * wide diffuse halo gives the soft "resting on velvet" depth. Earlier
+         * values were too timid (heavy negative spread + 3% opacity) so the
+         * elevation vanished on the light lavender canvas and the cards read as
+         * flat squares. These are intentionally stronger and unmistakable.
+         */
+        soft: "0 2px 6px -2px rgba(38,35,77,0.06), 0 12px 28px -10px rgba(38,35,77,0.12)",
+        card: "0 2px 6px -1px rgba(38,35,77,0.07), 0 10px 24px -8px rgba(38,35,77,0.12), 0 28px 56px -24px rgba(38,35,77,0.22)",
+        cardHover: "0 4px 10px -2px rgba(38,35,77,0.10), 0 18px 36px -10px rgba(38,35,77,0.18), 0 40px 72px -28px rgba(38,35,77,0.30)",
+        pillow: "0 3px 8px -2px rgba(38,35,77,0.07), 0 30px 64px -24px rgba(38,35,77,0.26)",
+        float: "0 10px 22px -8px rgba(108,92,224,0.34), 0 28px 56px -22px rgba(108,92,224,0.24)",
+        cta: "0 8px 24px -4px rgba(26,24,56,0.32), 0 2px 6px -1px rgba(26,24,56,0.20)",
+        ctaHover: "0 14px 34px -6px rgba(26,24,56,0.42), 0 4px 10px -2px rgba(26,24,56,0.26)",
+        // dark high-contrast pill (active segmented tab / nav)
+        pill: "0 8px 20px -6px rgba(26,24,56,0.50), 0 2px 6px -1px rgba(26,24,56,0.30)",
+        inset: "inset 0 1px 0 0 rgba(255,255,255,0.6)",
       },
       borderRadius: {
-        xl2: "1.25rem",
+        xl2: "1.25rem", // 20px
+        "3xl": "1.5rem", // 24px
+        "4xl": "1.75rem", // 28px — reference card radius
+        "5xl": "2rem", // 32px — large surfaces
+        "6xl": "2.25rem", // 36px — the unified app-surface wrapper
+      },
+      backgroundImage: {
+        // Soft pastel washes lifted from the reference designs (peach/lavender/mint)
+        "wash-peach": "linear-gradient(135deg, #FFE9E1 0%, #FFD9CE 100%)",
+        "wash-lavender": "linear-gradient(135deg, #ECE9FE 0%, #DDD6FB 100%)",
+        "wash-mint": "linear-gradient(135deg, #DFF4EF 0%, #C9EBE3 100%)",
+        "wash-sky": "linear-gradient(135deg, #E6EEFD 0%, #D6E3FB 100%)",
+        // signature aurora behind the greeting hero
+        "hero-aurora":
+          "radial-gradient(120% 140% at 0% 0%, rgba(108,92,224,0.55) 0%, rgba(108,92,224,0) 55%), radial-gradient(120% 140% at 100% 0%, rgba(60,185,169,0.40) 0%, rgba(60,185,169,0) 55%), linear-gradient(135deg, #211E47 0%, #2B2756 55%, #1A1838 100%)",
+      },
+      keyframes: {
+        shimmer: {
+          "100%": { transform: "translateX(100%)" },
+        },
+        floaty: {
+          "0%,100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-4px)" },
+        },
+      },
+      animation: {
+        shimmer: "shimmer 1.6s infinite",
+        floaty: "floaty 5s ease-in-out infinite",
       },
       transitionTimingFunction: {
         "out-cubic": "cubic-bezier(0.16, 1, 0.3, 1)",

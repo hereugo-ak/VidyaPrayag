@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAdminAuth } from "@/lib/admin/session";
 import { ADMIN_NAV } from "@/lib/admin/nav";
 import { EnrollMark } from "@/components/ui/Logo";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
+import { SidebarProvider, useSidebar } from "./SidebarContext";
 
 const SCHOOL_ROLES = new Set(["school_admin", "school_staff", "admin"]);
 
@@ -24,10 +25,18 @@ function titleForPath(pathname: string): string {
  *  - Authenticated school role → render the dashboard chrome.
  */
 export function AdminShell({ children }: { children: React.ReactNode }) {
+  return (
+    <SidebarProvider>
+      <AdminShellInner>{children}</AdminShellInner>
+    </SidebarProvider>
+  );
+}
+
+function AdminShellInner({ children }: { children: React.ReactNode }) {
   const { session, ready } = useAdminAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const { collapsed, mobileOpen, setMobileOpen } = useSidebar();
 
   useEffect(() => {
     if (!ready) return;
@@ -42,21 +51,21 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }, [ready, session, router, pathname]);
 
   // Close the drawer on route change.
-  useEffect(() => setMenuOpen(false), [pathname]);
+  useEffect(() => setMobileOpen(false), [pathname, setMobileOpen]);
 
   // A11y: Escape closes the mobile drawer.
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!mobileOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMenuOpen(false);
+      if (e.key === "Escape") setMobileOpen(false);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [menuOpen]);
+  }, [mobileOpen, setMobileOpen]);
 
   if (!ready || !session || !SCHOOL_ROLES.has(session.role)) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-lavender-soft">
+      <div className="admin-canvas flex min-h-screen items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <EnrollMark className="h-12 w-12 animate-pulse" />
           <p className="text-sm font-medium text-ink-3">Loading your dashboard…</p>
@@ -66,17 +75,24 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-lavender-soft">
+    <div className="admin-canvas min-h-screen">
       <a
         href="#admin-content"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-navy-deep focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
       >
         Skip to content
       </a>
-      <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
-      <div className="lg:pl-[264px]">
-        <Topbar title={titleForPath(pathname)} onMenu={() => setMenuOpen(true)} />
-        <main id="admin-content" className="mx-auto w-full max-w-[1320px] px-4 py-6 md:px-6 md:py-8">
+      <Sidebar />
+      <div
+        className={`transition-[padding] duration-300 ease-out-cubic ${
+          collapsed ? "lg:pl-[88px]" : "lg:pl-[268px]"
+        }`}
+      >
+        <Topbar title={titleForPath(pathname)} />
+        <main
+          id="admin-content"
+          className="mx-auto w-full max-w-[1340px] px-4 pb-12 pt-5 md:px-8 md:pb-16 md:pt-7"
+        >
           {children}
         </main>
       </div>
