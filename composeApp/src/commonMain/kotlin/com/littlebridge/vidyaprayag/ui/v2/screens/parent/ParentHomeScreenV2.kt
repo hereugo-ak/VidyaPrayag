@@ -62,6 +62,13 @@ import org.koin.compose.viewmodel.koinViewModel
  * aggregates every real backend read scoped to the shared selected child
  * (RA-S05 [SelectedChildHolder]) and derives the live, clock-driven "today" state.
  *
+ * NO FLOATING TOASTS (LAW): the website reference deliberately decorates its marketing
+ * mockup with two floating glass plates ("Marked present", "Maths result published").
+ * Those are presentation-only flourishes and are intentionally NOT reproduced here — the
+ * app surfaces that same information natively, inside the attendance + results cards and
+ * the Activity feed (the bell), never as transient floating popups/toasts overlaid on the
+ * dashboard. Do not add Snackbar/Toast/floating-notification overlays to this surface.
+ *
  * Commit 2 lays the shell: the top bar (child switcher), the time-aware greeting +
  * contextual line referencing the selected child, and the notification bell that
  * opens the Activity feed. The feature cards land in subsequent commits.
