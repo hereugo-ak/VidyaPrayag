@@ -358,14 +358,15 @@ private fun StatePill(label: String, bg: Color, fg: Color) {
 }
 
 /**
- * The month attendance ring — a violet→teal sweep over a soft track, percent centred,
+ * The month attendance ring — a violet sweep over a soft track, percent centred,
  * animated in with a spring so the card feels alive on load.
  */
 @Composable
 private fun AttendanceRing(percent: Int, modifier: Modifier = Modifier) {
     val c = VTheme.colors
     val sweep by animateFloatAsState(targetValue = percent / 100f, label = "attendanceSweep")
-    val gradient = Brush.linearGradient(listOf(c.accent, c.teal))
+    // RA-PP-THEME: on-palette violet sweep matching the reference ring (was violet→teal).
+    val gradient = Brush.linearGradient(listOf(c.accentSoft, c.accent))
     val trackColor = c.accent.copy(alpha = 0.12f)
 
     Box(modifier, contentAlignment = Alignment.Center) {

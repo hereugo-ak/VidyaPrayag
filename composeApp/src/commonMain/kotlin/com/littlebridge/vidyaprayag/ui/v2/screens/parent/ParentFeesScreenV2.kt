@@ -117,7 +117,8 @@ private fun ParentFeesContent(
                         Box(
                             Modifier
                                 .clip(RoundedCornerShape(999.dp))
-                                .background(c.teal)
+                                // RA-PP-THEME: website-accent violet CTA (was green teal).
+                                .background(c.accent)
                                 .padding(horizontal = 16.dp, vertical = 10.dp),
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -165,7 +166,7 @@ private fun ParentFeesContent(
 
             Text(
                 "Have a question about your fees? Message the school →",
-                style = VTheme.type.caption.colored(c.tealDeep).copy(fontWeight = FontWeight.SemiBold),
+                style = VTheme.type.caption.colored(c.accentDeep).copy(fontWeight = FontWeight.SemiBold),
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             )
         }

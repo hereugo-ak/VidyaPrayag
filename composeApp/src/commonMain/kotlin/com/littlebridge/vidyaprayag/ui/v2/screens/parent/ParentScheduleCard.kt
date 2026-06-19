@@ -187,7 +187,9 @@ private fun PeriodRow(p: LivePeriod) {
         }
         // status rail
         VStatusDot(
-            color = if (isNow) c.accent else if (isFinished) c.placeholder else c.teal,
+            // RA-PP-THEME: on-palette schedule rail — now = strong violet accent,
+            // upcoming = soft violet, finished = muted (was green teal for upcoming).
+            color = if (isNow) c.accent else if (isFinished) c.placeholder else c.accentSoft,
             size = 7.dp,
         )
         // subject + meta

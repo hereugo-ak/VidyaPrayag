@@ -436,7 +436,7 @@ private fun ParentMessageBubble(msg: ParentMessageDto) {
         Column(
             Modifier
                 .clip(bubbleShape)
-                .background(if (isMine) c.teal.copy(alpha = 0.16f) else c.cream)
+                .background(if (isMine) c.accent.copy(alpha = 0.16f) else c.cream)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
             Text(

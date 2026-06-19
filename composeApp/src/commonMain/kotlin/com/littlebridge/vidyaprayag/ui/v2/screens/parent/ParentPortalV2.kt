@@ -192,7 +192,14 @@ fun ParentPortalV2(
             }
         },
         bottomBar = {
-            VBottomNav(items = items, selected = tab, onSelect = { tab = it })
+            // RA-PP-THEME: Parents Portal migrates to the website's violet accent for
+            // active nav states (the reference dashboard uses #6C5CE0/#544AB8, not green).
+            VBottomNav(
+                items = items,
+                selected = tab,
+                onSelect = { tab = it },
+                activeColor = VTheme.colors.accentDeep,
+            )
         },
     ) { _ ->
         Box(Modifier.fillMaxSize()) {

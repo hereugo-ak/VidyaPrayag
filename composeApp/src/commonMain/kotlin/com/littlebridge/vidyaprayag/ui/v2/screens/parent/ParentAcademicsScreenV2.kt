@@ -155,8 +155,8 @@ private fun ParentAcademicsContent(
                     Box(
                         Modifier
                             .clip(RoundedCornerShape(20.dp))
-                            .background(if (selected) c.tealDeep else c.cream)
-                            .border(1.dp, if (selected) c.tealDeep else c.hairline, RoundedCornerShape(20.dp))
+                            .background(if (selected) c.accentDeep else c.cream)
+                            .border(1.dp, if (selected) c.accentDeep else c.hairline, RoundedCornerShape(20.dp))
                             .clickable { onSelectChild(child.id) }
                             .padding(horizontal = 14.dp, vertical = 8.dp),
                     ) {
