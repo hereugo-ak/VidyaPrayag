@@ -128,9 +128,11 @@ fun ParentResultsCard(
                     if (delta != null) {
                         Spacer(Modifier.width(6.dp))
                         val up = delta >= 0
+                        // No green on the parent surface — a positive trend reads in the brand
+                        // violet (accentDeep); a regression keeps the universal danger red.
                         Text(
                             "${if (up) "+" else ""}$delta vs last",
-                            style = VTheme.type.label.colored(if (up) c.successInk else c.dangerInk)
+                            style = VTheme.type.label.colored(if (up) c.accentDeep else c.dangerInk)
                                 .copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
                         )
                     }
@@ -269,7 +271,9 @@ fun ParentFeesCard(
                 )
                 Text(
                     if (overdue > 0) "Outstanding" else "Nothing due",
-                    style = VTheme.type.label.colored(if (overdue > 0) c.warningInk else c.successInk)
+                    // No green on the parent surface — a clear ledger reads as calm neutral ink,
+                    // an overdue balance keeps the warning amber.
+                    style = VTheme.type.label.colored(if (overdue > 0) c.warningInk else c.ink3)
                         .copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
                 )
             }
