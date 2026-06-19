@@ -148,7 +148,8 @@ private fun Sheet(
                 } else {
                     coveredToday.forEach { u ->
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            VStatusDot(color = c.successInk, size = 7.dp)
+                            // NO-GREEN LAW (parent surface): covered-topic markers read in brand violet.
+                            VStatusDot(color = c.accent, size = 7.dp)
                             Column {
                                 Text(u.title, style = VTheme.type.bodyStrong.colored(c.navyDeep).copy(fontSize = 13.sp))
                                 Text(u.subject, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))

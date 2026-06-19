@@ -58,7 +58,8 @@ fun ParentCoveredCard(
                     style = VTheme.type.label.colored(c.ink3).copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
                 )
             }
-            if (!schoolDayEnded) VStatusDot(color = c.successInk, size = 6.dp)
+            // NO-GREEN LAW (parent surface): the "live" pulse reads in the brand accent.
+            if (!schoolDayEnded) VStatusDot(color = c.accent, size = 6.dp)
         }
 
         Spacer(Modifier.height(8.dp))
