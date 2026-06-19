@@ -152,16 +152,21 @@ fun ParentPortalV2(
     VScreenScaffold(
         modifier = modifier,
         topBar = {
-            ParentHeader(
-                childName = progress.childName,
-                childSubline = progress.journeyDescription.ifBlank { "Level ${progress.currentLevel}" },
-                // RA-S06: real account name (RA-S03 pref) + real unread count.
-                accountName = progress.accountName,
-                unreadCount = notifications.unreadCount,
-                onOpenNotifications = { overlay = ParentOverlay.Notifications },
-                onOpenMessages = { overlay = ParentOverlay.Messages },
-                onExit = { overlay = ParentOverlay.Profile },
-            )
+            // The rebuilt Home dashboard renders its OWN greeting hero as the top bar
+            // (a faithful port of the website reference), so the shared portal header is
+            // suppressed on Home to avoid a duplicate bar. Every other tab keeps it.
+            if (tab != "home") {
+                ParentHeader(
+                    childName = progress.childName,
+                    childSubline = progress.journeyDescription.ifBlank { "Level ${progress.currentLevel}" },
+                    // RA-S06: real account name (RA-S03 pref) + real unread count.
+                    accountName = progress.accountName,
+                    unreadCount = notifications.unreadCount,
+                    onOpenNotifications = { overlay = ParentOverlay.Notifications },
+                    onOpenMessages = { overlay = ParentOverlay.Messages },
+                    onExit = { overlay = ParentOverlay.Profile },
+                )
+            }
         },
         bottomBar = {
             VBottomNav(items = items, selected = tab, onSelect = { tab = it })
@@ -169,7 +174,10 @@ fun ParentPortalV2(
     ) { _ ->
         Box(Modifier.fillMaxSize()) {
             when (tab) {
-                "home" -> ParentHomeScreenV2(onDiscoverSchools = { overlay = ParentOverlay.Discovery })
+                "home" -> ParentHomeScreenV2(
+                    onDiscoverSchools = { overlay = ParentOverlay.Discovery },
+                    onOpenNotifications = { overlay = ParentOverlay.Notifications },
+                )
                 "academics" -> ParentAcademicsScreenV2(onOpenLeave = { overlay = ParentOverlay.Leave })
                 "fees" -> ParentFeesScreenV2()
                 "activity" -> ParentActivityScreenV2()

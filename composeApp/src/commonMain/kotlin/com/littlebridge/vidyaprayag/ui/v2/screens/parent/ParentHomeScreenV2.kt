@@ -1,8 +1,9 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.parent
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,70 +13,89 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentHomeState
-import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentHomeViewModel
+import com.littlebridge.vidyaprayag.feature.parent.domain.model.DashboardChildSummary
+import com.littlebridge.vidyaprayag.feature.parent.presentation.AttendanceDayState
+import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentDashboardState
+import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentDashboardViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
-import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
-import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
-import com.littlebridge.vidyaprayag.ui.v2.components.VCard
-import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
-import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
+import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
+import com.littlebridge.vidyaprayag.ui.v2.components.VStatusDot
 import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import com.littlebridge.vidyaprayag.util.nowMinutesOfDay
+import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * ParentHomeScreenV2 — a faithful copy of `Parent.tsx → ParentHome`.
+ * ParentHomeScreenV2 — the rebuilt parent dashboard, a faithful Compose port of the
+ * website reference (`website/.../parents/PhoneMockup.tsx`): a calm lavender canvas
+ * with a greeting hero (portal eyebrow → bell → child identity), then a stack of
+ * live feature cards (attendance, schedule, covered-today, results, fees).
  *
- * Renders the greeting, the gradient child-hero card (avatar + name + level + overall-progress bar),
- * actionable alerts (e.g. overdue fees), and featured schools.
+ * Wired to the new [ParentDashboardViewModel] — the single source of truth that
+ * aggregates every real backend read scoped to the shared selected child
+ * (RA-S05 [SelectedChildHolder]) and derives the live, clock-driven "today" state.
  *
- * **Wired to the real [ParentHomeViewModel]** (`shared/`) → `ParentRepository.getDashboard` →
- * `GET /api/v1/parent/dashboard` — the primary parent "handshake" endpoint.
- *
- * Audit findings **J** (§8.1) + **SHAREDVM** (§5.4): this tab previously borrowed the academics
- * `TrackProgressViewModel`, leaving the richer `/dashboard` endpoint orphaned and coupling Home's
- * state to the Academics tab. It now has its own dedicated VM and real source of truth.
+ * Commit 2 lays the shell: the top bar (child switcher), the time-aware greeting +
+ * contextual line referencing the selected child, and the notification bell that
+ * opens the Activity feed. The feature cards land in subsequent commits.
  */
 @Composable
 fun ParentHomeScreenV2(
     modifier: Modifier = Modifier,
     onDiscoverSchools: () -> Unit = {},
-    viewModel: ParentHomeViewModel = koinViewModel(),
+    onOpenNotifications: () -> Unit = {},
+    viewModel: ParentDashboardViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
-    ParentHomeContent(
+
+    // Live clock — re-derive the time-aware greeting + period/end-of-day fields each minute
+    // so the dashboard reads live as the school day progresses (no manual refresh).
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000L)
+            viewModel.refreshLiveClock()
+        }
+    }
+
+    ParentDashboardContent(
         state = state,
         onRetry = viewModel::load,
         onSelectChild = viewModel::selectChild,
-        onDiscoverSchools = onDiscoverSchools,
+        onOpenNotifications = onOpenNotifications,
         modifier = modifier,
     )
 }
 
-/** Stateless body — also used by @Preview with seeded state (no MockV2 in the live path). */
+/** Stateless body. */
 @Composable
-private fun ParentHomeContent(
-    state: ParentHomeState,
+private fun ParentDashboardContent(
+    state: ParentDashboardState,
     onRetry: () -> Unit,
     onSelectChild: (String) -> Unit,
-    onDiscoverSchools: () -> Unit,
+    onOpenNotifications: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -84,148 +104,44 @@ private fun ParentHomeContent(
     Column(
         modifier
             .fillMaxSize()
+            .background(c.lavender)
+            .statusBarsPadding()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
-            .padding(top = 20.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(d.md),
+            .padding(horizontal = 16.dp)
+            .padding(top = 12.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(d.sm),
     ) {
         VStateHost(
             loading = state.isLoading,
             error = state.error,
-            isEmpty = state.childSummary == null &&
-                state.alerts.isEmpty() &&
-                state.featuredSchools.isEmpty(),
+            isEmpty = state.children.isEmpty(),
             emptyTitle = "No child linked yet",
             emptyBody = "Link your child to see their daily journey and progress.",
             onRetry = onRetry,
             skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonDashboard() },
         ) {
-            // ── Greeting ────────────────────────────────────────────────────────
-            if (state.greeting.isNotBlank()) {
-                Text(state.greeting, style = VTheme.type.h2.colored(c.ink))
-            }
+            val child = state.selectedChild
 
-            // ── Child switcher (RA-31: only when 2+ children are linked) ─────────
+            // ── Greeting hero ───────────────────────────────────────────────────
+            GreetingHero(
+                child = child,
+                className = state.timetable?.className.orEmpty(),
+                todayState = state.today.state,
+                contextLine = contextLineFor(state),
+                onOpenNotifications = onOpenNotifications,
+            )
+
+            // ── Child switcher (only when 2+ children are linked) ───────────────
             if (state.children.size > 1) {
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    state.children.forEach { ch ->
+                Spacer(Modifier.height(4.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(state.children, key = { it.id }) { ch ->
                         ChildChip(
                             name = ch.name.ifBlank { "—" },
+                            src = ch.profilePic,
                             selected = ch.id == state.selectedChildId,
                             onClick = { onSelectChild(ch.id) },
                         )
-                    }
-                }
-            }
-
-            // ── Child hero ──────────────────────────────────────────────────────
-            val child = state.childSummary
-            if (child != null) {
-                VCard(padding = 0.dp) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .background(
-                                Brush.linearGradient(
-                                    colors = if (c.isNight) listOf(c.cream, c.card)
-                                    else listOf(Color(0xFFF6F1FF), Color(0xFFE8F7F3)),
-                                ),
-                            )
-                            .padding(20.dp),
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            VAvatar(name = child.name.ifBlank { "?" }, src = child.profilePic, size = 68.dp, ring = true)
-                            Column(Modifier.weight(1f)) {
-                                Text(child.name.ifBlank { "—" }, style = VTheme.type.h2.colored(c.ink))
-                                Text(
-                                    "Attendance: ${child.attendanceStatus}",
-                                    style = VTheme.type.caption.colored(c.ink2),
-                                )
-                                Spacer(Modifier.height(8.dp))
-                                VBadge(text = "Level ${child.currentLevel}", tone = VBadgeTone.Arctic)
-                            }
-                        }
-                    }
-                    // overall-progress strip
-                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
-                            VLabel("Overall progress")
-                            Text(
-                                "${(child.overallProgress * 100.0).toInt()}%",
-                                style = VTheme.type.dataLg.colored(c.navy).copy(fontWeight = FontWeight.Bold, fontSize = 24.sp),
-                            )
-                        }
-                        VProgressBar(value = (child.overallProgress * 100.0).toFloat())
-                    }
-                }
-            }
-
-            // ── Alerts (overdue fees, info) ─────────────────────────────────────
-            if (state.alerts.isNotEmpty()) {
-                VCard {
-                    VLabel("Alerts")
-                    Spacer(Modifier.height(8.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        state.alerts.forEach { a ->
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Text(a.title, style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 13.sp))
-                                VBadge(
-                                    text = a.value,
-                                    tone = when (a.type.uppercase()) {
-                                        "CRITICAL" -> VBadgeTone.Danger
-                                        "WARNING" -> VBadgeTone.Warning
-                                        else -> VBadgeTone.Neutral
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ── Featured schools ────────────────────────────────────────────────
-            if (state.featuredSchools.isNotEmpty()) {
-                VCard {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        VLabel("Featured schools")
-                        // Opens the full Discovery marketplace as a portal overlay.
-                        Text(
-                            "View all ›",
-                            style = VTheme.type.caption.colored(c.tealDeep).copy(fontWeight = FontWeight.SemiBold),
-                            modifier = Modifier.clickable { onDiscoverSchools() },
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        state.featuredSchools.forEach { s ->
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                VAvatar(name = s.name, src = s.image, size = 40.dp)
-                                Column(Modifier.weight(1f)) {
-                                    Text(s.name, style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 13.sp))
-                                    Text(s.location, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp))
-                                }
-                                VBadge(text = "★ ${s.rating}", tone = VBadgeTone.Success)
-                            }
-                        }
-                    }
-                    if (state.curationLogic.isNotBlank()) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(state.curationLogic, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))
                     }
                 }
             }
@@ -234,24 +150,137 @@ private fun ParentHomeContent(
 }
 
 /**
- * RA-31: a child selector chip used when a parent has 2+ linked children.
- * Frozen V* primitives + theme tokens only (teal/tealDeep, cream, ink) — no
- * new tokens, no Material defaults.
+ * The greeting hero — mirrors the reference: a portal eyebrow + notification bell on the
+ * top row, then the child's avatar (with a live status badge) + "[Name]'s day" + a real
+ * class subline, and a time-aware contextual line referencing the selected child.
  */
 @Composable
-private fun ChildChip(name: String, selected: Boolean, onClick: () -> Unit) {
+private fun GreetingHero(
+    child: DashboardChildSummary?,
+    className: String,
+    todayState: AttendanceDayState,
+    contextLine: String,
+    onOpenNotifications: () -> Unit,
+) {
     val c = VTheme.colors
-    val (bg, fg) = if (selected) c.teal.copy(alpha = 0.16f) to c.tealDeep else c.cream to c.ink2
+    val name = child?.name?.ifBlank { "Your child" } ?: "Your child"
+    // A truthful status dot — its colour reflects the real resolved today-state.
+    val dotColor = when (todayState) {
+        AttendanceDayState.Present -> c.successInk
+        AttendanceDayState.Late -> c.warningInk
+        AttendanceDayState.Absent -> c.dangerInk
+        AttendanceDayState.Holiday, AttendanceDayState.Vacation, AttendanceDayState.Sunday -> c.accentDeep
+        AttendanceDayState.NoData -> c.ink3
+    }
+
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        // eyebrow + bell
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                "PARENTS PORTAL",
+                style = VTheme.type.label.colored(c.accentDeep).copy(
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.2.sp,
+                    fontSize = 10.sp,
+                ),
+            )
+            val bellInteraction = remember { MutableInteractionSource() }
+            Box(
+                Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(c.card)
+                    .border(1.dp, c.hairline, CircleShape)
+                    .clickable(interactionSource = bellInteraction, indication = null) { onOpenNotifications() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(VIcons.Bell, contentDescription = "Activity", tint = c.navy, modifier = Modifier.size(13.dp))
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box {
+                VAvatar(name = name, src = child?.profilePic, size = 44.dp, ring = true)
+                // live status badge — present = success check, else a neutral dot
+                VStatusDot(
+                    color = dotColor,
+                    size = 12.dp,
+                    ring = true,
+                    modifier = Modifier.align(Alignment.BottomEnd),
+                )
+            }
+            Column {
+                Text(
+                    "${name}'s day",
+                    style = VTheme.type.h3.colored(c.navyDeep).copy(fontWeight = FontWeight.ExtraBold, fontSize = 17.sp),
+                )
+                if (className.isNotBlank()) {
+                    Text(className, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))
+                }
+            }
+        }
+
+        if (contextLine.isNotBlank()) {
+            Spacer(Modifier.height(8.dp))
+            Text(contextLine, style = VTheme.type.body.colored(c.ink2).copy(fontSize = 13.sp))
+        }
+    }
+}
+
+/**
+ * Build the time-aware contextual line referencing the selected child. Time-of-day word
+ * is derived from the live device clock; the rest references the real resolved today-state
+ * so the copy always tells the truth about the child's day.
+ */
+private fun contextLineFor(state: ParentDashboardState): String {
+    val name = state.selectedChild?.name?.takeIf { it.isNotBlank() } ?: "your child"
+    val firstName = name.substringBefore(' ')
+    val partOfDay = when (nowMinutesOfDay() / 60) {
+        in 0..11 -> "morning"
+        in 12..16 -> "afternoon"
+        else -> "evening"
+    }
+    val tail = when (state.today.state) {
+        AttendanceDayState.Present -> "$firstName is marked present today."
+        AttendanceDayState.Late -> "$firstName arrived late today."
+        AttendanceDayState.Absent -> "$firstName is marked absent today."
+        AttendanceDayState.Holiday -> "It's a holiday — ${state.today.label}."
+        AttendanceDayState.Vacation -> "${state.today.label} — enjoy the break."
+        AttendanceDayState.Sunday -> "It's Sunday — no school today."
+        AttendanceDayState.NoData -> "Here's $firstName's day at a glance."
+    }
+    return "Good $partOfDay. $tail"
+}
+
+/**
+ * A child selector chip used when a parent has 2+ linked children. Theme tokens only —
+ * selected uses the lavender accent tint, idle uses the neutral cream surface.
+ */
+@Composable
+private fun ChildChip(name: String, src: String?, selected: Boolean, onClick: () -> Unit) {
+    val c = VTheme.colors
+    val (bg, fg) = if (selected) c.accent.copy(alpha = 0.14f) to c.accentDeep else c.card to c.ink2
+    val interaction = remember { MutableInteractionSource() }
     Row(
         Modifier
             .clip(RoundedCornerShape(999.dp))
             .background(bg)
-            .clickable { onClick() }
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .border(1.dp, if (selected) c.accent.copy(alpha = 0.3f) else c.hairline, RoundedCornerShape(999.dp))
+            .clickable(interactionSource = interaction, indication = null) { onClick() }
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        VAvatar(name = name, size = 24.dp)
-        Text(name, style = VTheme.type.label.colored(fg))
+        VAvatar(name = name, src = src, size = 24.dp)
+        Text(
+            name,
+            style = VTheme.type.label.colored(fg).copy(fontWeight = FontWeight.SemiBold),
+        )
     }
 }
