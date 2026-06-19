@@ -297,7 +297,8 @@ private fun OverviewTab(state: TrackProgressState) {
     VStateHost(
         loading = state.isLoading,
         error = state.error,
-        isEmpty = state.academicCompetencies.isEmpty() && state.emotionalIntelligence.isEmpty(),
+        isEmpty = state.academicCompetencies.isEmpty() &&
+            state.emotionalIntelligence.isEmpty() && state.emotionalDescription.isBlank(),
         emptyTitle = "No progress data yet",
         emptyBody = "Your child's competencies will appear here as teachers update them.",
     ) {
@@ -318,9 +319,16 @@ private fun OverviewTab(state: TrackProgressState) {
             }
         }
 
-        if (state.emotionalIntelligence.isNotEmpty()) {
+        if (state.emotionalIntelligence.isNotEmpty() || state.emotionalDescription.isNotBlank()) {
             VCard {
                 VLabel("Emotional intelligence")
+                if (state.emotionalDescription.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        state.emotionalDescription,
+                        style = VTheme.type.body.colored(c.ink2),
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     state.emotionalIntelligence.forEach { (trait, score) ->

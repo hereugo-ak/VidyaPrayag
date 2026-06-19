@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.feature.parent.presentation.NotificationsViewModel
+import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentDashboardViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.TrackProgressViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBottomNav
@@ -65,12 +66,19 @@ private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, 
 fun ParentPortalV2(
     onLogout: () -> Unit = {},
     modifier: Modifier = Modifier,
+    // RA-PP-FIX: child identity in the shared header now comes from the real
+    // /parent/dashboard child_summary (the single source of truth the rest of the
+    // dashboard already uses), NOT from /track-progress — which never returned a
+    // child name and used to crash on the EI field. `headerViewModel` (track-progress)
+    // still supplies the holistic level/journey copy as a graceful enrichment.
+    dashboardViewModel: ParentDashboardViewModel = koinViewModel(),
     headerViewModel: TrackProgressViewModel = koinViewModel(),
     // RA-S06: drives the header bell's unread dot from the real notifications feed.
     notificationsViewModel: NotificationsViewModel = koinViewModel(),
 ) {
     var tab by remember { mutableStateOf("home") }
     var overlay by remember { mutableStateOf(ParentOverlay.None) }
+    val dashboard by dashboardViewModel.state.collectAsStateV2()
     val progress by headerViewModel.state.collectAsStateV2()
     val notifications by notificationsViewModel.state.collectAsStateV2()
 
@@ -161,9 +169,19 @@ fun ParentPortalV2(
             // (a faithful port of the website reference), so the shared portal header is
             // suppressed on Home to avoid a duplicate bar. Every other tab keeps it.
             if (tab != "home") {
+                val child = dashboard.selectedChild
+                // Prefer the dashboard's authoritative level; fall back to the holistic level.
+                val level = child?.currentLevel?.takeIf { it > 0 } ?: progress.currentLevel
+                val subline = when {
+                    level > 0 && progress.overallProgress > 0f ->
+                        "Level $level · ${(progress.overallProgress * 100).toInt()}% journey"
+                    level > 0 -> "Level $level"
+                    progress.journeyDescription.isNotBlank() -> progress.journeyDescription
+                    else -> "Your child"
+                }
                 ParentHeader(
-                    childName = progress.childName,
-                    childSubline = progress.journeyDescription.ifBlank { "Level ${progress.currentLevel}" },
+                    childName = child?.name?.takeIf { it.isNotBlank() } ?: "Your child",
+                    childSubline = subline,
                     // RA-S06: real account name (RA-S03 pref) + real unread count.
                     accountName = progress.accountName,
                     unreadCount = notifications.unreadCount,
