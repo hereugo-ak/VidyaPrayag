@@ -91,11 +91,16 @@ enum class ProfileHouse(
     val foil: Color,
     val onColor: Color,
 ) {
-    Aether("Aether", "AE", Color(0xFF6C5CE0), Color(0xFF362F73), Color(0xFFB9AEFF), Color(0xFFFFFFFF)),
-    Verdant("Verdant", "VR", Color(0xFF1FA89A), Color(0xFF064F49), Color(0xFF8CF0E2), Color(0xFFFFFFFF)),
-    Ember("Ember", "EM", Color(0xFFE0734B), Color(0xFF7A2E18), Color(0xFFFFC4A6), Color(0xFFFFFFFF)),
-    Solace("Solace", "SO", Color(0xFFD9A441), Color(0xFF7A551A), Color(0xFFFFE6A6), Color(0xFF26234D)),
-    Indigo("Indigo", "IN", Color(0xFF2D63C8), Color(0xFF12305E), Color(0xFF9EC0FF), Color(0xFFFFFFFF)),
+    // RA-PP-THEME: every house now lives inside the brand's lavender/violet/indigo family — the
+    // website palette. No more clashing orange/green/gold collectible variants; the card always
+    // reads as one cohesive premium violet artifact, with each house only shifting the hue subtly
+    // (deep violet → royal indigo → midnight plum → twilight blue → ultraviolet) so siblings still
+    // feel distinct while staying unmistakably on-brand.
+    Aether("Aether", "AE", Color(0xFF6C5CE0), Color(0xFF2C2660), Color(0xFFC4BBFF), Color(0xFFFFFFFF)),
+    Lumen("Lumen", "LU", Color(0xFF7A6CF0), Color(0xFF332B6E), Color(0xFFD2C9FF), Color(0xFFFFFFFF)),
+    Indigo("Indigo", "IN", Color(0xFF5A4FD0), Color(0xFF211C52), Color(0xFFB3A9FF), Color(0xFFFFFFFF)),
+    Nocturne("Nocturne", "NO", Color(0xFF4A4296), Color(0xFF1A1838), Color(0xFFA89EF5), Color(0xFFFFFFFF)),
+    Vela("Vela", "VE", Color(0xFF8B7EE8), Color(0xFF3A3278), Color(0xFFDED7FF), Color(0xFFFFFFFF)),
 }
 
 /** Stable house assignment — sum of the id's code points mod the house count. */
@@ -151,7 +156,9 @@ fun ParentProfileCardScreenV2(
     var revealed by remember { mutableStateOf(false) }
     var dragPx by remember { mutableStateOf(0f) }
     var dragging by remember { mutableStateOf(false) }
-    val revealThresholdPx = 240f
+    // A forgiving travel budget — a confident downward flick clears it well before the finger
+    // reaches the bottom of the card, so the reveal feels responsive rather than stubborn.
+    val revealThresholdPx = 170f
 
     // §11 — when the options panel is open, system/predictive back collapses it back to the card
     // (instead of leaving the tab), matching the swipe-up gesture.
@@ -210,9 +217,11 @@ fun ParentProfileCardScreenV2(
             )
 
             // The grab-handle affordance + caption float just under the card while collapsed,
-            // fading out as the panel takes over.
+            // fading out as the panel takes over. It's also TAPPABLE as a guaranteed fallback to
+            // the swipe — a tap springs the options panel fully open.
             ProfileRevealHint(
                 progress = progress,
+                onOpen = { revealed = true; dragPx = 0f },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
@@ -321,8 +330,10 @@ fun ProfilePlayerCard(
                             val totalX = change.position.x - down.position.x
                             val totalY = change.position.y - down.position.y
                             if (abs(totalX) > touchSlop || abs(totalY) > touchSlop) {
-                                // Decide once: a clearly vertical intent (and reveal allowed) → reveal.
-                                mode = if (revealEnabled && abs(totalY) > abs(totalX) * 1.1f) {
+                                // Decide once. Reveal wins for any movement that is even loosely
+                                // vertical (|Δy| ≥ 0.6·|Δx|) — a downward swipe should NEVER be
+                                // swallowed by the tilt. The tilt only claims clearly lateral drags.
+                                mode = if (revealEnabled && abs(totalY) >= abs(totalX) * 0.6f) {
                                     onRevealDragStart(); 1
                                 } else {
                                     tilting = true; 2
@@ -647,9 +658,11 @@ private fun StatArc(ratio: Float, house: ProfileHouse, modifier: Modifier = Modi
 @Composable
 private fun ProfileRevealHint(
     progress: Float,
+    onOpen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val fade = (1f - progress * 2f).coerceIn(0f, 1f)
+    val hintInteraction = remember { MutableInteractionSource() }
     Column(
         modifier
             .fillMaxWidth()
@@ -658,7 +671,14 @@ private fun ProfileRevealHint(
             .graphicsLayer {
                 alpha = fade
                 translationY = 18f * progress
-            },
+            }
+            // Tap anywhere on the hint to open — a dependable companion to the swipe gesture.
+            .clickable(
+                interactionSource = hintInteraction,
+                indication = null,
+                enabled = fade > 0.5f,
+                onClick = onOpen,
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
@@ -678,7 +698,7 @@ private fun ProfileRevealHint(
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                "Swipe down for account options",
+                "Swipe or tap for account options",
                 style = VTheme.type.caption.colored(Color.White.copy(alpha = 0.6f)),
             )
         }
