@@ -149,6 +149,9 @@ fun ParentPortalV2(
         // Phase 3 (commit 9): "Activity" → "Conversations". The tab now leads with real two-way
         // messaging (Chat icon), with announcements one segment away — see ParentConversationsScreenV2.
         VNavItem("conversations", "Conversations", VIcons.Chat),
+        // Phase 4 (commit 10): the flagship house-colored collectible player card lives on its own
+        // tab — see ParentProfileCardScreenV2.
+        VNavItem("profile", "Profile", VIcons.User),
     )
 
     VScreenScaffold(
@@ -185,6 +188,8 @@ fun ParentPortalV2(
                 "fees" -> ParentFeesScreenV2()
                 // Phase 3 (commit 9): the Conversations hub — messaging-first, announcements second.
                 "conversations" -> ParentConversationsScreenV2()
+                // Phase 4 (commit 10): the flagship collectible player card.
+                "profile" -> ParentProfileCardScreenV2()
             }
         }
     }
