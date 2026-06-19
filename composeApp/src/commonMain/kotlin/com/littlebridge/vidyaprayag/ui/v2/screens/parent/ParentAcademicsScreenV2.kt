@@ -15,10 +15,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -30,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentAcademicsState
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentAcademicsViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.TrackProgressState
@@ -110,8 +116,21 @@ private fun ParentAcademicsContent(
     Column(
         modifier
             .fillMaxSize()
+            // Same lavender aurora canvas as the dashboard — a soft violet bloom top-left so the
+            // screen reads as one premium surface, not a flat grey sheet.
+            .background(c.lavender)
+            .drawBehind {
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(c.accent.copy(alpha = 0.10f), Color.Transparent),
+                        center = Offset(size.width * 0.12f, size.height * 0.02f),
+                        radius = size.width * 0.95f,
+                    ),
+                )
+            }
             .verticalScroll(rememberScrollState())
-            .padding(bottom = 24.dp),
+            // Breathing room under the last card (EI) so it never sits flush against the nav.
+            .padding(bottom = 28.dp),
     ) {
         Text(
             "Academics",
@@ -119,7 +138,7 @@ private fun ParentAcademicsContent(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
         )
 
-        // ── RA-44: apply-for-leave entry ─────────────────────────────────────
+        // ── RA-44: apply-for-leave entry — a premium violet action card ──────
         VCard(
             modifier = Modifier
                 .fillMaxWidth()
@@ -128,8 +147,18 @@ private fun ParentAcademicsContent(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
+                // Soft lavender icon chip — gives the row depth and an on-brand accent.
+                Box(
+                    Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(c.accent.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(VIcons.Calendar, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(20.dp))
+                }
                 Column(Modifier.weight(1f)) {
                     Text("Apply for leave", style = VTheme.type.bodyStrong.colored(c.ink))
                     Text(
@@ -137,7 +166,7 @@ private fun ParentAcademicsContent(
                         style = VTheme.type.caption.colored(c.ink2),
                     )
                 }
-                Icon(VIcons.ArrowRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
+                Icon(VIcons.ArrowRight, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(18.dp))
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -312,11 +341,18 @@ private fun OverviewTab(state: TrackProgressState) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text(comp.title, style = VTheme.type.bodyStrong.colored(c.ink))
-                        Text("${(comp.progress * 100f).toInt()}%", style = VTheme.type.data.colored(c.ink))
+                        Text(
+                            comp.title,
+                            style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 17.sp, fontWeight = FontWeight.SemiBold),
+                        )
+                        Text(
+                            "${(comp.progress * 100f).toInt()}%",
+                            style = VTheme.type.data.colored(c.accentDeep).copy(fontWeight = FontWeight.Bold),
+                        )
                     }
-                    Spacer(Modifier.height(8.dp))
-                    VProgressBar(value = comp.progress * 100f, tone = VBadgeTone.Accent)
+                    Spacer(Modifier.height(10.dp))
+                    // A slightly heavier track than the default reads as premium, not hairline.
+                    VProgressBar(value = comp.progress * 100f, tone = VBadgeTone.Accent, height = 8.dp)
                 }
             }
         }
