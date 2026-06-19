@@ -5,7 +5,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -102,8 +101,6 @@ fun ParentHomeScreenV2(
     ParentDashboardContent(
         state = state,
         onRetry = viewModel::load,
-        onSelectChild = viewModel::selectChild,
-        onOpenNotifications = onOpenNotifications,
         onOpenFees = onOpenFees,
         onOpenAcademics = onOpenAcademics,
         modifier = modifier,
@@ -116,8 +113,6 @@ fun ParentHomeScreenV2(
 private fun ParentDashboardContent(
     state: ParentDashboardState,
     onRetry: () -> Unit,
-    onSelectChild: (String) -> Unit,
-    onOpenNotifications: () -> Unit,
     onOpenFees: () -> Unit,
     onOpenAcademics: () -> Unit,
     modifier: Modifier = Modifier,
@@ -131,22 +126,16 @@ private fun ParentDashboardContent(
     Box(
         modifier
             .fillMaxSize()
-            // Aurora-washed lavender canvas (adapts the reference's radial wash). Soft violet
-            // bloom top-left, a cooler tint bottom-right, over the lavender base.
-            .background(c.lavender)
+            // The canvas IS the website background token (#FCF8FF) — a clean near-white with the
+            // faintest lavender tint. Lavender is the brand accent, not a wall-to-wall fill, so the
+            // wash is a barely-there whisper (≤4%) top-left, exactly like the reference mockup.
+            .background(c.background)
             .drawBehind {
                 drawRect(
                     brush = Brush.radialGradient(
-                        colors = listOf(c.accent.copy(alpha = 0.10f), Color.Transparent),
-                        center = Offset(size.width * 0.12f, size.height * 0.04f),
+                        colors = listOf(c.accent.copy(alpha = 0.04f), Color.Transparent),
+                        center = Offset(size.width * 0.12f, size.height * 0.02f),
                         radius = size.width * 0.9f,
-                    ),
-                )
-                drawRect(
-                    brush = Brush.radialGradient(
-                        colors = listOf(c.accentSoft.copy(alpha = 0.07f), Color.Transparent),
-                        center = Offset(size.width * 0.95f, size.height * 0.22f),
-                        radius = size.width * 0.8f,
                     ),
                 )
             },
@@ -193,42 +182,27 @@ private fun ParentDashboardContent(
                 }
 
             // Content — the live dashboard. A single scrolling Column, cards top-to-bottom.
+            // NOTE: the shared ParentHeader (identity chip + child switcher + icon cluster) is
+            // rendered by ParentPortalV2 ABOVE this content on every tab — Home no longer draws a
+            // bespoke pseudo-header. The greeting + journey live in a proper white content card.
             else -> {
                 val child = state.selectedChild
                 Column(
                     Modifier
                         .fillMaxSize()
-                        .statusBarsPadding()
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp)
-                        .padding(top = 16.dp, bottom = 28.dp),
+                        .padding(top = 14.dp, bottom = 28.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    // ── Top bar: eyebrow + chat/bell actions ─────────────────────────
-                    TopBar(onOpenNotifications = onOpenNotifications)
-
-                    // ── Hero: identity + live journey ring (always rich) ─────────────
-                    HeroJourneyCard(
+                    // ── Greeting + live journey — a premium WHITE content card ───────
+                    TodayCard(
                         child = child,
                         className = state.timetable?.className.orEmpty(),
                         todayState = state.today.state,
                         statusLabel = state.today.label,
                         contextLine = contextLineFor(state),
                     )
-
-                    // ── Child switcher (only when 2+ children are linked) ────────────
-                    if (state.children.size > 1) {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(state.children, key = { it.id }) { ch ->
-                                ChildChip(
-                                    name = ch.name.ifBlank { "—" },
-                                    src = ch.profilePic,
-                                    selected = ch.id == state.selectedChildId,
-                                    onClick = { onSelectChild(ch.id) },
-                                )
-                            }
-                        }
-                    }
 
                     // ── Alert strip (real /dashboard alerts — populated for the demo) ─
                     if (state.alerts.isNotEmpty()) {
@@ -306,54 +280,18 @@ private fun DashboardCenterState(content: @Composable () -> Unit) {
     }
 }
 
-/** Top bar — the portal eyebrow on the left, a chat + a bell action on the right. */
-@Composable
-private fun TopBar(onOpenNotifications: () -> Unit) {
-    val c = VTheme.colors
-    Row(
-        Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column {
-            Text(
-                "ENROLL+ · PARENTS PORTAL",
-                style = VTheme.type.label.colored(c.accentDeep).copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 1.4.sp,
-                    fontSize = 10.sp,
-                ),
-            )
-        }
-        CircleAction(VIcons.Bell, onOpenNotifications)
-    }
-}
-
-@Composable
-private fun CircleAction(icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
-    val c = VTheme.colors
-    val ix = remember { MutableInteractionSource() }
-    Box(
-        Modifier
-            .size(36.dp)
-            .clip(CircleShape)
-            .background(c.card)
-            .border(1.dp, c.hairline, CircleShape)
-            .clickable(interactionSource = ix, indication = null) { onClick() },
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(icon, contentDescription = null, tint = c.navy, modifier = Modifier.size(16.dp))
-    }
-}
-
 /**
- * The hero — a premium gradient panel adapting the reference's identity block. Carries the
- * child's avatar, name + class, a time-aware context line, and a live **journey ring** built
- * from the real `overall_progress`. This card always renders rich content (the journey figure
- * is always present for a linked child), so the dashboard never opens on emptiness.
+ * TodayCard — the dashboard's flagship greeting card, adapting the reference's identity block to a
+ * premium WHITE card on the lavender canvas (NOT a purple pseudo-header — the shared ParentHeader
+ * already owns identity/switching above this).
+ *
+ * It carries the child's avatar (with a semantic status pip), name + class, a truthful status chip
+ * (present=green, late=amber, absent=red — color is meaning), a live **journey ring** built from
+ * real `overall_progress`, and a time-aware context line. Always renders rich content for a linked
+ * child, so the dashboard never opens on emptiness.
  */
 @Composable
-private fun HeroJourneyCard(
+private fun TodayCard(
     child: DashboardChildSummary?,
     className: String,
     todayState: AttendanceDayState,
@@ -365,39 +303,39 @@ private fun HeroJourneyCard(
     val level = child?.currentLevel ?: 0
     val rawProgress = child?.overallProgress ?: 0.0
     val progressPct = (if (rawProgress <= 1.0) rawProgress * 100.0 else rawProgress).roundToInt().coerceIn(0, 100)
-
-    val statusTone = statusToneFor(todayState)
+    val status = statusVisualFor(todayState)
 
     Box(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .background(Brush.linearGradient(listOf(c.accent, c.accentDeep)))
-            // soft top sheen so the panel reads glossy, not flat
-            .drawBehind {
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        listOf(Color.White.copy(alpha = 0.14f), Color.Transparent),
-                        endY = size.height * 0.55f,
-                    ),
-                )
-                // faint orbit ring decoration, bottom-right
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.06f),
-                    radius = size.minDimension * 0.42f,
-                    center = Offset(size.width * 0.92f, size.height * 0.9f),
-                    style = Stroke(width = 1.5.dp.toPx()),
-                )
-            }
+            .background(c.card)
+            .border(1.dp, c.hairline, RoundedCornerShape(24.dp))
             .padding(18.dp),
     ) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                VAvatar(name = name, src = child?.profilePic, size = 56.dp, ring = true)
+                // Avatar with a semantic status pip (green check when present, etc.).
+                Box {
+                    VAvatar(name = name, src = child?.profilePic, size = 54.dp, ring = true)
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(c.card)
+                            .padding(2.dp)
+                            .clip(CircleShape)
+                            .background(status.color),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(status.icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(9.dp))
+                    }
+                }
                 Column(Modifier.weight(1f)) {
                     Text(
                         name,
-                        style = VTheme.type.h2.colored(Color.White).copy(fontWeight = FontWeight.ExtraBold, fontSize = 20.sp),
+                        style = VTheme.type.h2.colored(c.navyDeep).copy(fontWeight = FontWeight.ExtraBold, fontSize = 19.sp),
                         maxLines = 1,
                     )
                     val sub = listOfNotNull(
@@ -405,45 +343,45 @@ private fun HeroJourneyCard(
                         className.takeIf { it.isNotBlank() },
                     ).joinToString("  ·  ")
                     if (sub.isNotBlank()) {
-                        Text(sub, style = VTheme.type.caption.colored(Color.White.copy(alpha = 0.85f)).copy(fontSize = 12.sp))
+                        Text(sub, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 12.sp))
                     }
                 }
-                // status chip — truthful, reflects resolved today-state
+                // Status chip — color carries meaning (semantic), not always violet.
                 Box(
                     Modifier
                         .clip(RoundedCornerShape(999.dp))
-                        .background(Color.White.copy(alpha = 0.2f))
+                        .background(status.softBg)
                         .padding(horizontal = 10.dp, vertical = 5.dp),
                 ) {
                     Text(
-                        statusLabel.ifBlank { statusTone.word },
-                        style = VTheme.type.label.colored(Color.White).copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp),
+                        statusLabel.ifBlank { status.word },
+                        style = VTheme.type.label.colored(status.ink).copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp),
                     )
                 }
             }
 
             Spacer(Modifier.height(16.dp))
 
-            // Journey row: a real progress ring + a contextual line.
+            // Journey row: a real violet progress ring (brand accent moment) + a contextual line.
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                JourneyRing(percent = progressPct, modifier = Modifier.size(72.dp))
+                JourneyRing(percent = progressPct, modifier = Modifier.size(68.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "Learning journey",
-                        style = VTheme.type.label.colored(Color.White.copy(alpha = 0.8f)).copy(
-                            fontWeight = FontWeight.Bold, fontSize = 10.sp, letterSpacing = 0.8.sp,
+                        "LEARNING JOURNEY",
+                        style = VTheme.type.label.colored(c.accentDeep).copy(
+                            fontWeight = FontWeight.ExtraBold, fontSize = 10.sp, letterSpacing = 0.9.sp,
                         ),
                     )
                     Spacer(Modifier.height(3.dp))
                     Text(
                         "$progressPct% of the way to the next level",
-                        style = VTheme.type.bodyStrong.colored(Color.White).copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                        style = VTheme.type.bodyStrong.colored(c.navyDeep).copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
                     )
                     if (contextLine.isNotBlank()) {
                         Spacer(Modifier.height(2.dp))
                         Text(
                             contextLine,
-                            style = VTheme.type.caption.colored(Color.White.copy(alpha = 0.85f)).copy(fontSize = 11.sp),
+                            style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
                         )
                     }
                 }
@@ -452,9 +390,10 @@ private fun HeroJourneyCard(
     }
 }
 
-/** White-on-gradient progress ring with the percent centred — the hero's signature element. */
+/** Violet progress ring (the brand-accent moment) with the percent centred, on a white card. */
 @Composable
 private fun JourneyRing(percent: Int, modifier: Modifier = Modifier) {
+    val c = VTheme.colors
     val sweep by animateFloatAsState(targetValue = percent / 100f, label = "journeySweep")
     Box(modifier, contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
@@ -463,13 +402,13 @@ private fun JourneyRing(percent: Int, modifier: Modifier = Modifier) {
             val arcSize = Size(size.width - stroke, size.height - stroke)
             val topLeft = Offset(inset, inset)
             drawArc(
-                color = Color.White.copy(alpha = 0.22f),
+                color = c.accent.copy(alpha = 0.16f),
                 startAngle = 0f, sweepAngle = 360f, useCenter = false,
                 topLeft = topLeft, size = arcSize,
                 style = Stroke(width = stroke, cap = StrokeCap.Round),
             )
             drawArc(
-                brush = Brush.sweepGradient(listOf(Color.White.copy(alpha = 0.7f), Color.White)),
+                brush = Brush.sweepGradient(listOf(c.accentSoft, c.accent, c.accentDeep)),
                 startAngle = -90f, sweepAngle = 360f * sweep, useCenter = false,
                 topLeft = topLeft, size = arcSize,
                 style = Stroke(width = stroke, cap = StrokeCap.Round),
@@ -477,7 +416,7 @@ private fun JourneyRing(percent: Int, modifier: Modifier = Modifier) {
         }
         Text(
             "$percent%",
-            style = VTheme.type.dataLg.colored(Color.White).copy(fontWeight = FontWeight.ExtraBold, fontSize = 18.sp),
+            style = VTheme.type.dataLg.colored(c.accentDeep).copy(fontWeight = FontWeight.ExtraBold, fontSize = 17.sp),
         )
     }
 }
@@ -519,16 +458,44 @@ private fun AlertStrip(alerts: List<DashboardAlertDto>) {
     }
 }
 
-private data class StatusTone(val word: String)
+/**
+ * A semantic visual for the resolved today-state. COLOR CARRIES MEANING (design law): present is
+ * green, late is amber, absent is red, holidays/breaks are calm navy, awaiting is the brand violet.
+ */
+private data class StatusVisual(
+    val word: String,
+    val color: Color,
+    val ink: Color,
+    val softBg: Color,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+)
 
-private fun statusToneFor(state: AttendanceDayState): StatusTone = when (state) {
-    AttendanceDayState.Present -> StatusTone("Present")
-    AttendanceDayState.Late -> StatusTone("Late")
-    AttendanceDayState.Absent -> StatusTone("Absent")
-    AttendanceDayState.Holiday -> StatusTone("Holiday")
-    AttendanceDayState.Vacation -> StatusTone("Break")
-    AttendanceDayState.Sunday -> StatusTone("Sunday")
-    AttendanceDayState.NoData -> StatusTone("Today")
+@Composable
+private fun statusVisualFor(state: AttendanceDayState): StatusVisual {
+    val c = VTheme.colors
+    return when (state) {
+        AttendanceDayState.Present -> StatusVisual(
+            "Present", c.successInk, c.successInk, c.success.copy(alpha = 0.30f), VIcons.Check,
+        )
+        AttendanceDayState.Late -> StatusVisual(
+            "Late", c.warningInk, c.warningInk, c.warning.copy(alpha = 0.45f), VIcons.Clock,
+        )
+        AttendanceDayState.Absent -> StatusVisual(
+            "Absent", c.dangerInk, c.dangerInk, c.danger.copy(alpha = 0.45f), VIcons.Close,
+        )
+        AttendanceDayState.Holiday -> StatusVisual(
+            "Holiday", c.navy, c.navy, c.navy.copy(alpha = 0.10f), VIcons.Calendar,
+        )
+        AttendanceDayState.Vacation -> StatusVisual(
+            "Break", c.navy, c.navy, c.navy.copy(alpha = 0.10f), VIcons.Sparkles,
+        )
+        AttendanceDayState.Sunday -> StatusVisual(
+            "Sunday", c.ink3, c.ink2, c.cream, VIcons.Calendar,
+        )
+        AttendanceDayState.NoData -> StatusVisual(
+            "Awaiting", c.accent, c.accentDeep, c.accent.copy(alpha = 0.12f), VIcons.Clock,
+        )
+    }
 }
 
 /** Build the time-aware contextual line referencing the selected child. */
@@ -550,28 +517,4 @@ private fun contextLineFor(state: ParentDashboardState): String {
         AttendanceDayState.NoData -> "Here's $firstName's day at a glance."
     }
     return "Good $partOfDay. $tail"
-}
-
-/** A child selector chip used when a parent has 2+ linked children. */
-@Composable
-private fun ChildChip(name: String, src: String?, selected: Boolean, onClick: () -> Unit) {
-    val c = VTheme.colors
-    val (bg, fg) = if (selected) c.accent.copy(alpha = 0.14f) to c.accentDeep else c.card to c.ink2
-    val interaction = remember { MutableInteractionSource() }
-    Row(
-        Modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(bg)
-            .border(1.dp, if (selected) c.accent.copy(alpha = 0.3f) else c.hairline, RoundedCornerShape(999.dp))
-            .clickable(interactionSource = interaction, indication = null) { onClick() }
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        VAvatar(name = name, src = src, size = 24.dp)
-        Text(
-            name,
-            style = VTheme.type.label.colored(fg).copy(fontWeight = FontWeight.SemiBold),
-        )
-    }
 }
