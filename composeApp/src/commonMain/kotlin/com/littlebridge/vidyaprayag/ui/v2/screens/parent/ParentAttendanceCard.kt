@@ -358,11 +358,13 @@ private fun CalendarFace(attendance: ParentAttendanceData?, onCollapse: () -> Un
 
         Spacer(Modifier.height(12.dp))
 
+        // NO-GREEN LAW (parent surface): "present" reads in the brand violet (the on-track state),
+        // late=amber, absent=red, holiday=navy — a coherent, green-free status scale.
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            LegendDot(c.successInk, "Present")
+            LegendDot(c.accent, "Present")
             LegendDot(c.warningInk, "Late")
             LegendDot(c.dangerInk, "Absent")
-            LegendDot(c.accentDeep, "Holiday")
+            LegendDot(c.navy, "Holiday")
         }
     }
 }
@@ -381,11 +383,12 @@ private fun isHolidayCell(iso: String, year: Int, month: Int, day: Int, holidays
 @Composable
 private fun DayCell(day: Int, status: String?, isHoliday: Boolean) {
     val c = VTheme.colors
+    // NO-GREEN LAW (parent surface): present=brand violet, late=amber, absent=red, holiday=navy tint.
     val (bg, fg) = when (status) {
-        "present" -> c.successInk to c.card
+        "present" -> c.accent to c.card
         "late" -> c.warningInk to c.card
         "absent" -> c.dangerInk to c.card
-        else -> if (isHoliday) c.accent.copy(alpha = 0.16f) to c.accentDeep else c.cream.copy(alpha = 0.4f) to c.ink2
+        else -> if (isHoliday) c.navy.copy(alpha = 0.12f) to c.navy else c.cream.copy(alpha = 0.4f) to c.ink2
     }
     Box(
         Modifier
@@ -510,10 +513,11 @@ private data class AttendanceTone(
 private fun toneFor(state: AttendanceDayState): AttendanceTone {
     val c = VTheme.colors
     return when (state) {
+        // NO-GREEN LAW (parent surface): "present" is the brand-violet on-track state.
         AttendanceDayState.Present -> AttendanceTone(
             "Present", "Marked present today", "Your child is in school",
-            c.successInk, c.success.copy(alpha = 0.42f), c.successInk,
-            c.success.copy(alpha = 0.18f), VIcons.ShieldCheck,
+            c.accentDeep, c.accent.copy(alpha = 0.18f), c.accentDeep,
+            c.accent.copy(alpha = 0.12f), VIcons.ShieldCheck,
         )
         AttendanceDayState.Late -> AttendanceTone(
             "Late", "Arrived late today", "Marked present, after the bell",
@@ -525,15 +529,16 @@ private fun toneFor(state: AttendanceDayState): AttendanceTone {
             c.dangerInk, c.danger.copy(alpha = 0.55f), c.dangerInk,
             c.danger.copy(alpha = 0.28f), VIcons.AlertCircle,
         )
+        // Holiday/Vacation read in calm navy so they stay distinct from the violet "present" state.
         AttendanceDayState.Holiday -> AttendanceTone(
             "Holiday", "School holiday today", "Enjoy the day off",
-            c.accentDeep, c.accent.copy(alpha = 0.14f), c.accentDeep,
-            c.accent.copy(alpha = 0.1f), VIcons.Calendar,
+            c.navy, c.navy.copy(alpha = 0.10f), c.navy,
+            c.navy.copy(alpha = 0.07f), VIcons.Calendar,
         )
         AttendanceDayState.Vacation -> AttendanceTone(
             "Break", "On vacation", "Enjoy the break",
-            c.accentDeep, c.accent.copy(alpha = 0.14f), c.accentDeep,
-            c.accent.copy(alpha = 0.1f), VIcons.Sparkles,
+            c.navy, c.navy.copy(alpha = 0.10f), c.navy,
+            c.navy.copy(alpha = 0.07f), VIcons.Sparkles,
         )
         AttendanceDayState.Sunday -> AttendanceTone(
             "Sunday", "No school today", "It's a Sunday",
