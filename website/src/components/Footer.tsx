@@ -259,7 +259,7 @@ export function Footer() {
           </span>
         </div>
         <p className="relative -mt-3 pb-8 text-center text-[10px] font-bold uppercase tracking-[0.34em] text-ink-3/55 sm:-mt-6 md:-mt-10">
-          The operating system for your school
+          The OS for your campus
         </p>
       </div>
     </footer>

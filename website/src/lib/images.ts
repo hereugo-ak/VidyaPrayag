@@ -89,6 +89,31 @@ export const PHOTOS = {
     blur: BLUR_DATA,
   } satisfies Photo,
 
+  // Parents page hero, a real parent-and-child moment, warm and bright. Used on
+  // /parents to anchor the page in the actual relationship the app serves. NOT
+  // AI-generated, real Unsplash photography of a parent reading with their child.
+  parentsHero: {
+    src: unsplash("1503454537195-1dcabb73ffb9", 1800), // parent reading with child, warm light
+    alt: "A parent reading with their child in warm afternoon light",
+    blur: BLUR_DATA,
+  } satisfies Photo,
+
+  // Parents page secondary, a calm portrait of a family at home checking a
+  // phone together, supports the "their school day, in your pocket" promise.
+  parentsAtHome: {
+    src: unsplash("1581578731548-c64695cc6952", 1600), // mother and child looking at phone
+    alt: "A parent and child looking at a phone together at home",
+    blur: BLUR_DATA,
+  } satisfies Photo,
+
+  // Parents page atmosphere, a real campus exterior at golden hour, available
+  // for muted background bands on the parents page if needed.
+  parentsCampus: {
+    src: unsplash("1490127252417-7c393f993ee4", 2000), // school exterior, calm light
+    alt: "A school building at golden hour",
+    blur: BLUR_DATA,
+  } satisfies Photo,
+
   // Footer onboarding band, a real, light, muted campus exterior: an
   // institutional building above a wide, calm plaza of negative space. It sits
   // quietly behind the closing CTA (heavy light overlay), reinforcing that
