@@ -166,8 +166,10 @@ private fun StreakTile(label: String, value: String) {
 @Composable
 private fun ScholarshipCard(s: Scholarship) {
     val c = VTheme.colors
+    // NO-GREEN LAW (parent surface): no Success tone — "full funding" reads neutral,
+    // "merit based" keeps the brand violet, "international" the amber.
     val categoryTone = when (s.category.lowercase()) {
-        "full funding" -> VBadgeTone.Success
+        "full funding" -> VBadgeTone.Neutral
         "merit based" -> VBadgeTone.Accent
         "international" -> VBadgeTone.Warning
         else -> VBadgeTone.Neutral
@@ -204,9 +206,11 @@ private fun ScholarshipCard(s: Scholarship) {
 @Composable
 private fun ApplicationRow(a: ScholarshipApplication) {
     val c = VTheme.colors
+    // NO-GREEN LAW (parent surface): "received" reads in the brand violet (Accent);
+    // "shortlisted" steps down to neutral so the two stay distinct.
     val statusTone = when (a.status.lowercase()) {
-        "received" -> VBadgeTone.Success
-        "shortlisted" -> VBadgeTone.Accent
+        "received" -> VBadgeTone.Accent
+        "shortlisted" -> VBadgeTone.Neutral
         "under review" -> VBadgeTone.Warning
         else -> VBadgeTone.Neutral
     }
