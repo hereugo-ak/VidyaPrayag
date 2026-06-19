@@ -34,8 +34,10 @@ private val TagActiveBg = Color(0xFFDCF2EF)
 private val TagActiveFg = Color(0xFF006A60)
 private val TagActiveBorder = Color(0x2E006A60) // rgba(0,106,96,0.18)
 
-/** Semantic tones for [VBadge]. Mirrors primitives.tsx `VBadge` tone union. */
-enum class VBadgeTone { Arctic, Success, Warning, Danger, Neutral }
+/** Semantic tones for [VBadge]. Mirrors primitives.tsx `VBadge` tone union.
+ *  `Accent` is the website's lavender/violet (#6C5CE0) family — the Parents Portal default
+ *  so no parent surface ever renders the legacy teal `Arctic`. */
+enum class VBadgeTone { Arctic, Accent, Success, Warning, Danger, Neutral }
 
 /**
  * VBadge — a pill status chip. Background is a soft tint; foreground is the matching ink.
@@ -52,6 +54,7 @@ fun VBadge(
     val c = VTheme.colors
     val (bg, fg) = when (tone) {
         VBadgeTone.Arctic -> c.teal.copy(alpha = 0.16f) to c.tealDeep
+        VBadgeTone.Accent -> c.accent.copy(alpha = 0.14f) to c.accentDeep
         VBadgeTone.Success -> c.success.copy(alpha = 0.42f) to c.successInk
         VBadgeTone.Warning -> c.warning.copy(alpha = 0.55f) to c.warningInk
         VBadgeTone.Danger -> c.danger.copy(alpha = 0.55f) to c.dangerInk
