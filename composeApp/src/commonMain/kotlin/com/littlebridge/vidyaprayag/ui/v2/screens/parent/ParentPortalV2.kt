@@ -56,7 +56,7 @@ private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, 
  * ParentPortalV2 — the 4-tab parent shell, a faithful copy of `Parent.tsx → ParentApp`.
  *
  * Owns the header (child identity from the real [TrackProgressViewModel]) and the bottom nav
- * (Home · Academics · Fees · Activity). Each leaf is now wired to its own real ViewModel via
+ * (Home · Academics · Fees · Conversations). Each leaf is now wired to its own real ViewModel via
  * `koinViewModel()` — no MockV2 in any production path. Notifications & Calendar are pushed as
  * full-screen overlays.
  */
@@ -146,7 +146,9 @@ fun ParentPortalV2(
         VNavItem("home", "Home", VIcons.Home),
         VNavItem("academics", "Academics", VIcons.School),
         VNavItem("fees", "Fees", VIcons.Wallet),
-        VNavItem("activity", "Activity", VIcons.Bell),
+        // Phase 3 (commit 9): "Activity" → "Conversations". The tab now leads with real two-way
+        // messaging (Chat icon), with announcements one segment away — see ParentConversationsScreenV2.
+        VNavItem("conversations", "Conversations", VIcons.Chat),
     )
 
     VScreenScaffold(
@@ -181,7 +183,8 @@ fun ParentPortalV2(
                 )
                 "academics" -> ParentAcademicsScreenV2(onOpenLeave = { overlay = ParentOverlay.Leave })
                 "fees" -> ParentFeesScreenV2()
-                "activity" -> ParentActivityScreenV2()
+                // Phase 3 (commit 9): the Conversations hub — messaging-first, announcements second.
+                "conversations" -> ParentConversationsScreenV2()
             }
         }
     }

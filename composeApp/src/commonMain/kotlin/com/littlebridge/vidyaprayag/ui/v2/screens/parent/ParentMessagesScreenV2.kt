@@ -88,6 +88,29 @@ fun ParentMessagesScreenV2(
         .navigationBarsPadding()) {
         VBackHeader(title = title, onBack = backHandler)
 
+        ParentMessagesBody(viewModel = viewModel, modifier = Modifier.weight(1f).fillMaxWidth())
+    }
+}
+
+/**
+ * Phase 3 (commit 9) — the chrome-less messaging body, hosted *inside* the Conversations tab.
+ *
+ * Identical messaging surface as [ParentMessagesScreenV2] (inbox → conversation → compose-new
+ * layers driven by the SAME [ParentMessageViewModel]), but WITHOUT the standalone status-bar
+ * padding + [VBackHeader] — the Conversations hub owns that chrome. Drilling into a thread or
+ * compose-new is handled by the shared VM state, so the segmented hub's back is layered by the
+ * caller via [ParentMessageViewModel.composeOpen]/[ParentMessageViewModel.openThreadId].
+ */
+@Composable
+fun ParentMessagesBody(
+    viewModel: ParentMessageViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val state by viewModel.state.collectAsStateV2()
+
+    androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.loadThreads() }
+
+    Column(modifier.imePadding()) {
         when {
             // RA-S07: compose-new is the topmost layer (back closes it first).
             state.composeOpen -> {
