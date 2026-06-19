@@ -53,12 +53,12 @@ import org.koin.compose.viewmodel.koinViewModel
 private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, Profile, Leave, Messages, LinkChild, Discovery }
 
 /**
- * ParentPortalV2 — the 4-tab parent shell, a faithful copy of `Parent.tsx → ParentApp`.
+ * ParentPortalV2 — the 5-tab parent shell, a faithful copy of `Parent.tsx → ParentApp`.
  *
  * Owns the header (child identity from the real [TrackProgressViewModel]) and the bottom nav
- * (Home · Academics · Fees · Conversations). Each leaf is now wired to its own real ViewModel via
- * `koinViewModel()` — no MockV2 in any production path. Notifications & Calendar are pushed as
- * full-screen overlays.
+ * (Home · Academics · Fees · Conversations · Profile). Each leaf is now wired to its own real
+ * ViewModel via `koinViewModel()` — no MockV2 in any production path. Notifications & Calendar are
+ * pushed as full-screen overlays; the flagship collectible player card lives on the Profile tab.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
