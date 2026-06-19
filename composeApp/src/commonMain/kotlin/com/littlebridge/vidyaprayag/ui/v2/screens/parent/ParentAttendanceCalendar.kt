@@ -134,8 +134,9 @@ internal fun ParentAttendanceCalendar(
         // ── Legend ──────────────────────────────────────────────────────────
         VLabel("Legend")
         Spacer(Modifier.height(8.dp))
+        // NO-GREEN LAW (parent surface): present=brand violet, late=amber, absent=red.
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            LegendDot(c.success, "Present")
+            LegendDot(c.accent, "Present")
             LegendDot(c.warning, "Late")
             LegendDot(c.danger, "Absent")
         }
@@ -169,8 +170,9 @@ private fun PagerArrow(
 @Composable
 private fun DayCell(day: Int, status: String?) {
     val c = VTheme.colors
+    // NO-GREEN LAW (parent surface): present=brand violet, late=amber, absent=red.
     val bg = when (status) {
-        "present" -> c.success
+        "present" -> c.accent
         "late" -> c.warning
         "absent" -> c.danger
         else -> Color.Transparent
