@@ -6,10 +6,12 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -52,6 +54,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -138,26 +141,41 @@ fun ParentProfileCardScreenV2(
 
     // ── Swipe-down reveal rig ──────────────────────────────────────────────────
     // `revealed` is the settled rest state (false = card, true = options open).
-    // `dragPx` is the in-flight signed finger travel (down = +, up = −) while a drag is active;
-    // `dragging` gates whether we track the finger 1:1 or spring to the settled state.
-    // Composite progress (0..1) drives BOTH the card lift/scale and the panel rise, so the whole
-    // surface tracks the finger and then springs to the nearest rest on release.
+    // `dragPx` is the in-flight signed finger travel (down = +, up = −) while a vertical drag is
+    // active; `dragging` gates whether we track the finger 1:1 or spring to the settled state.
+    //
+    // CRITICAL FIX: the reveal gesture is now hosted ON THE CARD ITSELF (see [ProfilePlayerCard]'s
+    // unified gesture classifier), not on a tiny top strip. A predominantly-VERTICAL drag anywhere
+    // on the card drives this reveal; a small/lateral drag instead drives the 3D tilt. So "swipe the
+    // card down → options" finally works the way the brief intends.
     var revealed by remember { mutableStateOf(false) }
     var dragPx by remember { mutableStateOf(0f) }
     var dragging by remember { mutableStateOf(false) }
-    val revealThresholdPx = 220f
+    val revealThresholdPx = 240f
 
     // §11 — when the options panel is open, system/predictive back collapses it back to the card
     // (instead of leaving the tab), matching the swipe-up gesture.
     BackHandler(enabled = revealed) { revealed = false; dragPx = 0f }
 
     val baseProgress = if (revealed) 1f else 0f
+    // While dragging we map signed finger travel to progress *relative to the current rest*, so a
+    // swipe-up from the revealed state closes, and a swipe-down from the card opens. Rubber-banding
+    // past the ends keeps it from feeling like it hit a wall.
     val rawProgress = (baseProgress + dragPx / revealThresholdPx).coerceIn(0f, 1f)
     val progress by animateFloatAsState(
         targetValue = if (dragging) rawProgress else baseProgress,
-        animationSpec = tween(durationMillis = if (dragging) 0 else 420),
+        // Premium settle: a soft spring (not a linear tween) so the surface "arrives" with weight.
+        animationSpec = if (dragging) tween(durationMillis = 0)
+        else spring(dampingRatio = 0.82f, stiffness = 320f),
         label = "reveal-progress",
     )
+
+    fun settle() {
+        dragging = false
+        // Velocity-free threshold settle with hysteresis: easier to open than to keep open.
+        revealed = if (revealed) rawProgress > 0.35f else rawProgress >= 0.5f
+        dragPx = 0f
+    }
 
     Box(
         modifier
@@ -168,24 +186,39 @@ fun ParentProfileCardScreenV2(
         Box(
             Modifier
                 .fillMaxSize()
+                .statusBarsPadding()
                 .padding(horizontal = 28.dp),
             contentAlignment = Alignment.Center,
         ) {
             ProfilePlayerCard(
                 state = state,
+                // Reveal is interactive only when collapsed OR mid-drag — once fully open the panel
+                // owns the gestures (its own swipe-up + Back-to-card button close it).
+                revealEnabled = !revealed || dragging,
+                onRevealDragStart = { dragging = true },
+                onRevealDragDelta = { delta -> dragPx = delta },
+                onRevealDragEnd = { settle() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .graphicsLayer {
-                        translationY = -size.height * 0.18f * progress
-                        val s = 1f - 0.16f * progress
+                        translationY = -size.height * 0.20f * progress
+                        val s = 1f - 0.18f * progress
                         scaleX = s
                         scaleY = s
-                        alpha = 1f - 0.25f * progress
+                        alpha = 1f - 0.30f * progress
                     },
+            )
+
+            // The grab-handle affordance + caption float just under the card while collapsed,
+            // fading out as the panel takes over.
+            ProfileRevealHint(
+                progress = progress,
+                modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
 
-        // The options panel — rises from the bottom as progress → 1.
+        // The options panel — rises from the bottom as progress → 1. Swiping it back down/up or the
+        // explicit "Back to card" button collapses it.
         ProfileOptionsPanel(
             parentName = profileState.profile?.name ?: "",
             parentContact = listOfNotNull(
@@ -193,39 +226,37 @@ fun ParentProfileCardScreenV2(
                 profileState.profile?.email?.takeIf { it.isNotBlank() },
             ).joinToString("  ·  "),
             progress = progress,
+            onCollapseDragStart = { dragging = true },
+            onCollapseDragDelta = { delta -> dragPx = delta },
+            onCollapseDragEnd = { settle() },
             onLinkChild = onLinkChild,
             onDiscoverSchools = onDiscoverSchools,
             onLogout = onLogout,
             onClose = { revealed = false; dragPx = 0f },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
-
-        // Top swipe-down affordance — a grab handle + caption that drives the reveal.
-        // Swiping DOWN (positive y) opens from the card; swiping UP (negative y) closes from open.
-        ProfileRevealHandle(
-            progress = progress,
-            onDragStart = { dragging = true },
-            onDragDelta = { delta -> dragPx = delta },
-            onDragEnd = {
-                dragging = false
-                revealed = rawProgress >= 0.5f
-                dragPx = 0f
-            },
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .statusBarsPadding(),
-        )
     }
 }
 
 /**
- * The collectible card itself — tilt + holo + real stats. Pulled out as a stateless-ish body so
- * commit 11's swipe-down reveal can host it without duplicating the motion rig.
+ * The collectible card itself — tilt + holo + real stats + the swipe-down reveal gesture.
+ *
+ * Unified gesture model (the fix): a SINGLE [pointerInput] classifies each drag once, on its first
+ * decisive movement:
+ *   - predominantly VERTICAL  → drives the parent's reveal (card → account options)
+ *   - otherwise (lateral/small)→ drives the foil 3D tilt (parallax lean), springing back on release
+ * This removes the old conflict where a tilt detector swallowed every drag so the card could never
+ * be swiped down.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun ProfilePlayerCard(
     state: ParentDashboardState,
     modifier: Modifier = Modifier,
+    revealEnabled: Boolean = false,
+    onRevealDragStart: () -> Unit = {},
+    onRevealDragDelta: (Float) -> Unit = {},
+    onRevealDragEnd: () -> Unit = {},
 ) {
     val child = state.selectedChild
     val house = houseFor(child?.id ?: "")
@@ -236,19 +267,20 @@ fun ProfilePlayerCard(
     val progressPct = (if (rawProgress <= 1.0) rawProgress * 100.0 else rawProgress).roundToInt().coerceIn(0, 100)
 
     // ── Drag-driven tilt ──────────────────────────────────────────────────────
-    // Raw drag offset (px) → target rotation; spring back to 0 on release.
     var dragX by remember { mutableStateOf(0f) }
     var dragY by remember { mutableStateOf(0f) }
-    var dragging by remember { mutableStateOf(false) }
+    var tilting by remember { mutableStateOf(false) }
 
     val tiltY by animateFloatAsState(
-        targetValue = if (dragging) (dragX / 18f).coerceIn(-14f, 14f) else 0f,
-        animationSpec = tween(durationMillis = if (dragging) 60 else 520),
+        targetValue = if (tilting) (dragX / 18f).coerceIn(-14f, 14f) else 0f,
+        animationSpec = if (tilting) tween(durationMillis = 60)
+        else spring(dampingRatio = 0.55f, stiffness = 260f),
         label = "tiltY",
     )
     val tiltX by animateFloatAsState(
-        targetValue = if (dragging) (-dragY / 18f).coerceIn(-14f, 14f) else 0f,
-        animationSpec = tween(durationMillis = if (dragging) 60 else 520),
+        targetValue = if (tilting) (-dragY / 18f).coerceIn(-14f, 14f) else 0f,
+        animationSpec = if (tilting) tween(durationMillis = 60)
+        else spring(dampingRatio = 0.55f, stiffness = 260f),
         label = "tiltX",
     )
 
@@ -272,15 +304,40 @@ fun ProfilePlayerCard(
                 rotationY = tiltY
                 cameraDistance = 16f * density
             }
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { dragging = true },
-                    onDragEnd = { dragging = false; dragX = 0f; dragY = 0f },
-                    onDragCancel = { dragging = false; dragX = 0f; dragY = 0f },
-                ) { change, drag ->
-                    change.consume()
-                    dragX += drag.x
-                    dragY += drag.y
+            // ── Unified drag classifier (reveal vs tilt) ────────────────────────
+            .pointerInput(revealEnabled) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    var mode = 0 // 0 = undecided, 1 = reveal (vertical), 2 = tilt
+                    var accY = 0f
+                    val touchSlop = viewConfiguration.touchSlop
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) break
+                        val dx = change.positionChange().x
+                        val dy = change.positionChange().y
+                        if (mode == 0) {
+                            val totalX = change.position.x - down.position.x
+                            val totalY = change.position.y - down.position.y
+                            if (abs(totalX) > touchSlop || abs(totalY) > touchSlop) {
+                                // Decide once: a clearly vertical intent (and reveal allowed) → reveal.
+                                mode = if (revealEnabled && abs(totalY) > abs(totalX) * 1.1f) {
+                                    onRevealDragStart(); 1
+                                } else {
+                                    tilting = true; 2
+                                }
+                            }
+                        }
+                        when (mode) {
+                            1 -> { accY += dy; onRevealDragDelta(accY); change.consume() }
+                            2 -> { dragX += dx; dragY += dy; change.consume() }
+                        }
+                    }
+                    when (mode) {
+                        1 -> onRevealDragEnd()
+                        2 -> { tilting = false; dragX = 0f; dragY = 0f }
+                    }
                 }
             }
             .clip(RoundedCornerShape(28.dp))
@@ -494,35 +551,25 @@ private fun StatTile(
 }
 
 /**
- * ProfileRevealHandle — the top grab-handle + caption that drives the swipe-down reveal.
- * Reports vertical drag deltas (accumulated) to the screen, which maps them to reveal progress.
- * The handle itself rotates its chevron and dims its caption as the panel opens.
+ * ProfileRevealHint — a non-interactive grab-handle + caption that floats just beneath the card
+ * while it's collapsed, inviting the swipe-down. It owns NO gesture (the card itself does), so it
+ * never competes for the drag; it simply fades + drifts away as the panel reveals.
  */
 @Composable
-private fun ProfileRevealHandle(
+private fun ProfileRevealHint(
     progress: Float,
-    onDragStart: () -> Unit,
-    onDragDelta: (Float) -> Unit,
-    onDragEnd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val c = VTheme.colors
-    var acc by remember { mutableStateOf(0f) }
+    val fade = (1f - progress * 2f).coerceIn(0f, 1f)
     Column(
         modifier
             .fillMaxWidth()
-            .pointerInput(Unit) {
-                detectVerticalDragGestures(
-                    onDragStart = { acc = 0f; onDragStart() },
-                    onDragEnd = { acc = 0f; onDragEnd() },
-                    onDragCancel = { acc = 0f; onDragEnd() },
-                ) { change, dy ->
-                    change.consume()
-                    acc += dy
-                    onDragDelta(acc)
-                }
-            }
-            .padding(top = 10.dp, bottom = 6.dp),
+            .navigationBarsPadding()
+            .padding(bottom = 14.dp)
+            .graphicsLayer {
+                alpha = fade
+                translationY = 18f * progress
+            },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
@@ -530,22 +577,20 @@ private fun ProfileRevealHandle(
                 .width(44.dp)
                 .height(5.dp)
                 .clip(RoundedCornerShape(999.dp))
-                .background(Color.White.copy(alpha = 0.45f)),
+                .background(Color.White.copy(alpha = 0.42f)),
         )
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 VIcons.ChevronDown,
                 contentDescription = null,
-                tint = Color.White.copy(alpha = 0.55f * (1f - progress)),
-                modifier = Modifier
-                    .size(16.dp)
-                    .graphicsLayer { rotationZ = 180f * progress },
+                tint = Color.White.copy(alpha = 0.6f),
+                modifier = Modifier.size(15.dp),
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                if (progress > 0.5f) "Swipe up to close" else "Swipe down for account options",
-                style = VTheme.type.caption.colored(Color.White.copy(alpha = 0.55f)),
+                "Swipe down for account options",
+                style = VTheme.type.caption.colored(Color.White.copy(alpha = 0.6f)),
             )
         }
     }
@@ -557,11 +602,15 @@ private fun ProfileRevealHandle(
  * linked children, discover schools, help) and a gated **Log out**. No popup/toast — it's a
  * drag-tracked sheet that becomes interactive only once mostly revealed.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun ProfileOptionsPanel(
     parentName: String,
     parentContact: String,
     progress: Float,
+    onCollapseDragStart: () -> Unit,
+    onCollapseDragDelta: (Float) -> Unit,
+    onCollapseDragEnd: () -> Unit,
     onLinkChild: () -> Unit,
     onDiscoverSchools: () -> Unit,
     onLogout: () -> Unit,
@@ -582,7 +631,9 @@ private fun ProfileOptionsPanel(
         icon = VIcons.AlertTriangle,
     )
 
-    // Panel occupies ~72% of height; translates fully off-screen at progress 0.
+    // Panel occupies ~74% of height; translates fully off-screen at progress 0. Below ~2% it's
+    // effectively closed, so we skip pointer input to let the card own all gestures.
+    val interactive = progress > 0.02f
     Column(
         modifier
             .fillMaxWidth()
@@ -595,12 +646,42 @@ private fun ProfileOptionsPanel(
             .background(c.background)
             .navigationBarsPadding(),
     ) {
+        // Top grab handle — swipe UP here (negative dy → reveal stays/closes path) collapses the
+        // panel back to the card. Reports accumulated dy to the host like the card does.
+        var acc by remember { mutableStateOf(0f) }
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .then(
+                    if (interactive) Modifier.pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onDragStart = { acc = 0f; onCollapseDragStart() },
+                            onDragEnd = { acc = 0f; onCollapseDragEnd() },
+                            onDragCancel = { acc = 0f; onCollapseDragEnd() },
+                        ) { change, dy ->
+                            change.consume()
+                            acc += dy
+                            onCollapseDragDelta(acc)
+                        }
+                    } else Modifier,
+                )
+                .padding(top = 10.dp, bottom = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                Modifier
+                    .width(40.dp)
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(c.ink3.copy(alpha = 0.35f)),
+            )
+        }
         Column(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
-                .padding(top = 18.dp, bottom = 24.dp),
+                .padding(top = 8.dp, bottom = 24.dp),
         ) {
             Text("Account", style = VTheme.type.h2.colored(c.ink))
             if (parentName.isNotBlank()) {
