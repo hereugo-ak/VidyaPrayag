@@ -9,3 +9,8 @@ actual fun todayIso(): String {
     val d = now.getDate()
     return isoOf(y, m, d)
 }
+
+actual fun nowMinutesOfDay(): Int {
+    val now = Date()
+    return now.getHours() * 60 + now.getMinutes()
+}

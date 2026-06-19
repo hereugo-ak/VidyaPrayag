@@ -26,12 +26,53 @@ data class ParentAttendanceData(
     @SerialName("total_days") val totalDays: Int = 0,
     @SerialName("attendance_rate") val attendanceRate: Int = 0,
     val records: List<ParentAttendanceDayDto> = emptyList(),
+    // RA-PP1: declared non-school days for the child's school (holidays/vacations),
+    // so the dashboard renders them distinctly from real absences. Defaulted so older
+    // server builds that omit the field still deserialize.
+    val holidays: List<ParentHolidayDto> = emptyList(),
 )
 
 @Serializable
 data class ParentAttendanceDayDto(
     val date: String,
     val status: String, // present | absent | late
+)
+
+@Serializable
+data class ParentHolidayDto(
+    val date: String = "",      // "YYYY-MM-DD"; empty for recurring (weekly) rules
+    val title: String = "",
+    val type: String = "",      // Public | School
+    val frequency: String = "", // weekly | monthly | yearly
+)
+
+// ── Timetable (RA-PP1: the child's class weekly schedule, recurring) ──
+@Serializable
+data class ParentTimetableResponse(
+    val success: Boolean,
+    val data: ParentTimetableData,
+)
+
+@Serializable
+data class ParentTimetableData(
+    @SerialName("child_name") val childName: String = "",
+    @SerialName("class_name") val className: String = "",
+    val weekdays: List<ParentTimetableDayDto> = emptyList(),
+)
+
+@Serializable
+data class ParentTimetableDayDto(
+    val weekday: Int, // 1=Mon … 7=Sun
+    val periods: List<ParentPeriodDto> = emptyList(),
+)
+
+@Serializable
+data class ParentPeriodDto(
+    @SerialName("start_time") val startTime: String,
+    @SerialName("end_time") val endTime: String,
+    val subject: String,
+    val room: String = "",
+    @SerialName("teacher_name") val teacherName: String = "",
 )
 
 // ── Marks ──
