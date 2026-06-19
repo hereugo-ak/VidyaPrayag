@@ -353,8 +353,12 @@ fun ProfilePlayerCard(
             house = house,
             level = child?.currentLevel ?: 0,
             progressPct = progressPct,
-            attendancePct = state.attendance?.attendanceRate ?: 0,
-            statusLabel = state.today.label,
+            // Attendance %: only a real figure once the month actually has recorded school days —
+            // otherwise null so the tile shows a graceful "—" instead of a stark, misleading 0%.
+            attendancePct = state.attendance?.takeIf { it.totalDays > 0 }?.attendanceRate,
+            // Status pill: prefer the resolved live label (Holiday/Sunday/…); fall back to the
+            // dashboard's own attendance_status so the card is never blank for a real child.
+            statusLabel = state.today.label.ifBlank { child?.attendanceStatus.orEmpty() },
             scorePct = state.latestMark?.let { m ->
                 val marks = m.marks
                 if (marks != null && m.maxMarks > 0) ((marks / m.maxMarks) * 100).roundToInt() else null
@@ -427,7 +431,7 @@ private fun ProfileCardContent(
     house: ProfileHouse,
     level: Int,
     progressPct: Int,
-    attendancePct: Int,
+    attendancePct: Int?,
     statusLabel: String,
     scorePct: Int?,
     topicsToday: Int,
@@ -507,7 +511,7 @@ private fun ProfileCardContent(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            StatTile("ATTEND", "$attendancePct%", house, Modifier.weight(1f))
+            StatTile("ATTEND", attendancePct?.let { "$it%" } ?: "—", house, Modifier.weight(1f))
             StatTile("SCORE", scorePct?.let { "$it%" } ?: "—", house, Modifier.weight(1f))
             StatTile("TODAY", topicsToday.toString(), house, Modifier.weight(1f))
         }
