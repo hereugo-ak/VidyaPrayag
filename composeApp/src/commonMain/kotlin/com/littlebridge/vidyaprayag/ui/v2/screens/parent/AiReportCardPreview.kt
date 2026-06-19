@@ -49,7 +49,9 @@ fun AiReportCardPreview(modifier: Modifier = Modifier) {
     val insights = listOf(
         InsightChrome(VIcons.Heart, "STRENGTHS", Color(0xFFA8E6CF).copy(alpha = 0.4f)),
         InsightChrome(VIcons.Target, "FOCUS AREAS", Color(0xFFFFD4A3).copy(alpha = 0.5f)),
-        InsightChrome(VIcons.BookOpen, "STUDY TIPS", c.teal.copy(alpha = 0.16f)),
+        // RA-PP-THEME: study-tips chip on the violet accent (was legacy teal) so the report-card
+        // preview stays inside the Parents Portal palette.
+        InsightChrome(VIcons.BookOpen, "STUDY TIPS", c.accent.copy(alpha = 0.16f)),
     )
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {

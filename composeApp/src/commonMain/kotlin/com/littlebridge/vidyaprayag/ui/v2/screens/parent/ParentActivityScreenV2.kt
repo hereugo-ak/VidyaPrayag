@@ -112,7 +112,9 @@ private fun ParentActivityContent(
 private fun AnnouncementCard(a: ParentAnnouncement) {
     val c = VTheme.colors
     val (chipBg, icon) = when (a.category.lowercase()) {
-        "holidays", "holiday" -> c.teal.copy(alpha = 0.16f) to VIcons.Calendar
+        // RA-PP-THEME: holidays read on the violet accent (matching the dashboard attendance card's
+        // holiday treatment), not the legacy teal — keeps the Parents Portal palette consistent.
+        "holidays", "holiday" -> c.accent.copy(alpha = 0.14f) to VIcons.Calendar
         "ptm" -> c.warning.copy(alpha = 0.45f) to VIcons.Users
         "events", "event" -> c.cream to VIcons.Star
         "reminder" -> c.danger.copy(alpha = 0.45f) to VIcons.Clock
