@@ -137,8 +137,40 @@ private fun TodayScheduleFace(periods: List<LivePeriod>, onExpand: (() -> Unit)?
         Spacer(Modifier.height(10.dp))
 
         if (periods.isEmpty()) {
-            Text("No classes scheduled today", style = VTheme.type.bodyStrong.colored(c.navyDeep).copy(fontSize = 13.sp))
-            Text("Enjoy the day off", style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))
+            // Premium empty state — a tinted plate with an icon + copy, never a bare line.
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(c.accent.copy(alpha = 0.07f))
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(VIcons.Calendar, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(20.dp))
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "No classes scheduled",
+                        style = VTheme.type.h3.colored(c.navyDeep).copy(fontSize = 15.sp, fontWeight = FontWeight.ExtraBold),
+                    )
+                    Text(
+                        "The day's timetable will appear here once it's published",
+                        style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
+                    )
+                }
+            }
+            if (onExpand != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Swipe for the weekly timetable",
+                    style = VTheme.type.label.colored(c.ink3).copy(fontSize = 9.sp, letterSpacing = 0.4.sp),
+                )
+            }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 periods.forEach { p -> PeriodRow(p) }

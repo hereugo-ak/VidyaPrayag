@@ -64,15 +64,34 @@ fun ParentCoveredCard(
         Spacer(Modifier.height(8.dp))
 
         if (count == 0) {
-            Text(
-                if (schoolDayEnded) "Nothing logged today" else "Nothing covered yet today",
-                style = VTheme.type.h3.colored(c.navyDeep).copy(fontWeight = FontWeight.ExtraBold, fontSize = 15.sp),
-            )
-            Text(
-                if (schoolDayEnded) "Teachers didn't log syllabus coverage today"
-                else "Check back as the school day progresses",
-                style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
-            )
+            // Premium empty state — tinted plate with an icon + copy.
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(c.accent.copy(alpha = 0.07f))
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(VIcons.BookOpen, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(20.dp))
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        if (schoolDayEnded) "Nothing logged today" else "Nothing covered yet today",
+                        style = VTheme.type.h3.colored(c.navyDeep).copy(fontWeight = FontWeight.ExtraBold, fontSize = 15.sp),
+                    )
+                    Text(
+                        if (schoolDayEnded) "Teachers didn't log syllabus coverage today"
+                        else "This fills in live as the school day progresses",
+                        style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
+                    )
+                }
+            }
         } else {
             val subjectCount = coveredToday.map { it.subject }.distinct().size
             Text(

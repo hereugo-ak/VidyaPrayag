@@ -506,51 +506,136 @@ private fun ProfileCardContent(
             )
         }
 
-        // ── Stat tiles: all real backend numbers ──
+        // ── Stat tiles: real backend numbers, each a layered-glass tile with a mini
+        //    progress arc (ATTEND/SCORE) or a count badge (TODAY). Premium depth, not capsules. ──
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            StatTile("ATTEND", attendancePct?.let { "$it%" } ?: "—", house, Modifier.weight(1f))
-            StatTile("SCORE", scorePct?.let { "$it%" } ?: "—", house, Modifier.weight(1f))
-            StatTile("TODAY", topicsToday.toString(), house, Modifier.weight(1f))
+            StatTile(
+                label = "ATTEND",
+                value = attendancePct?.let { "$it%" } ?: "—",
+                ratio = attendancePct?.let { it / 100f },
+                house = house,
+                modifier = Modifier.weight(1f),
+            )
+            StatTile(
+                label = "SCORE",
+                value = scorePct?.let { "$it%" } ?: "—",
+                ratio = scorePct?.let { it / 100f },
+                house = house,
+                modifier = Modifier.weight(1f),
+            )
+            StatTile(
+                label = "TODAY",
+                value = topicsToday.toString(),
+                ratio = null,
+                sub = if (topicsToday == 1) "topic" else "topics",
+                house = house,
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }
 
+/**
+ * A premium glass stat tile. Renders a layered glass surface (top sheen + inset foil hairline)
+ * with a mini progress arc behind the value when a [ratio] is supplied, or a clean count when not.
+ */
 @Composable
 private fun StatTile(
     label: String,
     value: String,
+    ratio: Float?,
     house: ProfileHouse,
     modifier: Modifier = Modifier,
+    sub: String? = null,
 ) {
     Column(
         modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(Color.White.copy(alpha = 0.12f))
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.13f))
             .drawWithContent {
                 drawContent()
-                // thin top sheen on each glass tile
+                // top sheen
                 drawRect(
                     brush = Brush.verticalGradient(
-                        listOf(Color.White.copy(alpha = 0.16f), Color.Transparent),
+                        listOf(Color.White.copy(alpha = 0.18f), Color.Transparent),
                         endY = size.height * 0.5f,
                     ),
                 )
+                // inset foil hairline
+                val s = 1.2.dp.toPx()
+                drawRoundRect(
+                    color = house.foil.copy(alpha = 0.28f),
+                    topLeft = Offset(s / 2f, s / 2f),
+                    size = Size(size.width - s, size.height - s),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(15.dp.toPx(), 15.dp.toPx()),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = s),
+                )
             }
-            .padding(vertical = 12.dp, horizontal = 8.dp),
+            .padding(vertical = 14.dp, horizontal = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            value,
-            style = VTheme.type.h3.colored(house.onColor).copy(fontWeight = FontWeight.Black),
-        )
-        Spacer(Modifier.height(2.dp))
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(46.dp)) {
+            if (ratio != null) {
+                StatArc(ratio = ratio.coerceIn(0f, 1f), house = house, modifier = Modifier.fillMaxSize())
+            }
+            Text(
+                value,
+                style = VTheme.type.dataLg.colored(house.onColor).copy(
+                    fontWeight = FontWeight.Black,
+                    fontSize = 16.sp,
+                ),
+            )
+        }
+        Spacer(Modifier.height(6.dp))
         Text(
             label,
-            style = VTheme.type.label.colored(house.onColor.copy(alpha = 0.8f)).copy(fontSize = 9.sp),
+            style = VTheme.type.label.colored(house.onColor.copy(alpha = 0.82f)).copy(
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.8.sp,
+            ),
         )
+        if (sub != null) {
+            Text(
+                sub,
+                style = VTheme.type.caption.colored(house.onColor.copy(alpha = 0.6f)).copy(fontSize = 8.5.sp),
+            )
+        }
+    }
+}
+
+/** A small foil progress arc drawn behind a stat value. */
+@Composable
+private fun StatArc(ratio: Float, house: ProfileHouse, modifier: Modifier = Modifier) {
+    val sweep by animateFloatAsState(targetValue = ratio, label = "statArc")
+    Box(modifier) {
+        androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+            val stroke = 3.5.dp.toPx()
+            val inset = stroke / 2f
+            val arcSize = Size(size.width - stroke, size.height - stroke)
+            val topLeft = Offset(inset, inset)
+            drawArc(
+                color = Color.White.copy(alpha = 0.2f),
+                startAngle = 0f, sweepAngle = 360f, useCenter = false,
+                topLeft = topLeft, size = arcSize,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = stroke,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                ),
+            )
+            drawArc(
+                brush = Brush.sweepGradient(listOf(house.foil.copy(alpha = 0.8f), Color.White)),
+                startAngle = -90f, sweepAngle = 360f * sweep, useCenter = false,
+                topLeft = topLeft, size = arcSize,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = stroke,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                ),
+            )
+        }
     }
 }
 

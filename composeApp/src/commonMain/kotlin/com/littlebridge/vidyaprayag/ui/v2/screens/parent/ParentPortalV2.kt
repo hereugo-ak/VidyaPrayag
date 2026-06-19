@@ -208,6 +208,7 @@ fun ParentPortalV2(
                     onDiscoverSchools = { overlay = ParentOverlay.Discovery },
                     onOpenNotifications = { overlay = ParentOverlay.Notifications },
                     onOpenFees = { tab = "fees" },
+                    onOpenAcademics = { tab = "academics" },
                 )
                 "academics" -> ParentAcademicsScreenV2(onOpenLeave = { overlay = ParentOverlay.Leave })
                 "fees" -> ParentFeesScreenV2()

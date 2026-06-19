@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -46,10 +45,58 @@ fun ParentResultsCard(
     latestMark: ParentMarkDto?,
     previousMark: ParentMarkDto?,
     trend: List<Double>,
+    onOpenAcademics: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
-    if (latestMark == null || latestMark.marks == null) return // nothing published → omit the card
+
+    // Nothing published yet → a premium "awaiting results" state, never a collapsed card.
+    if (latestMark == null || latestMark.marks == null) {
+        VCard(modifier = modifier, padding = 14.dp, onClick = onOpenAcademics) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(VIcons.TrendingUp, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(14.dp))
+                    Text(
+                        "ACADEMICS",
+                        style = VTheme.type.label.colored(c.ink3).copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
+                    )
+                }
+                Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(16.dp))
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(c.accent.copy(alpha = 0.07f))
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Box(
+                    Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(c.accent.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(VIcons.ClipboardList, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(20.dp))
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "No results published yet",
+                        style = VTheme.type.h3.colored(c.navyDeep).copy(fontSize = 15.sp, fontWeight = FontWeight.ExtraBold),
+                    )
+                    Text(
+                        "See the full progress report in Academics",
+                        style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
+                    )
+                }
+            }
+        }
+        return
+    }
 
     val score = latestMark.marks!!.roundToInt()
     val max = latestMark.maxMarks
@@ -57,7 +104,7 @@ fun ParentResultsCard(
         (latestMark.marks!! - previousMark.marks!!).roundToInt()
     } else null
 
-    VCard(modifier = modifier, padding = 14.dp) {
+    VCard(modifier = modifier, padding = 14.dp, onClick = onOpenAcademics) {
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top,
@@ -161,7 +208,32 @@ fun ParentFeesCard(
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
-    if (fees == null) return
+
+    // No fees data yet → a premium placeholder row, never a vanished card.
+    if (fees == null) {
+        VCard(modifier = modifier, padding = 12.dp, onClick = onOpenFees) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(
+                    Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(c.accent.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(VIcons.Wallet, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(17.dp))
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Fees",
+                        style = VTheme.type.bodyStrong.colored(c.navyDeep).copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                    )
+                    Text(
+                        "Open the ledger to view dues & payments",
+                        style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 10.sp),
+                    )
+                }
+                Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(16.dp))
+            }
+        }
+        return
+    }
 
     val overdue = fees.overdueCount
     val outstanding = fees.outstandingFees

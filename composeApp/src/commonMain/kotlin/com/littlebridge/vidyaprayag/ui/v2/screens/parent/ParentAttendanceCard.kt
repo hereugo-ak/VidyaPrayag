@@ -133,7 +133,12 @@ fun ParentAttendanceCard(
     }
 }
 
-/** Front face — the today verdict + month ring (commit 3 content). */
+/**
+ * Front face — the today verdict + month ring. ALWAYS renders a rich, premium body:
+ * a tinted status hero (icon + headline + subline) and a stat band. When the month has real
+ * records the band is the live attendance ring + breakdown; when it's empty the band becomes a
+ * polished "tracking from today" placeholder — never a collapsed, near-blank card.
+ */
 @Composable
 private fun TodayFace(
     today: TodayAttendance,
@@ -142,6 +147,7 @@ private fun TodayFace(
 ) {
     val c = VTheme.colors
     val tone = toneFor(today.state)
+    val hasMonth = attendance != null && attendance.totalDays > 0
 
     Column(Modifier.fillMaxWidth()) {
         Row(
@@ -152,54 +158,130 @@ private fun TodayFace(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 VStatusDot(color = tone.dot, size = 6.dp)
                 Text(
-                    "LIVE · TODAY",
+                    "ATTENDANCE · TODAY",
                     style = VTheme.type.label.colored(c.ink3).copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
                 )
             }
             StatePill(label = tone.badge, bg = tone.badgeBg, fg = tone.badgeFg)
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
 
-        Text(
-            tone.headline,
-            style = VTheme.type.h3.colored(c.navyDeep).copy(fontWeight = FontWeight.ExtraBold, fontSize = 15.sp),
-        )
-        if (tone.subline.isNotBlank()) {
-            Text(tone.subline, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))
+        // ── Status hero — a tinted plate with an icon + verdict, always present. ──
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(tone.heroBg)
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                Modifier.size(40.dp).clip(CircleShape).background(tone.dot.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(tone.icon, contentDescription = null, tint = tone.dot, modifier = Modifier.size(20.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    tone.headline,
+                    style = VTheme.type.h3.colored(c.navyDeep).copy(fontWeight = FontWeight.ExtraBold, fontSize = 15.sp),
+                )
+                if (tone.subline.isNotBlank()) {
+                    Text(tone.subline, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp))
+                }
+            }
         }
 
-        if (attendance != null && attendance.totalDays > 0) {
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                AttendanceRing(percent = attendance.attendanceRate.coerceIn(0, 100), modifier = Modifier.size(48.dp))
+        Spacer(Modifier.height(12.dp))
+
+        // ── Stat band — ring + breakdown when there's a month; polished placeholder when not. ──
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            if (hasMonth) {
+                AttendanceRing(percent = attendance!!.attendanceRate.coerceIn(0, 100), modifier = Modifier.size(56.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "Attendance this month",
-                        style = VTheme.type.bodyStrong.colored(c.navyDeep).copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                        "This month",
+                        style = VTheme.type.label.colored(c.ink3).copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp),
+                    )
+                    Text(
+                        "${attendance.attendanceRate}% present",
+                        style = VTheme.type.bodyStrong.colored(c.navyDeep).copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
                     )
                     Text(monthBreakdown(attendance), style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 10.sp))
                 }
-                if (onExpand != null) {
-                    // affordance: a calendar chevron hinting the swipe-to-calendar.
-                    val ix = remember { MutableInteractionSource() }
-                    Box(
-                        Modifier.size(28.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.1f))
-                            .clickable(interactionSource = ix, indication = null) { onExpand() },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(VIcons.Calendar, contentDescription = "Open calendar", tint = c.accentDeep, modifier = Modifier.size(15.dp))
-                    }
+            } else {
+                // Empty month → an intentional, on-brand placeholder ring (dashed track) + copy.
+                EmptyRing(modifier = Modifier.size(56.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "This month",
+                        style = VTheme.type.label.colored(c.ink3).copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp),
+                    )
+                    Text(
+                        "Tracking from today",
+                        style = VTheme.type.bodyStrong.colored(c.navyDeep).copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                    )
+                    Text(
+                        "The month fills in as the class is marked",
+                        style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 10.sp),
+                    )
                 }
             }
+
             if (onExpand != null) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "Swipe for the month calendar",
-                    style = VTheme.type.label.colored(c.ink3).copy(fontSize = 9.sp, letterSpacing = 0.4.sp),
+                val ix = remember { MutableInteractionSource() }
+                Box(
+                    Modifier.size(32.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.1f))
+                        .clickable(interactionSource = ix, indication = null) { onExpand() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(VIcons.Calendar, contentDescription = "Open calendar", tint = c.accentDeep, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+
+        if (onExpand != null) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Swipe for the month calendar",
+                style = VTheme.type.label.colored(c.ink3).copy(fontSize = 9.sp, letterSpacing = 0.4.sp),
+            )
+        }
+    }
+}
+
+/** A soft dashed placeholder ring with a centred dash — used when the month has no records yet. */
+@Composable
+private fun EmptyRing(modifier: Modifier = Modifier) {
+    val c = VTheme.colors
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Canvas(Modifier.matchParentSize()) {
+            val stroke = 4.dp.toPx()
+            val inset = stroke / 2f
+            val arcSize = Size(size.width - stroke, size.height - stroke)
+            val topLeft = Offset(inset, inset)
+            // dashed track via a series of short arcs
+            val gaps = 16
+            val seg = 360f / gaps
+            for (i in 0 until gaps step 2) {
+                drawArc(
+                    color = c.accent.copy(alpha = 0.2f),
+                    startAngle = -90f + i * seg,
+                    sweepAngle = seg * 0.7f,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = stroke, cap = StrokeCap.Round),
                 )
             }
         }
+        Text("—", style = VTheme.type.dataSm.colored(c.accentDeep).copy(fontWeight = FontWeight.ExtraBold, fontSize = 13.sp))
     }
 }
 
@@ -420,6 +502,8 @@ private data class AttendanceTone(
     val dot: Color,
     val badgeBg: Color,
     val badgeFg: Color,
+    val heroBg: Color,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
 )
 
 @Composable
@@ -429,30 +513,37 @@ private fun toneFor(state: AttendanceDayState): AttendanceTone {
         AttendanceDayState.Present -> AttendanceTone(
             "Present", "Marked present today", "Your child is in school",
             c.successInk, c.success.copy(alpha = 0.42f), c.successInk,
+            c.success.copy(alpha = 0.18f), VIcons.ShieldCheck,
         )
         AttendanceDayState.Late -> AttendanceTone(
             "Late", "Arrived late today", "Marked present, after the bell",
             c.warningInk, c.warning.copy(alpha = 0.55f), c.warningInk,
+            c.warning.copy(alpha = 0.28f), VIcons.Clock,
         )
         AttendanceDayState.Absent -> AttendanceTone(
             "Absent", "Marked absent today", "No attendance recorded for today",
             c.dangerInk, c.danger.copy(alpha = 0.55f), c.dangerInk,
+            c.danger.copy(alpha = 0.28f), VIcons.AlertCircle,
         )
         AttendanceDayState.Holiday -> AttendanceTone(
-            "Holiday", "School holiday today", "",
+            "Holiday", "School holiday today", "Enjoy the day off",
             c.accentDeep, c.accent.copy(alpha = 0.14f), c.accentDeep,
+            c.accent.copy(alpha = 0.1f), VIcons.Calendar,
         )
         AttendanceDayState.Vacation -> AttendanceTone(
             "Break", "On vacation", "Enjoy the break",
             c.accentDeep, c.accent.copy(alpha = 0.14f), c.accentDeep,
+            c.accent.copy(alpha = 0.1f), VIcons.Sparkles,
         )
         AttendanceDayState.Sunday -> AttendanceTone(
             "Sunday", "No school today", "It's a Sunday",
             c.ink3, c.cream, c.ink2,
+            c.cream, VIcons.Calendar,
         )
         AttendanceDayState.NoData -> AttendanceTone(
             "Awaiting", "Attendance not marked yet", "You'll see today's status once the class is marked",
-            c.ink3, c.cream, c.ink2,
+            c.accentDeep, c.accent.copy(alpha = 0.12f), c.accentDeep,
+            c.accent.copy(alpha = 0.08f), VIcons.Clock,
         )
     }
 }
