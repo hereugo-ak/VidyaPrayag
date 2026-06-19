@@ -154,6 +154,13 @@ private fun ParentDashboardContent(
                 attendance = state.attendance,
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            // ── Today's schedule card (live) ────────────────────────────────────
+            ParentScheduleCard(
+                todayPeriods = state.todayPeriods,
+                timetable = state.timetable,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
