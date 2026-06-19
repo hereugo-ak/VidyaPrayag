@@ -56,7 +56,10 @@ fun VScreenScaffold(
                 .background(c.background),
         ) {
             topBar?.invoke()
-            Box(Modifier.weight(1f).fillMaxWidth()) {
+            // Opaque content surface — guarantees a tab's scrolling content can never
+            // ghost/bleed through onto whatever rendered beneath it (defends against the
+            // transient overlap artefacts seen on slow web first-paint).
+            Box(Modifier.weight(1f).fillMaxWidth().background(c.background)) {
                 content(PaddingValues(VTheme.dimens.screenPadding))
             }
             bottomBar?.invoke()
