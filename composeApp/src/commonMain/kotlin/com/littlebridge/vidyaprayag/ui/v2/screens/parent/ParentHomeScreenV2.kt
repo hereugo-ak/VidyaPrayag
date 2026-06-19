@@ -71,6 +71,7 @@ fun ParentHomeScreenV2(
     modifier: Modifier = Modifier,
     onDiscoverSchools: () -> Unit = {},
     onOpenNotifications: () -> Unit = {},
+    onOpenFees: () -> Unit = {},
     viewModel: ParentDashboardViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
@@ -89,6 +90,7 @@ fun ParentHomeScreenV2(
         onRetry = viewModel::load,
         onSelectChild = viewModel::selectChild,
         onOpenNotifications = onOpenNotifications,
+        onOpenFees = onOpenFees,
         modifier = modifier,
     )
 }
@@ -101,6 +103,7 @@ private fun ParentDashboardContent(
     onRetry: () -> Unit,
     onSelectChild: (String) -> Unit,
     onOpenNotifications: () -> Unit,
+    onOpenFees: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -176,6 +179,21 @@ private fun ParentDashboardContent(
                 coveredToday = state.coveredToday,
                 schoolDayEnded = state.schoolDayEnded,
                 onOpenDetail = { coveredDetailOpen = true },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            // ── Academics: latest published result + sparkline ──────────────────
+            ParentResultsCard(
+                latestMark = state.latestMark,
+                previousMark = state.previousMarkForSubject,
+                trend = state.markTrend,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            // ── Fees ────────────────────────────────────────────────────────────
+            ParentFeesCard(
+                fees = state.fees,
+                onOpenFees = onOpenFees,
                 modifier = Modifier.fillMaxWidth(),
             )
         }

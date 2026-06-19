@@ -7,6 +7,7 @@ import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
 import com.littlebridge.vidyaprayag.core.state.SelectedChildHolder
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.DashboardAlertDto
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.DashboardChildSummary
+import com.littlebridge.vidyaprayag.feature.parent.domain.model.FeeData
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.ParentAttendanceData
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.ParentHolidayDto
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.ParentMarkDto
@@ -106,7 +107,13 @@ data class ParentDashboardState(
     // marks (academics card)
     val latestMark: ParentMarkDto? = null,
     val previousMarkForSubject: ParentMarkDto? = null,
+    /** Recent scored marks for the same subject as [latestMark], oldest→newest, for the sparkline. */
+    val markTrend: List<Double> = emptyList(),
     val marksLoading: Boolean = false,
+
+    // fees (fees card)
+    val fees: FeeData? = null,
+    val feesLoading: Boolean = false,
 ) {
     val selectedChild: DashboardChildSummary?
         get() = children.firstOrNull { it.id == selectedChildId } ?: children.firstOrNull()
@@ -181,7 +188,8 @@ class ParentDashboardViewModel(
                 attendance = null, today = TodayAttendance(AttendanceDayState.NoData),
                 timetable = null, todayPeriods = emptyList(),
                 syllabus = null, coveredToday = emptyList(),
-                latestMark = null, previousMarkForSubject = null,
+                latestMark = null, previousMarkForSubject = null, markTrend = emptyList(),
+                fees = null,
             )
         }
         selectedChildHolder.select(childId)
@@ -206,6 +214,18 @@ class ParentDashboardViewModel(
         loadTimetable(childId)
         loadSyllabus(childId)
         loadMarks(childId)
+        loadFees(childId)
+    }
+
+    private fun loadFees(childId: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(feesLoading = true) }
+            val token = token() ?: run { _state.update { it.copy(feesLoading = false) }; return@launch }
+            when (val r = repository.getFees(token, childId)) {
+                is NetworkResult.Success -> _state.update { it.copy(feesLoading = false, fees = r.data.data) }
+                else -> _state.update { it.copy(feesLoading = false) }
+            }
+        }
     }
 
     private fun loadAttendance(childId: String) {
@@ -277,7 +297,15 @@ class ParentDashboardViewModel(
                     val prev = if (latest != null) {
                         scored.drop(1).firstOrNull { m -> m.subject == latest.subject }
                     } else null
-                    it.copy(marksLoading = false, latestMark = latest, previousMarkForSubject = prev)
+                    // Build the sparkline trend: same-subject scores as a percentage of max,
+                    // server orders DESC so reverse to oldest→newest. Capped to the last 8.
+                    val trend = if (latest != null) {
+                        scored.filter { m -> m.subject == latest.subject && m.marks != null && m.maxMarks > 0 }
+                            .map { m -> (m.marks!! / m.maxMarks) * 100.0 }
+                            .take(8)
+                            .reversed()
+                    } else emptyList()
+                    it.copy(marksLoading = false, latestMark = latest, previousMarkForSubject = prev, markTrend = trend)
                 }
                 else -> _state.update { it.copy(marksLoading = false) }
             }
