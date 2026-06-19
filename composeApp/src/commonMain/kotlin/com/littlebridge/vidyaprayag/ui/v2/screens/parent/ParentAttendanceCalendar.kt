@@ -136,7 +136,7 @@ internal fun ParentAttendanceCalendar(
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             LegendDot(c.success, "Present")
-            LegendDot(c.teal, "Late")
+            LegendDot(c.warning, "Late")
             LegendDot(c.danger, "Absent")
         }
     }
@@ -171,7 +171,7 @@ private fun DayCell(day: Int, status: String?) {
     val c = VTheme.colors
     val bg = when (status) {
         "present" -> c.success
-        "late" -> c.teal
+        "late" -> c.warning
         "absent" -> c.danger
         else -> Color.Transparent
     }
