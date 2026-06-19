@@ -26,9 +26,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -90,6 +94,7 @@ fun ParentHomeScreenV2(
 }
 
 /** Stateless body. */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun ParentDashboardContent(
     state: ParentDashboardState,
@@ -101,10 +106,14 @@ private fun ParentDashboardContent(
     val c = VTheme.colors
     val d = VTheme.dimens
 
+    // In-app "covered today" detail overlay state — component-scoped, NOT a separate screen.
+    var coveredDetailOpen by remember { mutableStateOf(false) }
+    BackHandler(enabled = coveredDetailOpen) { coveredDetailOpen = false }
+
+    Box(modifier.fillMaxSize().background(c.lavender)) {
     Column(
-        modifier
+        Modifier
             .fillMaxSize()
-            .background(c.lavender)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp)
@@ -161,7 +170,25 @@ private fun ParentDashboardContent(
                 timetable = state.timetable,
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            // ── Covered today card (live + end-of-day summary) ──────────────────
+            ParentCoveredCard(
+                coveredToday = state.coveredToday,
+                schoolDayEnded = state.schoolDayEnded,
+                onOpenDetail = { coveredDetailOpen = true },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
+    }
+
+    // In-app detail overlay (mounts above the dashboard, not a navigation push).
+    ParentCoveredDetailOverlay(
+        visible = coveredDetailOpen,
+        coveredToday = state.coveredToday,
+        syllabus = state.syllabus,
+        schoolDayEnded = state.schoolDayEnded,
+        onDismiss = { coveredDetailOpen = false },
+    )
     }
 }
 
