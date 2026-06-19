@@ -145,6 +145,15 @@ private fun ParentDashboardContent(
                     }
                 }
             }
+
+            Spacer(Modifier.height(4.dp))
+
+            // ── Attendance card (primary feature) ───────────────────────────────
+            ParentAttendanceCard(
+                today = state.today,
+                attendance = state.attendance,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
