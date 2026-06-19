@@ -84,6 +84,11 @@ private fun ParentFeesContent(
             emptyBody = "Once your school publishes fees, they'll appear here.",
             skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonFee() },
         ) {
+            // LAYOUT FIX: VStateHost hosts content inside an AnimatedContent (Box-like / stacking).
+            // Emitting the hero, the notices and the footer as bare siblings made them overlap
+            // (the "Have a question" line piling onto "Deadline"/"Payment"). One wrapping Column
+            // restores the vertical 12dp rhythm.
+            Column(verticalArrangement = Arrangement.spacedBy(d.sm + 4.dp)) {
             // ── Hero: outstanding balance + collection progress ─────────────────
             VCard(padding = 0.dp) {
                 Box(
@@ -133,7 +138,7 @@ private fun ParentFeesContent(
                         VLabel("Collected this term")
                         Text(state.totalCollected, style = VTheme.type.data.colored(c.ink).copy(fontWeight = FontWeight.SemiBold))
                     }
-                    VProgressBar(value = (state.collectionProgress * 100f))
+                    VProgressBar(value = (state.collectionProgress * 100f), tone = VBadgeTone.Accent)
                 }
             }
 
@@ -169,6 +174,7 @@ private fun ParentFeesContent(
                 style = VTheme.type.caption.colored(c.accentDeep).copy(fontWeight = FontWeight.SemiBold),
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             )
+            } // end content Column
         }
     }
 }

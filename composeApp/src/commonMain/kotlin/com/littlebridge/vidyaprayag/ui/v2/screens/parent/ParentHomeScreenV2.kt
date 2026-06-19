@@ -168,78 +168,85 @@ private fun ParentDashboardContent(
                 onRetry = onRetry,
                 skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonDashboard() },
             ) {
+                // CRITICAL LAYOUT FIX: VStateHost runs its content through an AnimatedContent,
+                // whose internal layout is Box-like — it STACKS its children. The dashboard emits
+                // ~8 sibling cards, so without an explicit Column they all piled on top of one
+                // another at y=0 (the "Fees over Results over Attendance" overlap bug). Wrapping
+                // them in a single Column makes AnimatedContent host exactly one child that lays
+                // the cards out vertically, with the same 14dp rhythm as the outer scroll column.
                 val child = state.selectedChild
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    // ── Top bar: eyebrow + chat/bell actions ─────────────────────────
+                    TopBar(onOpenNotifications = onOpenNotifications)
 
-                // ── Top bar: eyebrow + chat/bell actions ─────────────────────────
-                TopBar(onOpenNotifications = onOpenNotifications)
+                    // ── Hero: identity + live journey ring (always rich) ─────────────
+                    HeroJourneyCard(
+                        child = child,
+                        className = state.timetable?.className.orEmpty(),
+                        todayState = state.today.state,
+                        statusLabel = state.today.label,
+                        contextLine = contextLineFor(state),
+                    )
 
-                // ── Hero: identity + live journey ring (always rich) ─────────────
-                HeroJourneyCard(
-                    child = child,
-                    className = state.timetable?.className.orEmpty(),
-                    todayState = state.today.state,
-                    statusLabel = state.today.label,
-                    contextLine = contextLineFor(state),
-                )
-
-                // ── Child switcher (only when 2+ children are linked) ────────────
-                if (state.children.size > 1) {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(state.children, key = { it.id }) { ch ->
-                            ChildChip(
-                                name = ch.name.ifBlank { "—" },
-                                src = ch.profilePic,
-                                selected = ch.id == state.selectedChildId,
-                                onClick = { onSelectChild(ch.id) },
-                            )
+                    // ── Child switcher (only when 2+ children are linked) ────────────
+                    if (state.children.size > 1) {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(state.children, key = { it.id }) { ch ->
+                                ChildChip(
+                                    name = ch.name.ifBlank { "—" },
+                                    src = ch.profilePic,
+                                    selected = ch.id == state.selectedChildId,
+                                    onClick = { onSelectChild(ch.id) },
+                                )
+                            }
                         }
                     }
+
+                    // ── Alert strip (real /dashboard alerts — populated for the demo) ─
+                    if (state.alerts.isNotEmpty()) {
+                        AlertStrip(alerts = state.alerts)
+                    }
+
+                    // ── Attendance card (primary feature) ────────────────────────────
+                    ParentAttendanceCard(
+                        today = state.today,
+                        attendance = state.attendance,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    // ── Today's schedule card (live) ─────────────────────────────────
+                    ParentScheduleCard(
+                        todayPeriods = state.todayPeriods,
+                        timetable = state.timetable,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    // ── Covered today card (live + end-of-day summary) ───────────────
+                    ParentCoveredCard(
+                        coveredToday = state.coveredToday,
+                        schoolDayEnded = state.schoolDayEnded,
+                        onOpenDetail = { coveredDetailOpen = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    // ── Academics: latest published result + sparkline ───────────────
+                    ParentResultsCard(
+                        latestMark = state.latestMark,
+                        previousMark = state.previousMarkForSubject,
+                        trend = state.markTrend,
+                        onOpenAcademics = onOpenAcademics,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    // ── Fees ─────────────────────────────────────────────────────────
+                    ParentFeesCard(
+                        fees = state.fees,
+                        onOpenFees = onOpenFees,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    Spacer(Modifier.height(2.dp))
                 }
-
-                // ── Alert strip (real /dashboard alerts — populated for the demo) ─
-                if (state.alerts.isNotEmpty()) {
-                    AlertStrip(alerts = state.alerts)
-                }
-
-                // ── Attendance card (primary feature) ────────────────────────────
-                ParentAttendanceCard(
-                    today = state.today,
-                    attendance = state.attendance,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                // ── Today's schedule card (live) ─────────────────────────────────
-                ParentScheduleCard(
-                    todayPeriods = state.todayPeriods,
-                    timetable = state.timetable,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                // ── Covered today card (live + end-of-day summary) ───────────────
-                ParentCoveredCard(
-                    coveredToday = state.coveredToday,
-                    schoolDayEnded = state.schoolDayEnded,
-                    onOpenDetail = { coveredDetailOpen = true },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                // ── Academics: latest published result + sparkline ───────────────
-                ParentResultsCard(
-                    latestMark = state.latestMark,
-                    previousMark = state.previousMarkForSubject,
-                    trend = state.markTrend,
-                    onOpenAcademics = onOpenAcademics,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                // ── Fees ─────────────────────────────────────────────────────────
-                ParentFeesCard(
-                    fees = state.fees,
-                    onOpenFees = onOpenFees,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                Spacer(Modifier.height(2.dp))
             }
         }
 
