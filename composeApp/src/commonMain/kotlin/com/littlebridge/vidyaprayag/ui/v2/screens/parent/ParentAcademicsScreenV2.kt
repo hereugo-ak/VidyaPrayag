@@ -1,9 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.parent
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -78,7 +75,6 @@ fun ParentAcademicsScreenV2(
     ParentAcademicsContent(
         state = state,
         academics = academics,
-        onSelectChild = academicsViewModel::selectChild,
         onLoadAttendance = { academicsViewModel.loadAttendance() },
         onLoadMarks = { academicsViewModel.loadMarks() },
         onLoadSyllabus = { academicsViewModel.loadSyllabus() },
@@ -92,7 +88,6 @@ fun ParentAcademicsScreenV2(
 private fun ParentAcademicsContent(
     state: TrackProgressState,
     academics: ParentAcademicsState,
-    onSelectChild: (String) -> Unit,
     onLoadAttendance: () -> Unit,
     onLoadMarks: () -> Unit,
     onLoadSyllabus: () -> Unit,
@@ -116,15 +111,17 @@ private fun ParentAcademicsContent(
     Column(
         modifier
             .fillMaxSize()
-            // Same lavender aurora canvas as the dashboard — a soft violet bloom top-left so the
-            // screen reads as one premium surface, not a flat grey sheet.
-            .background(c.lavender)
+            // The canvas IS the website background token (#FCF8FF) — exactly like the Home
+            // dashboard. Lavender is the brand ACCENT, not a wall-to-wall fill, so the wash is a
+            // barely-there whisper (≤4%) top-left rather than a heavy violet bloom that used to
+            // take over the whole screen. Keeps every tab feeling like one calm premium surface.
+            .background(c.background)
             .drawBehind {
                 drawRect(
                     brush = Brush.radialGradient(
-                        colors = listOf(c.accent.copy(alpha = 0.10f), Color.Transparent),
+                        colors = listOf(c.accent.copy(alpha = 0.04f), Color.Transparent),
                         center = Offset(size.width * 0.12f, size.height * 0.02f),
-                        radius = size.width * 0.95f,
+                        radius = size.width * 0.9f,
                     ),
                 )
             }
@@ -171,32 +168,10 @@ private fun ParentAcademicsContent(
         }
         Spacer(Modifier.height(12.dp))
 
-        // RA-56: child switcher — only shown for a multi-child parent. Single-child
-        // parents see no chrome; zero children is handled by the empty tabs below.
-        if (academics.children.size > 1) {
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                academics.children.forEach { child ->
-                    val selected = child.id == (academics.selectedChild?.id)
-                    Box(
-                        Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(if (selected) c.accentDeep else c.cream)
-                            .border(1.dp, if (selected) c.accentDeep else c.hairline, RoundedCornerShape(20.dp))
-                            .clickable { onSelectChild(child.id) }
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                    ) {
-                        Text(
-                            child.name,
-                            style = VTheme.type.body.colored(if (selected) c.card else c.ink),
-                        )
-                    }
-                }
-            }
-        }
+        // ONE CANONICAL CHILD SWITCHER (design law): the active child is chosen ONLY from the
+        // dropdown in the shared portal header (ParentPortalV2 → ParentHeader). The pick flows
+        // through the app-scoped SelectedChildHolder, so this screen re-scopes reactively — there
+        // is deliberately NO second switcher here anymore.
 
         VTopTabs(
             tabs = listOf("Overview", "Attendance", "Marks", "Syllabus", "Report"),
@@ -228,15 +203,21 @@ private fun ParentAcademicsContent(
 private fun AttendanceTab(academics: ParentAcademicsState, onRetry: () -> Unit) {
     val c = VTheme.colors
     val data = academics.attendance
+    // NOTE (directive): the month calendar is a permanent element of this tab — it ALWAYS renders,
+    // even when no attendance has been marked yet. We never gate it behind an empty state, and we
+    // never invent fake attendance: an unmarked month simply shows blank day cells. Only genuine
+    // loading / hard-error conditions take over the surface.
     VStateHost(
         loading = academics.attendanceLoading,
         error = academics.attendanceError,
-        isEmpty = data != null && data.totalDays == 0,
-        emptyTitle = "No attendance yet",
-        emptyBody = "Daily attendance will appear here once the school marks it.",
+        // Empty is handled INLINE below (a calm note above a real, empty calendar), not as a
+        // full-surface takeover — so the calendar is always present.
+        isEmpty = false,
         onRetry = onRetry,
     ) {
-        if (data != null) {
+        val hasData = data != null && data.totalDays > 0
+        if (hasData && data != null) {
+            // Summary card — only when there is real marked attendance to summarise.
             VCard {
                 VLabel("This term")
                 Spacer(Modifier.height(8.dp))
@@ -253,10 +234,37 @@ private fun AttendanceTab(academics: ParentAcademicsState, onRetry: () -> Unit) 
                     Text("Absent ${data.absentDays}", style = VTheme.type.caption.colored(c.ink2))
                 }
             }
-            // RA-S19: month-grid calendar (was a flat list of date rows). Each day cell
-            // is colour-coded by status; the month can be paged. See ParentAttendanceCalendar.
-            ParentAttendanceCalendar(records = data.records)
+        } else {
+            // No attendance marked yet — a calm, honest note. NO fabricated stats, no fake rate.
+            VCard {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Box(
+                        Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(c.accent.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(VIcons.Calendar, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(20.dp))
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text("No attendance marked yet", style = VTheme.type.bodyStrong.colored(c.ink))
+                        Text(
+                            "Days will fill in below as the school marks attendance.",
+                            style = VTheme.type.caption.colored(c.ink2),
+                        )
+                    }
+                }
+            }
         }
+
+        // RA-S19: the month-grid calendar — ALWAYS shown. With real records each day cell is
+        // colour-coded by status; with none, it renders a clean, empty (blank-cell) month so the
+        // tab still feels complete and premium. See ParentAttendanceCalendar.
+        ParentAttendanceCalendar(records = data?.records ?: emptyList())
     }
 }
 
