@@ -96,12 +96,19 @@ fun VTag(
     onClick: (() -> Unit)? = null,
     trailingIcon: ImageVector? = null, // §7.2: People filter chips carry an inline ChevronDown
     contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+    // RA-PP-THEME: opt-in lavender active state for the Parents Portal. When true the active
+    // chip uses the website violet (#6C5CE0) instead of the legacy fixed teal. Defaults to false
+    // so every other portal is byte-for-byte unchanged (token reuse, no rework — LAW).
+    accentActive: Boolean = false,
 ) {
     val c = VTheme.colors
     // §2#6 / §matrix: active bg is the fixed #dcf2ef, fg #006a60, border rgba(0,106,96,.18).
-    val bg = if (active) TagActiveBg else c.cream
-    val fg = if (active) TagActiveFg else c.ink2
-    val borderColor = if (active) TagActiveBorder else c.shadowTint.copy(alpha = 0.04f)
+    val activeBg = if (accentActive) c.accent.copy(alpha = 0.14f) else TagActiveBg
+    val activeFg = if (accentActive) c.accentDeep else TagActiveFg
+    val activeBorder = if (accentActive) c.accent.copy(alpha = 0.30f) else TagActiveBorder
+    val bg = if (active) activeBg else c.cream
+    val fg = if (active) activeFg else c.ink2
+    val borderColor = if (active) activeBorder else c.shadowTint.copy(alpha = 0.04f)
 
     var mod = modifier
         .clip(VTheme.dimens.shapeSm)

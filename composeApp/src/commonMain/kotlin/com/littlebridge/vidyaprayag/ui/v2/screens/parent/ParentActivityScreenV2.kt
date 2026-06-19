@@ -95,7 +95,7 @@ private fun ParentActivityContent(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 filters.forEach { f ->
-                    VTag(text = f, active = filter == f, onClick = { filter = f })
+                    VTag(text = f, active = filter == f, onClick = { filter = f }, accentActive = true)
                 }
             }
 

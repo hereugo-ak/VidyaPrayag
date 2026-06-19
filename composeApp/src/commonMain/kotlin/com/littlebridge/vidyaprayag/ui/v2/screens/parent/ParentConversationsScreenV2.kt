@@ -212,7 +212,7 @@ private fun SegmentTab(
         )
         if (badge > 0) {
             Spacer(Modifier.width(6.dp))
-            VBadge(text = badge.toString(), tone = VBadgeTone.Arctic)
+            VBadge(text = badge.toString(), tone = VBadgeTone.Accent)
         }
     }
 }

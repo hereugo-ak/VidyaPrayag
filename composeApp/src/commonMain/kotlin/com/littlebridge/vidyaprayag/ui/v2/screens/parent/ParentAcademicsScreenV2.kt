@@ -173,6 +173,8 @@ private fun ParentAcademicsContent(
             tabs = listOf("Overview", "Attendance", "Marks", "Syllabus", "Report"),
             selected = tab,
             onSelect = { tab = it },
+            // RA-PP-THEME: Parents Portal tabs are violet, not the legacy teal.
+            activeColor = c.accentDeep,
         )
         Column(
             Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
@@ -214,7 +216,7 @@ private fun AttendanceTab(academics: ParentAcademicsState, onRetry: () -> Unit) 
                     Text("${data.attendanceRate}%", style = VTheme.type.data.colored(c.ink))
                 }
                 Spacer(Modifier.height(8.dp))
-                VProgressBar(value = data.attendanceRate.toFloat(), tone = VBadgeTone.Success)
+                VProgressBar(value = data.attendanceRate.toFloat(), tone = VBadgeTone.Accent)
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Present ${data.presentDays}", style = VTheme.type.caption.colored(c.ink2))
@@ -278,7 +280,7 @@ private fun SyllabusTab(academics: ParentAcademicsState, onRetry: () -> Unit) {
                     Text("${subj.progress}%", style = VTheme.type.data.colored(c.ink))
                 }
                 Spacer(Modifier.height(8.dp))
-                VProgressBar(value = subj.progress.toFloat(), tone = VBadgeTone.Arctic)
+                VProgressBar(value = subj.progress.toFloat(), tone = VBadgeTone.Accent)
                 Spacer(Modifier.height(8.dp))
                 subj.units.forEach { u ->
                     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -314,7 +316,7 @@ private fun OverviewTab(state: TrackProgressState) {
                         Text("${(comp.progress * 100f).toInt()}%", style = VTheme.type.data.colored(c.ink))
                     }
                     Spacer(Modifier.height(8.dp))
-                    VProgressBar(value = comp.progress * 100f, tone = VBadgeTone.Arctic)
+                    VProgressBar(value = comp.progress * 100f, tone = VBadgeTone.Accent)
                 }
             }
         }
@@ -337,7 +339,7 @@ private fun OverviewTab(state: TrackProgressState) {
                                 Text(trait, style = VTheme.type.caption.colored(c.ink2))
                                 Text("${(score * 100f).toInt()}%", style = VTheme.type.dataSm.colored(c.ink))
                             }
-                            VProgressBar(value = score * 100f, tone = VBadgeTone.Success)
+                            VProgressBar(value = score * 100f, tone = VBadgeTone.Accent)
                         }
                     }
                 }
@@ -353,7 +355,7 @@ private fun OverviewTab(state: TrackProgressState) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text("Level ${state.currentLevel}", style = VTheme.type.dataLg.colored(c.ink))
-                    VBadge(text = "${(state.overallProgress * 100f).toInt()}% complete", tone = VBadgeTone.Arctic)
+                    VBadge(text = "${(state.overallProgress * 100f).toInt()}% complete", tone = VBadgeTone.Accent)
                 }
             }
         }

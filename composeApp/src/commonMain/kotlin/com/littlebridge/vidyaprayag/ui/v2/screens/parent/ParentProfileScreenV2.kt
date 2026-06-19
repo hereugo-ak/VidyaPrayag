@@ -143,7 +143,7 @@ private fun ParentProfileContent(
                         Spacer(Modifier.height(8.dp))
                         VBadge(
                             text = me.role.lowercase().replaceFirstChar { it.uppercase() },
-                            tone = VBadgeTone.Arctic
+                            tone = VBadgeTone.Accent
                         )
                     }
                     Spacer(Modifier.height(24.dp))

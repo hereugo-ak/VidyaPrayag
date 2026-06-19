@@ -116,6 +116,7 @@ private fun ParentLeaveContent(
                         text = child.name.ifBlank { "Child" },
                         active = child.id == state.selectedChild?.id,
                         onClick = { onSelectChild(child.id) },
+                        accentActive = true,
                     )
                 }
             }
@@ -158,7 +159,7 @@ private fun ParentLeaveContent(
                     enabled = !state.submitting && state.selectedChild != null,
                     loading = state.submitting,
                     variant = VButtonVariant.Primary,
-                    tone = VButtonTone.Teal,
+                    tone = VButtonTone.Lavender,
                 )
             }
         }

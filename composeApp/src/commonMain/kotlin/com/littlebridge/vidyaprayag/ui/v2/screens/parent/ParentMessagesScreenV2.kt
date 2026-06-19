@@ -179,7 +179,7 @@ private fun ParentThreadListContent(
             onClick = onCompose,
             full = true,
             size = VButtonSize.Md,
-            tone = VButtonTone.Teal,
+            tone = VButtonTone.Lavender,
             leading = {
                 androidx.compose.material3.Icon(
                     VIcons.Chat,
@@ -237,7 +237,7 @@ private fun ParentThreadRow(thread: ParentMessageThreadDto, onClick: () -> Unit)
             )
         }
         if (thread.unreadCount > 0) {
-            VBadge(text = thread.unreadCount.toString(), tone = VBadgeTone.Arctic)
+            VBadge(text = thread.unreadCount.toString(), tone = VBadgeTone.Accent)
         }
     }
 }
@@ -316,7 +316,7 @@ private fun ParentComposeNewContent(
                         if (r != null && body.isNotBlank()) onSend(r.id, body)
                     },
                     size = VButtonSize.Md,
-                    tone = VButtonTone.Teal,
+                    tone = VButtonTone.Lavender,
                     loading = sending,
                     enabled = selected != null && body.isNotBlank() && !sending,
                 )
@@ -343,7 +343,7 @@ private fun ParentRecipientRow(recipient: ParentRecipientDto, isSelected: Boolea
             Text(recipient.subtitle, style = VTheme.type.caption.colored(c.ink3))
         }
         if (isSelected) {
-            VBadge(text = "Selected", tone = VBadgeTone.Arctic)
+            VBadge(text = "Selected", tone = VBadgeTone.Accent)
         }
     }
 }
@@ -410,7 +410,7 @@ private fun ParentConversationContent(
                         }
                     },
                     size = VButtonSize.Md,
-                    tone = VButtonTone.Teal,
+                    tone = VButtonTone.Lavender,
                     loading = sending,
                     enabled = reply.isNotBlank() && !sending,
                 )
