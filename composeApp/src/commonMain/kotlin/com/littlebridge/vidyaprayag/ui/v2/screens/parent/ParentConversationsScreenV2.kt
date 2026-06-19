@@ -140,7 +140,9 @@ private fun ConversationsSegmentBar(
     var trackWidth by remember { mutableStateOf(0.dp) }
     val pillX by animateDpAsState(
         targetValue = if (selected == ConversationsSegment.Messages) 0.dp else trackWidth / 2f,
-        animationSpec = VMotion.springSnappy,
+        // animateDpAsState needs an AnimationSpec<Dp>; VMotion.springSnappy is Float-typed, so use
+        // the generic snappy factory rebuilt for Dp (same stiffness/damping feel).
+        animationSpec = VMotion.snappy(),
         label = "segment-pill-x",
     )
 
