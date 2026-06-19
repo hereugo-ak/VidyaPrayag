@@ -188,8 +188,13 @@ fun ParentPortalV2(
                 "fees" -> ParentFeesScreenV2()
                 // Phase 3 (commit 9): the Conversations hub — messaging-first, announcements second.
                 "conversations" -> ParentConversationsScreenV2()
-                // Phase 4 (commit 10): the flagship collectible player card.
-                "profile" -> ParentProfileCardScreenV2()
+                // Phase 4 (commits 10–11): the flagship collectible player card, with a
+                // swipe-down account-options reveal (logout / link child / discover schools).
+                "profile" -> ParentProfileCardScreenV2(
+                    onLogout = onLogout,
+                    onLinkChild = { overlay = ParentOverlay.LinkChild },
+                    onDiscoverSchools = { overlay = ParentOverlay.Discovery },
+                )
             }
         }
     }

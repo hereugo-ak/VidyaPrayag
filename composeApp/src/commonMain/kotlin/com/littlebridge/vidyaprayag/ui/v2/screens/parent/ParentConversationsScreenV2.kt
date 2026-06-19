@@ -80,7 +80,7 @@ fun ParentConversationsScreenV2(
     Column(
         modifier
             .fillMaxSize()
-            .background(c.bg)
+            .background(c.background)
             .padding(horizontal = 20.dp)
             .padding(top = 20.dp),
     ) {

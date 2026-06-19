@@ -8,21 +8,30 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,7 +39,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
@@ -41,12 +52,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentDashboardState
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentDashboardViewModel
+import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentProfileViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
+import com.littlebridge.vidyaprayag.ui.v2.components.VButton
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
+import com.littlebridge.vidyaprayag.ui.v2.components.VConfirmDialog
+import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
@@ -100,30 +117,103 @@ fun houseFor(childId: String): ProfileHouse {
  * Every stat is real backend data from [ParentDashboardViewModel]; the house is the only
  * decorative (deterministic-from-id) element — see [ProfileHouse].
  *
- * Commit 11 layers the swipe-down account-options reveal ON TOP of this; this commit owns the
- * card and its motion.
+ * Phase 4 (commit 11): a **swipe-down on the card** smoothly reveals the account-options panel
+ * (personal details, linked children, discover schools, log out…). The reveal is a real,
+ * drag-tracked transition — the card lifts + tilts + shrinks toward the top as an options sheet
+ * rises from below — NOT a popup/dialog/toast.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun ParentProfileCardScreenV2(
+    onLogout: () -> Unit = {},
+    onLinkChild: () -> Unit = {},
+    onDiscoverSchools: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ParentDashboardViewModel = koinViewModel(),
+    profileViewModel: ParentProfileViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
+    val profileState by profileViewModel.state.collectAsStateV2()
     val c = VTheme.colors
+
+    // ── Swipe-down reveal rig ──────────────────────────────────────────────────
+    // `revealed` is the settled rest state (false = card, true = options open).
+    // `dragPx` is the in-flight signed finger travel (down = +, up = −) while a drag is active;
+    // `dragging` gates whether we track the finger 1:1 or spring to the settled state.
+    // Composite progress (0..1) drives BOTH the card lift/scale and the panel rise, so the whole
+    // surface tracks the finger and then springs to the nearest rest on release.
+    var revealed by remember { mutableStateOf(false) }
+    var dragPx by remember { mutableStateOf(0f) }
+    var dragging by remember { mutableStateOf(false) }
+    val revealThresholdPx = 220f
+
+    // §11 — when the options panel is open, system/predictive back collapses it back to the card
+    // (instead of leaving the tab), matching the swipe-up gesture.
+    BackHandler(enabled = revealed) { revealed = false; dragPx = 0f }
+
+    val baseProgress = if (revealed) 1f else 0f
+    val rawProgress = (baseProgress + dragPx / revealThresholdPx).coerceIn(0f, 1f)
+    val progress by animateFloatAsState(
+        targetValue = if (dragging) rawProgress else baseProgress,
+        animationSpec = tween(durationMillis = if (dragging) 0 else 420),
+        label = "reveal-progress",
+    )
 
     Box(
         modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(listOf(c.navyDeep, c.navy)),
-            ),
-        contentAlignment = Alignment.Center,
+            .background(Brush.verticalGradient(listOf(c.navyDeep, c.navy))),
     ) {
-        ProfilePlayerCard(
-            state = state,
-            modifier = Modifier
-                .fillMaxWidth()
+        // The card — lifts up + scales down + fades slightly as options reveal.
+        Box(
+            Modifier
+                .fillMaxSize()
                 .padding(horizontal = 28.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            ProfilePlayerCard(
+                state = state,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        translationY = -size.height * 0.18f * progress
+                        val s = 1f - 0.16f * progress
+                        scaleX = s
+                        scaleY = s
+                        alpha = 1f - 0.25f * progress
+                    },
+            )
+        }
+
+        // The options panel — rises from the bottom as progress → 1.
+        ProfileOptionsPanel(
+            parentName = profileState.profile?.name ?: "",
+            parentContact = listOfNotNull(
+                profileState.profile?.phone?.takeIf { it.isNotBlank() },
+                profileState.profile?.email?.takeIf { it.isNotBlank() },
+            ).joinToString("  ·  "),
+            progress = progress,
+            onLinkChild = onLinkChild,
+            onDiscoverSchools = onDiscoverSchools,
+            onLogout = onLogout,
+            onClose = { revealed = false; dragPx = 0f },
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+
+        // Top swipe-down affordance — a grab handle + caption that drives the reveal.
+        // Swiping DOWN (positive y) opens from the card; swiping UP (negative y) closes from open.
+        ProfileRevealHandle(
+            progress = progress,
+            onDragStart = { dragging = true },
+            onDragDelta = { delta -> dragPx = delta },
+            onDragEnd = {
+                dragging = false
+                revealed = rawProgress >= 0.5f
+                dragPx = 0f
+            },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding(),
         )
     }
 }
@@ -400,5 +490,193 @@ private fun StatTile(
             label,
             style = VTheme.type.label.colored(house.onColor.copy(alpha = 0.8f)).copy(fontSize = 9.sp),
         )
+    }
+}
+
+/**
+ * ProfileRevealHandle — the top grab-handle + caption that drives the swipe-down reveal.
+ * Reports vertical drag deltas (accumulated) to the screen, which maps them to reveal progress.
+ * The handle itself rotates its chevron and dims its caption as the panel opens.
+ */
+@Composable
+private fun ProfileRevealHandle(
+    progress: Float,
+    onDragStart: () -> Unit,
+    onDragDelta: (Float) -> Unit,
+    onDragEnd: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+    var acc by remember { mutableStateOf(0f) }
+    Column(
+        modifier
+            .fillMaxWidth()
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragStart = { acc = 0f; onDragStart() },
+                    onDragEnd = { acc = 0f; onDragEnd() },
+                    onDragCancel = { acc = 0f; onDragEnd() },
+                ) { change, dy ->
+                    change.consume()
+                    acc += dy
+                    onDragDelta(acc)
+                }
+            }
+            .padding(top = 10.dp, bottom = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier
+                .width(44.dp)
+                .height(5.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(Color.White.copy(alpha = 0.45f)),
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                VIcons.ChevronDown,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.55f * (1f - progress)),
+                modifier = Modifier
+                    .size(16.dp)
+                    .graphicsLayer { rotationZ = 180f * progress },
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                if (progress > 0.5f) "Swipe up to close" else "Swipe down for account options",
+                style = VTheme.type.caption.colored(Color.White.copy(alpha = 0.55f)),
+            )
+        }
+    }
+}
+
+/**
+ * ProfileOptionsPanel — the account-options surface that rises from the bottom as the card is
+ * swiped down. Slides + fades with `progress`, hosting the real account rows (personal details,
+ * linked children, discover schools, help) and a gated **Log out**. No popup/toast — it's a
+ * drag-tracked sheet that becomes interactive only once mostly revealed.
+ */
+@Composable
+private fun ProfileOptionsPanel(
+    parentName: String,
+    parentContact: String,
+    progress: Float,
+    onLinkChild: () -> Unit,
+    onDiscoverSchools: () -> Unit,
+    onLogout: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+    val uriHandler = LocalUriHandler.current
+    var showLogoutConfirm by remember { mutableStateOf(false) }
+
+    VConfirmDialog(
+        visible = showLogoutConfirm,
+        title = "Log out?",
+        message = "You'll need to sign in again to follow your child's progress.",
+        confirmLabel = "Log out",
+        onConfirm = { showLogoutConfirm = false; onLogout() },
+        onDismiss = { showLogoutConfirm = false },
+        icon = VIcons.AlertTriangle,
+    )
+
+    // Panel occupies ~72% of height; translates fully off-screen at progress 0.
+    Column(
+        modifier
+            .fillMaxWidth()
+            .fillMaxHeight(0.74f)
+            .graphicsLayer {
+                translationY = size.height * (1f - progress)
+                alpha = progress
+            }
+            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+            .background(c.background)
+            .navigationBarsPadding(),
+    ) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(top = 18.dp, bottom = 24.dp),
+        ) {
+            Text("Account", style = VTheme.type.h2.colored(c.ink))
+            if (parentName.isNotBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(parentName, style = VTheme.type.bodyStrong.colored(c.ink2))
+            }
+            if (parentContact.isNotBlank()) {
+                Text(parentContact, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))
+            }
+            Spacer(Modifier.height(16.dp))
+
+            data class Row2(val title: String, val sub: String, val onClick: (() -> Unit)?)
+            val rows = listOf(
+                Row2("Personal details", parentContact.ifBlank { "Mobile, email, photo" }, null),
+                Row2("Linked children", "Link a child or manage who you follow", onLinkChild),
+                Row2("Discover schools", "Browse all schools on VidyaPrayag", onDiscoverSchools),
+                Row2("Notification preferences", "Push, WhatsApp, quiet hours", null),
+                Row2("Change password", "Keep your account secure", null),
+                Row2(
+                    "Help & support",
+                    "Email ${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}",
+                    {
+                        runCatching {
+                            uriHandler.openUri(
+                                "mailto:${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}?subject=VidyaPrayag%20Support",
+                            )
+                        }
+                    },
+                ),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                rows.forEach { row -> OptionRow(row.title, row.sub, row.onClick) }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            VButton(
+                text = "Log out",
+                onClick = { showLogoutConfirm = true },
+                full = true,
+                variant = VButtonVariant.Destructive,
+            )
+            Spacer(Modifier.height(8.dp))
+            VButton(
+                text = "Back to card",
+                onClick = onClose,
+                full = true,
+                variant = VButtonVariant.Ghost,
+            )
+        }
+    }
+}
+
+@Composable
+private fun OptionRow(title: String, sub: String, onClick: (() -> Unit)?) {
+    val c = VTheme.colors
+    val interaction = remember { MutableInteractionSource() }
+    val base = Modifier
+        .fillMaxWidth()
+        .clip(RoundedCornerShape(16.dp))
+        .background(c.card)
+    val rowMod = if (onClick != null) {
+        base.clickable(interactionSource = interaction, indication = null, onClick = onClick)
+    } else {
+        base
+    }
+    Row(
+        rowMod.padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = VTheme.type.bodyStrong.colored(c.ink))
+            Text(sub, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp))
+        }
+        if (onClick != null) {
+            Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(16.dp))
+        }
     }
 }
