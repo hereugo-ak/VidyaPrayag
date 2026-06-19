@@ -52,8 +52,9 @@ import com.littlebridge.vidyaprayag.feature.parent.presentation.AttendanceDaySta
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentDashboardState
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentDashboardViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
+import com.littlebridge.vidyaprayag.ui.v2.components.VEmptyState
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
+import com.littlebridge.vidyaprayag.ui.v2.screens.VErrorState
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
@@ -150,32 +151,59 @@ private fun ParentDashboardContent(
                 )
             },
     ) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-                .padding(top = 16.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            VStateHost(
-                loading = state.isLoading,
-                error = state.error,
-                isEmpty = state.children.isEmpty(),
-                emptyTitle = "No child linked yet",
-                emptyBody = "Link your child to see their daily journey and progress.",
-                onRetry = onRetry,
-                skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonDashboard() },
-            ) {
-                // CRITICAL LAYOUT FIX: VStateHost runs its content through an AnimatedContent,
-                // whose internal layout is Box-like — it STACKS its children. The dashboard emits
-                // ~8 sibling cards, so without an explicit Column they all piled on top of one
-                // another at y=0 (the "Fees over Results over Attendance" overlap bug). Wrapping
-                // them in a single Column makes AnimatedContent host exactly one child that lays
-                // the cards out vertically, with the same 14dp rhythm as the outer scroll column.
+        // CRITICAL LAYOUT FIX (root cause of the "cards crammed at the top, ~70% empty space" bug):
+        // the dashboard body used to live inside VStateHost, whose loading leg drives an
+        // AnimatedContent. AnimatedContent lays out Box-like (it STACKS its children so it can
+        // crossfade them), and nested inside a verticalScroll (an UNBOUNDED-height parent) the
+        // settled Content child collapsed — all ~8 sibling cards painted on top of one another at
+        // y=0, so only the last few (Fees / Results / Covered) were visible and the rest of the
+        // screen was dead space.
+        //
+        // The state legs are now resolved OUTSIDE the scroll, each in its own bounded, centered Box,
+        // and the card stack is a plain verticalScroll Column with NO AnimatedContent anywhere in
+        // its parentage. The cards therefore always lay out top-to-bottom with the intended rhythm.
+        when {
+            // First load (no child resolved yet) → a centered brand-violet spinner (never the
+            // teal VLoadingState, never fillMaxSize inside a scroll).
+            state.isLoading && state.selectedChild == null ->
+                DashboardCenterState {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        color = c.accent,
+                        modifier = Modifier.size(36.dp),
+                    )
+                }
+
+            // Hard error before anything could load → centered retryable error.
+            state.error != null && state.selectedChild == null ->
+                DashboardCenterState {
+                    VErrorState(
+                        message = state.error ?: "",
+                        onRetry = onRetry,
+                    )
+                }
+
+            // No child linked → centered empty state.
+            state.children.isEmpty() ->
+                DashboardCenterState {
+                    VEmptyState(
+                        icon = VIcons.User,
+                        title = "No child linked yet",
+                        body = "Link your child to see their daily journey and progress.",
+                    )
+                }
+
+            // Content — the live dashboard. A single scrolling Column, cards top-to-bottom.
+            else -> {
                 val child = state.selectedChild
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp)
+                        .padding(top = 16.dp, bottom = 28.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
                     // ── Top bar: eyebrow + chat/bell actions ─────────────────────────
                     TopBar(onOpenNotifications = onOpenNotifications)
 
@@ -257,6 +285,24 @@ private fun ParentDashboardContent(
             schoolDayEnded = state.schoolDayEnded,
             onDismiss = { coveredDetailOpen = false },
         )
+    }
+}
+
+/**
+ * A bounded, centered host for the dashboard's loading / error / empty legs. Unlike VStateHost's
+ * loading leg (which uses fillMaxSize inside a scroll, plus a teal spinner) this lives OUTSIDE the
+ * scroll, fills the available canvas exactly once, and centers its content on the lavender wash.
+ */
+@Composable
+private fun DashboardCenterState(content: @Composable () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 24.dp, vertical = 48.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
     }
 }
 
