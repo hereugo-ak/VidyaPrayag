@@ -216,7 +216,10 @@ private fun ParentDashboardContent(
                         modifier = Modifier.fillMaxWidth(),
                     )
 
-                    // ── Today's schedule card (live) ─────────────────────────────────
+                    // ── Current class card (live, swipe-to-expand) ───────────────────
+                    // Swipe left to grow from the compact "current class" verdict → the full
+                    // today timeline (every subject marked done/now/pending live) → the weekly
+                    // timetable; swipe right to collapse back. Mirrors the attendance card.
                     ParentScheduleCard(
                         todayPeriods = state.todayPeriods,
                         timetable = state.timetable,

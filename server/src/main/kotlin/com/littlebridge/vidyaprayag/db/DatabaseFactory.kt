@@ -154,7 +154,9 @@ object DatabaseFactory {
         DeviceTokensTable,
         ParentChildLinksTable,
         // Non-teaching staff vertical (RA-S17 — Admin People sub-tabs)
-        NonTeachingStaffTable
+        NonTeachingStaffTable,
+        // Parents Portal — Profile tab "Missions & Achievements" (optional, CMS-fallback safe)
+        ParentAchievementsTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */
