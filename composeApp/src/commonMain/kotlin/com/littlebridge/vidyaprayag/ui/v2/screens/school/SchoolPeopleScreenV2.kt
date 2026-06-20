@@ -89,6 +89,8 @@ fun SchoolPeopleScreenV2(
     onOpenLinkRequests: () -> Unit = {},
     onOpenStudent: (String) -> Unit = {},
     onOpenTeacher: (String) -> Unit = {},
+    // RA-TAM — overflow "Assign classes" opens the reusable assignment module.
+    onAssignClasses: (String) -> Unit = {},
     onOpenStaff: (String) -> Unit = {},
     viewModel: StudentAnalyticsViewModel = koinViewModel(),
     teachersViewModel: SchoolTeachersViewModel = koinViewModel(),
@@ -129,6 +131,7 @@ fun SchoolPeopleScreenV2(
         onOpenLinkRequests = onOpenLinkRequests,
         onOpenStudent = onOpenStudent,
         onOpenTeacher = onOpenTeacher,
+        onAssignClasses = onAssignClasses,
         onOpenStaff = onOpenStaff,
         modifier = modifier,
     )
@@ -156,6 +159,7 @@ private fun SchoolPeopleContent(
     onOpenLinkRequests: () -> Unit,
     onOpenStudent: (String) -> Unit,
     onOpenTeacher: (String) -> Unit,
+    onAssignClasses: (String) -> Unit,
     onOpenStaff: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -216,9 +220,9 @@ private fun SchoolPeopleContent(
                     onOpenTeacher = onOpenTeacher,
                     onLoadMore = onLoadMoreTeachers,
                     onDeactivate = onDeactivateTeacher,
-                    // "Assign class" lives inside the teacher profile — route the
-                    // card's gated action there rather than inventing a new flow.
-                    onAssignClass = onOpenTeacher,
+                    // RA-TAM — "Assign classes" now opens the reusable Teacher
+                    // Assignment Management module (one of its 3 entry points).
+                    onAssignClass = onAssignClasses,
                 )
                 "Students" -> StudentsSubTab(
                     state = studentsState,
@@ -526,7 +530,7 @@ private fun TeacherCard(
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             if (teacher.actions.canAssignClass) {
                                 DropdownMenuItem(
-                                    text = { Text("Assign class") },
+                                    text = { Text("Assign classes") },
                                     onClick = { menuOpen = false; onAssignClass() },
                                     leadingIcon = { Icon(VIcons.GraduationCap, contentDescription = null, modifier = Modifier.size(16.dp)) },
                                 )

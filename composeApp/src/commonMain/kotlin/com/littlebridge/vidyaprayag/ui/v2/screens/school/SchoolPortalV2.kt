@@ -42,6 +42,7 @@ private enum class SchoolOverlay {
     StudentRoster,
     StudentProfile,
     TeacherProfile,
+    TeacherAssignments,
     Staff,
 }
 
@@ -176,6 +177,20 @@ fun SchoolPortalV2(
                     onBack = { overlay = SchoolOverlay.None },
                     onRemoved = { overlay = SchoolOverlay.None
                         peopleRefreshKey++ },
+                    // RA-TAM — Quick Action → reusable assignment module.
+                    onOpenAssignments = { overlay = SchoolOverlay.TeacherAssignments },
+                    modifier = modifier,
+                )
+                return@VTheme
+            }
+            SchoolOverlay.TeacherAssignments -> {
+                // RA-TAM — the single reusable Teacher Assignment Management
+                // screen, reached from Teacher Listing and Teacher Profile.
+                val id = selectedTeacherId
+                if (id == null) { overlay = SchoolOverlay.None; return@VTheme }
+                TeacherAssignmentManagementScreen(
+                    teacherId = id,
+                    onBack = { overlay = SchoolOverlay.None },
                     modifier = modifier,
                 )
                 return@VTheme
@@ -232,6 +247,8 @@ fun SchoolPortalV2(
                         // matching profile overlay (delete-in-profile lives there).
                         onOpenStudent = { id -> selectedStudentId = id; overlay = SchoolOverlay.StudentProfile },
                         onOpenTeacher = { id -> selectedTeacherId = id; overlay = SchoolOverlay.TeacherProfile },
+                        // RA-TAM — Teacher Listing entry point into the reusable module.
+                        onAssignClasses = { id -> selectedTeacherId = id; overlay = SchoolOverlay.TeacherAssignments },
                         onOpenStaff = { id -> selectedStaffId = id; overlay = SchoolOverlay.Staff },
                     )
                     "records" -> SchoolRecordsScreenV2()
