@@ -893,13 +893,6 @@ object ParentChildLinksTable : UUIDTable("parent_child_links", "id") {
     val childName   = text("child_name").nullable()
     val childId     = uuid("child_id").nullable()       // children.id once approved
     val status      = varchar("status", 16).default("pending") // pending | approved | rejected
-    // RA-SP: first-class parent relationship metadata. `relation` describes the
-    // guardian role (Father | Mother | Guardian | …) and `isPrimaryGuardian`
-    // marks the single primary point-of-contact for a student. The aggregation
-    // service enforces AT MOST ONE primary guardian per (school, student_code);
-    // both are nullable/defaulted so existing rows keep parsing unchanged.
-    val relation          = varchar("relation", 32).nullable()
-    val isPrimaryGuardian = bool("is_primary_guardian").default(false)
     val requestedAt = timestamp("requested_at")
     val actionedBy  = uuid("actioned_by").nullable()
     val actionedAt  = timestamp("actioned_at").nullable()
