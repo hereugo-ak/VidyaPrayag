@@ -93,6 +93,11 @@ fun DiscoveryScreenV2(
     // owns the header + tab switcher), and it skips status-bar padding the host already applied —
     // so the two surfaces read as one continuous screen, not a screen-within-a-screen.
     embedded: Boolean = false,
+    // When the marketplace is hosted in the unlinked-parent landing, this routes the parent to the
+    // "Link a child" tab. It powers the "already with a partner school? Link your child" closing CTA
+    // at the foot of the school list — the gentle off-ramp for a parent who discovers their child's
+    // school is already on VidyaPrayag. Null (standalone / unauth) hides the CTA entirely.
+    onAlreadyLinked: (() -> Unit)? = null,
     viewModel: SchoolDiscoveryViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
@@ -123,6 +128,8 @@ fun DiscoveryScreenV2(
             onExit = { onExit?.invoke() ?: onOpenSchool(active?.id.orEmpty()) },
             // Hide the duplicate hero header when hosted inside the two-tab landing.
             embedded = embedded,
+            // The closing "already linked? Link your child" CTA — only when the host wires it.
+            onAlreadyLinked = onAlreadyLinked,
         )
         DiscoveryView.Profile -> {
             // Smart-cast guard: `active` is a `var` in this scope, so we capture into a local.
@@ -159,6 +166,7 @@ private fun DiscoveryList(
     onCompare: () -> Unit,
     onExit: () -> Unit,
     embedded: Boolean = false,
+    onAlreadyLinked: (() -> Unit)? = null,
 ) {
     val c = VTheme.colors
 
@@ -253,6 +261,14 @@ private fun DiscoveryList(
                         onToggleCompare = { onToggleCompare(s.id) },
                         onOpen = { onOpen(s) },
                     )
+                }
+                // ── Closing CTA: "already with a partner school? Link your child" ───────────
+                // The gentle off-ramp for a parent browsing the marketplace who realises their
+                // child's school is already on VidyaPrayag — sends them straight to the link flow.
+                // Only when hosted in the unlinked-parent landing (onAlreadyLinked wired).
+                onAlreadyLinked?.let { go ->
+                    Spacer(Modifier.height(4.dp))
+                    AlreadyLinkedCta(onLink = go)
                 }
             }
         }
@@ -375,6 +391,61 @@ private fun SchoolCard(
                 soft = false,
                 full = true,
                 modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+/**
+ * AlreadyLinkedCta — the closing prompt at the foot of the marketplace list (unlinked-parent
+ * landing only). A premium, brand-tinted [VCard] in the same lavender language as the rest of the
+ * Parents Portal: a soft accent wash, a circular link glyph, a two-line pitch, and a full-width
+ * primary "Link your child" button that routes back to the Link tab. No emoji, no pop-up — one
+ * continuous, calm surface consistent with every other portal card.
+ */
+@Composable
+private fun AlreadyLinkedCta(onLink: () -> Unit) {
+    val c = VTheme.colors
+    VCard {
+        Column(
+            Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(c.accent.copy(alpha = 0.18f), c.accentSoft.copy(alpha = 0.12f)),
+                        ),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(VIcons.Users, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "Already with a partner school?",
+                style = VTheme.type.h3.colored(c.ink),
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "If your child's school is already on VidyaPrayag, link your child to see attendance, marks and their full journey.",
+                style = VTheme.type.caption.colored(c.ink2),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(16.dp))
+            VButton(
+                text = "Link your child",
+                onClick = onLink,
+                size = VButtonSize.Md,
+                tone = VButtonTone.Lavender,
+                soft = false,
+                full = true,
+                leading = {
+                    Icon(VIcons.User, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                },
             )
         }
     }

@@ -55,13 +55,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentDashboardState
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentDashboardViewModel
-import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentProfileViewModel
+import com.littlebridge.vidyaprayag.feature.parent.presentation.TrackProgressState
+import com.littlebridge.vidyaprayag.feature.parent.presentation.TrackProgressViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
@@ -112,20 +112,23 @@ fun houseFor(childId: String): ProfileHouse {
 }
 
 /**
- * ParentProfileCardScreenV2 — the rebuilt, **premium multi-section profile**.
+ * ParentProfileCardScreenV2 — the rebuilt, **premium child profile** the brief calls for.
  *
- * The previous build was a single full-screen collectible card whose only content lived behind a
- * fragile swipe-down gesture that frequently failed. This rebuild keeps the flagship card as a HERO
- * but seats it inside a rock-solid VERTICAL SCROLL with real, scannable sections below it:
- *   1. the holographic collectible hero card (tilt + holo, tap-to-lean — no fragile reveal),
- *   2. an animated key-metrics band (attendance · score · level · topics) that counts up,
- *   3. a "This month" attendance breakdown with semantic green/amber/red bars,
- *   4. an "Achievements" strip,
- *   5. the parent account section (personal details, linked children, discover, prefs, support),
- *   6. a gated Log out.
+ * This is NOT an account/settings surface anymore (every "Personal details / Change password /
+ * Notification preferences" row has been removed — that admin lives elsewhere). It is a celebratory,
+ * living portrait of the child built entirely from REAL backend data:
  *
- * Scrolling is the reliable, premium pattern — no more "swipe the card to reveal hidden options".
- * Every stat is real backend data; the house is the only decorative (deterministic-from-id) element.
+ *   • a holographic collectible HERO card (tilt + holo, drag-to-lean) — the child's identity,
+ *   • a fully ANIMATED live-metrics band (attendance · score · level · topics) that springs +
+ *     counts up on appearance, each tile carrying a sweeping progress arc,
+ *   • a clear "swipe down to see achievements" GUIDE with a bouncing chevron,
+ *   • a SWIPE-DOWN reveal that expands a rich Missions & Achievements sheet sourced from the real
+ *     `/parent/track-progress` endpoint (badges, NEP competencies, emotional-intelligence metrics,
+ *     play & discovery milestones) — animated bars, count-ups and locked/earned states throughout.
+ *
+ * The reveal is gesture-first (drag the hero down) AND tap-friendly (the guide chevron toggles it),
+ * so it never feels fragile. Logout is the only account affordance and lives quietly at the very
+ * bottom of the revealed sheet.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -135,12 +138,11 @@ fun ParentProfileCardScreenV2(
     onDiscoverSchools: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ParentDashboardViewModel = koinViewModel(),
-    profileViewModel: ParentProfileViewModel = koinViewModel(),
+    trackViewModel: TrackProgressViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
-    val profileState by profileViewModel.state.collectAsStateV2()
+    val track by trackViewModel.state.collectAsStateV2()
     val c = VTheme.colors
-    val uriHandler = LocalUriHandler.current
 
     val child = state.selectedChild
     val house = houseFor(child?.id ?: "")
@@ -156,15 +158,29 @@ fun ParentProfileCardScreenV2(
         icon = VIcons.AlertTriangle,
     )
 
-    // A calm lavender canvas (the website base background) with a soft house-tinted aurora at the
-    // very top so the hero card "glows" out of the surface — premium, but not a wall of purple.
+    // ── Swipe-down reveal state ─────────────────────────────────────────────────
+    // `revealed` flips when the parent drags the hero region down (or taps the guide). Once
+    // revealed, the Missions & Achievements sheet is shown and the page becomes scrollable so
+    // every section is reachable; swiping back up (or tapping the handle) collapses it again.
+    var revealed by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
+    val revealDrag = Modifier.pointerInput(Unit) {
+        var dy = 0f
+        androidx.compose.foundation.gestures.detectVerticalDragGestures(
+            onDragStart = { dy = 0f },
+            onDragEnd = {
+                if (dy >= 48f) revealed = true
+                else if (dy <= -48f && scrollState.value == 0) revealed = false
+            },
+        ) { _, delta -> dy += delta }
+    }
+
+    // A calm lavender canvas with a soft house-tinted aurora at the very top so the hero card
+    // "glows" out of the surface — premium ambience, never a wall of purple.
     Box(
         modifier
             .fillMaxSize()
             .background(c.background)
-            // Premium top aurora: a soft house-tinted radial glow bleeds down from behind the hero
-            // card so it appears to emit light from the lavender canvas — drawn UNDER the content,
-            // very low alpha, so it reads as ambience, never a wall of colour.
             .drawWithContent {
                 drawRect(
                     brush = Brush.radialGradient(
@@ -179,19 +195,21 @@ fun ParentProfileCardScreenV2(
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(horizontal = 16.dp)
                 .statusBarsPadding()
                 .padding(top = 12.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // ── 1 · Hero collectible card ────────────────────────────────────
-            ProfilePlayerCard(
-                state = state,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            // ── 1 · Hero collectible card (drag DOWN to reveal achievements) ──
+            Box(revealDrag) {
+                ProfilePlayerCard(
+                    state = state,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
-            // ── 2 · Key metrics band (counts up) ─────────────────────────────
+            // ── 2 · Animated live-metrics band ───────────────────────────────
             val attendancePct = state.attendance?.takeIf { it.totalDays > 0 }?.attendanceRate
             val scorePct = state.latestMark?.let { m ->
                 val marks = m.marks
@@ -206,6 +224,7 @@ fun ParentProfileCardScreenV2(
                     icon = VIcons.ShieldCheck,
                     accent = c.successInk,
                     value = attendancePct?.let { "$it%" } ?: "—",
+                    ratio = attendancePct?.let { it / 100f },
                     label = "Attendance",
                     modifier = Modifier.weight(1f),
                 )
@@ -213,6 +232,7 @@ fun ParentProfileCardScreenV2(
                     icon = VIcons.Target,
                     accent = c.accentDeep,
                     value = scorePct?.let { "$it%" } ?: "—",
+                    ratio = scorePct?.let { it / 100f },
                     label = "Latest score",
                     modifier = Modifier.weight(1f),
                 )
@@ -222,6 +242,7 @@ fun ParentProfileCardScreenV2(
                     icon = VIcons.Sparkles,
                     accent = Color(0xFF6C8DF5), // sky
                     value = "L${child?.currentLevel ?: 0}",
+                    ratio = journeyPct / 100f,
                     label = "$journeyPct% to next",
                     modifier = Modifier.weight(1f),
                 )
@@ -229,99 +250,314 @@ fun ParentProfileCardScreenV2(
                     icon = VIcons.School,
                     accent = c.teal,
                     value = state.coveredToday.size.toString(),
+                    ratio = null,
                     label = "Topics today",
                     modifier = Modifier.weight(1f),
                 )
             }
 
-            // ── 3 · This month attendance breakdown ──────────────────────────
-            val att = state.attendance
-            if (att != null && att.totalDays > 0) {
-                SectionLabel("This month")
-                VCard {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        AttendanceArc(
-                            percent = att.attendanceRate.coerceIn(0, 100),
-                            modifier = Modifier.size(72.dp),
-                        )
-                        Spacer(Modifier.width(16.dp))
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            BreakdownBar("Present", att.presentDays, att.totalDays, c.successInk)
-                            BreakdownBar("Late", att.lateDays, att.totalDays, c.warningInk)
-                            BreakdownBar("Absent", att.absentDays, att.totalDays, c.dangerInk)
-                        }
-                    }
+            // ── 3 · Swipe-down guide + reveal toggle ─────────────────────────
+            RevealGuide(
+                revealed = revealed,
+                onToggle = { revealed = !revealed },
+            )
+
+            // ── 4 · Missions & Achievements (revealed; real /track-progress) ──
+            androidx.compose.animation.AnimatedVisibility(
+                visible = revealed,
+                enter = androidx.compose.animation.expandVertically(spring(dampingRatio = 0.8f)) +
+                    androidx.compose.animation.fadeIn(tween(260)),
+                exit = androidx.compose.animation.shrinkVertically(tween(220)) +
+                    androidx.compose.animation.fadeOut(tween(160)),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    AchievementsSheet(
+                        track = track,
+                        state = state,
+                        attendancePct = attendancePct,
+                        scorePct = scorePct,
+                    )
+
+                    Spacer(Modifier.height(4.dp))
+                    VButton(
+                        text = "Log out",
+                        onClick = { showLogoutConfirm = true },
+                        full = true,
+                        variant = VButtonVariant.Ghost,
+                    )
                 }
             }
+        }
+    }
+}
 
-            // ── 4 · Achievements strip ───────────────────────────────────────
-            SectionLabel("Achievements")
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                AchievementChip(
-                    icon = VIcons.ShieldCheck,
-                    title = "On track",
-                    earned = (attendancePct ?: 0) >= 90,
-                    accent = c.successInk,
-                    modifier = Modifier.weight(1f),
-                )
-                AchievementChip(
-                    icon = VIcons.Star,
-                    title = "High scorer",
-                    earned = (scorePct ?: 0) >= 75,
-                    accent = c.warningInk,
-                    modifier = Modifier.weight(1f),
-                )
-                AchievementChip(
-                    icon = VIcons.Sparkles,
-                    title = "Level ${child?.currentLevel ?: 0}",
-                    earned = (child?.currentLevel ?: 0) > 0,
-                    accent = c.accentDeep,
-                    modifier = Modifier.weight(1f),
-                )
-            }
+/**
+ * The swipe-down GUIDE: a tappable handle + bouncing chevron + copy that tells the parent the
+ * achievements live just below. Doubles as a toggle (tap to open/close) so the reveal is never
+ * gesture-only and never feels stuck.
+ */
+@Composable
+private fun RevealGuide(revealed: Boolean, onToggle: () -> Unit) {
+    val c = VTheme.colors
+    val bounce = rememberInfiniteTransition(label = "guideBounce")
+    val dy by bounce.animateFloat(
+        initialValue = 0f, targetValue = 6f,
+        animationSpec = infiniteRepeatable(tween(820, easing = LinearEasing), RepeatMode.Reverse),
+        label = "guideDy",
+    )
+    val chevronRotation by animateFloatAsState(if (revealed) 180f else 0f, spring(dampingRatio = 0.7f), label = "guideChevron")
+    val interaction = remember { MutableInteractionSource() }
 
-            // ── 5 · Account section ──────────────────────────────────────────
-            SectionLabel("Account")
-            val parentName = profileState.profile?.name ?: ""
-            val parentContact = listOfNotNull(
-                profileState.profile?.phone?.takeIf { it.isNotBlank() },
-                profileState.profile?.email?.takeIf { it.isNotBlank() },
-            ).joinToString("  ·  ")
-            VCard(padding = 0.dp) {
-                AccountHeaderRow(name = parentName, contact = parentContact)
-                Divider()
-                AccountRow(VIcons.User, "Personal details", parentContact.ifBlank { "Mobile, email, photo" }, null)
-                Divider()
-                AccountRow(VIcons.Users, "Linked children", "Link a child or manage who you follow", onLinkChild)
-                Divider()
-                AccountRow(VIcons.School, "Discover schools", "Browse all schools on VidyaPrayag", onDiscoverSchools)
-                Divider()
-                AccountRow(VIcons.Bell, "Notification preferences", "Push, WhatsApp, quiet hours", null)
-                Divider()
-                AccountRow(VIcons.Lock, "Change password", "Keep your account secure", null)
-                Divider()
-                AccountRow(
-                    VIcons.Mail,
-                    "Help & support",
-                    "Email ${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}",
-                ) {
-                    runCatching {
-                        uriHandler.openUri(
-                            "mailto:${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}?subject=VidyaPrayag%20Support",
-                        )
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(4.dp))
-            VButton(
-                text = "Log out",
-                onClick = { showLogoutConfirm = true },
-                full = true,
-                variant = VButtonVariant.Destructive,
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .clickable(interactionSource = interaction, indication = null, onClick = onToggle)
+            .padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        // grab handle
+        Box(
+            Modifier.width(44.dp).height(5.dp).clip(RoundedCornerShape(999.dp)).background(c.hairline),
+        )
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(VIcons.Sparkles, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(16.dp))
+            Text(
+                if (revealed) "Hide missions & achievements" else "Swipe down for missions & achievements",
+                style = VTheme.type.bodyStrong.colored(c.accentDeep)
+                    .copy(fontWeight = FontWeight.Bold, fontSize = 12.5.sp),
+            )
+            Icon(
+                VIcons.ChevronDown,
+                contentDescription = null,
+                tint = c.accentDeep,
+                modifier = Modifier
+                    .size(18.dp)
+                    .graphicsLayer {
+                        rotationZ = chevronRotation
+                        translationY = if (!revealed) dy else 0f
+                    },
             )
         }
     }
+}
+
+/**
+ * The revealed Missions & Achievements sheet — every section is REAL `/parent/track-progress`
+ * data (badges, NEP-aligned competencies, emotional-intelligence metrics, play & discovery
+ * milestones), with animated bars / count-ups / locked-earned states. When the endpoint hasn't
+ * populated a section it falls back to honest, locally-derived achievements so the sheet is never
+ * an empty white block.
+ */
+@Composable
+private fun AchievementsSheet(
+    track: TrackProgressState,
+    state: ParentDashboardState,
+    attendancePct: Int?,
+    scorePct: Int?,
+) {
+    val c = VTheme.colors
+    val child = state.selectedChild
+
+    // ── Holistic growth hero line (journey description from the backend) ──────────
+    if (track.journeyDescription.isNotBlank()) {
+        VCard {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(VIcons.TrendingUp, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(20.dp))
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "HOLISTIC GROWTH",
+                        style = VTheme.type.label.colored(c.accentDeep)
+                            .copy(fontWeight = FontWeight.ExtraBold, fontSize = 9.5.sp, letterSpacing = 0.8.sp),
+                    )
+                    Text(
+                        track.journeyDescription,
+                        style = VTheme.type.bodyStrong.colored(c.navyDeep).copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
+                    )
+                }
+            }
+        }
+    }
+
+    // ── Badges (real achievements; locked/earned) ────────────────────────────────
+    SectionLabel("Achievements")
+    val badges = track.badges.ifEmpty {
+        // Honest local fallback derived from real dashboard numbers.
+        listOf(
+            com.littlebridge.vidyaprayag.feature.parent.presentation.AchievementBadge(
+                "On track", "verified", (attendancePct ?: 0) < 90, listOf("#22C55E"),
+            ),
+            com.littlebridge.vidyaprayag.feature.parent.presentation.AchievementBadge(
+                "High scorer", "star", (scorePct ?: 0) < 75, listOf("#F59E0B"),
+            ),
+            com.littlebridge.vidyaprayag.feature.parent.presentation.AchievementBadge(
+                "Level ${child?.currentLevel ?: 0}", "auto_awesome", (child?.currentLevel ?: 0) <= 0, listOf("#6C5CE0"),
+            ),
+        )
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        badges.take(3).forEach { b ->
+            AchievementChip(
+                icon = badgeIcon(b.title),
+                title = b.title,
+                earned = !b.isLocked,
+                accent = badgeAccent(b.gradientColors),
+                modifier = Modifier.weight(1f),
+            )
+        }
+        // pad to 3 columns so the row never looks lopsided
+        repeat(3 - badges.take(3).size) { Spacer(Modifier.weight(1f)) }
+    }
+
+    // ── NEP-aligned academic competencies (animated bars) ─────────────────────────
+    if (track.academicCompetencies.isNotEmpty()) {
+        SectionLabel("Academic core")
+        VCard {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                track.academicCompetencies.forEach { comp ->
+                    CompetencyBar(title = comp.title, progress = comp.progress)
+                }
+            }
+        }
+    }
+
+    // ── Emotional intelligence (radar-style metric bars) ──────────────────────────
+    if (track.emotionalIntelligence.isNotEmpty()) {
+        SectionLabel("Emotional intelligence")
+        VCard {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (track.emotionalDescription.isNotBlank()) {
+                    Text(
+                        track.emotionalDescription,
+                        style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.5.sp),
+                    )
+                }
+                track.emotionalIntelligence.entries.forEach { (label, value) ->
+                    CompetencyBar(title = label, progress = value, accent = Color(0xFF6C8DF5))
+                }
+            }
+        }
+    }
+
+    // ── Play & discovery milestones (mission cards) ───────────────────────────────
+    if (track.playIndicators.isNotEmpty()) {
+        SectionLabel("Play & discovery")
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            track.playIndicators.forEach { p ->
+                MissionRow(title = p.title, description = p.description, met = p.isMet)
+            }
+        }
+    }
+
+    // ── This-month attendance breakdown (real records) ────────────────────────────
+    val att = state.attendance
+    if (att != null && att.totalDays > 0) {
+        SectionLabel("This month")
+        VCard {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                AttendanceArc(percent = att.attendanceRate.coerceIn(0, 100), modifier = Modifier.size(72.dp))
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    BreakdownBar("Present", att.presentDays, att.totalDays, c.successInk)
+                    BreakdownBar("Late", att.lateDays, att.totalDays, c.warningInk)
+                    BreakdownBar("Absent", att.absentDays, att.totalDays, c.dangerInk)
+                }
+            }
+        }
+    }
+}
+
+/** An animated competency/EI progress bar that fills on appearance. */
+@Composable
+private fun CompetencyBar(title: String, progress: Float, accent: Color = VTheme.colors.accent) {
+    val c = VTheme.colors
+    var appeared by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { appeared = true }
+    val animated by animateFloatAsState(
+        targetValue = if (appeared) progress.coerceIn(0f, 1f) else 0f,
+        animationSpec = tween(760),
+        label = "competency",
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(title, style = VTheme.type.bodyStrong.colored(c.navyDeep).copy(fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold))
+            Text(
+                "${(progress.coerceIn(0f, 1f) * 100).roundToInt()}%",
+                style = VTheme.type.caption.colored(accent).copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+            )
+        }
+        Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(999.dp)).background(c.cream)) {
+            Box(
+                Modifier
+                    .fillMaxWidth(animated)
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Brush.horizontalGradient(listOf(accent.copy(alpha = 0.7f), accent))),
+            )
+        }
+    }
+}
+
+/** A play/discovery "mission" row — met (green tick) vs in-progress (violet ring). */
+@Composable
+private fun MissionRow(title: String, description: String, met: Boolean) {
+    val c = VTheme.colors
+    val tint = if (met) c.successInk else c.accentDeep
+    VCard(padding = 12.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(
+                Modifier.size(36.dp).clip(CircleShape).background(tint.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (met) VIcons.Check else VIcons.Target,
+                    contentDescription = null,
+                    tint = tint,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            Column(Modifier.weight(1f)) {
+                Text(title, style = VTheme.type.bodyStrong.colored(c.navyDeep).copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold))
+                if (description.isNotBlank()) {
+                    Text(description, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 10.5.sp))
+                }
+            }
+            Box(
+                Modifier.clip(RoundedCornerShape(999.dp)).background(tint.copy(alpha = 0.12f))
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+            ) {
+                Text(
+                    if (met) "Met" else "In progress",
+                    style = VTheme.type.label.colored(tint).copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
+                )
+            }
+        }
+    }
+}
+
+/** Map a badge title to one of the available VIcons (the server emits Material symbol names). */
+private fun badgeIcon(title: String): ImageVector = when {
+    title.contains("track", true) || title.contains("attend", true) -> VIcons.ShieldCheck
+    title.contains("scor", true) || title.contains("star", true) -> VIcons.Star
+    title.contains("read", true) || title.contains("liter", true) -> VIcons.BookOpen
+    title.contains("level", true) -> VIcons.Sparkles
+    else -> VIcons.Target
+}
+
+/** Parse the first hex colour the server emitted for a badge; fall back to brand violet. */
+@Composable
+private fun badgeAccent(colors: List<String>): Color {
+    val c = VTheme.colors
+    val hex = colors.firstOrNull()?.removePrefix("#")?.takeIf { it.length == 6 } ?: return c.accentDeep
+    return runCatching {
+        Color(("FF$hex").toLong(16))
+    }.getOrDefault(c.accentDeep)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -342,7 +578,11 @@ private fun SectionLabel(text: String) {
     )
 }
 
-/** An animated metric tile — the value scales in with a soft spring on first composition. */
+/**
+ * A fully animated metric tile: the icon plate carries a sweeping progress arc (when a [ratio] is
+ * supplied), and the value springs + fades in (count-up feel) on first composition. Every value is
+ * real backend data; `ratio` drives the arc 0..1.
+ */
 @Composable
 private fun MetricTile(
     icon: ImageVector,
@@ -350,6 +590,7 @@ private fun MetricTile(
     value: String,
     label: String,
     modifier: Modifier = Modifier,
+    ratio: Float? = null,
 ) {
     val c = VTheme.colors
     var appeared by remember { mutableStateOf(false) }
@@ -362,11 +603,16 @@ private fun MetricTile(
     androidx.compose.runtime.LaunchedEffect(Unit) { appeared = true }
 
     VCard(modifier = modifier) {
-        Box(
-            Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(accent.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(19.dp))
+        Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+            if (ratio != null) {
+                MetricArc(ratio = ratio.coerceIn(0f, 1f), accent = accent, modifier = Modifier.fillMaxSize())
+            }
+            Box(
+                Modifier.size(34.dp).clip(RoundedCornerShape(11.dp)).background(accent.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(17.dp))
+            }
         }
         Spacer(Modifier.height(12.dp))
         Text(
@@ -379,6 +625,28 @@ private fun MetricTile(
         )
         Spacer(Modifier.height(2.dp))
         Text(label, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))
+    }
+}
+
+/** A thin sweeping arc behind a metric tile's icon plate. */
+@Composable
+private fun MetricArc(ratio: Float, accent: Color, modifier: Modifier = Modifier) {
+    val sweep by animateFloatAsState(ratio, tween(820), label = "metricArc")
+    Canvas(modifier) {
+        val stroke = 3.dp.toPx()
+        val inset = stroke / 2f
+        val arcSize = Size(size.width - stroke, size.height - stroke)
+        val topLeft = Offset(inset, inset)
+        drawArc(
+            color = accent.copy(alpha = 0.14f),
+            startAngle = 0f, sweepAngle = 360f, useCenter = false,
+            topLeft = topLeft, size = arcSize, style = Stroke(width = stroke, cap = StrokeCap.Round),
+        )
+        drawArc(
+            brush = Brush.sweepGradient(listOf(accent.copy(alpha = 0.6f), accent)),
+            startAngle = -90f, sweepAngle = 360f * sweep, useCenter = false,
+            topLeft = topLeft, size = arcSize, style = Stroke(width = stroke, cap = StrokeCap.Round),
+        )
     }
 }
 
@@ -470,59 +738,6 @@ private fun AchievementChip(
             )
         }
     }
-}
-
-@Composable
-private fun AccountHeaderRow(name: String, contact: String) {
-    val c = VTheme.colors
-    Row(
-        Modifier.fillMaxWidth().padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        VAvatar(name = name.ifBlank { "Parent" }, size = 46.dp, ring = true)
-        Column(Modifier.weight(1f)) {
-            Text(name.ifBlank { "Parent" }, style = VTheme.type.bodyStrong.colored(c.ink).copy(fontWeight = FontWeight.Bold))
-            if (contact.isNotBlank()) {
-                Text(contact, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun AccountRow(icon: ImageVector, title: String, sub: String, onClick: (() -> Unit)?) {
-    val c = VTheme.colors
-    val interaction = remember { MutableInteractionSource() }
-    val base = Modifier.fillMaxWidth()
-    val rowMod = if (onClick != null) {
-        base.clickable(interactionSource = interaction, indication = null, onClick = onClick)
-    } else base
-    Row(
-        rowMod.padding(horizontal = 16.dp, vertical = 13.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Box(
-            Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(c.accent.copy(alpha = 0.10f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(17.dp))
-        }
-        Column(Modifier.weight(1f)) {
-            Text(title, style = VTheme.type.bodyStrong.colored(c.ink))
-            Text(sub, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp))
-        }
-        if (onClick != null) {
-            Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(16.dp))
-        }
-    }
-}
-
-@Composable
-private fun Divider() {
-    val c = VTheme.colors
-    Box(Modifier.fillMaxWidth().height(1.dp).padding(start = 64.dp).background(c.hairline))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

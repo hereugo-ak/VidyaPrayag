@@ -154,6 +154,9 @@ fun ParentUnlinkedScreenV2(
                             // Hosted inside this landing: suppress Discovery's own hero/Exit and
                             // its status-bar padding so the two surfaces read as one premium screen.
                             embedded = true,
+                            // Closing CTA at the foot of the school list: "already with a partner
+                            // school? Link your child" — routes the parent straight to the Link tab.
+                            onAlreadyLinked = { tab = UnlinkedTab.Link },
                             modifier = Modifier.fillMaxSize(),
                         )
                 }
