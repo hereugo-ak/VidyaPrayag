@@ -100,7 +100,7 @@ fun ParentDock(
         modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 16.dp, bottom = 12.dp, top = 4.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
         Box(
