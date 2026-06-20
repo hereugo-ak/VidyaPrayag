@@ -62,6 +62,7 @@ import com.littlebridge.vidyaprayag.util.dayOfWeek
 import com.littlebridge.vidyaprayag.util.daysInMonth
 import com.littlebridge.vidyaprayag.util.isoOf
 import com.littlebridge.vidyaprayag.util.parseIsoDate
+import com.littlebridge.vidyaprayag.util.todayIso
 
 /**
  * The dashboard's primary feature card — today's attendance verdict + this month's
@@ -86,22 +87,21 @@ fun ParentAttendanceCard(
 ) {
     // 0 = today summary (front), 1 = month calendar (back). Component-scoped.
     var face by remember { mutableStateOf(0) }
-    val hasMonth = attendance != null && attendance.records.isNotEmpty()
 
-    // A horizontal-drag detector scoped to the card. A decisive swipe flips the face;
-    // small drags are ignored so vertical scroll still wins.
-    val swipe = if (hasMonth) {
-        Modifier.pointerInput(Unit) {
-            var dx = 0f
-            detectHorizontalDragGestures(
-                onDragStart = { dx = 0f },
-                onDragEnd = {
-                    if (dx <= -36f) face = 1   // swipe left → calendar
-                    else if (dx >= 36f) face = 0 // swipe right → today
-                },
-            ) { _, delta -> dx += delta }
-        }
-    } else Modifier
+    // A horizontal-drag detector scoped to the card. A decisive swipe flips the face; small drags
+    // are ignored so vertical scroll still wins. The month calendar is ALWAYS reachable — even
+    // before any attendance is marked the card flips to a real, navigable (blank) month, so the
+    // swipe-within-the-card gesture the brief calls for never silently no-ops.
+    val swipe = Modifier.pointerInput(Unit) {
+        var dx = 0f
+        detectHorizontalDragGestures(
+            onDragStart = { dx = 0f },
+            onDragEnd = {
+                if (dx <= -36f) face = 1   // swipe left → calendar
+                else if (dx >= 36f) face = 0 // swipe right → today
+            },
+        ) { _, delta -> dx += delta }
+    }
 
     VCard(modifier = modifier.then(swipe), padding = 14.dp) {
         // animateContentSize on the card's content gives the fluid vertical expand +
@@ -124,7 +124,7 @@ fun ParentAttendanceCard(
                 TodayFace(
                     today = today,
                     attendance = attendance,
-                    onExpand = if (hasMonth) ({ face = 1 }) else null,
+                    onExpand = { face = 1 },
                 )
             } else {
                 CalendarFace(attendance = attendance, onCollapse = { face = 0 })
@@ -296,27 +296,38 @@ private fun CalendarFace(attendance: ParentAttendanceData?, onCollapse: () -> Un
     val holidays = attendance?.holidays.orEmpty()
 
     val byDate = remember(records) { records.associate { it.date to it.status.lowercase() } }
-    val months = remember(records) {
-        val set = records.mapNotNull { parseIsoDate(it.date)?.let { (y, m, _) -> y to m } }.toSortedSet(
-            compareByDescending<Pair<Int, Int>> { it.first }.thenByDescending { it.second },
-        )
-        if (set.isEmpty()) listOf(2026 to 1) else set.toList()
+
+    // Anchor on the newest month with data, else the current real month — then navigate FREELY.
+    val (startYear, startMonth) = remember(records) {
+        val newest = records.mapNotNull { parseIsoDate(it.date)?.let { (y, m, _) -> y to m } }
+            .maxWithOrNull(compareBy({ it.first }, { it.second }))
+        newest ?: (parseIsoDate(todayIso())?.let { (y, m, _) -> y to m } ?: (2026 to 1))
     }
-    var monthIndex by remember(months) { mutableStateOf(0) }
-    val (year, month) = months[monthIndex.coerceIn(0, months.lastIndex)]
+    var monthOffset by remember(startYear, startMonth) { mutableStateOf(0) }
+    val (year, month) = remember(startYear, startMonth, monthOffset) {
+        val abs = startYear * 12 + (startMonth - 1) + monthOffset
+        (abs / 12) to (abs % 12 + 1)
+    }
+    val (todayYear, todayMonth) = remember {
+        parseIsoDate(todayIso())?.let { (y, m, _) -> y to m } ?: (startYear to startMonth)
+    }
+    val canGoForward = (year < todayYear) || (year == todayYear && month < todayMonth)
+    val today = remember { todayIso() }
 
     Column(Modifier.fillMaxWidth()) {
-        // header: back chevron + month + pager
+        // header: a distinct "collapse to today" button (down chevron) + month + free month pager.
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            CircleIcon(VIcons.ChevronLeft, enabled = true, tint = c.accentDeep, bg = c.accent.copy(alpha = 0.1f), onClick = onCollapse)
-            Text("${MONTH_LONG.getOrNull(month - 1) ?: "—"} $year", style = VTheme.type.bodyStrong.colored(c.navyDeep))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CircleIcon(VIcons.ChevronUp, enabled = true, tint = c.accentDeep, bg = c.accent.copy(alpha = 0.10f), onClick = onCollapse)
+                Text("${MONTH_LONG.getOrNull(month - 1) ?: "—"} $year", style = VTheme.type.bodyStrong.colored(c.navyDeep))
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                CircleIcon(VIcons.ChevronLeft, monthIndex < months.lastIndex, c.ink2, c.cream) { if (monthIndex < months.lastIndex) monthIndex++ }
-                CircleIcon(VIcons.ChevronRight, monthIndex > 0, c.ink2, c.cream) { if (monthIndex > 0) monthIndex-- }
+                CircleIcon(VIcons.ChevronLeft, enabled = true, tint = c.ink2, bg = c.cream) { monthOffset-- }
+                CircleIcon(VIcons.ChevronRight, canGoForward, c.ink2, c.cream) { if (canGoForward) monthOffset++ }
             }
         }
 
@@ -348,6 +359,7 @@ private fun CalendarFace(attendance: ParentAttendanceData?, onCollapse: () -> Un
                                     day = day,
                                     status = byDate[iso],
                                     isHoliday = isHolidayCell(iso, year, month, day, holidays),
+                                    isToday = iso == today,
                                 )
                             }
                         }
@@ -358,10 +370,9 @@ private fun CalendarFace(attendance: ParentAttendanceData?, onCollapse: () -> Un
 
         Spacer(Modifier.height(12.dp))
 
-        // NO-GREEN LAW (parent surface): "present" reads in the brand violet (the on-track state),
-        // late=amber, absent=red, holiday=navy — a coherent, green-free status scale.
+        // COLOR IS SEMANTIC: present=green, late=amber, absent=red, holiday=navy.
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            LegendDot(c.accent, "Present")
+            LegendDot(c.successInk, "Present")
             LegendDot(c.warningInk, "Late")
             LegendDot(c.dangerInk, "Absent")
             LegendDot(c.navy, "Holiday")
@@ -381,14 +392,20 @@ private fun isHolidayCell(iso: String, year: Int, month: Int, day: Int, holidays
 }
 
 @Composable
-private fun DayCell(day: Int, status: String?, isHoliday: Boolean) {
+private fun DayCell(day: Int, status: String?, isHoliday: Boolean, isToday: Boolean = false) {
     val c = VTheme.colors
-    // NO-GREEN LAW (parent surface): present=brand violet, late=amber, absent=red, holiday=navy tint.
+    // COLOR IS SEMANTIC: present=green, late=amber, absent=red, holiday=navy tint. Today's cell
+    // gets a violet ring (the only brand-accent moment in the grid).
     val (bg, fg) = when (status) {
-        "present" -> c.accent to c.card
+        "present" -> c.successInk to c.card
         "late" -> c.warningInk to c.card
         "absent" -> c.dangerInk to c.card
         else -> if (isHoliday) c.navy.copy(alpha = 0.12f) to c.navy else c.cream.copy(alpha = 0.4f) to c.ink2
+    }
+    val borderColor = when {
+        isToday -> c.accent
+        status == null && !isHoliday -> c.hairline
+        else -> Color.Transparent
     }
     Box(
         Modifier
@@ -396,10 +413,14 @@ private fun DayCell(day: Int, status: String?, isHoliday: Boolean) {
             .aspectRatio(1f)
             .clip(RoundedCornerShape(9.dp))
             .background(bg)
-            .border(1.dp, if (status == null && !isHoliday) c.hairline else Color.Transparent, RoundedCornerShape(9.dp)),
+            .border(if (isToday) 1.5.dp else 1.dp, borderColor, RoundedCornerShape(9.dp)),
         contentAlignment = Alignment.Center,
     ) {
-        Text("$day", style = VTheme.type.caption.colored(fg).copy(fontSize = 10.sp))
+        Text(
+            "$day",
+            style = VTheme.type.caption.colored(if (isToday && status == null) c.accentDeep else fg)
+                .copy(fontSize = 10.sp, fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal),
+        )
     }
 }
 
@@ -450,9 +471,10 @@ private fun StatePill(label: String, bg: Color, fg: Color) {
 private fun AttendanceRing(percent: Int, modifier: Modifier = Modifier) {
     val c = VTheme.colors
     val sweep by animateFloatAsState(targetValue = percent / 100f, label = "attendanceSweep")
-    // RA-PP-THEME: on-palette violet sweep matching the reference ring (was violet→teal).
-    val gradient = Brush.linearGradient(listOf(c.accentSoft, c.accent))
-    val trackColor = c.accent.copy(alpha = 0.12f)
+    // The month attendance ring gauges "% present" — so it reads GREEN (semantic success), keeping
+    // it coherent with the green present state instead of a generic violet.
+    val gradient = Brush.linearGradient(listOf(c.success, c.successInk))
+    val trackColor = c.successInk.copy(alpha = 0.12f)
 
     Box(modifier, contentAlignment = Alignment.Center) {
         Canvas(Modifier.matchParentSize()) {
@@ -513,11 +535,13 @@ private data class AttendanceTone(
 private fun toneFor(state: AttendanceDayState): AttendanceTone {
     val c = VTheme.colors
     return when (state) {
-        // NO-GREEN LAW (parent surface): "present" is the brand-violet on-track state.
+        // COLOR IS SEMANTIC: "present" reads GREEN (success) — the universal "all good" signal a
+        // parent scans for. The lavender brand accent is reserved for the journey ring / active
+        // states, never overloaded to mean attendance-present.
         AttendanceDayState.Present -> AttendanceTone(
             "Present", "Marked present today", "Your child is in school",
-            c.accentDeep, c.accent.copy(alpha = 0.18f), c.accentDeep,
-            c.accent.copy(alpha = 0.12f), VIcons.ShieldCheck,
+            c.successInk, c.success.copy(alpha = 0.45f), c.successInk,
+            c.success.copy(alpha = 0.22f), VIcons.ShieldCheck,
         )
         AttendanceDayState.Late -> AttendanceTone(
             "Late", "Arrived late today", "Marked present, after the bell",
@@ -545,10 +569,11 @@ private fun toneFor(state: AttendanceDayState): AttendanceTone {
             c.ink3, c.cream, c.ink2,
             c.cream, VIcons.Calendar,
         )
+        // Awaiting is genuinely a "pending" state → amber/orange, NOT purple.
         AttendanceDayState.NoData -> AttendanceTone(
             "Awaiting", "Attendance not marked yet", "You'll see today's status once the class is marked",
-            c.accentDeep, c.accent.copy(alpha = 0.12f), c.accentDeep,
-            c.accent.copy(alpha = 0.08f), VIcons.Clock,
+            c.warningInk, c.warning.copy(alpha = 0.40f), c.warningInk,
+            c.warning.copy(alpha = 0.18f), VIcons.Clock,
         )
     }
 }

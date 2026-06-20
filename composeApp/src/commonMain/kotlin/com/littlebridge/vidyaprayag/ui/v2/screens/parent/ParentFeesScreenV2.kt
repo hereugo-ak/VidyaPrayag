@@ -132,7 +132,7 @@ private fun ParentFeesContent(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier.padding(top = 4.dp),
                             ) {
-                                Box(Modifier.size(6.dp).clip(RoundedCornerShape(999.dp)).background(Color(0xFFFFD4A3)))
+                                Box(Modifier.size(6.dp).clip(RoundedCornerShape(999.dp)).background(c.warning))
                                 Text(
                                     "${state.overdueCount} overdue",
                                     style = VTheme.type.caption.colored(Color.White.copy(alpha = 0.78f)),

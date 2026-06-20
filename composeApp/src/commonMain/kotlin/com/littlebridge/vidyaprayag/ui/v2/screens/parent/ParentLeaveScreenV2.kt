@@ -188,12 +188,13 @@ private fun ParentLeaveCard(req: ParentLeaveDto) {
     VCard {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(req.childName, style = VTheme.type.bodyStrong.colored(c.ink), modifier = Modifier.weight(1f))
-            // NO-GREEN LAW (parent surface): "Approved" reads in the brand violet (Accent),
-            // "Rejected" keeps the universal danger red.
+            // Semantic status: "Approved" reads success green, "Rejected" danger red,
+            // anything pending stays calm neutral — the universal traffic-light language a
+            // parent reads instantly (the brand violet is reserved for actions, not states).
             val tone = when {
-                req.status.equals("Approved", ignoreCase = true) -> VBadgeTone.Accent
+                req.status.equals("Approved", ignoreCase = true) -> VBadgeTone.Success
                 req.status.equals("Rejected", ignoreCase = true) -> VBadgeTone.Danger
-                else -> VBadgeTone.Neutral
+                else -> VBadgeTone.Warning
             }
             VBadge(text = req.status, tone = tone)
         }

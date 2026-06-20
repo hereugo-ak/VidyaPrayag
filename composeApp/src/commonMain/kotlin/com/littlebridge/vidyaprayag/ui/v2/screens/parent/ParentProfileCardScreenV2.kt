@@ -8,11 +8,12 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,11 +21,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -43,16 +42,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalUriHandler
@@ -65,6 +65,7 @@ import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentProfileVie
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
+import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VConfirmDialog
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
@@ -91,11 +92,10 @@ enum class ProfileHouse(
     val foil: Color,
     val onColor: Color,
 ) {
-    // RA-PP-THEME: every house now lives inside the brand's lavender/violet/indigo family — the
-    // website palette. No more clashing orange/green/gold collectible variants; the card always
-    // reads as one cohesive premium violet artifact, with each house only shifting the hue subtly
-    // (deep violet → royal indigo → midnight plum → twilight blue → ultraviolet) so siblings still
-    // feel distinct while staying unmistakably on-brand.
+    // Each house lives inside the brand's lavender/violet/indigo family — the website palette. The
+    // card always reads as one cohesive premium violet artifact, with each house only shifting the
+    // hue subtly (deep violet → royal indigo → midnight plum → twilight blue → ultraviolet) so
+    // siblings still feel distinct while staying unmistakably on-brand.
     Aether("Aether", "AE", Color(0xFF6C5CE0), Color(0xFF2C2660), Color(0xFFC4BBFF), Color(0xFFFFFFFF)),
     Lumen("Lumen", "LU", Color(0xFF7A6CF0), Color(0xFF332B6E), Color(0xFFD2C9FF), Color(0xFFFFFFFF)),
     Indigo("Indigo", "IN", Color(0xFF5A4FD0), Color(0xFF211C52), Color(0xFFB3A9FF), Color(0xFFFFFFFF)),
@@ -112,23 +112,20 @@ fun houseFor(childId: String): ProfileHouse {
 }
 
 /**
- * ParentProfileCardScreenV2 — Phase 4 (commit 10): the flagship, full-screen, house-colored
- * **collectible player card** for the selected child.
+ * ParentProfileCardScreenV2 — the rebuilt, **premium multi-section profile**.
  *
- * Real depth & motion (no cheap popups):
- *  - A parallax 3D tilt driven by a drag gesture (rotationX/Y), the card physically leaning
- *    toward the finger and springing back on release — like tilting a real foil card in the light.
- *  - A holographic sheen sweep (infinite) + a drag-reactive specular highlight whose centre
- *    tracks the tilt, so the gloss "catches the light" as you move it.
- *  - A house-colored foil border and crest, layered glass stat tiles.
+ * The previous build was a single full-screen collectible card whose only content lived behind a
+ * fragile swipe-down gesture that frequently failed. This rebuild keeps the flagship card as a HERO
+ * but seats it inside a rock-solid VERTICAL SCROLL with real, scannable sections below it:
+ *   1. the holographic collectible hero card (tilt + holo, tap-to-lean — no fragile reveal),
+ *   2. an animated key-metrics band (attendance · score · level · topics) that counts up,
+ *   3. a "This month" attendance breakdown with semantic green/amber/red bars,
+ *   4. an "Achievements" strip,
+ *   5. the parent account section (personal details, linked children, discover, prefs, support),
+ *   6. a gated Log out.
  *
- * Every stat is real backend data from [ParentDashboardViewModel]; the house is the only
- * decorative (deterministic-from-id) element — see [ProfileHouse].
- *
- * Phase 4 (commit 11): a **swipe-down on the card** smoothly reveals the account-options panel
- * (personal details, linked children, discover schools, log out…). The reveal is a real,
- * drag-tracked transition — the card lifts + tilts + shrinks toward the top as an options sheet
- * rises from below — NOT a popup/dialog/toast.
+ * Scrolling is the reliable, premium pattern — no more "swipe the card to reveal hidden options".
+ * Every stat is real backend data; the house is the only decorative (deterministic-from-id) element.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -143,139 +140,413 @@ fun ParentProfileCardScreenV2(
     val state by viewModel.state.collectAsStateV2()
     val profileState by profileViewModel.state.collectAsStateV2()
     val c = VTheme.colors
+    val uriHandler = LocalUriHandler.current
 
-    // ── Swipe-down reveal rig ──────────────────────────────────────────────────
-    // `revealed` is the settled rest state (false = card, true = options open).
-    // `dragPx` is the in-flight signed finger travel (down = +, up = −) while a vertical drag is
-    // active; `dragging` gates whether we track the finger 1:1 or spring to the settled state.
-    //
-    // CRITICAL FIX: the reveal gesture is now hosted ON THE CARD ITSELF (see [ProfilePlayerCard]'s
-    // unified gesture classifier), not on a tiny top strip. A predominantly-VERTICAL drag anywhere
-    // on the card drives this reveal; a small/lateral drag instead drives the 3D tilt. So "swipe the
-    // card down → options" finally works the way the brief intends.
-    var revealed by remember { mutableStateOf(false) }
-    var dragPx by remember { mutableStateOf(0f) }
-    var dragging by remember { mutableStateOf(false) }
-    // A forgiving travel budget — a confident downward flick clears it well before the finger
-    // reaches the bottom of the card, so the reveal feels responsive rather than stubborn.
-    val revealThresholdPx = 170f
+    val child = state.selectedChild
+    val house = houseFor(child?.id ?: "")
 
-    // §11 — when the options panel is open, system/predictive back collapses it back to the card
-    // (instead of leaving the tab), matching the swipe-up gesture.
-    BackHandler(enabled = revealed) { revealed = false; dragPx = 0f }
-
-    val baseProgress = if (revealed) 1f else 0f
-    // While dragging we map signed finger travel to progress *relative to the current rest*, so a
-    // swipe-up from the revealed state closes, and a swipe-down from the card opens. Rubber-banding
-    // past the ends keeps it from feeling like it hit a wall.
-    val rawProgress = (baseProgress + dragPx / revealThresholdPx).coerceIn(0f, 1f)
-    val progress by animateFloatAsState(
-        targetValue = if (dragging) rawProgress else baseProgress,
-        // Premium settle: a soft spring (not a linear tween) so the surface "arrives" with weight.
-        animationSpec = if (dragging) tween(durationMillis = 0)
-        else spring(dampingRatio = 0.82f, stiffness = 320f),
-        label = "reveal-progress",
+    var showLogoutConfirm by remember { mutableStateOf(false) }
+    VConfirmDialog(
+        visible = showLogoutConfirm,
+        title = "Log out?",
+        message = "You'll need to sign in again to follow your child's progress.",
+        confirmLabel = "Log out",
+        onConfirm = { showLogoutConfirm = false; onLogout() },
+        onDismiss = { showLogoutConfirm = false },
+        icon = VIcons.AlertTriangle,
     )
 
-    fun settle() {
-        dragging = false
-        // Velocity-free threshold settle with hysteresis: easier to open than to keep open.
-        revealed = if (revealed) rawProgress > 0.35f else rawProgress >= 0.5f
-        dragPx = 0f
-    }
-
+    // A calm lavender canvas (the website base background) with a soft house-tinted aurora at the
+    // very top so the hero card "glows" out of the surface — premium, but not a wall of purple.
     Box(
         modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(c.navyDeep, c.navy))),
+            .background(c.background)
+            // Premium top aurora: a soft house-tinted radial glow bleeds down from behind the hero
+            // card so it appears to emit light from the lavender canvas — drawn UNDER the content,
+            // very low alpha, so it reads as ambience, never a wall of colour.
+            .drawWithContent {
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(house.top.copy(alpha = 0.16f), Color.Transparent),
+                        center = Offset(size.width * 0.5f, size.height * 0.06f),
+                        radius = size.width * 0.9f,
+                    ),
+                )
+                drawContent()
+            },
     ) {
-        // The card — lifts up + scales down + fades slightly as options reveal.
-        Box(
+        Column(
             Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
                 .statusBarsPadding()
-                .padding(horizontal = 28.dp),
-            contentAlignment = Alignment.Center,
+                .padding(top = 12.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // ── 1 · Hero collectible card ────────────────────────────────────
             ProfilePlayerCard(
                 state = state,
-                // Reveal is interactive only when collapsed OR mid-drag — once fully open the panel
-                // owns the gestures (its own swipe-up + Back-to-card button close it).
-                revealEnabled = !revealed || dragging,
-                onRevealDragStart = { dragging = true },
-                onRevealDragDelta = { delta -> dragPx = delta },
-                onRevealDragEnd = { settle() },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .graphicsLayer {
-                        translationY = -size.height * 0.20f * progress
-                        val s = 1f - 0.18f * progress
-                        scaleX = s
-                        scaleY = s
-                        alpha = 1f - 0.30f * progress
-                    },
+                modifier = Modifier.fillMaxWidth(),
             )
 
-            // The grab-handle affordance + caption float just under the card while collapsed,
-            // fading out as the panel takes over. It's also TAPPABLE as a guaranteed fallback to
-            // the swipe — a tap springs the options panel fully open.
-            ProfileRevealHint(
-                progress = progress,
-                onOpen = { revealed = true; dragPx = 0f },
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
-        }
+            // ── 2 · Key metrics band (counts up) ─────────────────────────────
+            val attendancePct = state.attendance?.takeIf { it.totalDays > 0 }?.attendanceRate
+            val scorePct = state.latestMark?.let { m ->
+                val marks = m.marks
+                if (marks != null && m.maxMarks > 0) ((marks / m.maxMarks) * 100).roundToInt() else null
+            }
+            val rawProgress = child?.overallProgress ?: 0.0
+            val journeyPct = (if (rawProgress <= 1.0) rawProgress * 100.0 else rawProgress).roundToInt().coerceIn(0, 100)
 
-        // The options panel — rises from the bottom as progress → 1. Swiping it back down/up or the
-        // explicit "Back to card" button collapses it.
-        ProfileOptionsPanel(
-            parentName = profileState.profile?.name ?: "",
-            parentContact = listOfNotNull(
+            SectionLabel("At a glance")
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                MetricTile(
+                    icon = VIcons.ShieldCheck,
+                    accent = c.successInk,
+                    value = attendancePct?.let { "$it%" } ?: "—",
+                    label = "Attendance",
+                    modifier = Modifier.weight(1f),
+                )
+                MetricTile(
+                    icon = VIcons.Target,
+                    accent = c.accentDeep,
+                    value = scorePct?.let { "$it%" } ?: "—",
+                    label = "Latest score",
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                MetricTile(
+                    icon = VIcons.Sparkles,
+                    accent = Color(0xFF6C8DF5), // sky
+                    value = "L${child?.currentLevel ?: 0}",
+                    label = "$journeyPct% to next",
+                    modifier = Modifier.weight(1f),
+                )
+                MetricTile(
+                    icon = VIcons.School,
+                    accent = c.teal,
+                    value = state.coveredToday.size.toString(),
+                    label = "Topics today",
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            // ── 3 · This month attendance breakdown ──────────────────────────
+            val att = state.attendance
+            if (att != null && att.totalDays > 0) {
+                SectionLabel("This month")
+                VCard {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        AttendanceArc(
+                            percent = att.attendanceRate.coerceIn(0, 100),
+                            modifier = Modifier.size(72.dp),
+                        )
+                        Spacer(Modifier.width(16.dp))
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            BreakdownBar("Present", att.presentDays, att.totalDays, c.successInk)
+                            BreakdownBar("Late", att.lateDays, att.totalDays, c.warningInk)
+                            BreakdownBar("Absent", att.absentDays, att.totalDays, c.dangerInk)
+                        }
+                    }
+                }
+            }
+
+            // ── 4 · Achievements strip ───────────────────────────────────────
+            SectionLabel("Achievements")
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                AchievementChip(
+                    icon = VIcons.ShieldCheck,
+                    title = "On track",
+                    earned = (attendancePct ?: 0) >= 90,
+                    accent = c.successInk,
+                    modifier = Modifier.weight(1f),
+                )
+                AchievementChip(
+                    icon = VIcons.Star,
+                    title = "High scorer",
+                    earned = (scorePct ?: 0) >= 75,
+                    accent = c.warningInk,
+                    modifier = Modifier.weight(1f),
+                )
+                AchievementChip(
+                    icon = VIcons.Sparkles,
+                    title = "Level ${child?.currentLevel ?: 0}",
+                    earned = (child?.currentLevel ?: 0) > 0,
+                    accent = c.accentDeep,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            // ── 5 · Account section ──────────────────────────────────────────
+            SectionLabel("Account")
+            val parentName = profileState.profile?.name ?: ""
+            val parentContact = listOfNotNull(
                 profileState.profile?.phone?.takeIf { it.isNotBlank() },
                 profileState.profile?.email?.takeIf { it.isNotBlank() },
-            ).joinToString("  ·  "),
-            progress = progress,
-            onCollapseDragStart = { dragging = true },
-            onCollapseDragDelta = { delta -> dragPx = delta },
-            onCollapseDragEnd = { settle() },
-            onLinkChild = onLinkChild,
-            onDiscoverSchools = onDiscoverSchools,
-            onLogout = onLogout,
-            onClose = { revealed = false; dragPx = 0f },
-            modifier = Modifier.align(Alignment.BottomCenter),
+            ).joinToString("  ·  ")
+            VCard(padding = 0.dp) {
+                AccountHeaderRow(name = parentName, contact = parentContact)
+                Divider()
+                AccountRow(VIcons.User, "Personal details", parentContact.ifBlank { "Mobile, email, photo" }, null)
+                Divider()
+                AccountRow(VIcons.Users, "Linked children", "Link a child or manage who you follow", onLinkChild)
+                Divider()
+                AccountRow(VIcons.School, "Discover schools", "Browse all schools on VidyaPrayag", onDiscoverSchools)
+                Divider()
+                AccountRow(VIcons.Bell, "Notification preferences", "Push, WhatsApp, quiet hours", null)
+                Divider()
+                AccountRow(VIcons.Lock, "Change password", "Keep your account secure", null)
+                Divider()
+                AccountRow(
+                    VIcons.Mail,
+                    "Help & support",
+                    "Email ${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}",
+                ) {
+                    runCatching {
+                        uriHandler.openUri(
+                            "mailto:${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}?subject=VidyaPrayag%20Support",
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
+            VButton(
+                text = "Log out",
+                onClick = { showLogoutConfirm = true },
+                full = true,
+                variant = VButtonVariant.Destructive,
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section primitives
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun SectionLabel(text: String) {
+    val c = VTheme.colors
+    Text(
+        text.uppercase(),
+        style = VTheme.type.label.colored(c.ink3).copy(
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 11.sp,
+            letterSpacing = 0.9.sp,
+        ),
+        modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+    )
+}
+
+/** An animated metric tile — the value scales in with a soft spring on first composition. */
+@Composable
+private fun MetricTile(
+    icon: ImageVector,
+    accent: Color,
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+    var appeared by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (appeared) 1f else 0.86f,
+        animationSpec = spring(dampingRatio = 0.5f, stiffness = 260f),
+        label = "metricScale",
+    )
+    val alpha by animateFloatAsState(if (appeared) 1f else 0f, tween(280), label = "metricAlpha")
+    androidx.compose.runtime.LaunchedEffect(Unit) { appeared = true }
+
+    VCard(modifier = modifier) {
+        Box(
+            Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(accent.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(19.dp))
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            value,
+            style = VTheme.type.dataLg.colored(c.navyDeep).copy(fontWeight = FontWeight.ExtraBold, fontSize = 24.sp),
+            modifier = Modifier.graphicsLayer {
+                scaleX = scale; scaleY = scale; this.alpha = alpha
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
+            },
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(label, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))
+    }
+}
+
+/** A labelled, colour-coded attendance breakdown bar (count of total). */
+@Composable
+private fun BreakdownBar(label: String, count: Int, total: Int, accent: Color) {
+    val c = VTheme.colors
+    val ratio = if (total > 0) count.toFloat() / total else 0f
+    val animated by animateFloatAsState(ratio, tween(700), label = "breakdown")
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp))
+            Text(
+                "$count",
+                style = VTheme.type.caption.colored(accent).copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+            )
+        }
+        Box(
+            Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(999.dp)).background(c.cream),
+        ) {
+            Box(
+                Modifier.fillMaxWidth(animated.coerceIn(0f, 1f)).height(6.dp)
+                    .clip(RoundedCornerShape(999.dp)).background(accent),
+            )
+        }
+    }
+}
+
+/** A green attendance arc used in the "This month" card. */
+@Composable
+private fun AttendanceArc(percent: Int, modifier: Modifier = Modifier) {
+    val c = VTheme.colors
+    val sweep by animateFloatAsState(percent / 100f, tween(800), label = "attArc")
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val stroke = 7.dp.toPx()
+            val inset = stroke / 2f
+            val arcSize = Size(size.width - stroke, size.height - stroke)
+            val topLeft = Offset(inset, inset)
+            drawArc(
+                color = c.successInk.copy(alpha = 0.14f),
+                startAngle = 0f, sweepAngle = 360f, useCenter = false,
+                topLeft = topLeft, size = arcSize, style = Stroke(width = stroke, cap = StrokeCap.Round),
+            )
+            drawArc(
+                brush = Brush.sweepGradient(listOf(c.success, c.successInk)),
+                startAngle = -90f, sweepAngle = 360f * sweep, useCenter = false,
+                topLeft = topLeft, size = arcSize, style = Stroke(width = stroke, cap = StrokeCap.Round),
+            )
+        }
+        Text(
+            "$percent%",
+            style = VTheme.type.dataLg.colored(c.successInk).copy(fontWeight = FontWeight.ExtraBold, fontSize = 18.sp),
         )
     }
 }
 
+/** A small achievement chip — full-colour when earned, faded/locked when not. */
+@Composable
+private fun AchievementChip(
+    icon: ImageVector,
+    title: String,
+    earned: Boolean,
+    accent: Color,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+    val tint = if (earned) accent else c.placeholder
+    VCard(modifier = modifier) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+            Box(
+                Modifier.size(40.dp).clip(CircleShape)
+                    .background(if (earned) accent.copy(alpha = 0.14f) else c.cream),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.height(7.dp))
+            Text(
+                title,
+                style = VTheme.type.label.colored(if (earned) c.ink else c.ink3).copy(
+                    fontWeight = FontWeight.Bold, fontSize = 10.sp,
+                ),
+                maxLines = 1,
+            )
+            Text(
+                if (earned) "Earned" else "Locked",
+                style = VTheme.type.caption.colored(tint).copy(fontSize = 9.sp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AccountHeaderRow(name: String, contact: String) {
+    val c = VTheme.colors
+    Row(
+        Modifier.fillMaxWidth().padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        VAvatar(name = name.ifBlank { "Parent" }, size = 46.dp, ring = true)
+        Column(Modifier.weight(1f)) {
+            Text(name.ifBlank { "Parent" }, style = VTheme.type.bodyStrong.colored(c.ink).copy(fontWeight = FontWeight.Bold))
+            if (contact.isNotBlank()) {
+                Text(contact, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountRow(icon: ImageVector, title: String, sub: String, onClick: (() -> Unit)?) {
+    val c = VTheme.colors
+    val interaction = remember { MutableInteractionSource() }
+    val base = Modifier.fillMaxWidth()
+    val rowMod = if (onClick != null) {
+        base.clickable(interactionSource = interaction, indication = null, onClick = onClick)
+    } else base
+    Row(
+        rowMod.padding(horizontal = 16.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(c.accent.copy(alpha = 0.10f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(17.dp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(title, style = VTheme.type.bodyStrong.colored(c.ink))
+            Text(sub, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp))
+        }
+        if (onClick != null) {
+            Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun Divider() {
+    val c = VTheme.colors
+    Box(Modifier.fillMaxWidth().height(1.dp).padding(start = 64.dp).background(c.hairline))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The collectible card — tilt + holo + real stats (tap-to-lean, no fragile reveal)
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
- * The collectible card itself — tilt + holo + real stats + the swipe-down reveal gesture.
- *
- * Unified gesture model (the fix): a SINGLE [pointerInput] classifies each drag once, on its first
- * decisive movement:
- *   - predominantly VERTICAL  → drives the parent's reveal (card → account options)
- *   - otherwise (lateral/small)→ drives the foil 3D tilt (parallax lean), springing back on release
- * This removes the old conflict where a tilt detector swallowed every drag so the card could never
- * be swiped down.
+ * The collectible card itself — a foil holographic player card with a drag-driven 3D tilt that
+ * springs back on release. Every stat is real backend data; the house is the only decorative
+ * (deterministic-from-id) element. The tilt gesture is now the card's ONLY gesture, so it is
+ * conflict-free and reliable — there is no longer a fragile "swipe-down-to-reveal" rig fighting it.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun ProfilePlayerCard(
     state: ParentDashboardState,
     modifier: Modifier = Modifier,
-    revealEnabled: Boolean = false,
-    onRevealDragStart: () -> Unit = {},
-    onRevealDragDelta: (Float) -> Unit = {},
-    onRevealDragEnd: () -> Unit = {},
 ) {
     val child = state.selectedChild
     val house = houseFor(child?.id ?: "")
 
-    // overallProgress arrives either as a 0..1 fraction or an already-scaled 0..100 percent
-    // depending on the endpoint build — normalise to a whole-number percent for display.
     val rawProgress = child?.overallProgress ?: 0.0
     val progressPct = (if (rawProgress <= 1.0) rawProgress * 100.0 else rawProgress).roundToInt().coerceIn(0, 100)
 
-    // ── Drag-driven tilt ──────────────────────────────────────────────────────
     var dragX by remember { mutableStateOf(0f) }
     var dragY by remember { mutableStateOf(0f) }
     var tilting by remember { mutableStateOf(false) }
@@ -293,7 +564,6 @@ fun ProfilePlayerCard(
         label = "tiltX",
     )
 
-    // ── Infinite holographic sweep ─────────────────────────────────────────────
     val holo = rememberInfiniteTransition(label = "holo")
     val sweep by holo.animateFloat(
         initialValue = -1f,
@@ -307,54 +577,34 @@ fun ProfilePlayerCard(
 
     Box(
         modifier
-            .aspectRatio(0.66f)
+            .aspectRatio(0.74f)
             .graphicsLayer {
                 rotationX = tiltX
                 rotationY = tiltY
                 cameraDistance = 16f * density
             }
-            // ── Unified drag classifier (reveal vs tilt) ────────────────────────
-            .pointerInput(revealEnabled) {
+            // The ONLY gesture on the card: a drag tilts the foil; release springs it level.
+            .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
-                    var mode = 0 // 0 = undecided, 1 = reveal (vertical), 2 = tilt
-                    var accY = 0f
-                    val touchSlop = viewConfiguration.touchSlop
+                    tilting = true
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
                         if (!change.pressed) break
-                        val dx = change.positionChange().x
-                        val dy = change.positionChange().y
-                        if (mode == 0) {
-                            val totalX = change.position.x - down.position.x
-                            val totalY = change.position.y - down.position.y
-                            if (abs(totalX) > touchSlop || abs(totalY) > touchSlop) {
-                                // Decide once. Reveal wins for any movement that is even loosely
-                                // vertical (|Δy| ≥ 0.6·|Δx|) — a downward swipe should NEVER be
-                                // swallowed by the tilt. The tilt only claims clearly lateral drags.
-                                mode = if (revealEnabled && abs(totalY) >= abs(totalX) * 0.6f) {
-                                    onRevealDragStart(); 1
-                                } else {
-                                    tilting = true; 2
-                                }
-                            }
-                        }
-                        when (mode) {
-                            1 -> { accY += dy; onRevealDragDelta(accY); change.consume() }
-                            2 -> { dragX += dx; dragY += dy; change.consume() }
-                        }
+                        dragX += change.positionChange().x
+                        dragY += change.positionChange().y
+                        change.consume()
                     }
-                    when (mode) {
-                        1 -> onRevealDragEnd()
-                        2 -> { tilting = false; dragX = 0f; dragY = 0f }
-                    }
+                    tilting = false
+                    dragX = 0f
+                    dragY = 0f
                 }
             }
             .clip(RoundedCornerShape(28.dp))
             .background(Brush.verticalGradient(listOf(house.top, house.bottom)))
-            // Foil border — a thin bright rim that brightens toward the tilt direction.
-            .drawBehind {
+            .drawWithContent {
+                drawContent()
                 drawHoloAndFoil(house = house, sweep = sweep, tiltX = tiltX, tiltY = tiltY)
             },
     ) {
@@ -364,11 +614,7 @@ fun ProfilePlayerCard(
             house = house,
             level = child?.currentLevel ?: 0,
             progressPct = progressPct,
-            // Attendance %: only a real figure once the month actually has recorded school days —
-            // otherwise null so the tile shows a graceful "—" instead of a stark, misleading 0%.
             attendancePct = state.attendance?.takeIf { it.totalDays > 0 }?.attendanceRate,
-            // Status pill: prefer the resolved live label (Holiday/Sunday/…); fall back to the
-            // dashboard's own attendance_status so the card is never blank for a real child.
             statusLabel = state.today.label.ifBlank { child?.attendanceStatus.orEmpty() },
             scorePct = state.latestMark?.let { m ->
                 val marks = m.marks
@@ -390,7 +636,6 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHoloAndFoil(
     val w = size.width
     val h = size.height
 
-    // 1) Diagonal holographic band that sweeps across continuously.
     val bandCenter = sweep * w
     drawRect(
         brush = Brush.linearGradient(
@@ -409,7 +654,6 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHoloAndFoil(
         size = Size(w, h),
     )
 
-    // 2) Specular highlight that tracks the tilt — the card "catches light" where you lean it.
     val hx = (w / 2f) + (tiltY / 14f) * (w * 0.45f)
     val hy = (h / 2f) - (tiltX / 14f) * (h * 0.45f)
     val intensity = (abs(tiltX) + abs(tiltY)) / 28f
@@ -425,13 +669,12 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHoloAndFoil(
         size = Size(w, h),
     )
 
-    // 3) Foil rim — bright inset border.
     val stroke = 3f
     drawRect(
         brush = Brush.linearGradient(listOf(house.foil.copy(alpha = 0.9f), house.top.copy(alpha = 0.6f), house.foil.copy(alpha = 0.9f))),
         topLeft = Offset(stroke / 2f, stroke / 2f),
         size = Size(w - stroke, h - stroke),
-        style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke),
+        style = Stroke(width = stroke),
     )
 }
 
@@ -449,7 +692,6 @@ private fun ProfileCardContent(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier, verticalArrangement = Arrangement.SpaceBetween) {
-        // ── Header: house crest + status pill ──
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -489,10 +731,8 @@ private fun ProfileCardContent(
             }
         }
 
-        // ── Hero: avatar + name + level ──
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
             Box(contentAlignment = Alignment.Center) {
-                // Glow halo behind the avatar.
                 Box(
                     Modifier
                         .size(132.dp)
@@ -517,8 +757,6 @@ private fun ProfileCardContent(
             )
         }
 
-        // ── Stat tiles: real backend numbers, each a layered-glass tile with a mini
-        //    progress arc (ATTEND/SCORE) or a count badge (TODAY). Premium depth, not capsules. ──
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -549,10 +787,6 @@ private fun ProfileCardContent(
     }
 }
 
-/**
- * A premium glass stat tile. Renders a layered glass surface (top sheen + inset foil hairline)
- * with a mini progress arc behind the value when a [ratio] is supplied, or a clean count when not.
- */
 @Composable
 private fun StatTile(
     label: String,
@@ -568,21 +802,19 @@ private fun StatTile(
             .background(Color.White.copy(alpha = 0.13f))
             .drawWithContent {
                 drawContent()
-                // top sheen
                 drawRect(
                     brush = Brush.verticalGradient(
                         listOf(Color.White.copy(alpha = 0.18f), Color.Transparent),
                         endY = size.height * 0.5f,
                     ),
                 )
-                // inset foil hairline
                 val s = 1.2.dp.toPx()
                 drawRoundRect(
                     color = house.foil.copy(alpha = 0.28f),
                     topLeft = Offset(s / 2f, s / 2f),
                     size = Size(size.width - s, size.height - s),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(15.dp.toPx(), 15.dp.toPx()),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = s),
+                    style = Stroke(width = s),
                 )
             }
             .padding(vertical = 14.dp, horizontal = 8.dp),
@@ -618,12 +850,11 @@ private fun StatTile(
     }
 }
 
-/** A small foil progress arc drawn behind a stat value. */
 @Composable
 private fun StatArc(ratio: Float, house: ProfileHouse, modifier: Modifier = Modifier) {
     val sweep by animateFloatAsState(targetValue = ratio, label = "statArc")
     Box(modifier) {
-        androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+        Canvas(Modifier.fillMaxSize()) {
             val stroke = 3.5.dp.toPx()
             val inset = stroke / 2f
             val arcSize = Size(size.width - stroke, size.height - stroke)
@@ -632,241 +863,14 @@ private fun StatArc(ratio: Float, house: ProfileHouse, modifier: Modifier = Modi
                 color = Color.White.copy(alpha = 0.2f),
                 startAngle = 0f, sweepAngle = 360f, useCenter = false,
                 topLeft = topLeft, size = arcSize,
-                style = androidx.compose.ui.graphics.drawscope.Stroke(
-                    width = stroke,
-                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
-                ),
+                style = Stroke(width = stroke, cap = StrokeCap.Round),
             )
             drawArc(
                 brush = Brush.sweepGradient(listOf(house.foil.copy(alpha = 0.8f), Color.White)),
                 startAngle = -90f, sweepAngle = 360f * sweep, useCenter = false,
                 topLeft = topLeft, size = arcSize,
-                style = androidx.compose.ui.graphics.drawscope.Stroke(
-                    width = stroke,
-                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
-                ),
+                style = Stroke(width = stroke, cap = StrokeCap.Round),
             )
-        }
-    }
-}
-
-/**
- * ProfileRevealHint — a non-interactive grab-handle + caption that floats just beneath the card
- * while it's collapsed, inviting the swipe-down. It owns NO gesture (the card itself does), so it
- * never competes for the drag; it simply fades + drifts away as the panel reveals.
- */
-@Composable
-private fun ProfileRevealHint(
-    progress: Float,
-    onOpen: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val fade = (1f - progress * 2f).coerceIn(0f, 1f)
-    val hintInteraction = remember { MutableInteractionSource() }
-    Column(
-        modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(bottom = 14.dp)
-            .graphicsLayer {
-                alpha = fade
-                translationY = 18f * progress
-            }
-            // Tap anywhere on the hint to open — a dependable companion to the swipe gesture.
-            .clickable(
-                interactionSource = hintInteraction,
-                indication = null,
-                enabled = fade > 0.5f,
-                onClick = onOpen,
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            Modifier
-                .width(44.dp)
-                .height(5.dp)
-                .clip(RoundedCornerShape(999.dp))
-                .background(Color.White.copy(alpha = 0.42f)),
-        )
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                VIcons.ChevronDown,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.6f),
-                modifier = Modifier.size(15.dp),
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                "Swipe or tap for account options",
-                style = VTheme.type.caption.colored(Color.White.copy(alpha = 0.6f)),
-            )
-        }
-    }
-}
-
-/**
- * ProfileOptionsPanel — the account-options surface that rises from the bottom as the card is
- * swiped down. Slides + fades with `progress`, hosting the real account rows (personal details,
- * linked children, discover schools, help) and a gated **Log out**. No popup/toast — it's a
- * drag-tracked sheet that becomes interactive only once mostly revealed.
- */
-@OptIn(ExperimentalComposeUiApi::class)
-@Composable
-private fun ProfileOptionsPanel(
-    parentName: String,
-    parentContact: String,
-    progress: Float,
-    onCollapseDragStart: () -> Unit,
-    onCollapseDragDelta: (Float) -> Unit,
-    onCollapseDragEnd: () -> Unit,
-    onLinkChild: () -> Unit,
-    onDiscoverSchools: () -> Unit,
-    onLogout: () -> Unit,
-    onClose: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val c = VTheme.colors
-    val uriHandler = LocalUriHandler.current
-    var showLogoutConfirm by remember { mutableStateOf(false) }
-
-    VConfirmDialog(
-        visible = showLogoutConfirm,
-        title = "Log out?",
-        message = "You'll need to sign in again to follow your child's progress.",
-        confirmLabel = "Log out",
-        onConfirm = { showLogoutConfirm = false; onLogout() },
-        onDismiss = { showLogoutConfirm = false },
-        icon = VIcons.AlertTriangle,
-    )
-
-    // Panel occupies ~74% of height; translates fully off-screen at progress 0. Below ~2% it's
-    // effectively closed, so we skip pointer input to let the card own all gestures.
-    val interactive = progress > 0.02f
-    Column(
-        modifier
-            .fillMaxWidth()
-            .fillMaxHeight(0.74f)
-            .graphicsLayer {
-                translationY = size.height * (1f - progress)
-                alpha = progress
-            }
-            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-            .background(c.background)
-            .navigationBarsPadding(),
-    ) {
-        // Top grab handle — swipe UP here (negative dy → reveal stays/closes path) collapses the
-        // panel back to the card. Reports accumulated dy to the host like the card does.
-        var acc by remember { mutableStateOf(0f) }
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .then(
-                    if (interactive) Modifier.pointerInput(Unit) {
-                        detectVerticalDragGestures(
-                            onDragStart = { acc = 0f; onCollapseDragStart() },
-                            onDragEnd = { acc = 0f; onCollapseDragEnd() },
-                            onDragCancel = { acc = 0f; onCollapseDragEnd() },
-                        ) { change, dy ->
-                            change.consume()
-                            acc += dy
-                            onCollapseDragDelta(acc)
-                        }
-                    } else Modifier,
-                )
-                .padding(top = 10.dp, bottom = 4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Box(
-                Modifier
-                    .width(40.dp)
-                    .height(5.dp)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(c.ink3.copy(alpha = 0.35f)),
-            )
-        }
-        Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(top = 8.dp, bottom = 24.dp),
-        ) {
-            Text("Account", style = VTheme.type.h2.colored(c.ink))
-            if (parentName.isNotBlank()) {
-                Spacer(Modifier.height(2.dp))
-                Text(parentName, style = VTheme.type.bodyStrong.colored(c.ink2))
-            }
-            if (parentContact.isNotBlank()) {
-                Text(parentContact, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))
-            }
-            Spacer(Modifier.height(16.dp))
-
-            data class Row2(val title: String, val sub: String, val onClick: (() -> Unit)?)
-            val rows = listOf(
-                Row2("Personal details", parentContact.ifBlank { "Mobile, email, photo" }, null),
-                Row2("Linked children", "Link a child or manage who you follow", onLinkChild),
-                Row2("Discover schools", "Browse all schools on VidyaPrayag", onDiscoverSchools),
-                Row2("Notification preferences", "Push, WhatsApp, quiet hours", null),
-                Row2("Change password", "Keep your account secure", null),
-                Row2(
-                    "Help & support",
-                    "Email ${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}",
-                    {
-                        runCatching {
-                            uriHandler.openUri(
-                                "mailto:${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}?subject=VidyaPrayag%20Support",
-                            )
-                        }
-                    },
-                ),
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                rows.forEach { row -> OptionRow(row.title, row.sub, row.onClick) }
-            }
-
-            Spacer(Modifier.height(16.dp))
-            VButton(
-                text = "Log out",
-                onClick = { showLogoutConfirm = true },
-                full = true,
-                variant = VButtonVariant.Destructive,
-            )
-            Spacer(Modifier.height(8.dp))
-            VButton(
-                text = "Back to card",
-                onClick = onClose,
-                full = true,
-                variant = VButtonVariant.Ghost,
-            )
-        }
-    }
-}
-
-@Composable
-private fun OptionRow(title: String, sub: String, onClick: (() -> Unit)?) {
-    val c = VTheme.colors
-    val interaction = remember { MutableInteractionSource() }
-    val base = Modifier
-        .fillMaxWidth()
-        .clip(RoundedCornerShape(16.dp))
-        .background(c.card)
-    val rowMod = if (onClick != null) {
-        base.clickable(interactionSource = interaction, indication = null, onClick = onClick)
-    } else {
-        base
-    }
-    Row(
-        rowMod.padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(title, style = VTheme.type.bodyStrong.colored(c.ink))
-            Text(sub, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp))
-        }
-        if (onClick != null) {
-            Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(16.dp))
         }
     }
 }

@@ -58,8 +58,9 @@ fun ParentCoveredCard(
                     style = VTheme.type.label.colored(c.ink3).copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
                 )
             }
-            // NO-GREEN LAW (parent surface): the "live" pulse reads in the brand accent.
-            if (!schoolDayEnded) VStatusDot(color = c.accent, size = 6.dp)
+            // Semantic "live" pulse — an active, in-progress signal reads in success green
+            // (matching the dashboard's present=green language), not a flat brand tint.
+            if (!schoolDayEnded) VStatusDot(color = c.successInk, size = 6.dp)
         }
 
         Spacer(Modifier.height(8.dp))
@@ -123,12 +124,15 @@ fun ParentCoveredCard(
 @Composable
 private fun CoveredRow(u: CoveredUnit) {
     val c = VTheme.colors
+    // Per-subject harmonious accent (keyed by name → the same subject is always the same hue,
+    // here and everywhere else in the portal), so the list isn't a wall of one violet.
+    val tint = parentSubjectColor(c, u.subject)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(
-            Modifier.clip(RoundedCornerShape(999.dp)).background(c.accent.copy(alpha = 0.14f))
+            Modifier.clip(RoundedCornerShape(999.dp)).background(tint.copy(alpha = 0.14f))
                 .padding(horizontal = 7.dp, vertical = 2.dp),
         ) {
-            Text(u.subject, style = VTheme.type.label.colored(c.accentDeep).copy(fontWeight = FontWeight.Bold, fontSize = 9.sp))
+            Text(u.subject, style = VTheme.type.label.colored(tint).copy(fontWeight = FontWeight.Bold, fontSize = 9.sp))
         }
         Text(
             u.title,

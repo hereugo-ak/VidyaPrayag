@@ -166,10 +166,10 @@ private fun StreakTile(label: String, value: String) {
 @Composable
 private fun ScholarshipCard(s: Scholarship) {
     val c = VTheme.colors
-    // NO-GREEN LAW (parent surface): no Success tone — "full funding" reads neutral,
-    // "merit based" keeps the brand violet, "international" the amber.
+    // Semantic categories: "full funding" is the best outcome → success green; "merit based"
+    // is a brand highlight → violet; "international" → amber accent. Distinct + meaningful.
     val categoryTone = when (s.category.lowercase()) {
-        "full funding" -> VBadgeTone.Neutral
+        "full funding" -> VBadgeTone.Success
         "merit based" -> VBadgeTone.Accent
         "international" -> VBadgeTone.Warning
         else -> VBadgeTone.Neutral
@@ -178,7 +178,7 @@ private fun ScholarshipCard(s: Scholarship) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             VBadge(text = s.category, tone = categoryTone)
             if (s.isCritical) {
-                VBadge(text = "● CRITICAL", tone = VBadgeTone.Danger)
+                VBadge(text = "CRITICAL", tone = VBadgeTone.Danger)
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -206,11 +206,11 @@ private fun ScholarshipCard(s: Scholarship) {
 @Composable
 private fun ApplicationRow(a: ScholarshipApplication) {
     val c = VTheme.colors
-    // NO-GREEN LAW (parent surface): "received" reads in the brand violet (Accent);
-    // "shortlisted" steps down to neutral so the two stay distinct.
+    // Semantic application states: "received" + "shortlisted" are positive progress → success
+    // green (shortlisted the deeper read), "under review" is in-flight → amber.
     val statusTone = when (a.status.lowercase()) {
-        "received" -> VBadgeTone.Accent
-        "shortlisted" -> VBadgeTone.Neutral
+        "received" -> VBadgeTone.Success
+        "shortlisted" -> VBadgeTone.Success
         "under review" -> VBadgeTone.Warning
         else -> VBadgeTone.Neutral
     }

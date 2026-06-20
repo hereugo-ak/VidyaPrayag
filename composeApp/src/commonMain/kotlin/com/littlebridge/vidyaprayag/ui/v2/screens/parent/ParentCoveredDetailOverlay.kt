@@ -23,19 +23,22 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.ParentSyllabusData
 import com.littlebridge.vidyaprayag.feature.parent.presentation.CoveredUnit
-import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
 import com.littlebridge.vidyaprayag.ui.v2.components.VStatusDot
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
@@ -148,8 +151,9 @@ private fun Sheet(
                 } else {
                     coveredToday.forEach { u ->
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            // NO-GREEN LAW (parent surface): covered-topic markers read in brand violet.
-                            VStatusDot(color = c.accent, size = 7.dp)
+                            // Semantic: a topic that's been COVERED reads as success green (the same
+                            // "done = green" language used by attendance present + syllabus checks).
+                            VStatusDot(color = c.successInk, size = 7.dp)
                             Column {
                                 Text(u.title, style = VTheme.type.bodyStrong.colored(c.navyDeep).copy(fontSize = 13.sp))
                                 Text(u.subject, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))
@@ -165,6 +169,9 @@ private fun Sheet(
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Text("Syllabus coverage", style = VTheme.type.labelStrong.colored(c.ink2))
                     subjects.forEach { s ->
+                        // Each subject carries its own harmonious hue (keyed by name → stable
+                        // everywhere), so the coverage list reads expressive, not a violet block.
+                        val tint = parentSubjectColor(c, s.subject)
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Row(
                                 Modifier.fillMaxWidth(),
@@ -174,10 +181,10 @@ private fun Sheet(
                                 Text(s.subject, style = VTheme.type.bodyStrong.colored(c.navyDeep).copy(fontSize = 13.sp))
                                 Text(
                                     "${s.progress}%",
-                                    style = VTheme.type.dataSm.colored(c.accentDeep).copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
+                                    style = VTheme.type.dataSm.colored(tint).copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
                                 )
                             }
-                            VProgressBar(value = s.progress.toFloat())
+                            OverlayTintedBar(value = s.progress.toFloat(), fill = tint)
                             val coveredCount = s.units.count { it.isCovered }
                             Text(
                                 "$coveredCount of ${s.units.size} units covered",
@@ -188,5 +195,31 @@ private fun Sheet(
                 }
             }
         }
+    }
+}
+
+/**
+ * A premium tinted progress bar with an animated fill — used for per-subject coverage in the
+ * sheet so each subject can carry its own harmonious hue (VProgressBar only takes a tone enum).
+ */
+@Composable
+private fun OverlayTintedBar(value: Float, fill: Color) {
+    val c = VTheme.colors
+    val clamped = value.coerceIn(0f, 100f) / 100f
+    val animated by animateFloatAsState(targetValue = clamped, animationSpec = tween(600))
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(8.dp)
+            .clip(RoundedCornerShape(999.dp))
+            .background(c.cream),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth(animated)
+                .height(8.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(fill),
+        )
     }
 }

@@ -35,7 +35,6 @@ import com.littlebridge.vidyaprayag.feature.parent.presentation.NotificationsVie
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentDashboardViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.TrackProgressViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
-import com.littlebridge.vidyaprayag.ui.v2.components.VBottomNav
 import com.littlebridge.vidyaprayag.ui.v2.components.VDivider
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VNavItem
@@ -81,6 +80,23 @@ fun ParentPortalV2(
     val dashboard by dashboardViewModel.state.collectAsStateV2()
     val progress by headerViewModel.state.collectAsStateV2()
     val notifications by notificationsViewModel.state.collectAsStateV2()
+
+    // ── Unlinked-parent gate ────────────────────────────────────────────────────
+    // A parent with NO child linked yet shouldn't land in the 5-tab portal where every tab is an
+    // empty state. Once the dashboard has resolved (not loading, no error) and reports zero
+    // children, we hand off to the focused two-tab landing — Link a child / Explore schools.
+    // (While the very first load is still in flight we fall through to the portal's own skeletons,
+    // so the unlinked screen never flashes for an existing parent.)
+    val hasResolved = !dashboard.isLoading && dashboard.error == null
+    if (hasResolved && dashboard.children.isEmpty()) {
+        ParentUnlinkedScreenV2(
+            // After a successful link request the dashboard reloads — once the school approves and
+            // a child appears, this gate falls through to the full portal automatically.
+            onLinked = { dashboardViewModel.load() },
+            modifier = modifier,
+        )
+        return
+    }
 
     // §11 cross-platform — predictive back / edge-swipe dismisses the full-screen overlay back to
     // the tabs, not the portal.
@@ -156,7 +172,9 @@ fun ParentPortalV2(
         VNavItem("fees", "Fees", VIcons.Wallet),
         // Phase 3 (commit 9): "Activity" → "Conversations". The tab now leads with real two-way
         // messaging (Chat icon), with announcements one segment away — see ParentConversationsScreenV2.
-        VNavItem("conversations", "Conversations", VIcons.Chat),
+        // The dock badge rides the real unread notifications count so the parent always sees pending
+        // conversation activity at a glance.
+        VNavItem("conversations", "Conversations", VIcons.Chat, badge = notifications.unreadCount),
         // Phase 4 (commit 10): the flagship house-colored collectible player card lives on its own
         // tab — see ParentProfileCardScreenV2.
         VNavItem("profile", "Profile", VIcons.User),
@@ -198,13 +216,13 @@ fun ParentPortalV2(
             )
         },
         bottomBar = {
-            // RA-PP-THEME: Parents Portal migrates to the website's violet accent for
-            // active nav states (the reference dashboard uses #6C5CE0/#544AB8, not green).
-            VBottomNav(
+            // The Parents Portal's signature premium FLOATING DOCK (ParentDock) — a detached glass
+            // bar with a liquid violet active-lozenge. The shared VBottomNav stays in place for the
+            // Admin/Teacher portals; this bespoke dock is exclusive to the parent experience.
+            ParentDock(
                 items = items,
                 selected = tab,
                 onSelect = { tab = it },
-                activeColor = VTheme.colors.accentDeep,
             )
         },
     ) { _ ->

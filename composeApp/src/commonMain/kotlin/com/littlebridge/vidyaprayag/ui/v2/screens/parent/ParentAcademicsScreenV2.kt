@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -218,20 +219,29 @@ private fun AttendanceTab(academics: ParentAcademicsState, onRetry: () -> Unit) 
         val hasData = data != null && data.totalDays > 0
         if (hasData && data != null) {
             // Summary card — only when there is real marked attendance to summarise.
+            // COLOR IS SEMANTIC: the rate bar reads GREEN (a healthy attendance figure), and the
+            // present/late/absent breakdown is colour-coded green/amber/red — not flattened to one
+            // brand-violet tint.
             VCard {
                 VLabel("This term")
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Attendance rate", style = VTheme.type.bodyStrong.colored(c.ink))
-                    Text("${data.attendanceRate}%", style = VTheme.type.data.colored(c.ink))
+                    Text(
+                        "${data.attendanceRate}%",
+                        style = VTheme.type.data.colored(c.successInk).copy(fontWeight = FontWeight.Bold),
+                    )
                 }
                 Spacer(Modifier.height(8.dp))
-                VProgressBar(value = data.attendanceRate.toFloat(), tone = VBadgeTone.Accent)
-                Spacer(Modifier.height(12.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Present ${data.presentDays}", style = VTheme.type.caption.colored(c.ink2))
-                    Text("Late ${data.lateDays}", style = VTheme.type.caption.colored(c.ink2))
-                    Text("Absent ${data.absentDays}", style = VTheme.type.caption.colored(c.ink2))
+                VProgressBar(value = data.attendanceRate.toFloat(), tone = VBadgeTone.Success, height = 8.dp)
+                Spacer(Modifier.height(14.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    AttendanceStat("Present", data.presentDays, c.successInk, Modifier.weight(1f))
+                    AttendanceStat("Late", data.lateDays, c.warningInk, Modifier.weight(1f))
+                    AttendanceStat("Absent", data.absentDays, c.dangerInk, Modifier.weight(1f))
                 }
             }
         } else {
@@ -245,10 +255,10 @@ private fun AttendanceTab(academics: ParentAcademicsState, onRetry: () -> Unit) 
                         Modifier
                             .size(42.dp)
                             .clip(CircleShape)
-                            .background(c.accent.copy(alpha = 0.12f)),
+                            .background(c.successInk.copy(alpha = 0.12f)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(VIcons.Calendar, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(20.dp))
+                        Icon(VIcons.Calendar, contentDescription = null, tint = c.successInk, modifier = Modifier.size(20.dp))
                     }
                     Column(Modifier.weight(1f)) {
                         Text("No attendance marked yet", style = VTheme.type.bodyStrong.colored(c.ink))
@@ -268,6 +278,29 @@ private fun AttendanceTab(academics: ParentAcademicsState, onRetry: () -> Unit) 
     }
 }
 
+/** A small colour-coded breakdown tile (Present/Late/Absent) — colour carries the state. */
+@Composable
+private fun AttendanceStat(label: String, count: Int, accent: Color, modifier: Modifier = Modifier) {
+    val c = VTheme.colors
+    Column(
+        modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(accent.copy(alpha = 0.10f))
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            "$count",
+            style = VTheme.type.dataLg.colored(accent).copy(fontWeight = FontWeight.ExtraBold, fontSize = 18.sp),
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            label,
+            style = VTheme.type.label.colored(c.ink2).copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold),
+        )
+    }
+}
+
 @Composable
 private fun MarksTab(academics: ParentAcademicsState, onRetry: () -> Unit) {
     val c = VTheme.colors
@@ -280,23 +313,63 @@ private fun MarksTab(academics: ParentAcademicsState, onRetry: () -> Unit) {
         emptyBody = "Marks appear here once teachers publish results to parents.",
         onRetry = onRetry,
     ) {
-        data?.results?.forEach { m ->
+        data?.results?.forEachIndexed { idx, m ->
+            val marksValue = m.marks
+            val pct = if (marksValue != null && m.maxMarks > 0) (marksValue / m.maxMarks * 100.0) else null
+            // COLOR IS SEMANTIC: the score itself drives a calm grade tone (strong=green,
+            // mid=amber, low=red). A neutral subject tint chip on the left gives each row identity
+            // so the list isn't a wall of one colour.
+            val gradeColor = when {
+                pct == null -> c.ink3
+                pct >= 75 -> c.successInk
+                pct >= 40 -> c.warningInk
+                else -> c.dangerInk
+            }
+            val subjectColor = subjectPalette(c)[idx % subjectPalette(c).size]
             VCard {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(subjectColor.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            m.subject.take(2).uppercase(),
+                            style = VTheme.type.labelStrong.colored(subjectColor).copy(fontWeight = FontWeight.ExtraBold, fontSize = 12.sp),
+                        )
+                    }
+                    Column(Modifier.weight(1f)) {
                         Text(m.examName, style = VTheme.type.bodyStrong.colored(c.ink))
                         Text(m.subject, style = VTheme.type.caption.colored(c.ink2))
                     }
-                    val marksValue = m.marks
-                    Text(
-                        if (marksValue != null) "${marksValue.toInt()} / ${m.maxMarks}" else "—",
-                        style = VTheme.type.data.colored(c.ink),
-                    )
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            if (marksValue != null) "${marksValue.toInt()} / ${m.maxMarks}" else "—",
+                            style = VTheme.type.data.colored(gradeColor).copy(fontWeight = FontWeight.Bold),
+                        )
+                        if (pct != null) {
+                            Text(
+                                "${pct.toInt()}%",
+                                style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 10.sp),
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 }
+
+/**
+ * A small, on-brand palette of secondary accents that HARMONISE with the lavender brand without
+ * being lavender — drawn straight from the website token set (teal/sky/peach + violet). Used to
+ * give list rows/sections individual identity so the portal reads expressive, not monochrome.
+ */
+// The harmonious accent rotation now lives in one place — [parentSubjectPalette] in
+// ParentPalette.kt — so Academics, the Covered-today card and the detail overlay all draw from
+// the SAME palette (one source of truth, consistent across the whole Parents Portal).
+@Composable
+private fun subjectPalette(c: com.littlebridge.vidyaprayag.ui.v2.theme.VColors): List<Color> =
+    parentSubjectPalette(c)
 
 @Composable
 private fun SyllabusTab(academics: ParentAcademicsState, onRetry: () -> Unit) {
@@ -310,23 +383,73 @@ private fun SyllabusTab(academics: ParentAcademicsState, onRetry: () -> Unit) {
         emptyBody = "A subject-wise coverage log will appear here once the school shares it.",
         onRetry = onRetry,
     ) {
-        data?.subjects?.forEach { subj ->
+        val palette = subjectPalette(c)
+        data?.subjects?.forEachIndexed { idx, subj ->
+            // Each subject gets its own harmonious accent (rotating through the on-brand palette) so
+            // the syllabus reads as a colourful, scannable list rather than a violet monolith. The
+            // progress bar matches the subject's tone; covered units read GREEN, pending AMBER.
+            val tone = palette[idx % palette.size]
             VCard {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text(subj.subject, style = VTheme.type.bodyStrong.colored(c.ink))
-                    Text("${subj.progress}%", style = VTheme.type.data.colored(c.ink))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(tone.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            subj.subject.take(2).uppercase(),
+                            style = VTheme.type.labelStrong.colored(tone).copy(fontWeight = FontWeight.ExtraBold, fontSize = 11.sp),
+                        )
+                    }
+                    Text(subj.subject, style = VTheme.type.bodyStrong.colored(c.ink), modifier = Modifier.weight(1f))
+                    Text("${subj.progress}%", style = VTheme.type.data.colored(tone).copy(fontWeight = FontWeight.Bold))
                 }
-                Spacer(Modifier.height(8.dp))
-                VProgressBar(value = subj.progress.toFloat(), tone = VBadgeTone.Accent)
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
+                VTintedProgressBar(value = subj.progress.toFloat(), fill = tone, height = 8.dp)
+                Spacer(Modifier.height(10.dp))
                 subj.units.forEach { u ->
-                    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(u.title, style = VTheme.type.caption.colored(if (u.isCovered) c.ink else c.ink2))
-                        Text(if (u.isCovered) "✓ ${u.coveredOn ?: "Covered"}" else "Pending", style = VTheme.type.caption.colored(c.ink2))
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(u.title, style = VTheme.type.caption.colored(if (u.isCovered) c.ink else c.ink2), modifier = Modifier.weight(1f))
+                        if (u.isCovered) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(VIcons.Check, contentDescription = null, tint = c.successInk, modifier = Modifier.size(13.dp))
+                                Text(
+                                    u.coveredOn ?: "Covered",
+                                    style = VTheme.type.caption.colored(c.successInk).copy(fontWeight = FontWeight.SemiBold),
+                                )
+                            }
+                        } else {
+                            Text("Pending", style = VTheme.type.caption.colored(c.warningInk).copy(fontWeight = FontWeight.SemiBold))
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+/** A progress bar that fills with an arbitrary tonal [fill] colour (not limited to badge tones). */
+@Composable
+private fun VTintedProgressBar(value: Float, fill: Color, height: androidx.compose.ui.unit.Dp) {
+    val c = VTheme.colors
+    val clamped = (value.coerceIn(0f, 100f)) / 100f
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(height)
+            .clip(RoundedCornerShape(999.dp))
+            .background(c.cream),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth(clamped)
+                .height(height)
+                .clip(RoundedCornerShape(999.dp))
+                .background(fill),
+        )
     }
 }
 
@@ -342,7 +465,11 @@ private fun OverviewTab(state: TrackProgressState) {
         emptyBody = "Your child's competencies will appear here as teachers update them.",
     ) {
         if (state.academicCompetencies.isNotEmpty()) {
-            state.academicCompetencies.forEach { comp ->
+            val palette = subjectPalette(c)
+            state.academicCompetencies.forEachIndexed { idx, comp ->
+                // Each competency carries its own harmonious accent so the overview is expressive,
+                // not a stack of identical violet bars.
+                val tone = palette[idx % palette.size]
                 VCard {
                     Row(
                         Modifier.fillMaxWidth(),
@@ -355,12 +482,12 @@ private fun OverviewTab(state: TrackProgressState) {
                         )
                         Text(
                             "${(comp.progress * 100f).toInt()}%",
-                            style = VTheme.type.data.colored(c.accentDeep).copy(fontWeight = FontWeight.Bold),
+                            style = VTheme.type.data.colored(tone).copy(fontWeight = FontWeight.Bold),
                         )
                     }
                     Spacer(Modifier.height(10.dp))
                     // A slightly heavier track than the default reads as premium, not hairline.
-                    VProgressBar(value = comp.progress * 100f, tone = VBadgeTone.Accent, height = 8.dp)
+                    VTintedProgressBar(value = comp.progress * 100f, fill = tone, height = 8.dp)
                 }
             }
         }
@@ -376,14 +503,16 @@ private fun OverviewTab(state: TrackProgressState) {
                     )
                 }
                 Spacer(Modifier.height(8.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    state.emotionalIntelligence.forEach { (trait, score) ->
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    val palette = subjectPalette(c)
+                    state.emotionalIntelligence.entries.forEachIndexed { idx, (trait, score) ->
+                        val tone = palette[(idx + 1) % palette.size]
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text(trait, style = VTheme.type.caption.colored(c.ink2))
-                                Text("${(score * 100f).toInt()}%", style = VTheme.type.dataSm.colored(c.ink))
+                                Text("${(score * 100f).toInt()}%", style = VTheme.type.dataSm.colored(tone).copy(fontWeight = FontWeight.Bold))
                             }
-                            VProgressBar(value = score * 100f, tone = VBadgeTone.Accent)
+                            VTintedProgressBar(value = score * 100f, fill = tone, height = 7.dp)
                         }
                     }
                 }

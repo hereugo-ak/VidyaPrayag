@@ -128,11 +128,11 @@ fun ParentResultsCard(
                     if (delta != null) {
                         Spacer(Modifier.width(6.dp))
                         val up = delta >= 0
-                        // No green on the parent surface — a positive trend reads in the brand
-                        // violet (accentDeep); a regression keeps the universal danger red.
+                        // Semantic trend: an improvement reads success green, a regression danger
+                        // red — the instant traffic-light read a parent expects on a score delta.
                         Text(
                             "${if (up) "+" else ""}$delta vs last",
-                            style = VTheme.type.label.colored(if (up) c.accentDeep else c.dangerInk)
+                            style = VTheme.type.label.colored(if (up) c.successInk else c.dangerInk)
                                 .copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
                         )
                     }
@@ -244,13 +244,15 @@ fun ParentFeesCard(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
                 Modifier.size(36.dp).clip(RoundedCornerShape(12.dp))
-                    .background(if (overdue > 0) c.warning.copy(alpha = 0.5f) else c.accent.copy(alpha = 0.12f)),
+                    // Semantic: overdue = warning amber, all-clear = success green (calm "you're
+                    // good" signal) — reserves the brand violet for actions, not a paid state.
+                    .background(if (overdue > 0) c.warning.copy(alpha = 0.5f) else c.success.copy(alpha = 0.5f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     VIcons.Wallet,
                     contentDescription = null,
-                    tint = if (overdue > 0) c.warningInk else c.accentDeep,
+                    tint = if (overdue > 0) c.warningInk else c.successInk,
                     modifier = Modifier.size(17.dp),
                 )
             }
@@ -271,9 +273,9 @@ fun ParentFeesCard(
                 )
                 Text(
                     if (overdue > 0) "Outstanding" else "Nothing due",
-                    // No green on the parent surface — a clear ledger reads as calm neutral ink,
-                    // an overdue balance keeps the warning amber.
-                    style = VTheme.type.label.colored(if (overdue > 0) c.warningInk else c.ink3)
+                    // Semantic: an overdue balance reads warning amber, a clear ledger reads
+                    // success green — the instant "all good / needs attention" traffic light.
+                    style = VTheme.type.label.colored(if (overdue > 0) c.warningInk else c.successInk)
                         .copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
                 )
             }
