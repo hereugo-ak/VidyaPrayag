@@ -6,6 +6,7 @@ import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardActivity
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardAnalytics
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardOverview
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardSummary
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingStep
 import com.littlebridge.vidyaprayag.feature.admin.domain.repository.AdminDashboardRepository
@@ -92,6 +93,12 @@ class SchoolDashboardViewModel(
     private val _activity = MutableStateFlow<AdminDashboardActivity?>(null)
     val activity: StateFlow<AdminDashboardActivity?> = _activity.asStateFlow()
 
+    // ---- Consolidated command-center overview (the redesigned home's canonical
+    // source). Null until the /overview endpoint resolves so the UI shows a
+    // skeleton and never renders fabricated numbers. ----
+    private val _overview = MutableStateFlow<AdminDashboardOverview?>(null)
+    val overview: StateFlow<AdminDashboardOverview?> = _overview.asStateFlow()
+
     init {
         refresh()
     }
@@ -147,6 +154,19 @@ class SchoolDashboardViewModel(
      * source).
      */
     private suspend fun loadDashboard(token: String) {
+        // The consolidated overview is the redesigned home's canonical source.
+        // It is fetched first and, when present, supplies the admin greeting name.
+        when (val r = dashboardRepository.getOverview(token)) {
+            is NetworkResult.Success -> {
+                r.data.data?.let { o ->
+                    _overview.value = o
+                    o.header.adminName.takeIf { it.isNotBlank() }?.let { _adminName.value = it }
+                }
+            }
+            is NetworkResult.Error -> AppLogger.e("SchoolDashboardVM", "getOverview failed: ${r.message}")
+            is NetworkResult.ConnectionError -> AppLogger.e("SchoolDashboardVM", "getOverview connection error")
+        }
+
         when (val r = dashboardRepository.getSummary(token)) {
             is NetworkResult.Success -> {
                 r.data.data?.let { s ->

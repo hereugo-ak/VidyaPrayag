@@ -17,6 +17,7 @@ import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.network.safeApiCall
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardActivity
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardAnalytics
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardOverview
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardSummary
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
@@ -48,5 +49,17 @@ class AdminDashboardApi(
         token: String
     ): NetworkResult<ApiResponse<AdminDashboardActivity>> = safeApiCall {
         client.get(getUrl("api/admin/dashboard/activity"))
+    }
+
+    /**
+     * Consolidated command-center payload powering the redesigned
+     * SchoolHomeScreenV2 in ONE network call (School Pulse, KPIs, insights,
+     * parent engagement, communication, events, teacher spotlight,
+     * achievements, fee analytics, birthdays).
+     */
+    suspend fun getOverview(
+        token: String
+    ): NetworkResult<ApiResponse<AdminDashboardOverview>> = safeApiCall {
+        client.get(getUrl("api/admin/dashboard/overview"))
     }
 }

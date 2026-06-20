@@ -1,19 +1,54 @@
+/*
+ * File: SchoolHomeScreenV2.kt
+ * Module: ui.v2.screens.school
+ *
+ * The REDESIGNED School Admin command center — a modern, analytics-driven home
+ * that replaces the legacy ERP layout. Every widget is driven by real data from
+ * GET /api/admin/dashboard/overview (SchoolDashboardViewModel.overview); nothing
+ * is hardcoded and modules without backing data hide gracefully.
+ *
+ * Layout (top → bottom):
+ *   1. Personalized header (greeting, school, session, last updated, quick actions)
+ *   2. Smart Insights carousel (horizontal, actionable, data-driven)
+ *   3. School Pulse (flagship animated gauge 0..100 + category breakdown)
+ *   4. KPI cards grid (with trend deltas)
+ *   5. Campus Health analytics (attendance trend chart)
+ *   6. Fee Collection analytics (bars + summary)
+ *   7. Parent Engagement Center (leaderboard + gamification)
+ *   8. Communication Center (actionable cards)
+ *   9. Event Dashboard (upcoming countdown + recently completed)
+ *  10. Teacher Spotlight (top performer)
+ *  11. Student Achievement showcase (carousel)
+ *  12. Birthday & Celebration widget
+ *  13. Live Activity feed (timeline)
+ *  14. Analytics / Risk-monitor entry cards
+ *
+ * Design language: modern SaaS — rounded 16–24dp, gradient accents, smooth
+ * animations, skeleton loading, dark-mode aware (all colors via VTheme tokens).
+ */
 package com.littlebridge.vidyaprayag.ui.v2.screens.school
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,10 +58,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -36,15 +74,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardActivity
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardAnalytics
-import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardSummary
-import com.littlebridge.vidyaprayag.feature.admin.domain.model.DashboardAlert
-import com.littlebridge.vidyaprayag.feature.admin.domain.model.DashboardAttendanceTrend
-import com.littlebridge.vidyaprayag.feature.admin.domain.model.DashboardCampusHealth
-import com.littlebridge.vidyaprayag.feature.admin.domain.model.DashboardCountTrend
-import com.littlebridge.vidyaprayag.feature.admin.domain.model.DashboardStatistics
-import com.littlebridge.vidyaprayag.feature.admin.domain.model.DashboardTeacherInsight
-import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingStep
-import com.littlebridge.vidyaprayag.feature.admin.presentation.DashboardOnboardingStatus
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardOverview
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.OverviewAchievement
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.OverviewBirthday
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.OverviewEvent
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.OverviewInsight
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.OverviewKpi
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.OverviewLeaderClass
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.OverviewSchoolPulse
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolDashboardViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.NotificationsViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
@@ -58,6 +95,11 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 import com.littlebridge.vidyaprayag.ui.v2.theme.vElevation
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.math.min
+
+// =====================================================================
+// Screen entry
+// =====================================================================
 
 @Composable
 fun SchoolHomeScreenV2(
@@ -71,35 +113,28 @@ fun SchoolHomeScreenV2(
     notificationsViewModel: NotificationsViewModel = koinViewModel(),
 ) {
     val adminName by viewModel.adminName.collectAsStateV2()
-    val progress by viewModel.progress.collectAsStateV2()
-    val steps by viewModel.steps.collectAsStateV2()
-    val onboardingStatus by viewModel.onboardingStatus.collectAsStateV2()
-    val loading by viewModel.isLoading.collectAsStateV2() 
+    val loading by viewModel.isLoading.collectAsStateV2()
     val error by viewModel.errorMessage.collectAsStateV2()
-    val notifications by notificationsViewModel.state.collectAsStateV2() 
-    val summary by viewModel.summary.collectAsStateV2() 
-    val analytics by viewModel.analytics.collectAsStateV2() 
+    val notifications by notificationsViewModel.state.collectAsStateV2()
+    val overview by viewModel.overview.collectAsStateV2()
+    val analytics by viewModel.analytics.collectAsStateV2()
     val activity by viewModel.activity.collectAsStateV2()
 
     SchoolDashboardContent(
         modifier = modifier,
         adminName = adminName,
-        progress = progress,
-        steps = steps,
-        onboardingStatus = onboardingStatus,
         unreadCount = notifications.unreadCount,
         loading = loading,
         error = error,
-        summary = summary,
+        overview = overview,
         analytics = analytics,
         activity = activity,
-        onRetry = {
-            viewModel.refresh()
-        },
+        onRetry = { viewModel.refresh() },
         onOpenNotifications = onOpenNotifications,
+        onOpenCalendar = onOpenCalendar,
         onOpenAnalytics = onOpenAnalytics,
         onOpenPews = onOpenPews,
-        onExit = onExit
+        onExit = onExit,
     )
 }
 
@@ -107,2844 +142,1186 @@ fun SchoolHomeScreenV2(
 private fun SchoolDashboardContent(
     modifier: Modifier = Modifier,
     adminName: String,
-    progress: Float,
-    steps: List<OnboardingStep>,
-    onboardingStatus: DashboardOnboardingStatus,
     unreadCount: Int,
     loading: Boolean,
     error: String?,
-    summary: AdminDashboardSummary?,
+    overview: AdminDashboardOverview?,
     analytics: AdminDashboardAnalytics?,
     activity: AdminDashboardActivity?,
     onRetry: () -> Unit,
     onOpenNotifications: () -> Unit,
+    onOpenCalendar: () -> Unit,
     onOpenAnalytics: () -> Unit,
     onOpenPews: () -> Unit,
     onExit: () -> Unit,
 ) {
-    val completed = onboardingStatus == DashboardOnboardingStatus.COMPLETED
     Column(
-        modifier = modifier.fillMaxSize().statusBarsPadding().verticalScroll(
-            rememberScrollState()
-        ).padding(
-            horizontal = 20.dp,
-            vertical = 20.dp,
-        ).padding(bottom = 140.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        modifier = modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 18.dp, vertical = 16.dp)
+            .padding(bottom = 130.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         VStateHost(
-            loading = loading,
-            error = error,
+            loading = loading && overview == null,
+            error = if (overview == null) error else null,
             isEmpty = false,
             onRetry = onRetry,
-            skeleton = {
-                SkeletonDashboard()
-            }
+            skeleton = { SkeletonDashboard() },
         ) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(22.dp)
-            ) {
-                AdminHeader(
-                    name = adminName,
-                    completed = completed,
+            Column(verticalArrangement = Arrangement.spacedBy(22.dp)) {
+
+                // 1. Header
+                DashboardHeader(
+                    overview = overview,
+                    fallbackName = adminName,
                     unreadCount = unreadCount,
                     onNotifications = onOpenNotifications,
-                    onExit = onExit
+                    onAvatar = onExit,
                 )
-                val alerts = activity?.alerts.orEmpty()
-                if (alerts.isNotEmpty()) {
-                    AlertsSection(alerts = alerts)
+
+                // Quick actions row
+                QuickActionsRow(
+                    onAnnouncement = onOpenNotifications,
+                    onEvent = onOpenCalendar,
+                    onNotice = onOpenNotifications,
+                    onReports = onOpenAnalytics,
+                )
+
+                // 2. Smart insights carousel
+                val insights = overview?.insights.orEmpty()
+                if (insights.isNotEmpty()) {
+                    SmartInsightsCarousel(insights = insights)
                 }
+
+                // 3. School Pulse (flagship)
+                overview?.schoolPulse?.let { pulse ->
+                    SchoolPulseCard(pulse = pulse)
+                }
+
+                // 4. KPI grid
+                val kpis = overview?.kpis.orEmpty().filter { it.available }
+                if (kpis.isNotEmpty()) {
+                    KpiGrid(kpis = kpis, onClick = onOpenAnalytics)
+                }
+
+                // 5. Campus health analytics (attendance trend)
                 CampusHealthCard(
-                    campusHealth = summary?.campusHealth,
-                    students = summary?.statistics?.students?.total ?: 0,
-                    teachers = summary?.statistics?.teachers?.total ?: 0,
-                    attendanceTrend = analytics?.attendanceTrend?.values.orEmpty(),
+                    analytics = analytics,
+                    onClick = onOpenAnalytics,
                 )
-                DashboardMetricGrid(
-                    statistics = summary?.statistics,
-                    onStudentClick = onOpenPews,
-                    onTeacherClick = onOpenPews,
-                    onClassesClick ={},
-                    onSubjectClick = {}
-                )
-                AttendanceChartCard(
-                    attendanceTrend = analytics?.attendanceTrend,
-                )
-                
-                QuickActionGrid(
-                    onAddTeacher = onOpenPews,
-                    onAddStudent = onOpenPews,
-                    onCreateClass = {},
-                    onReports = {}
-                )
-                TeacherInsightCard(
-                    insight = summary?.teacherInsight,
-                    modifier = Modifier.clickable(
-                        enabled = true,
-                        onClick = onOpenPews
+
+                // 6. Fee analytics
+                overview?.feeAnalytics?.takeIf { it.available }?.let { fee ->
+                    FeeAnalyticsCard(fee = fee, onClick = onOpenAnalytics)
+                }
+
+                // 7. Parent engagement center
+                overview?.parentEngagement?.takeIf { it.available }?.let { pe ->
+                    ParentEngagementCard(engagement = pe)
+                }
+
+                // 8. Communication center
+                overview?.communication?.let { comm ->
+                    CommunicationCenterCard(
+                        unread = comm.unreadMessages,
+                        pending = comm.pendingQueries,
+                        announcements = comm.announcements,
+                        acks = comm.noticeAcknowledgements,
+                        onOpenComms = onOpenNotifications,
                     )
-                )
-                ActivityTimeline(
-                    activities = activity?.activities.orEmpty().map {
-                        ActivityItem(
-                            title = it.title,
-                            subtitle = it.description,
-                            time = it.time,
-                        )
-                    },
-                    modifier = Modifier.clickable(
-                        enabled = true,
-                        onClick = onOpenPews
+                }
+
+                // 9. Event dashboard
+                overview?.events?.takeIf { it.available }?.let { ev ->
+                    EventDashboardCard(
+                        upcoming = ev.upcoming,
+                        completed = ev.recentlyCompleted,
+                        onOpenCalendar = onOpenCalendar,
                     )
-                )
-                AnalyticsEntryCard(
-                    onClick = onOpenAnalytics
-                )
-                PewsEntryCard(
-                    onClick = onOpenPews
-                )
+                }
+
+                // 10. Teacher spotlight
+                overview?.teacherSpotlight?.takeIf { it.available }?.let { spot ->
+                    TeacherSpotlightCard(
+                        name = spot.name,
+                        department = spot.department,
+                        avatarUrl = spot.avatarUrl,
+                        score = spot.score,
+                        highlight = spot.highlight,
+                        onClick = onOpenPews,
+                    )
+                }
+
+                // 11. Student achievement showcase
+                overview?.achievements?.takeIf { it.available && it.items.isNotEmpty() }?.let { ach ->
+                    AchievementShowcase(items = ach.items)
+                }
+
+                // 12. Birthdays
+                overview?.birthdays?.takeIf { it.available }?.let { b ->
+                    BirthdayWidget(today = b.today, upcoming = b.upcoming)
+                }
+
+                // 13. Live activity feed
+                val activities = activity?.activities.orEmpty()
+                if (activities.isNotEmpty()) {
+                    ActivityFeedCard(
+                        activities = activities.map {
+                            ActivityItem(it.title, it.description, it.time)
+                        },
+                        onClick = onOpenNotifications,
+                    )
+                }
+
+                // 14. Entry cards
+                AnalyticsEntryCard(onClick = onOpenAnalytics)
+                PewsEntryCard(onClick = onOpenPews)
             }
         }
     }
 }
 
-@Composable
-fun AdminHeader(
-    name: String, completed: Boolean, unreadCount: Int,
+// =====================================================================
+// 1. Header
+// =====================================================================
 
+@Composable
+private fun DashboardHeader(
+    overview: AdminDashboardOverview?,
+    fallbackName: String,
+    unreadCount: Int,
     onNotifications: () -> Unit,
-
-    onExit: () -> Unit,
-
-    modifier: Modifier = Modifier
+    onAvatar: () -> Unit,
 ) {
-
-
     val c = VTheme.colors
-
-
-
-    Row(
-
-        modifier = modifier
-
-            .vElevation(
-                VElevationLevel.Card, radius = 28.dp
-            )
-
-            .clip(
-                RoundedCornerShape(28.dp)
-            )
-
-            .background(
-                c.card
-            )
-
-            .padding(
-                horizontal = 14.dp, vertical = 12.dp
-            ),
-
-
-        verticalAlignment = Alignment.CenterVertically,
-
-
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
-
-    ) {
-
-
-        /*
-        SCHOOL ICON
-        */
-
-
-        Box(
-
-            modifier = Modifier.size(48.dp)
-
-                .clip(
-                    RoundedCornerShape(18.dp)
-                )
-
-                .background(
-                    c.teal.copy(
-                        alpha = .15f
-                    )
-                ),
-
-
-            contentAlignment = Alignment.Center
-
-        ) {
-
-
-            Icon(
-
-                imageVector = VIcons.GraduationCap,
-
-
-                contentDescription = null,
-
-
-                tint = c.tealDeep,
-
-
-                modifier = Modifier.size(24.dp)
-
-            )
-
+    val header = overview?.header
+    val name = header?.adminName?.takeIf { it.isNotBlank() } ?: fallbackName
+    val greeting = header?.greeting?.takeIf { it.isNotBlank() } ?: "Welcome"
+    val schoolName = header?.schoolName?.takeIf { it.isNotBlank() } ?: "Your School"
+    val session = buildString {
+        header?.academicYear?.takeIf { it.isNotBlank() }?.let { append(it) }
+        header?.currentTerm?.takeIf { it.isNotBlank() }?.let {
+            if (isNotEmpty()) append(" · ")
+            append(it)
         }
-
-
-        /*
-        TITLE
-        */
-
-
-        Column(
-
-            modifier = Modifier.weight(1f)
-
-        ) {
-
-
-            Text(
-
-                text = "School Console",
-
-
-                style = VTheme.type.h4.colored(c.ink)
-
-            )
-
-
-
-            Row(
-
-                verticalAlignment = Alignment.CenterVertically,
-
-
-                horizontalArrangement = Arrangement.spacedBy(7.dp)
-
-            ) {
-
-
-                Box(
-
-                    modifier = Modifier.size(8.dp)
-
-                        .clip(
-                            CircleShape
-                        )
-
-                        .background(
-
-                            if (completed) c.successInk
-                            else c.warningInk
-
-                        )
-
-                )
-
-
-
-                Text(
-
-                    text = if (completed) "Campus live"
-                    else "Setup in progress",
-
-
-                    style = VTheme.type.caption.colored(c.ink2)
-
-                )
-
-
-            }
-
-
-        }
-
-
-        /*
-        NOTIFICATION BUTTON
-        */
-
-
-        NotificationButton(
-
-            count = unreadCount,
-
-            onClick = onNotifications
-
-        )
-
-
-        /*
-        PROFILE
-        */
-
-
-        Box(
-
-            modifier = Modifier.clip(
-                CircleShape
-            ).clickable {
-                onExit()
-            }
-
-        ) {
-
-            VAvatar(
-
-                name = name,
-
-                size = 42.dp
-
-            )
-
-        }
-
-
     }
 
-
-}
-
-@Composable
-private fun NotificationButton(
-    count: Int,
-
-    onClick: () -> Unit
-
-) {
-
-    val c = VTheme.colors
-
-
-
-    Box(
-
-        modifier = Modifier
-
-            .size(42.dp)
-
-            .clip(
-                CircleShape
-            )
-
-            .background(
-                c.ink.copy(
-                    alpha = .06f
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "$greeting, $name 👋",
+                    style = VTheme.type.h2.colored(c.ink),
                 )
-            )
+                Text(
+                    text = schoolName,
+                    style = VTheme.type.bodyStrong.colored(c.ink2),
+                )
+                if (session.isNotBlank()) {
+                    Text(
+                        text = session,
+                        style = VTheme.type.caption.colored(c.ink3),
+                    )
+                }
+            }
 
-            .clickable {
-                onClick()
-            },
-
-
-        contentAlignment = Alignment.Center
-
-    ) {
-
-
-        Icon(
-
-            imageVector = VIcons.Bell,
-
-
-            contentDescription = "Notifications",
-
-
-            tint = c.ink,
-
-
-            modifier = Modifier.size(20.dp)
-
-        )
-
-
-
-
-
-        if (count > 0) {
-
+            NotificationButton(count = unreadCount, onClick = onNotifications)
 
             Box(
-
-                modifier = Modifier
-
-                    .size(9.dp)
-
-                    .clip(
-                        CircleShape
-                    )
-
-                    .background(
-                        c.danger
-                    )
-
-                    .align(
-                        Alignment.TopEnd
-                    )
-
-            )
-
+                modifier = Modifier.clip(CircleShape).clickable { onAvatar() },
+            ) {
+                VAvatar(name = name, size = 44.dp, src = header?.adminAvatarUrl)
+            }
         }
-
-
     }
-
 }
 
 @Composable
-fun AlertsSection(
-    alerts: List<DashboardAlert>,
-    modifier: Modifier = Modifier
-) {
-
-    if (alerts.isEmpty()) return
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-
-        // Surface the most urgent items first; keep the list short and scannable.
-        val ordered = alerts.sortedBy { priorityRank(it.priority) }
-
-        ordered.take(3).forEach { alert ->
-            AlertCard(alert = alert)
-        }
-
-    }
-
-}
-
-/** Lower rank = higher urgency, used to sort alerts. */
-private fun priorityRank(priority: String): Int = when (priority.uppercase()) {
-    "HIGH" -> 0
-    "MEDIUM" -> 1
-    "LOW" -> 2
-    else -> 3
-}
-
-@Composable
-private fun AlertCard(
-    alert: DashboardAlert
-) {
-
+private fun NotificationButton(count: Int, onClick: () -> Unit) {
     val c = VTheme.colors
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(c.ink.copy(alpha = .06f))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = VIcons.Bell,
+            contentDescription = "Notifications",
+            tint = c.ink,
+            modifier = Modifier.size(20.dp),
+        )
+        if (count > 0) {
+            Box(
+                modifier = Modifier
+                    .size(9.dp)
+                    .clip(CircleShape)
+                    .background(c.danger)
+                    .align(Alignment.TopEnd),
+            )
+        }
+    }
+}
 
-    /*
-     Colour + icon are driven by the alert type so WARNING / CRITICAL / INFO
-     each read at a glance. Unknown types degrade gracefully to a neutral
-     informational style instead of crashing or showing nothing.
-     */
-    val type = alert.type.uppercase()
-    val accent = when (type) {
-        "CRITICAL" -> c.dangerInk
-        "WARNING" -> c.warningInk
+@Composable
+private fun QuickActionsRow(
+    onAnnouncement: () -> Unit,
+    onEvent: () -> Unit,
+    onNotice: () -> Unit,
+    onReports: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        QuickActionChip("Announcement", VIcons.Megaphone, onAnnouncement)
+        QuickActionChip("Add Event", VIcons.Calendar, onEvent)
+        QuickActionChip("Send Notice", VIcons.Send, onNotice)
+        QuickActionChip("Reports", VIcons.TrendingUp, onReports)
+    }
+}
+
+@Composable
+private fun QuickActionChip(label: String, icon: ImageVector, onClick: () -> Unit) {
+    val c = VTheme.colors
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(c.card)
+            .vElevation(VElevationLevel.Card, radius = 50.dp)
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(16.dp))
+        Text(label, style = VTheme.type.caption.colored(c.ink), maxLines = 1)
+    }
+}
+
+// =====================================================================
+// 2. Smart Insights carousel
+// =====================================================================
+
+@Composable
+private fun SmartInsightsCarousel(insights: List<OverviewInsight>) {
+    val c = VTheme.colors
+    // Most urgent first.
+    val ordered = insights.sortedBy { severityRank(it.severity) }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Smart Insights", style = VTheme.type.h3.colored(c.ink))
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ordered.forEach { InsightCard(it) }
+        }
+    }
+}
+
+private fun severityRank(s: String): Int = when (s.uppercase()) {
+    "HIGH" -> 0; "MEDIUM" -> 1; "LOW" -> 2; else -> 3
+}
+
+@Composable
+private fun InsightCard(insight: OverviewInsight) {
+    val c = VTheme.colors
+    val accent = when (insight.type.uppercase()) {
+        "ALERT" -> c.dangerInk
+        "REMINDER" -> c.warningInk
+        "ACHIEVEMENT" -> c.successInk
         else -> c.tealDeep
     }
-    val icon = when (type) {
-        "CRITICAL" -> VIcons.AlertCircle
-        "WARNING" -> VIcons.AlertTriangle
-        else -> VIcons.Bell
+    val icon = when (insight.type.uppercase()) {
+        "ALERT" -> VIcons.AlertTriangle
+        "REMINDER" -> VIcons.Clock
+        "ACHIEVEMENT" -> VIcons.Star
+        else -> VIcons.Sparkles
     }
-
-    VCard(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
+    Column(
+        modifier = Modifier
+            .widthIn(min = 230.dp, max = 280.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(c.card)
+            .vElevation(VElevationLevel.Card, radius = 20.dp)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(
+                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(accent.copy(alpha = .14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(18.dp))
+            }
+            Text(insight.title, style = VTheme.type.bodyStrong.colored(c.ink), maxLines = 2)
+        }
+        Text(insight.description, style = VTheme.type.caption.colored(c.ink2), maxLines = 3)
+    }
+}
 
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+// =====================================================================
+// 3. School Pulse (flagship)
+// =====================================================================
+
+@Composable
+private fun SchoolPulseCard(pulse: OverviewSchoolPulse) {
+    val c = VTheme.colors
+    val animated by animateFloatAsState(
+        targetValue = pulse.score / 100f,
+        animationSpec = tween(900, easing = LinearEasing),
+        label = "pulse",
+    )
+    VCard(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)), padding = 0.dp) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Brush.linearGradient(listOf(c.navy, c.navyDeep)))
+                .padding(22.dp),
         ) {
+            Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("School Pulse", style = VTheme.type.h3.colored(Color.White))
+                        Text(
+                            pulse.message,
+                            style = VTheme.type.caption.colored(Color.White.copy(alpha = .8f)),
+                        )
+                    }
+                    StatusPill(pulse.status)
+                }
 
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                ) {
+                    PulseGauge(progress = animated, score = pulse.score)
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(9.dp),
+                    ) {
+                        pulse.categories.filter { it.available }.forEach { cat ->
+                            PulseCategoryRow(label = cat.label, score = cat.score)
+                        }
+                        if (pulse.categories.none { it.available }) {
+                            Text(
+                                "Metrics appear as your school records data.",
+                                style = VTheme.type.caption.colored(Color.White.copy(alpha = .75f)),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusPill(status: String) {
+    val tint = when (status.uppercase()) {
+        "EXCELLENT", "HEALTHY" -> Color(0xFF5FD6A4)
+        "WATCH" -> Color(0xFFFFC275)
+        else -> Color(0xFFFF8A82)
+    }
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(tint.copy(alpha = .18f))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    ) {
+        Text(status, style = VTheme.type.label.colored(tint))
+    }
+}
+
+@Composable
+private fun PulseGauge(progress: Float, score: Int) {
+    val track = Color.White.copy(alpha = .18f)
+    val arc = Color(0xFF3CD1BE)
+    Box(modifier = Modifier.size(112.dp), contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.size(112.dp)) {
+            val stroke = 12.dp.toPx()
+            val diameter = min(size.width, size.height) - stroke
+            val topLeft = Offset((size.width - diameter) / 2, (size.height - diameter) / 2)
+            val arcSize = Size(diameter, diameter)
+            // Track (full ring)
+            drawArc(
+                color = track,
+                startAngle = 135f,
+                sweepAngle = 270f,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = stroke, cap = StrokeCap.Round),
+            )
+            // Progress
+            drawArc(
+                color = arc,
+                startAngle = 135f,
+                sweepAngle = 270f * progress.coerceIn(0f, 1f),
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = stroke, cap = StrokeCap.Round),
+            )
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                score.toString(),
+                style = VTheme.type.h1.colored(Color.White),
+            )
+            Text("/ 100", style = VTheme.type.caption.colored(Color.White.copy(alpha = .75f)))
+        }
+    }
+}
+
+@Composable
+private fun PulseCategoryRow(label: String, score: Int) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(label, style = VTheme.type.caption.colored(Color.White.copy(alpha = .85f)))
+            Text("$score", style = VTheme.type.caption.colored(Color.White))
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(5.dp)
+                .clip(RoundedCornerShape(50))
+                .background(Color.White.copy(alpha = .16f)),
+        ) {
+            val frac by animateFloatAsState(
+                targetValue = (score / 100f).coerceIn(0f, 1f),
+                animationSpec = tween(800),
+                label = "catbar",
+            )
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(13.dp))
-                    .background(accent.copy(alpha = .14f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = accent,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-
-                Text(
-                    text = alert.title.ifBlank { "Action needed" },
-                    style = VTheme.type.bodyStrong.colored(c.ink)
-                )
-
-                if (alert.description.isNotBlank()) {
-                    Text(
-                        text = alert.description,
-                        style = VTheme.type.caption.colored(c.ink2)
-                    )
-                }
-
-            }
-
+                    .fillMaxWidth(frac)
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color(0xFF3CD1BE)),
+            )
         }
-
     }
-
 }
 
+// =====================================================================
+// 4. KPI grid
+// =====================================================================
+
 @Composable
-fun CampusHealthCard(
-    campusHealth: DashboardCampusHealth?,
-    students: Int,
-    teachers: Int,
-    attendanceTrend: List<Int>,
-    modifier: Modifier = Modifier
-) {
-
-
+private fun KpiGrid(kpis: List<OverviewKpi>, onClick: () -> Unit) {
     val c = VTheme.colors
-
-
-    /*
-     The hero "Present" figure is the attendance metric reported by the
-     /summary endpoint (campusHealth.metrics keyed "attendance"). We fall
-     back to any metric whose unit is "%" so a contract tweak still renders,
-     and finally to a neutral "—" when the server has nothing to report.
-     */
-    val attendanceMetric = campusHealth?.metrics?.firstOrNull { it.key == "attendance" }
-        ?: campusHealth?.metrics?.firstOrNull { it.unit.equals("percentage", true) || it.unit == "%" }
-
-    // Normalise the server's unit token ("percentage") into a display suffix.
-    val presentLabel = attendanceMetric?.let { "${it.value}${unitSuffix(it.unit)}" } ?: "—"
-
-    val headerMessage = campusHealth?.message
-        ?.takeIf { it.isNotBlank() }
-        ?: when (campusHealth?.status) {
-            "CRITICAL" -> "Needs attention today"
-            "WATCH" -> "A few things to review"
-            "HEALTHY" -> "Everything looks stable today"
-            else -> "Campus overview"
-        }
-
-    /*
-     Normalise the attendance-trend percentages (0..100) into 0..1 ratios for
-     the mini graph. When the server returns nothing we keep a flat baseline
-     so the card still reads as a calm, intentional empty state.
-     */
-    val graphPoints = if (attendanceTrend.isEmpty()) emptyList()
-    else attendanceTrend.map { (it.coerceIn(0, 100)) / 100f }
-
-
-
-    VCard(
-
-        modifier = modifier.fillMaxWidth()
-
-            .clip(
-                RoundedCornerShape(28.dp)
-            )
-
-    ) {
-
-
-        Box(
-
-            modifier = Modifier
-
-                .fillMaxWidth()
-
-                .background(
-
-                    Brush.linearGradient(
-
-                        listOf(
-
-                            c.tealDeep,
-
-                            c.teal
-
-                        )
-
-                    )
-
-                )
-
-                .padding(22.dp)
-
-        ) {
-
-
-            Column(
-
-                verticalArrangement = Arrangement.spacedBy(18.dp)
-
-            ) {
-
-
-                /*
-                HEADER
-                 */
-
-
-                Row(
-
-                    modifier = Modifier.fillMaxWidth(),
-
-
-                    horizontalArrangement = Arrangement.SpaceBetween,
-
-
-                    verticalAlignment = Alignment.CenterVertically
-
-                ) {
-
-
-                    Column {
-
-
-                        Text(
-
-                            text = "Campus Health",
-
-
-                            style = VTheme.type.h3.colored(Color.White)
-
-                        )
-
-
-                        Text(
-
-                            text = headerMessage,
-
-
-                            style = VTheme.type.caption.colored(
-                                Color.White.copy(
-                                    alpha = .8f
-                                )
-                            )
-
-                        )
-
-
-                    }
-
-
-
-
-
-                    Box(
-
-                        modifier = Modifier
-
-                            .size(52.dp)
-
-                            .clip(
-                                CircleShape
-                            )
-
-                            .background(
-                                Color.White.copy(
-                                    alpha = .15f
-                                )
-                            ),
-
-
-                        contentAlignment = Alignment.Center
-
-                    ) {
-
-                        Icon(
-
-                            imageVector = VIcons.TrendingUp,
-
-
-                            contentDescription = null,
-
-
-                            tint = Color.White,
-
-
-                            modifier = Modifier.size(26.dp)
-
-                        )
-
-
-                    }
-
-
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Key Metrics", style = VTheme.type.h3.colored(c.ink))
+        // 2-up rows.
+        kpis.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { kpi ->
+                    KpiCard(kpi = kpi, modifier = Modifier.weight(1f), onClick = onClick)
                 }
-
-
-                /*
-                ATTENDANCE SCORE
-                 */
-
-
-                Row(
-
-                    verticalAlignment = Alignment.CenterVertically,
-
-
-                    horizontalArrangement = Arrangement.spacedBy(18.dp)
-
-                ) {
-
-
-                    Box(
-
-                        modifier = Modifier.size(86.dp)
-
-                            .clip(
-                                CircleShape
-                            )
-
-                            .background(
-                                Color.White.copy(
-                                    alpha = .18f
-                                )
-                            ),
-
-
-                        contentAlignment = Alignment.Center
-
-                    ) {
-
-
-                        Column(
-
-                            horizontalAlignment = Alignment.CenterHorizontally
-
-                        ) {
-
-
-                            Text(
-
-                                presentLabel,
-
-
-                                style = VTheme.type.h2.colored(Color.White)
-
-                            )
-
-
-                            Text(
-
-                                "Present",
-
-
-                                style = VTheme.type.caption.colored(
-                                    Color.White.copy(
-                                        alpha = .8f
-                                    )
-                                )
-
-                            )
-
-                        }
-
-
-                    }
-
-
-
-
-
-                    Column {
-
-
-                        HealthMetric(
-                            icon = VIcons.Users, value = students.toString(), label = "Students"
-                        )
-
-
-                        Spacer(
-                            Modifier.height(10.dp)
-                        )
-
-
-                        HealthMetric(
-                            icon = VIcons.Users, value = teachers.toString(), label = "Teachers"
-                        )
-
-
-                    }
-
-
-                }
-
-
-                /*
-                MINI GRAPH (only when the server reports a trend)
-                 */
-
-
-                if (graphPoints.size >= 2) {
-                    AttendanceMiniGraph(points = graphPoints)
-                }
-
-
+                if (row.size == 1) Spacer(Modifier.weight(1f))
             }
-
-
         }
-
-
     }
-
-
 }
 
 @Composable
-private fun HealthMetric(
-    icon: ImageVector,
-
-    value: String,
-
-    label: String
-
-) {
-
-    Row(
-
-        verticalAlignment = Alignment.CenterVertically,
-
-
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-
-    ) {
-
-
-        Icon(
-
-            imageVector = icon,
-
-            contentDescription = null,
-
-
-            tint = Color.White.copy(
-                alpha = .9f
-            ),
-
-            modifier = Modifier.size(18.dp)
-
-        )
-
-
-
-        Text(
-
-            "$value $label",
-
-
-            style = VTheme.type.body.colored(Color.White)
-
-        )
-
-
-    }
-
-}
-
-@Composable
-private fun AttendanceMiniGraph(
-    points: List<Float>
-) {
-
-    // Guard: a line needs at least two points; render nothing otherwise.
-    if (points.size < 2) return
-
-    Canvas(
-
-        modifier = Modifier
-
-            .fillMaxWidth()
-
-            .height(70.dp)
-
-    ) {
-
-
-        val path = Path()
-
-
-
-        points.forEachIndexed { index, value ->
-
-
-            val x = size.width * index / (points.size - 1)
-
-
-            // Clamp the ratio so an out-of-range value can never draw off-canvas.
-            val y = size.height - (size.height * value.coerceIn(0f, 1f))
-
-
-
-            if (index == 0)
-
-                path.moveTo(x, y)
-            else
-
-                path.lineTo(x, y)
-
-
-        }
-
-
-
-        // BUGFIX: drawPath defaults to Fill, which rendered the trend as a
-        // solid white wedge instead of a line. Draw it as a rounded stroke.
-        drawPath(
-
-            path = path,
-
-            color = Color.White,
-
-            style = Stroke(
-                width = 3.dp.toPx(),
-                cap = StrokeCap.Round,
-            ),
-
-            )
-
-
-    }
-
-}
-
-@Composable
-fun DashboardMetricGrid(
-    statistics: DashboardStatistics?,
-    modifier: Modifier = Modifier,
-    onStudentClick: () -> Unit,
-    onTeacherClick: () -> Unit,
-    onClassesClick: () -> Unit,
-    onSubjectClick: () -> Unit
-) {
-
-    val students = statistics?.students
-    val teachers = statistics?.teachers
-    val classes = statistics?.classes
-    val subjects = statistics?.subjects
-
-    val studentTotal = students?.total ?: 0
-    val teacherTotal = teachers?.total ?: 0
-    val classTotal = classes?.total ?: 0
-    val subjectTotal = subjects?.total ?: 0
-
-
-    Column(
-
-        modifier = modifier.fillMaxWidth(),
-
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-
-    ) {
-
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            DashboardMetricCard(
-                modifier = Modifier.weight(1f),
-                title = "Students",
-                value = studentTotal.toString(),
-                change = trendLabel(students?.trend),
-                changePositive = isPositiveTrend(students?.trend),
-                icon = VIcons.Users,
-                // Progress reflects the active share of this metric.
-                progress = activeRatio(students?.active, studentTotal),
-                onClick = onStudentClick
-            )
-
-            DashboardMetricCard(
-                modifier = Modifier.weight(1f),
-                title = "Teachers",
-                value = teacherTotal.toString(),
-                change = trendLabel(teachers?.trend),
-                changePositive = isPositiveTrend(teachers?.trend),
-                icon = VIcons.Users,
-                progress = activeRatio(teachers?.active, teacherTotal),
-                onClick = onTeacherClick
-            )
-        }
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            DashboardMetricCard(
-                modifier = Modifier.weight(1f),
-                title = "Classes",
-                value = classTotal.toString(),
-                change = if ((classes?.active ?: 0) > 0) "${classes?.active} active" else "—",
-                changePositive = true,
-                icon = VIcons.School,
-                progress = activeRatio(classes?.active, classTotal),
-                onClick = onClassesClick
-            )
-
-            DashboardMetricCard(
-                modifier = Modifier.weight(1f),
-                title = "Subjects",
-                value = subjectTotal.toString(),
-                change = if ((subjects?.active ?: 0) > 0) "${subjects?.active} active" else "—",
-                changePositive = true,
-                icon = VIcons.BookOpen,
-                progress = activeRatio(subjects?.active, subjectTotal),
-                onClick = onSubjectClick
-            )
-        }
-
-    }
-
-}
-
-/** Formats a count trend (e.g. +12% / -3% / flat) into a compact label. */
-private fun trendLabel(trend: DashboardCountTrend?): String {
-    if (trend == null || trend.percentage == 0) return "—"
-    val sign = when (trend.direction) {
-        "up" -> "+"
-        "down" -> "-"
-        else -> ""
-    }
-    return "$sign${trend.percentage}%"
-}
-
-/** A trend is "good" (green) when flat or rising, "bad" (warning) when falling. */
-private fun isPositiveTrend(trend: DashboardCountTrend?): Boolean =
-    trend?.direction != "down"
-
-/** Active-to-total ratio clamped to a sensible visible range for the bar. */
-private fun activeRatio(active: Int?, total: Int): Float {
-    if (total <= 0) return 0f
-    val ratio = (active ?: total).toFloat() / total.toFloat()
-    return ratio.coerceIn(0f, 1f)
-}
-
-/** Maps a server unit token to a compact display suffix (e.g. "percentage" → "%"). */
-private fun unitSuffix(unit: String): String = when (unit.lowercase()) {
-    "percentage", "percent", "%" -> "%"
-    "", "count", "number" -> ""
-    else -> " $unit"
-}
-
-@Composable
-private fun DashboardMetricCard(
-    title: String,
-    value: String,
-    change: String,
-    changePositive: Boolean,
-    icon: ImageVector,
-    progress: Float,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit = {}
-) {
+private fun KpiCard(kpi: OverviewKpi, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val c = VTheme.colors
-    VCard(
-        modifier = modifier.clickable { onClick() }
-    ) {
-
-
-        Column(
-
-            modifier = Modifier.padding(16.dp),
-
-
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-
-        ) {
-
-
+    val icon = when (kpi.key) {
+        "students" -> VIcons.Users
+        "teachers" -> VIcons.GraduationCap
+        "attendance" -> VIcons.ListChecks
+        "fees" -> VIcons.Wallet
+        "parents" -> VIcons.Heart
+        "approvals" -> VIcons.ShieldCheck
+        "events" -> VIcons.Calendar
+        else -> VIcons.Target
+    }
+    val deltaPositive = kpi.deltaDirection != "down"
+    val deltaTint = if (deltaPositive) c.successInk else c.warningInk
+    val showDelta = kpi.deltaDirection != "flat" && kpi.deltaValue > 0.0
+    VCard(modifier = modifier.clickable { onClick() }) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
-
                 modifier = Modifier.fillMaxWidth(),
-
-
                 horizontalArrangement = Arrangement.SpaceBetween,
-
-
-                verticalAlignment = Alignment.CenterVertically
-
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-
-
-                MetricIcon(
-
-                    icon = icon
-
-                )
-
-
-
-                Text(
-
-                    text = change,
-
-
-                    style = VTheme.type.caption.colored(
-                        if (changePositive) c.successInk else c.warningInk
-                    )
-
-                )
-
-
+                Box(
+                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(13.dp))
+                        .background(c.teal.copy(alpha = .14f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(20.dp))
+                }
+                if (showDelta) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Icon(
+                            VIcons.TrendingUp,
+                            contentDescription = null,
+                            tint = deltaTint,
+                            modifier = Modifier.size(13.dp).rotate(if (deltaPositive) 0f else 180f),
+                        )
+                        Text(formatDelta(kpi), style = VTheme.type.caption.colored(deltaTint))
+                    }
+                }
             }
-
-
-
-
-
-            Spacer(
-                Modifier.height(2.dp)
-            )
-
-
-
-
-
             Text(
-
-                value,
-
-
-                style = VTheme.type.h2.colored(c.ink)
-
+                "${kpi.value}${kpi.unit}",
+                style = VTheme.type.h2.colored(c.ink),
             )
-
-
-
-
-
-            Text(
-
-                title,
-
-
-                style = VTheme.type.caption.colored(c.ink2)
-
-            )
-
-
-
-
-
-
-            ProgressLine(
-
-                value = progress
-
-            )
-
-
+            Text(kpi.label, style = VTheme.type.caption.colored(c.ink2), maxLines = 1)
+            if (kpi.deltaLabel.isNotBlank()) {
+                Text(kpi.deltaLabel, style = VTheme.type.dataSm.colored(c.ink3), maxLines = 1)
+            }
         }
-
-
     }
-
-
 }
 
-@Composable
-private fun MetricIcon(
-    icon: ImageVector
-) {
-
-    val c = VTheme.colors
-
-
-    Column {
-
-
-        Box(
-
-            modifier = Modifier
-
-                .size(42.dp)
-
-                .clip(
-                    RoundedCornerShape(14.dp)
-                )
-
-                .background(
-                    c.teal.copy(
-                        alpha = .14f
-                    )
-                ),
-
-
-            contentAlignment = Alignment.Center
-
-        ) {
-
-
-            Icon(
-
-                imageVector = icon,
-
-                contentDescription = null,
-
-
-                tint = c.tealDeep,
-
-
-                modifier = Modifier.size(22.dp)
-
-            )
-
-        }
-
-    }
-
-
+private fun formatDelta(kpi: OverviewKpi): String {
+    val sign = if (kpi.deltaDirection == "up") "+" else "-"
+    val v = if (kpi.deltaValue % 1.0 == 0.0) kpi.deltaValue.toInt().toString()
+    else ((kpi.deltaValue * 10).toInt() / 10.0).toString()
+    return "$sign$v${kpi.unit}"
 }
 
-@Composable
-private fun ProgressLine(
-    value: Float
-) {
-
-    val c = VTheme.colors
-
-
-
-    Box(
-
-        modifier = Modifier
-
-            .fillMaxWidth()
-
-            .height(6.dp)
-
-            .clip(
-                RoundedCornerShape(50)
-            )
-
-            .background(
-                c.ink.copy(
-                    alpha = .08f
-                )
-            )
-
-    ) {
-
-
-        Box(
-
-            modifier = Modifier
-
-                .fillMaxWidth(value)
-
-                .height(6.dp)
-
-                .clip(
-                    RoundedCornerShape(50)
-                )
-
-                .background(
-                    c.tealDeep
-                )
-
-        )
-
-    }
-
-
-}
+// =====================================================================
+// 5. Campus Health (attendance trend)
+// =====================================================================
 
 @Composable
-fun AttendanceChartCard(
-    attendanceTrend: DashboardAttendanceTrend?,
-    modifier: Modifier = Modifier
-) {
-
-
+private fun CampusHealthCard(analytics: AdminDashboardAnalytics?, onClick: () -> Unit) {
     val c = VTheme.colors
-
-    val values = attendanceTrend?.values.orEmpty()
-    val labels = attendanceTrend?.labels.orEmpty()
-
-    // Normalise reported percentages (0..100) into 0..1 ratios for the graph.
+    val trend = analytics?.attendanceTrend
+    val values = trend?.values.orEmpty()
+    val labels = trend?.labels.orEmpty()
     val points = values.map { (it.coerceIn(0, 100)) / 100f }
-
-    /*
-     The badge shows the net change between the first and last reported
-     points (e.g. "+4%"). Hidden when there isn't enough data to compare.
-     */
+    val hasData = points.size >= 2
     val delta = if (values.size >= 2) values.last() - values.first() else null
 
-    val hasData = points.size >= 2
-
-
-    VCard(
-
-        modifier = modifier.fillMaxWidth()
-
-    ) {
-
-
-        Column(
-
-            modifier = Modifier.padding(18.dp),
-
-
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-
-        ) {
-
-
+    VCard(modifier = Modifier.fillMaxWidth().clickable { onClick() }) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(
-
                 modifier = Modifier.fillMaxWidth(),
-
-
                 horizontalArrangement = Arrangement.SpaceBetween,
-
-
-                verticalAlignment = Alignment.CenterVertically
-
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-
-
                 Column {
-
-
+                    Text("Campus Health", style = VTheme.type.h3.colored(c.ink))
                     Text(
-
-                        "Attendance Trend",
-
-                        style = VTheme.type.h3.colored(c.ink)
-
-                    )
-
-
-
-                    Text(
-
-                        if (hasData) "Last ${values.size} ${attendanceTrend?.period.orEmpty().ifEmpty { "period" }} performance"
+                        if (hasData) "Attendance over ${values.size} ${trend?.period.orEmpty().ifEmpty { "periods" }}"
                         else "No attendance data yet",
-
-                        style = VTheme.type.caption.colored(c.ink2)
-
+                        style = VTheme.type.caption.colored(c.ink2),
                     )
-
-
                 }
-
-
-
-
-
-                if (delta != null) {
-                    BoxPercentage(delta = delta)
-                }
-
+                if (delta != null) DeltaBadge(delta)
             }
-
-
-
-
             if (hasData) {
-
                 AttendanceLineGraph(points = points)
-
-
-                Row(
-
-                    modifier = Modifier.fillMaxWidth(),
-
-
-                    horizontalArrangement = Arrangement.SpaceBetween
-
-                ) {
-
-
-                    labels.forEach {
-
-
-                        Text(
-
-                            text = it,
-
-                            style = VTheme.type.dataSm.colored(c.ink3)
-
-                        )
-
-                    }
-
-
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    labels.forEach { Text(it, style = VTheme.type.dataSm.colored(c.ink3)) }
                 }
-
             } else {
-
                 Text(
-                    "Attendance trends will appear once daily records are captured.",
-                    style = VTheme.type.caption.colored(c.ink2)
+                    "Attendance trends appear once daily records are captured.",
+                    style = VTheme.type.caption.colored(c.ink2),
                 )
-
             }
-
-
         }
-
-
     }
-
-
 }
 
 @Composable
-private fun BoxPercentage(delta: Int) {
-
-
+private fun DeltaBadge(delta: Int) {
     val c = VTheme.colors
-
     val positive = delta >= 0
     val tint = if (positive) c.successInk else c.warningInk
-    val sign = if (positive) "+" else ""
-
-
     Box(
-
-        modifier = Modifier
-
-            .background(
-
-                tint.copy(
-                    alpha = .12f
-                ),
-
-                RoundedCornerShape(50)
-
-            )
-
-            .padding(
-                horizontal = 12.dp, vertical = 6.dp
-            )
-
+        modifier = Modifier.background(tint.copy(alpha = .12f), RoundedCornerShape(50))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
-
-
-        Text(
-
-            "$sign$delta%",
-
-            style = VTheme.type.caption.colored(tint)
-
-        )
-
-
+        Text("${if (positive) "+" else ""}$delta%", style = VTheme.type.caption.colored(tint))
     }
-
-
 }
 
 @Composable
-private fun AttendanceLineGraph(
-    points: List<Float>
-) {
-
-
+private fun AttendanceLineGraph(points: List<Float>) {
     val c = VTheme.colors
-
-
-    // A line/area needs at least two points.
     if (points.size < 2) return
-
-
-
-
-    Canvas(
-
-        modifier = Modifier
-
-            .fillMaxWidth()
-
-            .height(180.dp)
-
-    ) {
-
-
+    Canvas(modifier = Modifier.fillMaxWidth().height(160.dp)) {
         val widthStep = size.width / (points.size - 1)
-
-
-        val graphHeight = size.height - 20.dp.toPx()
-
-
+        val graphHeight = size.height - 18.dp.toPx()
         val path = Path()
-
-
         val fillPath = Path()
-
-
-
         points.forEachIndexed { index, value ->
-
-
             val x = index * widthStep
-
-
             val y = graphHeight - (graphHeight * value.coerceIn(0f, 1f))
-
-
-
             if (index == 0) {
-
-                path.moveTo(
-                    x, y
-                )
-
-
-                fillPath.moveTo(
-                    x, size.height
-                )
-
-
-                fillPath.lineTo(
-                    x, y
-                )
-
+                path.moveTo(x, y)
+                fillPath.moveTo(x, size.height)
+                fillPath.lineTo(x, y)
             } else {
-
-
-                path.lineTo(
-                    x, y
-                )
-
-
-                fillPath.lineTo(
-                    x, y
-                )
-
+                path.lineTo(x, y)
+                fillPath.lineTo(x, y)
             }
-
-
         }
-
-
-
-        fillPath.lineTo(
-            size.width, size.height
-        )
-
-
+        fillPath.lineTo(size.width, size.height)
         fillPath.close()
-
-
-
-        drawPath(
-
-            path = fillPath,
-
-            color = c.teal.copy(
-                alpha = .12f
-            )
-
-        )
-
-
-
-
-        drawPath(
-
-            path = path,
-
-            color = c.tealDeep,
-
-
-            style = Stroke(
-                width = 4.dp.toPx(),
-
-                cap = StrokeCap.Round
-
-            )
-
-        )
-
-
-
-
-
+        drawPath(path = fillPath, color = c.teal.copy(alpha = .12f))
+        drawPath(path = path, color = c.tealDeep, style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round))
         points.forEachIndexed { index, value ->
-
-
             val x = index * widthStep
-
-
             val y = graphHeight - (graphHeight * value.coerceIn(0f, 1f))
-
-
-
-            drawCircle(
-
-                color = c.tealDeep,
-
-
-                radius = 6.dp.toPx(),
-
-
-                center = Offset(
-                    x, y
-                )
-
-            )
-
+            drawCircle(color = c.tealDeep, radius = 5.dp.toPx(), center = Offset(x, y))
         }
-
-
     }
-
-
 }
 
+// =====================================================================
+// 6. Fee analytics
+// =====================================================================
 
 @Composable
-fun QuickActionGrid(
-
-    onAddTeacher: () -> Unit,
-
-    onAddStudent: () -> Unit,
-
-    onCreateClass: () -> Unit,
-
-    onReports: () -> Unit,
-
-
-    modifier: Modifier = Modifier
-
-) {
-
-
-    Column(
-
-        modifier = modifier.fillMaxWidth(),
-
-
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-
-    ) {
-
-
-        Text(
-
-            "Quick Actions",
-
-            style = VTheme.type.h3.colored(
-                VTheme.colors.ink
-            )
-
-        )
-
-
-
-
-
-        Row(
-
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-
-        ) {
-
-
-            ActionCard(
-
-                modifier = Modifier.weight(1f),
-
-
-                title = "Add Teacher",
-
-
-                description = "Create staff profile",
-
-
-                icon = VIcons.Users,
-
-
-                onClick = onAddTeacher
-
-            )
-
-
-
-            ActionCard(
-
-                modifier = Modifier.weight(1f),
-
-
-                title = "Add Student",
-
-
-                description = "New admission",
-
-
-                icon = VIcons.Users,
-
-
-                onClick = onAddStudent
-
-            )
-
-        }
-
-
-
-
-
-        Row(
-
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-
-        ) {
-
-
-            ActionCard(
-
-                modifier = Modifier.weight(1f),
-
-
-                title = "Create Class",
-
-
-                description = "Setup classroom",
-
-
-                icon = VIcons.School,
-
-
-                onClick = onCreateClass
-
-            )
-
-
-
-
-
-            ActionCard(
-
-                modifier = Modifier.weight(1f),
-
-
-                title = "Reports",
-
-
-                description = "View analytics",
-
-
-                icon = VIcons.AlertTriangle,
-
-
-                onClick = onReports
-
-            )
-
-
-        }
-
-
-    }
-
-
-}
-
-@Composable
-private fun ActionCard(
-
-    title: String,
-
-    description: String,
-
-    icon: ImageVector,
-
-
+private fun FeeAnalyticsCard(
+    fee: com.littlebridge.vidyaprayag.feature.admin.domain.model.OverviewFeeAnalytics,
     onClick: () -> Unit,
-
-
-    modifier: Modifier = Modifier
-
 ) {
-
-
     val c = VTheme.colors
-
-
-
-    VCard(
-
-        modifier = modifier
-
-            .clip(
-                RoundedCornerShape(22.dp)
-            )
-
-            .clickable {
-                onClick()
-            }
-
-    ) {
-
-
-        Column(
-
-            modifier = Modifier.padding(16.dp),
-
-
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-
-        ) {
-
-
-            IconContainer(
-
-                icon = icon
-
-            )
-
-
-
-
-
-            Text(
-
-                title,
-
-
-                style = VTheme.type.bodyStrong.colored(c.ink)
-
-            )
-
-
-
-
-
-            Text(
-
-                description,
-
-
-                style = VTheme.type.caption.colored(c.ink2)
-
-            )
-
-
-        }
-
-
-    }
-
-
-}
-
-@Composable
-private fun IconContainer(
-
-    icon: ImageVector
-
-) {
-
-
-    val c = VTheme.colors
-
-
-
-    Box(
-
-        modifier = Modifier
-
-            .size(44.dp)
-
-            .clip(
-                RoundedCornerShape(14.dp)
-            )
-
-            .background(
-                c.teal.copy(
-                    alpha = .15f
-                )
-            ),
-
-
-        contentAlignment = Alignment.Center
-
-    ) {
-
-
-        Icon(
-
-            imageVector = icon,
-
-
-            contentDescription = null,
-
-
-            tint = c.tealDeep,
-
-
-            modifier = Modifier.size(22.dp)
-
-        )
-
-
-    }
-
-
-}
-
-
-@Composable
-fun TeacherInsightCard(
-
-    insight: DashboardTeacherInsight?,
-
-    modifier: Modifier = Modifier
-
-) {
-
-
-    val c = VTheme.colors
-
-
-    val assigned = insight?.assignedTeachers ?: 0
-
-    val pending = insight?.pendingAssignment ?: 0
-
-    val total = insight?.totalTeachers ?: (assigned + pending)
-
-
-    /*
-     Prefer the server-computed coverage (already a 0..100 percentage). Fall
-     back to deriving it locally so an older payload still renders sanely.
-     */
-    val coverage = when {
-        insight != null && insight.assignmentCoverage > 0 ->
-            (insight.assignmentCoverage.coerceIn(0, 100)) / 100f
-        total > 0 -> (assigned.toFloat() / total).coerceIn(0f, 1f)
-        else -> 0f
-    }
-
-    val departments = insight?.departments.orEmpty()
-
-
-
-
-
-    VCard(
-
-        modifier = modifier.fillMaxWidth()
-
-    ) {
-
-
-        Column(
-
-            modifier = Modifier.padding(18.dp),
-
-
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-
-        ) {
-
-
-            /*
-             HEADER
-             */
-
-
+    VCard(modifier = Modifier.fillMaxWidth().clickable { onClick() }) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(
-
                 modifier = Modifier.fillMaxWidth(),
-
-
-                verticalAlignment = Alignment.CenterVertically
-
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-
-
-                BoxIcon()
-
-
-
-                Spacer(
-                    Modifier.size(12.dp)
-                )
-
-
-
-                Column(
-
-                    modifier = Modifier.weight(1f)
-
+                Column {
+                    Text("Fee Collection", style = VTheme.type.h3.colored(c.ink))
+                    Text("Collection rate ${fee.collectionRate}%", style = VTheme.type.caption.colored(c.ink2))
+                }
+                Box(
+                    modifier = Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(c.teal.copy(alpha = .14f)),
+                    contentAlignment = Alignment.Center,
                 ) {
-
-
-                    Text(
-
-                        "Teacher Insights",
-
-                        style = VTheme.type.h3.colored(c.ink)
-
-                    )
-
-
-                    Text(
-
-                        "Staff assignment overview",
-
-                        style = VTheme.type.caption.colored(c.ink2)
-
-                    )
-
+                    Icon(VIcons.Wallet, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(22.dp))
                 }
-
-
             }
-
-
-            /*
-             SUMMARY NUMBERS
-             */
-
-
-            Row(
-
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-
-            ) {
-
-
-                TeacherMetric(
-
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                FeeStat(
                     modifier = Modifier.weight(1f),
-
-
-                    title = "Assigned",
-
-
-                    value = assigned.toString(),
-
-
-                    positive = true
-
+                    label = "Collected",
+                    value = formatMoney(fee.totalCollected, fee.currency),
+                    positive = true,
                 )
-
-
-
-                TeacherMetric(
-
+                FeeStat(
                     modifier = Modifier.weight(1f),
-
-
-                    title = "Pending",
-
-
-                    value = pending.toString(),
-
-
-                    positive = false
-
+                    label = "Pending",
+                    value = formatMoney(fee.pending, fee.currency),
+                    positive = false,
                 )
-
-
             }
-
-
-            /*
-             COVERAGE
-             */
-
-
-
-            Column {
-
-
-                Row(
-
-                    modifier = Modifier.fillMaxWidth(),
-
-
-                    horizontalArrangement = Arrangement.SpaceBetween
-
-                ) {
-
-
-                    Text(
-
-                        "Assignment coverage",
-
-                        style = VTheme.type.caption.colored(c.ink2)
-
-                    )
-
-
-                    Text(
-
-                        "${(coverage * 100).toInt()}%",
-
-                        style = VTheme.type.caption.colored(c.tealDeep)
-
-                    )
-
-                }
-
-
-
-                Spacer(
-                    Modifier.height(8.dp)
-                )
-
-
-
-                CoverageBar(
-                    progress = coverage
-                )
-
+            if (fee.trend.size >= 2) {
+                FeeBars(values = fee.trend.map { it.value }, labels = fee.trend.map { it.label })
             }
-
-
-            /*
-            DEPARTMENT BREAKDOWN (server-driven; honest empty state)
-             */
-
-
-            if (departments.isEmpty()) {
-
-                Text(
-                    "No departments recorded yet",
-                    style = VTheme.type.caption.colored(c.ink2)
-                )
-
-            } else {
-
-                departments.forEach { dept ->
-                    DepartmentRow(
-                        name = dept.name,
-                        count = dept.teacherCount
-                    )
-                }
-
-            }
-
-
         }
-
     }
-
-
 }
 
-
 @Composable
-private fun BoxIcon() {
-
-
+private fun FeeStat(label: String, value: String, positive: Boolean, modifier: Modifier = Modifier) {
     val c = VTheme.colors
-
-
-
-    Box(
-
-        modifier = Modifier
-
-            .size(44.dp)
-
-            .clip(
-                RoundedCornerShape(14.dp)
-            )
-
-            .background(
-                c.teal.copy(
-                    alpha = .15f
-                )
-            ),
-
-
-        contentAlignment = Alignment.Center
-
-    ) {
-
-        Icon(
-
-            imageVector = VIcons.Users,
-
-
-            contentDescription = null,
-
-
-            tint = c.tealDeep,
-
-
-            modifier = Modifier.size(22.dp)
-
-        )
-
-    }
-
-
-}
-
-
-@Composable
-private fun TeacherMetric(
-
-    title: String,
-
-    value: String,
-
-    positive: Boolean,
-
-
-    modifier: Modifier = Modifier
-
-) {
-
-
-    val c = VTheme.colors
-
-
-
+    val tint = if (positive) c.successInk else c.warningInk
     Column(
-
-        modifier = modifier
-
-            .clip(
-                RoundedCornerShape(16.dp)
-            )
-
-            .background(
-
-                if (positive)
-
-                    c.successInk.copy(
-                        alpha = .10f
-                    )
-                else
-
-                    c.warningInk.copy(
-                        alpha = .10f
-                    )
-
-            )
-
-            .padding(14.dp)
-
-
+        modifier = modifier.clip(RoundedCornerShape(16.dp)).background(tint.copy(alpha = .10f)).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-
-
-        Text(
-
-            value,
-
-
-            style = VTheme.type.h2.colored(
-
-                if (positive) c.successInk
-                else c.warningInk
-
-            )
-
-        )
-
-
-
-        Text(
-
-            title,
-
-
-            style = VTheme.type.caption.colored(c.ink2)
-
-        )
-
-
+        Text(value, style = VTheme.type.h4.colored(tint))
+        Text(label, style = VTheme.type.caption.colored(c.ink2))
     }
-
 }
 
-
 @Composable
-private fun CoverageBar(
-
-    progress: Float
-
-) {
-
+private fun FeeBars(values: List<Int>, labels: List<String>) {
     val c = VTheme.colors
-
-
-
-    Box(
-
-        modifier = Modifier
-
-            .fillMaxWidth()
-
-            .height(8.dp)
-
-            .clip(
-                RoundedCornerShape(50)
-            )
-
-            .background(
-                c.ink.copy(
-                    alpha = .08f
-                )
-            )
-
-    ) {
-
-
-        Box(
-
-            modifier = Modifier
-
-                .fillMaxWidth(progress)
-
-                .height(8.dp)
-
-                .clip(
-                    RoundedCornerShape(50)
-                )
-
-                .background(
-                    c.tealDeep
-                )
-
-        )
-
-    }
-
-}
-
-
-@Composable
-private fun DepartmentRow(
-
-    name: String,
-
-    count: Int
-
-) {
-
-
-    val c = VTheme.colors
-
-
-
-    Row(
-
-        modifier = Modifier.fillMaxWidth(),
-
-
-        horizontalArrangement = Arrangement.SpaceBetween
-
-    ) {
-
-
-        Text(
-
-            name,
-
-
-            style = VTheme.type.body.colored(c.ink)
-
-        )
-
-
-
-        Text(
-
-            "$count teachers",
-
-
-            style = VTheme.type.caption.colored(c.ink2)
-
-        )
-
-
-    }
-
-}
-
-
-data class ActivityItem(
-    val title: String, val subtitle: String, val time: String
-)
-
-
-@Composable
-fun ActivityTimeline(
-
-    activities: List<ActivityItem>,
-
-    modifier: Modifier = Modifier
-
-) {
-
-    val c = VTheme.colors
-
-
-
-    VCard(
-
-        modifier = modifier.fillMaxWidth()
-
-    ) {
-
-        Column(
-
-            modifier = Modifier.padding(18.dp),
-
-
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-
-        ) {
-
-
-            Text(
-
-                "Recent Activity",
-
-                style = VTheme.type.h3.colored(c.ink)
-
-            )
-
-
-
-            Text(
-
-                "Latest school operations",
-
-                style = VTheme.type.caption.colored(c.ink2)
-
-            )
-
-
-
-            Spacer(
-                Modifier.height(4.dp)
-            )
-
-
-
-
-            if (activities.isEmpty()) {
-
-
-                Text(
-
-                    "No activity recorded",
-
-                    style = VTheme.type.caption.colored(c.ink2)
-
-                )
-
-
-            } else {
-
-
-                activities.take(6).forEachIndexed { index, item ->
-
-
-                    TimelineItem(
-
-                        activity = item,
-
-                        isLast = index == activities.lastIndex
-
-                    )
-
-
-                }
-
-
-            }
-
-
-        }
-
-
-    }
-
-
-}
-
-
-@Composable
-private fun TimelineItem(
-
-    activity: ActivityItem,
-
-    isLast: Boolean
-
-) {
-
-    val c = VTheme.colors
-
-
-
-    Row(
-
-        modifier = Modifier.fillMaxWidth(),
-
-        verticalAlignment = Alignment.Top
-
-    ) {
-
-
-        Column(
-
-            horizontalAlignment = Alignment.CenterHorizontally
-
-        ) {
-
-
-            Box(
-
-                modifier = Modifier
-
-                    .size(12.dp)
-
-                    .background(
-                        c.tealDeep, CircleShape
-                    )
-
-            )
-
-
-
-            if (!isLast) {
-
-
-                Spacer(
-
-                    Modifier.height(48.dp)
-
-                )
-
-
-            }
-
-
-        }
-
-
-
-
-
-        Spacer(
-            Modifier.size(14.dp)
-        )
-
-
-
-
-
-        Column(
-
-            modifier = Modifier.weight(1f),
-
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-
-        ) {
-
-
-            Text(
-
-                activity.title,
-
-                style = VTheme.type.bodyStrong.colored(c.ink)
-
-            )
-
-
-
-            Text(
-
-                activity.subtitle,
-
-                style = VTheme.type.caption.colored(c.ink2)
-
-            )
-
-
-
-            Text(
-
-                activity.time,
-
-                style = VTheme.type.dataSm.colored(c.ink3)
-
-            )
-
-
-
-            if (!isLast) {
-
-                HorizontalDivider(
-
-                    modifier = Modifier.padding(
-                        top = 12.dp
-                    )
-
-                )
-
-            }
-
-
-        }
-
-
-    }
-
-
-}
-
-
-@Composable
-fun AnalyticsEntryCard(
-
-    onClick: () -> Unit,
-
-    modifier: Modifier = Modifier
-
-) {
-
-    DashboardFeatureCard(
-
-        title = "School Analytics",
-
-        description = "View attendance, academic performance and growth insights",
-
-
-        icon = VIcons.AlertTriangle,
-
-
-        button = "Explore Analytics",
-
-
-        onClick = onClick,
-
-
-        modifier = modifier
-
-    )
-
-
-}
-
-
-@Composable
-fun PewsEntryCard(
-
-    onClick: () -> Unit,
-
-    modifier: Modifier = Modifier
-
-) {
-
-    DashboardFeatureCard(
-
-        title = "Student Risk Monitor",
-
-
-        description = "Identify students requiring attention early",
-
-
-        icon = VIcons.AlertCircle,
-
-
-        button = "Open Monitor",
-
-
-        onClick = onClick,
-
-
-        modifier = modifier
-
-    )
-
-}
-
-
-@Composable
-private fun DashboardFeatureCard(
-
-    title: String,
-
-    description: String,
-
-    icon: ImageVector,
-
-
-    button: String,
-
-
-    onClick: () -> Unit,
-
-
-    modifier: Modifier
-
-) {
-
-
-    val c = VTheme.colors
-
-
-
-
-    VCard(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(26.dp))
-            .clickable { onClick() }
-            .background(c.card)
-    ) {
-
-
+    val max = (values.maxOrNull() ?: 0).coerceAtLeast(1)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
-
-            modifier = Modifier
-
-                .padding(18.dp),
-
-
-            verticalAlignment = Alignment.CenterVertically,
-
-
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-
+            modifier = Modifier.fillMaxWidth().height(96.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Bottom,
         ) {
-
-
-            IconBox(
-
-                icon = icon
-
-            )
-
-
-
-
-
-
-            Column(
-
-                modifier = Modifier.weight(1f),
-
-
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-
-            ) {
-
-
-                Text(
-
-                    title,
-
-
-                    style = VTheme.type.h4.colored(c.ink)
-
+            values.forEach { v ->
+                val frac by animateFloatAsState(
+                    targetValue = (v.toFloat() / max).coerceIn(0.04f, 1f),
+                    animationSpec = tween(700),
+                    label = "feebar",
                 )
-
-
-
-
-
-                Text(
-
-                    description,
-
-
-                    style = VTheme.type.caption.colored(c.ink2)
-
-                )
-
-
-
-
-
-                Text(
-
-                    button + "  →",
-
-
-                    style = VTheme.type.bodyStrong.colored(c.tealDeep)
-
-                )
-
-
+                // Each column gets equal width via weight; the bar fills a
+                // fraction of the fixed-height row (96dp) anchored to the bottom.
+                Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.BottomCenter) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().fillMaxHeight(frac)
+                            .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                            .background(c.tealDeep),
+                    )
+                }
             }
-
-
         }
-
-
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            labels.forEach {
+                Text(it, style = VTheme.type.dataSm.colored(c.ink3), modifier = Modifier.weight(1f))
+            }
+        }
     }
-
-
 }
 
+private fun formatMoney(amount: Double, currency: String): String {
+    val symbol = when (currency.uppercase()) { "INR" -> "₹"; "USD" -> "$"; else -> "$currency " }
+    val rounded = amount.toLong()
+    return when {
+        rounded >= 10_000_000 -> "$symbol${(rounded / 100_000) / 10.0}Cr"
+        rounded >= 100_000 -> "$symbol${(rounded / 1_000) / 100.0}L"
+        rounded >= 1_000 -> "$symbol${(rounded / 100) / 10.0}K"
+        else -> "$symbol$rounded"
+    }
+}
+
+// =====================================================================
+// 7. Parent engagement center
+// =====================================================================
 
 @Composable
-private fun IconBox(
-
-    icon: ImageVector
-
+private fun ParentEngagementCard(
+    engagement: com.littlebridge.vidyaprayag.feature.admin.domain.model.OverviewParentEngagement,
 ) {
-
-
     val c = VTheme.colors
-
-
-
-    Box(
-
-        modifier = Modifier
-
-            .size(52.dp)
-
-            .clip(
-                RoundedCornerShape(18.dp)
-            )
-
-            .background(
-                c.teal.copy(
-                    alpha = .15f
-                )
-            ),
-
-
-        contentAlignment = Alignment.Center
-
-    ) {
-
-
-        Icon(
-
-            imageVector = icon,
-
-
-            contentDescription = null,
-
-
-            tint = c.tealDeep,
-
-
-            modifier = Modifier.size(26.dp)
-
-        )
-
-
+    VCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(
+                    modifier = Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(c.teal.copy(alpha = .14f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(VIcons.Heart, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(22.dp))
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Parent Engagement", style = VTheme.type.h3.colored(c.ink))
+                    Text(
+                        "${engagement.activeParentsPct}% active · ${engagement.activeParents}/${engagement.totalParents} parents",
+                        style = VTheme.type.caption.colored(c.ink2),
+                    )
+                }
+            }
+            if (engagement.mostEngagedClass.isNotBlank()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                        .background(c.successInk.copy(alpha = .10f)).padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(VIcons.Star, contentDescription = null, tint = c.successInk, modifier = Modifier.size(18.dp))
+                    Text("Most engaged: ${engagement.mostEngagedClass}", style = VTheme.type.bodyStrong.colored(c.ink))
+                }
+            }
+            if (engagement.leaderboard.isNotEmpty()) {
+                Text("Class Leaderboard", style = VTheme.type.label.colored(c.ink3))
+                engagement.leaderboard.forEachIndexed { idx, lc ->
+                    LeaderboardRow(rank = idx + 1, item = lc)
+                }
+            }
+        }
     }
+}
 
+@Composable
+private fun LeaderboardRow(rank: Int, item: OverviewLeaderClass) {
+    val c = VTheme.colors
+    val medal = when (rank) { 1 -> "🥇"; 2 -> "🥈"; 3 -> "🥉"; else -> "$rank" }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(modifier = Modifier.width(28.dp), contentAlignment = Alignment.Center) {
+            Text(medal, style = VTheme.type.bodyStrong.colored(c.ink))
+        }
+        Text(item.className, style = VTheme.type.body.colored(c.ink), modifier = Modifier.weight(1f))
+        Box(
+            modifier = Modifier.height(6.dp).width(60.dp).clip(RoundedCornerShape(50)).background(c.ink.copy(alpha = .08f)),
+        ) {
+            Box(
+                modifier = Modifier.fillMaxWidth((item.score / 100f).coerceIn(0f, 1f)).height(6.dp)
+                    .clip(RoundedCornerShape(50)).background(c.tealDeep),
+            )
+        }
+        val dirTint = when (item.direction) { "up" -> c.successInk; "down" -> c.warningInk; else -> c.ink3 }
+        Text("${item.score}", style = VTheme.type.caption.colored(dirTint))
+    }
+}
+
+// =====================================================================
+// 8. Communication center
+// =====================================================================
+
+@Composable
+private fun CommunicationCenterCard(
+    unread: Int,
+    pending: Int,
+    announcements: Int,
+    acks: Int,
+    onOpenComms: () -> Unit,
+) {
+    val c = VTheme.colors
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Communication", style = VTheme.type.h3.colored(c.ink))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            CommTile(Modifier.weight(1f), "Unread", unread.toString(), VIcons.Chat, onOpenComms)
+            CommTile(Modifier.weight(1f), "Queries", pending.toString(), VIcons.AlertCircle, onOpenComms)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            CommTile(Modifier.weight(1f), "Announcements", announcements.toString(), VIcons.Megaphone, onOpenComms)
+            CommTile(Modifier.weight(1f), "Acknowledgements", acks.toString(), VIcons.Check, onOpenComms)
+        }
+    }
+}
+
+@Composable
+private fun CommTile(modifier: Modifier, label: String, value: String, icon: ImageVector, onClick: () -> Unit) {
+    val c = VTheme.colors
+    VCard(modifier = modifier.clickable { onClick() }) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(
+                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(c.teal.copy(alpha = .14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(18.dp))
+            }
+            Text(value, style = VTheme.type.h3.colored(c.ink))
+            Text(label, style = VTheme.type.caption.colored(c.ink2), maxLines = 1)
+        }
+    }
+}
+
+// =====================================================================
+// 9. Event dashboard
+// =====================================================================
+
+@Composable
+private fun EventDashboardCard(
+    upcoming: List<OverviewEvent>,
+    completed: List<OverviewEvent>,
+    onOpenCalendar: () -> Unit,
+) {
+    val c = VTheme.colors
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Events", style = VTheme.type.h3.colored(c.ink))
+            Text("View calendar →", style = VTheme.type.caption.colored(c.tealDeep), modifier = Modifier.clickable { onOpenCalendar() })
+        }
+        if (upcoming.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                upcoming.forEach { EventCountdownCard(it) }
+            }
+        }
+        if (completed.isNotEmpty()) {
+            Text("Recently completed", style = VTheme.type.label.colored(c.ink3))
+            completed.forEach { CompletedEventRow(it) }
+        }
+    }
+}
+
+@Composable
+private fun EventCountdownCard(event: OverviewEvent) {
+    val c = VTheme.colors
+    val accent = if (event.isHoliday) c.warningInk else c.tealDeep
+    Column(
+        modifier = Modifier
+            .widthIn(min = 150.dp, max = 190.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(c.card)
+            .vElevation(VElevationLevel.Card, radius = 18.dp)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier = Modifier.clip(RoundedCornerShape(50)).background(accent.copy(alpha = .14f))
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+        ) {
+            Text(
+                when {
+                    event.daysAway == 0 -> "Today"
+                    event.daysAway == 1 -> "Tomorrow"
+                    else -> "In ${event.daysAway} days"
+                },
+                style = VTheme.type.label.colored(accent),
+            )
+        }
+        Text(event.title, style = VTheme.type.bodyStrong.colored(c.ink), maxLines = 2)
+        Text(event.date, style = VTheme.type.dataSm.colored(c.ink3))
+    }
+}
+
+@Composable
+private fun CompletedEventRow(event: OverviewEvent) {
+    val c = VTheme.colors
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(VIcons.Check, contentDescription = null, tint = c.successInk, modifier = Modifier.size(16.dp))
+        Text(event.title, style = VTheme.type.body.colored(c.ink), modifier = Modifier.weight(1f), maxLines = 1)
+        Text(event.date, style = VTheme.type.dataSm.colored(c.ink3))
+    }
+}
+
+// =====================================================================
+// 10. Teacher spotlight
+// =====================================================================
+
+@Composable
+private fun TeacherSpotlightCard(
+    name: String,
+    department: String,
+    avatarUrl: String?,
+    score: Int,
+    highlight: String,
+    onClick: () -> Unit,
+) {
+    val c = VTheme.colors
+    VCard(modifier = Modifier.fillMaxWidth().clickable { onClick() }, padding = 0.dp) {
+        Box(
+            modifier = Modifier.fillMaxWidth()
+                .background(Brush.linearGradient(listOf(c.tealDeep, c.teal)))
+                .padding(20.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                VAvatar(name = name, size = 56.dp, src = avatarUrl, ring = true)
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("⭐ Teacher Spotlight", style = VTheme.type.label.colored(Color.White.copy(alpha = .85f)))
+                    Text(name, style = VTheme.type.h3.colored(Color.White))
+                    if (department.isNotBlank()) {
+                        Text(department, style = VTheme.type.caption.colored(Color.White.copy(alpha = .85f)))
+                    }
+                    if (highlight.isNotBlank()) {
+                        Text(highlight, style = VTheme.type.caption.colored(Color.White.copy(alpha = .9f)))
+                    }
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("$score", style = VTheme.type.h2.colored(Color.White))
+                    Text("score", style = VTheme.type.caption.colored(Color.White.copy(alpha = .8f)))
+                }
+            }
+        }
+    }
+}
+
+// =====================================================================
+// 11. Achievement showcase
+// =====================================================================
+
+@Composable
+private fun AchievementShowcase(items: List<OverviewAchievement>) {
+    val c = VTheme.colors
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Student Achievements", style = VTheme.type.h3.colored(c.ink))
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items.forEach { AchievementCard(it) }
+        }
+    }
+}
+
+@Composable
+private fun AchievementCard(item: OverviewAchievement) {
+    val c = VTheme.colors
+    val accent = when (item.category.uppercase()) {
+        "SPORTS" -> c.warningInk
+        "COMPETITION" -> c.navy
+        else -> c.tealDeep
+    }
+    Column(
+        modifier = Modifier
+            .widthIn(min = 200.dp, max = 240.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(c.card)
+            .vElevation(VElevationLevel.Card, radius = 18.dp)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            VAvatar(name = item.studentName, size = 40.dp, src = item.imageUrl)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(item.studentName, style = VTheme.type.bodyStrong.colored(c.ink), maxLines = 1)
+                Text(item.category, style = VTheme.type.label.colored(accent))
+            }
+        }
+        Text(item.title, style = VTheme.type.caption.colored(c.ink), maxLines = 2)
+        Text(item.detail, style = VTheme.type.dataSm.colored(c.ink2), maxLines = 2)
+    }
+}
+
+// =====================================================================
+// 12. Birthday widget
+// =====================================================================
+
+@Composable
+private fun BirthdayWidget(today: List<OverviewBirthday>, upcoming: List<OverviewBirthday>) {
+    val c = VTheme.colors
+    if (today.isEmpty() && upcoming.isEmpty()) return
+    VCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("🎂", style = VTheme.type.h3.colored(c.ink))
+                Text("Celebrations", style = VTheme.type.h3.colored(c.ink))
+            }
+            if (today.isNotEmpty()) {
+                Text("Today", style = VTheme.type.label.colored(c.ink3))
+                today.forEach { BirthdayRow(it, isToday = true) }
+            }
+            if (upcoming.isNotEmpty()) {
+                Text("Upcoming", style = VTheme.type.label.colored(c.ink3))
+                upcoming.forEach { BirthdayRow(it, isToday = false) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BirthdayRow(b: OverviewBirthday, isToday: Boolean) {
+    val c = VTheme.colors
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        VAvatar(name = b.name, size = 38.dp, src = b.avatarUrl)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(b.name, style = VTheme.type.bodyStrong.colored(c.ink), maxLines = 1)
+            Text(if (b.role == "TEACHER") "Teacher" else "Student", style = VTheme.type.caption.colored(c.ink2))
+        }
+        Text(
+            if (isToday) "🎉 Today" else "in ${b.daysAway}d",
+            style = VTheme.type.caption.colored(if (isToday) c.successInk else c.ink3),
+        )
+    }
+}
+
+// =====================================================================
+// 13. Live activity feed
+// =====================================================================
+
+data class ActivityItem(val title: String, val subtitle: String, val time: String)
+
+@Composable
+private fun ActivityFeedCard(activities: List<ActivityItem>, onClick: () -> Unit) {
+    val c = VTheme.colors
+    VCard(modifier = Modifier.fillMaxWidth().clickable { onClick() }) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Live Activity", style = VTheme.type.h3.colored(c.ink))
+            activities.take(6).forEachIndexed { index, item ->
+                TimelineItem(item, isLast = index == activities.take(6).lastIndex)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TimelineItem(activity: ActivityItem, isLast: Boolean) {
+    val c = VTheme.colors
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(modifier = Modifier.size(10.dp).background(c.tealDeep, CircleShape))
+            if (!isLast) Spacer(Modifier.height(44.dp))
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(activity.title, style = VTheme.type.bodyStrong.colored(c.ink), maxLines = 2)
+            if (activity.subtitle.isNotBlank()) {
+                Text(activity.subtitle, style = VTheme.type.caption.colored(c.ink2), maxLines = 2)
+            }
+            Text(activity.time, style = VTheme.type.dataSm.colored(c.ink3))
+            if (!isLast) HorizontalDivider(modifier = Modifier.padding(top = 10.dp))
+        }
+    }
+}
+
+// =====================================================================
+// 14. Entry cards
+// =====================================================================
+
+@Composable
+private fun AnalyticsEntryCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    FeatureCard(
+        title = "School Analytics",
+        description = "Attendance, academics & growth insights",
+        icon = VIcons.TrendingUp,
+        button = "Explore Analytics",
+        onClick = onClick,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun PewsEntryCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    FeatureCard(
+        title = "Student Risk Monitor",
+        description = "Identify students needing attention early",
+        icon = VIcons.AlertCircle,
+        button = "Open Monitor",
+        onClick = onClick,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun FeatureCard(
+    title: String,
+    description: String,
+    icon: ImageVector,
+    button: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+    VCard(modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).clickable { onClick() }) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Box(
+                modifier = Modifier.size(50.dp).clip(RoundedCornerShape(16.dp)).background(c.teal.copy(alpha = .15f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(24.dp))
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, style = VTheme.type.h4.colored(c.ink))
+                Text(description, style = VTheme.type.caption.colored(c.ink2))
+                Text("$button  →", style = VTheme.type.bodyStrong.colored(c.tealDeep))
+            }
+        }
+    }
 }
