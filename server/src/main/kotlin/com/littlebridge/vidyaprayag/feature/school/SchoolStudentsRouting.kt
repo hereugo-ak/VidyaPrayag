@@ -70,46 +70,11 @@ data class StudentDto(
     @SerialName("class_name") val className: String,
     val section: String,
     @SerialName("roll_number") val rollNumber: String,
-    @SerialName("profile_photo_url") val profilePhotoUrl: String? = null,
-    // RA-SP: listing-card enrichment so the redesigned roster cards can show
-    // meaningful, relationship-aware information at a glance. All defaulted so
-    // older clients keep parsing; all DERIVED by StudentAggregationService.
-    @SerialName("attendance_percent") val attendancePercent: Float = 0f,
-    @SerialName("teacher_count") val teacherCount: Int = 0,
-    @SerialName("parent_count") val parentCount: Int = 0,
-    @SerialName("is_new_admission") val isNewAdmission: Boolean = false,
-    val status: String = "active"
+    @SerialName("profile_photo_url") val profilePhotoUrl: String? = null
 )
 
 @Serializable
 data class StudentListResponse(val students: List<StudentDto>)
-
-// RA-SP: a teacher connected to a student, derived from class assignments.
-@Serializable
-data class StudentTeacherDto(
-    val id: String,
-    val name: String,
-    val subject: String,
-    val designation: String? = null
-)
-
-// RA-SP: a parent linked to a student. Supports multiple; one primary guardian.
-@Serializable
-data class StudentParentDto(
-    val id: String,
-    val name: String,
-    val relation: String,
-    @SerialName("is_primary_guardian") val isPrimaryGuardian: Boolean = false,
-    val phone: String? = null
-)
-
-// RA-SP: a single recent-activity timeline entry (newest first in the list).
-@Serializable
-data class StudentActivityDto(
-    val title: String,
-    @SerialName("created_at") val createdAt: String,
-    val type: String
-)
 
 @Serializable
 data class CreateStudentRequest(
@@ -181,22 +146,7 @@ data class StudentProfileDto(
     @SerialName("recent_attendance") val recentAttendance: List<AttendanceDayDto>,
     val marks: List<StudentMarkDto>,
     val leave: List<StudentLeaveDto>,
-    val fees: List<StudentFeeDto>,
-    // RA-SP: dashboard enrichment — relationship-aware sections + KPI carousel
-    // metrics + backend-generated narrative. Defaulted so older clients still
-    // parse; every value is DERIVED by StudentAggregationService.
-    @SerialName("admission_date") val admissionDate: String? = null,
-    @SerialName("attendance_percent") val attendancePercent: Float = 0f,
-    @SerialName("teacher_count") val teacherCount: Int = 0,
-    @SerialName("parent_count") val parentCount: Int = 0,
-    @SerialName("subject_count") val subjectCount: Int = 0,
-    @SerialName("academic_score") val academicScore: Float? = null,
-    @SerialName("is_new_admission") val isNewAdmission: Boolean = false,
-    val status: String = "active",
-    val teachers: List<StudentTeacherDto> = emptyList(),
-    val parents: List<StudentParentDto> = emptyList(),
-    val insights: List<String> = emptyList(),
-    val activities: List<StudentActivityDto> = emptyList()
+    val fees: List<StudentFeeDto>
 )
 
 @Serializable
@@ -549,56 +499,8 @@ private fun studentRowToDto(row: org.jetbrains.exposed.sql.ResultRow): StudentDt
         className = row[StudentsTable.className],
         section = row[StudentsTable.section],
         rollNumber = row[StudentsTable.rollNumber],
-        profilePhotoUrl = row[StudentsTable.profilePhotoUrl],
-        status = if (row[StudentsTable.isActive]) "active" else "inactive",
-        isNewAdmission = isNewAdmission(row[StudentsTable.createdAt])
+        profilePhotoUrl = row[StudentsTable.profilePhotoUrl]
     )
-
-/**
- * RA-SP: average attendance % across the active students of a (class, section),
- * used to derive the "above class average" insight. Returns null when the class
- * has no attendance records yet. Runs inside the caller's Exposed transaction.
- */
-private fun classSectionAverageAttendance(schoolId: UUID, className: String, section: String): Float? {
-    val codes = StudentsTable.selectAll().where {
-        (StudentsTable.schoolId eq schoolId) and
-            (StudentsTable.isActive eq true) and
-            (StudentsTable.className eq className) and
-            (StudentsTable.section eq section)
-    }.map { it[StudentsTable.studentCode] }
-    if (codes.isEmpty()) return null
-    val percents = codes.mapNotNull { code ->
-        val summary = StudentAggregationService.attendanceForStudent(schoolId, code)
-        summary.percent.takeIf { it > 0f }
-    }
-    return if (percents.isEmpty()) null else percents.average().toFloat()
-}
-
-/** RA-SP: a student admitted within the last 30 days reads as a New Admission. */
-private fun isNewAdmission(admittedAt: Instant?): Boolean {
-    if (admittedAt == null) return false
-    val days = runCatching {
-        java.time.Duration.between(admittedAt, Instant.now()).toDays()
-    }.getOrDefault(Long.MAX_VALUE)
-    return days in 0..30
-}
-
-/**
- * RA-SP: enrich a roster [StudentDto] with the relationship-aware listing
- * metrics (attendance %, teacher count, parent count) via the centralized
- * [StudentAggregationService] — the single source of truth — so cards never show
- * stale numbers. Runs inside the caller's Exposed transaction.
- */
-private fun enrichStudentForList(schoolId: UUID, dto: StudentDto): StudentDto {
-    val attendance = StudentAggregationService.attendanceForStudent(schoolId, dto.studentCode)
-    val teacherCount = StudentAggregationService.teacherCountForStudent(schoolId, dto.className, dto.section)
-    val parentCount = StudentAggregationService.parentCountForStudent(schoolId, dto.studentCode)
-    return dto.copy(
-        attendancePercent = attendance.percent,
-        teacherCount = teacherCount,
-        parentCount = parentCount
-    )
-}
 
 /**
  * Parse CSV text into CreateStudentRequest rows.
@@ -687,19 +589,12 @@ fun Route.schoolStudentsRouting() {
                         .where { (StudentsTable.schoolId eq ctx.schoolId) and (StudentsTable.isActive eq true) }
                         .orderBy(StudentsTable.className to SortOrder.ASC, StudentsTable.rollNumber to SortOrder.ASC)
                         .map(::studentRowToDto)
-                        // Apply the in-memory search/class filter BEFORE enrichment so
-                        // we only run the (per-student) aggregation queries for the rows
-                        // we actually return.
-                        .filter { s ->
-                            (classFilter == null || s.className.equals(classFilter, ignoreCase = true)) &&
-                                (q == null ||
-                                    s.fullName.lowercase().contains(q) ||
-                                    s.rollNumber.lowercase().contains(q) ||
-                                    s.studentCode.lowercase().contains(q))
-                        }
-                        // RA-SP: relationship-aware enrichment via the single source of
-                        // truth so each card shows live attendance/teacher/parent counts.
-                        .map { enrichStudentForList(ctx.schoolId, it) }
+                }.filter { s ->
+                    (classFilter == null || s.className.equals(classFilter, ignoreCase = true)) &&
+                        (q == null ||
+                            s.fullName.lowercase().contains(q) ||
+                            s.rollNumber.lowercase().contains(q) ||
+                            s.studentCode.lowercase().contains(q))
                 }
                 call.ok(StudentListResponse(students), message = "Students fetched")
             }
@@ -723,26 +618,16 @@ fun Route.schoolStudentsRouting() {
                         .firstOrNull()
                     if (clash != null) return@dbQuery null  // duplicate code
 
-                    val resolvedClass = req.className.trim()
-                    val resolvedSection = req.section?.takeIf { s -> s.isNotBlank() }?.trim() ?: "A"
-
                     val newId = StudentsTable.insert {
                         it[schoolId] = ctx.schoolId
                         it[studentCode] = code
                         it[fullName] = req.fullName.trim()
-                        it[className] = resolvedClass
-                        it[section] = resolvedSection
+                        it[className] = req.className.trim()
+                        it[section] = req.section?.takeIf { s -> s.isNotBlank() }?.trim() ?: "A"
                         it[rollNumber] = req.rollNumber.trim()
                         it[isActive] = true
                         it[createdAt] = Instant.now()
                     } get StudentsTable.id
-
-                    // RA-SP: student joined a class → recompute the live student
-                    // counts for every teacher assigned to that class+section, so
-                    // teacher workload/metrics never go stale. No manual updates.
-                    StudentAggregationService.recalcTeacherStudentCountsForClass(
-                        ctx.schoolId, resolvedClass, resolvedSection
-                    )
 
                     StudentsTable.selectAll().where { StudentsTable.id eq newId }.first().let(::studentRowToDto)
                 }
@@ -778,9 +663,6 @@ fun Route.schoolStudentsRouting() {
 
                 val results = mutableListOf<BulkImportRowResult>()
                 var inserted = 0
-                // RA-SP: track every class+section that gained a student so we can
-                // recompute the affected teachers' workload once, after the batch.
-                val touchedClasses = LinkedHashSet<Pair<String, String>>()
                 dbQuery {
                     rows.forEachIndexed { index, r ->
                         val rowNo = index + 1
@@ -798,27 +680,18 @@ fun Route.schoolStudentsRouting() {
                             results += BulkImportRowResult(rowNo, false, code, "Student code already exists.")
                             return@forEachIndexed
                         }
-                        val resolvedClass = r.className.trim()
-                        val resolvedSection = r.section?.takeIf { s -> s.isNotBlank() }?.trim() ?: "A"
                         StudentsTable.insert {
                             it[schoolId] = ctx.schoolId
                             it[studentCode] = code
                             it[fullName] = r.fullName.trim()
-                            it[className] = resolvedClass
-                            it[section] = resolvedSection
+                            it[className] = r.className.trim()
+                            it[section] = r.section?.takeIf { s -> s.isNotBlank() }?.trim() ?: "A"
                             it[rollNumber] = r.rollNumber.trim()
                             it[isActive] = true
                             it[createdAt] = Instant.now()
                         }
-                        touchedClasses += resolvedClass to resolvedSection
                         inserted++
                         results += BulkImportRowResult(rowNo, true, code, null)
-                    }
-
-                    // RA-SP: one workload recalc per affected class+section after the
-                    // import, so teacher metrics reflect every newly-added student.
-                    touchedClasses.forEach { (cls, sec) ->
-                        StudentAggregationService.recalcTeacherStudentCountsForClass(ctx.schoolId, cls, sec)
                     }
                 }
                 call.ok(
@@ -852,10 +725,6 @@ fun Route.schoolStudentsRouting() {
                         .where { (StudentsTable.id eq id) and (StudentsTable.schoolId eq ctx.schoolId) }
                         .firstOrNull() ?: return@dbQuery false
                     val code = row[StudentsTable.studentCode]   // globally unique
-                    // RA-SP: remember the class so we can refresh affected teachers
-                    // after the student is removed.
-                    val removedClass = row[StudentsTable.className]
-                    val removedSection = row[StudentsTable.section]
 
                     AttendanceRecordsTable.deleteWhere {
                         (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
@@ -882,13 +751,6 @@ fun Route.schoolStudentsRouting() {
                     StudentsTable.deleteWhere {
                         (StudentsTable.id eq id) and (StudentsTable.schoolId eq ctx.schoolId)
                     }
-
-                    // RA-SP: student left the class → recompute the live student
-                    // counts for every teacher assigned to it (workload auto-sync,
-                    // no stale data).
-                    StudentAggregationService.recalcTeacherStudentCountsForClass(
-                        ctx.schoolId, removedClass, removedSection
-                    )
                     true
                 }
                 if (!removed) {
@@ -972,41 +834,6 @@ fun Route.schoolStudentsRouting() {
                         )
                     }
 
-                    // ── RA-SP: relationship-aware aggregation via the single source
-                    // of truth, so teachers/parents/insights/activities and the KPI
-                    // carousel metrics are always derived from live facts. ──
-                    val admittedAt = row[StudentsTable.createdAt]
-                    val teachers = StudentAggregationService.teachersForStudent(
-                        ctx.schoolId, student.className, student.section
-                    )
-                    val parents = StudentAggregationService.parentsForStudent(ctx.schoolId, code)
-                    val subjectCount = StudentAggregationService.subjectCountForStudent(
-                        ctx.schoolId, student.className, student.section
-                    )
-                    val academicScore = StudentAggregationService.academicScoreForStudent(ctx.schoolId, code)
-                    val daysSinceAdmission = runCatching {
-                        java.time.Duration.between(admittedAt, Instant.now()).toDays()
-                    }.getOrNull()
-                    // Average attendance of the student's class+section, used to derive
-                    // an "above class average" insight.
-                    val classAvgAttendance = classSectionAverageAttendance(
-                        ctx.schoolId, student.className, student.section
-                    )
-                    val insights = StudentAggregationService.insightsForStudent(
-                        attendancePercent = rate.toFloat(),
-                        classAverageAttendance = classAvgAttendance,
-                        parentCount = parents.size,
-                        hasPrimaryGuardian = parents.any { it.isPrimaryGuardian },
-                        teacherCount = teachers.map { it.id }.distinct().size,
-                        academicScore = academicScore,
-                        daysSinceAdmission = daysSinceAdmission
-                    )
-                    val activities = StudentAggregationService.activitiesForStudent(
-                        schoolId = ctx.schoolId,
-                        studentCode = code,
-                        admissionDate = admittedAt
-                    )
-
                     StudentProfileDto(
                         student = student,
                         presentDays = present,
@@ -1016,19 +843,7 @@ fun Route.schoolStudentsRouting() {
                         recentAttendance = attRows.take(30),
                         marks = marks,
                         leave = leave,
-                        fees = fees,
-                        admissionDate = admittedAt?.toString()?.take(10),
-                        attendancePercent = rate.toFloat(),
-                        teacherCount = teachers.map { it.id }.distinct().size,
-                        parentCount = parents.size,
-                        subjectCount = subjectCount,
-                        academicScore = academicScore,
-                        isNewAdmission = student.isNewAdmission,
-                        status = student.status,
-                        teachers = teachers,
-                        parents = parents,
-                        insights = insights,
-                        activities = activities
+                        fees = fees
                     )
                 }
                 if (profile == null) {

@@ -87,7 +87,6 @@ import com.littlebridge.vidyaprayag.feature.parent.presentation.NotificationsVie
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.components.VPullRefresh
 import com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonDashboard
 import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
@@ -156,27 +155,15 @@ private fun SchoolDashboardContent(
     onOpenPews: () -> Unit,
     onExit: () -> Unit,
 ) {
-    // Pull-to-refresh: swipe down anywhere on the dashboard to re-sync the
-    // overview / KPIs / insights / cards. The indicator only engages once the
-    // initial load has resolved (overview != null); during the very first load
-    // the skeleton owns the screen, so we never show a refresh spinner on top
-    // of a skeleton. The gesture wraps the scrollable body and does NOT block
-    // vertical scrolling (PullToRefreshBox only intercepts the overscroll-at-top
-    // gesture). See [VPullRefresh].
-    VPullRefresh(
-        isRefreshing = loading && overview != null,
-        onRefresh = onRetry,
-        modifier = modifier.fillMaxSize(),
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 18.dp, vertical = 16.dp)
+            .padding(bottom = 130.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 18.dp, vertical = 16.dp)
-                .padding(bottom = 130.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-        ) {
         VStateHost(
             loading = loading && overview == null,
             error = if (overview == null) error else null,
@@ -293,7 +280,6 @@ private fun SchoolDashboardContent(
                 AnalyticsEntryCard(onClick = onOpenAnalytics)
                 PewsEntryCard(onClick = onOpenPews)
             }
-        }
         }
     }
 }

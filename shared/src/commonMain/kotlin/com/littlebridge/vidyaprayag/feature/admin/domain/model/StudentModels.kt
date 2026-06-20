@@ -25,45 +25,11 @@ data class StudentDto(
     @SerialName("class_name") val className: String,
     val section: String,
     @SerialName("roll_number") val rollNumber: String,
-    @SerialName("profile_photo_url") val profilePhotoUrl: String? = null,
-    // RA-SP: listing-card enrichment. All defaulted so existing JSON decodes; all
-    // DERIVED server-side by StudentAggregationService.
-    @SerialName("attendance_percent") val attendancePercent: Float = 0f,
-    @SerialName("teacher_count") val teacherCount: Int = 0,
-    @SerialName("parent_count") val parentCount: Int = 0,
-    @SerialName("is_new_admission") val isNewAdmission: Boolean = false,
-    val status: String = "active"
+    @SerialName("profile_photo_url") val profilePhotoUrl: String? = null
 )
 
 @Serializable
 data class StudentListResponse(val students: List<StudentDto>)
-
-// RA-SP: a teacher connected to a student, derived from class assignments.
-@Serializable
-data class StudentTeacherDto(
-    val id: String,
-    val name: String,
-    val subject: String,
-    val designation: String? = null
-)
-
-// RA-SP: a parent linked to a student. Supports multiple; one primary guardian.
-@Serializable
-data class StudentParentDto(
-    val id: String,
-    val name: String,
-    val relation: String,
-    @SerialName("is_primary_guardian") val isPrimaryGuardian: Boolean = false,
-    val phone: String? = null
-)
-
-// RA-SP: a single recent-activity timeline entry (newest first).
-@Serializable
-data class StudentActivityDto(
-    val title: String,
-    @SerialName("created_at") val createdAt: String,
-    val type: String
-)
 
 @Serializable
 data class CreateStudentRequest(
@@ -140,22 +106,7 @@ data class StudentProfileDto(
     @SerialName("recent_attendance") val recentAttendance: List<AttendanceDayDto>,
     val marks: List<StudentMarkDto>,
     val leave: List<StudentLeaveDto>,
-    val fees: List<StudentFeeDto>,
-    // RA-SP: dashboard enrichment — relationship-aware sections + KPI carousel
-    // metrics + backend-generated narrative. Defaulted for compatibility; every
-    // value is DERIVED server-side by StudentAggregationService.
-    @SerialName("admission_date") val admissionDate: String? = null,
-    @SerialName("attendance_percent") val attendancePercent: Float = 0f,
-    @SerialName("teacher_count") val teacherCount: Int = 0,
-    @SerialName("parent_count") val parentCount: Int = 0,
-    @SerialName("subject_count") val subjectCount: Int = 0,
-    @SerialName("academic_score") val academicScore: Float? = null,
-    @SerialName("is_new_admission") val isNewAdmission: Boolean = false,
-    val status: String = "active",
-    val teachers: List<StudentTeacherDto> = emptyList(),
-    val parents: List<StudentParentDto> = emptyList(),
-    val insights: List<String> = emptyList(),
-    val activities: List<StudentActivityDto> = emptyList()
+    val fees: List<StudentFeeDto>
 )
 
 @Serializable
