@@ -38,6 +38,11 @@
 --        two-party conversation_id/peer_user_id columns on message_threads /
 --        messages (RA-51).
 --
+--   4b. docs/db/migration_004_parent_link_guardian_metadata.sql
+--        Guardian relationship metadata on parent_child_links (RA-SP):
+--        relation + is_primary_guardian (enforces one primary guardian per
+--        student) powering the redesigned Student Profile parent connections.
+--
 --   5. docs/backend/sql/02_teacher_schema.sql
 --        Teacher-vertical tables: assessments, assessment_marks,
 --        syllabus_units, homework, homework_submissions, teacher_periods.
@@ -60,6 +65,7 @@
 --     \i docs/db/migration_001_faculty_and_holiday_list.sql
 --     \i docs/db/migration_002_segmentation_geo_assignments.sql
 --     \i docs/db/migration_003_leave_workflow_and_two_party_messaging.sql
+--     \i docs/db/migration_004_parent_link_guardian_metadata.sql
 --     \i docs/backend/sql/02_teacher_schema.sql
 --     \i scripts/schema-patch-2026-06-07.sql
 --     \i docs/db/schema-patch-school-onboarding.sql

@@ -457,6 +457,31 @@ fun Route.parentLinkRouting() {
                         it[actionedAt] = now
                     }
 
+                    // RA-SP: parent linking rule — a student may have MULTIPLE
+                    // parents but AT MOST ONE primary guardian. Enforce it via the
+                    // centralized aggregation service: if no approved link for this
+                    // student is primary yet, promote the one we just approved;
+                    // otherwise leave the existing primary intact.
+                    val hasPrimary = ParentChildLinksTable.selectAll().where {
+                        (ParentChildLinksTable.schoolId eq ctx.schoolId) and
+                            (ParentChildLinksTable.studentCode eq code) and
+                            (ParentChildLinksTable.status eq "approved") and
+                            (ParentChildLinksTable.isPrimaryGuardian eq true)
+                    }.any()
+                    com.littlebridge.vidyaprayag.feature.school.StudentAggregationService
+                        .enforceSinglePrimaryGuardian(
+                            schoolId = ctx.schoolId,
+                            studentCode = code,
+                            primaryLinkId = if (hasPrimary) {
+                                ParentChildLinksTable.selectAll().where {
+                                    (ParentChildLinksTable.schoolId eq ctx.schoolId) and
+                                        (ParentChildLinksTable.studentCode eq code) and
+                                        (ParentChildLinksTable.status eq "approved") and
+                                        (ParentChildLinksTable.isPrimaryGuardian eq true)
+                                }.first()[ParentChildLinksTable.id].value
+                            } else linkId
+                        )
+
                     // A parent who just got their first child approved has completed
                     // their onboarding — flip profile_completed so the app routes to
                     // the dashboard instead of the link wizard.
