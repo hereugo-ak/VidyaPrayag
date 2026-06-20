@@ -383,6 +383,14 @@ fun Route.teacherAssignmentRouting() {
                         newId
                     }
 
+                    // RA-LINK: an assignment was created/re-pointed → re-derive the
+                    // affected teacher metrics through the centralized reconciler so
+                    // every student of (class, section) is now linked to this teacher
+                    // and the teacher's workload reflects the change. No manual link.
+                    StudentAggregationService.recalcForAssignmentChange(
+                        ctx.schoolId, req.className, section, teacherUuid
+                    )
+
                     TeacherSubjectAssignmentsTable.selectAll()
                         .where { TeacherSubjectAssignmentsTable.id eq rowId }
                         .first()
@@ -405,13 +413,33 @@ fun Route.teacherAssignmentRouting() {
                     return@delete
                 }
                 val updated = dbQuery {
-                    TeacherSubjectAssignmentsTable.update({
+                    // Capture the relationship coordinates BEFORE soft-deleting so we
+                    // can re-derive the affected teacher metrics afterwards.
+                    val row = TeacherSubjectAssignmentsTable.selectAll().where {
+                        (TeacherSubjectAssignmentsTable.id eq id) and
+                            (TeacherSubjectAssignmentsTable.schoolId eq ctx.schoolId)
+                    }.firstOrNull() ?: return@dbQuery 0
+                    val affectedClass = row[TeacherSubjectAssignmentsTable.className]
+                    val affectedSection = row[TeacherSubjectAssignmentsTable.section]
+                    val affectedTeacher = row[TeacherSubjectAssignmentsTable.teacherId]
+
+                    val n = TeacherSubjectAssignmentsTable.update({
                         (TeacherSubjectAssignmentsTable.id eq id) and
                             (TeacherSubjectAssignmentsTable.schoolId eq ctx.schoolId)
                     }) {
-                        it[isActive] = false
+                        it[isActive] = false   // soft-delete: relationship history preserved
                         it[updatedAt] = Instant.now()
                     }
+
+                    // RA-LINK: assignment de-activated → re-derive the affected
+                    // teacher metrics so this teacher is dropped from those students'
+                    // teacher lists and remaining counts stay accurate.
+                    if (n > 0) {
+                        StudentAggregationService.recalcForAssignmentChange(
+                            ctx.schoolId, affectedClass, affectedSection, affectedTeacher
+                        )
+                    }
+                    n
                 }
                 if (updated == 0) {
                     call.fail("Assignment not found in your school", HttpStatusCode.NotFound)
@@ -549,6 +577,9 @@ fun Route.teacherAssignmentRouting() {
 
                     val created = mutableListOf<TeacherAssignmentDto>()
                     val results = mutableListOf<BulkAssignResultItemDto>()
+                    // RA-LINK: every (class, section) that gained/re-pointed an
+                    // assignment in this batch, so we reconcile each one ONCE after.
+                    val touchedClasses = LinkedHashSet<Pair<String, String>>()
 
                     req.assignments.forEach { target ->
                         // Resolve class name + validate section against the school.
@@ -615,6 +646,7 @@ fun Route.teacherAssignmentRouting() {
                                 .first().toAssignmentDto()
                                 .copy(studentCount = studentCountFor(ctx.schoolId, className, section))
                             created += dto
+                            touchedClasses += className to section
                             results += BulkAssignResultItemDto(className, section, "created", assignment = dto)
                             return@forEach
                         }
@@ -640,7 +672,17 @@ fun Route.teacherAssignmentRouting() {
                             .first().toAssignmentDto()
                             .copy(studentCount = studentCountFor(ctx.schoolId, className, section))
                         created += dto
+                        touchedClasses += className to section
                         results += BulkAssignResultItemDto(className, section, "created", assignment = dto)
+                    }
+
+                    // RA-LINK: reconcile every affected (class, section) once so all
+                    // students in those classes are linked to this teacher and the
+                    // teacher's workload reflects the full batch. No manual linking.
+                    touchedClasses.forEach { (cls, sec) ->
+                        StudentAggregationService.recalcForAssignmentChange(
+                            ctx.schoolId, cls, sec, teacherId
+                        )
                     }
 
                     BulkAssignResponseDto(
@@ -668,14 +710,34 @@ fun Route.teacherAssignmentRouting() {
                     return@delete
                 }
                 val updated = dbQuery {
-                    TeacherSubjectAssignmentsTable.update({
+                    // Capture coordinates BEFORE soft-deleting so we can re-derive
+                    // the affected teacher metrics afterwards.
+                    val row = TeacherSubjectAssignmentsTable.selectAll().where {
+                        (TeacherSubjectAssignmentsTable.id eq assignmentId) and
+                            (TeacherSubjectAssignmentsTable.schoolId eq ctx.schoolId) and
+                            (TeacherSubjectAssignmentsTable.teacherId eq teacherId)
+                    }.firstOrNull() ?: return@dbQuery 0
+                    val affectedClass = row[TeacherSubjectAssignmentsTable.className]
+                    val affectedSection = row[TeacherSubjectAssignmentsTable.section]
+
+                    val n = TeacherSubjectAssignmentsTable.update({
                         (TeacherSubjectAssignmentsTable.id eq assignmentId) and
                             (TeacherSubjectAssignmentsTable.schoolId eq ctx.schoolId) and
                             (TeacherSubjectAssignmentsTable.teacherId eq teacherId)
                     }) {
-                        it[isActive] = false
+                        it[isActive] = false   // soft-delete: relationship history preserved
                         it[updatedAt] = Instant.now()
                     }
+
+                    // RA-LINK: assignment removed → re-derive affected teacher metrics
+                    // so this teacher is dropped from those students' teacher lists and
+                    // the teacher's workload refreshes.
+                    if (n > 0) {
+                        StudentAggregationService.recalcForAssignmentChange(
+                            ctx.schoolId, affectedClass, affectedSection, teacherId
+                        )
+                    }
+                    n
                 }
                 if (updated == 0) {
                     call.fail("Assignment not found for this teacher", HttpStatusCode.NotFound)

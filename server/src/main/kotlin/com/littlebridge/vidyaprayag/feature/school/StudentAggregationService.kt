@@ -301,6 +301,103 @@ object StudentAggregationService {
         return out
     }
 
+    // ───────────── Teacher ↔ Student reconciliation (centralized) ──────────
+    //
+    // RA-LINK: the single, shared reconciliation surface for the
+    // Student ↔ Teacher relationship. Because relationships are DERIVED from
+    // the active (class, section, subject) assignment graph + the live roster,
+    // "reconciling" is simply re-deriving the affected counts so every read
+    // path (student profile teacher list, teacher workload, school dashboard)
+    // reflects the change with no manual linking. Every write path (assignment
+    // create/upsert/soft-delete, teacher create/deactivate, student
+    // create/move/remove) funnels here so the logic lives in ONE place.
+
+    /**
+     * RA-LINK: recompute the live student headcount for a SINGLE teacher across
+     * every class+section they are actively assigned to. This is the
+     * teacher-side workload auto-sync entry point — call it right after a
+     * teacher is created, their assignments change, or they are
+     * activated/deactivated. Returns the distinct active-student total so the
+     * caller can log/assert it. Because the value is DERIVED (never stored),
+     * reading it here guarantees it is never stale.
+     */
+    fun recalcTeacherWorkload(schoolId: UUID, teacherId: UUID): Int {
+        val pairs = TeacherSubjectAssignmentsTable.selectAll().where {
+            (TeacherSubjectAssignmentsTable.schoolId eq schoolId) and
+                (TeacherSubjectAssignmentsTable.isActive eq true) and
+                (TeacherSubjectAssignmentsTable.teacherId eq teacherId)
+        }.map { it[TeacherSubjectAssignmentsTable.className] to it[TeacherSubjectAssignmentsTable.section] }
+            .distinct()
+        return pairs.sumOf { (cls, sec) ->
+            StudentsTable.selectAll().where {
+                (StudentsTable.schoolId eq schoolId) and
+                    (StudentsTable.isActive eq true) and
+                    (StudentsTable.className eq cls) and
+                    (StudentsTable.section eq sec)
+            }.count().toInt()
+        }
+    }
+
+    /**
+     * RA-LINK: the canonical hook to call AFTER any single teacher-assignment
+     * write (create / upsert / re-point / soft-delete). It re-derives every
+     * affected teacher metric:
+     *
+     *   • student counts for all teachers touching the affected (class, section)
+     *     — so students of that class instantly gain/lose this teacher; and
+     *   • the workload of the specific teacher whose assignment changed (when
+     *     known) — so a re-pointed teacher's totals refresh on BOTH ends.
+     *
+     * Returns the per-teacher student-count map for the affected class+section.
+     * Idempotent and read-only with respect to the assignment graph (it only
+     * recomputes derived numbers), so it is safe to call on every path.
+     */
+    fun recalcForAssignmentChange(
+        schoolId: UUID,
+        className: String,
+        section: String,
+        teacherId: UUID? = null
+    ): Map<String, Int> {
+        val counts = recalcTeacherStudentCountsForClass(schoolId, className, section)
+        if (teacherId != null) recalcTeacherWorkload(schoolId, teacherId)
+        return counts
+    }
+
+    /**
+     * RA-LINK: SOFT-DELETE every active assignment of a teacher (Example 5 —
+     * teacher deactivated / removed). Relationship history is preserved: rows
+     * are flipped to `isActive = false` (reusing the project's soft-delete
+     * convention) instead of being physically removed, and the derived student
+     * teacher lists drop the teacher automatically.
+     *
+     * Returns the distinct set of (class, section) pairs that were touched so
+     * the caller can recompute the remaining teachers' counts for those classes.
+     * Write operation — call from a write transaction.
+     */
+    fun softDeactivateTeacherAssignments(
+        schoolId: UUID,
+        teacherId: UUID
+    ): Set<Pair<String, String>> {
+        val affected = TeacherSubjectAssignmentsTable.selectAll().where {
+            (TeacherSubjectAssignmentsTable.schoolId eq schoolId) and
+                (TeacherSubjectAssignmentsTable.teacherId eq teacherId) and
+                (TeacherSubjectAssignmentsTable.isActive eq true)
+        }.map { it[TeacherSubjectAssignmentsTable.className] to it[TeacherSubjectAssignmentsTable.section] }
+            .toSet()
+
+        if (affected.isNotEmpty()) {
+            TeacherSubjectAssignmentsTable.update({
+                (TeacherSubjectAssignmentsTable.schoolId eq schoolId) and
+                    (TeacherSubjectAssignmentsTable.teacherId eq teacherId) and
+                    (TeacherSubjectAssignmentsTable.isActive eq true)
+            }) {
+                it[isActive] = false
+                it[updatedAt] = Instant.now()
+            }
+        }
+        return affected
+    }
+
     // ─────────────────────────── Insights ─────────────────────────────────
 
     /**

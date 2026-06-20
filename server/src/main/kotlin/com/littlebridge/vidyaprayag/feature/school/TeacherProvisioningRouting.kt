@@ -229,6 +229,16 @@ fun Route.teacherProvisioningRouting() {
                         it[createdAt] = now
                         it[updatedAt] = now
                     }
+
+                    // RA-LINK: a teacher was created → reconcile their workload
+                    // through the centralized service so they are immediately linked
+                    // to all students in any class+section they already cover. A
+                    // freshly-provisioned teacher has no assignments yet (those are
+                    // created via the assignment routing, which triggers its own
+                    // reconciliation), so this is typically 0 — but funnelling every
+                    // teacher-create through the SAME reconciler guarantees the link
+                    // graph is never left stale and needs no manual linking.
+                    StudentAggregationService.recalcTeacherWorkload(ctx.schoolId, newId)
                 }
 
                 call.created(
@@ -519,12 +529,16 @@ fun Route.teacherProvisioningRouting() {
                     // the account is gone — purge it so no orphan rows linger.
                     NotificationsTable.deleteWhere { NotificationsTable.userId eq teacherId }
 
-                    // Remove the teacher's class/subject assignments (no DB FK — must
-                    // be cleaned manually or they linger as orphans in Supabase).
-                    TeacherSubjectAssignmentsTable.deleteWhere {
-                        (TeacherSubjectAssignmentsTable.schoolId eq ctx.schoolId) and
-                            (TeacherSubjectAssignmentsTable.teacherId eq teacherId)
-                    }
+                    // RA-LINK: the teacher's class/subject assignments are the
+                    // relationship records that derive Student ↔ Teacher links.
+                    // Per the soft-delete requirement (Example 5) we do NOT hard
+                    // delete them — they are flipped to is_active=false via the
+                    // centralized reconciler so relationship HISTORY remains intact
+                    // while the teacher disappears from every live derived view.
+                    // The reconciler returns the (class, section) pairs it touched.
+                    val affected = StudentAggregationService.softDeactivateTeacherAssignments(
+                        ctx.schoolId, teacherId
+                    )
 
                     // Finally the account row itself. Tables with real FKs to
                     // app_users (assessments / homework / syllabus_units → SET NULL,
@@ -533,6 +547,15 @@ fun Route.teacherProvisioningRouting() {
                         (AppUsersTable.id eq teacherId) and
                             (AppUsersTable.schoolId eq ctx.schoolId) and
                             (AppUsersTable.role eq "teacher")
+                    }
+
+                    // RA-LINK: re-derive student counts for every class the removed
+                    // teacher used to cover, so the REMAINING teachers of those
+                    // classes keep accurate workload metrics with no stale data.
+                    affected.forEach { (cls, sec) ->
+                        StudentAggregationService.recalcTeacherStudentCountsForClass(
+                            ctx.schoolId, cls, sec
+                        )
                     }
                     true
                 }

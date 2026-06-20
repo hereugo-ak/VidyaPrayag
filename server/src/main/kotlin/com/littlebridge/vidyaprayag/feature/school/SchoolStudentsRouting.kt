@@ -120,6 +120,21 @@ data class CreateStudentRequest(
     @SerialName("student_code") val studentCode: String? = null  // optional; auto-generated when blank
 )
 
+/**
+ * RA-LINK: partial student update (rename / move class+section / change roll).
+ * Every field is optional so a caller can move ONLY the class without resending
+ * the whole record. A non-null `className`/`section` that differs from the
+ * stored value is what drives the Student ↔ Teacher relationship re-sync, since
+ * relationships are DERIVED from the student's (class, section).
+ */
+@Serializable
+data class UpdateStudentRequest(
+    @SerialName("full_name") val fullName: String? = null,
+    @SerialName("class_name") val className: String? = null,
+    val section: String? = null,
+    @SerialName("roll_number") val rollNumber: String? = null
+)
+
 @Serializable
 data class BulkImportStudentsRequest(
     val students: List<CreateStudentRequest>? = null,
@@ -751,6 +766,66 @@ fun Route.schoolStudentsRouting() {
                     return@post
                 }
                 call.created(dto, message = "Student added")
+            }
+
+            // ---- update a student / MOVE class+section (school-admin) ----
+            // RA-LINK: the missing write surface for Example 3 (a student changes
+            // class). Student ↔ Teacher relationships are DERIVED from the
+            // student's (class, section), so moving a student is what re-syncs the
+            // link graph. When the class/section actually changes we funnel through
+            // the centralized reconciler `recalcTeacherStudentCountsForMove`, which:
+            //   1. drops the student from the OLD class's teachers' counts,
+            //   2. links the student to the NEW class's teachers automatically,
+            //   3. refreshes the workload of every affected teacher,
+            // with no manual linking. The student's profile teacher list updates on
+            // the next read because it too is derived from (class, section).
+            patch("{id}") {
+                val ctx = call.requireSchoolAdmin() ?: return@patch
+                val id = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                    ?: run { call.fail("Invalid student id"); return@patch }
+                val req = runCatching { call.receive<UpdateStudentRequest>() }.getOrNull()
+                    ?: run { call.fail("Invalid body"); return@patch }
+
+                val dto = dbQuery {
+                    val row = StudentsTable.selectAll()
+                        .where { (StudentsTable.id eq id) and (StudentsTable.schoolId eq ctx.schoolId) }
+                        .firstOrNull() ?: return@dbQuery null
+
+                    val oldClass = row[StudentsTable.className]
+                    val oldSection = row[StudentsTable.section]
+
+                    // Resolve the new values, falling back to the current ones.
+                    val newName = req.fullName?.takeIf { it.isNotBlank() }?.trim()
+                    val newClass = req.className?.takeIf { it.isNotBlank() }?.trim() ?: oldClass
+                    val newSection = req.section?.takeIf { it.isNotBlank() }?.trim() ?: oldSection
+                    val newRoll = req.rollNumber?.takeIf { it.isNotBlank() }?.trim()
+
+                    StudentsTable.update({
+                        (StudentsTable.id eq id) and (StudentsTable.schoolId eq ctx.schoolId)
+                    }) {
+                        if (newName != null) it[fullName] = newName
+                        it[className] = newClass
+                        it[section] = newSection
+                        if (newRoll != null) it[rollNumber] = newRoll
+                    }
+
+                    // RA-LINK: only re-sync when the class+section actually changed —
+                    // a pure rename/roll edit leaves the relationship graph intact.
+                    val moved = !oldClass.equals(newClass, ignoreCase = true) ||
+                        !oldSection.equals(newSection, ignoreCase = true)
+                    if (moved) {
+                        StudentAggregationService.recalcTeacherStudentCountsForMove(
+                            ctx.schoolId, oldClass, oldSection, newClass, newSection
+                        )
+                    }
+
+                    StudentsTable.selectAll().where { StudentsTable.id eq id }.first().let(::studentRowToDto)
+                }
+                if (dto == null) {
+                    call.fail("Student not found in your school", HttpStatusCode.NotFound, "STUDENT_NOT_FOUND")
+                    return@patch
+                }
+                call.ok(dto, message = "Student updated")
             }
 
             // ---- bulk import students (school-admin) ----
