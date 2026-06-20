@@ -164,6 +164,13 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    // RA-TAM: Teacher Assignment Management (reusable assignment module)
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.TeacherAssignmentApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
     // RA-S17: Non-teaching-staff vertical
     single {
         com.littlebridge.vidyaprayag.feature.admin.data.remote.StaffApi(
@@ -283,6 +290,10 @@ val commonModule = module {
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.StudentsRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.StudentsRepositoryImpl(get())
     }
+    // RA-TAM: Teacher Assignment Management repository
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.TeacherAssignmentRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.TeacherAssignmentRepositoryImpl(get())
+    }
     // RA-S17
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.StaffRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.StaffRepositoryImpl(get())
@@ -373,6 +384,7 @@ val viewModelModule = module {
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.StaffViewModel(get(), get()) } // RA-S17
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.StudentProfileViewModel(get(), get()) } // RA-45
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.TeacherProfileViewModel(get(), get(), get()) } // RA-45 (+RA-S17 delete-in-profile)
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.TeacherAssignmentViewModel(get(), get()) } // RA-TAM: reusable assignment module
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolRecordsViewModel(get(), get()) } // RA-52
     factory { AdmissionCRMViewModel(get(), get()) }
     factory { SchoolAnnouncementsViewModel(get(), get()) }

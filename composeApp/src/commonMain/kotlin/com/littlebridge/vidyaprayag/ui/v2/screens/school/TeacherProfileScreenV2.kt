@@ -77,6 +77,8 @@ fun TeacherProfileScreenV2(
     // RA-S17: called after a successful soft-delete so the host can pop back to
     // People and refresh the roster.
     onRemoved: () -> Unit = onBack,
+    // RA-TAM — Quick Action → reusable Teacher Assignment Management module.
+    onOpenAssignments: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: TeacherProfileViewModel = koinViewModel(),
 ) {
@@ -97,6 +99,7 @@ fun TeacherProfileScreenV2(
             state = state,
             onRetry = viewModel::retry,
             onRemove = { viewModel.remove(teacherId) },
+            onOpenAssignments = onOpenAssignments,
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -107,6 +110,7 @@ private fun TeacherProfileContent(
     state: TeacherProfileUiState,
     onRetry: () -> Unit,
     onRemove: () -> Unit,
+    onOpenAssignments: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var confirmRemove by remember { mutableStateOf(false) }
@@ -128,7 +132,7 @@ private fun TeacherProfileContent(
             onRetry = onRetry,
         ) {
             val p = state.profile ?: return@VStateHost
-            TeacherProfileBody(p)
+            TeacherProfileBody(p, onOpenAssignments = onOpenAssignments)
 
             // ── 9. Danger zone — destructive action separated at the bottom. ──
             Spacer(Modifier.height(8.dp))
@@ -153,9 +157,10 @@ private fun TeacherProfileContent(
 }
 
 @Composable
-private fun TeacherProfileBody(p: TeacherProfileDto) {
+private fun TeacherProfileBody(p: TeacherProfileDto, onOpenAssignments: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
         HeroBanner(p)                 // 1. Hero profile banner
+        QuickActions(onOpenAssignments = onOpenAssignments) // 1b. Quick actions
         KpiCarousel(p)                // 2. KPI carousel
         PerformanceOverview(p)        // 3. Performance overview
         TeachingPortfolio(p.assignments) // 4. Teaching portfolio carousel
@@ -224,6 +229,44 @@ private fun HeroFact(icon: ImageVector, label: String, value: String) {
         Column {
             Text(value, style = VTheme.type.bodyStrong.colored(c.ink))
             Text(label, style = VTheme.type.label.colored(c.ink3))
+        }
+    }
+}
+
+// ─────────────────────────── 1b. Quick actions ────────────────────────────
+
+/**
+ * RA-TAM: Quick Actions row on the Teacher Profile dashboard. The "Assignments"
+ * action is one of the three entry points into the reusable Teacher Assignment
+ * Management module (single source of truth).
+ */
+@Composable
+private fun QuickActions(onOpenAssignments: () -> Unit) {
+    val c = VTheme.colors
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        VSectionHeader(title = "QUICK ACTIONS")
+        VCard(padding = 16.dp, onClick = onOpenAssignments) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Box(
+                    Modifier.size(42.dp).clip(RoundedCornerShape(12.dp))
+                        .background(c.tealDeep.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(VIcons.GraduationCap, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(20.dp))
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("Assignments", style = VTheme.type.h4.colored(c.ink))
+                    Text(
+                        "Manage classes, subjects & sections",
+                        style = VTheme.type.caption.colored(c.ink2),
+                    )
+                }
+                Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(20.dp))
+            }
         }
     }
 }
