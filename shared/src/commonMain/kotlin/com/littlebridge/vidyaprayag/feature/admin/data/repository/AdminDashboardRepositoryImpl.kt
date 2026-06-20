@@ -5,6 +5,7 @@ import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.feature.admin.data.remote.AdminDashboardApi
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardActivity
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardAnalytics
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardOverview
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardSummary
 import com.littlebridge.vidyaprayag.feature.admin.domain.repository.AdminDashboardRepository
 
@@ -20,4 +21,7 @@ class AdminDashboardRepositoryImpl(
 
     override suspend fun getActivity(token: String): NetworkResult<ApiResponse<AdminDashboardActivity>> =
         api.getActivity(token)
+
+    override suspend fun getOverview(token: String): NetworkResult<ApiResponse<AdminDashboardOverview>> =
+        api.getOverview(token)
 }
