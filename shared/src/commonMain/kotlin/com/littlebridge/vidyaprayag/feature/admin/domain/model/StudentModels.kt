@@ -113,17 +113,55 @@ data class StudentProfileDto(
 data class TeacherAssignmentDto(
     @SerialName("class_name") val className: String,
     val section: String,
-    val subject: String
+    val subject: String,
+    // RA-PP: per-assignment student count powers the Teaching Portfolio carousel.
+    @SerialName("student_count") val studentCount: Int = 0
+)
+
+// RA-PP: surfaced as modern highlight cards in the redesigned profile.
+@Serializable
+data class TeacherAchievementDto(
+    val title: String,
+    val description: String
+)
+
+// RA-PP: chronological timeline entries (newest first) for the Recent Activity feed.
+@Serializable
+data class TeacherActivityDto(
+    val title: String,
+    @SerialName("created_at") val createdAt: String,
+    val type: String
 )
 
 @Serializable
 data class TeacherProfileDto(
     val id: String,
     val name: String,
+
     val email: String? = null,
     val phone: String? = null,
+
     val role: String,
-    val assignments: List<TeacherAssignmentDto>,
+
+    // RA-PP: identity / hero-banner enrichment.
+    val designation: String? = null,
+    @SerialName("joined_on") val joinedOn: String? = null,
+    @SerialName("experience_years") val experienceYears: Int? = null,
+
+    // RA-PP: KPI carousel + performance overview metrics.
+    @SerialName("student_count") val studentCount: Int = 0,
     @SerialName("class_count") val classCount: Int,
-    @SerialName("subject_count") val subjectCount: Int
+    @SerialName("subject_count") val subjectCount: Int,
+    @SerialName("attendance_percent") val attendancePercent: Float = 0f,
+    @SerialName("assignment_completion_percent") val assignmentCompletionPercent: Float = 0f,
+    @SerialName("parent_satisfaction_percent") val parentSatisfactionPercent: Float = 0f,
+
+    val status: String = "active",
+
+    val assignments: List<TeacherAssignmentDto>,
+
+    // RA-PP: backend-generated narrative sections.
+    val insights: List<String> = emptyList(),
+    val achievements: List<TeacherAchievementDto> = emptyList(),
+    @SerialName("recent_activities") val recentActivities: List<TeacherActivityDto> = emptyList()
 )
