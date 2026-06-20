@@ -1,5 +1,10 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.parent
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -14,6 +19,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -166,13 +172,15 @@ fun ParentProfileCardScreenV2(
     val scrollState = rememberScrollState()
     val revealDrag = Modifier.pointerInput(Unit) {
         var dy = 0f
-        androidx.compose.foundation.gestures.detectVerticalDragGestures(
+        detectVerticalDragGestures(
             onDragStart = { dy = 0f },
             onDragEnd = {
                 if (dy >= 48f) revealed = true
                 else if (dy <= -48f && scrollState.value == 0) revealed = false
             },
-        ) { _, delta -> dy += delta }
+            onDragCancel = { dy = 0f },
+            onVerticalDrag = { _, delta -> dy += delta },
+        )
     }
 
     // A calm lavender canvas with a soft house-tinted aurora at the very top so the hero card
@@ -263,12 +271,10 @@ fun ParentProfileCardScreenV2(
             )
 
             // ── 4 · Missions & Achievements (revealed; real /track-progress) ──
-            androidx.compose.animation.AnimatedVisibility(
+            AnimatedVisibility(
                 visible = revealed,
-                enter = androidx.compose.animation.expandVertically(spring(dampingRatio = 0.8f)) +
-                    androidx.compose.animation.fadeIn(tween(260)),
-                exit = androidx.compose.animation.shrinkVertically(tween(220)) +
-                    androidx.compose.animation.fadeOut(tween(160)),
+                enter = expandVertically(spring(dampingRatio = 0.8f)) + fadeIn(tween(260)),
+                exit = shrinkVertically(tween(220)) + fadeOut(tween(160)),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     AchievementsSheet(
