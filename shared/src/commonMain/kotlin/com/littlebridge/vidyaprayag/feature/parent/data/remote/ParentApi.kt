@@ -96,6 +96,12 @@ class ParentApi(
         }
     }
 
+    suspend fun getChildTimetable(token: String, childId: String): NetworkResult<ParentTimetableResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/child/$childId/timetable"))
+        }
+    }
+
     // ── RA-44: parent leave workflow ─────────────────────────────────────────
 
     /** List the parent's own submitted leave requests. */

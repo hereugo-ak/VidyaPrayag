@@ -46,10 +46,13 @@ private data class InsightChrome(val icon: ImageVector, val label: String, val t
 @Composable
 fun AiReportCardPreview(modifier: Modifier = Modifier) {
     val c = VTheme.colors
+    // NO-GREEN LAW (parent surface): the three insight chips stay inside the Parents Portal palette
+    // — STRENGTHS on the soft violet accent (was legacy green), FOCUS AREAS on amber, STUDY TIPS on
+    // a calm navy tint — three distinct, green-free chrome tones.
     val insights = listOf(
-        InsightChrome(VIcons.Heart, "STRENGTHS", Color(0xFFA8E6CF).copy(alpha = 0.4f)),
+        InsightChrome(VIcons.Heart, "STRENGTHS", c.accentSoft.copy(alpha = 0.30f)),
         InsightChrome(VIcons.Target, "FOCUS AREAS", Color(0xFFFFD4A3).copy(alpha = 0.5f)),
-        InsightChrome(VIcons.BookOpen, "STUDY TIPS", c.teal.copy(alpha = 0.16f)),
+        InsightChrome(VIcons.BookOpen, "STUDY TIPS", c.navy.copy(alpha = 0.10f)),
     )
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {

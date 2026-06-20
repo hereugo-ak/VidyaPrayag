@@ -57,13 +57,20 @@ internal fun ParentAttendanceCalendar(
     // (it shouldn't — the upsert is per-day), the last one wins.
     val byDate = remember(records) { records.associate { it.date to it.status.lowercase() } }
 
-    // Month list available in the data, newest first. If empty, fall back to a single
-    // sensible month so the grid still renders (it will simply be all-blank).
+    // Month list available in the data, newest first. If empty (no attendance marked yet), fall
+    // back to the CURRENT real month so the grid still renders a truthful, all-blank calendar —
+    // never a fabricated month and never fake attendance.
     val months = remember(records) {
         val set = records.mapNotNull { parseIsoDate(it.date)?.let { (y, m, _) -> y to m } }.toSortedSet(
             compareByDescending<Pair<Int, Int>> { it.first }.thenByDescending { it.second },
         )
-        if (set.isEmpty()) listOf(2026 to 1) else set.toList()
+        if (set.isEmpty()) {
+            val today = com.littlebridge.vidyaprayag.util.todayIso()
+            val parsed = parseIsoDate(today)
+            listOf((parsed?.first ?: 2026) to (parsed?.second ?: 1))
+        } else {
+            set.toList()
+        }
     }
 
     // Default to the most recent month present in the data.
@@ -134,9 +141,10 @@ internal fun ParentAttendanceCalendar(
         // ── Legend ──────────────────────────────────────────────────────────
         VLabel("Legend")
         Spacer(Modifier.height(8.dp))
+        // NO-GREEN LAW (parent surface): present=brand violet, late=amber, absent=red.
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            LegendDot(c.success, "Present")
-            LegendDot(c.teal, "Late")
+            LegendDot(c.accent, "Present")
+            LegendDot(c.warning, "Late")
             LegendDot(c.danger, "Absent")
         }
     }
@@ -169,9 +177,10 @@ private fun PagerArrow(
 @Composable
 private fun DayCell(day: Int, status: String?) {
     val c = VTheme.colors
+    // NO-GREEN LAW (parent surface): present=brand violet, late=amber, absent=red.
     val bg = when (status) {
-        "present" -> c.success
-        "late" -> c.teal
+        "present" -> c.accent
+        "late" -> c.warning
         "absent" -> c.danger
         else -> Color.Transparent
     }

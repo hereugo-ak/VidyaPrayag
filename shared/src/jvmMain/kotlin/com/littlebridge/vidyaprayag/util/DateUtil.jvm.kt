@@ -9,3 +9,8 @@ actual fun todayIso(): String {
     val d = cal.get(Calendar.DAY_OF_MONTH)
     return isoOf(y, m, d)
 }
+
+actual fun nowMinutesOfDay(): Int {
+    val cal = Calendar.getInstance()
+    return cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
+}
