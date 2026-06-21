@@ -130,6 +130,23 @@ dependencies {
     implementation(libs.sqlite)
     implementation(libs.dotenv)
 
+    // -----------------------------------------------------------------
+    // Notification foundation (feature/setup_notification).
+    //
+    // Firebase Admin SDK is the ONLY sanctioned path for server-side FCM
+    // dispatch in this codebase. We deliberately do NOT hand-roll POSTs to
+    // the FCM REST endpoint — the Admin SDK handles service-account auth,
+    // automatic token refresh, batched multicast, structured error responses
+    // (UNREGISTERED → mark inactive), and retry/backoff for us.
+    //
+    // Initialisation is lazy and guarded (see feature/notification/firebase/
+    // FirebaseAdminInitializer.kt): if FIREBASE_CREDENTIALS_* env vars are
+    // absent, the NotificationService degrades to a no-op that logs a
+    // warning instead of crashing the boot. This lets local dev (SQLite, no
+    // Firebase project) run the rest of the API surface unchanged.
+    // -----------------------------------------------------------------
+    implementation(libs.firebase.admin)
+
     testImplementation(libs.ktor.serverTestHost)
     testImplementation(libs.kotlin.testJunit)
 }

@@ -865,15 +865,44 @@ object NotificationsTable : UUIDTable("notifications", "id") {
 }
 
 // =====================================================================
-// device_tokens  (RA-41 push — FCM/APNs registry; dispatch is Phase E)
+// device_tokens  (RA-41 push — FCM/APNs registry; dispatch via Admin SDK)
 // =====================================================================
+//
+// Notification foundation (feature/setup_notification):
+//   A user may own MULTIPLE devices (phone + tablet + another phone). We
+//   intentionally do NOT overwrite previous tokens — every active token
+//   stays valid and is fanned out to independently. Registration is keyed
+//   by the (token) value itself; re-registering an existing token merely
+//   refreshes its metadata + last_seen_at and re-asserts is_active=true.
+//
+// Columns mirror database/migrations/setup_notification_foundation.sql
+// (the canonical Supabase migration) EXACTLY so the Exposed mapping lines
+// up with the real Postgres schema.
 object DeviceTokensTable : UUIDTable("device_tokens", "id") {
-    val userId    = uuid("user_id")
-    val token     = text("token")
-    val platform  = varchar("platform", 16).default("android")
-    val isActive  = bool("is_active").default(true)
-    val createdAt = timestamp("created_at")
-    val updatedAt = timestamp("updated_at")
+    val schoolId    = uuid("school_id").nullable()       // optional tenant scope (admin/teacher tokens)
+    val userId      = uuid("user_id")                     // owner app_users.id
+    val token       = text("token")
+    val platform    = varchar("platform", 16).default("android") // android | ios | web
+    val appVersion  = varchar("app_version", 64).nullable()
+    val deviceModel = varchar("device_model", 128).nullable()
+    val isActive    = bool("is_active").default(true)
+    val createdAt   = timestamp("created_at")
+    val updatedAt   = timestamp("updated_at")
+    val lastSeenAt  = timestamp("last_seen_at").nullable()
+
+    init {
+        // A token string is globally unique (FCM issues one per install).
+        // Re-registering the same token from a different user (rare, e.g. a
+        // handed-down device) re-points the owner via an UPDATE, never a dup.
+        uniqueIndex("ux_device_tokens_token", token)
+        // Fast lookup of every active token for a user (multi-device fan-out).
+        index(
+            customIndexName = "ix_device_tokens_user_active",
+            isUnique = false,
+            userId,
+            isActive
+        )
+    }
 }
 
 // =====================================================================

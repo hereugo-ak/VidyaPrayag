@@ -64,6 +64,7 @@ import com.littlebridge.vidyaprayag.feature.config.versionRouting
 import com.littlebridge.vidyaprayag.feature.content.landingRouting
 import com.littlebridge.vidyaprayag.feature.content.supportRouting
 import com.littlebridge.vidyaprayag.feature.media.mediaRouting
+import com.littlebridge.vidyaprayag.feature.notification.api.notificationRouting
 import com.littlebridge.vidyaprayag.feature.notifications.notificationsRouting
 import com.littlebridge.vidyaprayag.feature.onboarding.onboardingRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentDashboardRouting
@@ -296,5 +297,10 @@ fun Application.module() {
         // Cross-user notification spine (audit part-2 RA-41/42/46/50) — role-aware
         // inbox replacing the parent-only synth; persisted read state; bell summary.
         notificationsRouting()       // /api/v1/notifications[/summary,/{id}/read,/read-all,/device-token]
+
+        // Notification FOUNDATION (push infra — distinct from the inbox spine):
+        //   /api/device-tokens            — register/refresh FCM token (any role)
+        //   /api/admin/notifications/send — school-admin broadcast via Firebase Admin SDK
+        notificationRouting()
     }
 }

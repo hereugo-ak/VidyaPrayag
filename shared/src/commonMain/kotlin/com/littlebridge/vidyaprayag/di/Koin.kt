@@ -267,6 +267,15 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    // Notification FOUNDATION (push infra) — device-token registration client.
+    // The admin broadcast endpoint is server-only, so the client surface is a
+    // single POST /api/device-tokens call invoked by the Android token registrar.
+    single {
+        com.littlebridge.vidyaprayag.feature.notification.data.remote.NotificationApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
 
     // Repositories
     single<SchoolRepository> { SchoolRepositoryImpl(get(), get()) }
@@ -352,6 +361,10 @@ val commonModule = module {
     }
     single<com.littlebridge.vidyaprayag.feature.teacher.domain.repository.TeacherRepository> {
         com.littlebridge.vidyaprayag.feature.teacher.data.repository.TeacherRepositoryImpl(get())
+    }
+    // Notification FOUNDATION repository — delegates to NotificationApi.
+    single<com.littlebridge.vidyaprayag.feature.notification.domain.repository.NotificationRepository> {
+        com.littlebridge.vidyaprayag.feature.notification.data.repository.NotificationRepositoryImpl(get())
     }
 
     // UseCases

@@ -17,6 +17,10 @@ class PreferenceManager(
     private val REFRESH_TOKEN_KEY = stringPreferencesKey("refresh_token")
     private val PROFILE_COMPLETED_KEY = booleanPreferencesKey("profile_completed")
     private val USER_NAME_KEY = stringPreferencesKey("user_name")
+    // Notification foundation: cached FCM token used by DeviceTokenRegistrar to
+    // skip redundant re-registrations on cold start when the token has not
+    // rotated. Cleared on logout so a re-login re-registers under the new user.
+    private val FCM_TOKEN_KEY = stringPreferencesKey("fcm_token")
 
     override fun getThemeName(): Flow<String> {
         return dataStore.data.map { preferences ->
@@ -110,6 +114,23 @@ class PreferenceManager(
         }
     }
 
+    // --- notification foundation: cached FCM token ---
+    // The Android DeviceTokenRegistrar compares the freshly-fetched FCM token
+    // against this cache and only re-registers with the backend when the token
+    // has CHANGED — so a normal cold start with a stable token is a no-op.
+    override fun getFcmToken(): Flow<String?> {
+        return dataStore.data.map { preferences ->
+            preferences[FCM_TOKEN_KEY]
+        }
+    }
+
+    override suspend fun setFcmToken(token: String?) {
+        dataStore.edit { preferences ->
+            if (token == null) preferences.remove(FCM_TOKEN_KEY)
+            else preferences[FCM_TOKEN_KEY] = token
+        }
+    }
+
     override suspend fun clearSession() {
         dataStore.edit { preferences ->
             preferences.remove(USER_ROLE_KEY)
@@ -118,6 +139,10 @@ class PreferenceManager(
             preferences.remove(REFRESH_TOKEN_KEY)
             preferences.remove(PROFILE_COMPLETED_KEY)
             preferences.remove(USER_NAME_KEY)
+            // Notification foundation: drop the cached FCM token so a re-login
+            // (possibly as a different user on the same physical device) forces
+            // the registrar to re-register the device token under the new user.
+            preferences.remove(FCM_TOKEN_KEY)
         }
     }
 }

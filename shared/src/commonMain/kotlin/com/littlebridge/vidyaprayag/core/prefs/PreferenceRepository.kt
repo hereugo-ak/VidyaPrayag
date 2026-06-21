@@ -32,5 +32,15 @@ interface PreferenceRepository {
     fun getUserName(): Flow<String?>
     suspend fun setUserName(name: String?)
 
+    // --- notification foundation (FCM device-token registration cache) ---
+    // The last FCM token we successfully registered with the backend. The
+    // Android DeviceTokenRegistrar compares the freshly-fetched token against
+    // this cache and only POSTs /api/device-tokens when it has CHANGED —
+    // avoiding a redundant registration on every cold start. Cleared on
+    // logout so a re-login with a different account re-registers the same
+    // physical device token under the new user.
+    fun getFcmToken(): Flow<String?>
+    suspend fun setFcmToken(token: String?)
+
     suspend fun clearSession()
 }

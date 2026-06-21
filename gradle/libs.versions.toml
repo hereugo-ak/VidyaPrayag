@@ -32,6 +32,13 @@ dotenv = "6.5.1"
 logback = "1.5.32"
 material3 = "1.10.0-alpha05"
 okio = "3.10.2"
+# Notification foundation (feature/setup_notification)
+# - firebase-admin: server-side FCM dispatch via the Admin SDK (NOT raw REST).
+# - firebase-bom + firebase-messaging: Android client for receiving pushes.
+firebase-admin = "9.4.3"
+firebase-bom = "33.7.0"
+firebase-messaging = "25.0.1"
+google-services = "4.4.3"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -84,8 +91,13 @@ hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
 sqlite = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite" }
 sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqlite-bundled" }
 dotenv = { module = "io.github.cdimascio:dotenv-kotlin", version.ref = "dotenv" }
+# Notification foundation (feature/setup_notification)
+firebase-admin = { module = "com.google.firebase:firebase-admin", version.ref = "firebase-admin" }
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
+firebase-messaging = { module = "com.google.firebase:firebase-messaging", version.ref = "firebase-messaging" }
 
 [plugins]
+google-services = { id = "com.google.gms.google-services", version.ref = "google-services" }
 androidApplication = { id = "com.android.application", version.ref = "agp" }
 androidLibrary = { id = "com.android.library", version.ref = "agp" }
 composeHotReload = { id = "org.jetbrains.compose.hot-reload", version.ref = "composeHotReload" }
