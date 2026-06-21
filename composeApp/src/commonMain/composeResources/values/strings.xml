@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">VidyaPrayag</string>
+    <string name="app_name">EnRoll+</string>
     <string name="education_with_trust">Education with Trust.</string>
     <string name="progress_with_purpose">Progress with Purpose.</string>
     <string name="featured_institutions">Featured Institutions</string>
@@ -15,18 +15,18 @@
     <string name="next_gen_intelligence">Next-Gen Intelligence</string>
     <string name="proprietary_systems">Proprietary systems powering the ecosystem.</string>
     <string name="access_your_portal">Access Your Portal</string>
-    <string name="already_part_ecosystem">Already part of the VidyaPrayag ecosystem?</string>
+    <string name="already_part_ecosystem">Already part of the EnRoll+ ecosystem?</string>
     <string name="view_all_portals">View All Portals</string>
     <string name="ready_secure_future">Ready to secure the future?</string>
     <string name="join_ecosystem_description">Join the ecosystem where trust meets technology. Join over 50k+ parents today.</string>
     <string name="join_as_parent">Join as a Parent</string>
     <string name="register_your_school">Register Your School</string>
-    <string name="footer_copyright">© 2024 VidyaPrayag Ecosystem. Built for modern institutional excellence and parent-child security. Innovating education through trust.</string>
+    <string name="footer_copyright">© 2024 EnRoll+ Ecosystem. Built for modern institutional excellence and parent-child security. Innovating education through trust.</string>
     <string name="portals">PORTALS</string>
     <string name="support">SUPPORT</string>
     <string name="log_in">Log In</string>
     <string name="continue_btn">Continue</string>
-    <string name="access_vidyaprayag">Access VidyaPrayag</string>
+    <string name="access_vidyaprayag">Access EnRoll+</string>
     <string name="enter_credentials">Enter your credentials to continue</string>
     <string name="verify_identity">Verify your identity</string>
     <string name="email_or_mobile">Email or Mobile Number</string>
@@ -37,5 +37,5 @@
     <string name="verify_secure_access">Verify &amp; Secure Access</string>
     <string name="resend_code">Resend code</string>
     <string name="back_to_entry">Back to entry</string>
-    <string name="terms_privacy_footer">By continuing, you agree to VidyaPrayag\'s Terms of Service and Privacy Policy. Protected by reCAPTCHA.</string>
+    <string name="terms_privacy_footer">By continuing, you agree to EnRoll+\'s Terms of Service and Privacy Policy. Protected by reCAPTCHA.</string>
 </resources>

@@ -1,9 +1,17 @@
 package com.littlebridge.vidyaprayag.feature.admin.presentation
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.littlebridge.vidyaprayag.core.network.NetworkResult
+import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.LeaveRequestDto
+import com.littlebridge.vidyaprayag.feature.admin.domain.repository.LeaveRequestsRepository
+import com.littlebridge.vidyaprayag.util.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 data class LeaveRequestItem(
     val id: String,
@@ -16,46 +24,96 @@ data class LeaveRequestItem(
 
 data class LeaveRequestsState(
     val requestType: String = "Student", // "Student" or "Teacher"
-    val approvalRate: Int = 94,
-    val weeklyCount: Int = 12,
-    val requests: List<LeaveRequestItem> = listOf(
-        LeaveRequestItem(
-            id = "1",
-            requesterName = "Marcus Holloway",
-            dateRange = "Dec 12 - Dec 14",
-            reason = "Family Function",
-            imageUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuADD51tvVqoilR317bXmVub2jVhfp03ym3tul0lBBnTDpn46NkORLXqKFqF4uEjK5R0Vd_TBJfz-g8ERJHaBb8_Pyjs5E0uJCo5CG0T8izpQQ8etO8PNyGnkvAy5_9Nz6kdz7Ij-P073gFTqG5JzVUsetyt0dHkdSWQjwzlmjCPkVKatzuwS96eh_wWRPqp--U-s0J7sC56yQodYFsnZ6qN2TqfyTvOyM7v6VGg636LkmWNI-D_046yB_EZVay364R6aEGyzSm7vKRf"
-        ),
-        LeaveRequestItem(
-            id = "2",
-            requesterName = "Sarah Jenkins",
-            dateRange = "Dec 15 - Dec 15",
-            reason = "Medical Appointment",
-            imageUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuDOsOeDKhKTw9eUW-s72iE3NmLYcbp6acUaU_gZoMcMkmfWg5PxZH0ZIonMVAx-skdBJk0RpkJIbxWouy1l6AfbMbyLufrIPlIGH1ht6XzNpqnwt4SkujG0TkDaGw5YYPYhZAbL55D9rzB8zAw4LLTWdunV4cLvjEIL5sG0Wr3olRwFSVaBL9XymA_2X-5Cja-YtGOVsDfYMhxmwPVGiRcuoRZd7Zdr1MoqhWBNLw0xEYZGnKTVegMWlCyATqwBAixGWgu0QNqNOBlP"
-        ),
-        LeaveRequestItem(
-            id = "3",
-            requesterName = "Liam Chen",
-            dateRange = "Dec 18 - Dec 22",
-            reason = "Out of Station",
-            imageUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuApS3hTBebNtgycw8IqT-I-KBRQywp7S2SaMYgn7q3MbYqJoSUFPexx6oYwwDmgZq6gIka7UZOzfCTvbSDIk7sUUUUiHsgP1A5woIegYg1hbtjkhAgKYmB3RNRjKXr7jwD3WZLrRos3EQMmpK1ilSZwJRcX9hJyJYXDjS87ZJ-uGd0OswQNBhEMNyIeWwY1vz_VLeb4a37NlOvZn0PfzNMxKG_4ECp3QBL0ykiUA66C8CXleoW-4lnN82FUHAygw_ULsOWZbjcCIXKU"
-        )
-    )
+    val approvalRate: Int = 0,
+    val weeklyCount: Int = 0,
+    val requests: List<LeaveRequestItem> = emptyList(),
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
 )
 
-class LeaveRequestsViewModel : ViewModel() {
+class LeaveRequestsViewModel(
+    private val leaveRequestsRepository: LeaveRequestsRepository,
+    private val preferenceRepository: PreferenceRepository
+) : ViewModel() {
+
     private val _state = MutableStateFlow(LeaveRequestsState())
     val state: StateFlow<LeaveRequestsState> = _state.asStateFlow()
 
+    init {
+        loadRequests()
+    }
+
     fun setRequestType(type: String) {
         _state.value = _state.value.copy(requestType = type)
+        loadRequests(type)
+    }
+
+    fun loadRequests(type: String = _state.value.requestType) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isLoading = true, errorMessage = null)
+
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                AppLogger.d("LeaveRequestsVM", "No auth token; skipping load")
+                _state.value = _state.value.copy(isLoading = false)
+                return@launch
+            }
+
+            val serverType = if (type.lowercase() == "teacher") "teacher" else "student"
+            when (val result = leaveRequestsRepository.getLeaveRequests(token, serverType)) {
+                is NetworkResult.Success -> {
+                    val data = result.data.data
+                    _state.value = _state.value.copy(
+                        requests = data?.requests?.map { it.toUiModel() } ?: emptyList(),
+                        approvalRate = data?.approvalRate ?: 0,
+                        weeklyCount = data?.weeklyCount ?: 0,
+                        isLoading = false
+                    )
+                }
+                is NetworkResult.Error -> {
+                    AppLogger.e("LeaveRequestsVM", "getLeaveRequests error: ${result.message}")
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        errorMessage = result.message
+                    )
+                }
+                is NetworkResult.ConnectionError -> {
+                    AppLogger.e("LeaveRequestsVM", "getLeaveRequests connection error")
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        errorMessage = "Connection error. Check your internet."
+                    )
+                }
+            }
+        }
     }
 
     fun approveRequest(id: String) {
-        // Handle approval
+        viewModelScope.launch {
+            val token = preferenceRepository.getUserToken().first() ?: return@launch
+            when (leaveRequestsRepository.updateLeaveStatus(token, id, "Approved")) {
+                is NetworkResult.Success -> loadRequests()
+                else -> AppLogger.e("LeaveRequestsVM", "Failed to approve request $id")
+            }
+        }
     }
 
     fun rejectRequest(id: String) {
-        // Handle rejection
+        viewModelScope.launch {
+            val token = preferenceRepository.getUserToken().first() ?: return@launch
+            when (leaveRequestsRepository.updateLeaveStatus(token, id, "Rejected")) {
+                is NetworkResult.Success -> loadRequests()
+                else -> AppLogger.e("LeaveRequestsVM", "Failed to reject request $id")
+            }
+        }
     }
+
+    private fun LeaveRequestDto.toUiModel() = LeaveRequestItem(
+        id = id,
+        requesterName = requesterName,
+        dateRange = dateRange,
+        reason = reason,
+        imageUrl = imageUrl ?: "",
+        status = status
+    )
 }

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Splash / window background — the brand teal, identical to the Compose
+        VColors.teal token (Color(0xFF3CB9A9)) used by SplashScreenV2 and the
+        hero of every Light-tone screen. Keeping this in lockstep with the
+        Compose token is what eliminates the white flash on cold start:
+        the native splash window, the activity windowBackground, and the first
+        Compose frame are all the same teal.
+    -->
+    <color name="vp_splash_background">#FF3CB9A9</color>
+    <color name="vp_teal_deep">#FF006A60</color>
+</resources>

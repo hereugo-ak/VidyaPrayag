@@ -19,6 +19,17 @@ package com.littlebridge.vidyaprayag.core
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
+import io.ktor.util.AttributeKey
+
+/**
+ * Marks a call whose response was EXPLICITLY produced by a route handler (via
+ * [fail]). The StatusPages `status(NotFound)` catch-all in ErrorHandling.kt
+ * checks this marker and steps aside, so a route's own 404 body (e.g.
+ * "No student found with that roll…") is never rewritten into the misleading
+ * "Endpoint not found: <uri>" envelope. Without this, EVERY call.fail(...,
+ * NotFound) in the codebase was masked by the catch-all.
+ */
+val RouteHandledResponseKey = AttributeKey<Unit>("RouteHandledResponse")
 
 suspend inline fun <reified T : Any> ApplicationCall.ok(
     data: T,
@@ -45,4 +56,10 @@ suspend fun ApplicationCall.fail(
     message: String,
     status: HttpStatusCode = HttpStatusCode.BadRequest,
     errorCode: String? = null
-) = respond(status, ApiError(success = false, message = message, errorCode = errorCode))
+) {
+    // Mark this call as route-handled BEFORE responding so the StatusPages
+    // status(NotFound) catch-all does not clobber our explicit error body
+    // with "Endpoint not found: <uri>" (see ErrorHandling.kt).
+    attributes.put(RouteHandledResponseKey, Unit)
+    respond(status, ApiError(success = false, message = message, errorCode = errorCode))
+}

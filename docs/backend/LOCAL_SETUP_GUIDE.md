@@ -168,50 +168,43 @@ The backend **does not** create or alter tables in Supabase — all schema
 changes are reviewed SQL files you run yourself. This protects production
 from silent ORM-driven mutations.
 
-You need to run **two** SQL files, in order. Both are idempotent (`CREATE
-TABLE IF NOT EXISTS`, `ON CONFLICT DO NOTHING`), so running them twice is
-safe.
+> **RA-63 — canonical provisioning.** Run **ONE** schema file plus the seed.
+> Do **NOT** use the legacy root "VIDYASETU v2.1" schema (it has been archived
+> to `docs/_archive/supabase_schema_VIDYASETU_v2.1_ABANDONED.sql` and does not
+> match `Tables.kt`). All files are idempotent (`CREATE TABLE IF NOT EXISTS`,
+> `ON CONFLICT DO NOTHING`), so re-running is safe.
 
-### 4.1 `supabase_schema` (operational tables — schools, students, …)
+### 4.1 `scripts/schema-all-in-one-2026-06-07.sql` (every table the backend needs)
 
-This is the v2.1 schema you already maintain. It's checked in at the repo
-root:
+This single file is concatenated, in dependency order, from
+`docs/db/vidyasetu_schema.sql` + `migration_001` (faculty/holiday_list) +
+`migration_002` (segmentation/geo/assignments) + `migration_003` (leave
+workflow + two-party messaging) + the part-2 patch. It creates every table
+`Tables.kt` maps — `app_users`, `auth_otps`, `user_sessions`, `schools`,
+`students`, `children`, `fee_records`, `announcements`, `attendance_records`,
+`assessments`, `assessment_marks`, `notifications`, `parent_child_links`, …
 
 ```
-%USERPROFILE%\Desktop\Vidyaprayag\supabase_schema
+%USERPROFILE%\Desktop\Vidyaprayag\scripts\schema-all-in-one-2026-06-07.sql
 ```
-
-Open it in Notepad / VS Code, **select all → copy**.
 
 In the Supabase Dashboard:
 
 1. Left sidebar → **SQL Editor** → **New query**.
-2. Paste the contents → **Run**.
+2. Open the file, **select all → copy**, paste → **Run**.
 3. Wait for *"Success. No rows returned."*
 
 If you've already run this in the past, you'll get a bunch of "skip — already
 exists" notices. That's fine.
 
-### 4.2 `docs/backend/sql/01_supplementary_schema.sql` (this backend's tables)
+### 4.2 `scripts/seed-2026-06-07.sql` (test data)
 
-This file adds everything the Ktor backend needs that isn't in the
-operational schema: `app_users`, `auth_otps`, `user_sessions`,
-`cms_landing_content`, `app_config`, `school_onboarding_drafts`,
-`school_classes`, `school_subjects`, `announcements`, `whatsapp_logs`,
-`admission_enquiries`, `school_philosophy`, `school_media`,
-`storage_metrics`, `academic_calendar`, `holiday_list`, `faculty`,
-`attendance_records`, plus the `purge_expired_otps()` function and RLS
-policies.
+Loads 2 schools, ~15 users, and filler academic/fee data so the portals have
+something to render. Open it, copy everything, paste into a new SQL Editor
+query, **Run**.
 
-```
-%USERPROFILE%\Desktop\Vidyaprayag\docs\backend\sql\01_supplementary_schema.sql
-```
-
-Open it, copy everything, paste into a new SQL Editor query, **Run**.
-
-You should see all the `CREATE TABLE` / `CREATE INDEX` / `CREATE POLICY`
-statements succeed. If a `policy already exists` warning appears, ignore
-it — that's the idempotency guard kicking in.
+See `docs/db/PROVISION.sql` and `scripts/README-RUN-ORDER.md` for the full
+file manifest.
 
 ### 4.3 (Optional) Enable the OTP purge cron job
 

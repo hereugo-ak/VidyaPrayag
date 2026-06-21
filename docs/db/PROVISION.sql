@@ -1,0 +1,91 @@
+-- ============================================================================
+-- VidyaPrayag — CANONICAL DATABASE PROVISIONING SCRIPT
+-- ============================================================================
+--
+-- TL;DR — if you are running against Supabase, do this:
+--
+--   1. Open Supabase → SQL Editor → + New query
+--   2. Paste ALL of:  scripts/schema-all-in-one-2026-06-07.sql
+--   3. Click Run.  This creates every table the backend + seed need.
+--   4. Paste ALL of:  scripts/seed-2026-06-07.sql
+--   5. Click Run.  This loads the test data.
+--
+-- That's it. PROVISION.sql ITSELF DOES NOTHING — it's just documentation.
+-- The actual schema is split across the files listed below, all rolled into
+-- the all-in-one file referenced above.
+--
+-- ----------------------------------------------------------------------------
+-- WHAT FILES ARE IN THE ALL-IN-ONE
+-- ----------------------------------------------------------------------------
+-- scripts/schema-all-in-one-2026-06-07.sql concatenates, in dependency order:
+--
+--   1. docs/db/vidyasetu_schema.sql
+--        Base operational tables (app_users, auth_otps, user_sessions,
+--        schools, students, children, fee_records, exam_results,
+--        message_threads, messages, leave_requests, ptm_events,
+--        ptm_class_progress, cms_landing_content, app_config, …).
+--
+--   2. docs/db/migration_001_faculty_and_holiday_list.sql
+--        Adds the supplementary tables Tables.kt maps but the base omitted:
+--        faculty, holiday_list.
+--
+--   3. docs/db/migration_002_segmentation_geo_assignments.sql
+--        Adds announcement broadcast segmentation columns; the
+--        teacher_subject_assignments table; and children.student_code.
+--
+--   4. docs/db/migration_003_leave_workflow_and_two_party_messaging.sql
+--        Cross-role leave routing columns on leave_requests (RA-44) and the
+--        two-party conversation_id/peer_user_id columns on message_threads /
+--        messages (RA-51).
+--
+--   4b. docs/db/migration_004_parent_link_guardian_metadata.sql
+--        Guardian relationship metadata on parent_child_links (RA-SP):
+--        relation + is_primary_guardian (enforces one primary guardian per
+--        student) powering the redesigned Student Profile parent connections.
+--
+--   5. docs/backend/sql/02_teacher_schema.sql
+--        Teacher-vertical tables: assessments, assessment_marks,
+--        syllabus_units, homework, homework_submissions, teacher_periods.
+--
+--   6. scripts/schema-patch-2026-06-07.sql
+--        Scholarships + scholarship_applications (RE-AUDIT RA-05).
+--
+--   7. docs/db/schema-patch-school-onboarding.sql
+--        schools.onboarding_status + richer onboarding identity/academic
+--        columns the setup wizard collects (all ADD COLUMN IF NOT EXISTS).
+--
+-- OPTIONAL (Parents Portal Profile tab — "Missions & Achievements"):
+--   8. docs/db/migration_004_parent_achievements.sql
+--        parent_achievements — OPTIONAL per-child achievement store. The
+--        /parent/track-progress endpoint works WITHOUT it (CMS fallback), so
+--        run this only if you want real per-child achievements. Fully guarded
+--        with IF NOT EXISTS — 100% safe to re-run, never errors.
+--
+-- ALL CREATE TABLE statements use IF NOT EXISTS, so it is safe to re-run.
+--
+-- ----------------------------------------------------------------------------
+-- ALTERNATIVE: running with psql from the repo root
+-- ----------------------------------------------------------------------------
+-- If you have psql installed, you can run the original files in order:
+--
+--     \i docs/db/vidyasetu_schema.sql
+--     \i docs/db/migration_001_faculty_and_holiday_list.sql
+--     \i docs/db/migration_002_segmentation_geo_assignments.sql
+--     \i docs/db/migration_003_leave_workflow_and_two_party_messaging.sql
+--     \i docs/db/migration_004_parent_link_guardian_metadata.sql
+--     \i docs/backend/sql/02_teacher_schema.sql
+--     \i scripts/schema-patch-2026-06-07.sql
+--     \i docs/db/schema-patch-school-onboarding.sql
+--     \i scripts/seed-2026-06-07.sql
+--
+-- ----------------------------------------------------------------------------
+-- ALTERNATIVE: let the backend self-create everything
+-- ----------------------------------------------------------------------------
+-- Set AUTO_CREATE_TABLES=true on first boot and Exposed will run
+-- createMissingTablesAndColumns() for the 38 registered tables. After it
+-- succeeds you can flip the env var back to false.
+-- ============================================================================
+
+-- This file intentionally contains no executable SQL.
+-- See scripts/schema-all-in-one-2026-06-07.sql for the runnable bundle.
+SELECT 'PROVISION.sql is documentation only — run scripts/schema-all-in-one-2026-06-07.sql instead' AS notice;

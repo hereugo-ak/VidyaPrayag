@@ -1,53 +1,154 @@
 package com.littlebridge.vidyaprayag.feature.schools.data.remote
 
+import com.littlebridge.vidyaprayag.core.network.NetworkResult
+import com.littlebridge.vidyaprayag.core.network.safeApiCall
 import com.littlebridge.vidyaprayag.feature.schools.domain.model.School
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.http.*
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.request.parameter
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
+/**
+ * Real Ktor client for the schools-discovery endpoint.
+ *
+ * Previously this class was a stub that returned hard-coded `picsum.photos` school records,
+ * isolated from the network entirely (BACKEND_GAPS.md §3 — "the one stubbed API client").
+ * This rewrite:
+ *
+ *  1. Calls the real server route `GET /api/v1/parent/schools/discover` (defined in
+ *     `server/.../feature/parent/ParentDashboardRouting.kt`). The endpoint requires a valid
+ *     JWT — any authenticated role can browse — so we pass a bearer token through.
+ *  2. Decodes the canonical envelope (`success`, `message`, `data { schools, sorted_by }`)
+ *     and the [DiscoveredSchoolDto] payload using `@SerialName` to match the server's
+ *     snake_case keys (e.g. `distance_km`, `sorted_by`).
+ *  3. Wraps the call in `safeApiCall { ... }` so every transport / parse / non-2xx case
+ *     funnels through the shared [NetworkResult] sealed type — identical to every other
+ *     real API client (`ParentApi`, `TeacherApi`, `AdminApi`, …).
+ *
+ * The legacy `fetchSchools(): List<School>` API is retained as a thin adapter that maps the
+ * new wire DTO onto the existing [School] domain model so [com.littlebridge.vidyaprayag.feature
+ * .schools.data.repository.SchoolRepositoryImpl] and the Room cache continue to work. The
+ * marketplace screen consumes [discoverSchools] directly to get the canonical fields.
+ */
 class KtorSchoolApi(
     private val client: HttpClient,
-    private val baseUrl: String
+    private val baseUrl: String,
 ) {
-    // In a real app, this would be an actual URL.
-    // For now, we simulate a network response.
-    suspend fun fetchSchools(): List<School> {
-        // Mocking behavior for demonstration
-        return listOf(
-            School(
-                id = "1", 
-                name = "St. Xavier\'s Global Academy", 
-                location = "Mumbai", 
-                board = "CBSE", 
-                description = "Focus on holistic development with world-class IB curriculum and Olympic-sized sports facilities.", 
-                imageUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuCtZsoBnpomGaN5EmO_sG73GoM7J9ZLKKnPf-RmDqu2iRw3Owx3jjCXoj-AJOTPxM7R0RtbCNz6bX6uhy1m8y7TIUM6FZSYYGtbJ7itQgKPY48-QLsdU7_Rpc3iOrNCMcemyAMN8KlVQeAXGOIK-ZBmJLHBR6lvxVz2WzC3kkpPJNmiAds7YP4S-NLoy9KlTIFnxMOX1_JjwqNB9Xk-kPo0aLXznyaE5qUO-KBA0UspY9L02mfUrkr_3WN1t-8dsYPdGnS5mPLE2H9g",
-                sriScore = 9.4,
-                feesRange = "$24k - $28k",
-                isVerified = true
-            ),
-            School(
-                id = "2", 
-                name = "Pinnacle International", 
-                location = "Delhi", 
-                board = "IB", 
-                description = "Award-winning STEM lab and arts conservatory programs located in the heart of the tech district.", 
-                imageUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuBCDgaG5pYAxIrxIM71VX7W_KV-XCGUOA4piv3W2rOdG8Bjdm2_gM83qiJAQlXg4LSckIzlG-l007_XJYutSP9o2Q1zgoEIatN1W_Ij9RFw2fVFKyGQoQeYc67rH9Gm_8UqxUMds-MKurCL_fwgrq4D-KGqinBzv9Gndd82J1da4EFudHnB57-3RmlNjUCfnB7vnl6Ro2bbRkBJW2-RjHc12QqVrA0rQX6jcp3uyVob_pxNK-yKUu40IFBoSxy3TagSkjoL420fvEPf",
-                sriScore = 8.9,
-                feesRange = "$18k - $22k",
-                isVerified = true
-            ),
-            School(
-                id = "3", 
-                name = "Merit Hall Prep", 
-                location = "Bangalore", 
-                board = "IGCSE", 
-                description = "Ivy-League pathway school with a 100% placement rate in top-tier global universities.", 
-                imageUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuBtpb6PQ46MMzzY51ow29NBhn4tMu8O3VK2an3c7mZERdhEWZFHMd03hv7uWKNUmVzoJE1EUX3yiwdndALTXmEd63AJgsHNpih7Bb1ULia_8O5VppmFDifXwKmGxIThSOAJKAxP-q1dfafFV85BsotUbO2LtYDCZfBi4LLS-lfS1SB6LWrf32mYmr98CiBIABuXGa1ZwT-X29YmHKxHHzJW-ICuHjgESZedb7tOX96EI4NXj36dC0i7IVNJ8617m_Yvk8d9rSrAkqi5",
-                sriScore = 9.7,
-                feesRange = "$32k - $40k",
-                isVerified = true
-            )
-        )
+    private fun url(path: String): String {
+        val b = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+        val p = if (path.startsWith("/")) path.substring(1) else path
+        return "$b$p"
     }
+
+    /**
+     * Real call: `GET /api/v1/parent/schools/discover`. Returns the full envelope so the
+     * caller can read `sortedBy` if it wants to display "Showing nearest 12 schools" etc.
+     *
+     * @param token bearer JWT from `PreferenceRepository.getUserToken()`. The route is
+     *              authenticated; an empty token will trigger `NetworkResult.Error(401)`.
+     * @param lat   optional latitude — when present (with [lng]), the server returns
+     *              nearest-first ordering and populates `distance_km`.
+     * @param lng   optional longitude — see [lat].
+     * @param radiusKm filter to schools within this many kilometres of [lat]/[lng].
+     * @param city  optional city filter (ignored when lat/lng provided).
+     * @param limit cap on result size; server clamps to 1..100.
+     */
+    suspend fun discoverSchools(
+        token: String,
+        lat: Double? = null,
+        lng: Double? = null,
+        radiusKm: Double? = null,
+        city: String? = null,
+        limit: Int? = null,
+    ): NetworkResult<SchoolDiscoveryEnvelope> {
+        return safeApiCall {
+            client.get(url("api/v1/parent/schools/discover")) {
+                if (lat != null) parameter("lat", lat)
+                if (lng != null) parameter("lng", lng)
+                if (radiusKm != null) parameter("radius_km", radiusKm)
+                if (!city.isNullOrBlank()) parameter("city", city)
+                if (limit != null) parameter("limit", limit)
+            }
+        }
+    }
+
+    /**
+     * Compatibility shim for the existing [com.littlebridge.vidyaprayag.feature.schools.data
+     * .repository.SchoolRepositoryImpl] / Room cache path. Maps each [DiscoveredSchoolDto] onto
+     * the cached [School] model. Fields the new endpoint does not supply (`board`,
+     * `description`, `feesRange`) are returned as empty strings so we never fabricate data
+     * (LAW 6) — the marketplace screen reads those from the real DTO directly via
+     * [discoverSchools] instead of this adapter.
+     *
+     * The existing repository contract is `suspend fun fetchSchools(): List<School>` with no
+     * token, so a caller that wants real data must use the token-bearing overload added here.
+     * The no-arg overload is retained but returns an empty list (the old hard-coded mock data
+     * is gone — see LAW 6 again).
+     */
+    suspend fun fetchSchools(token: String): List<School> {
+        return when (val r = discoverSchools(token)) {
+            is NetworkResult.Success -> r.data.data?.schools.orEmpty().map { it.toDomain() }
+            is NetworkResult.Error -> emptyList()
+            NetworkResult.ConnectionError -> emptyList()
+        }
+    }
+
+    /**
+     * Token-less overload kept only because the existing [com.littlebridge.vidyaprayag.feature
+     * .schools.domain.repository.SchoolRepository.refreshSchools] contract has no token. The
+     * server route is authenticated so this can only return an empty list. Removing the stub
+     * data here is intentional — see BACKEND_GAPS.md §3 and LAW 6.
+     */
+    suspend fun fetchSchools(): List<School> = emptyList()
 }
+
+/** Maps a wire DTO to the cached [School] domain model. */
+private fun DiscoveredSchoolDto.toDomain(): School = School(
+    id = id,
+    name = name,
+    location = location,
+    board = "",            // not provided by /schools/discover — LAW 6: no fabrication
+    description = "",      // ditto
+    imageUrl = image.orEmpty(),
+    sriScore = rating,
+    feesRange = "",        // ditto
+    isVerified = false,
+)
+
+// ───────────────────────────────────────────────────────────────────────────
+// Wire DTOs — must mirror server/.../ParentDashboardRouting.kt exactly
+// (DiscoveredSchool / SchoolDiscoveryResponse / ApiResponse envelope).
+// ───────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class DiscoveredSchoolDto(
+    val id: String,
+    val name: String,
+    val rating: Double,
+    val location: String,
+    val image: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    @SerialName("distance_km") val distanceKm: Double? = null,
+    // Public-profile fields (board badge, medium chip, co-ed flag, address) —
+    // nullable so the client also deserialises responses from older servers.
+    val board: String? = null,
+    val medium: String? = null,
+    @SerialName("school_gender") val schoolGender: String? = null,
+    val address: String? = null,
+)
+
+@Serializable
+data class SchoolDiscoveryDataDto(
+    val schools: List<DiscoveredSchoolDto> = emptyList(),
+    @SerialName("sorted_by") val sortedBy: String = "name",
+)
+
+/** Mirrors `core.ApiResponse<T>` envelope on the server (`success`, `message`, `data`). */
+@Serializable
+data class SchoolDiscoveryEnvelope(
+    val success: Boolean = true,
+    val message: String = "",
+    val data: SchoolDiscoveryDataDto? = null,
+)

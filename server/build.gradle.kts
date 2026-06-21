@@ -1,9 +1,49 @@
+import java.io.ByteArrayOutputStream
+import java.time.Instant
+
 plugins {
     alias(libs.plugins.kotlinJvm)
     alias(libs.plugins.ktor)
     kotlin("plugin.serialization") version libs.versions.kotlin.get()
     application
 }
+
+// ---------------------------------------------------------------------------
+// Build identity — capture the current git SHA + build time so the running
+// server can report exactly which commit is deployed. This is what lets a
+// phone screenshot prove whether it hit the laptop backend or stale Render.
+// Resolution is best-effort: if git isn't available (e.g. Render shallow
+// clone), we fall back to "unknown" instead of failing the build.
+// ---------------------------------------------------------------------------
+val gitSha: String = run {
+    // 1) Prefer CI/PaaS-provided commit SHAs. On Render the build container is
+    //    often a shallow checkout WITHOUT a usable `.git`, so `git rev-parse`
+    //    silently returns "unknown" and /api/v1/config/version becomes useless
+    //    for the very deploy-drift verification the report demands. Render
+    //    always exports RENDER_GIT_COMMIT; GitHub Actions exports GITHUB_SHA.
+    val envSha = sequenceOf(
+        "RENDER_GIT_COMMIT",
+        "GIT_COMMIT",
+        "GITHUB_SHA",
+        "SOURCE_COMMIT",
+        "VIDYAPRAYAG_GIT_SHA"
+    ).mapNotNull { System.getenv(it)?.trim()?.takeIf { sha -> sha.isNotBlank() } }
+        .firstOrNull()
+        ?.take(12)
+
+    // 2) Fall back to a local `git` call (works for laptop builds).
+    envSha ?: runCatching {
+        val proc = ProcessBuilder("git", "rev-parse", "--short", "HEAD")
+            .directory(rootDir)
+            .redirectErrorStream(true)
+            .start()
+        val out = ByteArrayOutputStream()
+        proc.inputStream.copyTo(out)
+        proc.waitFor()
+        out.toString(Charsets.UTF_8.name()).trim().ifBlank { "unknown" }
+    }.getOrDefault("unknown")
+}
+val buildTimeIso: String = Instant.now().toString()
 
 kotlin {
     compilerOptions {
@@ -17,7 +57,14 @@ application {
     mainClass.set("com.littlebridge.vidyaprayag.ApplicationKt")
     
     val isDevelopment: Boolean = project.ext.has("development")
-    applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
+    applicationDefaultJvmArgs = listOf(
+        "-Dio.ktor.development=$isDevelopment",
+        // Surface build identity to the running process so /api/v1/config/version
+        // can report which commit is live. Render/Docker also pick these up.
+        "-Dvidyaprayag.git.sha=$gitSha",
+        "-Dvidyaprayag.build.time=$buildTimeIso",
+        "-Dvidyaprayag.version=$version"
+    )
 }
 
 dependencies {
@@ -44,6 +91,7 @@ dependencies {
     implementation("io.ktor:ktor-server-auth:3.4.3")
     implementation("io.ktor:ktor-server-auth-jwt:3.4.3")
     implementation("io.ktor:ktor-server-call-logging:3.4.3")
+    implementation("io.ktor:ktor-server-auto-head-response:3.4.3")
 
     // -----------------------------------------------------------------
     // Ktor HTTP CLIENT — used by the OTP delivery layer (Fast2SMS, MSG91,
