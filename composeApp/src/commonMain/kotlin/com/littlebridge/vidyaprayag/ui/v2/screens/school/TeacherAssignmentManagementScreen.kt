@@ -538,7 +538,7 @@ private fun EmptyCard(icon: ImageVector, message: String) {
 
 @Composable
 private fun toneTint(tone: VBadgeTone) = when (tone) {
-    VBadgeTone.Arctic -> VTheme.colors.tealDeep
+    VBadgeTone.Arctic,VBadgeTone.Accent -> VTheme.colors.tealDeep
     VBadgeTone.Success -> VTheme.colors.successInk
     VBadgeTone.Warning -> VTheme.colors.warningInk
     VBadgeTone.Danger -> VTheme.colors.dangerInk

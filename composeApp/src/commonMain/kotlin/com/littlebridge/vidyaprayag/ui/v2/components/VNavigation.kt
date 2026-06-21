@@ -76,10 +76,7 @@ fun VTopTabs(
     selected: String,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
-    // RA-PP-THEME: portals can override the active accent. Parents Portal passes the
-    // website violet (#544AB8) so the underline/active label reads lavender, never green.
-    // Defaults to teal so Admin/Teacher keep their existing aesthetic (token reuse, no rework).
-    activeColor: Color = VTheme.colors.tealDeep,
+    activeColor: Color? = VTheme.colors.tealDeep
 ) {
     val c = VTheme.colors
 
@@ -102,10 +99,33 @@ fun VTopTabs(
             tabs.forEach { tab ->
 
                 val active = tab == selected
-                val color by animateColorAsState(if (active) activeColor else c.ink3, tween(180), label = "tabColor")
-                val interaction = remember { MutableInteractionSource() }
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
+
+                val bgColor by animateColorAsState(
+                    targetValue = if (active)
+                        activeColor?:c.tealDeep
+                    else
+                        Color.Transparent,
+                    animationSpec = tween(220),
+                    label = "tabBackground"
+                )
+
+                val textColor by animateColorAsState(
+                    targetValue = if (active)
+                        Color.White
+                    else
+                        c.ink3,
+                    animationSpec = tween(220),
+                    label = "tabText"
+                )
+
+                val scale by animateFloatAsState(
+                    targetValue = if (active) 1f else 0.98f,
+                    animationSpec = tween(220),
+                    label = "tabScale"
+                )
+
+
+                Box(
                     modifier = Modifier
                         .graphicsLayer {
                             scaleX = scale
@@ -134,16 +154,12 @@ fun VTopTabs(
                         text = tab,
                         style = VTheme.type.dataSm.copy(
                             fontFamily = VTheme.type.uiFamily,
-                            fontWeight = FontWeight.SemiBold,
-                        ),
-                        modifier = Modifier.padding(vertical = 12.dp),
-                    )
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(2.5.dp)
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(if (active) activeColor else Color.Transparent),
+                            fontWeight = if (active)
+                                FontWeight.Bold
+                            else
+                                FontWeight.SemiBold,
+                            color = textColor
+                        )
                     )
                 }
             }

@@ -302,6 +302,7 @@ private fun KpiCarousel(p: TeacherProfileDto) {
 private fun KpiCard(data: KpiCardData) {
     val c = VTheme.colors
     val tint = when (data.tone) {
+        VBadgeTone.Accent -> c.tealDeep
         VBadgeTone.Arctic -> c.tealDeep
         VBadgeTone.Success -> c.successInk
         VBadgeTone.Warning -> c.warningInk
