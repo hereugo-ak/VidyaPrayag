@@ -149,7 +149,16 @@ WHERE t.section IS DISTINCT FROM vp_section_key(t.section);
 --     IDEMPOTENT: a student whose current code is ALREADY the base (or a
 --     base-with-suffix in the standard) keeps it — ordering prefers such rows
 --     for rank 1, so a second run produces new_code == old_code (no-ops).
-CREATE TEMP TABLE vp_code_map ON COMMIT DROP AS
+--
+--     NOTE: we use a REAL (non-temp) table dropped explicitly at the end of
+--     this transaction instead of CREATE TEMP TABLE ... ON COMMIT DROP. A
+--     TEMP table is invisible to the plpgsql DO block below when the Supabase
+--     SQL editor compiles it (causing: relation "vp_code_map" does not exist).
+--     A regular table in the public schema is always resolvable. It is dropped
+--     before COMMIT so nothing is left behind, and DROP ... IF EXISTS at the
+--     top makes the whole migration safely re-runnable.
+DROP TABLE IF EXISTS vp_code_map;
+CREATE TABLE vp_code_map AS
 WITH base AS (
     SELECT
         id,
@@ -190,48 +199,81 @@ WHERE EXISTS (
 --     Each table is guarded with to_regclass so the migration still runs on a
 --     deployment that does not (yet) have an optional table. We also verify the
 --     specific column exists before touching it (defensive against schema drift).
+-- We use EXECUTE (dynamic SQL) for every cascade UPDATE. Dynamic SQL resolves
+-- table names at RUN time, not at plpgsql COMPILE time, which is what makes the
+-- reference to vp_code_map (and the optional dependent tables) reliable inside
+-- the Supabase SQL editor. The to_regclass(...) guard skips any optional table
+-- that is not present in this deployment, and a column-existence check guards
+-- against schema drift.
 DO $cascade$
+DECLARE
+    has_col boolean;
 BEGIN
+    -- attendance_records.person_id (type = 'student')
     IF to_regclass('public.attendance_records') IS NOT NULL THEN
-        UPDATE attendance_records a
-        SET person_id = m.new_code
-        FROM vp_code_map m
-        WHERE a.type = 'student' AND a.person_id = m.old_code;
+        EXECUTE $q$
+            UPDATE attendance_records a
+            SET person_id = m.new_code
+            FROM vp_code_map m
+            WHERE a.type = 'student' AND a.person_id = m.old_code
+        $q$;
     END IF;
 
+    -- children.student_code
     IF to_regclass('public.children') IS NOT NULL THEN
-        UPDATE children c
-        SET student_code = m.new_code
-        FROM vp_code_map m
-        WHERE c.student_code = m.old_code;
+        EXECUTE $q$
+            UPDATE children c
+            SET student_code = m.new_code
+            FROM vp_code_map m
+            WHERE c.student_code = m.old_code
+        $q$;
     END IF;
 
+    -- exam_results.student_id
     IF to_regclass('public.exam_results') IS NOT NULL THEN
-        UPDATE exam_results e
-        SET student_id = m.new_code
-        FROM vp_code_map m
-        WHERE e.student_id = m.old_code;
+        EXECUTE $q$
+            UPDATE exam_results e
+            SET student_id = m.new_code
+            FROM vp_code_map m
+            WHERE e.student_id = m.old_code
+        $q$;
     END IF;
 
+    -- assessment_marks.student_id (optional table)
     IF to_regclass('public.assessment_marks') IS NOT NULL THEN
-        UPDATE assessment_marks am
-        SET student_id = m.new_code
-        FROM vp_code_map m
-        WHERE am.student_id = m.old_code;
+        EXECUTE $q$
+            UPDATE assessment_marks am
+            SET student_id = m.new_code
+            FROM vp_code_map m
+            WHERE am.student_id = m.old_code
+        $q$;
     END IF;
 
+    -- homework_submissions.student_id (optional table)
     IF to_regclass('public.homework_submissions') IS NOT NULL THEN
-        UPDATE homework_submissions h
-        SET student_id = m.new_code
-        FROM vp_code_map m
-        WHERE h.student_id = m.old_code;
+        EXECUTE $q$
+            UPDATE homework_submissions h
+            SET student_id = m.new_code
+            FROM vp_code_map m
+            WHERE h.student_id = m.old_code
+        $q$;
     END IF;
 
+    -- parent_child_links.student_code (optional table)
     IF to_regclass('public.parent_child_links') IS NOT NULL THEN
-        UPDATE parent_child_links p
-        SET student_code = m.new_code
-        FROM vp_code_map m
-        WHERE p.student_code = m.old_code;
+        -- only touch it if the column actually exists on this deployment
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'parent_child_links' AND column_name = 'student_code'
+        ) INTO has_col;
+        IF has_col THEN
+            EXECUTE $q$
+                UPDATE parent_child_links p
+                SET student_code = m.new_code
+                FROM vp_code_map m
+                WHERE p.student_code = m.old_code
+            $q$;
+        END IF;
     END IF;
 END
 $cascade$;
@@ -248,7 +290,10 @@ CREATE INDEX IF NOT EXISTS ix_students_school_class_section
 CREATE INDEX IF NOT EXISTS ix_tsa_school_class_section
     ON teacher_subject_assignments (school_id, class_name, section);
 
--- ── 5. Clean up helper functions (optional; keep if you prefer) ──────
+-- ── 5. Drop the working table (regular table, so drop it explicitly) ─
+DROP TABLE IF EXISTS vp_code_map;
+
+-- ── 6. Clean up helper functions (optional; keep if you prefer) ──────
 DROP FUNCTION IF EXISTS vp_class_key(text);
 DROP FUNCTION IF EXISTS vp_section_key(text);
 DROP FUNCTION IF EXISTS vp_class_token(text);
