@@ -197,6 +197,19 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    // VP-CAL: Academic Calendar platform + Academic Year management
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.AcademicCalendarPlatformApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.AcademicYearApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
     single {
         com.littlebridge.vidyaprayag.feature.admin.data.remote.AttendanceApi(
             client = get(),
@@ -308,6 +321,13 @@ val commonModule = module {
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.CalendarRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.CalendarRepositoryImpl(get())
     }
+    // VP-CAL: Academic Calendar platform + Academic Year management repositories
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AcademicCalendarPlatformRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.AcademicCalendarPlatformRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AcademicYearRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.AcademicYearRepositoryImpl(get())
+    }
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AttendanceRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.AttendanceRepositoryImpl(get())
     }
@@ -392,6 +412,10 @@ val viewModelModule = module {
     factory { MessagesViewModel(get(), get(), get()) }
     factory { SchedulePTMViewModel(get(), get()) }
     factory { AcademicCalendarViewModel(get(), get()) }
+    // VP-CAL: premium Academic Calendar platform + 7-step create-event wizard + Academic Year mgmt
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.AcademicCalendarPlatformViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.CreateCalendarEventViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.AcademicYearViewModel(get(), get()) }
     factory { LeaveRequestsViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.LinkRequestsViewModel(get(), get()) }
     factory { DailyAttendanceViewModel(get(), get()) }

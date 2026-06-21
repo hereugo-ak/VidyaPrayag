@@ -991,30 +991,6 @@ private fun CompletionScreen(
                 }
             }
 
-            /*Text("NEXT STEPS", style = VTheme.type.labelStrong.colored(c.ink3))
-            listOf(
-                Triple(VIcons.User, "Add your teachers", "Provision staff accounts from Settings"),
-                Triple(VIcons.Upload, "Import your students", "Upload a roster CSV to create records"),
-                Triple(VIcons.ShieldCheck, "Review permissions", "Class teachers only by default"),
-            ).forEach { (icon, title, sub) ->
-                VCard(modifier = Modifier.fillMaxWidth(), onClick = {}) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFDCF2EF)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(icon, contentDescription = null, tint = Color(0xFF006A60), modifier = Modifier.size(16.dp))
-                        }
-                        Spacer(Modifier.width(d.md))
-                        Column(Modifier.weight(1f)) {
-                            Text(title, style = VTheme.type.bodyStrong.colored(c.ink))
-                            Text(sub, style = VTheme.type.caption.colored(c.ink3))
-                        }
-                        Icon(VIcons.ArrowRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(16.dp))
-                    }
-                }
-            }*/
-
             Spacer(Modifier.height(d.xs))
             VButton(
                 text = "Open dashboard",
@@ -1073,64 +1049,6 @@ private fun Modifier.dashedBorder(color: Color, strokeWidth: androidx.compose.ui
             style = Stroke(width = sw, pathEffect = dash),
         )
     }
-
-
-
-/*@Composable
-fun OnboardingCompleteCard(
-    modifier: Modifier = Modifier,
-) {
-    val c = VTheme.colors
-    val d = VTheme.dimens
-
-    VCard(
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFDCF2EF)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = VIcons.Check,
-                    contentDescription = null,
-                    tint = Color(0xFF006A60),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-
-            Spacer(Modifier.width(d.md))
-
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-
-                Text(
-                    text = "Onboarding complete",
-                    style = VTheme.type.bodyStrong.colored(c.ink)
-                )
-
-
-                Spacer(Modifier.height(3.dp))
-
-
-                Text(
-                    text = "Your school profile is set up. Add teachers, students and parents from your dashboard.",
-                    style = VTheme.type.caption.colored(c.ink3)
-                )
-            }
-        }
-    }
-}*/
 
 @Preview
 @Composable

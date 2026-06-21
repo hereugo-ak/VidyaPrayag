@@ -82,6 +82,11 @@ import com.littlebridge.vidyaprayag.feature.admin.domain.model.OverviewInsight
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OverviewKpi
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OverviewLeaderClass
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OverviewSchoolPulse
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.AcademicCalendarEventDto
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.CalEventStatus
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.CalEventType
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.CalendarDashboardDto
+import com.littlebridge.vidyaprayag.feature.admin.presentation.AcademicCalendarPlatformViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolDashboardViewModel
 import com.littlebridge.vidyaprayag.feature.parent.presentation.NotificationsViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
@@ -112,6 +117,7 @@ fun SchoolHomeScreenV2(
     onExit: () -> Unit = {},
     viewModel: SchoolDashboardViewModel = koinViewModel(),
     notificationsViewModel: NotificationsViewModel = koinViewModel(),
+    calendarViewModel: AcademicCalendarPlatformViewModel = koinViewModel(),
 ) {
     val adminName by viewModel.adminName.collectAsStateV2()
     val loading by viewModel.isLoading.collectAsStateV2()
@@ -120,6 +126,7 @@ fun SchoolHomeScreenV2(
     val overview by viewModel.overview.collectAsStateV2()
     val analytics by viewModel.analytics.collectAsStateV2()
     val activity by viewModel.activity.collectAsStateV2()
+    val calendarState by calendarViewModel.state.collectAsStateV2()
 
     SchoolDashboardContent(
         modifier = modifier,
@@ -130,7 +137,11 @@ fun SchoolHomeScreenV2(
         overview = overview,
         analytics = analytics,
         activity = activity,
-        onRetry = { viewModel.refresh() },
+        calendarDashboard = calendarState.dashboard,
+        onRetry = {
+            viewModel.refresh()
+            calendarViewModel.refresh()
+        },
         onOpenNotifications = onOpenNotifications,
         onOpenCalendar = onOpenCalendar,
         onOpenAnalytics = onOpenAnalytics,
@@ -149,6 +160,7 @@ private fun SchoolDashboardContent(
     overview: AdminDashboardOverview?,
     analytics: AdminDashboardAnalytics?,
     activity: AdminDashboardActivity?,
+    calendarDashboard: CalendarDashboardDto?,
     onRetry: () -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenCalendar: () -> Unit,
@@ -202,6 +214,13 @@ private fun SchoolDashboardContent(
                     onNotice = onOpenNotifications,
                     onReports = onOpenAnalytics,
                 )
+
+                // 1b. Academic Calendar integration — Quick Insights + Upcoming
+                //     Events carousel, sourced from GET /api/admin/calendar/dashboard.
+                calendarDashboard?.let { cal ->
+                    CalendarQuickInsights(dashboard = cal, onOpenCalendar = onOpenCalendar)
+                    CalendarUpcomingCarousel(dashboard = cal, onOpenCalendar = onOpenCalendar)
+                }
 
                 // 2. Smart insights carousel
                 val insights = overview?.insights.orEmpty()
@@ -1110,6 +1129,204 @@ private fun CompletedEventRow(event: OverviewEvent) {
         Text(event.title, style = VTheme.type.body.colored(c.ink), modifier = Modifier.weight(1f), maxLines = 1)
         Text(event.date, style = VTheme.type.dataSm.colored(c.ink3))
     }
+}
+
+// =====================================================================
+// 1b. Academic Calendar — Quick Insights + Upcoming Events carousel
+// =====================================================================
+
+/**
+ * Compact KPI strip surfacing the three headline calendar metrics the spec
+ * requires on the home page: events this week, draft events, and the next
+ * holiday. Values are derived from the calendar dashboard payload so they stay
+ * consistent with the dedicated Academic Calendar screen.
+ */
+@Composable
+private fun CalendarQuickInsights(
+    dashboard: CalendarDashboardDto,
+    onOpenCalendar: () -> Unit,
+) {
+    val c = VTheme.colors
+
+    // Events this week → server-computed KPI (events starting within 7 days),
+    // falling back to the upcoming-timeline size if the KPI is unavailable.
+    val eventsThisWeek = dashboard.analytics
+        .firstOrNull { it.key.equals("this_week", ignoreCase = true) }
+        ?.value
+        ?: dashboard.upcomingTimeline.size
+
+    // Draft events → prefer the analytics KPI, fall back to the drafts list.
+    val draftCount = dashboard.analytics
+        .firstOrNull { it.key.equals("draft", ignoreCase = true) || it.key.equals("drafts", ignoreCase = true) }
+        ?.value
+        ?: dashboard.draftEvents.size
+
+    // Next holiday → earliest upcoming HOLIDAY across timeline + highlights.
+    val nextHoliday = (dashboard.upcomingTimeline + dashboard.upcomingHighlights)
+        .filter { it.type.equals(CalEventType.HOLIDAY, ignoreCase = true) }
+        .minByOrNull { it.startDate }
+    val nextHolidayLabel = nextHoliday?.let { homeFormatShortDate(it.startDate) } ?: "—"
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Calendar at a glance", style = VTheme.type.h3.colored(c.ink))
+            Text(
+                "Open calendar →",
+                style = VTheme.type.caption.colored(c.tealDeep),
+                modifier = Modifier.clickable { onOpenCalendar() },
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            CalendarInsightTile(
+                modifier = Modifier.weight(1f),
+                value = eventsThisWeek.toString(),
+                label = "This week",
+                icon = VIcons.Calendar,
+                accent = c.tealDeep,
+                onClick = onOpenCalendar,
+            )
+            CalendarInsightTile(
+                modifier = Modifier.weight(1f),
+                value = draftCount.toString(),
+                label = "Drafts",
+                icon = VIcons.FileText,
+                accent = c.warningInk,
+                onClick = onOpenCalendar,
+            )
+            CalendarInsightTile(
+                modifier = Modifier.weight(1f),
+                value = nextHolidayLabel,
+                label = "Next holiday",
+                icon = VIcons.Sparkles,
+                accent = c.successInk,
+                onClick = onOpenCalendar,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CalendarInsightTile(
+    value: String,
+    label: String,
+    icon: ImageVector,
+    accent: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+    VCard(modifier = modifier.clickable { onClick() }) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(
+                modifier = Modifier.size(34.dp).clip(RoundedCornerShape(11.dp)).background(accent.copy(alpha = .14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(17.dp))
+            }
+            Text(value, style = VTheme.type.h3.colored(c.ink), maxLines = 1)
+            Text(label, style = VTheme.type.caption.colored(c.ink2), maxLines = 1)
+        }
+    }
+}
+
+/**
+ * Horizontal carousel of upcoming calendar events for the home page. Prefers the
+ * curated highlights from the dashboard, falling back to the upcoming timeline.
+ */
+@Composable
+private fun CalendarUpcomingCarousel(
+    dashboard: CalendarDashboardDto,
+    onOpenCalendar: () -> Unit,
+) {
+    val c = VTheme.colors
+    val events = dashboard.upcomingHighlights.ifEmpty { dashboard.upcomingTimeline }
+    if (events.isEmpty()) return
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Upcoming Events", style = VTheme.type.h3.colored(c.ink))
+            Text(
+                "See all →",
+                style = VTheme.type.caption.colored(c.tealDeep),
+                modifier = Modifier.clickable { onOpenCalendar() },
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            events.take(8).forEach { ev ->
+                CalendarUpcomingCard(event = ev, onClick = onOpenCalendar)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarUpcomingCard(event: AcademicCalendarEventDto, onClick: () -> Unit) {
+    val c = VTheme.colors
+    val accent = when (event.type.uppercase()) {
+        CalEventType.HOLIDAY -> c.warningInk
+        CalEventType.PTM -> c.navy
+        CalEventType.EXAM -> c.dangerInk
+        else -> c.tealDeep
+    }
+    Column(
+        modifier = Modifier
+            .widthIn(min = 180.dp, max = 220.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(c.card)
+            .vElevation(VElevationLevel.Card, radius = 18.dp)
+            .clickable { onClick() }
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier = Modifier.clip(RoundedCornerShape(50)).background(accent.copy(alpha = .14f))
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+        ) {
+            Text(CalEventType.label(event.type), style = VTheme.type.label.colored(accent))
+        }
+        Text(event.title, style = VTheme.type.bodyStrong.colored(c.ink), maxLines = 2)
+        Text(
+            if (event.isMultiDay) {
+                "${homeFormatShortDate(event.startDate)} – ${homeFormatShortDate(event.endDate)}"
+            } else {
+                homeFormatShortDate(event.startDate)
+            },
+            style = VTheme.type.dataSm.colored(c.ink3),
+        )
+        if (event.status.equals(CalEventStatus.DRAFT, ignoreCase = true)) {
+            Text("Draft", style = VTheme.type.label.colored(c.warningInk))
+        }
+        if (event.hasConflicts) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Icon(VIcons.AlertTriangle, contentDescription = null, tint = c.dangerInk, modifier = Modifier.size(13.dp))
+                Text("Conflict", style = VTheme.type.label.colored(c.dangerInk))
+            }
+        }
+    }
+}
+
+// ── tiny date helper for the home calendar widgets (ISO yyyy-MM-dd) ─────────
+
+private fun homeFormatShortDate(iso: String): String {
+    // iso = yyyy-MM-dd → "DD MON"
+    val parts = iso.split("-")
+    if (parts.size != 3) return iso
+    val month = parts[1].toIntOrNull() ?: return iso
+    val day = parts[2].toIntOrNull() ?: return iso
+    val months = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    val mon = months.getOrElse(month - 1) { parts[1] }
+    return "$day $mon"
 }
 
 // =====================================================================

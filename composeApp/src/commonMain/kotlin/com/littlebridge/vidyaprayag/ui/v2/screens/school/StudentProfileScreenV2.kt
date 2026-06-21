@@ -243,13 +243,6 @@ private fun KpiCarousel(p: StudentProfileDto) {
     }
 }
 
-private data class KpiCardData(
-    val label: String,
-    val value: String,
-    val support: String,
-    val icon: ImageVector,
-    val tone: VBadgeTone,
-)
 
 @Composable
 private fun KpiCard(data: KpiCardData) {
@@ -322,7 +315,7 @@ private fun TeacherConnectionCard(t: StudentTeacherDto) {
         }
         if (!t.designation.isNullOrBlank()) {
             Spacer(Modifier.height(10.dp))
-            VBadge(text = t.designation, tone = VBadgeTone.Arctic)
+            VBadge(text = t.designation?:"", tone = VBadgeTone.Arctic)
         }
     }
 }

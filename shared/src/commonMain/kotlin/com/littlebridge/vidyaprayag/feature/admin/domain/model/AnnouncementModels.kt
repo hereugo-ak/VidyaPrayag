@@ -44,7 +44,11 @@ data class CreateAnnouncementRequest(
     // validates). audienceFilter carries the scope JSON (e.g. class_names).
     // Both omitted → server defaults to ALL_SCHOOL (back-compat).
     @SerialName("audience_type") val audienceType: String? = null,
-    @SerialName("audience_filter") val audienceFilter: JsonElement? = null
+    @SerialName("audience_filter") val audienceFilter: JsonElement? = null,
+    // VP-CAL: when the UI's "Add To Academic Calendar" toggle is enabled (the
+    // default) and the type is Holiday/PTM/Event, the server also creates a
+    // matching calendar event (source = ANNOUNCEMENT). No-op for Update/Reminder.
+    @SerialName("add_to_calendar") val addToCalendar: Boolean = true
 )
 
 @Serializable

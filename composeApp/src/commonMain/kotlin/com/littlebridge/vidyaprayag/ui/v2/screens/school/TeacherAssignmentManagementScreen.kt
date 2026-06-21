@@ -407,7 +407,7 @@ private fun AddAssignment(
                 StepLabel("Step 4 · Preview")
                 Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.cream).padding(12.dp)) {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(draft.subjectName, style = VTheme.type.bodyStrong.colored(c.ink))
+                        Text(draft.subjectName?:"", style = VTheme.type.bodyStrong.colored(c.ink))
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             previewTargets.forEach { t -> VBadge(text = t, tone = VBadgeTone.Arctic) }
                         }

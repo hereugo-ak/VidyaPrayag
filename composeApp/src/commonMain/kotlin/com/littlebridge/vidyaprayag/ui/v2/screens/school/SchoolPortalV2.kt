@@ -28,6 +28,11 @@ private enum class SchoolOverlay {
     None,
     Notifications,
     Calendar,
+    // VP-CAL: the premium Academic Calendar platform, the 7-step create-event
+    // wizard, and Academic Year management.
+    AcademicCalendarPlatform,
+    CreateEvent,
+    AcademicYear,
     Messages,
     LeaveRequests,
     LinkRequests,
@@ -94,7 +99,31 @@ fun SchoolPortalV2(
                 return@VTheme
             }
             SchoolOverlay.Calendar -> {
+                // Legacy read-only month grid (kept for back-compat / deep-links).
                 AcademicCalendarScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
+                return@VTheme
+            }
+            SchoolOverlay.AcademicCalendarPlatform -> {
+                // VP-CAL — the premium centralized planning & scheduling platform.
+                AcademicCalendarPlatformScreenV2(
+                    onBack = { overlay = SchoolOverlay.None },
+                    onCreateEvent = { overlay = SchoolOverlay.CreateEvent },
+                    onOpenEvent = { /* event detail handled in-screen via overflow actions */ },
+                    modifier = modifier,
+                )
+                return@VTheme
+            }
+            SchoolOverlay.CreateEvent -> {
+                // 7-step create-event wizard; pops back to the platform on success.
+                CreateEventScreenV2(
+                    onBack = { overlay = SchoolOverlay.AcademicCalendarPlatform },
+                    onCreated = { overlay = SchoolOverlay.AcademicCalendarPlatform },
+                    modifier = modifier,
+                )
+                return@VTheme
+            }
+            SchoolOverlay.AcademicYear -> {
+                AcademicYearManagementScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
                 return@VTheme
             }
             SchoolOverlay.Messages -> {
@@ -228,7 +257,8 @@ fun SchoolPortalV2(
                 when (tab) {
                     "home" -> SchoolHomeScreenV2(
                         onOpenNotifications = { overlay = SchoolOverlay.Notifications },
-                        onOpenCalendar = { overlay = SchoolOverlay.Calendar },
+                        // VP-CAL — Home now opens the premium Academic Calendar platform.
+                        onOpenCalendar = { overlay = SchoolOverlay.AcademicCalendarPlatform },
                         // RA-24 — the Home "live metrics" / PEWS cards now open the
                         // real analytics dashboard and the at-risk cohort (People
                         // tab) instead of dead Coming-Soon placeholders.
@@ -265,6 +295,8 @@ fun SchoolPortalV2(
                         onOpenTeachers = { tab = "people" },
                         // RA-47 — open the editable institutional-profile screen.
                         onOpenProfile = { overlay = SchoolOverlay.EditProfile },
+                        // VP-CAL — "Academic year" is now a real management screen.
+                        onOpenAcademicYear = { overlay = SchoolOverlay.AcademicYear },
                     )
                 }
             }

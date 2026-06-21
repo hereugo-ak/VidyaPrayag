@@ -165,6 +165,9 @@ class SchoolAnnouncementsViewModel(
         // is split by the caller). For ALL_SCHOOL the list is ignored.
         audienceType: String = "ALL_SCHOOL",
         audienceValues: List<String> = emptyList(),
+        // VP-CAL: mirror Holiday/PTM/Event posts into the Academic Calendar.
+        // Default enabled; ignored by the server for Update/Reminder types.
+        addToCalendar: Boolean = true,
         onCreated: (() -> Unit)? = null
     ) {
         if (title.isBlank() || description.isBlank() || date.isBlank()) {
@@ -195,7 +198,8 @@ class SchoolAnnouncementsViewModel(
                 eventImage = eventImage?.trim()?.takeIf { it.isNotBlank() },
                 date = date.trim(),
                 audienceType = normalizedAudience,
-                audienceFilter = filter
+                audienceFilter = filter,
+                addToCalendar = addToCalendar
             )
             when (val r = announcementsRepository.createAnnouncement(token, body)) {
                 is NetworkResult.Success -> {

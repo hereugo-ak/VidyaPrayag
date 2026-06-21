@@ -290,7 +290,7 @@ private fun KpiCarousel(p: TeacherProfileDto) {
     }
 }
 
-private data class KpiCardData(
+ data class KpiCardData(
     val label: String,
     val value: String,
     val support: String,

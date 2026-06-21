@@ -63,6 +63,8 @@ fun SchoolSettingsScreenV2(
     onOpenTeachers: () -> Unit = {},
     // RA-47 — open the editable institutional-profile (schools row) screen.
     onOpenProfile: () -> Unit = {},
+    // VP-CAL — open the real Academic Year management screen.
+    onOpenAcademicYear: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: InstitutionalProfileViewModel = koinViewModel(),
 ) {
@@ -72,6 +74,7 @@ fun SchoolSettingsScreenV2(
         onLogout = onLogout,
         onOpenTeachers = onOpenTeachers,
         onOpenProfile = onOpenProfile,
+        onOpenAcademicYear = onOpenAcademicYear,
         onRetry = viewModel::load,
         modifier = modifier.statusBarsPadding()
             .imePadding()
@@ -85,6 +88,7 @@ private fun SchoolSettingsContent(
     onLogout: () -> Unit,
     onOpenTeachers: () -> Unit,
     onOpenProfile: () -> Unit,
+    onOpenAcademicYear: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -137,7 +141,7 @@ private fun SchoolSettingsContent(
                 // RA-47 — edit the live schools row (name, board, contact,
                 // principal, address) instead of leaving it read-only.
                 //SettingRow(VIcons.School, "Edit institutional profile", "Name, board, contact, principal & address",false, onClick = onOpenProfile),
-                SettingRow(VIcons.Calendar, "Academic year", "Manage term dates & holidays", true),
+                SettingRow(VIcons.Calendar, "Academic year", "Manage term dates & holidays", false, onClick = onOpenAcademicYear),
                 SettingRow(VIcons.BookOpen, "Classes & subjects", "Class & subject setup", true),
                 SettingRow(VIcons.Users, "Teacher management", "Add, view & remove teachers",false, onClick = onOpenTeachers),
                 SettingRow(VIcons.Wallet, "Fee structure", "Edit heads & amounts for next cycle ", true),

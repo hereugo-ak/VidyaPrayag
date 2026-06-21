@@ -154,7 +154,10 @@ object DatabaseFactory {
         DeviceTokensTable,
         ParentChildLinksTable,
         // Non-teaching staff vertical (RA-S17 — Admin People sub-tabs)
-        NonTeachingStaffTable
+        NonTeachingStaffTable,
+        // Academic Calendar platform (VP-CAL — centralized planning & scheduling)
+        CalendarEventsTable,
+        AcademicYearsTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

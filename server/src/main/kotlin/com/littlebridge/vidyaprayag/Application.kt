@@ -56,6 +56,8 @@ import com.littlebridge.vidyaprayag.db.DatabaseFactory
 import com.littlebridge.vidyaprayag.feature.admissions.admissionRouting
 import com.littlebridge.vidyaprayag.feature.announcements.announcementRouting
 import com.littlebridge.vidyaprayag.feature.auth.authRouting
+import com.littlebridge.vidyaprayag.feature.calendar.academicCalendarRouting
+import com.littlebridge.vidyaprayag.feature.calendar.academicYearRouting
 import com.littlebridge.vidyaprayag.feature.auth.otpAdminRouting
 import com.littlebridge.vidyaprayag.feature.config.appStatusRouting
 import com.littlebridge.vidyaprayag.feature.config.versionRouting
@@ -277,6 +279,10 @@ fun Application.module() {
         nonTeachingStaffRouting()    // /api/v1/school/staff[…] — RA-S17 non-teaching-staff vertical (school-scoped CRUD)
         schoolRecordsRouting()       // /api/v1/school/{attendance/summary,marks/summary,fees/ledger} — RA-52 admin Records rollups (school-scoped reads)
         mediaRouting()               // /api/v1/school/media/upload[…] — REAL binary uploads → Supabase Storage (kills URL placeholders)
+
+        // Academic Calendar platform (VP-CAL) — centralized planning & scheduling
+        academicCalendarRouting()    // /api/admin/calendar/{dashboard,events[…],events/{id}/duplicate}
+        academicYearRouting()        // /api/admin/academic-years[…] — real Academic Year management (replaces "Coming Soon")
 
         // Teacher vertical (master rebuild doc Step 7 / gap G1)
         teacherRouting()             // /api/v1/teacher/{home,classes,profile,attendance,marks,syllabus,homework}
