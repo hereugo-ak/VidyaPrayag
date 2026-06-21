@@ -895,8 +895,18 @@ object ParentChildLinksTable : UUIDTable("parent_child_links", "id") {
     val studentCode = varchar("student_code", 64).nullable()
     val rollNumber  = varchar("roll_number", 64).nullable()
     val childName   = text("child_name").nullable()
+    // ISSUE 2c: the class+section the parent provided for the matched student,
+    // captured so the admin queue can show the full claim and the matcher can
+    // compare against the roster. Nullable so existing rows parse unchanged.
+    val className   = text("class_name").nullable()
+    val section     = varchar("section", 16).nullable()
+    // ISSUE 2d: the parent phone that was on the request, and a flag for the
+    // "needs review" (phone-mismatch) bucket so it is never silently dropped.
+    val parentPhone = varchar("parent_phone", 32).nullable()
+    val reviewReason = text("review_reason").nullable()
     val childId     = uuid("child_id").nullable()       // children.id once approved
-    val status      = varchar("status", 16).default("pending") // pending | approved | rejected
+    // status: pending | approved | rejected | needs_review (ISSUE 2d)
+    val status      = varchar("status", 24).default("pending")
     // RA-SP: first-class parent relationship metadata. `relation` describes the
     // guardian role (Father | Mother | Guardian | …) and `isPrimaryGuardian`
     // marks the single primary point-of-contact for a student. The aggregation

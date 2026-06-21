@@ -16,6 +16,8 @@
  */
 package com.littlebridge.vidyaprayag.feature.parent
 
+import com.littlebridge.vidyaprayag.core.ClassNaming
+import com.littlebridge.vidyaprayag.core.PhoneNormalizer
 import com.littlebridge.vidyaprayag.core.created
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
@@ -67,6 +69,16 @@ data class SchoolSearchResponse(
 data class LinkChildRequest(
     @SerialName("school_id") val schoolId: String,
     @SerialName("roll_number") val rollNumber: String,
+    // ISSUE 2c: the school is already chosen, so the final step now collects the
+    // child's class + section (guided/auto-formatted on the client) and the
+    // child's name, which the matcher checks against the roster.
+    @SerialName("class_name") val className: String? = null,
+    val section: String? = null,
+    @SerialName("child_name") val childName: String? = null,
+    // ISSUE 2d: the parent's contact phone for this child; matched against the
+    // student's parent_phone on record. May also fall back to the parent's
+    // account phone server-side when omitted.
+    @SerialName("parent_phone") val parentPhone: String? = null,
     // Optional — parent's preferred contact name/language captured in step 1.
     @SerialName("parent_name") val parentName: String? = null
 )
@@ -96,6 +108,9 @@ data class LinkRequestDto(
     @SerialName("roll_number") val rollNumber: String? = null,
     @SerialName("child_name") val childName: String? = null,
     @SerialName("class_name") val className: String? = null,
+    val section: String? = null,
+    // ISSUE 2d: why this request is in the "needs review" bucket (phone mismatch).
+    @SerialName("review_reason") val reviewReason: String? = null,
     val status: String,
     @SerialName("requested_at") val requestedAt: String,
 )
@@ -219,9 +234,23 @@ fun Route.parentLinkRouting() {
                     val byCode = roster.filter {
                         it[StudentsTable.studentCode].equals(rollInput, ignoreCase = true)
                     }
-                    val matches = if (byCode.isNotEmpty()) byCode else {
+                    var matches = if (byCode.isNotEmpty()) byCode else {
                         val wanted = normaliseRoll(rollInput)
                         roster.filter { normaliseRoll(it[StudentsTable.rollNumber]) == wanted }
+                    }
+
+                    // ISSUE 2c/2d: when the parent supplied a class+section (the new
+                    // guided step-3 inputs), narrow an ambiguous roll by the class so
+                    // roll '1' in 3-A no longer collides with roll '1' in 5-B. Matching
+                    // uses the ClassNaming key so format differences never block it.
+                    if (matches.size > 1 && !req.className.isNullOrBlank()) {
+                        val narrowed = matches.filter {
+                            ClassNaming.sameClassSection(
+                                it[StudentsTable.className], it[StudentsTable.section],
+                                req.className, req.section
+                            )
+                        }
+                        if (narrowed.isNotEmpty()) matches = narrowed
                     }
 
                     val studentRow = when {
@@ -233,15 +262,46 @@ fun Route.parentLinkRouting() {
                     val studentCodeVal = studentRow[StudentsTable.studentCode]
                     val childNameVal = studentRow[StudentsTable.fullName]
                     val classNameVal = studentRow[StudentsTable.className]
+                    val sectionVal = studentRow[StudentsTable.section]
                     val photoVal = studentRow[StudentsTable.profilePhotoUrl]
                     val now = Instant.now()
 
-                    // If a link (pending or approved) already exists, don't duplicate.
+                    // ─── ISSUE 2d: full-match vs phone-mismatch classification ───
+                    // The parent phone is taken from the request, falling back to the
+                    // parent's account phone so an omitted field still matches when it
+                    // can. It is compared (last-10-digits) against the student's
+                    // parent_phone on record.
+                    val accountPhone = AppUsersTable.selectAll()
+                        .where { AppUsersTable.id eq uid }
+                        .firstOrNull()?.get(AppUsersTable.phone)
+                    val providedPhone = req.parentPhone?.takeIf { it.isNotBlank() } ?: accountPhone
+                    val onRecordPhone = studentRow[StudentsTable.parentPhone]
+
+                    // Phone matches when the school HAS a number on record AND it
+                    // equals the provided one. If the school stored no number we
+                    // cannot contradict the parent, so we DO NOT flag on that alone.
+                    val phoneOnRecordPresent = !onRecordPhone.isNullOrBlank()
+                    val phoneMatches = if (phoneOnRecordPresent) {
+                        PhoneNormalizer.sameNumber(providedPhone, onRecordPhone)
+                    } else true
+
+                    val isPhoneMismatch = phoneOnRecordPresent &&
+                        !providedPhone.isNullOrBlank() &&
+                        !PhoneNormalizer.sameNumber(providedPhone, onRecordPhone)
+
+                    val targetStatus = if (isPhoneMismatch) "needs_review" else "pending"
+                    val reviewReasonVal = if (isPhoneMismatch)
+                        "Parent phone does not match the number on record for this student." else null
+
+                    // If a link already exists for this (parent, school, student) in
+                    // any non-final state, reuse it (don't duplicate).
                     val existingLink = ParentChildLinksTable.selectAll().where {
                         (ParentChildLinksTable.parentId eq uid) and
                             (ParentChildLinksTable.schoolId eq schoolUuid) and
                             (ParentChildLinksTable.studentCode eq studentCodeVal) and
-                            ((ParentChildLinksTable.status eq "pending") or (ParentChildLinksTable.status eq "approved"))
+                            ((ParentChildLinksTable.status eq "pending") or
+                                (ParentChildLinksTable.status eq "approved") or
+                                (ParentChildLinksTable.status eq "needs_review"))
                     }.singleOrNull()
 
                     val linkId: UUID = if (existingLink != null) {
@@ -252,30 +312,35 @@ fun Route.parentLinkRouting() {
                             it[id] = newId
                             it[parentId] = uid
                             it[schoolId] = schoolUuid
-                            // Store the school's CANONICAL roll (not the raw parent
-                            // input like '001' / 'S1-G3A-001') so the admin queue
-                            // displays exactly what the roster shows.
+                            // Store the school's CANONICAL roll/class/section (not the
+                            // raw parent input) so the admin queue shows the roster value.
                             it[rollNumber] = studentRow[StudentsTable.rollNumber]
                             it[studentCode] = studentCodeVal
                             it[childName] = childNameVal
-                            it[status] = "pending"
+                            it[className] = classNameVal
+                            it[section] = sectionVal
+                            it[parentPhone] = providedPhone?.let { p -> PhoneNormalizer.canonical(p) }
+                            it[reviewReason] = reviewReasonVal
+                            it[status] = targetStatus
                             it[requestedAt] = now
                         }
                         newId
                     }
 
-                    LinkResult.Pending(
-                        linkId = linkId,
-                        child = LinkedChildDto(
-                            childId = "",                 // no child row until approved
-                            childName = childNameVal,
-                            className = classNameVal,
-                            roll = studentRow[StudentsTable.rollNumber],
-                            schoolName = schoolNameVal,
-                            profilePhotoUrl = photoVal,
-                            status = "pending",
-                        ),
+                    val childDto = LinkedChildDto(
+                        childId = "",                 // no child row until approved
+                        childName = childNameVal,
+                        className = classNameVal,
+                        roll = studentRow[StudentsTable.rollNumber],
+                        schoolName = schoolNameVal,
+                        profilePhotoUrl = photoVal,
+                        status = targetStatus,
                     )
+                    if (isPhoneMismatch) {
+                        LinkResult.NeedsReview(linkId, childDto, reviewReasonVal ?: "Needs review")
+                    } else {
+                        LinkResult.Pending(linkId, childDto)
+                    }
                 }
 
                 when (result) {
@@ -313,6 +378,26 @@ fun Route.parentLinkRouting() {
                         }
                         call.created(result.child, message = "Link request submitted for approval")
                     }
+                    is LinkResult.NeedsReview -> {
+                        // ISSUE 2d: the claim matched the student EXCEPT the phone.
+                        // Flag it into the admin "needs review" queue instead of the
+                        // normal pending queue, and tell the admins it needs a closer look.
+                        val admins = NotifyRecipients.adminsInSchool(schoolUuid)
+                        if (admins.isNotEmpty()) {
+                            Notify.toUsers(
+                                userIds = admins,
+                                category = "link_request",
+                                title = "Child-link request needs review",
+                                body = "A parent's phone didn't match the number on record for roll ${req.rollNumber}.",
+                                schoolId = schoolUuid,
+                                actorId = uid,
+                                deepLink = "admin/link-requests",
+                                refType = "link_request",
+                                refId = result.linkId.toString(),
+                            )
+                        }
+                        call.created(result.child, message = "Submitted — pending admin review (phone needs verification)")
+                    }
                 }
             }
         }
@@ -331,8 +416,10 @@ fun Route.parentLinkRouting() {
             // List the link requests for the admin's school. Defaults to pending.
             get("/link-requests") {
                 val ctx = call.requireSchoolAdmin() ?: return@get
+                // ISSUE 2d: the "needs review" (phone-mismatch) bucket is now a
+                // first-class filterable status alongside pending/approved/rejected.
                 val statusFilter = call.request.queryParameters["status"]?.trim()?.lowercase()
-                    ?.takeIf { it in setOf("pending", "approved", "rejected") }
+                    ?.takeIf { it in setOf("pending", "approved", "rejected", "needs_review") }
                     ?: "pending"
 
                 val rows = dbQuery {
@@ -348,22 +435,28 @@ fun Route.parentLinkRouting() {
                             val parentRow = AppUsersTable.selectAll()
                                 .where { AppUsersTable.id eq parentUuid }
                                 .singleOrNull()
-                            // Enrich with the canonical class from students by code.
+                            // Enrich with the canonical class from students by code,
+                            // falling back to the class stored on the link itself.
                             val code = link[ParentChildLinksTable.studentCode]
                             val classNameVal = code?.let { c ->
                                 StudentsTable.selectAll()
                                     .where { (StudentsTable.schoolId eq ctx.schoolId) and (StudentsTable.studentCode eq c) }
                                     .singleOrNull()?.get(StudentsTable.className)
-                            }
+                            } ?: link[ParentChildLinksTable.className]
                             LinkRequestDto(
                                 id = link[ParentChildLinksTable.id].value.toString(),
                                 parentId = parentUuid.toString(),
                                 parentName = parentRow?.get(AppUsersTable.fullName),
-                                parentPhone = parentRow?.get(AppUsersTable.phone),
+                                // Prefer the phone the parent submitted with THIS request
+                                // (what we matched on) then their account phone.
+                                parentPhone = link[ParentChildLinksTable.parentPhone]
+                                    ?: parentRow?.get(AppUsersTable.phone),
                                 studentCode = code,
                                 rollNumber = link[ParentChildLinksTable.rollNumber],
                                 childName = link[ParentChildLinksTable.childName],
                                 className = classNameVal,
+                                section = link[ParentChildLinksTable.section],
+                                reviewReason = link[ParentChildLinksTable.reviewReason],
                                 status = link[ParentChildLinksTable.status],
                                 requestedAt = link[ParentChildLinksTable.requestedAt].toString(),
                             )
@@ -390,8 +483,13 @@ fun Route.parentLinkRouting() {
                                 (ParentChildLinksTable.schoolId eq ctx.schoolId)
                         }
                         .singleOrNull() ?: return@dbQuery DecisionResult.NotFound
-                    if (link[ParentChildLinksTable.status] != "pending") {
-                        return@dbQuery DecisionResult.AlreadyDecided(link[ParentChildLinksTable.status])
+                    // ISSUE 2d: an admin can approve a request from EITHER the normal
+                    // pending queue OR the "needs review" (phone-mismatch) queue once
+                    // they've verified it out-of-band. Already-decided requests are not
+                    // re-approved.
+                    val curStatus = link[ParentChildLinksTable.status]
+                    if (curStatus != "pending" && curStatus != "needs_review") {
+                        return@dbQuery DecisionResult.AlreadyDecided(curStatus)
                     }
 
                     val parentUuid = link[ParentChildLinksTable.parentId]
@@ -530,8 +628,10 @@ fun Route.parentLinkRouting() {
                                 (ParentChildLinksTable.schoolId eq ctx.schoolId)
                         }
                         .singleOrNull() ?: return@dbQuery DecisionResult.NotFound
-                    if (link[ParentChildLinksTable.status] != "pending") {
-                        return@dbQuery DecisionResult.AlreadyDecided(link[ParentChildLinksTable.status])
+                    // ISSUE 2d: rejectable from pending OR needs_review.
+                    val curStatus = link[ParentChildLinksTable.status]
+                    if (curStatus != "pending" && curStatus != "needs_review") {
+                        return@dbQuery DecisionResult.AlreadyDecided(curStatus)
                     }
                     val parentUuid = link[ParentChildLinksTable.parentId]
                     val childNameVal = link[ParentChildLinksTable.childName]
@@ -587,5 +687,12 @@ private sealed interface LinkResult {
     /** Several classes share this roll number — the parent must use the unique admission code. */
     data class AmbiguousRoll(val count: Int) : LinkResult
     data object Throttled : LinkResult
+    /** Full match (name + class/section/roll + parent phone) → standard pending queue. */
     data class Pending(val linkId: UUID, val child: LinkedChildDto) : LinkResult
+    /**
+     * ISSUE 2d: name + class/section/roll matched but the parent phone did NOT
+     * match the number on record. Routed to the "needs review" queue (flagged,
+     * never silently dropped) for an admin to verify out-of-band.
+     */
+    data class NeedsReview(val linkId: UUID, val child: LinkedChildDto, val reason: String) : LinkResult
 }
