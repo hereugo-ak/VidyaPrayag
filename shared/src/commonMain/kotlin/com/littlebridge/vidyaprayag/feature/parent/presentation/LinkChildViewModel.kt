@@ -156,8 +156,22 @@ class LinkChildViewModel(
                         it.copy(
                             isSearching = false,
                             matches = schools,
-                            // Auto-select the single best match so the wizard's "Match" card lights up.
-                            selectedSchool = schools.firstOrNull(),
+                            // ROOT FIX (link failed "No student found"): previously we
+                            // auto-selected schools.firstOrNull() — the alphabetically
+                            // FIRST result — and the result cards were not tappable, so
+                            // a parent whose child is at the SECOND/THIRD match was
+                            // silently locked onto the wrong school and EVERY roll
+                            // lookup then 404'd against the wrong school's roster.
+                            // Now we ONLY auto-select when the search returns exactly one
+                            // school; with multiple results the parent must tap to choose
+                            // (the cards are now clickable — see ParentLinkChildScreenV2).
+                            // Preserve a prior valid selection if it is still in results.
+                            selectedSchool = when {
+                                schools.size == 1 -> schools.first()
+                                it.selectedSchool != null &&
+                                    schools.any { s -> s.id == it.selectedSchool.id } -> it.selectedSchool
+                                else -> null
+                            },
                         )
                     }
                 }

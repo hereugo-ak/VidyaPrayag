@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.feature.parent.presentation.LinkChildState
 import com.littlebridge.vidyaprayag.feature.parent.presentation.LinkChildViewModel
+import com.littlebridge.vidyaprayag.feature.parent.presentation.SchoolMatch
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
@@ -83,6 +84,9 @@ fun ParentLinkChildScreenV2(
         onFullNameChange = viewModel::onFullNameChange,
         onLanguageChange = viewModel::onLanguageChange,
         onSchoolQueryChange = viewModel::onSchoolQueryChange,
+        // ROOT FIX: let the parent explicitly tap their child's school so they're
+        // never silently locked onto the alphabetically-first search result.
+        onSelectSchool = viewModel::selectSchool,
         onRollNumberChange = viewModel::onRollNumberChange,
         // ISSUE 2c: guided step-3 inputs.
         onChildNameChange = viewModel::onChildNameChange,
@@ -106,6 +110,7 @@ private fun ParentLinkChildContent(
     onFullNameChange: (String) -> Unit,
     onLanguageChange: (String) -> Unit,
     onSchoolQueryChange: (String) -> Unit,
+    onSelectSchool: (SchoolMatch) -> Unit,
     onRollNumberChange: (String) -> Unit,
     // ISSUE 2c: guided step-3 inputs.
     onChildNameChange: (String) -> Unit,
@@ -214,9 +219,22 @@ private fun ParentLinkChildContent(
                         )
                     }
                     else -> {
+                        // ROOT FIX: when several schools match, the parent MUST pick
+                        // their child's school — tapping a card selects it. Auto-select
+                        // only happens for a single result (see LinkChildViewModel).
+                        if (state.matches.size > 1) {
+                            Text(
+                                "Tap your child's school to select it.",
+                                style = VTheme.type.caption.colored(c.ink2),
+                            )
+                            Spacer(Modifier.height(d.sm))
+                        }
                         state.matches.forEach { match ->
                             val selected = state.selectedSchool?.id == match.id
-                            VCard(modifier = Modifier.fillMaxWidth()) {
+                            VCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = { onSelectSchool(match) },
+                            ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     // §5: React match-icon circle = solid var(--arctic)=teal, dark glyph (Auth.tsx L294).
                                     Box(

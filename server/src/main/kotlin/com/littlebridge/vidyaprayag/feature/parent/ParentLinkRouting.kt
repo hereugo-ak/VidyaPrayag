@@ -231,6 +231,15 @@ fun Route.parentLinkRouting() {
                         } else t.lowercase()
                     }
 
+                    // Helper: does this roster row's name match the typed child name?
+                    // Case/space-insensitive; blank typed name never filters anything.
+                    fun nameMatches(row: org.jetbrains.exposed.sql.ResultRow): Boolean {
+                        val typed = req.childName?.trim()?.lowercase()?.replace(Regex("\\s+"), " ")
+                        if (typed.isNullOrBlank()) return true
+                        val stored = row[StudentsTable.fullName].trim().lowercase().replace(Regex("\\s+"), " ")
+                        return stored == typed
+                    }
+
                     val byCode = roster.filter {
                         it[StudentsTable.studentCode].equals(rollInput, ignoreCase = true)
                     }
@@ -251,6 +260,30 @@ fun Route.parentLinkRouting() {
                             )
                         }
                         if (narrowed.isNotEmpty()) matches = narrowed
+                    }
+
+                    // Still ambiguous after class narrowing? Use the typed child name
+                    // as a final tie-breaker before giving up (e.g. two pupils share
+                    // a roll in the same section — pick the one whose name matches).
+                    if (matches.size > 1) {
+                        val byName = matches.filter { nameMatches(it) }
+                        if (byName.isNotEmpty()) matches = byName
+                    }
+
+                    // ROOT FIX (graceful fallback): a parent often mistypes/omits the
+                    // roll yet gets the NAME + CLASS + SECTION right. Rather than a
+                    // dead-end "No student found", fall back to matching the roster on
+                    // (name + class + section) when the roll lookup found nothing. This
+                    // is only used as a fallback so a correct roll always wins first.
+                    if (matches.isEmpty() &&
+                        !req.childName.isNullOrBlank() && !req.className.isNullOrBlank()
+                    ) {
+                        matches = roster.filter {
+                            nameMatches(it) && ClassNaming.sameClassSection(
+                                it[StudentsTable.className], it[StudentsTable.section],
+                                req.className, req.section
+                            )
+                        }
                     }
 
                     val studentRow = when {
