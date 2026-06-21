@@ -59,7 +59,17 @@ kotlin {
         }
     }
     
-    jvm()
+    jvm {
+        // Pin the Kotlin JVM target so it stays consistent with the Java
+        // compile tasks (compileJvmMainJava). Without this, when Gradle runs
+        // on a very new JDK (e.g. 26) that Kotlin does not support yet, Kotlin
+        // falls back to JVM 24 while javac defaults to 26, which makes Gradle
+        // abort with "Inconsistent JVM-target compatibility between Java and
+        // Kotlin tasks". JVM 21 matches the rest of the project.
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_21)
+        }
+    }
     
     js {
         browser()
@@ -209,6 +219,15 @@ tasks.matching { task ->
         n.startsWith("prepareComposeResources")
 }.configureEach {
     outputs.upToDateWhen { false }
+}
+
+// Pin every Java compile task (including the Kotlin/JVM target's
+// `compileJvmMainJava`) to Java 21 so javac and the Kotlin compiler/KSP agree
+// on the JVM target even when Gradle runs on a much newer JDK (e.g. 26) that
+// Kotlin has not added support for yet.
+tasks.withType<JavaCompile>().configureEach {
+    sourceCompatibility = JavaVersion.VERSION_21.toString()
+    targetCompatibility = JavaVersion.VERSION_21.toString()
 }
 
 compose.desktop {
