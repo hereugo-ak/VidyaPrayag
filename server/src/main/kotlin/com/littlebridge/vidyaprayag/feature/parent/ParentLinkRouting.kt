@@ -40,14 +40,19 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.lowerCase
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
+import org.slf4j.LoggerFactory
 import java.time.Instant
 import java.util.UUID
+
+/** Diagnostic logger for the parent→child link matcher (ROOT CAUSE visibility). */
+private val linkLog = LoggerFactory.getLogger("ParentLinkRouting")
 
 // ---------- DTOs ----------
 
@@ -233,20 +238,48 @@ fun Route.parentLinkRouting() {
 
                     // Helper: does this roster row's name match the typed child name?
                     // Case/space-insensitive; blank typed name never filters anything.
+                    // TOLERANT by design (zero-technical-familiarity requirement): a
+                    // parent who types only "Gaurav" still matches "Gaurav Kumar", and
+                    // one who types the full name still matches a roster stored as just
+                    // the first name. We accept when one normalised name CONTAINS the
+                    // other, or when they share any whole name-token (first/last name).
                     fun nameMatches(row: org.jetbrains.exposed.sql.ResultRow): Boolean {
                         val typed = req.childName?.trim()?.lowercase()?.replace(Regex("\\s+"), " ")
                         if (typed.isNullOrBlank()) return true
                         val stored = row[StudentsTable.fullName].trim().lowercase().replace(Regex("\\s+"), " ")
-                        return stored == typed
+                        if (stored == typed) return true
+                        if (stored.contains(typed) || typed.contains(stored)) return true
+                        val storedTokens = stored.split(" ").filter { it.isNotBlank() }.toSet()
+                        val typedTokens = typed.split(" ").filter { it.isNotBlank() }.toSet()
+                        return storedTokens.intersect(typedTokens).isNotEmpty()
                     }
 
+                    // Helper: normalise an admission/student code so trivial format
+                    // drift ('g6b-012' / 'G6B 012' / 'G6B012') never blocks an exact
+                    // code match. We strip every non-alphanumeric char + upper-case.
+                    fun normaliseCode(v: String): String =
+                        v.uppercase().filter { it.isLetterOrDigit() }
+
+                    val rollInputCode = normaliseCode(rollInput)
                     val byCode = roster.filter {
-                        it[StudentsTable.studentCode].equals(rollInput, ignoreCase = true)
+                        normaliseCode(it[StudentsTable.studentCode]) == rollInputCode
                     }
                     var matches = if (byCode.isNotEmpty()) byCode else {
                         val wanted = normaliseRoll(rollInput)
                         roster.filter { normaliseRoll(it[StudentsTable.rollNumber]) == wanted }
                     }
+
+                    // ROOT-CAUSE VISIBILITY: log exactly what we searched and how big
+                    // the selected school's roster is, so a "No student found" is never
+                    // a silent mystery again. The single biggest real-world cause was a
+                    // parent landing on the WRONG school in step 2 (roster size 0 here).
+                    linkLog.info(
+                        "link-child match probe: school='{}' ({}) rosterSize={} roll='{}' " +
+                            "class='{}' section='{}' childName='{}' byCode={} byRoll={}",
+                        schoolNameVal, schoolUuid, roster.size, rollInput,
+                        req.className, req.section, req.childName,
+                        byCode.size, matches.size,
+                    )
 
                     // ISSUE 2c/2d: when the parent supplied a class+section (the new
                     // guided step-3 inputs), narrow an ambiguous roll by the class so
@@ -287,7 +320,61 @@ fun Route.parentLinkRouting() {
                     }
 
                     val studentRow = when {
-                        matches.isEmpty() -> return@dbQuery LinkResult.StudentNotFound
+                        matches.isEmpty() -> {
+                            // ROOT FIX (the persistent "No student found"): the dominant
+                            // real-world cause is the parent landing on the WRONG school
+                            // in step 2 — the child genuinely exists, just under another
+                            // school_id. Before failing, probe the WHOLE platform for a
+                            // student that matches (name + class/section + roll). If we
+                            // find exactly that child at a DIFFERENT school, tell the
+                            // parent precisely which school to pick instead of a dead-end.
+                            val wrongSchool = run {
+                                if (req.childName.isNullOrBlank() || req.className.isNullOrBlank()) return@run null
+                                val wantRoll = normaliseRoll(rollInput)
+                                val elsewhere = StudentsTable.selectAll()
+                                    .where {
+                                        (StudentsTable.schoolId neq schoolUuid) and
+                                            (StudentsTable.isActive eq true)
+                                    }
+                                    .toList()
+                                    .filter { r ->
+                                        val nameOk = run {
+                                            val typed = req.childName.trim().lowercase().replace(Regex("\\s+"), " ")
+                                            val stored = r[StudentsTable.fullName].trim().lowercase().replace(Regex("\\s+"), " ")
+                                            stored == typed || stored.contains(typed) || typed.contains(stored) ||
+                                                stored.split(" ").toSet().intersect(typed.split(" ").toSet()).isNotEmpty()
+                                        }
+                                        val classOk = ClassNaming.sameClassSection(
+                                            r[StudentsTable.className], r[StudentsTable.section],
+                                            req.className, req.section,
+                                        )
+                                        val rollOk = normaliseRoll(r[StudentsTable.rollNumber]) == wantRoll ||
+                                            normaliseCode(r[StudentsTable.studentCode]) == rollInputCode
+                                        nameOk && classOk && rollOk
+                                    }
+                                // Only confident when exactly one other-school student fits.
+                                elsewhere.singleOrNull()?.let { hit ->
+                                    val sid = hit[StudentsTable.schoolId]
+                                    val sName = SchoolsTable.selectAll()
+                                        .where { SchoolsTable.id eq sid }
+                                        .firstOrNull()?.get(SchoolsTable.name)
+                                    sName
+                                }
+                            }
+                            linkLog.warn(
+                                "link-child NO MATCH: school='{}' ({}) rosterSize={} roll='{}' " +
+                                    "class='{}' section='{}' childName='{}' — {}{}",
+                                schoolNameVal, schoolUuid, roster.size, rollInput,
+                                req.className, req.section, req.childName,
+                                if (roster.isEmpty()) "school roster is EMPTY (likely WRONG school selected)"
+                                else "roster has ${roster.size} student(s) but none matched the roll/code/name",
+                                wrongSchool?.let { " — but a matching child exists at '$it'" } ?: "",
+                            )
+                            if (wrongSchool != null) {
+                                return@dbQuery LinkResult.WrongSchool(wrongSchool)
+                            }
+                            return@dbQuery LinkResult.StudentNotFound(emptyRoster = roster.isEmpty())
+                        }
                         matches.size > 1 -> return@dbQuery LinkResult.AmbiguousRoll(matches.size)
                         else -> matches.single()
                     }
@@ -380,9 +467,22 @@ fun Route.parentLinkRouting() {
                     is LinkResult.SchoolNotFound -> call.fail("School not found", HttpStatusCode.NotFound)
                     is LinkResult.StudentNotFound ->
                         call.fail(
-                            "No student found with that roll/admission number at this school. " +
-                                "Try the full admission number printed on the school ID (e.g. S1-G3A-001).",
+                            if (result.emptyRoster)
+                                "We couldn't find your child at this school — it has no students on " +
+                                    "VidyaPrayag yet. Please go back and make sure you picked the right " +
+                                    "school in the previous step."
+                            else
+                                "No student found with that name and roll number at this school. " +
+                                    "Double-check the class, section and roll number on the school ID — " +
+                                    "or go back and confirm you selected the right school.",
                             HttpStatusCode.NotFound
+                        )
+                    is LinkResult.WrongSchool ->
+                        call.fail(
+                            "We found your child at \"${result.schoolName}\", not the school you picked. " +
+                                "Please go back to the previous step and select \"${result.schoolName}\", then try again.",
+                            HttpStatusCode.NotFound,
+                            "WRONG_SCHOOL"
                         )
                     is LinkResult.AmbiguousRoll ->
                         call.fail(
@@ -716,7 +816,18 @@ private sealed interface DecisionResult {
 /** Internal result of the link transaction so the suspend respond happens outside dbQuery. */
 private sealed interface LinkResult {
     data object SchoolNotFound : LinkResult
-    data object StudentNotFound : LinkResult
+    /**
+     * No canonical student matched. [emptyRoster] is true when the selected
+     * school has NO active students at all — a strong signal the parent picked
+     * the WRONG school in step 2 (so we say so instead of blaming their roll).
+     */
+    data class StudentNotFound(val emptyRoster: Boolean = false) : LinkResult
+    /**
+     * The child wasn't at the SELECTED school but an exact match (name + class/
+     * section + roll) was found at [schoolName] — the parent picked the wrong
+     * school in step 2. We name the right one so they can go back and fix it.
+     */
+    data class WrongSchool(val schoolName: String) : LinkResult
     /** Several classes share this roll number — the parent must use the unique admission code. */
     data class AmbiguousRoll(val count: Int) : LinkResult
     data object Throttled : LinkResult
