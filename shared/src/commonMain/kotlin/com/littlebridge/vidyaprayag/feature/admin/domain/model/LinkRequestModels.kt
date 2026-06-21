@@ -28,7 +28,13 @@ data class LinkRequestDto(
     @SerialName("roll_number") val rollNumber: String? = null,
     @SerialName("child_name") val childName: String? = null,
     @SerialName("class_name") val className: String? = null,
+    // ISSUE 2c/2d: the section captured during the guided link step.
+    val section: String? = null,
+    // ISSUE 2d: status is now "pending" | "needs_review" | "approved" | "rejected".
+    // A "needs_review" request carries a human-readable reason (e.g. a phone
+    // mismatch) so the admin queue can explain why it needs manual attention.
     val status: String,
+    @SerialName("review_reason") val reviewReason: String? = null,
     @SerialName("requested_at") val requestedAt: String,
 )
 
