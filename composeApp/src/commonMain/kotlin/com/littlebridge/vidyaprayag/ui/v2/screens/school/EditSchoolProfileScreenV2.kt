@@ -3,6 +3,8 @@ package com.littlebridge.vidyaprayag.ui.v2.screens.school
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,13 +13,23 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Phone
+import androidx.compose.material.icons.outlined.School
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolProfileState
@@ -52,33 +64,103 @@ fun EditSchoolProfileScreenV2(
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SchoolProfileViewModel = koinViewModel(),
-) {
+)
+{
+
     val state by viewModel.state.collectAsStateV2()
 
-    Column(modifier.fillMaxSize().statusBarsPadding()
-        .imePadding()
-        .navigationBarsPadding()) {
-        VBackHeader(title = "Institutional Profile", onBack = onBack)
-        EditSchoolProfileContent(
-            state = state,
-            onName = viewModel::onName,
-            onBoard = viewModel::onBoard,
-            onMedium = viewModel::onMedium,
-            onSchoolGender = viewModel::onSchoolGender,
-            onContactPhone = viewModel::onContactPhone,
-            onContactEmail = viewModel::onContactEmail,
-            onPrincipalName = viewModel::onPrincipalName,
-            onPrincipalPhone = viewModel::onPrincipalPhone,
-            onPrincipalEmail = viewModel::onPrincipalEmail,
-            onFullAddress = viewModel::onFullAddress,
-            onCity = viewModel::onCity,
-            onDistrict = viewModel::onDistrict,
-            onState = viewModel::onState,
-            onPincode = viewModel::onPincode,
-            onSave = viewModel::save,
-            onRetry = viewModel::load,
-            modifier = Modifier.fillMaxSize(),
-        )
+
+    Box(
+        modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+    ) {
+
+
+        Column(
+            Modifier.fillMaxSize()
+        ) {
+
+
+            VBackHeader(
+                title = "Institutional Profile",
+                onBack = onBack
+            )
+
+
+            EditSchoolProfileContent(
+                state = state,
+
+                onName = viewModel::onName,
+                onBoard = viewModel::onBoard,
+                onMedium = viewModel::onMedium,
+                onSchoolGender = viewModel::onSchoolGender,
+
+                onContactPhone = viewModel::onContactPhone,
+                onContactEmail = viewModel::onContactEmail,
+
+                onPrincipalName = viewModel::onPrincipalName,
+                onPrincipalPhone = viewModel::onPrincipalPhone,
+                onPrincipalEmail = viewModel::onPrincipalEmail,
+
+                onFullAddress = viewModel::onFullAddress,
+                onCity = viewModel::onCity,
+                onDistrict = viewModel::onDistrict,
+                onState = viewModel::onState,
+                onPincode = viewModel::onPincode,
+
+                onSave = viewModel::save,
+                onRetry = viewModel::load,
+
+                modifier = Modifier
+                    .weight(1f)
+            )
+        }
+
+
+
+        // Floating Save Button
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth(),
+
+            color = VTheme.colors.card,
+
+            shadowElevation = 12.dp
+        ) {
+
+            Box(
+                modifier = Modifier
+                    .padding(
+                        horizontal = 20.dp,
+                        vertical = 12.dp
+                    )
+                    .navigationBarsPadding()
+            ) {
+
+
+                VButton(
+                    text = "Save changes",
+
+                    onClick = viewModel::save,
+
+                    full = true,
+
+                    variant =
+                        VButtonVariant.Primary,
+
+                    tone =
+                        VButtonTone.Teal,
+
+                    enabled =
+                        !state.isSaving,
+
+                    loading =
+                        state.isSaving
+                )
+            }
+        }
     }
 }
 
@@ -103,188 +185,348 @@ private fun EditSchoolProfileContent(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+
     val c = VTheme.colors
+
+
     Column(
         modifier
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
+            .fillMaxSize()
+            .verticalScroll(
+                rememberScrollState()
+            )
             .statusBarsPadding()
             .imePadding()
             .navigationBarsPadding()
-            .padding(top = 16.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(
+                horizontal = 20.dp,
+                vertical = 16.dp
+            ),
+
+        verticalArrangement =
+            Arrangement.spacedBy(20.dp)
     ) {
+
+
         VStateHost(
             loading = state.isLoading,
             error = state.loadError,
-            // The form always has fields to show once loaded; never "empty".
             isEmpty = false,
             onRetry = onRetry,
         ) {
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+
+
+            // HEADER ------------------------------------------------
+
+            Column(
+                verticalArrangement =
+                    Arrangement.spacedBy(8.dp)
+            ) {
+
                 Text(
-                    "Update your school's public record. These details appear on your " +
-                            "discovery listing and on documents shared with parents.",
-                    style = VTheme.type.caption.colored(c.ink3),
+                    text = "School profile",
+
+                    style =
+                        VTheme.type.h2
+                            .colored(c.ink)
                 )
 
-                // ── Identity ─────────────────────────────────────────────────────
-                VSectionHeader(title = "IDENTITY")
-                VCard {
-                    VInput(
-                        state.name,
-                        onName,
-                        label = "School name",
-                        placeholder = "e.g. Little Bridge Public School",
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    VInput(
-                        state.board,
-                        onBoard,
-                        label = "Board",
-                        placeholder = "e.g. CBSE / ICSE / State",
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    VInput(
-                        state.medium,
-                        onMedium,
-                        label = "Medium of instruction",
-                        placeholder = "e.g. English",
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    VInput(
-                        state.schoolGender,
-                        onSchoolGender,
-                        label = "School type",
-                        placeholder = "co_ed / boys / girls",
-                        modifier = Modifier.fillMaxWidth()
-                    )
+
+                Text(
+                    text =
+                        "Keep your school's information accurate for parents, students and documents.",
+
+                    style =
+                        VTheme.type.body
+                            .colored(c.ink3)
+                )
+            }
+
+
+
+            // IDENTITY ------------------------------------------------
+
+            EditSection(
+                title = "School identity",
+                subtitle = "Basic information",
+                icon = Icons.Outlined.School
+            ) {
+
+
+                VInput(
+                    value = state.name,
+                    onValueChange = onName,
+                    label = "School name",
+                    placeholder =
+                        "Little Bridge Public School"
+                )
+
+
+                VInput(
+                    value = state.board,
+                    onValueChange = onBoard,
+                    label = "Board",
+                    placeholder =
+                        "CBSE / ICSE / State"
+                )
+
+
+                VInput(
+                    value = state.medium,
+                    onValueChange = onMedium,
+                    label = "Medium",
+                    placeholder =
+                        "English"
+                )
+
+
+                VInput(
+                    value = state.schoolGender,
+                    onValueChange = onSchoolGender,
+                    label = "School type",
+                    placeholder =
+                        "Co-ed / Boys / Girls"
+                )
+            }
+
+
+
+            // CONTACT ------------------------------------------------
+
+            EditSection(
+                title = "Contact details",
+                subtitle = "Public communication",
+                icon = Icons.Outlined.Phone
+            ) {
+
+
+                VInput(
+                    value = state.contactPhone,
+                    onValueChange = onContactPhone,
+                    label = "Phone",
+                    placeholder =
+                        "10-digit number",
+                    keyboardType =
+                        KeyboardType.Phone
+                )
+
+
+                VInput(
+                    value = state.contactEmail,
+                    onValueChange = onContactEmail,
+                    label = "Email",
+                    placeholder =
+                        "office@school.edu",
+                    keyboardType =
+                        KeyboardType.Email
+                )
+            }
+
+
+
+
+            // PRINCIPAL ------------------------------------------------
+
+            EditSection(
+                title = "Principal",
+                subtitle = "Leadership contact",
+                icon = Icons.Outlined.Person
+            ) {
+
+
+                VInput(
+                    value = state.principalName,
+                    onValueChange = onPrincipalName,
+                    label = "Name",
+                    placeholder =
+                        "Full name"
+                )
+
+
+                VInput(
+                    value = state.principalPhone,
+                    onValueChange = onPrincipalPhone,
+                    label = "Phone",
+                    placeholder =
+                        "10-digit number",
+                    keyboardType =
+                        KeyboardType.Phone
+                )
+
+
+                VInput(
+                    value = state.principalEmail,
+                    onValueChange = onPrincipalEmail,
+                    label = "Email",
+                    placeholder =
+                        "principal@school.edu",
+                    keyboardType =
+                        KeyboardType.Email
+                )
+            }
+
+
+
+
+            // ADDRESS ------------------------------------------------
+
+            EditSection(
+                title = "Location",
+                subtitle = "School address",
+                icon = Icons.Outlined.LocationOn
+            ) {
+
+
+                VInput(
+                    value = state.fullAddress,
+                    onValueChange = onFullAddress,
+                    label = "Address",
+                    placeholder =
+                        "Street, area, landmark",
+                    singleLine = false
+                )
+
+
+                Row(
+                    horizontalArrangement =
+                        Arrangement.spacedBy(12.dp)
+                ) {
+
+                    Box(
+                        Modifier.weight(1f)
+                    ) {
+                        VInput(
+                            value = state.city,
+                            onValueChange = onCity,
+                            label = "City"
+                        )
+                    }
+
+
+                    Box(
+                        Modifier.weight(1f)
+                    ) {
+                        VInput(
+                            value = state.pincode,
+                            onValueChange = onPincode,
+                            label = "PIN",
+                            keyboardType =
+                                KeyboardType.Number
+                        )
+                    }
                 }
 
-                // ── Contact ──────────────────────────────────────────────────────
-                VSectionHeader(title = "CONTACT")
-                VCard {
-                    VInput(
-                        state.contactPhone,
-                        onContactPhone,
-                        label = "Contact phone",
-                        placeholder = "10-digit number",
-                        keyboardType = KeyboardType.Phone,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    VInput(
-                        state.contactEmail,
-                        onContactEmail,
-                        label = "Contact email",
-                        placeholder = "office@school.edu",
-                        keyboardType = KeyboardType.Email,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
 
-                // ── Principal ────────────────────────────────────────────────────
-                VSectionHeader(title = "PRINCIPAL")
-                VCard {
-                    VInput(
-                        state.principalName,
-                        onPrincipalName,
-                        label = "Principal name",
-                        placeholder = "Full name",
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    VInput(
-                        state.principalPhone,
-                        onPrincipalPhone,
-                        label = "Principal phone",
-                        placeholder = "10-digit number",
-                        keyboardType = KeyboardType.Phone,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    VInput(
-                        state.principalEmail,
-                        onPrincipalEmail,
-                        label = "Principal email",
-                        placeholder = "principal@school.edu",
-                        keyboardType = KeyboardType.Email,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+                VInput(
+                    value = state.district,
+                    onValueChange = onDistrict,
+                    label = "District"
+                )
 
-                // ── Address ──────────────────────────────────────────────────────
-                VSectionHeader(title = "ADDRESS")
-                VCard {
-                    VInput(
-                        state.fullAddress,
-                        onFullAddress,
-                        label = "Full address",
-                        placeholder = "Street, area, landmark",
-                        singleLine = false,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    VInput(
-                        state.city,
-                        onCity,
-                        label = "City",
-                        placeholder = "City",
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    VInput(
-                        state.district,
-                        onDistrict,
-                        label = "District",
-                        placeholder = "District",
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    VInput(
-                        state.state,
-                        onState,
-                        label = "State",
-                        placeholder = "State",
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    VInput(
-                        state.pincode,
-                        onPincode,
-                        label = "PIN code",
-                        placeholder = "6-digit PIN",
-                        keyboardType = KeyboardType.Number,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
 
-                // ── Inline save feedback (LAW 3 — never silent) ──────────────────
-                if (state.errorMessage != null) {
-                    Spacer(Modifier.height(2.dp))
-                    Text(state.errorMessage!!, style = VTheme.type.body.colored(c.dangerInk))
-                }
-                if (state.infoMessage != null) {
-                    Spacer(Modifier.height(2.dp))
-                    Text(state.infoMessage!!, style = VTheme.type.body.colored(c.successInk))
-                }
+                VInput(
+                    value = state.state,
+                    onValueChange = onState,
+                    label = "State"
+                )
+            }
 
-                Spacer(Modifier.height(4.dp))
-                Box(Modifier.fillMaxWidth()) {
-                    VButton(
-                        text = "Save changes",
-                        onClick = onSave,
-                        full = true,
-                        variant = VButtonVariant.Primary,
-                        tone = VButtonTone.Teal,
-                        enabled = !state.isSaving,
-                        loading = state.isSaving,
+
+
+
+            // FEEDBACK -----------------------------------------------
+
+            state.errorMessage?.let {
+
+                Text(
+                    it,
+                    style =
+                        VTheme.type.body
+                            .colored(c.dangerInk)
+                )
+            }
+
+
+            state.infoMessage?.let {
+
+                Text(
+                    it,
+                    style =
+                        VTheme.type.body
+                            .colored(c.successInk)
+                )
+            }
+
+
+
+            Spacer(
+                Modifier.height(70.dp)
+            )
+        }
+    }
+
+
+
+    // Floating save button
+}
+
+@Composable
+private fun EditSection(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    content: @Composable ColumnScope.() -> Unit
+) {
+
+    VCard {
+
+        Column(
+            verticalArrangement =
+                Arrangement.spacedBy(14.dp)
+        ) {
+
+
+            Row(
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
+
+                Icon(
+                    icon,
+                    contentDescription = null
+                )
+
+
+                Spacer(
+                    Modifier.width(12.dp)
+                )
+
+
+                Column {
+
+                    Text(
+                        title,
+                        style =
+                            VTheme.type.body
+                    )
+
+                    Text(
+                        subtitle,
+                        style =
+                            VTheme.type.caption
                     )
                 }
             }
+
+
+            HorizontalDivider()
+
+
+            Column(
+                verticalArrangement =
+                    Arrangement.spacedBy(10.dp),
+                content = content
+            )
         }
     }
 }

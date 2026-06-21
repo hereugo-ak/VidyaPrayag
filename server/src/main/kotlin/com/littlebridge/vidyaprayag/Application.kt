@@ -30,6 +30,8 @@
  *   - parentFeesRouting()                 — /api/v1/parent/fees
  *   - parentLinkRouting()                 — /api/v1/parent/{schools/search, link-child}
  *   - schoolDashboardRouting()            — /api/v1/school/dashboard
+ *   - adminDashboardRouting()             — /api/admin/dashboard/{summary,analytics,activity}
+ *   - adminDashboardOverviewRouting()     — /api/admin/dashboard/overview
  *   - schoolAnalyticsRouting()            — /api/v1/school/analytics/{overview,class-performance,teacher-performance,student/{id},syllabus-coverage}
  *   - leaveRequestsRouting()              — /api/v1/school/leave-requests[…]
  *   - ptmRouting()                        — /api/v1/school/ptm
@@ -54,6 +56,8 @@ import com.littlebridge.vidyaprayag.db.DatabaseFactory
 import com.littlebridge.vidyaprayag.feature.admissions.admissionRouting
 import com.littlebridge.vidyaprayag.feature.announcements.announcementRouting
 import com.littlebridge.vidyaprayag.feature.auth.authRouting
+import com.littlebridge.vidyaprayag.feature.calendar.academicCalendarRouting
+import com.littlebridge.vidyaprayag.feature.calendar.academicYearRouting
 import com.littlebridge.vidyaprayag.feature.auth.otpAdminRouting
 import com.littlebridge.vidyaprayag.feature.config.appStatusRouting
 import com.littlebridge.vidyaprayag.feature.config.versionRouting
@@ -68,6 +72,8 @@ import com.littlebridge.vidyaprayag.feature.parent.parentLeaveRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentLinkRouting
 import com.littlebridge.vidyaprayag.feature.parent.parentAcademicsRouting
 import com.littlebridge.vidyaprayag.feature.parent.trackProgressRouting
+import com.littlebridge.vidyaprayag.feature.school.adminDashboardRouting
+import com.littlebridge.vidyaprayag.feature.school.adminDashboardOverviewRouting
 import com.littlebridge.vidyaprayag.feature.school.leaveRequestsRouting
 import com.littlebridge.vidyaprayag.feature.school.messagesRouting
 import com.littlebridge.vidyaprayag.feature.school.ptmRouting
@@ -106,6 +112,8 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
+import java.io.File
+import java.util.Properties
 
 /**
  * RA-36: max accepted Content-Length for non-multipart (JSON) requests, in bytes.
@@ -115,11 +123,31 @@ import kotlinx.serialization.json.Json
  */
 private const val MAX_JSON_BODY_BYTES = 1L * 1024 * 1024 // 1 MB
 
+private fun loadRootLocalProperties(): Properties {
+    val file = File("local.properties")
+
+    return Properties().apply {
+        if (file.exists()) {
+            file.inputStream().use { load(it) }
+        }
+    }
+}
+
 fun main() {
     DatabaseFactory.init()
-    val port = System.getenv("PORT")?.toIntOrNull() ?: SERVER_PORT
-    embeddedServer(Netty, port = port, host = "0.0.0.0", module = Application::module)
-        .start(wait = true)
+    val props = loadRootLocalProperties()
+
+    val host = props.getProperty("SERVER_HOST") ?: "0.0.0.0"
+    val port = props.getProperty("SERVER_PORT")
+        ?.toIntOrNull()
+        ?: SERVER_PORT
+
+    embeddedServer(
+        Netty,
+        port = port,
+        host = host,
+        module = Application::module
+    ).start(wait = true)
 }
 
 fun Application.module() {
@@ -239,6 +267,8 @@ fun Application.module() {
 
         // School ecosystem (school_api_spec.artifact.md)
         schoolDashboardRouting()     // /api/v1/school/dashboard
+        adminDashboardRouting()      // /api/admin/dashboard/{summary,analytics,activity} — redesigned SchoolHomeScreenV2 data
+        adminDashboardOverviewRouting() // /api/admin/dashboard/overview — consolidated command-center payload for SchoolHomeScreenV2
         schoolIntelligenceRouting()  // /api/v1/school/dashboard/intelligence — Command Center: attendance timeline+anomalies+exam overlay, early-warning students, academic health grid, activity feed (all real-data)
         schoolAnalyticsRouting()     // /api/v1/school/analytics/{overview,class-performance,teacher-performance,student/{id},syllabus-coverage}
         leaveRequestsRouting()       // /api/v1/school/leave-requests[…]
@@ -253,6 +283,10 @@ fun Application.module() {
         schoolRecordsRouting()       // /api/v1/school/{attendance/summary,marks/summary,fees/ledger} — RA-52 admin Records rollups (school-scoped reads)
         schoolTimetableRouting()     // /api/v1/school/timetable — school-wide weekly schedule (all classes) from teacher_periods, for the Command Center calendar (read-only, additive)
         mediaRouting()               // /api/v1/school/media/upload[…] — REAL binary uploads → Supabase Storage (kills URL placeholders)
+
+        // Academic Calendar platform (VP-CAL) — centralized planning & scheduling
+        academicCalendarRouting()    // /api/admin/calendar/{dashboard,events[…],events/{id}/duplicate}
+        academicYearRouting()        // /api/admin/academic-years[…] — real Academic Year management (replaces "Coming Soon")
 
         // Teacher vertical (master rebuild doc Step 7 / gap G1)
         teacherRouting()             // /api/v1/teacher/{home,classes,profile,attendance,marks,syllabus,homework}

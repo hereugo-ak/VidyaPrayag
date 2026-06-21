@@ -5,16 +5,20 @@ import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.feature.admin.data.remote.TeachersApi
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.CreateTeacherRequest
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherAccountDto
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherCardListResponse
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherCredentialDto
-import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherListResponse
 import com.littlebridge.vidyaprayag.feature.admin.domain.repository.TeachersRepository
 
 class TeachersRepositoryImpl(
     private val api: TeachersApi
 ) : TeachersRepository {
 
-    override suspend fun getTeachers(token: String): NetworkResult<ApiResponse<TeacherListResponse>> =
-        api.getTeachers(token)
+    override suspend fun getTeachers(
+        token: String,
+        page: Int,
+        pageSize: Int
+    ): NetworkResult<ApiResponse<TeacherCardListResponse>> =
+        api.getTeachers(token, page, pageSize)
 
     override suspend fun createTeacher(token: String, request: CreateTeacherRequest): NetworkResult<ApiResponse<TeacherAccountDto>> =
         api.createTeacher(token, request)

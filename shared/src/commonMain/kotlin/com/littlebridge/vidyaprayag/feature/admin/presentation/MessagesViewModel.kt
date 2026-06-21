@@ -382,13 +382,15 @@ class MessagesViewModel(
                 _compose.value = _compose.value.copy(isLoadingRecipients = false, error = "Not signed in")
                 return@launch
             }
-            when (val result = teachersRepository.getTeachers(token)) {
+            // Pull a generous first page of teacher cards as compose recipients.
+            // The card contract nests name/role under `profile`.
+            when (val result = teachersRepository.getTeachers(token, page = 1, pageSize = 100)) {
                 is NetworkResult.Success -> {
                     val candidates = result.data.data?.teachers.orEmpty().map {
                         MessageRecipient(
                             id = it.id,
-                            name = it.name,
-                            subtitle = it.role.replaceFirstChar { ch -> ch.uppercase() },
+                            name = it.profile.name,
+                            subtitle = it.profile.role.replaceFirstChar { ch -> ch.uppercase() },
                         )
                     }
                     _compose.value = _compose.value.copy(isLoadingRecipients = false, candidates = candidates, error = null)

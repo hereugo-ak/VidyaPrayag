@@ -1,19 +1,26 @@
 package com.littlebridge.vidyaprayag.ui.v2.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -25,6 +32,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,8 +40,10 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -66,49 +76,94 @@ fun VTopTabs(
     selected: String,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
-    // RA-PP-THEME: portals can override the active accent. Parents Portal passes the
-    // website violet (#544AB8) so the underline/active label reads lavender, never green.
-    // Defaults to teal so Admin/Teacher keep their existing aesthetic (token reuse, no rework).
-    activeColor: Color = VTheme.colors.tealDeep,
+    activeColor: Color? = VTheme.colors.tealDeep
 ) {
     val c = VTheme.colors
-    Column(modifier.fillMaxWidth().background(c.card)) {
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = c.card,
+    ) {
         Row(
-            Modifier
+            modifier = Modifier
+                .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                .padding(
+                    horizontal = 12.dp,
+                    vertical = 8.dp
+                ),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
+
             tabs.forEach { tab ->
+
                 val active = tab == selected
-                val color by animateColorAsState(if (active) activeColor else c.ink3, tween(180), label = "tabColor")
-                val interaction = remember { MutableInteractionSource() }
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
+
+                val bgColor by animateColorAsState(
+                    targetValue = if (active)
+                        activeColor?:c.tealDeep
+                    else
+                        Color.Transparent,
+                    animationSpec = tween(220),
+                    label = "tabBackground"
+                )
+
+                val textColor by animateColorAsState(
+                    targetValue = if (active)
+                        Color.White
+                    else
+                        c.ink3,
+                    animationSpec = tween(220),
+                    label = "tabText"
+                )
+
+                val scale by animateFloatAsState(
+                    targetValue = if (active) 1f else 0.98f,
+                    animationSpec = tween(220),
+                    label = "tabScale"
+                )
+
+
+                Box(
                     modifier = Modifier
-                        .clickable(interactionSource = interaction, indication = null) { onSelect(tab) }
-                        .padding(horizontal = 12.dp),
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        }
+                        .clip(
+                            RoundedCornerShape(50)
+                        )
+                        .background(bgColor)
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember {
+                                MutableInteractionSource()
+                            }
+                        ) {
+                            onSelect(tab)
+                        }
+                        .padding(
+                            horizontal = 18.dp,
+                            vertical = 10.dp
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
+
                     Text(
                         text = tab,
-                        // React VTopTabs: 13 / 600 (not caption's 12). §matrix.
-                        style = VTheme.type.dataSm.colored(color).copy(
+                        style = VTheme.type.dataSm.copy(
                             fontFamily = VTheme.type.uiFamily,
-                            fontWeight = FontWeight.SemiBold,
-                        ),
-                        modifier = Modifier.padding(vertical = 12.dp),
-                    )
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(2.5.dp)
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(if (active) activeColor else Color.Transparent),
+                            fontWeight = if (active)
+                                FontWeight.Bold
+                            else
+                                FontWeight.SemiBold,
+                            color = textColor
+                        )
                     )
                 }
             }
         }
-        VDivider()
     }
 }
 
@@ -126,10 +181,10 @@ data class VNavItem(
 
 /**
  * VBottomNav — the five-or-fewer tab bar pinned to the screen bottom.
- * Translated from primitives.tsx → `VBottomNav`.
+ * Translated from primitives.tsx → `VBottomNav`. original
  */
 @Composable
-fun VBottomNav(
+fun VBottomNav2(
     items: List<VNavItem>,
     selected: String,
     onSelect: (String) -> Unit,
@@ -167,12 +222,6 @@ fun VBottomNav(
         }
     }
 
-    // ── Animated pill indicator ───────────────────────────────────────────────
-    // Each tab reports its own bounds (x-offset within the Row + measured width)
-    // via onGloballyPositioned. The pill animates its x-offset and width toward
-    // the currently-selected tab's bounds with a bouncy spring so it *slides*
-    // under the icon rather than jumping. Bounds are stored in Dp so the layer is
-    // density-independent and CMP-safe (no platform APIs).
     val itemXs = remember { mutableStateMapOf<String, Dp>() }
     val itemWidths = remember { mutableStateMapOf<String, Dp>() }
     val targetX = itemXs[selected] ?: 0.dp
@@ -207,8 +256,6 @@ fun VBottomNav(
                 .navigationBarsPadding()
                 .padding(horizontal = 8.dp, vertical = 8.dp),
         ) {
-            // Pill sits *behind* the row. Only drawn once bounds are known so it
-            // never flashes a zero-width sliver on first composition.
             if (pillWidth > 0.dp) {
                 Box(
                     Modifier
@@ -241,16 +288,11 @@ fun VBottomNav(
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier
                             .onGloballyPositioned { coords ->
-                                // x relative to the parent Box (Row fills it), width of this tab.
-                                // CMP 1.10: LayoutCoordinates.positionInParent() was removed;
-                                // boundsInParent().left gives the same parent-relative x offset.
                                 itemXs[item.id] = with(density) { coords.boundsInParent().left.toDp() }
                                 itemWidths[item.id] = with(density) { coords.size.width.toDp() }
                             }
                             .clip(RoundedCornerShape(999.dp))
                             .clickable(interactionSource = interaction, indication = null) {
-                                // Haptic only when the selection actually changes — no
-                                // buzz on re-tapping the already-active tab.
                                 if (!active) {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 }
@@ -276,7 +318,6 @@ fun VBottomNav(
                                         .align(Alignment.TopEnd)
                                         .padding(start = 10.dp)
                                         .clip(CircleShape)
-                                        // §matrix: bottom-nav badge is #c14a44 (rose), not dangerInk #b3261e.
                                         .background(Color(0xFFC14A44))
                                         .padding(horizontal = 5.dp, vertical = 1.dp),
                                 ) {
@@ -302,6 +343,562 @@ fun VBottomNav(
     }
 }
 
+/*Telegrams*/
+@Composable
+fun VBottomNav(
+    items: List<VNavItem>,
+    selected: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+    val haptic = LocalHapticFeedback.current
+    val density = LocalDensity.current
+
+    val itemPositions = remember {
+        mutableStateMapOf<String, Dp>()
+    }
+
+    val itemWidths = remember {
+        mutableStateMapOf<String, Dp>()
+    }
+
+    val pillX by animateDpAsState(
+        targetValue = itemPositions[selected] ?: 0.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "pillX"
+    )
+
+    val pillWidth by animateDpAsState(
+        targetValue = itemWidths[selected] ?: 0.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "pillWidth"
+    )
+
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(
+                horizontal = 18.dp,
+                vertical = 14.dp
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+
+        Box(
+            modifier = Modifier
+                .height(68.dp)
+                .fillMaxWidth()
+                .shadow(
+                    elevation = 18.dp,
+                    shape = RoundedCornerShape(34.dp),
+                    clip = false
+                )
+                .clip(
+                    RoundedCornerShape(34.dp)
+                )
+                .background(
+                    c.card.copy(
+                        alpha = if (c.isNight) 0.96f else 0.98f
+                    )
+                )
+                .padding(horizontal = 8.dp),
+        ) {
+
+            // Telegram style active bubble
+            if (pillWidth > 0.dp) {
+
+                Box(
+                    modifier = Modifier
+                        .offset(
+                            x = pillX
+                        )
+                        .width(
+                            pillWidth
+                        )
+                        .height(52.dp)
+                        .align(
+                            Alignment.CenterStart
+                        )
+                        .clip(
+                            RoundedCornerShape(26.dp)
+                        )
+                        .background(
+                            c.tealDeep.copy(
+                                alpha = if (c.isNight)
+                                    0.22f
+                                else
+                                    0.12f
+                            )
+                        )
+                )
+            }
+
+
+            Row(
+                modifier = Modifier
+                    .fillMaxSize(),
+
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+
+                items.forEach { item ->
+
+                    val active =
+                        item.id == selected
+
+
+                    val scale by animateFloatAsState(
+                        targetValue =
+                            if (active) 1.15f else 1f,
+
+                        animationSpec =
+                            spring(
+                                dampingRatio =
+                                    Spring.DampingRatioMediumBouncy
+                            ),
+
+                        label = "iconScale"
+                    )
+
+
+                    val tint =
+                        if (active)
+                            c.tealDeep
+                        else
+                            c.ink3
+
+
+                    val interaction =
+                        remember {
+                            MutableInteractionSource()
+                        }
+
+
+                    Column(
+
+                        modifier =
+                            Modifier
+                                .onGloballyPositioned {
+
+                                    itemPositions[item.id] =
+                                        with(density) {
+                                            it.boundsInParent()
+                                                .left
+                                                .toDp()
+                                        }
+
+                                    itemWidths[item.id] =
+                                        with(density) {
+                                            it.size.width
+                                                .toDp()
+                                        }
+                                }
+
+                                .clip(
+                                    RoundedCornerShape(26.dp)
+                                )
+
+                                .clickable(
+                                    interactionSource =
+                                        interaction,
+                                    indication = null
+                                ) {
+
+                                    if (!active) {
+                                        haptic.performHapticFeedback(
+                                            HapticFeedbackType.TextHandleMove
+                                        )
+                                    }
+
+                                    onSelect(item.id)
+                                }
+
+                                .padding(
+                                    horizontal = 16.dp,
+                                    vertical = 8.dp
+                                ),
+
+                        horizontalAlignment =
+                            Alignment.CenterHorizontally,
+
+                        verticalArrangement =
+                            Arrangement.Center
+
+                    ) {
+
+
+                        Box {
+
+                            Icon(
+                                imageVector = item.icon,
+                                contentDescription =
+                                    item.label,
+
+                                tint = tint,
+
+                                modifier =
+                                    Modifier
+                                        .size(24.dp)
+                                        .graphicsLayer {
+                                            scaleX = scale
+                                            scaleY = scale
+                                        }
+                            )
+
+
+                            if (item.badge > 0) {
+
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .align(
+                                                Alignment.TopEnd
+                                            )
+                                            .offset(
+                                                x = 8.dp,
+                                                y = (-4).dp
+                                            )
+                                            .clip(
+                                                CircleShape
+                                            )
+                                            .background(
+                                                Color(0xFFC14A44)
+                                            )
+                                            .padding(
+                                                horizontal = 5.dp,
+                                                vertical = 1.dp
+                                            )
+                                ) {
+
+                                    Text(
+                                        text =
+                                            if(item.badge > 99)
+                                                "99+"
+                                            else
+                                                item.badge.toString(),
+
+                                        style =
+                                            VTheme.type.dataSm.colored(
+                                                Color.White
+                                            ).copy(
+                                                fontSize = 9.sp
+                                            )
+                                    )
+                                }
+                            }
+                        }
+
+
+                        AnimatedVisibility(
+                            visible = active
+                        ) {
+
+                            Text(
+                                text = item.label,
+
+                                style =
+                                    VTheme.type.label.colored(
+                                        tint
+                                    ).copy(
+                                        fontSize = 10.sp,
+                                        fontWeight =
+                                            FontWeight.Bold,
+                                        letterSpacing =
+                                            TextUnit.Unspecified
+                                    )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun VBottomNav4(
+    items: List<VNavItem>,
+    selected: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+    val haptic = LocalHapticFeedback.current
+
+
+    val selectedIndex = remember(selected, items) {
+        items.indexOfFirst { it.id == selected }
+            .coerceAtLeast(0)
+    }
+
+
+    val animatedIndex by animateFloatAsState(
+        targetValue = selectedIndex.toFloat(),
+        animationSpec = spring(
+            dampingRatio = 0.85f,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "navPillPosition"
+    )
+
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+    ) {
+
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(
+                    RoundedCornerShape(
+                        topStart = 28.dp,
+                        topEnd = 28.dp
+                    )
+                )
+                .background(c.lavenderLight)
+                .drawBehind {
+
+                    // soft upward shadow
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                c.shadowTint.copy(
+                                    alpha = 0.08f
+                                ),
+                                Color.Transparent
+                            ),
+                            startY = 0f,
+                            endY = 18.dp.toPx()
+                        )
+                    )
+                }
+                .padding(
+                    top = 10.dp,
+                    bottom = 8.dp,
+                    start = 8.dp,
+                    end = 8.dp
+                )
+                .navigationBarsPadding()
+
+        ) {
+
+
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+            ) {
+
+
+                val itemWidth =
+                    maxWidth / items.size
+
+
+                // Animated selected background pill
+                Box(
+                    modifier = Modifier
+                        .offset(
+                            x = itemWidth * animatedIndex
+                        )
+                        .width(itemWidth)
+                        .height(44.dp)
+                        .align(
+                            Alignment.CenterStart
+                        )
+                        .clip(
+                            RoundedCornerShape(
+                                24.dp
+                            )
+                        )
+                        .background(
+                            c.tealDeep.copy(
+                                alpha =
+                                    if (c.isNight)
+                                        0.20f
+                                    else
+                                        0.12f
+                            )
+                        )
+                )
+
+
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+
+                    horizontalArrangement =
+                        Arrangement.Center,
+
+                    verticalAlignment =
+                        Alignment.CenterVertically
+                ) {
+
+
+                    items.forEach { item ->
+
+
+                        val active =
+                            item.id == selected
+
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+
+                            contentAlignment =
+                                Alignment.Center
+                        ) {
+
+
+                            VBottomBarItem(
+                                item = item,
+                                active = active,
+                                onClick = {
+
+                                    if (!active) {
+                                        haptic.performHapticFeedback(
+                                            HapticFeedbackType.TextHandleMove
+                                        )
+                                    }
+
+                                    onSelect(item.id)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun VBottomBarItem(
+    item: VNavItem,
+    active: Boolean,
+    onClick: () -> Unit,
+) {
+    val c = VTheme.colors
+
+    val tint =
+        if (active) c.tealDeep else c.ink3
+
+
+    val scale by animateFloatAsState(
+        targetValue = if (active) 1.12f else 1f,
+        animationSpec = spring(
+            dampingRatio = 0.85f,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "iconScale"
+    )
+
+
+    val labelAlpha by animateFloatAsState(
+        targetValue = if (active) 1f else 0f,
+        animationSpec = tween(150),
+        label = "labelAlpha"
+    )
+
+
+    // icon moves down when label disappears
+    val iconOffsetY by animateDpAsState(
+        targetValue =
+            if (active)
+                (-6).dp
+            else
+                7.dp,
+
+        animationSpec = spring(
+            dampingRatio = 0.85f,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+
+        label = "iconOffset"
+    )
+
+
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(24.dp))
+            .clickable(
+                indication = null,
+                interactionSource = remember {
+                    MutableInteractionSource()
+                }
+            ) {
+                onClick()
+            }
+            .padding(
+                horizontal = 12.dp,
+                vertical = 6.dp
+            ),
+
+        horizontalAlignment = Alignment.CenterHorizontally,
+
+        verticalArrangement = Arrangement.Center
+    ) {
+
+
+        Box(
+            modifier = Modifier
+                .height(42.dp),
+            contentAlignment = Alignment.Center
+        ) {
+
+
+            Icon(
+                imageVector = item.icon,
+
+                contentDescription = item.label,
+
+                tint = tint,
+
+                modifier = Modifier
+                    .size(23.dp)
+                    .offset(y = iconOffsetY)
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                    }
+            )
+
+
+            Text(
+                text = item.label,
+
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .alpha(labelAlpha),
+
+                style =
+                    VTheme.type.label
+                        .colored(tint)
+                        .copy(
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = TextUnit.Unspecified
+                        )
+            )
+        }
+
+
+        // badge stays independent
+    }
+}
 // ─────────────────────────────────────────────────────────────────────────────
 // VBackHeader — a back chevron, centered title, and optional trailing action
 // ─────────────────────────────────────────────────────────────────────────────

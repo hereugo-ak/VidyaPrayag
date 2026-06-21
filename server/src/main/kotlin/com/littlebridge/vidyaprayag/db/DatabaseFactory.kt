@@ -156,7 +156,10 @@ object DatabaseFactory {
         // Non-teaching staff vertical (RA-S17 — Admin People sub-tabs)
         NonTeachingStaffTable,
         // Parents Portal — Profile tab "Missions & Achievements" (optional, CMS-fallback safe)
-        ParentAchievementsTable
+        ParentAchievementsTable,
+        // Academic Calendar platform (VP-CAL — centralized planning & scheduling)
+        CalendarEventsTable,
+        AcademicYearsTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

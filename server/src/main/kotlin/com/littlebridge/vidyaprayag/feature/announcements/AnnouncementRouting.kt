@@ -44,6 +44,7 @@ import com.littlebridge.vidyaprayag.db.ChildrenTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.TeacherSubjectAssignmentsTable
 import com.littlebridge.vidyaprayag.db.WhatsappLogsTable
+import com.littlebridge.vidyaprayag.feature.calendar.syncAnnouncementToCalendar
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.request.*
@@ -96,7 +97,12 @@ data class CreateAnnouncementDto(
     // Broadcast segmentation. Defaults to ALL_SCHOOL when omitted so existing
     // clients keep working. audienceFilter is the scope JSON (see Tables.kt).
     @SerialName("audience_type") val audienceType: String? = null,
-    @SerialName("audience_filter") val audienceFilter: JsonElement? = null
+    @SerialName("audience_filter") val audienceFilter: JsonElement? = null,
+    // VP-CAL integration: when a Holiday/PTM/Event announcement is created with
+    // this flag enabled (the default), the platform also mirrors it into a
+    // calendar event tagged source = ANNOUNCEMENT so the admin never has to
+    // create the same thing twice. Plain "Update"/"Reminder" types ignore this.
+    @SerialName("add_to_calendar") val addToCalendar: Boolean = true
 )
 
 /** Audience scopes a broadcast can target. */
@@ -254,6 +260,25 @@ fun Route.announcementRouting() {
                         refId = eventId,
                     )
                 }
+                // VP-CAL: mirror Holiday/PTM/Event announcements into the Academic
+                // Calendar when "Add To Academic Calendar" is enabled. Idempotent
+                // and a no-op for Update/Reminder types. Best-effort: a calendar
+                // sync failure must never fail the announcement creation.
+                if (req.addToCalendar) {
+                    runCatching {
+                        syncAnnouncementToCalendar(
+                            schoolId = schoolId,
+                            announcementEventId = eventId,
+                            announcementType = req.type,
+                            title = req.title,
+                            description = req.description,
+                            date = req.date,
+                            eventImage = req.eventImage,
+                            createdBy = uid
+                        )
+                    }
+                }
+
                 call.created(
                     AnnouncementDto(
                         req.type, eventId, req.title, req.subTitle, req.description,

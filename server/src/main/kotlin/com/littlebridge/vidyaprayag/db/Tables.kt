@@ -211,6 +211,20 @@ object SchoolsTable : UUIDTable("schools", "id") {
     val totalClasses       = integer("total_classes").nullable()
     val academicYearStartMonth = text("academic_year_start_month").nullable()
     val gradingSystem      = text("grading_system").nullable()
+    // EXPLICIT per-wizard-step completion ledger (onboarding redirect fix).
+    //
+    // The bug: self-registration (`POST /auth/register-school`) pre-creates a
+    // fully-named `schools` row at signup. The old status logic inferred
+    // "BASIC step done" purely from "a named school row exists", so a BRAND-NEW
+    // school read as having already finished Step 1 — the wizard then resumed at
+    // ACADEMIC (frontend Step 3) and skipped the required earlier steps.
+    //
+    // We now record which wizard steps the admin ACTUALLY submitted, as a CSV of
+    // step tokens (BASIC,BRANDING,ACADEMIC,REVIEW). It is written ONLY by
+    // `POST /onboarding/submit` (and `/complete`), never by registration, so it
+    // cleanly distinguishes a registration placeholder from genuine step
+    // completion. NULL/empty for a freshly-registered school → resume at BASIC.
+    val onboardingStepsDone = text("onboarding_steps_done").nullable()
     val createdAt      = timestamp("created_at")
     val updatedAt      = timestamp("updated_at")
 }
@@ -879,6 +893,13 @@ object ParentChildLinksTable : UUIDTable("parent_child_links", "id") {
     val childName   = text("child_name").nullable()
     val childId     = uuid("child_id").nullable()       // children.id once approved
     val status      = varchar("status", 16).default("pending") // pending | approved | rejected
+    // RA-SP: first-class parent relationship metadata. `relation` describes the
+    // guardian role (Father | Mother | Guardian | …) and `isPrimaryGuardian`
+    // marks the single primary point-of-contact for a student. The aggregation
+    // service enforces AT MOST ONE primary guardian per (school, student_code);
+    // both are nullable/defaulted so existing rows keep parsing unchanged.
+    val relation          = varchar("relation", 32).nullable()
+    val isPrimaryGuardian = bool("is_primary_guardian").default(false)
     val requestedAt = timestamp("requested_at")
     val actionedBy  = uuid("actioned_by").nullable()
     val actionedAt  = timestamp("actioned_at").nullable()
@@ -952,4 +973,88 @@ object ParentAchievementsTable : UUIDTable("parent_achievements", "id") {
         index("ix_parent_achievements_child", false, childId)
         index("ix_parent_achievements_child_kind", false, childId, kind)
     }
+}
+
+// =====================================================================
+// Academic Calendar Platform (VP-CAL)
+// =====================================================================
+//
+// The Academic Calendar module is the school's centralized planning &
+// scheduling system. It supersedes the legacy read-only `academic_calendar`
+// table (which only ever held simple title/date rows surfaced by the old
+// GET /api/v1/school/calendar grid) with a first-class, mutable event model
+// that supports types, status (draft/published lifecycle), audience targeting,
+// notifications, source tracking (manual vs announcement) and multi-day ranges.
+//
+// We deliberately introduce a NEW table (`calendar_events`) instead of widening
+// `academic_calendar` so that:
+//   - the legacy month-grid endpoint keeps working unchanged (no behaviour drift)
+//   - the new platform owns its richer schema without back-compat baggage
+//
+// All rows are school-scoped (multi-tenant) and soft-deletable.
+
+/**
+ * VP-CAL: a single planned item in the Academic Calendar (event / holiday /
+ * exam / PTM / activity / administrative). This is the operational scheduling
+ * record the Academic Calendar platform reads & writes.
+ */
+object CalendarEventsTable : UUIDTable("calendar_events", "id") {
+    val schoolId        = uuid("school_id")                     // FK schools.id — tenant scope
+    val eventCode       = text("event_code").uniqueIndex()      // stable external id, e.g. CAL_AB12CD34
+    // Optional link to the academic year this event belongs to (nullable so an
+    // event can exist before a year is formally created — defaults to active).
+    val academicYearId  = uuid("academic_year_id").nullable()
+    val title           = text("title")
+    val description     = text("description").default("")
+    // type: EXAM | HOLIDAY | PTM | SCHOOL_EVENT | ACTIVITY | ADMINISTRATIVE | MILESTONE
+    val type            = varchar("type", 24).default("SCHOOL_EVENT")
+    // status: DRAFT | PUBLISHED | CANCELLED | COMPLETED
+    val status          = varchar("status", 16).default("DRAFT")
+    // source: MANUAL | ANNOUNCEMENT  (where the event originated)
+    val eventSource          = varchar("source", 16).default("MANUAL")
+    // When source = ANNOUNCEMENT, the originating announcement's event_id so we
+    // can keep the two in sync and avoid duplicate workflows.
+    val sourceRef       = text("source_ref").nullable()
+    val startDate       = varchar("start_date", 12)             // YYYY-MM-DD
+    val endDate         = varchar("end_date", 12)               // YYYY-MM-DD (== startDate for single-day)
+    val allDay          = bool("all_day").default(true)
+    val bannerUrl       = text("banner_url").nullable()
+    val icon            = text("icon").nullable()
+    // audience: ALL_SCHOOL | GRADES | CLASSES | SECTIONS | TEACHERS | PARENTS | STUDENTS
+    val audience        = varchar("audience", 16).default("ALL_SCHOOL")
+    val classIds        = text("class_ids").nullable()          // JSON array (string) of class/grade ids
+    val sectionIds      = text("section_ids").nullable()        // JSON array (string) of section ids
+    val notifyStudents  = bool("notify_students").default(false)
+    val notifyParents   = bool("notify_parents").default(false)
+    val notifyTeachers  = bool("notify_teachers").default(false)
+    // Highlights a milestone (session start, quarters, finals, session end).
+    val isMilestone     = bool("is_milestone").default(false)
+    val isActive        = bool("is_active").default(true)       // soft-delete flag
+    val createdBy       = uuid("created_by").nullable()
+    val updatedBy       = uuid("updated_by").nullable()
+    val createdAt       = timestamp("created_at")
+    val updatedAt       = timestamp("updated_at")
+}
+
+/**
+ * VP-CAL: an Academic Year. Replaces the "Academic Year (Coming Soon)" settings
+ * placeholder with a real, manageable record. A school can have many years but
+ * only ONE active at a time (enforced in the routing layer). Calendar events
+ * reference a year via `calendar_events.academic_year_id`.
+ *
+ * status: DRAFT | ACTIVE | ARCHIVED
+ */
+object AcademicYearsTable : UUIDTable("academic_years", "id") {
+    val schoolId      = uuid("school_id")                       // FK schools.id — tenant scope
+    val name          = text("name")                            // e.g. "2026-27"
+    val startDate     = varchar("start_date", 12)               // YYYY-MM-DD
+    val endDate       = varchar("end_date", 12)                 // YYYY-MM-DD
+    val isActive      = bool("is_active").default(false)
+    val status        = varchar("status", 16).default("DRAFT")  // DRAFT | ACTIVE | ARCHIVED
+    // Planning numbers the admin sets (or that get computed); kept nullable so a
+    // freshly created year doesn't have to specify them up-front.
+    val academicDays  = integer("academic_days").nullable()
+    val holidayDays   = integer("holiday_days").nullable()
+    val createdAt     = timestamp("created_at")
+    val updatedAt     = timestamp("updated_at")
 }

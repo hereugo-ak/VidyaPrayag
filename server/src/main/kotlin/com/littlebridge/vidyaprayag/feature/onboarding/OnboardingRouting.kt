@@ -234,6 +234,33 @@ private suspend fun resolveSchoolIdForUser(uid: UUID): UUID? = dbQuery {
 private fun slugify(name: String) = name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
 
 /**
+ * Marks [step] (and any earlier wizard steps the admin necessarily passed
+ * through to reach it) as completed in `schools.onboarding_steps_done`. This is
+ * the AUTHORITATIVE per-step completion signal — it is set ONLY here, never at
+ * registration, so a freshly-registered school starts with an empty ledger and
+ * the gate resumes it at BASIC. Idempotent. Must run inside a dbQuery {}.
+ *
+ * We backfill earlier steps because the frontend collapses its 6-step wizard
+ * onto these 4 backend steps and submits them strictly in order; reaching
+ * ACADEMIC therefore guarantees BASIC + BRANDING were already submitted.
+ */
+private fun markStepCompleted(schoolId: UUID, step: String) {
+    val target = step.uppercase().takeIf { it in ONBOARDING_STEPS } ?: return
+    val row = SchoolsTable.selectAll().where { SchoolsTable.id eq schoolId }.singleOrNull() ?: return
+    val current = parseOnboardingLedger(row[SchoolsTable.onboardingStepsDone])
+    // Include every step up to and including the target (in-order wizard).
+    val throughTarget = ONBOARDING_STEPS.subList(0, ONBOARDING_STEPS.indexOf(target) + 1).toSet()
+    val merged = (current + throughTarget)
+    val csv = ONBOARDING_STEPS.filter { it in merged }.joinToString(",")
+    if (csv != row[SchoolsTable.onboardingStepsDone]) {
+        SchoolsTable.update({ SchoolsTable.id eq schoolId }) {
+            it[onboardingStepsDone] = csv
+            it[updatedAt] = Instant.now()
+        }
+    }
+}
+
+/**
  * Ensures a `schools` row exists for [uid] and returns its id, creating one from
  * the saved BASIC/BRANDING drafts when absent. Also stamps app_users.school_id
  * and promotes the user to school_admin. Does NOT set onboarded_at (that only
@@ -699,48 +726,54 @@ private suspend fun computeOnboardingStatusResponse(uid: UUID): OnboardingStatus
         SchoolsTable.selectAll().where { SchoolsTable.id eq it }.singleOrNull()
     }
 
-    val schoolId = schoolRow?.get(SchoolsTable.id)?.value
-    val basicDone = schoolRow != null && schoolRow[SchoolsTable.name].isNotBlank()
-    val brandingDone = schoolRow != null && (
-        !schoolRow[SchoolsTable.logoUrl].isNullOrBlank() ||
-            schoolRow[SchoolsTable.brandColor] != "#2563EB"
+    // No school at all → a fresh account that never registered/onboarded.
+    // Honest 0% with resume at the very first step.
+    if (schoolRow == null) {
+        return@dbQuery OnboardingStatusResponse(
+            schoolId = null,
+            isComplete = false,
+            completionPercent = 0,
+            resumeStep = "BASIC",
+            totalStepCount = ONBOARDING_STEPS.size,
+            steps = ONBOARDING_STEPS.mapIndexed { i, s -> OnboardingStepStatus(s, i + 1, false) }
         )
-    val academicDone = schoolId != null &&
-        SchoolClassesTable.selectAll().where { SchoolClassesTable.schoolId eq schoolId }.count() > 0L
-    val stampPresent = schoolRow?.get(SchoolsTable.onboardedAt) != null
-
-    // The final REVIEW step only reads as done when the school was ACTUALLY taken
-    // through onboarding: the stamp must be backed by the substantive prerequisite
-    // data (a named school + at least one class). A bare stamp on an otherwise
-    // empty row is treated as stale and does NOT mark the step done.
-    val reviewDone = stampPresent && basicDone && academicDone
-
-    val steps = listOf(
-        OnboardingStepStatus("BASIC", 1, basicDone),
-        OnboardingStepStatus("BRANDING", 2, brandingDone),
-        OnboardingStepStatus("ACADEMIC", 3, academicDone),
-        OnboardingStepStatus("REVIEW", 4, reviewDone)
-    )
-    val doneCount = steps.count { it.isDone }
-
-    // Completion requires the substantive steps to genuinely exist, not just the
-    // timestamp. BRANDING is best-effort (logo/brand color), so it never blocks.
-    val isComplete = basicDone && academicDone && reviewDone
-
-    // Resume at the first NON-branding step that is still missing; if only the
-    // final stamp is missing, resume at REVIEW.
-    val resume = when {
-        !basicDone -> "BASIC"
-        !academicDone -> "ACADEMIC"
-        !reviewDone -> "REVIEW"
-        else -> "REVIEW"
     }
 
+    val schoolId = schoolRow[SchoolsTable.id].value
+
+    // A class count > 0 is something registration NEVER creates, so it is a
+    // trustworthy independent signal for ACADEMIC (and a defensive fallback for
+    // legacy rows that pre-date the ledger).
+    val hasClasses = SchoolClassesTable.selectAll()
+        .where { SchoolClassesTable.schoolId eq schoolId }.count() > 0L
+
+    // `onboarding_steps_done` is written ONLY when the admin actually submits a
+    // wizard step (see markStepCompleted). It is NULL/empty for a freshly
+    // self-registered school, so "a named school row exists" no longer falsely
+    // marks BASIC complete — THIS is the redirect fix. Derivation + resume logic
+    // are shared (and unit-tested) via deriveOnboardingStatus / resumeStep.
+    val status = deriveOnboardingStatus(
+        schoolExists = true,
+        ledger = parseOnboardingLedger(schoolRow[SchoolsTable.onboardingStepsDone]),
+        hasClasses = hasClasses,
+        logoPresent = schoolRow[SchoolsTable.logoUrl]?.isNotBlank() == true,
+        stampPresent = schoolRow[SchoolsTable.onboardedAt] != null,
+    )
+
+    val steps = listOf(
+        OnboardingStepStatus("BASIC", 1, status.basicsDone),
+        OnboardingStepStatus("BRANDING", 2, status.brandingDone),
+        OnboardingStepStatus("ACADEMIC", 3, status.academicDone),
+        OnboardingStepStatus("REVIEW", 4, status.finalDone)
+    )
+
     OnboardingStatusResponse(
-        schoolId = schoolId?.toString(),
-        isComplete = isComplete,
-        completionPercent = (doneCount * 100) / steps.size,
-        resumeStep = resume,
+        schoolId = schoolId.toString(),
+        // Completion requires the substantive steps to genuinely exist, not just
+        // a timestamp. BRANDING is best-effort and never blocks completion.
+        isComplete = status.basicsDone && status.academicDone && status.finalDone,
+        completionPercent = (status.completedSteps * 100) / steps.size,
+        resumeStep = status.resumeStep(),
         totalStepCount = steps.size,
         steps = steps
     )
@@ -964,11 +997,18 @@ fun Route.onboardingRouting() {
                         "BASIC", "BRANDING" -> {
                             val sid = ensureSchoolForUser(uid)
                             syncSchoolBasics(sid, uid)
+                            // Record genuine wizard-step completion in the ledger
+                            // so the gate can resume correctly. This is the ONLY
+                            // place BASIC/BRANDING are marked done — registration
+                            // never writes the ledger, so a fresh school always
+                            // starts the wizard at BASIC.
+                            markStepCompleted(sid, step)
                         }
                         "ACADEMIC" -> {
                             val sid = ensureSchoolForUser(uid)
                             syncSchoolBasics(sid, uid)
                             persistAcademicStructure(sid, req.dataPayload)
+                            markStepCompleted(sid, "ACADEMIC")
                         }
                         "REVIEW" -> {
                             val sid = ensureSchoolForUser(uid)
@@ -981,6 +1021,7 @@ fun Route.onboardingRouting() {
                             if (!hasClasses) persistAcademicStructure(sid, JsonObject(emptyMap()))
 
                             if (complete) {
+                                markStepCompleted(sid, "REVIEW")
                                 val now = Instant.now()
                                 SchoolsTable.update({ SchoolsTable.id eq sid }) {
                                     it[onboardedAt] = now
@@ -1036,6 +1077,10 @@ fun Route.onboardingRouting() {
                         .where { SchoolClassesTable.schoolId eq schoolId }
                         .count() > 0L
                     if (!hasClasses) persistAcademicStructure(schoolId, JsonObject(emptyMap()))
+                    // Mark every step done — /complete is the explicit "finish
+                    // onboarding now" entry point, so the ledger reflects a fully
+                    // completed flow (and the gate resolves to the dashboard).
+                    markStepCompleted(schoolId, "REVIEW")
                     val now = Instant.now()
                     SchoolsTable.update({ SchoolsTable.id eq schoolId }) {
                         it[onboardedAt] = now

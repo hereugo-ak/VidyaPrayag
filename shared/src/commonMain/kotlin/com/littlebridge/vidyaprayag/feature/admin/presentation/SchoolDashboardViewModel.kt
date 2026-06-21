@@ -4,7 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardActivity
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardAnalytics
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardOverview
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.AdminDashboardSummary
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.OnboardingStep
+import com.littlebridge.vidyaprayag.feature.admin.domain.repository.AdminDashboardRepository
 import com.littlebridge.vidyaprayag.feature.auth.domain.model.OnboardingStepData
 import com.littlebridge.vidyaprayag.feature.auth.domain.model.UserDetailsData
 import com.littlebridge.vidyaprayag.feature.auth.domain.repository.AuthRepository
@@ -54,7 +59,8 @@ enum class DashboardOnboardingStatus {
  */
 class SchoolDashboardViewModel(
     private val authRepository: AuthRepository,
-    private val preferenceRepository: PreferenceRepository
+    private val preferenceRepository: PreferenceRepository,
+    private val dashboardRepository: AdminDashboardRepository
 ) : ViewModel() {
 
     private val _steps = MutableStateFlow<List<OnboardingStep>>(DEFAULT_STEPS)
@@ -75,15 +81,41 @@ class SchoolDashboardViewModel(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    // ---- Redesigned home dashboard payloads (summary / analytics / activity) ----
+    // Each is null until its endpoint resolves so the UI can fall back to a
+    // skeleton / honest empty state and never renders fabricated numbers.
+    private val _summary = MutableStateFlow<AdminDashboardSummary?>(null)
+    val summary: StateFlow<AdminDashboardSummary?> = _summary.asStateFlow()
+
+    private val _analytics = MutableStateFlow<AdminDashboardAnalytics?>(null)
+    val analytics: StateFlow<AdminDashboardAnalytics?> = _analytics.asStateFlow()
+
+    private val _activity = MutableStateFlow<AdminDashboardActivity?>(null)
+    val activity: StateFlow<AdminDashboardActivity?> = _activity.asStateFlow()
+
+    // ---- Consolidated command-center overview (the redesigned home's canonical
+    // source). Null until the /overview endpoint resolves so the UI shows a
+    // skeleton and never renders fabricated numbers. ----
+    private val _overview = MutableStateFlow<AdminDashboardOverview?>(null)
+    val overview: StateFlow<AdminDashboardOverview?> = _overview.asStateFlow()
+
     init {
         refresh()
     }
 
     /**
-     * Re-fetch user details from `/user/details`. Called on init and any time
-     * we want the dashboard to re-sync (e.g. screen resume or post-onboarding
-     * navigation).
+     * Re-fetch everything the home screen needs:
+     *   1. `/user/details`             — onboarding progress + greeting (existing)
+     *   2. `/api/admin/dashboard/`    — summary, analytics, activity (new)
+     *
+     * Called on init and any time we want the dashboard to re-sync (screen
+     * resume or post-onboarding navigation). The three dashboard reads are
+     * best-effort: a failure on any one of them logs and leaves that section in
+     * its previous (null/empty) state without blocking the others or surfacing a
+     * blocking error — onboarding/user-details remains the source of the
+     * top-level loading + error state.
      */
+
     fun refresh() {
         viewModelScope.launch {
             _isLoading.value = true
@@ -107,7 +139,55 @@ class SchoolDashboardViewModel(
                     AppLogger.e("SchoolDashboardVM", "getUserDetails connection error")
                 }
             }
+
+            loadDashboard(token)
+
             _isLoading.value = false
+        }
+    }
+
+    /**
+     * Best-effort fetch of the three dashboard endpoints. Each result is applied
+     * independently; a failure on one does not clear the others. The admin name
+     * from the summary header takes precedence over the user-details name when
+     * present (it's the same person but the summary is the home's canonical
+     * source).
+     */
+    private suspend fun loadDashboard(token: String) {
+        // The consolidated overview is the redesigned home's canonical source.
+        // It is fetched first and, when present, supplies the admin greeting name.
+        when (val r = dashboardRepository.getOverview(token)) {
+            is NetworkResult.Success -> {
+                r.data.data?.let { o ->
+                    _overview.value = o
+                    o.header.adminName.takeIf { it.isNotBlank() }?.let { _adminName.value = it }
+                }
+            }
+            is NetworkResult.Error -> AppLogger.e("SchoolDashboardVM", "getOverview failed: ${r.message}")
+            is NetworkResult.ConnectionError -> AppLogger.e("SchoolDashboardVM", "getOverview connection error")
+        }
+
+        when (val r = dashboardRepository.getSummary(token)) {
+            is NetworkResult.Success -> {
+                r.data.data?.let { s ->
+                    _summary.value = s
+                    s.admin.name.takeIf { it.isNotBlank() }?.let { _adminName.value = it }
+                }
+            }
+            is NetworkResult.Error -> AppLogger.e("SchoolDashboardVM", "getSummary failed: ${r.message}")
+            is NetworkResult.ConnectionError -> AppLogger.e("SchoolDashboardVM", "getSummary connection error")
+        }
+
+        when (val r = dashboardRepository.getAnalytics(token)) {
+            is NetworkResult.Success -> r.data.data?.let { _analytics.value = it }
+            is NetworkResult.Error -> AppLogger.e("SchoolDashboardVM", "getAnalytics failed: ${r.message}")
+            is NetworkResult.ConnectionError -> AppLogger.e("SchoolDashboardVM", "getAnalytics connection error")
+        }
+
+        when (val r = dashboardRepository.getActivity(token)) {
+            is NetworkResult.Success -> r.data.data?.let { _activity.value = it }
+            is NetworkResult.Error -> AppLogger.e("SchoolDashboardVM", "getActivity failed: ${r.message}")
+            is NetworkResult.ConnectionError -> AppLogger.e("SchoolDashboardVM", "getActivity connection error")
         }
     }
 

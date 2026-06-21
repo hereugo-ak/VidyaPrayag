@@ -97,7 +97,7 @@ private fun TeacherProfileContent(
             .statusBarsPadding()
             .imePadding()
             .navigationBarsPadding()
-            .padding(top = 24.dp, bottom = 24.dp),
+            .padding(top = 24.dp, bottom = 140.dp),
 
     ) {
         VStateHost(

@@ -18,6 +18,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,6 +37,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.littlebridge.vidyaprayag.feature.admin.domain.model.TeacherCardDto
 import com.littlebridge.vidyaprayag.feature.admin.presentation.RiskStudent
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolTeachersState
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolTeachersViewModel
@@ -44,6 +47,7 @@ import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentAnalyticsS
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentAnalyticsViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentRosterState
 import com.littlebridge.vidyaprayag.feature.admin.presentation.StudentRosterViewModel
+import com.littlebridge.vidyaprayag.ui.v2.components.VActionCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
@@ -85,6 +89,8 @@ fun SchoolPeopleScreenV2(
     onOpenLinkRequests: () -> Unit = {},
     onOpenStudent: (String) -> Unit = {},
     onOpenTeacher: (String) -> Unit = {},
+    // RA-TAM — overflow "Assign classes" opens the reusable assignment module.
+    onAssignClasses: (String) -> Unit = {},
     onOpenStaff: (String) -> Unit = {},
     viewModel: StudentAnalyticsViewModel = koinViewModel(),
     teachersViewModel: SchoolTeachersViewModel = koinViewModel(),
@@ -110,6 +116,8 @@ fun SchoolPeopleScreenV2(
         teachersState = teachersState,
         onTeachersRetry = teachersViewModel::load,
         onAddTeacher = teachersViewModel::addTeacher,
+        onLoadMoreTeachers = teachersViewModel::loadMore,
+        onDeactivateTeacher = teachersViewModel::removeTeacher,
         studentsState = studentsState,
         onStudentsRetry = studentsViewModel::load,
         onStudentSearch = { studentsViewModel.load() }, // students VM reloads full list; client-side filter below
@@ -123,6 +131,7 @@ fun SchoolPeopleScreenV2(
         onOpenLinkRequests = onOpenLinkRequests,
         onOpenStudent = onOpenStudent,
         onOpenTeacher = onOpenTeacher,
+        onAssignClasses = onAssignClasses,
         onOpenStaff = onOpenStaff,
         modifier = modifier,
     )
@@ -135,6 +144,8 @@ private fun SchoolPeopleContent(
     teachersState: SchoolTeachersState,
     onTeachersRetry: () -> Unit,
     onAddTeacher: (name: String, identifier: String, initialPassword: String?, onAdded: (() -> Unit)?) -> Unit,
+    onLoadMoreTeachers: () -> Unit,
+    onDeactivateTeacher: (String) -> Unit,
     studentsState: StudentRosterState,
     onStudentsRetry: () -> Unit,
     onStudentSearch: (String) -> Unit,
@@ -148,6 +159,7 @@ private fun SchoolPeopleContent(
     onOpenLinkRequests: () -> Unit,
     onOpenStudent: (String) -> Unit,
     onOpenTeacher: (String) -> Unit,
+    onAssignClasses: (String) -> Unit,
     onOpenStaff: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -176,24 +188,18 @@ private fun SchoolPeopleContent(
             .statusBarsPadding()
             .imePadding()
             .navigationBarsPadding()
-            .padding(top = 24.dp, bottom = 24.dp),
+            .padding(top = 24.dp, bottom = 140.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text("People", style = VTheme.type.h1.colored(c.ink), modifier = Modifier.padding(horizontal = 20.dp))
 
-        // ── RA-48: parent→child link approval queue entry ──────────────────
-        VCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).clickable(onClick = onOpenLinkRequests)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Child link requests", style = VTheme.type.bodyStrong.colored(c.ink))
-                    Text(
-                        "Review parents requesting access to a student's records",
-                        style = VTheme.type.caption.colored(c.ink2),
-                    )
-                }
-                Icon(VIcons.ArrowRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
-            }
-        }
+        VActionCard(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            title = "Child link requests",
+            subtitle = "Review parents requesting access to student records",
+            icon = VIcons.Plus,
+            onClick = onOpenLinkRequests,
+        )
 
         // ── RA-S17: sub-tabs ─────────────────────────────────────────────────
         VTopTabs(
@@ -212,6 +218,11 @@ private fun SchoolPeopleContent(
                     onRetry = onTeachersRetry,
                     onAddClick = { showAddTeacher = true },
                     onOpenTeacher = onOpenTeacher,
+                    onLoadMore = onLoadMoreTeachers,
+                    onDeactivate = onDeactivateTeacher,
+                    // RA-TAM — "Assign classes" now opens the reusable Teacher
+                    // Assignment Management module (one of its 3 entry points).
+                    onAssignClass = onAssignClasses,
                 )
                 "Students" -> StudentsSubTab(
                     state = studentsState,
@@ -285,6 +296,9 @@ private fun TeachersSubTab(
     onRetry: () -> Unit,
     onAddClick: () -> Unit,
     onOpenTeacher: (String) -> Unit,
+    onLoadMore: () -> Unit,
+    onDeactivate: (String) -> Unit,
+    onAssignClass: (String) -> Unit,
 ) {
     val c = VTheme.colors
     var query by remember { mutableStateOf("") }
@@ -308,15 +322,19 @@ private fun TeachersSubTab(
         value = query,
         onValueChange = { query = it },
         label = "",
-        placeholder = "Search by name or contact",
+        placeholder = "Search by name, role or subject",
         leadingIcon = VIcons.Search,
         modifier = Modifier.fillMaxWidth(),
     )
 
-    val filtered = state.teachers.filter {
+    // Card DTOs have no phone/contact field — search the human-facing summary
+    // instead: name, role label, assigned subjects and grades.
+    val filtered = state.teachers.filter { t ->
         query.isBlank() ||
-            it.name.contains(query, ignoreCase = true) ||
-            it.contact.contains(query, ignoreCase = true)
+            t.profile.name.contains(query, ignoreCase = true) ||
+            t.profile.role.contains(query, ignoreCase = true) ||
+            t.academicAssignment.subjects.any { it.contains(query, ignoreCase = true) } ||
+            t.academicAssignment.grades.any { it.contains(query, ignoreCase = true) }
     }
 
     VStateHost(
@@ -332,18 +350,275 @@ private fun TeachersSubTab(
         skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonList(rows = 5) },
     ) {
         val ready = filtered.isNotEmpty() && !state.isLoading
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             filtered.forEachIndexed { index, t ->
                 Box(modifier = Modifier.staggeredItemEntrance(index = index, trigger = ready)) {
-                    PersonRow(
-                        name = t.name,
-                        subtitle = t.contact.ifBlank { "Teacher" },
-                        onClick = { onOpenTeacher(t.id) },
+                    TeacherCard(
+                        teacher = t,
+                        isMutating = state.isMutating,
+                        onViewProfile = { onOpenTeacher(t.id) },
+                        onDeactivate = { onDeactivate(t.id) },
+                        onAssignClass = { onAssignClass(t.id) },
                     )
+                }
+            }
+
+            // Pagination: only meaningful when NOT filtering locally (a local
+            // search filters just the loaded page; loading more would surprise).
+            if (query.isBlank() && state.hasNext) {
+                VButton(
+                    text = if (state.isLoadingMore) "Loading…" else "Load more",
+                    onClick = onLoadMore,
+                    variant = VButtonVariant.Ghost,
+                    size = VButtonSize.Sm,
+                    full = true,
+                    enabled = !state.isLoadingMore && !state.isLoading,
+                    loading = state.isLoadingMore,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Teacher summary CARD — the redesigned School-Admin teacher list row. Every
+ * card is self-contained: header (avatar + name + role + status), academic
+ * assignment (grades / subjects), workload (classes / students), activity
+ * (attendance % + last active), and a footer with View Profile plus an overflow
+ * menu. Every action is driven by the backend `actions` flags — nothing is
+ * hardcoded — and every data section degrades gracefully when empty.
+ */
+@Composable
+private fun TeacherCard(
+    teacher: TeacherCardDto,
+    isMutating: Boolean,
+    onViewProfile: () -> Unit,
+    onDeactivate: () -> Unit,
+    onAssignClass: () -> Unit,
+) {
+    val c = VTheme.colors
+    val isActive = teacher.profile.status.equals("ACTIVE", ignoreCase = true)
+    var menuOpen by remember { mutableStateOf(false) }
+    // The overflow menu only has content when the backend grants at least one
+    // overflow action; otherwise we hide the ⋮ entirely.
+    val hasOverflow = teacher.actions.canAssignClass || teacher.actions.canDeactivate
+
+    VCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+
+            // ── Header: avatar · name · role · status ──────────────────────
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                VAvatar(
+                    name = teacher.profile.name,
+                    src = teacher.profile.avatarUrl?.takeIf { it.isNotBlank() },
+                    size = 46.dp,
+                )
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        teacher.profile.name.ifBlank { "Unnamed teacher" },
+                        style = VTheme.type.bodyStrong.colored(c.ink),
+                    )
+                    if (teacher.profile.role.isNotBlank()) {
+                        Text(teacher.profile.role, style = VTheme.type.caption.colored(c.ink2))
+                    }
+                }
+                VBadge(
+                    text = if (isActive) "Active" else "Inactive",
+                    tone = if (isActive) VBadgeTone.Success else VBadgeTone.Neutral,
+                )
+            }
+
+            CardDivider()
+
+            // ── Academic assignment: grades + subjects ─────────────────────
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LabeledChipsRow(
+                    label = "Grades",
+                    values = teacher.academicAssignment.grades,
+                    emptyText = "No grades assigned",
+                )
+                LabeledChipsRow(
+                    label = "Subjects",
+                    values = teacher.academicAssignment.subjects,
+                    emptyText = "No subjects assigned",
+                )
+            }
+
+            CardDivider()
+
+            // ── Workload: classes + students (side by side) ────────────────
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                WorkloadStat(
+                    label = "Classes",
+                    value = teacher.workload.totalClasses.toString(),
+                    icon = VIcons.BookOpen,
+                    modifier = Modifier.weight(1f),
+                )
+                WorkloadStat(
+                    label = "Students",
+                    value = teacher.workload.totalStudents.toString(),
+                    icon = VIcons.Users,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            CardDivider()
+
+            // ── Activity: attendance % + last active ───────────────────────
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(VIcons.TrendingUp, contentDescription = null, tint = c.ink3, modifier = Modifier.size(14.dp))
+                    Text(
+                        teacher.activity.attendancePercentage
+                            ?.let { "Attendance $it%" }
+                            ?: "Attendance —",
+                        style = VTheme.type.caption.colored(c.ink2),
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(VIcons.Clock, contentDescription = null, tint = c.ink3, modifier = Modifier.size(14.dp))
+                    Text(
+                        lastActiveLabel(teacher.activity.lastActiveAt),
+                        style = VTheme.type.caption.colored(c.ink2),
+                    )
+                }
+            }
+
+            // ── Actions: View Profile + overflow (backend-driven) ──────────
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (teacher.actions.canViewProfile) {
+                    VButton(
+                        text = "View Profile",
+                        onClick = onViewProfile,
+                        variant = VButtonVariant.Secondary,
+                        size = VButtonSize.Sm,
+                        modifier = Modifier.weight(1f),
+                        leading = { Icon(VIcons.Eye, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                    )
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+
+                if (hasOverflow) {
+                    Box {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(c.cream)
+                                .clickable(enabled = !isMutating) { menuOpen = true },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(VIcons.More, contentDescription = "More actions", tint = c.ink2, modifier = Modifier.size(18.dp))
+                        }
+                        // Overflow items are strictly backend-driven by the
+                        // `actions` flags — nothing here is hardcoded. Both map to
+                        // existing flows (assign-class lives in the profile;
+                        // deactivate reuses the soft-delete endpoint).
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            if (teacher.actions.canAssignClass) {
+                                DropdownMenuItem(
+                                    text = { Text("Assign classes") },
+                                    onClick = { menuOpen = false; onAssignClass() },
+                                    leadingIcon = { Icon(VIcons.GraduationCap, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                )
+                            }
+                            if (teacher.actions.canDeactivate) {
+                                DropdownMenuItem(
+                                    text = { Text("Deactivate", style = VTheme.type.body.colored(c.dangerInk)) },
+                                    onClick = { menuOpen = false; onDeactivate() },
+                                    leadingIcon = { Icon(VIcons.Close, contentDescription = null, tint = c.dangerInk, modifier = Modifier.size(16.dp)) },
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
     }
+}
+
+/** Thin hairline divider used between a teacher card's sections. */
+@Composable
+private fun CardDivider() {
+    val c = VTheme.colors
+    Box(Modifier.fillMaxWidth().height(1.dp).background(c.ink.copy(alpha = 0.06f)))
+}
+
+/**
+ * A labelled wrapped row of value "chips" (e.g. Grades / Subjects). Renders
+ * [emptyText] in a muted tone when [values] is empty so an unassigned teacher
+ * still reads cleanly.
+ */
+@Composable
+private fun LabeledChipsRow(
+    label: String,
+    values: List<String>,
+    emptyText: String,
+) {
+    val c = VTheme.colors
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, style = VTheme.type.label.colored(c.ink3))
+        if (values.isEmpty()) {
+            Text(emptyText, style = VTheme.type.caption.colored(c.ink3))
+        } else {
+            // Bullet-joined to mirror the "Grade 6 • Grade 7" mock and avoid a
+            // new FlowRow dependency (keeps to existing layout primitives).
+            Text(
+                values.joinToString("  •  "),
+                style = VTheme.type.body.colored(c.ink),
+            )
+        }
+    }
+}
+
+/** A single workload stat tile (big number + caption + icon). */
+@Composable
+private fun WorkloadStat(
+    label: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+    Column(
+        modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(c.ink.copy(alpha = 0.05f))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(icon, contentDescription = null, tint = c.ink3, modifier = Modifier.size(14.dp))
+            Text(label, style = VTheme.type.label.colored(c.ink3))
+        }
+        Text(value, style = VTheme.type.dataLg.colored(c.ink).copy(fontSize = 20.sp, fontWeight = FontWeight.SemiBold))
+    }
+}
+
+/**
+ * Humanise the ISO-8601 lastActiveAt into a short label. We intentionally keep
+ * this dependency-free (no kotlinx-datetime parsing here): a null/blank value
+ * → "Never active"; otherwise we surface the calendar date portion, falling
+ * back to the raw value if it is not in the expected shape.
+ */
+private fun lastActiveLabel(iso: String?): String {
+    if (iso.isNullOrBlank()) return "Never active"
+    // ISO-8601 UTC like "2026-06-16T09:30:00Z" → "Active 2026-06-16".
+    val datePart = iso.substringBefore('T').takeIf { it.length == 10 && it.count { ch -> ch == '-' } == 2 }
+    return datePart?.let { "Active $it" } ?: "Active"
 }
 
 // ───────────────────────── Students sub-tab ─────────────────────────

@@ -25,11 +25,45 @@ data class StudentDto(
     @SerialName("class_name") val className: String,
     val section: String,
     @SerialName("roll_number") val rollNumber: String,
-    @SerialName("profile_photo_url") val profilePhotoUrl: String? = null
+    @SerialName("profile_photo_url") val profilePhotoUrl: String? = null,
+    // RA-SP: listing-card enrichment. All defaulted so existing JSON decodes; all
+    // DERIVED server-side by StudentAggregationService.
+    @SerialName("attendance_percent") val attendancePercent: Float = 0f,
+    @SerialName("teacher_count") val teacherCount: Int = 0,
+    @SerialName("parent_count") val parentCount: Int = 0,
+    @SerialName("is_new_admission") val isNewAdmission: Boolean = false,
+    val status: String = "active"
 )
 
 @Serializable
 data class StudentListResponse(val students: List<StudentDto>)
+
+// RA-SP: a teacher connected to a student, derived from class assignments.
+@Serializable
+data class StudentTeacherDto(
+    val id: String,
+    val name: String,
+    val subject: String,
+    val designation: String? = null
+)
+
+// RA-SP: a parent linked to a student. Supports multiple; one primary guardian.
+@Serializable
+data class StudentParentDto(
+    val id: String,
+    val name: String,
+    val relation: String,
+    @SerialName("is_primary_guardian") val isPrimaryGuardian: Boolean = false,
+    val phone: String? = null
+)
+
+// RA-SP: a single recent-activity timeline entry (newest first).
+@Serializable
+data class StudentActivityDto(
+    val title: String,
+    @SerialName("created_at") val createdAt: String,
+    val type: String
+)
 
 @Serializable
 data class CreateStudentRequest(
@@ -106,24 +140,77 @@ data class StudentProfileDto(
     @SerialName("recent_attendance") val recentAttendance: List<AttendanceDayDto>,
     val marks: List<StudentMarkDto>,
     val leave: List<StudentLeaveDto>,
-    val fees: List<StudentFeeDto>
+    val fees: List<StudentFeeDto>,
+    // RA-SP: dashboard enrichment — relationship-aware sections + KPI carousel
+    // metrics + backend-generated narrative. Defaulted for compatibility; every
+    // value is DERIVED server-side by StudentAggregationService.
+    @SerialName("admission_date") val admissionDate: String? = null,
+    @SerialName("attendance_percent") val attendancePercent: Float = 0f,
+    @SerialName("teacher_count") val teacherCount: Int = 0,
+    @SerialName("parent_count") val parentCount: Int = 0,
+    @SerialName("subject_count") val subjectCount: Int = 0,
+    @SerialName("academic_score") val academicScore: Float? = null,
+    @SerialName("is_new_admission") val isNewAdmission: Boolean = false,
+    val status: String = "active",
+    val teachers: List<StudentTeacherDto> = emptyList(),
+    val parents: List<StudentParentDto> = emptyList(),
+    val insights: List<String> = emptyList(),
+    val activities: List<StudentActivityDto> = emptyList()
 )
 
 @Serializable
 data class TeacherAssignmentDto(
     @SerialName("class_name") val className: String,
     val section: String,
-    val subject: String
+    val subject: String,
+    // RA-PP: per-assignment student count powers the Teaching Portfolio carousel.
+    @SerialName("student_count") val studentCount: Int = 0
+)
+
+// RA-PP: surfaced as modern highlight cards in the redesigned profile.
+@Serializable
+data class TeacherAchievementDto(
+    val title: String,
+    val description: String
+)
+
+// RA-PP: chronological timeline entries (newest first) for the Recent Activity feed.
+@Serializable
+data class TeacherActivityDto(
+    val title: String,
+    @SerialName("created_at") val createdAt: String,
+    val type: String
 )
 
 @Serializable
 data class TeacherProfileDto(
     val id: String,
     val name: String,
+
     val email: String? = null,
     val phone: String? = null,
+
     val role: String,
-    val assignments: List<TeacherAssignmentDto>,
+
+    // RA-PP: identity / hero-banner enrichment.
+    val designation: String? = null,
+    @SerialName("joined_on") val joinedOn: String? = null,
+    @SerialName("experience_years") val experienceYears: Int? = null,
+
+    // RA-PP: KPI carousel + performance overview metrics.
+    @SerialName("student_count") val studentCount: Int = 0,
     @SerialName("class_count") val classCount: Int,
-    @SerialName("subject_count") val subjectCount: Int
+    @SerialName("subject_count") val subjectCount: Int,
+    @SerialName("attendance_percent") val attendancePercent: Float = 0f,
+    @SerialName("assignment_completion_percent") val assignmentCompletionPercent: Float = 0f,
+    @SerialName("parent_satisfaction_percent") val parentSatisfactionPercent: Float = 0f,
+
+    val status: String = "active",
+
+    val assignments: List<TeacherAssignmentDto>,
+
+    // RA-PP: backend-generated narrative sections.
+    val insights: List<String> = emptyList(),
+    val achievements: List<TeacherAchievementDto> = emptyList(),
+    @SerialName("recent_activities") val recentActivities: List<TeacherActivityDto> = emptyList()
 )

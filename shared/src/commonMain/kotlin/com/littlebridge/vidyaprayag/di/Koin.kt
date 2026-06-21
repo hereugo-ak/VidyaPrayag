@@ -164,6 +164,13 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    // RA-TAM: Teacher Assignment Management (reusable assignment module)
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.TeacherAssignmentApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
     // RA-S17: Non-teaching-staff vertical
     single {
         com.littlebridge.vidyaprayag.feature.admin.data.remote.StaffApi(
@@ -190,6 +197,19 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    // VP-CAL: Academic Calendar platform + Academic Year management
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.AcademicCalendarPlatformApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.AcademicYearApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
     single {
         com.littlebridge.vidyaprayag.feature.admin.data.remote.AttendanceApi(
             client = get(),
@@ -211,6 +231,13 @@ val commonModule = module {
     }
     single {
         com.littlebridge.vidyaprayag.feature.admin.data.remote.AnalyticsApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    // Redesigned admin home dashboard (summary / analytics / activity).
+    single {
+        com.littlebridge.vidyaprayag.feature.admin.data.remote.AdminDashboardApi(
             client = get(),
             baseUrl = AppConfig.schoolBaseUrl
         )
@@ -276,6 +303,10 @@ val commonModule = module {
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.StudentsRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.StudentsRepositoryImpl(get())
     }
+    // RA-TAM: Teacher Assignment Management repository
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.TeacherAssignmentRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.TeacherAssignmentRepositoryImpl(get())
+    }
     // RA-S17
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.StaffRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.StaffRepositoryImpl(get())
@@ -290,6 +321,13 @@ val commonModule = module {
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.CalendarRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.CalendarRepositoryImpl(get())
     }
+    // VP-CAL: Academic Calendar platform + Academic Year management repositories
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AcademicCalendarPlatformRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.AcademicCalendarPlatformRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AcademicYearRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.AcademicYearRepositoryImpl(get())
+    }
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AttendanceRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.AttendanceRepositoryImpl(get())
     }
@@ -302,6 +340,9 @@ val commonModule = module {
     }
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AnalyticsRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.AnalyticsRepositoryImpl(get())
+    }
+    single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.AdminDashboardRepository> {
+        com.littlebridge.vidyaprayag.feature.admin.data.repository.AdminDashboardRepositoryImpl(get())
     }
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.ResultsRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.ResultsRepositoryImpl(get())
@@ -349,7 +390,7 @@ val viewModelModule = module {
     factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentDashboardViewModel(get(), get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentLeaveViewModel(get(), get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.parent.presentation.ParentMessageViewModel(get(), get()) }
-    factory { SchoolDashboardViewModel(get(), get()) }
+    factory { SchoolDashboardViewModel(get(), get(), get()) }
     factory { InstitutionalBasicOBViewModel(get(), get()) }
     factory { BrandingInfoOBViewModel(get(), get(), get()) }
     factory { AcademicInfoOBViewModel(get(), get()) }
@@ -364,6 +405,7 @@ val viewModelModule = module {
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.StaffViewModel(get(), get()) } // RA-S17
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.StudentProfileViewModel(get(), get()) } // RA-45
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.TeacherProfileViewModel(get(), get(), get()) } // RA-45 (+RA-S17 delete-in-profile)
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.TeacherAssignmentViewModel(get(), get()) } // RA-TAM: reusable assignment module
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.SchoolRecordsViewModel(get(), get()) } // RA-52
     factory { AdmissionCRMViewModel(get(), get()) }
     factory { SchoolAnnouncementsViewModel(get(), get()) }
@@ -371,6 +413,10 @@ val viewModelModule = module {
     factory { MessagesViewModel(get(), get(), get()) }
     factory { SchedulePTMViewModel(get(), get()) }
     factory { AcademicCalendarViewModel(get(), get()) }
+    // VP-CAL: premium Academic Calendar platform + 7-step create-event wizard + Academic Year mgmt
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.AcademicCalendarPlatformViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.CreateCalendarEventViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.admin.presentation.AcademicYearViewModel(get(), get()) }
     factory { LeaveRequestsViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.admin.presentation.LinkRequestsViewModel(get(), get()) }
     factory { DailyAttendanceViewModel(get(), get()) }
