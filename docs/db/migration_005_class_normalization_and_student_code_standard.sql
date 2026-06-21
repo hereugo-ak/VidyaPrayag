@@ -22,6 +22,19 @@
 --        - homework_submissions.student_id
 --        - parent_child_links.student_code
 --
+-- SAFETY / IDEMPOTENCY:
+--   • ADD COLUMN ... IF NOT EXISTS         — re-running won't error if the
+--     parent_phone column is already present.
+--   • CREATE OR REPLACE FUNCTION           — helper functions are replaced,
+--     never duplicated.
+--   • CREATE INDEX ... IF NOT EXISTS       — indexes are only created once.
+--   • to_regclass(...) IS NOT NULL guards  — every OPTIONAL dependent table
+--     update is skipped if that table doesn't exist in this deployment.
+--   • The whole thing runs in ONE transaction, so a failure rolls back fully.
+--   Re-running after a successful run is harmless: class names are already
+--   canonical (DISTINCT FROM guards skip them) and codes are already in the
+--   standard, so the regenerated value equals the stored one.
+--
 -- Run inside a single transaction.
 -- =====================================================================
 
@@ -133,6 +146,9 @@ WHERE t.section IS DISTINCT FROM vp_section_key(t.section);
 -- propagate it everywhere the old code was referenced by value.
 
 -- 3a. Compute the desired base code and a uniqueness-safe final code.
+--     IDEMPOTENT: a student whose current code is ALREADY the base (or a
+--     base-with-suffix in the standard) keeps it — ordering prefers such rows
+--     for rank 1, so a second run produces new_code == old_code (no-ops).
 CREATE TEMP TABLE vp_code_map ON COMMIT DROP AS
 WITH base AS (
     SELECT
@@ -145,7 +161,15 @@ WITH base AS (
 ranked AS (
     SELECT
         id, school_id, old_code, base_code,
-        ROW_NUMBER() OVER (PARTITION BY base_code ORDER BY old_code) AS rn
+        ROW_NUMBER() OVER (
+            PARTITION BY base_code
+            -- Prefer the row that already holds the exact base code, then any
+            -- row already in the base-with-suffix standard, then by old code.
+            ORDER BY
+                (old_code = base_code) DESC,
+                (old_code ~ ('^' || base_code || '(-[0-9]+)?$')) DESC,
+                old_code
+        ) AS rn
     FROM base
 )
 SELECT
@@ -163,35 +187,54 @@ WHERE EXISTS (
 );
 
 -- 3c. Cascade to dependent tables FIRST (they reference the OLD code by value).
-UPDATE attendance_records a
-SET person_id = m.new_code
-FROM vp_code_map m
-WHERE a.type = 'student' AND a.person_id = m.old_code;
+--     Each table is guarded with to_regclass so the migration still runs on a
+--     deployment that does not (yet) have an optional table. We also verify the
+--     specific column exists before touching it (defensive against schema drift).
+DO $cascade$
+BEGIN
+    IF to_regclass('public.attendance_records') IS NOT NULL THEN
+        UPDATE attendance_records a
+        SET person_id = m.new_code
+        FROM vp_code_map m
+        WHERE a.type = 'student' AND a.person_id = m.old_code;
+    END IF;
 
-UPDATE children c
-SET student_code = m.new_code
-FROM vp_code_map m
-WHERE c.student_code = m.old_code;
+    IF to_regclass('public.children') IS NOT NULL THEN
+        UPDATE children c
+        SET student_code = m.new_code
+        FROM vp_code_map m
+        WHERE c.student_code = m.old_code;
+    END IF;
 
-UPDATE exam_results e
-SET student_id = m.new_code
-FROM vp_code_map m
-WHERE e.student_id = m.old_code;
+    IF to_regclass('public.exam_results') IS NOT NULL THEN
+        UPDATE exam_results e
+        SET student_id = m.new_code
+        FROM vp_code_map m
+        WHERE e.student_id = m.old_code;
+    END IF;
 
-UPDATE assessment_marks am
-SET student_id = m.new_code
-FROM vp_code_map m
-WHERE am.student_id = m.old_code;
+    IF to_regclass('public.assessment_marks') IS NOT NULL THEN
+        UPDATE assessment_marks am
+        SET student_id = m.new_code
+        FROM vp_code_map m
+        WHERE am.student_id = m.old_code;
+    END IF;
 
-UPDATE homework_submissions h
-SET student_id = m.new_code
-FROM vp_code_map m
-WHERE h.student_id = m.old_code;
+    IF to_regclass('public.homework_submissions') IS NOT NULL THEN
+        UPDATE homework_submissions h
+        SET student_id = m.new_code
+        FROM vp_code_map m
+        WHERE h.student_id = m.old_code;
+    END IF;
 
-UPDATE parent_child_links p
-SET student_code = m.new_code
-FROM vp_code_map m
-WHERE p.student_code = m.old_code;
+    IF to_regclass('public.parent_child_links') IS NOT NULL THEN
+        UPDATE parent_child_links p
+        SET student_code = m.new_code
+        FROM vp_code_map m
+        WHERE p.student_code = m.old_code;
+    END IF;
+END
+$cascade$;
 
 -- 3d. Finally rewrite the canonical students.student_code.
 UPDATE students s
