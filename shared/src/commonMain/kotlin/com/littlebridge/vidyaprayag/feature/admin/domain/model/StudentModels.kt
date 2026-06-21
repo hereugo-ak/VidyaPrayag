@@ -25,6 +25,8 @@ data class StudentDto(
     @SerialName("class_name") val className: String,
     val section: String,
     @SerialName("roll_number") val rollNumber: String,
+    // ISSUE 2b: parent/guardian phone on record.
+    @SerialName("parent_phone") val parentPhone: String? = null,
     @SerialName("profile_photo_url") val profilePhotoUrl: String? = null,
     // RA-SP: listing-card enrichment. All defaulted so existing JSON decodes; all
     // DERIVED server-side by StudentAggregationService.
@@ -71,6 +73,8 @@ data class CreateStudentRequest(
     @SerialName("class_name") val className: String,
     val section: String? = null,
     @SerialName("roll_number") val rollNumber: String,
+    // ISSUE 2b: parent/guardian phone — required by the admin add-student form.
+    @SerialName("parent_phone") val parentPhone: String? = null,
     @SerialName("student_code") val studentCode: String? = null
 )
 

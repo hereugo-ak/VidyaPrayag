@@ -112,7 +112,7 @@ fun StudentRosterScreenV2(
             isSubmitting = state.isSaving,
             error = state.addError,
             onDismiss = { showAdd = false; viewModel.clearMessages() },
-            onSubmit = { name, cls, sec, roll -> viewModel.addStudent(name, cls, sec, roll) },
+            onSubmit = { name, cls, sec, roll, phone -> viewModel.addStudent(name, cls, sec, roll, phone) },
         )
     }
 
@@ -292,15 +292,20 @@ private fun AddStudentDialog(
     isSubmitting: Boolean,
     error: String?,
     onDismiss: () -> Unit,
-    onSubmit: (name: String, className: String, section: String, rollNumber: String) -> Unit,
+    onSubmit: (name: String, className: String, section: String, rollNumber: String, parentPhone: String) -> Unit,
 ) {
     val c = VTheme.colors
     var name by remember { mutableStateOf("") }
     var className by remember { mutableStateOf("") }
     var section by remember { mutableStateOf("") }
     var roll by remember { mutableStateOf("") }
+    // ISSUE 2b: capture parent/guardian phone, digits-only, validated >= 10.
+    var parentPhone by remember { mutableStateOf("") }
+    val phoneDigits = parentPhone.filter { it.isDigit() }
+    val phoneValid = phoneDigits.length >= 10
 
-    val canSubmit = name.isNotBlank() && className.isNotBlank() && roll.isNotBlank() && !isSubmitting
+    val canSubmit = name.isNotBlank() && className.isNotBlank() &&
+        roll.isNotBlank() && phoneValid && !isSubmitting
 
     Dialog(onDismissRequest = onDismiss) {
         VCard(modifier = Modifier.fillMaxWidth()) {
@@ -310,13 +315,25 @@ private fun AddStudentDialog(
                 VInput(className, { className = it }, label = "Class", placeholder = "e.g. Grade 4")
                 VInput(section, { section = it }, label = "Section", placeholder = "A")
                 VInput(roll, { roll = it }, label = "Roll number", placeholder = "e.g. 12", keyboardType = KeyboardType.Number)
+                // ISSUE 2b: parent phone is mandatory; used by parent-link matching.
+                VInput(
+                    parentPhone,
+                    // keep digits + a leading + and common separators while typing
+                    { input -> parentPhone = input.filter { it.isDigit() || it == '+' || it == ' ' || it == '-' } },
+                    label = "Parent/Guardian phone",
+                    placeholder = "e.g. 98765 43210",
+                    keyboardType = KeyboardType.Phone,
+                )
+                if (parentPhone.isNotBlank() && !phoneValid) {
+                    Text("Phone must have at least 10 digits.", style = VTheme.type.label.colored(c.dangerInk))
+                }
                 if (error != null) {
                     Text(error, style = VTheme.type.body.colored(c.dangerInk))
                 }
                 Spacer(Modifier.height(2.dp))
                 VButton(
                     text = "Add student",
-                    onClick = { onSubmit(name, className, section, roll) },
+                    onClick = { onSubmit(name, className, section, roll, parentPhone) },
                     variant = VButtonVariant.Primary,
                     full = true,
                     enabled = canSubmit,

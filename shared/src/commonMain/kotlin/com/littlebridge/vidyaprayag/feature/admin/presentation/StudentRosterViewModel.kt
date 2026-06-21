@@ -71,9 +71,23 @@ class StudentRosterViewModel(
         }
     }
 
-    fun addStudent(fullName: String, className: String, section: String, rollNumber: String) {
+    fun addStudent(
+        fullName: String,
+        className: String,
+        section: String,
+        rollNumber: String,
+        parentPhone: String,
+    ) {
         if (fullName.isBlank() || className.isBlank() || rollNumber.isBlank()) {
             _state.value = _state.value.copy(addError = "Name, class and roll number are required.")
+            return
+        }
+        // ISSUE 2b: a valid parent/guardian phone is mandatory (>= 10 digits).
+        val phoneDigits = parentPhone.filter { it.isDigit() }
+        if (phoneDigits.length < 10) {
+            _state.value = _state.value.copy(
+                addError = "Enter a valid parent/guardian phone number (at least 10 digits)."
+            )
             return
         }
         viewModelScope.launch {
@@ -87,7 +101,8 @@ class StudentRosterViewModel(
                 fullName = fullName.trim(),
                 className = className.trim(),
                 section = section.trim().ifBlank { null },
-                rollNumber = rollNumber.trim()
+                rollNumber = rollNumber.trim(),
+                parentPhone = parentPhone.trim()
             )
             when (val r = repository.createStudent(token, req)) {
                 is NetworkResult.Success -> {
