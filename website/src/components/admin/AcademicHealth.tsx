@@ -6,11 +6,11 @@ import { Card, CardHeader, EmptyState, Skeleton } from "./Primitives";
 import { SidePanel } from "./SidePanel";
 
 /**
- * Academic health grid — syllabus coverage heat map. Classes on the Y axis,
+ * Academic health grid, syllabus coverage heat map. Classes on the Y axis,
  * subjects on the X axis, coverage % as colour intensity (from syllabus_units:
  * covered / total). Immediately surfaces which class-subject pairs are behind.
  * Click any cell → drill-down with the covered/total breakdown for that pair.
- * Empty when no syllabus units exist (honest — never a fabricated heat map).
+ * Empty when no syllabus units exist (honest, never a fabricated heat map).
  */
 function cellColor(pct: number, hasData: boolean): { bg: string; fg: string } {
   if (!hasData) return { bg: "#F1EFFB", fg: "#BCC9C6" };
@@ -36,10 +36,10 @@ export function AcademicHealth({
 
   return (
     <>
-      <Card className="h-full pb-5">
+      <Card className="h-full pb-6" hover>
         <CardHeader
           title="Academic health"
-          subtitle="Syllabus coverage by class & subject — click a cell to inspect"
+          subtitle="Syllabus coverage by class & subject, click a cell to inspect"
         />
         <div className="px-5 pt-3">
           {loading && !data ? (
@@ -74,7 +74,7 @@ export function AcademicHealth({
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.class_name}>
-                      <td className="sticky left-0 z-10 whitespace-nowrap bg-lavender-soft px-2 py-1 text-[12px] font-semibold text-navy-deep">
+                      <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-2 py-1 text-[12px] font-semibold text-navy-deep">
                         {row.class_name}
                       </td>
                       {row.cells.map((cell) => {
@@ -86,12 +86,12 @@ export function AcademicHealth({
                               disabled={!has}
                               onClick={() => setSelected({ className: row.class_name, cell })}
                               style={{ background: c.bg, color: c.fg }}
-                              className={`nums flex h-10 w-full min-w-[52px] items-center justify-center rounded-lg text-[12px] font-bold transition-transform duration-150 ${
+                              className={`nums flex h-11 w-full min-w-[52px] items-center justify-center rounded-xl text-[12px] font-bold transition-transform duration-150 ${
                                 has ? "hover:scale-[1.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40" : "cursor-default"
                               }`}
                               title={has ? `${cell.subject}: ${cell.covered_units}/${cell.total_units} units` : "No units"}
                             >
-                              {has ? `${cell.percentage}%` : "—"}
+                              {has ? `${cell.percentage}%` : "-"}
                             </button>
                           </td>
                         );
@@ -123,15 +123,15 @@ export function AcademicHealth({
       >
         {selected && (
           <div className="space-y-5">
-            <div className="rounded-2xl border border-navy/8 bg-white/70 p-5 text-center">
-              <p className="nums text-[40px] font-bold leading-none text-navy-deep">
+            <div className="rounded-3xl bg-wash-lavender p-6 text-center shadow-soft">
+              <p className="nums text-[44px] font-extrabold leading-none text-navy-deep">
                 {selected.cell.percentage}%
               </p>
               <p className="mt-1.5 text-[13px] text-ink-3">
                 {selected.cell.covered_units} of {selected.cell.total_units} units covered
               </p>
             </div>
-            <div className="rounded-xl border border-navy/8 bg-white/70 p-4">
+            <div className="rounded-2xl bg-navy/[0.03] p-4 ring-1 ring-inset ring-navy/[0.05]">
               <p className="text-[13px] font-semibold text-navy-deep">Status</p>
               <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
                 {selected.cell.percentage >= 85

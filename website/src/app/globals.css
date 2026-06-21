@@ -12,7 +12,7 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     scroll-behavior: smooth;
-    /* Header is fixed at 72px — keep anchor jumps from landing under it. */
+    /* Header is fixed at 72px, keep anchor jumps from landing under it. */
     scroll-padding-top: 88px;
   }
 
@@ -41,7 +41,7 @@
   }
 
   /* A11y: one consistent keyboard focus ring across the whole product.
-     Uses :focus-visible so it never shows on mouse/touch — only keyboard. */
+     Uses :focus-visible so it never shows on mouse/touch, only keyboard. */
   :focus-visible {
     outline: 2px solid #6c5ce0;
     outline-offset: 2px;
@@ -61,7 +61,7 @@
     @apply mx-auto w-full max-w-shell px-6 md:px-8;
   }
 
-  /* Eyebrow label — 11px, tracked, uppercase (mirrors app `labelStrong`). */
+  /* Eyebrow label, 11px, tracked, uppercase (mirrors app `labelStrong`). */
   .eyebrow {
     @apply text-[11px] font-bold uppercase tracking-[0.14em] text-accent;
   }
@@ -76,6 +76,56 @@
   .nums {
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";
+  }
+
+  /**
+   * Premium admin canvas — a cool lavender wash with pastel light-sources in
+   * the corners (peach left, violet right, mint lower-right). The base tone is
+   * deepened (#ECEAF6) so the borderless WHITE cards have real contrast to
+   * float against — the earlier near-white canvas let cards blend in and read
+   * as flat squares. Fixed so it never scrolls under the content.
+   */
+  .admin-canvas {
+    background-color: #eceaf6;
+    background-image:
+      radial-gradient(58% 48% at 0% 0%, rgba(255, 173, 140, 0.16) 0%, rgba(255, 173, 140, 0) 60%),
+      radial-gradient(55% 45% at 100% 0%, rgba(108, 92, 224, 0.16) 0%, rgba(108, 92, 224, 0) 60%),
+      radial-gradient(72% 60% at 100% 100%, rgba(60, 185, 169, 0.11) 0%, rgba(60, 185, 169, 0) 60%);
+    background-attachment: fixed;
+  }
+
+  /* Soft glass surface used for the topbar / floating chrome. */
+  .glass {
+    background-color: rgba(255, 255, 255, 0.72);
+    backdrop-filter: saturate(140%) blur(14px);
+    -webkit-backdrop-filter: saturate(140%) blur(14px);
+  }
+
+  /**
+   * Signature greeting-hero surface — DEFENCE IN DEPTH.
+   *
+   * The hero is the first thing a head-of-school sees, in white type, so it can
+   * NEVER fall back to a transparent/light surface (that is the washed-out,
+   * ghosted-text bug). We therefore set an opaque deep-navy `background-color`
+   * FIRST (the guaranteed floor), then layer the aurora `background-image` on
+   * top. If the JIT image utility is ever purged/stale, the card still renders
+   * dark and the white text stays legible. Defined as a real CSS rule (not a
+   * Tailwind `bg-*` image token) precisely so it cannot be tree-shaken away.
+   */
+  .hero-surface {
+    background-color: #1a1838;
+    background-image:
+      radial-gradient(120% 140% at 0% 0%, rgba(108, 92, 224, 0.55) 0%, rgba(108, 92, 224, 0) 55%),
+      radial-gradient(120% 140% at 100% 0%, rgba(60, 185, 169, 0.4) 0%, rgba(60, 185, 169, 0) 55%),
+      radial-gradient(90% 120% at 50% 120%, rgba(108, 92, 224, 0.28) 0%, rgba(108, 92, 224, 0) 60%),
+      linear-gradient(135deg, #211e47 0%, #2b2756 55%, #1a1838 100%);
+    color: #ffffff;
+  }
+  /* Headings inside the hero must stay white — our base layer forces navy on h1. */
+  .hero-surface h1,
+  .hero-surface h2,
+  .hero-surface h3 {
+    color: #ffffff;
   }
   /* hide scrollbar on horizontal chip rows while keeping scroll */
   .no-scrollbar {

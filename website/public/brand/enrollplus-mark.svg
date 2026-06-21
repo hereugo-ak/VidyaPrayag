@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Enroll+ mark">
   <!--
-    Enroll+ mark — the "Setu" bridge.
+    Enroll+ mark, the "Setu" bridge.
     This is the EXACT mobile-app mark (composeApp/.../ui/v2/components/VBrandLogo.kt
     → drawBridge): a quadratic span arcing between two grounded pillar caps over a
-    deck, three suspension cables and a solid apex node — the connection between
+    deck, three suspension cables and a solid apex node, the connection between
     school and home (infrastructure, not classroom imagery).
 
     The geometry is the app's 56-unit bridge scaled 1:1 into a centred 64-unit
@@ -39,6 +39,6 @@
   <circle cx="16" cy="36" r="2.9" fill="#26234D"/>
   <circle cx="48" cy="36" r="2.9" fill="#26234D"/>
 
-  <!-- apex node (app (28,22) → (32,26)) — the accent keystone, no "+" -->
+  <!-- apex node (app (28,22) → (32,26)), the accent keystone, no "+" -->
   <circle cx="32" cy="26" r="3" fill="#6C5CE0"/>
 </svg>

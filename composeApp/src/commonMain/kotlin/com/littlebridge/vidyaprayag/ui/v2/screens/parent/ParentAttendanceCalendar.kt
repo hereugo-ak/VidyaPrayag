@@ -1,8 +1,16 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.parent
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,23 +34,33 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.feature.parent.domain.model.ParentAttendanceDayDto
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import com.littlebridge.vidyaprayag.util.MONTH_LONG
+import com.littlebridge.vidyaprayag.util.WEEKDAY_SHORT
+import com.littlebridge.vidyaprayag.util.dayOfWeek
+import com.littlebridge.vidyaprayag.util.daysInMonth
+import com.littlebridge.vidyaprayag.util.isoOf
+import com.littlebridge.vidyaprayag.util.parseIsoDate
+import com.littlebridge.vidyaprayag.util.todayIso
 
 /**
- * RA-S19 — Parent attendance month-calendar.
+ * RA-S19 — Parent attendance month-calendar (freely navigable).
  *
- * Replaces the flat 30-row list with a true month grid: each day cell is colour-coded by
- * its attendance status (present / late / absent), the month can be paged, and a legend
- * sits below. Built entirely with V* primitives + [VTheme] tokens — no Material defaults,
- * no external date library (manual ISO date math, mirroring the existing
- * AcademicCalendarScreenV2 convention so the codebase stays kotlinx-datetime-free).
+ * A true month grid: each day cell is colour-coded by its attendance status — present=green,
+ * late=amber, absent=red (COLOR IS SEMANTIC: the lavender brand accent is NOT used to mean
+ * "present"; green is). The month can be paged FREELY in either direction (the parent can walk
+ * back to any prior month or forward toward today), not just the months that happen to contain
+ * marked data. Built entirely with V* primitives + [VTheme] tokens + the shared kotlinx-free
+ * date helpers in `util/DateUtil.kt`.
  *
  * Input is the same `records: List<ParentAttendanceDayDto>` the endpoint already returns
  * (`date` = "YYYY-MM-DD", `status` = present|late|absent), so no backend change is needed.
@@ -57,40 +75,57 @@ internal fun ParentAttendanceCalendar(
     // (it shouldn't — the upsert is per-day), the last one wins.
     val byDate = remember(records) { records.associate { it.date to it.status.lowercase() } }
 
-    // Month list available in the data, newest first. If empty, fall back to a single
-    // sensible month so the grid still renders (it will simply be all-blank).
-    val months = remember(records) {
-        val set = records.mapNotNull { parseIsoDate(it.date)?.let { (y, m, _) -> y to m } }.toSortedSet(
-            compareByDescending<Pair<Int, Int>> { it.first }.thenByDescending { it.second },
-        )
-        if (set.isEmpty()) listOf(2026 to 1) else set.toList()
+    // Anchor the calendar on the most recent month that actually has data; otherwise the current
+    // real month. From there, navigation is FREE in both directions (no longer clamped to the set
+    // of data-months) — exactly the "switch the month" interaction the brief asks for.
+    val (startYear, startMonth) = remember(records) {
+        val newest = records.mapNotNull { parseIsoDate(it.date)?.let { (y, m, _) -> y to m } }
+            .maxWithOrNull(compareBy({ it.first }, { it.second }))
+        newest ?: (parseIsoDate(todayIso())?.let { (y, m, _) -> y to m } ?: (2026 to 1))
     }
 
-    // Default to the most recent month present in the data.
-    var monthIndex by remember(months) { mutableStateOf(0) }
-    val (year, month) = months[monthIndex.coerceIn(0, months.lastIndex)]
+    // Visible month, expressed as an absolute month-offset relative to the anchor so we can page
+    // smoothly across year boundaries with simple integer math.
+    var monthOffset by remember(startYear, startMonth) { mutableStateOf(0) }
+    val (year, month) = remember(startYear, startMonth, monthOffset) {
+        addMonths(startYear, startMonth, monthOffset)
+    }
+    // Don't let parents page into the future beyond the current real month — there's nothing there.
+    val (todayYear, todayMonth) = remember {
+        parseIsoDate(todayIso())?.let { (y, m, _) -> y to m } ?: (startYear to startMonth)
+    }
+    val canGoForward = (year < todayYear) || (year == todayYear && month < todayMonth)
 
     VCard {
-        // ── Header: month name + pager ──────────────────────────────────────
+        // ── Header: pager ◄ · Month YYYY · ► ────────────────────────────────
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            PagerArrow(
-                icon = VIcons.ChevronLeft,
-                enabled = monthIndex < months.lastIndex,
-                onClick = { if (monthIndex < months.lastIndex) monthIndex++ },
-            )
-            Text(
-                "${MONTH_LONG.getOrNull(month - 1) ?: "—"} $year",
-                style = VTheme.type.bodyStrong.colored(c.ink),
-            )
-            PagerArrow(
-                icon = VIcons.ChevronRight,
-                enabled = monthIndex > 0,
-                onClick = { if (monthIndex > 0) monthIndex-- },
-            )
+            PagerArrow(icon = VIcons.ChevronLeft, enabled = true) { monthOffset-- }
+            AnimatedContent(
+                targetState = year to month,
+                transitionSpec = {
+                    val forward = targetState.toComparable() > initialState.toComparable()
+                    if (forward) {
+                        (slideInHorizontally(tween(220)) { it / 2 } + fadeIn(tween(180))) togetherWith
+                            (slideOutHorizontally(tween(220)) { -it / 2 } + fadeOut(tween(120)))
+                    } else {
+                        (slideInHorizontally(tween(220)) { -it / 2 } + fadeIn(tween(180))) togetherWith
+                            (slideOutHorizontally(tween(220)) { it / 2 } + fadeOut(tween(120)))
+                    }
+                },
+                label = "calMonth",
+            ) { (y, m) ->
+                Text(
+                    "${MONTH_LONG.getOrNull(m - 1) ?: "—"} $y",
+                    style = VTheme.type.bodyStrong.colored(c.ink).copy(fontWeight = FontWeight.Bold),
+                )
+            }
+            PagerArrow(icon = VIcons.ChevronRight, enabled = canGoForward) {
+                if (canGoForward) monthOffset++
+            }
         }
 
         Spacer(Modifier.height(12.dp))
@@ -111,6 +146,7 @@ internal fun ParentAttendanceCalendar(
         val totalDays = daysInMonth(year, month)
         val cells = firstWeekday + totalDays
         val rows = (cells + 6) / 7
+        val today = remember { todayIso() }
 
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             for (week in 0 until rows) {
@@ -121,7 +157,7 @@ internal fun ParentAttendanceCalendar(
                         Box(Modifier.weight(1f)) {
                             if (day in 1..totalDays) {
                                 val iso = isoOf(year, month, day)
-                                DayCell(day = day, status = byDate[iso])
+                                DayCell(day = day, status = byDate[iso], isToday = iso == today)
                             }
                         }
                     }
@@ -134,12 +170,24 @@ internal fun ParentAttendanceCalendar(
         // ── Legend ──────────────────────────────────────────────────────────
         VLabel("Legend")
         Spacer(Modifier.height(8.dp))
+        // COLOR IS SEMANTIC: present=green, late=amber, absent=red — meaning carried by colour.
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            LegendDot(c.success, "Present")
-            LegendDot(c.teal, "Late")
-            LegendDot(c.danger, "Absent")
+            LegendDot(c.successInk, "Present")
+            LegendDot(c.warningInk, "Late")
+            LegendDot(c.dangerInk, "Absent")
         }
     }
+}
+
+private fun Pair<Int, Int>.toComparable(): Int = first * 12 + second
+
+/** Adds [delta] months (can be negative) to a (year, 1-based month), returning the new pair. */
+private fun addMonths(year: Int, month: Int, delta: Int): Pair<Int, Int> {
+    // Convert to a zero-based absolute month index, shift, convert back.
+    val abs = year * 12 + (month - 1) + delta
+    val y = abs / 12
+    val m = abs % 12 + 1
+    return y to m
 }
 
 @Composable
@@ -149,12 +197,13 @@ private fun PagerArrow(
     onClick: () -> Unit,
 ) {
     val c = VTheme.colors
+    val ix = remember { MutableInteractionSource() }
     Box(
         Modifier
-            .size(32.dp)
+            .size(34.dp)
             .clip(CircleShape)
             .background(if (enabled) c.cream else Color.Transparent)
-            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier),
+            .then(if (enabled) Modifier.clickable(interactionSource = ix, indication = null, onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -167,33 +216,39 @@ private fun PagerArrow(
 }
 
 @Composable
-private fun DayCell(day: Int, status: String?) {
+private fun DayCell(day: Int, status: String?, isToday: Boolean) {
     val c = VTheme.colors
-    val bg = when (status) {
-        "present" -> c.success
-        "late" -> c.teal
-        "absent" -> c.danger
+    // COLOR IS SEMANTIC: present=green, late=amber, absent=red. Lavender is reserved for the brand
+    // accent (today's ring) — never overloaded to mean "present".
+    val fill = when (status) {
+        "present" -> c.successInk
+        "late" -> c.warningInk
+        "absent" -> c.dangerInk
         else -> Color.Transparent
     }
-    // High-contrast text when the cell is filled, ink otherwise.
-    val fg = when (status) {
-        null -> c.ink2
-        else -> c.card
-    }
+    val fg = if (status != null) c.card else c.ink2
     Box(
         Modifier
             .fillMaxWidth()
             .aspectRatio(1f)
             .clip(RoundedCornerShape(10.dp))
-            .background(if (status == null) c.cream.copy(alpha = 0.4f) else bg)
+            .background(if (status == null) c.cream.copy(alpha = 0.4f) else fill)
             .border(
-                1.dp,
-                if (status == null) c.hairline else Color.Transparent,
+                if (isToday) 1.5.dp else 1.dp,
+                when {
+                    isToday -> c.accent
+                    status == null -> c.hairline
+                    else -> Color.Transparent
+                },
                 RoundedCornerShape(10.dp),
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Text("$day", style = VTheme.type.caption.colored(fg))
+        Text(
+            "$day",
+            style = VTheme.type.caption.colored(if (isToday && status == null) c.accentDeep else fg)
+                .copy(fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal),
+        )
     }
 }
 
@@ -205,45 +260,3 @@ private fun LegendDot(color: Color, label: String) {
         Text(label, style = VTheme.type.caption.colored(c.ink2))
     }
 }
-
-// ── Local ISO date helpers (kotlinx-datetime-free, mirrors AcademicCalendarScreenV2) ─────
-
-/** Parses "YYYY-MM-DD" into Triple(year, month, day). Returns null on bad input. */
-private fun parseIsoDate(iso: String): Triple<Int, Int, Int>? {
-    if (iso.length < 10) return null
-    val y = iso.substring(0, 4).toIntOrNull() ?: return null
-    val m = iso.substring(5, 7).toIntOrNull() ?: return null
-    val d = iso.substring(8, 10).toIntOrNull() ?: return null
-    if (m !in 1..12 || d !in 1..31) return null
-    return Triple(y, m, d)
-}
-
-private fun isoOf(year: Int, month: Int, day: Int): String {
-    val mm = month.toString().padStart(2, '0')
-    val dd = day.toString().padStart(2, '0')
-    return "$year-$mm-$dd"
-}
-
-private fun daysInMonth(year: Int, month: Int): Int = when (month) {
-    1, 3, 5, 7, 8, 10, 12 -> 31
-    4, 6, 9, 11 -> 30
-    2 -> if ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0) 29 else 28
-    else -> 30
-}
-
-/**
- * Day of week for a given date using Sakamoto's algorithm.
- * Returns 0=Sunday .. 6=Saturday (matches [WEEKDAY_SHORT] ordering).
- */
-private fun dayOfWeek(year: Int, month: Int, day: Int): Int {
-    val t = intArrayOf(0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4)
-    val y = if (month < 3) year - 1 else year
-    return (y + y / 4 - y / 100 + y / 400 + t[month - 1] + day) % 7
-}
-
-private val WEEKDAY_SHORT = listOf("S", "M", "T", "W", "T", "F", "S")
-
-private val MONTH_LONG = listOf(
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
-)

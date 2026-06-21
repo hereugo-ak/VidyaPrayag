@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { IconClose, IconSearch } from "./icons";
 
 /**
- * Toolbar — a search input plus optional filter chips, used above every list
+ * Toolbar, a search input plus optional filter chips, used above every list
  * surface (People, Attendance, …). Controlled: the caller owns the query/filter
  * state so the same toolbar drives server-filtered and client-filtered lists.
  */
@@ -90,7 +90,7 @@ function Chip({
 }
 
 /**
- * Modal — a centred dialog with a scrim. Closes on Escape or scrim click.
+ * Modal, a centred dialog with a scrim. Closes on Escape or scrim click.
  * Restrained motion: scales/fades in once and settles (no looping). Locks body
  * scroll while open. Accessible: role=dialog + aria-modal, labelled by title.
  */

@@ -14,6 +14,48 @@ package com.littlebridge.vidyaprayag.util
 /** Today's local date as an ISO "YYYY-MM-DD" string. Platform-provided. */
 expect fun todayIso(): String
 
+/**
+ * Current local wall-clock time as minutes-since-midnight (0..1439). Platform-provided.
+ *
+ * Used by the parent dashboard's "today's schedule" card to highlight the period the
+ * child is in *right now* and dim the periods already finished — a genuinely live read
+ * that re-evaluates as the school day progresses (no fabricated "current class").
+ */
+expect fun nowMinutesOfDay(): Int
+
+/**
+ * Today's ISO weekday: 1=Monday … 7=Sunday — matches `teacher_periods.weekday` and
+ * `java.time.DayOfWeek.value`, so the weekly-timetable read lines up day-for-day.
+ */
+fun todayWeekday(): Int {
+    val (y, m, d) = parseIsoDate(todayIso()) ?: return 1
+    // dayOfWeek() returns 0=Sun..6=Sat; remap to 1=Mon..7=Sun.
+    return when (val dow = dayOfWeek(y, m, d)) {
+        0 -> 7          // Sunday
+        else -> dow     // Mon..Sat → 1..6
+    }
+}
+
+/** Parses "HH:mm" (24h) into minutes-since-midnight (0..1439); null on bad input. */
+fun parseHourMinute(hm: String): Int? {
+    val parts = hm.trim().split(":")
+    if (parts.size < 2) return null
+    val h = parts[0].toIntOrNull() ?: return null
+    val mi = parts[1].take(2).toIntOrNull() ?: return null
+    if (h !in 0..23 || mi !in 0..59) return null
+    return h * 60 + mi
+}
+
+/** Formats minutes-since-midnight into a friendly 12h clock, e.g. 525 → "8:45 AM". */
+fun formatClock12h(minutesOfDay: Int): String {
+    val m = ((minutesOfDay % 1440) + 1440) % 1440
+    val h24 = m / 60
+    val mi = m % 60
+    val period = if (h24 < 12) "AM" else "PM"
+    val h12 = when (val h = h24 % 12) { 0 -> 12; else -> h }
+    return "$h12:${mi.toString().padStart(2, '0')} $period"
+}
+
 /** Parses "YYYY-MM-DD" into Triple(year, month, day); null on bad input. */
 fun parseIsoDate(iso: String): Triple<Int, Int, Int>? {
     if (iso.length < 10) return null

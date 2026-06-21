@@ -116,6 +116,7 @@ private fun ParentLeaveContent(
                         text = child.name.ifBlank { "Child" },
                         active = child.id == state.selectedChild?.id,
                         onClick = { onSelectChild(child.id) },
+                        accentActive = true,
                     )
                 }
             }
@@ -158,7 +159,7 @@ private fun ParentLeaveContent(
                     enabled = !state.submitting && state.selectedChild != null,
                     loading = state.submitting,
                     variant = VButtonVariant.Primary,
-                    tone = VButtonTone.Teal,
+                    tone = VButtonTone.Lavender,
                 )
             }
         }
@@ -187,10 +188,13 @@ private fun ParentLeaveCard(req: ParentLeaveDto) {
     VCard {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(req.childName, style = VTheme.type.bodyStrong.colored(c.ink), modifier = Modifier.weight(1f))
+            // Semantic status: "Approved" reads success green, "Rejected" danger red,
+            // anything pending stays calm neutral — the universal traffic-light language a
+            // parent reads instantly (the brand violet is reserved for actions, not states).
             val tone = when {
                 req.status.equals("Approved", ignoreCase = true) -> VBadgeTone.Success
                 req.status.equals("Rejected", ignoreCase = true) -> VBadgeTone.Danger
-                else -> VBadgeTone.Neutral
+                else -> VBadgeTone.Warning
             }
             VBadge(text = req.status, tone = tone)
         }

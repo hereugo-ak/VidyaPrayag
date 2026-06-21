@@ -17,7 +17,7 @@ import { Card, CardHeader, EmptyState, Skeleton, Badge } from "./Primitives";
 import { SidePanel } from "./SidePanel";
 
 /**
- * Primary intelligence panel — daily attendance present-rate over the last 30
+ * Primary intelligence panel, daily attendance present-rate over the last 30
  * days. Anomaly days (rate below the server's dynamic threshold) are rendered
  * as red dots; exam days (from assessments + academic_calendar) get a vertical
  * marker so the correlation between exams and attendance dips is visible.
@@ -40,9 +40,9 @@ function ChartTooltip({
     ? p.date
     : d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
   return (
-    <div className="max-w-[220px] rounded-xl border border-navy/10 bg-white px-3 py-2.5 shadow-cardHover">
+    <div className="max-w-[220px] rounded-2xl bg-white px-3.5 py-3 shadow-cardHover ring-1 ring-navy/[0.05]">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">{label}</p>
-      <p className="nums mt-0.5 text-[16px] font-bold text-navy-deep">
+      <p className="nums mt-0.5 text-[17px] font-extrabold text-navy-deep">
         {p.rate}% present
       </p>
       <p className="nums text-[12px] text-ink-3">
@@ -50,11 +50,11 @@ function ChartTooltip({
       </p>
       {p.is_anomaly && (
         <p className="mt-1.5 text-[11px] font-semibold text-danger">
-          ↓ Below normal — click to inspect
+          ↓ Below normal, click to inspect
         </p>
       )}
       {p.exam && (
-        <p className="mt-1.5 rounded-md bg-accent/8 px-2 py-1 text-[11px] font-semibold text-accent-deep">
+        <p className="mt-1.5 rounded-lg bg-accent/8 px-2 py-1 text-[11px] font-semibold text-accent-deep">
           Exam: {p.exam}
         </p>
       )}
@@ -79,6 +79,20 @@ export function AttendanceIntelligence({
     [points]
   );
 
+  // Recent-trend delta — last week's average present-rate vs the prior week.
+  // Drives the floating gradient badge (the reference "+24%" highlight chip),
+  // but built from REAL data, so it reads "+3 pts" / "−2 pts" / "On par".
+  const delta = useMemo(() => {
+    if (points.length < 4) return null;
+    const avg = (arr: AttendancePoint[]) =>
+      arr.reduce((s, p) => s + p.rate, 0) / Math.max(1, arr.length);
+    const recent = points.slice(-7);
+    const prior = points.slice(-14, -7);
+    if (!prior.length) return null;
+    const diff = Math.round(avg(recent) - avg(prior));
+    return { diff, recentAvg: Math.round(avg(recent)) };
+  }, [points]);
+
   const fmtDay = (s: string) => {
     const d = new Date(s);
     return isNaN(d.getTime()) ? s.slice(5) : d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
@@ -86,7 +100,7 @@ export function AttendanceIntelligence({
 
   return (
     <>
-      <Card className="h-full pb-4">
+      <Card className="h-full pb-5" hover>
         <CardHeader
           title="Attendance intelligence"
           subtitle="Daily present-rate · anomalies flagged · exam days overlaid"
@@ -104,16 +118,44 @@ export function AttendanceIntelligence({
             <Skeleton className="mx-3 h-[260px]" />
           ) : points.length >= 2 ? (
             <>
-              <div className="h-[260px] w-full">
+              <div className="relative h-[280px] w-full">
+                {/* Floating recent-trend badge — the reference "+24%" highlight,
+                    but real: last 7 days' present-rate average vs the prior 7. */}
+                {delta && (
+                  <div className="pointer-events-none absolute right-4 top-2 z-10 animate-floaty">
+                    <div
+                      className={`rounded-2xl px-3.5 py-2 shadow-float ${
+                        delta.diff >= 0 ? "bg-wash-lavender" : "bg-wash-peach"
+                      }`}
+                    >
+                      <p
+                        className={`nums text-[18px] font-extrabold leading-none ${
+                          delta.diff >= 0 ? "text-accent-deep" : "text-[#C2410C]"
+                        }`}
+                      >
+                        {delta.diff > 0 ? "+" : ""}
+                        {delta.diff} pts
+                      </p>
+                      <p className="mt-0.5 text-[10px] font-semibold text-navy-deep/60">
+                        7-day vs prior
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={points} margin={{ top: 8, right: 12, left: -16, bottom: 0 }}>
                     <defs>
                       <linearGradient id="attFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#6C5CE0" stopOpacity={0.18} />
+                        <stop offset="0%" stopColor="#6C5CE0" stopOpacity={0.28} />
+                        <stop offset="55%" stopColor="#6C5CE0" stopOpacity={0.08} />
                         <stop offset="100%" stopColor="#6C5CE0" stopOpacity={0} />
                       </linearGradient>
+                      <linearGradient id="attStroke" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="#8B7EE8" />
+                        <stop offset="100%" stopColor="#6C5CE0" />
+                      </linearGradient>
                     </defs>
-                    <CartesianGrid stroke="#26234D" strokeOpacity={0.06} vertical={false} />
+                    <CartesianGrid stroke="#26234D" strokeOpacity={0.05} vertical horizontal={false} />
                     <XAxis
                       dataKey="date"
                       tickFormatter={fmtDay}
@@ -153,13 +195,14 @@ export function AttendanceIntelligence({
                     <Area
                       type="monotone"
                       dataKey="rate"
-                      stroke="#6C5CE0"
-                      strokeWidth={2.25}
+                      stroke="url(#attStroke)"
+                      strokeWidth={3}
+                      strokeLinecap="round"
                       fill="url(#attFill)"
                       dot={false}
-                      activeDot={{ r: 4, fill: "#6C5CE0" }}
+                      activeDot={{ r: 5, fill: "#6C5CE0", stroke: "#fff", strokeWidth: 2 }}
                     />
-                    {/* anomaly dots — clickable */}
+                    {/* anomaly dots, clickable */}
                     <Scatter
                       data={anomalies}
                       dataKey="rate"
@@ -223,20 +266,20 @@ export function AttendanceIntelligence({
               <Stat label="Absent" value={`${selected.absent}`} tone="danger" />
               <Stat label="Rate" value={`${selected.rate}%`} tone="accent" />
             </div>
-            <div className="rounded-xl border border-navy/8 bg-white/70 p-4">
+            <div className="rounded-2xl bg-navy/[0.03] p-4 ring-1 ring-inset ring-navy/[0.05]">
               <p className="text-[13px] font-semibold text-navy-deep">Why this is flagged</p>
               <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
                 Present-rate of <b>{selected.rate}%</b> fell below the period mean of{" "}
-                <b>{mean}%</b> — {mean - selected.rate} points under normal. {selected.absent} of{" "}
+                <b>{mean}%</b>, {mean - selected.rate} points under normal. {selected.absent} of{" "}
                 {selected.total} students were absent.
               </p>
             </div>
             {selected.exam ? (
-              <div className="rounded-xl border border-accent/20 bg-accent/[0.06] p-4">
+              <div className="rounded-2xl bg-wash-lavender p-4 shadow-soft">
                 <p className="text-[13px] font-semibold text-accent-deep">Exam on this day</p>
                 <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
                   {selected.exam} was scheduled. Attendance dips on exam days are worth a closer
-                  look — confirm whether absences were exam-related.
+                  look, confirm whether absences were exam-related.
                 </p>
               </div>
             ) : (
@@ -267,8 +310,8 @@ function Stat({
     accent: "text-accent-deep",
   } as const;
   return (
-    <div className="rounded-xl border border-navy/8 bg-white/70 px-3 py-3 text-center">
-      <p className={`nums text-[20px] font-bold ${map[tone]}`}>{value}</p>
+    <div className="rounded-2xl bg-navy/[0.03] px-3 py-3.5 text-center ring-1 ring-inset ring-navy/[0.05]">
+      <p className={`nums text-[21px] font-extrabold ${map[tone]}`}>{value}</p>
       <p className="mt-0.5 text-[11px] text-ink-3">{label}</p>
     </div>
   );

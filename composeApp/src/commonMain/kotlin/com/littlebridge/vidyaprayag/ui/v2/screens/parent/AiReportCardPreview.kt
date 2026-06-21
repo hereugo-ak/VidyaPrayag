@@ -27,7 +27,7 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 
-private data class InsightChrome(val icon: ImageVector, val label: String, val tone: Color)
+private data class InsightChrome(val icon: ImageVector, val label: String, val tone: Color, val ink: Color)
 
 /**
  * AiReportCardPreview — a **label-free schematic teaser** for the parent "AI Report Card"
@@ -46,10 +46,13 @@ private data class InsightChrome(val icon: ImageVector, val label: String, val t
 @Composable
 fun AiReportCardPreview(modifier: Modifier = Modifier) {
     val c = VTheme.colors
+    // Semantic insight chips, each carrying its own meaning AND a matching glyph tint:
+    //   STRENGTHS → success green (what's going well), FOCUS AREAS → warning amber (needs work),
+    //   STUDY TIPS → brand violet (actionable guidance). Distinct, scannable, on-palette.
     val insights = listOf(
-        InsightChrome(VIcons.Heart, "STRENGTHS", Color(0xFFA8E6CF).copy(alpha = 0.4f)),
-        InsightChrome(VIcons.Target, "FOCUS AREAS", Color(0xFFFFD4A3).copy(alpha = 0.5f)),
-        InsightChrome(VIcons.BookOpen, "STUDY TIPS", c.teal.copy(alpha = 0.16f)),
+        InsightChrome(VIcons.Heart, "STRENGTHS", c.success.copy(alpha = 0.40f), c.successInk),
+        InsightChrome(VIcons.Target, "FOCUS AREAS", c.warning.copy(alpha = 0.50f), c.warningInk),
+        InsightChrome(VIcons.BookOpen, "STUDY TIPS", c.accentSoft.copy(alpha = 0.26f), c.accentDeep),
     )
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -76,11 +79,11 @@ fun AiReportCardPreview(modifier: Modifier = Modifier) {
         insights.forEach { b ->
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(b.tone).padding(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon(b.icon, contentDescription = null, tint = c.ink, modifier = Modifier.size(12.dp))
-                    Text(b.label, style = VTheme.type.label.colored(c.ink).copy(fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.06.em))
+                    Icon(b.icon, contentDescription = null, tint = b.ink, modifier = Modifier.size(12.dp))
+                    Text(b.label, style = VTheme.type.label.colored(b.ink).copy(fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.06.em))
                 }
                 Spacer(Modifier.height(6.dp))
-                Box(Modifier.fillMaxWidth(0.7f).height(7.dp).clip(RoundedCornerShape(4.dp)).background(c.ink.copy(alpha = 0.08f)))
+                Box(Modifier.fillMaxWidth(0.7f).height(7.dp).clip(RoundedCornerShape(4.dp)).background(b.ink.copy(alpha = 0.16f)))
             }
         }
     }

@@ -113,7 +113,7 @@ private fun ScholarshipsContent(
                             style = VTheme.type.dataLg.colored(c.ink),
                         )
                     }
-                    VBadge(text = "LVL ${state.currentLevel}", tone = VBadgeTone.Arctic)
+                    VBadge(text = "LVL ${state.currentLevel}", tone = VBadgeTone.Accent)
                 }
                 Spacer(Modifier.height(10.dp))
                 VProgressBar(value = state.profileStrength.toFloat().coerceIn(0f, 100f))
@@ -166,9 +166,11 @@ private fun StreakTile(label: String, value: String) {
 @Composable
 private fun ScholarshipCard(s: Scholarship) {
     val c = VTheme.colors
+    // Semantic categories: "full funding" is the best outcome → success green; "merit based"
+    // is a brand highlight → violet; "international" → amber accent. Distinct + meaningful.
     val categoryTone = when (s.category.lowercase()) {
         "full funding" -> VBadgeTone.Success
-        "merit based" -> VBadgeTone.Arctic
+        "merit based" -> VBadgeTone.Accent
         "international" -> VBadgeTone.Warning
         else -> VBadgeTone.Neutral
     }
@@ -176,7 +178,7 @@ private fun ScholarshipCard(s: Scholarship) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             VBadge(text = s.category, tone = categoryTone)
             if (s.isCritical) {
-                VBadge(text = "● CRITICAL", tone = VBadgeTone.Danger)
+                VBadge(text = "CRITICAL", tone = VBadgeTone.Danger)
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -204,9 +206,11 @@ private fun ScholarshipCard(s: Scholarship) {
 @Composable
 private fun ApplicationRow(a: ScholarshipApplication) {
     val c = VTheme.colors
+    // Semantic application states: "received" + "shortlisted" are positive progress → success
+    // green (shortlisted the deeper read), "under review" is in-flight → amber.
     val statusTone = when (a.status.lowercase()) {
         "received" -> VBadgeTone.Success
-        "shortlisted" -> VBadgeTone.Arctic
+        "shortlisted" -> VBadgeTone.Success
         "under review" -> VBadgeTone.Warning
         else -> VBadgeTone.Neutral
     }

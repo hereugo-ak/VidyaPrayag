@@ -16,12 +16,14 @@ data class AchievementBadge(
     val title: String,
     val iconName: String,
     val isLocked: Boolean = false,
-    val gradientColors: List<Long>
+    /** Hex colour stops as emitted by the server (e.g. "#B6C7EB"). */
+    val gradientColors: List<String> = emptyList()
 )
 
 data class AcademicCompetency(
     val title: String,
     val iconName: String,
+    /** 0f..1f as emitted by the server. */
     val progress: Float
 )
 
@@ -43,6 +45,10 @@ data class TrackProgressState(
     val journeyDescription: String = "",
     val badges: List<AchievementBadge> = emptyList(),
     val academicCompetencies: List<AcademicCompetency> = emptyList(),
+    // RA-PP-FIX: the holistic-growth EI block is a narrative `description` PLUS a
+    // 0..1 metric map — not a flat Map<String,Float>. Modelled truthfully so the
+    // Overview tab renders both, and parsing never crashes on the string field.
+    val emotionalDescription: String = "",
     val emotionalIntelligence: Map<String, Float> = emptyMap(),
     val playIndicators: List<PlayIndicator> = emptyList(),
     val isLoading: Boolean = false,
@@ -83,19 +89,28 @@ class TrackProgressViewModel(
                             _state.update {
                                 it.copy(
                                     isLoading = false,
-                                    childName = data.childName,
-                                    overallProgress = data.overallProgress,
-                                    currentLevel = data.currentLevel,
-                                    journeyDescription = data.journeyDescription,
+                                    // hero_section is the canonical source for the holistic
+                                    // level/progress. The child NAME comes from the dashboard
+                                    // (child_summary), not this endpoint — left blank here.
+                                    overallProgress = data.heroSection.progressPercentage / 100f,
+                                    currentLevel = parseLevel(data.heroSection.levelLabel),
+                                    journeyDescription = data.heroSection.journeyDescription,
                                     badges = data.badges.map { b ->
-                                        AchievementBadge(b.title, b.iconName, b.isLocked, b.gradientColors)
+                                        AchievementBadge(b.title, b.icon, b.isLocked, b.colors)
                                     },
-                                    academicCompetencies = data.academicCompetencies.map { c ->
-                                        AcademicCompetency(c.title, c.iconName, c.progress)
+                                    academicCompetencies = data.academicCore.competencies.map { c ->
+                                        AcademicCompetency(c.title, c.icon, c.progress.toFloat())
                                     },
-                                    emotionalIntelligence = data.emotionalIntelligence,
-                                    playIndicators = data.playIndicators.map { p ->
-                                        PlayIndicator(p.title, p.description, p.imageUrl, p.isMet)
+                                    emotionalDescription = data.emotionalIntelligence.description,
+                                    emotionalIntelligence = data.emotionalIntelligence.metrics
+                                        .mapValues { (_, v) -> v.toFloat() },
+                                    playIndicators = data.playDiscovery.map { p ->
+                                        PlayIndicator(
+                                            title = p.title,
+                                            description = p.description,
+                                            imageUrl = p.image.orEmpty(),
+                                            isMet = p.status.equals("MET", ignoreCase = true),
+                                        )
                                     }
                                 )
                             }
@@ -112,3 +127,7 @@ class TrackProgressViewModel(
         }
     }
 }
+
+/** Extract the numeric level from a server label like "LEVEL 4 REACHED" → 4 (0 if absent). */
+private fun parseLevel(label: String): Int =
+    Regex("""\d+""").find(label)?.value?.toIntOrNull() ?: 0

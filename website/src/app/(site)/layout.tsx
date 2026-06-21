@@ -2,7 +2,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 
 /**
- * Marketing/onboarding shell — the public site. The authenticated admin app
+ * Marketing/onboarding shell, the public site. The authenticated admin app
  * lives under /admin with its own chrome (sidebar, no marketing header/footer).
  */
 export default function SiteLayout({ children }: { children: React.ReactNode }) {

@@ -88,6 +88,29 @@ fun ParentMessagesScreenV2(
         .navigationBarsPadding()) {
         VBackHeader(title = title, onBack = backHandler)
 
+        ParentMessagesBody(viewModel = viewModel, modifier = Modifier.weight(1f).fillMaxWidth())
+    }
+}
+
+/**
+ * Phase 3 (commit 9) — the chrome-less messaging body, hosted *inside* the Conversations tab.
+ *
+ * Identical messaging surface as [ParentMessagesScreenV2] (inbox → conversation → compose-new
+ * layers driven by the SAME [ParentMessageViewModel]), but WITHOUT the standalone status-bar
+ * padding + [VBackHeader] — the Conversations hub owns that chrome. Drilling into a thread or
+ * compose-new is handled by the shared VM state, so the segmented hub's back is layered by the
+ * caller via [ParentMessageViewModel.composeOpen]/[ParentMessageViewModel.openThreadId].
+ */
+@Composable
+fun ParentMessagesBody(
+    viewModel: ParentMessageViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val state by viewModel.state.collectAsStateV2()
+
+    androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.loadThreads() }
+
+    Column(modifier.imePadding()) {
         when {
             // RA-S07: compose-new is the topmost layer (back closes it first).
             state.composeOpen -> {
@@ -156,7 +179,7 @@ private fun ParentThreadListContent(
             onClick = onCompose,
             full = true,
             size = VButtonSize.Md,
-            tone = VButtonTone.Teal,
+            tone = VButtonTone.Lavender,
             leading = {
                 androidx.compose.material3.Icon(
                     VIcons.Chat,
@@ -214,7 +237,7 @@ private fun ParentThreadRow(thread: ParentMessageThreadDto, onClick: () -> Unit)
             )
         }
         if (thread.unreadCount > 0) {
-            VBadge(text = thread.unreadCount.toString(), tone = VBadgeTone.Arctic)
+            VBadge(text = thread.unreadCount.toString(), tone = VBadgeTone.Accent)
         }
     }
 }
@@ -293,7 +316,7 @@ private fun ParentComposeNewContent(
                         if (r != null && body.isNotBlank()) onSend(r.id, body)
                     },
                     size = VButtonSize.Md,
-                    tone = VButtonTone.Teal,
+                    tone = VButtonTone.Lavender,
                     loading = sending,
                     enabled = selected != null && body.isNotBlank() && !sending,
                 )
@@ -320,7 +343,7 @@ private fun ParentRecipientRow(recipient: ParentRecipientDto, isSelected: Boolea
             Text(recipient.subtitle, style = VTheme.type.caption.colored(c.ink3))
         }
         if (isSelected) {
-            VBadge(text = "Selected", tone = VBadgeTone.Arctic)
+            VBadge(text = "Selected", tone = VBadgeTone.Accent)
         }
     }
 }
@@ -387,7 +410,7 @@ private fun ParentConversationContent(
                         }
                     },
                     size = VButtonSize.Md,
-                    tone = VButtonTone.Teal,
+                    tone = VButtonTone.Lavender,
                     loading = sending,
                     enabled = reply.isNotBlank() && !sending,
                 )
@@ -413,7 +436,7 @@ private fun ParentMessageBubble(msg: ParentMessageDto) {
         Column(
             Modifier
                 .clip(bubbleShape)
-                .background(if (isMine) c.teal.copy(alpha = 0.16f) else c.cream)
+                .background(if (isMine) c.accent.copy(alpha = 0.16f) else c.cream)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
             Text(

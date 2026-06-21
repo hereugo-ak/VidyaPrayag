@@ -52,6 +52,10 @@ class ParentRepositoryImpl(
         return api.getChildSyllabus(token, childId)
     }
 
+    override suspend fun getChildTimetable(token: String, childId: String): NetworkResult<ParentTimetableResponse> {
+        return api.getChildTimetable(token, childId)
+    }
+
     override suspend fun searchSchools(token: String, query: String): NetworkResult<SchoolSearchResponse> {
         return api.searchSchools(token, query)
     }

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
@@ -72,6 +73,7 @@ object VIcons {
     val Settings get() = Icons.Filled.Settings               // settings
     val Bookmark get() = Icons.Filled.Bookmark               // bookmark
     val ChevronDown get() = Icons.Filled.KeyboardArrowDown   // ChevronDown
+    val ChevronUp get() = Icons.Filled.KeyboardArrowUp       // ChevronUp
     val ChevronLeft get() = Icons.Filled.KeyboardArrowLeft   // ChevronLeft
     val ChevronRight get() = Icons.Filled.KeyboardArrowRight // ChevronRight
     val ArrowLeft get() = Icons.AutoMirrored.Filled.ArrowBack    // ArrowLeft

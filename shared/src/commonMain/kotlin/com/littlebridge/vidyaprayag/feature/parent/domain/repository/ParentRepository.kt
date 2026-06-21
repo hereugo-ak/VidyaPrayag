@@ -17,6 +17,8 @@ interface ParentRepository {
     suspend fun getChildAttendance(token: String, childId: String): NetworkResult<ParentAttendanceResponse>
     suspend fun getChildMarks(token: String, childId: String): NetworkResult<ParentMarksResponse>
     suspend fun getChildSyllabus(token: String, childId: String): NetworkResult<ParentSyllabusResponse>
+    // RA-PP1: the child's class weekly timetable (recurring), backing the dashboard schedule card.
+    suspend fun getChildTimetable(token: String, childId: String): NetworkResult<ParentTimetableResponse>
     suspend fun searchSchools(token: String, query: String): NetworkResult<SchoolSearchResponse>
     suspend fun linkChild(token: String, request: LinkChildRequest): NetworkResult<LinkChildResponse>
     // RA-44: parent leave workflow.

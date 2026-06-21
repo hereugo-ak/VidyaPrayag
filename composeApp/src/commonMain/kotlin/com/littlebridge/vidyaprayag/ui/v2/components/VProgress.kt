@@ -27,6 +27,7 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 @Composable
 private fun progressColor(tone: VBadgeTone): Color = when (tone) {
     VBadgeTone.Arctic -> VTheme.colors.tealDeep
+    VBadgeTone.Accent -> VTheme.colors.accent
     VBadgeTone.Success -> VTheme.colors.successInk
     VBadgeTone.Warning -> VTheme.colors.warningInk
     VBadgeTone.Danger -> VTheme.colors.dangerInk

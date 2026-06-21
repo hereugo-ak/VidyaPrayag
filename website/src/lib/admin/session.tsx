@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * Admin session — JWT access + refresh token storage and a React context that
+ * Admin session, JWT access + refresh token storage and a React context that
  * gates every /admin route. Tokens live in localStorage under a dedicated key
  * (the wizard's `enrollplus.auth.v1` is separate and short-lived). On a 401 the
  * authed client transparently rotates the token via /api/v1/auth/refresh
- * (server rotates the refresh token on every use — see AuthRouting.kt §refresh).
+ * (server rotates the refresh token on every use, see AuthRouting.kt §refresh).
  *
  * Logout revokes the refresh session server-side and clears local state.
  */

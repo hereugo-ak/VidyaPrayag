@@ -9,13 +9,14 @@ import { Button } from "./ui/Button";
 
 const NAV = [
   { label: "Product", href: "/features" },
+  { label: "For Parents", href: "/parents" },
   { label: "About", href: "/about" },
   { label: "How it works", href: "/#how-it-works" },
   { label: "Pricing", href: "/pricing" },
 ];
 
 // Active when the current path starts with the link's base path.
-// "/" -segments only — anchor links (/#...) never count as active.
+// "/" -segments only, anchor links (/#...) never count as active.
 function isActivePath(pathname: string, href: string): boolean {
   if (href.includes("#")) return false;
   if (href === "/") return pathname === "/";
@@ -27,7 +28,7 @@ export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname() ?? "/";
 
-  // Backdrop blur appears AFTER 60px — a subtle reveal, not a jarring swap.
+  // Backdrop blur appears AFTER 60px, a subtle reveal, not a jarring swap.
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 60);
     onScroll();
@@ -61,7 +62,7 @@ export function Header() {
         <nav className="shell flex h-[72px] items-center justify-between">
           <Logo />
 
-          {/* Centre nav — evenly spaced links with subtle dot separators
+          {/* Centre nav, evenly spaced links with subtle dot separators
               between them (the Grow+ reference treatment). */}
           <div className="hidden items-center gap-5 md:flex lg:gap-6">
             {NAV.map((item, i) => {

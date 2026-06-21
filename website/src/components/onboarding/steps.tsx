@@ -166,7 +166,7 @@ export function BrandingStep({
     <div>
       <StepHead
         title="Branding & identity"
-        lede="Pick the accent colour parents and teachers will see in your school's app. You can change it later — and add a logo URL if you have one."
+        lede="Pick the accent colour parents and teachers will see in your school's app. You can change it later, and add a logo URL if you have one."
       />
       <div className="grid gap-6">
         <div>
@@ -228,7 +228,7 @@ export function AcademicStep({
     <div>
       <StepHead
         title="Academic structure"
-        lede="Add the classes you run, the sections in each, and the subjects taught. Separate sections and subjects with commas — you can refine all of this inside the dashboard."
+        lede="Add the classes you run, the sections in each, and the subjects taught. Separate sections and subjects with commas, you can refine all of this inside the dashboard."
       />
       <div className="space-y-4">
         {rows.map((row, i) => (
@@ -302,7 +302,7 @@ export function StudentsStep({
     <div>
       <StepHead
         title="Import your students"
-        lede="Optional but recommended. Upload a CSV of your students and we'll create their records the moment your school goes live — you can always add or edit students later inside the dashboard."
+        lede="Optional but recommended. Upload a CSV of your students and we'll create their records the moment your school goes live, you can always add or edit students later inside the dashboard."
       />
 
       <div className="grid gap-5">
@@ -344,9 +344,9 @@ export function StudentsStep({
           Required header:{" "}
           <code className="rounded bg-navy/6 px-1.5 py-0.5 font-mono text-[11px] text-navy-deep">
             {STUDENT_CSV_HEADER}
-          </code>{" "}
-          — <span className="font-medium">section</span> and{" "}
-          <span className="font-medium">student_code</span> are optional (we default
+          </code>. The{" "}
+          <span className="font-medium">section</span> and{" "}
+          <span className="font-medium">student_code</span> columns are optional (we default
           the section to A and generate a unique code when blank).
         </p>
 
@@ -411,9 +411,9 @@ export function StudentsStep({
                             bad ? "bg-danger/5" : ""
                           }`}
                         >
-                          <td className="px-3 py-1.5 text-navy-deep">{r.full_name || "—"}</td>
-                          <td className="px-3 py-1.5">{r.class_name || "—"}</td>
-                          <td className="px-3 py-1.5">{r.roll_number || "—"}</td>
+                          <td className="px-3 py-1.5 text-navy-deep">{r.full_name || "-"}</td>
+                          <td className="px-3 py-1.5">{r.class_name || "-"}</td>
+                          <td className="px-3 py-1.5">{r.roll_number || "-"}</td>
                           <td className="px-3 py-1.5">{r.section || "A"}</td>
                           <td className="px-3 py-1.5 text-ink-3">{r.student_code || "auto"}</td>
                         </tr>
@@ -440,7 +440,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-6 border-b border-navy/8 py-2.5 last:border-0">
       <span className="text-sm text-ink-3">{label}</span>
-      <span className="text-right text-sm font-medium text-navy-deep">{value || "—"}</span>
+      <span className="text-right text-sm font-medium text-navy-deep">{value || "-"}</span>
     </div>
   );
 }
@@ -486,7 +486,7 @@ export function ReviewStep({
     <div>
       <StepHead
         title="Review & launch"
-        lede="A final look before we create everything. Edit any section, then launch — your school goes live immediately."
+        lede="A final look before we create everything. Edit any section, then launch, your school goes live immediately."
       />
       <div className="grid gap-4">
         <Card title="Account & school" step="REGISTER" onJump={onJump}>
@@ -515,8 +515,7 @@ export function ReviewStep({
                 <li key={i} className="text-sm text-navy-deep">
                   <span className="font-medium">{c.name}</span>
                   <span className="text-ink-3">
-                    {" "}
-                    — sections {c.sections || "—"}
+                    {" · "}sections {c.sections || "-"}
                     {c.subjects ? ` · ${c.subjects}` : ""}
                   </span>
                 </li>
@@ -527,7 +526,7 @@ export function ReviewStep({
         <Card title="Students" step="STUDENTS" onJump={onJump}>
           {studentCount === 0 ? (
             <p className="text-sm text-ink-3">
-              No CSV uploaded — you can import students any time from the dashboard.
+              No CSV uploaded, you can import students any time from the dashboard.
             </p>
           ) : (
             <p className="text-sm text-navy-deep">

@@ -6,6 +6,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -50,6 +51,17 @@ object VMotion {
 
     /** framer spring(stiffness=300) — success tick / snappy. */
     val springSnappy: AnimationSpec<Float> = framerSpring(stiffness = 300f, damping = 20f)
+
+    /**
+     * The snappy spring as a *generic* spec, usable for any animatable type (Dp, Offset, Color…).
+     *
+     * [springSnappy] is typed `AnimationSpec<Float>`, so it cannot be passed to e.g.
+     * `animateDpAsState` (which needs `AnimationSpec<Dp>`). A Compose `spring` is per-type, so this
+     * factory rebuilds the same (stiffness=300, damping=20 → ratio≈0.577) feel for whatever `T`
+     * the call site needs.
+     */
+    fun <T> snappy(): SpringSpec<T> =
+        spring(dampingRatio = 20f / (2f * sqrt(300f)), stiffness = 300f)
 
     /** fadeUp(delayMs): opacity 0→1 + slide y from +12 (matches the React reveal ladder). */
     fun fadeUp(delayMs: Int, durationMs: Int = 450, fromY: Int = 12): EnterTransition =

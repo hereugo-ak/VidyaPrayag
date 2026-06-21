@@ -1,5 +1,5 @@
 /**
- * Admin API types — mirror the Ktor server DTOs verbatim (snake_case keys as
+ * Admin API types, mirror the Ktor server DTOs verbatim (snake_case keys as
  * serialized by kotlinx.serialization @SerialName). Source of truth:
  *   server/src/main/kotlin/.../feature/school/**  +  feature/notifications/**
  *
@@ -302,6 +302,74 @@ export interface DashboardIntelligenceDto {
   early_warning: EarlyWarningStudent[];
   academic_health: AcademicHealth;
   activity_feed: ActivityItem[];
+}
+
+// ── Timetable (GET /api/v1/school/timetable) ─────────────────────────────────
+// School-wide weekly schedule for the Command Center calendar. Source of truth:
+// server/.../feature/school/SchoolTimetableRouting.kt (reads teacher_periods,
+// joined to app_users for teacher_name). The timetable is a RECURRING WEEKLY
+// PATTERN keyed by weekday (1=Mon..7=Sun); the client paints it onto the dates
+// of the week it is viewing. Honest empty payload when no timetable entered.
+export interface TimetablePeriod {
+  id: string;
+  start_time: string; // "HH:mm"
+  end_time: string; // "HH:mm"
+  class_name: string;
+  section: string;
+  subject: string;
+  room: string;
+  teacher_id: string;
+  teacher_name: string; // "" when unassigned/unknown
+}
+export interface TimetableWeekday {
+  weekday: number; // 1=Mon … 7=Sun (java.time.DayOfWeek.value)
+  periods: TimetablePeriod[];
+}
+export interface TimetableDto {
+  weekdays: TimetableWeekday[];
+  classes: string[]; // distinct class_name present, sorted — feeds class filters
+}
+
+// ── Academic calendar (GET /api/v1/school/calendar) ──────────────────────────
+// Date-specific events/holidays/exams layered onto the recurring timetable.
+// Source: server/.../feature/school/SchoolRouting.kt (academic_calendar +
+// holidays). Keys are the exact @SerialName wire format.
+export interface CalendarEventDto {
+  date: string; // YYYY-MM-DD
+  day: string;
+  event_id: string;
+  event_title: string;
+  event_description: string;
+}
+export interface CalendarSummaryDto {
+  working_days: number;
+  total_working_days: number;
+  public_holidays: number;
+  school_holidays: number;
+}
+export interface CalendarResponse {
+  calendar_events: CalendarEventDto[];
+  summary: CalendarSummaryDto;
+}
+
+// ── Daily attendance (GET /api/v1/school/attendance/daily) ───────────────────
+// On-demand read for the calendar slot drill-down: present vs enrolled for a
+// class on a date, and whether attendance was marked. Source: SchoolRouting.kt.
+// status ∈ "present" | "absent" | "late" | "half_day".
+export interface AttendanceDailyEntry {
+  profile_pic: string | null;
+  name: string;
+  id: string;
+  status: string;
+}
+export interface AttendanceDailyResponse {
+  type: string;
+  grade: string | null;
+  present_count: number;
+  absent_count: number;
+  total_count: number;
+  attendance_percentage: string;
+  attendance_list: AttendanceDailyEntry[];
 }
 
 // ── Onboarding status (GET /api/v1/onboarding/status) ────────────────────────

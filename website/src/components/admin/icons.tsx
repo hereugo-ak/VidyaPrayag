@@ -1,4 +1,4 @@
-/** Minimal stroked icon set — 24px grid, currentColor, no dependency. */
+/** Minimal stroked icon set, 24px grid, currentColor, no dependency. */
 import type { SVGProps } from "react";
 
 type P = SVGProps<SVGSVGElement>;
@@ -91,4 +91,13 @@ export const IconBolt = (p: P) => (
 );
 export const IconGrid = (p: P) => (
   <svg {...base(p)}><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>
+);
+export const IconChevronLeft = (p: P) => (
+  <svg {...base(p)}><path d="m15 6-6 6 6 6" /></svg>
+);
+export const IconPanelLeft = (p: P) => (
+  <svg {...base(p)}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></svg>
+);
+export const IconSparkle = (p: P) => (
+  <svg {...base(p)}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" /></svg>
 );

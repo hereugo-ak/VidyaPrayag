@@ -1,6 +1,8 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.discovery
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -86,6 +88,16 @@ fun DiscoveryScreenV2(
     // When set (e.g. parent-portal overlay host), the header "Exit" pops the overlay
     // instead of routing through [onOpenSchool] (the unauth NavGraphV2 path).
     onExit: (() -> Unit)? = null,
+    // When true the marketplace is hosted *inside* another premium shell (the unlinked-parent
+    // two-tab landing): its own hero title block and "Exit" pill are suppressed (the host already
+    // owns the header + tab switcher), and it skips status-bar padding the host already applied —
+    // so the two surfaces read as one continuous screen, not a screen-within-a-screen.
+    embedded: Boolean = false,
+    // When the marketplace is hosted in the unlinked-parent landing, this routes the parent to the
+    // "Link a child" tab. It powers the "already with a partner school? Link your child" closing CTA
+    // at the foot of the school list — the gentle off-ramp for a parent who discovers their child's
+    // school is already on VidyaPrayag. Null (standalone / unauth) hides the CTA entirely.
+    onAlreadyLinked: (() -> Unit)? = null,
     viewModel: SchoolDiscoveryViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
@@ -97,7 +109,9 @@ fun DiscoveryScreenV2(
     val effectiveView = if (view == DiscoveryView.Profile && active == null) DiscoveryView.List else view
     when (effectiveView) {
         DiscoveryView.List -> DiscoveryList(
-            modifier = modifier.statusBarsPadding()
+            // Embedded: the host (unlinked-parent landing) already consumed the status-bar inset,
+            // so we don't re-apply it here (no double padding). Standalone keeps its own insets.
+            modifier = (if (embedded) modifier else modifier.statusBarsPadding())
                 .imePadding()
                 .navigationBarsPadding(),
             state = state,
@@ -112,6 +126,10 @@ fun DiscoveryScreenV2(
             // Header "Exit" sends the user out of the marketplace; in the unauth flow we pass
             // an empty id to the host, in the parent portal the dedicated [onExit] pops the overlay.
             onExit = { onExit?.invoke() ?: onOpenSchool(active?.id.orEmpty()) },
+            // Hide the duplicate hero header when hosted inside the two-tab landing.
+            embedded = embedded,
+            // The closing "already linked? Link your child" CTA — only when the host wires it.
+            onAlreadyLinked = onAlreadyLinked,
         )
         DiscoveryView.Profile -> {
             // Smart-cast guard: `active` is a `var` in this scope, so we capture into a local.
@@ -147,6 +165,8 @@ private fun DiscoveryList(
     onOpen: (DiscoveredSchool) -> Unit,
     onCompare: () -> Unit,
     onExit: () -> Unit,
+    embedded: Boolean = false,
+    onAlreadyLinked: (() -> Unit)? = null,
 ) {
     val c = VTheme.colors
 
@@ -162,32 +182,36 @@ private fun DiscoveryList(
     }
 
     Column(modifier.fillMaxSize().background(c.background)) {
-        // header
+        // header — when embedded inside the unlinked-parent landing the host already owns the
+        // title + tab switcher, so we drop the duplicate hero title block and the "Exit" pill and
+        // render a clean, transparent search-only header that sits flush under the segmented control.
         Column(
             Modifier
                 .fillMaxWidth()
-                .background(c.card)
+                .then(if (embedded) Modifier else Modifier.background(c.card))
                 .padding(horizontal = 20.dp)
-                .padding(top = 20.dp, bottom = 12.dp),
+                .padding(top = if (embedded) 8.dp else 20.dp, bottom = 12.dp),
         ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
-                Column {
-                    VLabel("Discover")
-                    Text("Find your child's school", style = VTheme.type.h2.colored(c.ink), modifier = Modifier.padding(top = 4.dp))
+            if (!embedded) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column {
+                        VLabel("Discover")
+                        Text("Find your child's school", style = VTheme.type.h2.colored(c.ink), modifier = Modifier.padding(top = 4.dp))
+                    }
+                    val exitInteraction = remember { MutableInteractionSource() }
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(c.cream)
+                            .clickable(interactionSource = exitInteraction, indication = null) { onExit() }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                    ) {
+                        // React label is "Exit" (leaves the discovery flow).
+                        Text("Exit", style = VTheme.type.caption.colored(c.ink2).copy(fontWeight = FontWeight.SemiBold))
+                    }
                 }
-                val exitInteraction = remember { MutableInteractionSource() }
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(c.cream)
-                        .clickable(interactionSource = exitInteraction, indication = null) { onExit() }
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                ) {
-                    // React label is "Exit" (leaves the discovery flow).
-                    Text("Exit", style = VTheme.type.caption.colored(c.ink2).copy(fontWeight = FontWeight.SemiBold))
-                }
+                Spacer(Modifier.height(12.dp))
             }
-            Spacer(Modifier.height(12.dp))
             VInput(
                 value = state.query,
                 onValueChange = onQuery,
@@ -200,8 +224,10 @@ private fun DiscoveryList(
             // server-side filter contract for board / fee-range / SRI is finalised (Phase D).
             // Keeping the visual affordance preserves the React fidelity per LAW 5.
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("📍 Within 3 km", "🎓 CBSE", "💰 Fee range", "🏫 Type", "⭐ SRI").forEachIndexed { i, f ->
-                    com.littlebridge.vidyaprayag.ui.v2.components.VTag(text = f, active = i == 0)
+                // Clean, premium text pills (no emoji glyphs — those read cheap). Active chip uses
+                // the Parents Portal lavender accent, consistent with every other filter row.
+                listOf("Within 3 km", "CBSE", "Fee range", "Type", "SRI rating").forEachIndexed { i, f ->
+                    com.littlebridge.vidyaprayag.ui.v2.components.VTag(text = f, active = i == 0, accentActive = true)
                 }
             }
         }
@@ -235,6 +261,14 @@ private fun DiscoveryList(
                         onToggleCompare = { onToggleCompare(s.id) },
                         onOpen = { onOpen(s) },
                     )
+                }
+                // ── Closing CTA: "already with a partner school? Link your child" ───────────
+                // The gentle off-ramp for a parent browsing the marketplace who realises their
+                // child's school is already on VidyaPrayag — sends them straight to the link flow.
+                // Only when hosted in the unlinked-parent landing (onAlreadyLinked wired).
+                onAlreadyLinked?.let { go ->
+                    Spacer(Modifier.height(4.dp))
+                    AlreadyLinkedCta(onLink = go)
                 }
             }
         }
@@ -362,6 +396,61 @@ private fun SchoolCard(
     }
 }
 
+/**
+ * AlreadyLinkedCta — the closing prompt at the foot of the marketplace list (unlinked-parent
+ * landing only). A premium, brand-tinted [VCard] in the same lavender language as the rest of the
+ * Parents Portal: a soft accent wash, a circular link glyph, a two-line pitch, and a full-width
+ * primary "Link your child" button that routes back to the Link tab. No emoji, no pop-up — one
+ * continuous, calm surface consistent with every other portal card.
+ */
+@Composable
+private fun AlreadyLinkedCta(onLink: () -> Unit) {
+    val c = VTheme.colors
+    VCard {
+        Column(
+            Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(c.accent.copy(alpha = 0.18f), c.accentSoft.copy(alpha = 0.12f)),
+                        ),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(VIcons.Users, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "Already with a partner school?",
+                style = VTheme.type.h3.colored(c.ink),
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "If your child's school is already on VidyaPrayag, link your child to see attendance, marks and their full journey.",
+                style = VTheme.type.caption.colored(c.ink2),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(16.dp))
+            VButton(
+                text = "Link your child",
+                onClick = onLink,
+                size = VButtonSize.Md,
+                tone = VButtonTone.Lavender,
+                soft = false,
+                full = true,
+                leading = {
+                    Icon(VIcons.User, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                },
+            )
+        }
+    }
+}
+
 @Composable
 private fun SchoolProfile(
     modifier: Modifier,
@@ -408,8 +497,21 @@ private fun SchoolProfile(
                         Text(it, style = VTheme.type.caption.colored(c.ink2))
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    VButton(text = "♡", onClick = {}, variant = VButtonVariant.Secondary, size = VButtonSize.Sm, tone = VButtonTone.Navy)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // Save/favourite — a proper circular icon button (was a raw "♡" glyph in a
+                    // text button, which read cheap). Outlined heart, brand-accent tinted.
+                    val saveIx = remember { MutableInteractionSource() }
+                    Box(
+                        Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(c.accent.copy(alpha = 0.10f))
+                            .border(BorderStroke(1.dp, c.accent.copy(alpha = 0.28f)), RoundedCornerShape(999.dp))
+                            .clickable(interactionSource = saveIx, indication = null) {},
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(VIcons.Heart, contentDescription = "Save school", tint = c.accentDeep, modifier = Modifier.size(18.dp))
+                    }
                     VButton(text = "Compare", onClick = {}, variant = VButtonVariant.Secondary, size = VButtonSize.Sm, tone = VButtonTone.Navy, full = true, modifier = Modifier.weight(1f))
                     VButton(text = "Enquire now", onClick = { enquireOpen = true }, size = VButtonSize.Sm, tone = VButtonTone.Sky, soft = false, full = true, modifier = Modifier.weight(1f))
                 }
