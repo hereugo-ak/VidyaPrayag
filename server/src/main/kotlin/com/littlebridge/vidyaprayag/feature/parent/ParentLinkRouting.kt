@@ -329,7 +329,12 @@ fun Route.parentLinkRouting() {
                             // find exactly that child at a DIFFERENT school, tell the
                             // parent precisely which school to pick instead of a dead-end.
                             val wrongSchool = run {
-                                if (req.childName.isNullOrBlank() || req.className.isNullOrBlank()) return@run null
+                                // Capture into non-null locals so smart-casts hold inside
+                                // the filter lambda below (avoids nullable-capture issues).
+                                val typedName = req.childName?.trim()?.lowercase()?.replace(Regex("\\s+"), " ")
+                                val reqClass = req.className
+                                if (typedName.isNullOrBlank() || reqClass.isNullOrBlank()) return@run null
+                                val typedTokens = typedName.split(" ").filter { it.isNotBlank() }.toSet()
                                 val wantRoll = normaliseRoll(rollInput)
                                 val elsewhere = StudentsTable.selectAll()
                                     .where {
@@ -338,15 +343,14 @@ fun Route.parentLinkRouting() {
                                     }
                                     .toList()
                                     .filter { r ->
-                                        val nameOk = run {
-                                            val typed = req.childName.trim().lowercase().replace(Regex("\\s+"), " ")
-                                            val stored = r[StudentsTable.fullName].trim().lowercase().replace(Regex("\\s+"), " ")
-                                            stored == typed || stored.contains(typed) || typed.contains(stored) ||
-                                                stored.split(" ").toSet().intersect(typed.split(" ").toSet()).isNotEmpty()
-                                        }
+                                        val stored = r[StudentsTable.fullName].trim().lowercase().replace(Regex("\\s+"), " ")
+                                        val nameOk = stored == typedName ||
+                                            stored.contains(typedName) || typedName.contains(stored) ||
+                                            stored.split(" ").filter { it.isNotBlank() }.toSet()
+                                                .intersect(typedTokens).isNotEmpty()
                                         val classOk = ClassNaming.sameClassSection(
                                             r[StudentsTable.className], r[StudentsTable.section],
-                                            req.className, req.section,
+                                            reqClass, req.section,
                                         )
                                         val rollOk = normaliseRoll(r[StudentsTable.rollNumber]) == wantRoll ||
                                             normaliseCode(r[StudentsTable.studentCode]) == rollInputCode
