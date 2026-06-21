@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentAnnouncement
 import com.littlebridge.vidyaprayag.feature.parent.presentation.ParentAnnouncementState
@@ -95,7 +96,7 @@ private fun ParentActivityContent(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 filters.forEach { f ->
-                    VTag(text = f, active = filter == f, onClick = { filter = f })
+                    VTag(text = f, active = filter == f, onClick = { filter = f }, accentActive = true)
                 }
             }
 
@@ -111,20 +112,22 @@ private fun ParentActivityContent(
 @Composable
 private fun AnnouncementCard(a: ParentAnnouncement) {
     val c = VTheme.colors
-    val (chipBg, icon) = when (a.category.lowercase()) {
-        "holidays", "holiday" -> c.teal.copy(alpha = 0.16f) to VIcons.Calendar
-        "ptm" -> c.warning.copy(alpha = 0.45f) to VIcons.Users
-        "events", "event" -> c.cream to VIcons.Star
-        "reminder" -> c.danger.copy(alpha = 0.45f) to VIcons.Clock
-        else -> c.cream to VIcons.Bell
+    // Each category carries a semantic colour AND a matching icon tint (was a flat grey icon on a
+    // tinted chip, which read cheap). The tint pairs with the chip so the glyph belongs to its hue.
+    val (tint, icon) = when (a.category.lowercase()) {
+        "holidays", "holiday" -> c.accentDeep to VIcons.Calendar      // brand violet — a treat day
+        "ptm" -> c.warningInk to VIcons.Users                          // amber — needs your time
+        "events", "event" -> Color(0xFF6C8DF5) to VIcons.Star          // sky — something happening
+        "reminder" -> c.dangerInk to VIcons.Clock                      // red — don't miss it
+        else -> c.tealDeep to VIcons.Bell                              // teal — general notice
     }
     VCard(modifier = Modifier.fillMaxWidth()) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
-                Modifier.size(40.dp).clip(CircleShape).background(chipBg),
+                Modifier.size(40.dp).clip(CircleShape).background(tint.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(icon, contentDescription = null, tint = c.ink2, modifier = Modifier.size(16.dp))
+                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
             }
             Column(Modifier.weight(1f)) {
                 Text(a.title, style = VTheme.type.bodyStrong.colored(c.ink))

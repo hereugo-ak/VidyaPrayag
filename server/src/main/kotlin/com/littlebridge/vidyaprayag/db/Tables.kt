@@ -930,6 +930,52 @@ object NonTeachingStaffTable : UUIDTable("non_teaching_staff", "id") {
 }
 
 // =====================================================================
+// parent_achievements  (Parents Portal — Profile tab "Missions & Achievements")
+// =====================================================================
+/**
+ * Per-child achievements / missions surfaced on the rebuilt Parents Portal **Profile tab**
+ * (the swipe-down "Missions & Achievements" sheet) and the holistic Track-Progress view.
+ *
+ * BACKWARD-COMPATIBLE BY DESIGN: the `/api/v1/parent/track-progress` endpoint already works
+ * WITHOUT this table — it falls back to the `app_config` CMS templates + locally-derived
+ * achievements. This table is the OPTIONAL upgrade path for schools/operators that want to
+ * store REAL, per-child earned achievements instead of CMS-wide templates.
+ *
+ * IDEMPOTENT PROVISIONING: the matching SQL (docs/db/migration_004_parent_achievements.sql)
+ * is fully guarded with `CREATE TABLE IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`, so running
+ * it against a Supabase that already has the table is a harmless no-op — never an error.
+ *
+ * `kind` discriminates the row so one table powers every section of the sheet:
+ *   BADGE        — a collectible achievement badge (title + icon + earned/locked + colours)
+ *   COMPETENCY   — a NEP-aligned academic competency bar (title + 0..1 progress)
+ *   EI_METRIC    — an emotional-intelligence metric (title + 0..1 value)
+ *   MISSION      — a play & discovery milestone (title + description + MET/IN_PROGRESS/LOCKED)
+ */
+object ParentAchievementsTable : UUIDTable("parent_achievements", "id") {
+    val childId     = uuid("child_id")                          // FK children.id — whose achievement
+    val schoolId    = uuid("school_id").nullable()             // FK schools.id (optional tenant scope)
+    val kind        = varchar("kind", 16)                      // BADGE | COMPETENCY | EI_METRIC | MISSION
+    val title       = text("title")
+    val description = text("description").nullable()
+    val icon        = varchar("icon", 64).nullable()          // Material symbol name (e.g. "verified")
+    // Hex colour stops for badges, JSON array string e.g. ["#B6C7EB","#006C49"].
+    val colors      = text("colors").default("[]")
+    // 0..1 progress for COMPETENCY / EI_METRIC rows; null for BADGE / MISSION.
+    val progress    = double("progress").nullable()
+    // Lifecycle: BADGE/MISSION use status (EARNED|LOCKED|MET|IN_PROGRESS); bars ignore it.
+    val status      = varchar("status", 16).default("LOCKED")
+    val isLocked    = bool("is_locked").default(true)
+    val sortOrder   = integer("sort_order").default(0)
+    val createdAt   = timestamp("created_at")
+    val updatedAt   = timestamp("updated_at")
+
+    init {
+        index("ix_parent_achievements_child", false, childId)
+        index("ix_parent_achievements_child_kind", false, childId, kind)
+    }
+}
+
+// =====================================================================
 // Academic Calendar Platform (VP-CAL)
 // =====================================================================
 //

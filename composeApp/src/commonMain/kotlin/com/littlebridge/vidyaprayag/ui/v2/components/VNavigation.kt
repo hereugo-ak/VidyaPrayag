@@ -76,6 +76,10 @@ fun VTopTabs(
     selected: String,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
+    // RA-PP-THEME: portals can override the active accent. Parents Portal passes the
+    // website violet (#544AB8) so the underline/active label reads lavender, never green.
+    // Defaults to teal so Admin/Teacher keep their existing aesthetic (token reuse, no rework).
+    activeColor: Color = VTheme.colors.tealDeep,
 ) {
     val c = VTheme.colors
 
@@ -98,33 +102,10 @@ fun VTopTabs(
             tabs.forEach { tab ->
 
                 val active = tab == selected
-
-                val bgColor by animateColorAsState(
-                    targetValue = if (active)
-                        c.tealDeep
-                    else
-                        Color.Transparent,
-                    animationSpec = tween(220),
-                    label = "tabBackground"
-                )
-
-                val textColor by animateColorAsState(
-                    targetValue = if (active)
-                        Color.White
-                    else
-                        c.ink3,
-                    animationSpec = tween(220),
-                    label = "tabText"
-                )
-
-                val scale by animateFloatAsState(
-                    targetValue = if (active) 1f else 0.98f,
-                    animationSpec = tween(220),
-                    label = "tabScale"
-                )
-
-
-                Box(
+                val color by animateColorAsState(if (active) activeColor else c.ink3, tween(180), label = "tabColor")
+                val interaction = remember { MutableInteractionSource() }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .graphicsLayer {
                             scaleX = scale
@@ -153,12 +134,16 @@ fun VTopTabs(
                         text = tab,
                         style = VTheme.type.dataSm.copy(
                             fontFamily = VTheme.type.uiFamily,
-                            fontWeight = if (active)
-                                FontWeight.Bold
-                            else
-                                FontWeight.SemiBold,
-                            color = textColor
-                        )
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                        modifier = Modifier.padding(vertical = 12.dp),
+                    )
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(2.5.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(if (active) activeColor else Color.Transparent),
                     )
                 }
             }
@@ -188,8 +173,15 @@ fun VBottomNav2(
     selected: String,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
+    // RA-PP-THEME: the active-state accent. Defaults to the legacy primary
+    // (tealDeep) so every other portal is untouched, but the Parents Portal —
+    // the first to migrate to the website's lavender/navy/violet palette —
+    // passes `accentDeep` (the violet #544AB8) so the active tab/pill matches
+    // the reference dashboard instead of the old green.
+    activeColor: Color? = null,
 ) {
     val c = VTheme.colors
+    val active0 = activeColor ?: c.tealDeep
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
 
@@ -256,8 +248,8 @@ fun VBottomNav2(
                         .width(pillWidth)
                         .height(40.dp)
                         .clip(RoundedCornerShape(999.dp))
-                        // tint of the existing primary token — no new colour token
-                        .background(c.tealDeep.copy(alpha = if (c.isNight) 0.18f else 0.10f)),
+                        // tint of the active accent (portal-configurable)
+                        .background(active0.copy(alpha = if (c.isNight) 0.18f else 0.10f)),
                 )
             }
             Row(
@@ -267,7 +259,7 @@ fun VBottomNav2(
             ) {
                 items.forEach { item ->
                     val active = item.id == selected
-                    val tint = if (active) c.tealDeep else c.ink3
+                    val tint = if (active) active0 else c.ink3
                     val interaction = remember { MutableInteractionSource() }
                     // Selected icon scales to 1.1f, unselected to 1.0f, with a soft spring.
                     val iconScale by animateFloatAsState(

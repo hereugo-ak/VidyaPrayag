@@ -23,6 +23,18 @@ data class VColors(
     val cream: Color,      // secondary / input surface
     val warmOrange: Color,
 
+    // ── Accent (lavender / violet family) — the website's `--accent` ──────────
+    // Ported verbatim from `website/tailwind.config.ts → colors.accent` and the
+    // reference parent dashboard (`PhoneMockup.tsx`), where the violet `#6C5CE0`
+    // is the dominant active-state accent (rings, pills, active tabs, sparklines).
+    // Structured as a first-class brand family so ANY portal can adopt it later
+    // (Parents Portal is the first to migrate). NOTHING per-screen hardcodes the
+    // hex — every accent read goes through [VColors.accent*] / [accentTint].
+    val accent: Color,      // #6C5CE0 — primary active accent
+    val accentSoft: Color,  // #8B7EE8 — soft step (gradients, hovers)
+    val accentDeep: Color,  // #544AB8 — deep step (ink on accent tints, eyebrow text)
+    val accentTint: Color,  // canvas behind floating cards (cool off-white lavender, #F4F3FA)
+
     // ── Ink (text) ──────────────────────────────────────────────────────────
     val ink: Color,
     val ink2: Color,
@@ -67,6 +79,12 @@ private object Raw {
     val cream = Color(0xFFF5F5F3)
     val warmOrange = Color(0xFF9E421A)
 
+    // Accent (lavender/violet) — website tailwind `colors.accent`.
+    val accent = Color(0xFF6C5CE0)
+    val accentSoft = Color(0xFF8B7EE8)
+    val accentDeep = Color(0xFF544AB8)
+    val accentTint = Color(0xFFF4F3FA) // website `colors.canvas` — cool lavender card canvas
+
     // Ink (light)
     val ink = Color(0xFF1A2422)
     val ink2 = Color(0xFF3D4947)
@@ -96,6 +114,11 @@ private object Raw {
     val nightNavyDeep = Color(0xFFFFFFFF)
     val nightTeal = Color(0xFF3CD1BE)
     val nightWarmOrange = Color(0xFFFFB37A)
+    // Accent stays punchy on black (theme.css §"keep accents punchy on black").
+    val nightAccent = Color(0xFF8B7EE8)
+    val nightAccentSoft = Color(0xFFA99EF0)
+    val nightAccentDeep = Color(0xFF6C5CE0)
+    val nightAccentTint = Color(0xFF15141C) // violet-tinted near-black card canvas
     val nightInk = Color(0xFFF4F4F6)
     val nightInk2 = Color(0xFFB9BCC4)
     val nightInk3 = Color(0xFF7A7E89)
@@ -117,6 +140,10 @@ val LightVColors = VColors(
     lavenderLight = Raw.lavenderLight,
     cream = Raw.cream,
     warmOrange = Raw.warmOrange,
+    accent = Raw.accent,
+    accentSoft = Raw.accentSoft,
+    accentDeep = Raw.accentDeep,
+    accentTint = Raw.accentTint,
     ink = Raw.ink,
     ink2 = Raw.ink2,
     ink3 = Raw.ink3,
@@ -146,6 +173,10 @@ val NightVColors = VColors(
     lavenderLight = Raw.lavenderLight,
     cream = Raw.nightTinted,
     warmOrange = Raw.nightWarmOrange,
+    accent = Raw.nightAccent,
+    accentSoft = Raw.nightAccentSoft,
+    accentDeep = Raw.nightAccentDeep,
+    accentTint = Raw.nightAccentTint,
     ink = Raw.nightInk,
     ink2 = Raw.nightInk2,
     ink3 = Raw.nightInk3,

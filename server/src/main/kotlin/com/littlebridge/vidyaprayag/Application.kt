@@ -80,9 +80,11 @@ import com.littlebridge.vidyaprayag.feature.school.ptmRouting
 import com.littlebridge.vidyaprayag.feature.school.resultsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolAnalyticsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolDashboardRouting
+import com.littlebridge.vidyaprayag.feature.school.schoolIntelligenceRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolProfileRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRecordsRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolStudentsRouting
+import com.littlebridge.vidyaprayag.feature.school.schoolTimetableRouting
 import com.littlebridge.vidyaprayag.feature.school.nonTeachingStaffRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRouting
 import com.littlebridge.vidyaprayag.feature.school.teacherAssignmentRouting
@@ -267,6 +269,7 @@ fun Application.module() {
         schoolDashboardRouting()     // /api/v1/school/dashboard
         adminDashboardRouting()      // /api/admin/dashboard/{summary,analytics,activity} — redesigned SchoolHomeScreenV2 data
         adminDashboardOverviewRouting() // /api/admin/dashboard/overview — consolidated command-center payload for SchoolHomeScreenV2
+        schoolIntelligenceRouting()  // /api/v1/school/dashboard/intelligence — Command Center: attendance timeline+anomalies+exam overlay, early-warning students, academic health grid, activity feed (all real-data)
         schoolAnalyticsRouting()     // /api/v1/school/analytics/{overview,class-performance,teacher-performance,student/{id},syllabus-coverage}
         leaveRequestsRouting()       // /api/v1/school/leave-requests[…]
         ptmRouting()                 // /api/v1/school/ptm
@@ -278,6 +281,7 @@ fun Application.module() {
         schoolStudentsRouting()      // /api/v1/school/students[…] + teachers/{id} — RA-45 student roster + student/teacher profile (school-scoped)
         nonTeachingStaffRouting()    // /api/v1/school/staff[…] — RA-S17 non-teaching-staff vertical (school-scoped CRUD)
         schoolRecordsRouting()       // /api/v1/school/{attendance/summary,marks/summary,fees/ledger} — RA-52 admin Records rollups (school-scoped reads)
+        schoolTimetableRouting()     // /api/v1/school/timetable — school-wide weekly schedule (all classes) from teacher_periods, for the Command Center calendar (read-only, additive)
         mediaRouting()               // /api/v1/school/media/upload[…] — REAL binary uploads → Supabase Storage (kills URL placeholders)
 
         // Academic Calendar platform (VP-CAL) — centralized planning & scheduling

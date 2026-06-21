@@ -21,13 +21,16 @@ package com.littlebridge.vidyaprayag.feature.parent
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.principalUserId
+import com.littlebridge.vidyaprayag.db.AppUsersTable
 import com.littlebridge.vidyaprayag.db.AssessmentMarksTable
 import com.littlebridge.vidyaprayag.db.AssessmentsTable
 import com.littlebridge.vidyaprayag.db.AttendanceRecordsTable
 import com.littlebridge.vidyaprayag.db.ChildrenTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
+import com.littlebridge.vidyaprayag.db.HolidayListTable
 import com.littlebridge.vidyaprayag.db.StudentsTable
 import com.littlebridge.vidyaprayag.db.SyllabusUnitsTable
+import com.littlebridge.vidyaprayag.db.TeacherPeriodsTable
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -47,6 +50,21 @@ data class ParentAttendanceDayDto(
     val status: String, // present | absent | late
 )
 
+/**
+ * A non-instructional day for the child's school — the canonical representation of
+ * "not a school day" so the parent dashboard can tell a holiday/vacation apart from a
+ * genuine absence. Sourced from `holiday_list` (type Public|School, frequency
+ * weekly|monthly|yearly). Weekly Sundays are derived client-side from the weekday, so
+ * a school need not enumerate every Sunday for the calendar to read correctly.
+ */
+@Serializable
+data class ParentHolidayDto(
+    val date: String,           // "YYYY-MM-DD"; empty when it's a recurring (weekly) rule
+    val title: String,
+    val type: String,           // Public | School
+    val frequency: String,      // weekly | monthly | yearly
+)
+
 @Serializable
 data class ParentAttendanceData(
     @SerialName("child_name") val childName: String,
@@ -56,6 +74,34 @@ data class ParentAttendanceData(
     @SerialName("total_days") val totalDays: Int,
     @SerialName("attendance_rate") val attendanceRate: Int, // 0..100
     val records: List<ParentAttendanceDayDto> = emptyList(),
+    // RA-PP1: declared non-school days for the child's school, so the parent dashboard
+    // can render holidays / vacations distinctly from real absences. Honest empty when a
+    // school hasn't published a holiday list.
+    val holidays: List<ParentHolidayDto> = emptyList(),
+)
+
+// ── Timetable (RA-PP1: parent read of the child's class weekly schedule) ──────
+
+@Serializable
+data class ParentPeriodDto(
+    @SerialName("start_time") val startTime: String, // "HH:mm"
+    @SerialName("end_time") val endTime: String,      // "HH:mm"
+    val subject: String,
+    val room: String,
+    @SerialName("teacher_name") val teacherName: String, // "" when unassigned/unknown
+)
+
+@Serializable
+data class ParentTimetableDayDto(
+    val weekday: Int,                              // 1=Mon … 7=Sun
+    val periods: List<ParentPeriodDto>,
+)
+
+@Serializable
+data class ParentTimetableData(
+    @SerialName("child_name") val childName: String,
+    @SerialName("class_name") val className: String,
+    val weekdays: List<ParentTimetableDayDto> = emptyList(),
 )
 
 @Serializable
@@ -183,6 +229,20 @@ fun Route.parentAcademicsRouting() {
                 val late = rows.count { it.status == "late" }
                 val total = rows.size
                 val rate = if (total > 0) (((present + late) * 100) / total) else 0
+                // RA-PP1: the child's school holiday list — lets the parent dashboard tell a
+                // declared non-school day apart from a real absence. Honest empty when none.
+                val holidays = dbQuery {
+                    HolidayListTable.selectAll().where {
+                        HolidayListTable.schoolId eq child.schoolId
+                    }.map {
+                        ParentHolidayDto(
+                            date = it[HolidayListTable.date],
+                            title = it[HolidayListTable.title],
+                            type = it[HolidayListTable.type],
+                            frequency = it[HolidayListTable.frequency],
+                        )
+                    }
+                }
                 call.ok(
                     ParentAttendanceData(
                         childName = child.childName,
@@ -192,6 +252,7 @@ fun Route.parentAcademicsRouting() {
                         totalDays = total,
                         attendanceRate = rate,
                         records = rows,
+                        holidays = holidays,
                     ),
                     message = "Attendance loaded",
                 )
@@ -279,6 +340,70 @@ fun Route.parentAcademicsRouting() {
                     ParentSyllabusData(childName = child.childName, className = child.grade, subjects = subjects),
                     message = "Syllabus loaded",
                 )
+            }
+
+            // ── Timetable — the child's class weekly schedule (recurring) ────
+            // RA-PP1: the parent dashboard's "today's schedule" + "weekly timetable"
+            // cards read REAL rows from teacher_periods, scoped to the child's class.
+            // teacher_periods is a recurring weekly pattern keyed by weekday (1=Mon…7=Sun);
+            // the client paints today's column live and reveals the six-day grid on swipe.
+            // Honest empty payload when the school hasn't entered a timetable — never faked.
+            get("/timetable") {
+                val child = call.requireOwnedChild() ?: return@get
+                if (child.schoolId == null || child.grade == null) {
+                    call.ok(
+                        ParentTimetableData(childName = child.childName, className = child.grade ?: "", weekdays = emptyList()),
+                        message = "No timetable feed yet",
+                    )
+                    return@get
+                }
+                val data = dbQuery {
+                    // Teacher display names for this school (id → full name).
+                    val teacherNames = AppUsersTable.selectAll()
+                        .where { AppUsersTable.schoolId eq child.schoolId }
+                        .associate { it[AppUsersTable.id].value to it[AppUsersTable.fullName] }
+
+                    val rows = TeacherPeriodsTable.selectAll().where {
+                        var cond = (TeacherPeriodsTable.schoolId eq child.schoolId) and
+                            (TeacherPeriodsTable.className eq child.grade)
+                        // RA-S19: only constrain to the section when it's authoritative
+                        // (came from a linked students row); else relax to class-level.
+                        if (child.sectionResolved) {
+                            cond = cond and (TeacherPeriodsTable.section eq child.section)
+                        }
+                        cond
+                    }.map { r ->
+                        val tId = r[TeacherPeriodsTable.teacherId]
+                        Triple(
+                            r[TeacherPeriodsTable.weekday],
+                            r[TeacherPeriodsTable.startTime],
+                            ParentPeriodDto(
+                                startTime = r[TeacherPeriodsTable.startTime],
+                                endTime = r[TeacherPeriodsTable.endTime],
+                                subject = r[TeacherPeriodsTable.subject],
+                                room = r[TeacherPeriodsTable.room],
+                                teacherName = teacherNames[tId] ?: "",
+                            ),
+                        )
+                    }
+
+                    val weekdays = rows.groupBy { it.first }
+                        .map { (weekday, list) ->
+                            ParentTimetableDayDto(
+                                weekday = weekday,
+                                periods = list.sortedWith(compareBy({ it.second }, { it.third.endTime }))
+                                    .map { it.third },
+                            )
+                        }
+                        .sortedBy { it.weekday }
+
+                    ParentTimetableData(
+                        childName = child.childName,
+                        className = child.grade,
+                        weekdays = weekdays,
+                    )
+                }
+                call.ok(data, message = "Timetable loaded")
             }
         }
     }

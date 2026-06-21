@@ -32,7 +32,6 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
 import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
-import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
@@ -64,26 +63,53 @@ private fun ParentFeesContent(
     val c = VTheme.colors
     val d = VTheme.dimens
 
-    Column(
-        modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
-            .padding(top = 20.dp, bottom = 140.dp),
-        verticalArrangement = Arrangement.spacedBy(d.sm + 4.dp),
-    ) {
-        Text("Fees", style = VTheme.type.h1.colored(c.ink))
+    val isEmpty = state.announcements.isEmpty() &&
+        state.outstandingFees.isBlank() &&
+        state.totalCollected.isBlank()
 
-        VStateHost(
-            loading = state.isLoading,
-            error = state.error,
-            isEmpty = state.announcements.isEmpty() &&
-                state.outstandingFees.isBlank() &&
-                state.totalCollected.isBlank(),
-            emptyTitle = "No fee records yet",
-            emptyBody = "Once your school publishes fees, they'll appear here.",
-            skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonFee() },
-        ) {
+    // LAYOUT FIX (same root cause as the Home dashboard): the body used to sit inside VStateHost,
+    // whose skeleton leg runs an AnimatedContent that lays out Box-like (stacking children) — nested
+    // in a verticalScroll the cards collapsed and overlapped. The state legs are now resolved in
+    // their own bounded, centered Box OUTSIDE the scroll, and the content is a plain scrolling
+    // Column with no AnimatedContent in its parentage.
+    when {
+        state.isLoading && isEmpty ->
+            Box(
+                modifier.fillMaxSize().padding(24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                androidx.compose.material3.CircularProgressIndicator(
+                    color = c.accent,
+                    modifier = Modifier.size(36.dp),
+                )
+            }
+
+        state.error != null && isEmpty ->
+            Box(modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                com.littlebridge.vidyaprayag.ui.v2.screens.VErrorState(
+                    message = state.error ?: "",
+                    onRetry = null,
+                )
+            }
+
+        isEmpty ->
+            Box(modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                com.littlebridge.vidyaprayag.ui.v2.components.VEmptyState(
+                    title = "No fee records yet",
+                    body = "Once your school publishes fees, they'll appear here.",
+                )
+            }
+
+        else ->
+            Column(
+                modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 20.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(d.sm + 4.dp),
+            ) {
+            Text("Fees", style = VTheme.type.h1.colored(c.ink))
             // ── Hero: outstanding balance + collection progress ─────────────────
             VCard(padding = 0.dp) {
                 Box(
@@ -106,7 +132,7 @@ private fun ParentFeesContent(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier.padding(top = 4.dp),
                             ) {
-                                Box(Modifier.size(6.dp).clip(RoundedCornerShape(999.dp)).background(Color(0xFFFFD4A3)))
+                                Box(Modifier.size(6.dp).clip(RoundedCornerShape(999.dp)).background(c.warning))
                                 Text(
                                     "${state.overdueCount} overdue",
                                     style = VTheme.type.caption.colored(Color.White.copy(alpha = 0.78f)),
@@ -117,7 +143,8 @@ private fun ParentFeesContent(
                         Box(
                             Modifier
                                 .clip(RoundedCornerShape(999.dp))
-                                .background(c.teal)
+                                // RA-PP-THEME: website-accent violet CTA (was green teal).
+                                .background(c.accent)
                                 .padding(horizontal = 16.dp, vertical = 10.dp),
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -132,7 +159,7 @@ private fun ParentFeesContent(
                         VLabel("Collected this term")
                         Text(state.totalCollected, style = VTheme.type.data.colored(c.ink).copy(fontWeight = FontWeight.SemiBold))
                     }
-                    VProgressBar(value = (state.collectionProgress * 100f))
+                    VProgressBar(value = (state.collectionProgress * 100f), tone = VBadgeTone.Accent)
                 }
             }
 
@@ -165,9 +192,9 @@ private fun ParentFeesContent(
 
             Text(
                 "Have a question about your fees? Message the school →",
-                style = VTheme.type.caption.colored(c.tealDeep).copy(fontWeight = FontWeight.SemiBold),
+                style = VTheme.type.caption.colored(c.accentDeep).copy(fontWeight = FontWeight.SemiBold),
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             )
-        }
+            } // end content Column (else branch)
     }
 }

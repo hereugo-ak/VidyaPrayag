@@ -54,6 +54,13 @@
 --        schools.onboarding_status + richer onboarding identity/academic
 --        columns the setup wizard collects (all ADD COLUMN IF NOT EXISTS).
 --
+-- OPTIONAL (Parents Portal Profile tab — "Missions & Achievements"):
+--   8. docs/db/migration_004_parent_achievements.sql
+--        parent_achievements — OPTIONAL per-child achievement store. The
+--        /parent/track-progress endpoint works WITHOUT it (CMS fallback), so
+--        run this only if you want real per-child achievements. Fully guarded
+--        with IF NOT EXISTS — 100% safe to re-run, never errors.
+--
 -- ALL CREATE TABLE statements use IF NOT EXISTS, so it is safe to re-run.
 --
 -- ----------------------------------------------------------------------------
