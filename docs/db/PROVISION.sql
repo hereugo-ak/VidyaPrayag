@@ -76,6 +76,8 @@
 --     \i docs/backend/sql/02_teacher_schema.sql
 --     \i scripts/schema-patch-2026-06-07.sql
 --     \i docs/db/schema-patch-school-onboarding.sql
+--     \i docs/db/migration_005_class_normalization_and_student_code_standard.sql
+--     \i docs/db/migration_006_parent_link_review_fields.sql
 --     \i scripts/seed-2026-06-07.sql
 --
 -- ----------------------------------------------------------------------------
