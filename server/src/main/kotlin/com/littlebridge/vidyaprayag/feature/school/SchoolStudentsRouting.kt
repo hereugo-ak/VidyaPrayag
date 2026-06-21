@@ -23,6 +23,10 @@
  */
 package com.littlebridge.vidyaprayag.feature.school
 
+import com.littlebridge.vidyaprayag.core.ClassNaming
+import com.littlebridge.vidyaprayag.core.ClassResolution
+import com.littlebridge.vidyaprayag.core.PhoneNormalizer
+import com.littlebridge.vidyaprayag.core.StudentCode
 import com.littlebridge.vidyaprayag.core.created
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
@@ -70,6 +74,8 @@ data class StudentDto(
     @SerialName("class_name") val className: String,
     val section: String,
     @SerialName("roll_number") val rollNumber: String,
+    // ISSUE 2b: parent/guardian phone on record (used by parent-link matching).
+    @SerialName("parent_phone") val parentPhone: String? = null,
     @SerialName("profile_photo_url") val profilePhotoUrl: String? = null,
     // RA-SP: listing-card enrichment so the redesigned roster cards can show
     // meaningful, relationship-aware information at a glance. All defaulted so
@@ -117,6 +123,9 @@ data class CreateStudentRequest(
     @SerialName("class_name") val className: String,
     val section: String? = null,
     @SerialName("roll_number") val rollNumber: String,
+    // ISSUE 2b: parent/guardian phone captured at creation, validated + persisted,
+    // and consumed by the parent→child link matcher.
+    @SerialName("parent_phone") val parentPhone: String? = null,
     @SerialName("student_code") val studentCode: String? = null  // optional; auto-generated when blank
 )
 
@@ -306,14 +315,16 @@ private fun buildTeacherProfile(schoolId: UUID, teacherId: UUID): TeacherProfile
     }
 
     // Per (class, section) active-student headcount — looked up once, reused.
+    // ISSUE 1: match via ClassNaming so counts aren't lost to format drift.
     val classSectionCounts: Map<Pair<String, String>, Int> =
         rawAssignments.map { it.first to it.second }.distinct().associateWith { (cls, sec) ->
             StudentsTable.selectAll().where {
-                (StudentsTable.schoolId eq schoolId) and
-                    (StudentsTable.isActive eq true) and
-                    (StudentsTable.className eq cls) and
-                    (StudentsTable.section eq sec)
-            }.count().toInt()
+                (StudentsTable.schoolId eq schoolId) and (StudentsTable.isActive eq true)
+            }.count {
+                ClassNaming.sameClassSection(
+                    it[StudentsTable.className], it[StudentsTable.section], cls, sec
+                )
+            }
         }
 
     val assignments = rawAssignments.map { (cls, sec, subject) ->
@@ -365,11 +376,12 @@ private fun buildTeacherProfile(schoolId: UUID, teacherId: UUID): TeacherProfile
     homeworkIds.forEach { hw ->
         val expected = classSectionCounts[hw.className to hw.section]
             ?: StudentsTable.selectAll().where {
-                (StudentsTable.schoolId eq schoolId) and
-                    (StudentsTable.isActive eq true) and
-                    (StudentsTable.className eq hw.className) and
-                    (StudentsTable.section eq hw.section)
-            }.count().toInt()
+                (StudentsTable.schoolId eq schoolId) and (StudentsTable.isActive eq true)
+            }.count {
+                ClassNaming.sameClassSection(
+                    it[StudentsTable.className], it[StudentsTable.section], hw.className, hw.section
+                )
+            }
         val submitted = HomeworkSubmissionsTable.selectAll()
             .where { HomeworkSubmissionsTable.homeworkId eq hw.id }
             .count().toInt()
@@ -564,6 +576,7 @@ private fun studentRowToDto(row: org.jetbrains.exposed.sql.ResultRow): StudentDt
         className = row[StudentsTable.className],
         section = row[StudentsTable.section],
         rollNumber = row[StudentsTable.rollNumber],
+        parentPhone = row[StudentsTable.parentPhone],
         profilePhotoUrl = row[StudentsTable.profilePhotoUrl],
         status = if (row[StudentsTable.isActive]) "active" else "inactive",
         isNewAdmission = isNewAdmission(row[StudentsTable.createdAt])
@@ -576,10 +589,11 @@ private fun studentRowToDto(row: org.jetbrains.exposed.sql.ResultRow): StudentDt
  */
 private fun classSectionAverageAttendance(schoolId: UUID, className: String, section: String): Float? {
     val codes = StudentsTable.selectAll().where {
-        (StudentsTable.schoolId eq schoolId) and
-            (StudentsTable.isActive eq true) and
-            (StudentsTable.className eq className) and
-            (StudentsTable.section eq section)
+        (StudentsTable.schoolId eq schoolId) and (StudentsTable.isActive eq true)
+    }.filter {
+        ClassNaming.sameClassSection(
+            it[StudentsTable.className], it[StudentsTable.section], className, section
+        )
     }.map { it[StudentsTable.studentCode] }
     if (codes.isEmpty()) return null
     val percents = codes.mapNotNull { code ->
@@ -659,6 +673,7 @@ private fun parseStudentCsv(csv: String): List<CreateStudentRequest> {
     val iRoll = indexOfAny("roll_number", "roll", "roll_no", "rollno")
     val iSection = indexOfAny("section", "sec")
     val iCode = indexOfAny("student_code", "code", "admission_no", "admission_number")
+    val iPhone = indexOfAny("parent_phone", "phone", "parent_mobile", "mobile", "guardian_phone", "contact")
 
     fun cell(cols: List<String>, idx: Int): String? =
         if (idx in cols.indices) cols[idx].takeIf { it.isNotBlank() } else null
@@ -676,6 +691,7 @@ private fun parseStudentCsv(csv: String): List<CreateStudentRequest> {
             className = klass ?: "",
             section = cell(cols, iSection),
             rollNumber = roll ?: "",
+            parentPhone = cell(cols, iPhone),
             studentCode = cell(cols, iCode)
         )
     }
@@ -728,18 +744,35 @@ fun Route.schoolStudentsRouting() {
                     call.fail("Name, class and roll number are required.")
                     return@post
                 }
-                // Auto-generate a unique student_code when not supplied.
-                val code = req.studentCode?.takeIf { it.isNotBlank() }
-                    ?: "S-${System.currentTimeMillis().toString(36).uppercase()}"
+                // ISSUE 2b: parent phone is required and must be a plausible number.
+                if (req.parentPhone.isNullOrBlank() || !PhoneNormalizer.isValid(req.parentPhone)) {
+                    call.fail(
+                        "A valid parent/guardian phone number is required.",
+                        HttpStatusCode.BadRequest, "PARENT_PHONE_INVALID"
+                    )
+                    return@post
+                }
+                val canonPhone = PhoneNormalizer.canonical(req.parentPhone)
 
                 val dto = dbQuery {
+                    // ISSUE 1: store the canonical class name + section so the derived
+                    // teacher⇄student join holds byte-for-byte.
+                    val resolvedClass = ClassResolution.canonicalClassName(ctx.schoolId, req.className)
+                    val resolvedSection = ClassNaming.canonicalSection(req.section)
+
+                    // ISSUE 2a: one predictable code derived from class/section/roll,
+                    // unique per school. An explicit code (rare) is still honoured.
+                    val code = req.studentCode?.takeIf { it.isNotBlank() }?.trim()
+                        ?: StudentCode.generate(resolvedClass, resolvedSection, req.rollNumber) { candidate ->
+                            StudentsTable.selectAll()
+                                .where { StudentsTable.studentCode eq candidate }
+                                .any()
+                        }
+
                     val clash = StudentsTable.selectAll()
                         .where { StudentsTable.studentCode eq code }
                         .firstOrNull()
                     if (clash != null) return@dbQuery null  // duplicate code
-
-                    val resolvedClass = req.className.trim()
-                    val resolvedSection = req.section?.takeIf { s -> s.isNotBlank() }?.trim() ?: "A"
 
                     val newId = StudentsTable.insert {
                         it[schoolId] = ctx.schoolId
@@ -748,6 +781,7 @@ fun Route.schoolStudentsRouting() {
                         it[className] = resolvedClass
                         it[section] = resolvedSection
                         it[rollNumber] = req.rollNumber.trim()
+                        it[parentPhone] = canonPhone
                         it[isActive] = true
                         it[createdAt] = Instant.now()
                     } get StudentsTable.id
@@ -795,9 +829,13 @@ fun Route.schoolStudentsRouting() {
                     val oldSection = row[StudentsTable.section]
 
                     // Resolve the new values, falling back to the current ones.
+                    // ISSUE 1: canonicalise a class/section change so the moved
+                    // student stores the same string the teacher assignment does.
                     val newName = req.fullName?.takeIf { it.isNotBlank() }?.trim()
-                    val newClass = req.className?.takeIf { it.isNotBlank() }?.trim() ?: oldClass
-                    val newSection = req.section?.takeIf { it.isNotBlank() }?.trim() ?: oldSection
+                    val newClass = req.className?.takeIf { it.isNotBlank() }
+                        ?.let { ClassResolution.canonicalClassName(ctx.schoolId, it) } ?: oldClass
+                    val newSection = req.section?.takeIf { it.isNotBlank() }
+                        ?.let { ClassNaming.canonicalSection(it) } ?: oldSection
                     val newRoll = req.rollNumber?.takeIf { it.isNotBlank() }?.trim()
 
                     StudentsTable.update({
@@ -863,8 +901,18 @@ fun Route.schoolStudentsRouting() {
                             results += BulkImportRowResult(rowNo, false, null, "Name, class and roll number are required.")
                             return@forEachIndexed
                         }
-                        val code = r.studentCode?.takeIf { it.isNotBlank() }
-                            ?: "S-${System.currentTimeMillis().toString(36).uppercase()}-$rowNo"
+                        // ISSUE 1: canonical class + section so the derived join holds.
+                        val resolvedClass = ClassResolution.canonicalClassName(ctx.schoolId, r.className)
+                        val resolvedSection = ClassNaming.canonicalSection(r.section)
+
+                        // ISSUE 2a: standardized, per-school-unique code derived from
+                        // class/section/roll (explicit code still honoured if given).
+                        val code = r.studentCode?.takeIf { it.isNotBlank() }?.trim()
+                            ?: StudentCode.generate(resolvedClass, resolvedSection, r.rollNumber) { candidate ->
+                                StudentsTable.selectAll()
+                                    .where { StudentsTable.studentCode eq candidate }
+                                    .any()
+                            }
 
                         val clash = StudentsTable.selectAll()
                             .where { StudentsTable.studentCode eq code }
@@ -873,8 +921,10 @@ fun Route.schoolStudentsRouting() {
                             results += BulkImportRowResult(rowNo, false, code, "Student code already exists.")
                             return@forEachIndexed
                         }
-                        val resolvedClass = r.className.trim()
-                        val resolvedSection = r.section?.takeIf { s -> s.isNotBlank() }?.trim() ?: "A"
+                        // ISSUE 2b: persist a parent phone when the row supplies one
+                        // (bulk import stays lenient — phone is optional here).
+                        val canonPhone = r.parentPhone?.takeIf { PhoneNormalizer.isValid(it) }
+                            ?.let { PhoneNormalizer.canonical(it) }
                         StudentsTable.insert {
                             it[schoolId] = ctx.schoolId
                             it[studentCode] = code
@@ -882,6 +932,7 @@ fun Route.schoolStudentsRouting() {
                             it[className] = resolvedClass
                             it[section] = resolvedSection
                             it[rollNumber] = r.rollNumber.trim()
+                            it[parentPhone] = canonPhone
                             it[isActive] = true
                             it[createdAt] = Instant.now()
                         }

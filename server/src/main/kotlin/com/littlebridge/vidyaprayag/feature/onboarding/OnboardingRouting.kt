@@ -39,6 +39,9 @@
  */
 package com.littlebridge.vidyaprayag.feature.onboarding
 
+import com.littlebridge.vidyaprayag.core.ClassNaming
+import com.littlebridge.vidyaprayag.core.ClassResolution
+import com.littlebridge.vidyaprayag.core.StudentCode
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.principalUserId
@@ -567,16 +570,26 @@ private fun upsertAssignment(
     teacherName: String?
 ) {
     val now = Instant.now()
+    // ISSUE 1: store canonical class + section so onboarding assignments match
+    // the students persisted with the same canonical values.
+    val canonClass = ClassResolution.canonicalClassName(schoolId, className)
+    val canonSection = ClassNaming.canonicalSection(section)
     val existing = TeacherSubjectAssignmentsTable.selectAll()
         .where {
             (TeacherSubjectAssignmentsTable.schoolId eq schoolId) and
-                (TeacherSubjectAssignmentsTable.className eq className) and
-                (TeacherSubjectAssignmentsTable.section eq section) and
                 (TeacherSubjectAssignmentsTable.subject eq subject)
         }
-        .firstOrNull()
+        .firstOrNull {
+            ClassNaming.sameClassSection(
+                it[TeacherSubjectAssignmentsTable.className],
+                it[TeacherSubjectAssignmentsTable.section],
+                canonClass, canonSection
+            )
+        }
     if (existing != null) {
         TeacherSubjectAssignmentsTable.update({ TeacherSubjectAssignmentsTable.id eq existing[TeacherSubjectAssignmentsTable.id].value }) {
+            it[TeacherSubjectAssignmentsTable.className] = canonClass
+            it[TeacherSubjectAssignmentsTable.section] = canonSection
             it[TeacherSubjectAssignmentsTable.teacherId] = teacherId
             it[TeacherSubjectAssignmentsTable.teacherName] = teacherName
             it[isActive] = true
@@ -586,8 +599,8 @@ private fun upsertAssignment(
         TeacherSubjectAssignmentsTable.insert {
             it[id] = UUID.randomUUID()
             it[TeacherSubjectAssignmentsTable.schoolId] = schoolId
-            it[TeacherSubjectAssignmentsTable.className] = className
-            it[TeacherSubjectAssignmentsTable.section] = section
+            it[TeacherSubjectAssignmentsTable.className] = canonClass
+            it[TeacherSubjectAssignmentsTable.section] = canonSection
             it[TeacherSubjectAssignmentsTable.subject] = subject
             it[TeacherSubjectAssignmentsTable.teacherId] = teacherId
             it[TeacherSubjectAssignmentsTable.teacherName] = teacherName
@@ -679,8 +692,13 @@ private fun persistOnboardingStudents(schoolId: UUID, payload: JsonObject) {
         val className = o["class_name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: return@forEach
         val section = o["section"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: "A"
         val rollNumber = o["roll_number"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: ""
+        // ISSUE 1: canonical class + section. ISSUE 2a: standardized code.
+        val canonClass = ClassResolution.canonicalClassName(schoolId, className)
+        val canonSection = ClassNaming.canonicalSection(section)
         val code = o["student_code"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
-            ?: "S-${UUID.randomUUID().toString().take(8).uppercase()}"
+            ?: StudentCode.generate(canonClass, canonSection, rollNumber) { candidate ->
+                StudentsTable.selectAll().where { StudentsTable.studentCode eq candidate }.any()
+            }
 
         val clash = StudentsTable.selectAll().where { StudentsTable.studentCode eq code }.firstOrNull()
         if (clash != null) return@forEach
@@ -688,8 +706,8 @@ private fun persistOnboardingStudents(schoolId: UUID, payload: JsonObject) {
             it[StudentsTable.schoolId] = schoolId
             it[studentCode] = code
             it[StudentsTable.fullName] = fullName.trim()
-            it[StudentsTable.className] = className.trim()
-            it[StudentsTable.section] = section.trim()
+            it[StudentsTable.className] = canonClass
+            it[StudentsTable.section] = canonSection
             it[StudentsTable.rollNumber] = rollNumber.trim()
             it[isActive] = true
             it[createdAt] = now

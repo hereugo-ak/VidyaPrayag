@@ -450,6 +450,10 @@ object StudentsTable : UUIDTable("students", "id") {
     val className  = text("class_name")
     val section    = text("section").default("A")
     val rollNumber = text("roll_number")
+    // ISSUE 2b: parent/guardian phone captured at admin student creation. Used by
+    // the parent→child link matching logic (full match vs phone-mismatch review).
+    // Nullable so pre-existing rows remain valid until backfilled.
+    val parentPhone = text("parent_phone").nullable()
     val profilePhotoUrl = text("profile_photo_url").nullable()
     val isActive   = bool("is_active").default(true)
     val createdAt  = timestamp("created_at")
