@@ -34,6 +34,7 @@
  */
 package com.littlebridge.vidyaprayag.feature.teacher
 
+import com.littlebridge.vidyaprayag.core.ClassNaming
 import com.littlebridge.vidyaprayag.core.TeacherContext
 import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.requireTeacherContext
@@ -136,24 +137,56 @@ internal fun todayIso(): String = LocalDate.now().toString()
  * homework totalCount / marks rosters. Reads the read-only students mirror.
  */
 internal suspend fun studentCountFor(schoolId: java.util.UUID, className: String, section: String): Int = dbQuery {
+    // ROOT FIX (ISSUE 1): match the roster to the teacher's assignment via the
+    // ClassNaming key, not raw eq, so "Grade 4"/"4"/"Class IV" + "A"/"a"/"" all
+    // resolve to the same class+section.
     StudentsTable.selectAll().where {
-        (StudentsTable.schoolId eq schoolId) and
-            (StudentsTable.className eq className) and
-            (StudentsTable.section eq section) and
-            (StudentsTable.isActive eq true)
-    }.count().toInt()
+        (StudentsTable.schoolId eq schoolId) and (StudentsTable.isActive eq true)
+    }.count {
+        ClassNaming.sameClassSection(
+            it[StudentsTable.className], it[StudentsTable.section], className, section
+        )
+    }
 }
+
+/**
+ * ROOT FIX (ISSUE 1): the shared, normalised student-roster query for teacher
+ * task screens (attendance, marks). Returns active students in [schoolId] whose
+ * (class, section) matches [className]/[section] under [ClassNaming], sorted by
+ * roll number. Replaces the per-screen raw `eq` filters that silently produced
+ * empty rosters when the stored class label differed only by case/format.
+ *
+ * Runs inside the caller's transaction — call from `dbQuery { ... }`.
+ */
+internal fun studentsForAssignment(
+    schoolId: java.util.UUID,
+    className: String,
+    section: String,
+    includeInactive: Boolean = false,
+): List<org.jetbrains.exposed.sql.ResultRow> =
+    StudentsTable.selectAll().where {
+        if (includeInactive) StudentsTable.schoolId eq schoolId
+        else (StudentsTable.schoolId eq schoolId) and (StudentsTable.isActive eq true)
+    }.filter {
+        ClassNaming.sameClassSection(
+            it[StudentsTable.className], it[StudentsTable.section], className, section
+        )
+    }.sortedBy { it[StudentsTable.rollNumber] }
 
 /** Overall syllabus progress (covered / total) for a class+section+subject; 0f if none. */
 internal suspend fun syllabusProgressFor(
     schoolId: java.util.UUID, className: String, section: String, subject: String,
 ): Float = dbQuery {
+    // ROOT FIX (ISSUE 1): subject is exact, but (class, section) is matched via
+    // the ClassNaming key so syllabus progress isn't lost to format drift.
     val units = SyllabusUnitsTable.selectAll().where {
         (SyllabusUnitsTable.schoolId eq schoolId) and
-            (SyllabusUnitsTable.className eq className) and
-            (SyllabusUnitsTable.section eq section) and
             (SyllabusUnitsTable.subject eq subject)
-    }.toList()
+    }.filter {
+        ClassNaming.sameClassSection(
+            it[SyllabusUnitsTable.className], it[SyllabusUnitsTable.section], className, section
+        )
+    }
     if (units.isEmpty()) 0f
     else units.count { it[SyllabusUnitsTable.isCovered] }.toFloat() / units.size.toFloat()
 }
@@ -338,12 +371,20 @@ fun Route.teacherRouting() {
 
 /** Average attendance ratio (present / total marked) for a class over its history; 0f if none. */
 internal suspend fun avgAttendanceFor(schoolId: java.util.UUID, className: String, section: String): Float = dbQuery {
-    val grade = "$className-$section"
+    // ROOT FIX (ISSUE 1): attendance rows store a "grade" string ("<class>-<section>").
+    // Match it to the teacher's class via the ClassNaming key (split on the LAST
+    // '-' so class labels containing a hyphen still parse) instead of raw eq.
+    val want = ClassNaming.key(className, section).composite
     val rows = AttendanceRecordsTable.selectAll().where {
         (AttendanceRecordsTable.schoolId eq schoolId) and
-            (AttendanceRecordsTable.type eq "student") and
-            (AttendanceRecordsTable.grade eq grade)
-    }.toList()
+            (AttendanceRecordsTable.type eq "student")
+    }.filter { row ->
+        val grade = row[AttendanceRecordsTable.grade] ?: return@filter false
+        val idx = grade.lastIndexOf('-')
+        val cls = if (idx >= 0) grade.substring(0, idx) else grade
+        val sec = if (idx >= 0) grade.substring(idx + 1) else ""
+        ClassNaming.key(cls, sec).composite == want
+    }
     if (rows.isEmpty()) 0f
     else rows.count { it[AttendanceRecordsTable.status].equals("present", ignoreCase = true) }
         .toFloat() / rows.size.toFloat()

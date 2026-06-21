@@ -22,6 +22,7 @@
  */
 package com.littlebridge.vidyaprayag.feature.teacher
 
+import com.littlebridge.vidyaprayag.core.ClassNaming
 import com.littlebridge.vidyaprayag.core.created
 import com.littlebridge.vidyaprayag.feature.notifications.Notify
 import com.littlebridge.vidyaprayag.feature.notifications.NotifyRecipients
@@ -202,12 +203,8 @@ fun Route.teacherTaskRoutes() {
             val grade = "${asg.className}-${asg.section}"
 
             val data = dbQuery {
-                val students = StudentsTable.selectAll().where {
-                    (StudentsTable.schoolId eq ctx.schoolId) and
-                        (StudentsTable.className eq asg.className) and
-                        (StudentsTable.section eq asg.section) and
-                        (StudentsTable.isActive eq true)
-                }.orderBy(StudentsTable.rollNumber, SortOrder.ASC).toList()
+                // ROOT FIX (ISSUE 1): normalised roster match (was raw eq).
+                val students = studentsForAssignment(ctx.schoolId, asg.className, asg.section)
 
                 val marked = AttendanceRecordsTable.selectAll().where {
                     (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
@@ -339,12 +336,8 @@ fun Route.teacherTaskRoutes() {
                     AssessmentMarksTable.assessmentId eq assessmentId
                 }.associateBy { it[AssessmentMarksTable.studentId] }
 
-                val students = StudentsTable.selectAll().where {
-                    (StudentsTable.schoolId eq ctx.schoolId) and
-                        (StudentsTable.className eq asg.className) and
-                        (StudentsTable.section eq asg.section) and
-                        (StudentsTable.isActive eq true)
-                }.orderBy(StudentsTable.rollNumber, SortOrder.ASC).toList()
+                // ROOT FIX (ISSUE 1): normalised roster match (was raw eq).
+                val students = studentsForAssignment(ctx.schoolId, asg.className, asg.section)
 
                 students.map { s ->
                     val code = s[StudentsTable.studentCode]
@@ -393,12 +386,10 @@ fun Route.teacherTaskRoutes() {
             val maxMarks = assessment[AssessmentsTable.maxMarks].toDouble()
 
             // Map student_code → display name for denormalised storage.
+            // ROOT FIX (ISSUE 1): normalised roster match incl. inactive (was raw eq).
             val names = dbQuery {
-                StudentsTable.selectAll().where {
-                    (StudentsTable.schoolId eq ctx.schoolId) and
-                        (StudentsTable.className eq asg.className) and
-                        (StudentsTable.section eq asg.section)
-                }.associate { it[StudentsTable.studentCode] to it[StudentsTable.fullName] }
+                studentsForAssignment(ctx.schoolId, asg.className, asg.section, includeInactive = true)
+                    .associate { it[StudentsTable.studentCode] to it[StudentsTable.fullName] }
             }
 
             val now = Instant.now()
@@ -473,13 +464,18 @@ fun Route.teacherTaskRoutes() {
             val classId = call.request.queryParameters["class_id"]
             val asg = call.requireOwnedAssignment(ctx, classId) ?: return@get
             val rows = dbQuery {
+                // ROOT FIX (ISSUE 1): subject exact, (class, section) normalised.
                 AssessmentsTable.selectAll().where {
                     (AssessmentsTable.schoolId eq ctx.schoolId) and
-                        (AssessmentsTable.className eq asg.className) and
-                        (AssessmentsTable.section eq asg.section) and
                         (AssessmentsTable.subject eq asg.subject) and
                         (AssessmentsTable.isActive eq true)
-                }.orderBy(AssessmentsTable.createdAt, SortOrder.DESC).map { a ->
+                }.orderBy(AssessmentsTable.createdAt, SortOrder.DESC)
+                    .filter {
+                        ClassNaming.sameClassSection(
+                            it[AssessmentsTable.className], it[AssessmentsTable.section],
+                            asg.className, asg.section
+                        )
+                    }.map { a ->
                     TeacherAssessmentDto(
                         id = a[AssessmentsTable.id].value.toString(),
                         name = a[AssessmentsTable.name],
@@ -546,12 +542,17 @@ fun Route.teacherTaskRoutes() {
             val grade = "${asg.className}-${asg.section}"
 
             val units = dbQuery {
+                // ROOT FIX (ISSUE 1): subject exact, (class, section) normalised.
                 SyllabusUnitsTable.selectAll().where {
                     (SyllabusUnitsTable.schoolId eq ctx.schoolId) and
-                        (SyllabusUnitsTable.className eq asg.className) and
-                        (SyllabusUnitsTable.section eq asg.section) and
                         (SyllabusUnitsTable.subject eq subject)
-                }.orderBy(SyllabusUnitsTable.position, SortOrder.ASC).toList()
+                }.orderBy(SyllabusUnitsTable.position, SortOrder.ASC)
+                    .filter {
+                        ClassNaming.sameClassSection(
+                            it[SyllabusUnitsTable.className], it[SyllabusUnitsTable.section],
+                            asg.className, asg.section
+                        )
+                    }
             }
             val dtos = units.map { u ->
                 SyllabusUnitDto(
