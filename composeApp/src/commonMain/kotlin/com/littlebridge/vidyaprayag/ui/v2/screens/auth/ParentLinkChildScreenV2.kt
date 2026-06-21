@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -83,6 +84,11 @@ fun ParentLinkChildScreenV2(
         onLanguageChange = viewModel::onLanguageChange,
         onSchoolQueryChange = viewModel::onSchoolQueryChange,
         onRollNumberChange = viewModel::onRollNumberChange,
+        // ISSUE 2c: guided step-3 inputs.
+        onChildNameChange = viewModel::onChildNameChange,
+        onClassNameChange = viewModel::onClassNameChange,
+        onSectionChange = viewModel::onSectionChange,
+        onParentPhoneChange = viewModel::onParentPhoneChange,
         onSearch = viewModel::searchSchools,
         onLink = viewModel::linkChild,
         modifier = modifier.statusBarsPadding()
@@ -101,6 +107,11 @@ private fun ParentLinkChildContent(
     onLanguageChange: (String) -> Unit,
     onSchoolQueryChange: (String) -> Unit,
     onRollNumberChange: (String) -> Unit,
+    // ISSUE 2c: guided step-3 inputs.
+    onChildNameChange: (String) -> Unit,
+    onClassNameChange: (String) -> Unit,
+    onSectionChange: (String) -> Unit,
+    onParentPhoneChange: (String) -> Unit,
     onSearch: () -> Unit,
     onLink: (() -> Unit) -> Unit,
     modifier: Modifier = Modifier,
@@ -237,15 +248,57 @@ private fun ParentLinkChildContent(
                 Spacer(Modifier.height(d.lg))
                 Text("Link your child", style = VTheme.type.h1.colored(c.ink))
                 Text(
-                    "Enter the roll or admission number assigned by the school.",
+                    "Tell us about your child at ${state.selectedSchool?.name ?: "the school"} " +
+                        "so we can match them precisely.",
                     style = VTheme.type.body.colored(c.ink2),
                 )
                 Spacer(Modifier.height(d.lg))
+                // ISSUE 2c: guided, real-time-formatted inputs (school already chosen).
+                // 1) Child's name.
+                VInput(
+                    value = state.childName,
+                    onValueChange = onChildNameChange,
+                    label = "Child's full name",
+                    placeholder = "e.g. Aarav Sharma",
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(d.md))
+                // 2) Class + Section on one row (the VM auto-peels a trailing
+                //    section letter typed into the class field into Section).
+                Row(horizontalArrangement = Arrangement.spacedBy(d.md)) {
+                    VInput(
+                        value = state.className,
+                        onValueChange = onClassNameChange,
+                        label = "Class",
+                        placeholder = "e.g. 4",
+                        modifier = Modifier.weight(2f),
+                    )
+                    VInput(
+                        value = state.section,
+                        onValueChange = onSectionChange,
+                        label = "Section",
+                        placeholder = "e.g. A",
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Spacer(Modifier.height(d.md))
+                // 3) Roll / admission number.
                 VInput(
                     value = rollNo,
                     onValueChange = onRollNumberChange,
                     label = "Roll / admission number",
                     placeholder = "e.g. 02",
+                    keyboardType = KeyboardType.Number,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(d.md))
+                // 4) Parent phone — used to verify against the student's record.
+                VInput(
+                    value = state.parentPhone,
+                    onValueChange = onParentPhoneChange,
+                    label = "Your phone number",
+                    placeholder = "e.g. 98765 43210",
+                    keyboardType = KeyboardType.Phone,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(d.md))
@@ -266,10 +319,16 @@ private fun ParentLinkChildContent(
                                 Spacer(Modifier.width(d.md))
                                 Column(Modifier.weight(1f)) {
                                     Text(linked.childName, style = VTheme.type.bodyStrong.colored(c.ink))
-                                    Text(
-                                        "Request sent — awaiting ${state.selectedSchool?.name ?: "school"} approval",
-                                        style = VTheme.type.caption.colored(c.ink2),
-                                    )
+                                    // ISSUE 2d: a phone mismatch lands in the school's
+                                    // "needs review" queue — say so explicitly so the
+                                    // parent knows it may take an extra check.
+                                    val msg = if (state.linkNeedsReview) {
+                                        "We found your child but the phone number didn't match — " +
+                                            "${state.selectedSchool?.name ?: "the school"} will review and confirm."
+                                    } else {
+                                        "Request sent — awaiting ${state.selectedSchool?.name ?: "school"} approval"
+                                    }
+                                    Text(msg, style = VTheme.type.caption.colored(c.ink2))
                                 }
                                 Icon(VIcons.Clock, contentDescription = null, tint = Color(0xFFB7791F), modifier = Modifier.size(18.dp))
                             }
@@ -321,7 +380,8 @@ private fun ParentLinkChildContent(
             step == 2 -> state.selectedSchool != null
             step < total -> true
             state.linkPending -> true
-            else -> !state.isLinking && rollNo.isNotBlank()
+            // ISSUE 2c: every guided field (name + class + roll + valid phone) is required.
+            else -> !state.isLinking && state.step3Valid
         }
         VButton(
             text = ctaText,
