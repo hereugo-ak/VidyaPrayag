@@ -20,7 +20,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import com.littlebridge.vidyaprayag.feature.admin.domain.model.LinkRequestDto
+import com.littlebridge.vidyaprayag.feature.admin.presentation.LinkRequestTab
 import com.littlebridge.vidyaprayag.feature.admin.presentation.LinkRequestsState
 import com.littlebridge.vidyaprayag.feature.admin.presentation.LinkRequestsViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
@@ -31,6 +33,7 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
+import com.littlebridge.vidyaprayag.ui.v2.components.VTag
 import com.littlebridge.vidyaprayag.ui.v2.screens.VSectionHeader
 import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
@@ -66,6 +69,7 @@ fun LinkRequestsScreenV2(
             onApprove = viewModel::approve,
             onReject = viewModel::reject,
             onRetry = viewModel::load,
+            onSelectTab = viewModel::selectTab,
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -77,9 +81,11 @@ private fun LinkRequestsContent(
     onApprove: (String) -> Unit,
     onReject: (String) -> Unit,
     onRetry: () -> Unit,
+    onSelectTab: (LinkRequestTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
+    val needsReview = state.tab == LinkRequestTab.NEEDS_REVIEW
     Column(
         modifier
             .verticalScroll(rememberScrollState())
@@ -91,19 +97,47 @@ private fun LinkRequestsContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            "Parents requesting access to a student's records. Approving grants the " +
-                "parent attendance, marks and syllabus for the matched student.",
+            if (needsReview) {
+                "These requests partly matched a student but the phone number didn't. " +
+                    "Verify the parent's identity before approving — nothing here is auto-linked."
+            } else {
+                "Parents requesting access to a student's records. Approving grants the " +
+                    "parent attendance, marks and syllabus for the matched student."
+            },
             style = VTheme.type.caption.colored(c.ink3),
         )
 
-        VSectionHeader(title = "PENDING REQUESTS")
+        // ISSUE 2d: two queues — clean full matches vs. phone-mismatch "needs review".
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            VTag(
+                text = "Pending",
+                active = state.tab == LinkRequestTab.PENDING,
+                onClick = { onSelectTab(LinkRequestTab.PENDING) },
+            )
+            val reviewLabel = if (state.needsReviewCount > 0) {
+                "Needs review (${state.needsReviewCount})"
+            } else {
+                "Needs review"
+            }
+            VTag(
+                text = reviewLabel,
+                active = needsReview,
+                onClick = { onSelectTab(LinkRequestTab.NEEDS_REVIEW) },
+            )
+        }
+
+        VSectionHeader(title = if (needsReview) "NEEDS REVIEW" else "PENDING REQUESTS")
 
         VStateHost(
             loading = state.isLoading,
             error = state.error,
             isEmpty = state.requests.isEmpty(),
-            emptyTitle = "No pending requests",
-            emptyBody = "There are no parent link requests awaiting your review.",
+            emptyTitle = if (needsReview) "Nothing to review" else "No pending requests",
+            emptyBody = if (needsReview) {
+                "No flagged link requests need manual verification right now."
+            } else {
+                "There are no parent link requests awaiting your review."
+            },
             emptyIcon = VIcons.ClipboardList,
             onRetry = onRetry,
         ) {
@@ -140,6 +174,11 @@ private fun LinkRequestCard(
                 Spacer(Modifier.height(2.dp))
                 val classRoll = buildString {
                     req.className?.takeIf { it.isNotBlank() }?.let { append("Class $it") }
+                    // ISSUE 2d: surface the section captured in the guided link step.
+                    req.section?.takeIf { it.isNotBlank() }?.let {
+                        if (isNotEmpty()) append(" ") else append("Section ")
+                        append(it)
+                    }
                     req.rollNumber?.takeIf { it.isNotBlank() }?.let {
                         if (isNotEmpty()) append(" • ")
                         append("Roll $it")
@@ -155,6 +194,15 @@ private fun LinkRequestCard(
                 }
                 Spacer(Modifier.height(6.dp))
                 Text(parentLine, style = VTheme.type.body.colored(c.ink2))
+                // ISSUE 2d: explain WHY a needs-review request was flagged (e.g. a
+                // phone mismatch) so the admin knows what to verify.
+                req.reviewReason?.takeIf { it.isNotBlank() }?.let { reason ->
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "⚠ $reason",
+                        style = VTheme.type.caption.colored(Color(0xFFB7791F)),
+                    )
+                }
             }
         }
         Spacer(Modifier.height(12.dp))
