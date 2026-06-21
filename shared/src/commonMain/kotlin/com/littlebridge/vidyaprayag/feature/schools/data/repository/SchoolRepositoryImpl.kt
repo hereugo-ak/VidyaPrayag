@@ -24,4 +24,8 @@ class SchoolRepositoryImpl(
     override suspend fun getSchoolById(id: String): School? {
         return localDataSource.getSchoolById(id)
     }
+
+    override suspend fun clearCache() {
+        localDataSource.deleteAll()
+    }
 }

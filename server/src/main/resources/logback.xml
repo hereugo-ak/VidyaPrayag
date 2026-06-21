@@ -1,12 +1,27 @@
 <configuration>
+    <!--
+      Log level is env-driven so production can stay at INFO while devs can opt
+      into verbose output without a rebuild:
+        LOG_LEVEL=DEBUG  (or TRACE) for local debugging.
+      Default is INFO. Shipping TRACE in production floods stdout with Ktor
+      routing-resolution noise (every "Selector didn't match" line) and was part
+      of how request/response bodies leaked into shared logs.
+    -->
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
-    <root level="trace">
+
+    <root level="${LOG_LEVEL:-INFO}">
         <appender-ref ref="STDOUT"/>
     </root>
+
+    <!-- Always keep noisy infrastructure loggers quiet regardless of LOG_LEVEL. -->
     <logger name="org.eclipse.jetty" level="INFO"/>
     <logger name="io.netty" level="INFO"/>
+    <!-- Ktor's routing tracer is TRACE-only; pin it to INFO so a global
+         LOG_LEVEL=DEBUG doesn't bring back the per-request route dump. -->
+    <logger name="io.ktor.server.routing.Routing" level="INFO"/>
+    <logger name="io.ktor.server.plugins.cors.CORS" level="INFO"/>
 </configuration>

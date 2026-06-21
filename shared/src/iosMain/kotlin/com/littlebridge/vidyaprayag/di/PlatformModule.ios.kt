@@ -17,6 +17,7 @@ import platform.Foundation.NSUserDomainMask
 
 @OptIn(ExperimentalForeignApi::class)
 actual fun platformModule(): Module = module {
+    single<com.littlebridge.vidyaprayag.Platform> { com.littlebridge.vidyaprayag.getPlatform() }
     single { Darwin.create() }
     single { DatabaseFactory() }
     single<AppDatabase> { get<DatabaseFactory>().createBuilder().build() }

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Enroll+ mark">
+  <!-- Enroll+ "Setu" bridge mark on a deep navy card, Apple touch / embossed-on-black usage.
+       Same exact app geometry as enrollplus-mark.svg, recoloured white-on-navy with a
+       lavender apex node for premium contrast. No "+" in the mark. -->
+  <defs>
+    <linearGradient id="ep-span-d" x1="16" y1="36" x2="48" y2="36" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.5" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#FFFFFF"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="64" height="64" rx="16" fill="#1A1838"/>
+  <rect x="0.5" y="0.5" width="63" height="63" rx="15.5" stroke="#ffffff" stroke-opacity="0.08"/>
+
+  <!-- span arc -->
+  <path d="M16 36 Q32 16 48 36" stroke="url(#ep-span-d)" stroke-width="3.4" stroke-linecap="round"/>
+  <!-- deck -->
+  <path d="M14 44 H50" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- cables -->
+  <path d="M22 36 V44" stroke="#ffffff" stroke-opacity="0.7" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M32 26 V44" stroke="#ffffff" stroke-opacity="0.7" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M42 36 V44" stroke="#ffffff" stroke-opacity="0.7" stroke-width="1.8" stroke-linecap="round"/>
+
+  <!-- pillar caps -->
+  <circle cx="16" cy="36" r="2.9" fill="#ffffff"/>
+  <circle cx="48" cy="36" r="2.9" fill="#ffffff"/>
+
+  <!-- apex node, lavender keystone for premium contrast on the dark card -->
+  <circle cx="32" cy="26" r="3" fill="#E6E6FA"/>
+</svg>

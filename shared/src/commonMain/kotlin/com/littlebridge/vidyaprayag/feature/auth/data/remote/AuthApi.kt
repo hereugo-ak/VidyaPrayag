@@ -1,5 +1,6 @@
 package com.littlebridge.vidyaprayag.feature.auth.data.remote
 
+import com.littlebridge.vidyaprayag.core.model.ApiResponse
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.network.safeApiCall
 import com.littlebridge.vidyaprayag.feature.auth.domain.model.*
@@ -11,38 +12,107 @@ class AuthApi(
     private val client: HttpClient,
     private val baseUrl: String
 ) {
-    suspend fun checkUser(identifier: String): NetworkResult<UserFlowResponse> {
+    private fun getUrl(path: String): String {
+        val base = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+        val cleanPath = if (path.startsWith("/")) path.substring(1) else path
+        return "$base$cleanPath"
+    }
+
+    suspend fun checkUser(identifier: String): NetworkResult<ApiResponse<UserFlowResponse>> {
         return safeApiCall {
-            client.post("$baseUrl/auth/check-user") {
+            client.post(getUrl("api/v1/auth/check-user")) {
                 contentType(ContentType.Application.Json)
                 setBody(CheckUserRequest(identifier))
             }
         }
     }
 
-    suspend fun signup(request: SignupRequest): NetworkResult<AuthResponse> {
+    suspend fun signup(request: SignupRequest): NetworkResult<ApiResponse<AuthResponse>> {
         return safeApiCall {
-            client.post("$baseUrl/auth/signup") {
+            client.post(getUrl("api/v1/auth/signup")) {
                 contentType(ContentType.Application.Json)
                 setBody(request)
             }
         }
     }
 
-    suspend fun login(request: LoginRequest): NetworkResult<AuthResponse> {
+    suspend fun registerSchool(request: SchoolRegisterRequest): NetworkResult<ApiResponse<AuthResponse>> {
         return safeApiCall {
-            client.post("$baseUrl/auth/login") {
+            client.post(getUrl("api/v1/auth/register-school")) {
                 contentType(ContentType.Application.Json)
                 setBody(request)
             }
         }
     }
 
-    suspend fun sendOtp(contact: String): NetworkResult<OtpResponse> {
+    suspend fun login(request: LoginRequest): NetworkResult<ApiResponse<AuthResponse>> {
         return safeApiCall {
-            client.post("$baseUrl/auth/send-otp") {
+            client.post(getUrl("api/v1/auth/login")) {
                 contentType(ContentType.Application.Json)
-                setBody(OtpRequest(contact))
+                setBody(request)
+            }
+        }
+    }
+
+    suspend fun sendOtp(identifier: String, purpose: String? = null): NetworkResult<ApiResponse<OtpResponse>> {
+        return safeApiCall {
+            client.post(getUrl("api/v1/auth/send-otp")) {
+                contentType(ContentType.Application.Json)
+                setBody(OtpRequest(identifier, purpose))
+            }
+        }
+    }
+
+    suspend fun verifyOtp(identifier: String, code: String, purpose: String? = null): NetworkResult<ApiResponse<OtpResponse>> {
+        return safeApiCall {
+            client.post(getUrl("api/v1/auth/verify-otp")) {
+                contentType(ContentType.Application.Json)
+                setBody(mapOf("identifier" to identifier, "code" to code, "purpose" to purpose))
+            }
+        }
+    }
+
+    suspend fun getUserDetails(token: String): NetworkResult<UserDetailsResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/user/details"))
+        }
+    }
+
+    /**
+     * Exchange a refresh token for a fresh access token (audit §3.4, finding F).
+     * The server's /refresh route was previously unreachable because no client
+     * method called it.
+     */
+    suspend fun refresh(refreshToken: String): NetworkResult<ApiResponse<AuthResponse>> {
+        return safeApiCall {
+            client.post(getUrl("api/v1/auth/refresh")) {
+                contentType(ContentType.Application.Json)
+                setBody(RefreshRequest(refreshToken))
+            }
+        }
+    }
+
+    /**
+     * RA-54: change the authenticated user's password. The bearer token is
+     * attached automatically by the Ktor Auth plugin. On success the server
+     * flips profile_completed=true and must_change_password=false, resolving
+     * the teacher first-login gate permanently.
+     */
+    suspend fun changePassword(request: ChangePasswordRequest): NetworkResult<ApiResponse<Unit>> {
+        return safeApiCall {
+            client.post(getUrl("api/v1/auth/change-password")) {
+                contentType(ContentType.Application.Json)
+                setBody(request)
+            }
+        }
+    }
+
+    /** Revoke the current session server-side (audit §3.6). */
+    suspend fun logout(token: String, refreshToken: String?): NetworkResult<ApiResponse<Unit>> {
+        return safeApiCall {
+            client.post(getUrl("api/v1/auth/logout")) {
+                contentType(ContentType.Application.Json)
+                setBody(LogoutRequest(refreshToken))
             }
         }
     }
