@@ -95,3 +95,25 @@ ORDER BY 1,2,3;
 If query (2) returns rows, they are pre-existing edge cases (e.g. a roll number
 that is entirely non-alphanumeric) — send them over and we'll extend the token
 rules; the migration will not have errored.
+
+## Troubleshooting
+
+### `ERROR: 42P01: relation "vp_code_map" does not exist`
+
+**Fixed.** Early versions of `migration_005` built its working table with
+`CREATE TEMP TABLE vp_code_map ON COMMIT DROP`. In the Supabase SQL editor the
+`DO $cascade$ … $cascade$` block compiles its statements before they run, and a
+plain reference to that TEMP table failed to resolve, raising the error above.
+
+The current `migration_005` fixes this by:
+
+1. using a **regular** `public.vp_code_map` table (created with
+   `DROP TABLE IF EXISTS` first, dropped again before `COMMIT`), which is always
+   resolvable, and
+2. running every cascade `UPDATE` inside the `DO` block via **`EXECUTE`
+   (dynamic SQL)**, which resolves names at run time instead of compile time.
+
+If you still see this error, you are running an **old copy** of the file — pull
+the latest `backend-by-abuzar_v1.0.3` and re-paste the whole file. Because the
+migration is single-transaction, the earlier failed run rolled back fully and
+left nothing half-applied, so it is safe to just re-run the corrected file.
