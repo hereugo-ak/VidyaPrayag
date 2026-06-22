@@ -222,16 +222,19 @@ fun Route.teacherRouting() {
 
                 val now = java.time.LocalTime.now()
                 val periodDtos = periods.map { r ->
-                    val start = runCatching { java.time.LocalTime.parse(r[TeacherPeriodsTable.startTime], HHMM) }.getOrNull()
-                    val end = runCatching { java.time.LocalTime.parse(r[TeacherPeriodsTable.endTime], HHMM) }.getOrNull()
+                    // T-101: start_time/end_time are now typed `time` (LocalTime),
+                    // so compare directly (no string parsing) and format to "HH:mm"
+                    // at the wire boundary to preserve the contract.
+                    val start = r[TeacherPeriodsTable.startTime]
+                    val end = r[TeacherPeriodsTable.endTime]
                     val status = when {
-                        start != null && end != null && !now.isBefore(start) && now.isBefore(end) -> "current"
-                        end != null && !now.isBefore(end) -> "done"
+                        !now.isBefore(start) && now.isBefore(end) -> "current"
+                        !now.isBefore(end) -> "done"
                         else -> "upcoming"
                     }
                     TeacherPeriodDto(
                         id = r[TeacherPeriodsTable.id].value.toString(),
-                        time = "${r[TeacherPeriodsTable.startTime]} - ${r[TeacherPeriodsTable.endTime]}",
+                        time = "${start.format(HHMM)} - ${end.format(HHMM)}",
                         className = "${r[TeacherPeriodsTable.className]}-${r[TeacherPeriodsTable.section]}",
                         subject = r[TeacherPeriodsTable.subject],
                         room = r[TeacherPeriodsTable.room],

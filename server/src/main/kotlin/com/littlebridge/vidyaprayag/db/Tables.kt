@@ -46,6 +46,7 @@ package com.littlebridge.vidyaprayag.db
 import org.jetbrains.exposed.dao.id.UUIDTable
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.date
+import org.jetbrains.exposed.sql.javatime.time
 import org.jetbrains.exposed.sql.javatime.timestamp
 
 // =====================================================================
@@ -844,15 +845,66 @@ object HomeworkSubmissionsTable : UUIDTable("homework_submissions", "id") {
 object TeacherPeriodsTable : UUIDTable("teacher_periods", "id") {
     val schoolId   = uuid("school_id")
     val teacherId  = uuid("teacher_id")                 // FK app_users.id
-    val weekday    = integer("weekday")                 // 1=Mon … 7=Sun
-    val startTime  = varchar("start_time", 8)           // "HH:mm"
-    val endTime    = varchar("end_time", 8)             // "HH:mm"
-    val className  = text("class_name")
-    val section    = varchar("section", 8).default("A")
-    val subject    = text("subject")
+    val weekday    = integer("weekday")                 // 1=Mon … 7=Sun (ISO, documented — D-TT-1)
+    // T-101 (Doc 05 §2.1): start_time/end_time promoted varchar("HH:mm") → typed
+    // `time` (LocalTime) so the resolved-day computation can compare without
+    // string parsing (D-TT-2). The wire contract is preserved: every consumer
+    // formats LocalTime back to "HH:mm" at the DTO boundary.
+    val startTime  = time("start_time")                 // TYPED (was varchar8 "HH:mm")
+    val endTime    = time("end_time")                   // TYPED (was varchar8 "HH:mm")
+    // T-101 NEW (Doc 05 §2.1): term validity + the TSA this period implements.
+    // academic_year_id / assignment_id are nullable for back-compat with rows
+    // written before the binding existed; backfill is best-effort in the
+    // migration. assignment_id is the linchpin (D-TT-4): "current period" →
+    // assignment_id → requireOwnedAssignment → authorized attendance/marks scope.
+    val academicYearId = uuid("academic_year_id").nullable()  // FK academic_years.id
+    val assignmentId   = uuid("assignment_id").nullable()     // FK teacher_subject_assignments.id
+    // DEVIATION (Doc 05 §2.1 says "DROP className/section/subject as truth"):
+    // the columns are KEPT as display-only/legacy here (NOT dropped) so the
+    // existing timetable readers (Parent/School/Teacher routing) keep compiling
+    // green in this commit (Rule 4). assignment_id is now the source of truth;
+    // the legacy columns are demoted to a denormalised display fallback and a
+    // later phase drops them once all readers derive class/subject via the FK.
+    val className  = text("class_name")                 // DISPLAY/legacy (demoted)
+    val section    = varchar("section", 8).default("A") // DISPLAY/legacy (demoted)
+    val subject    = text("subject")                    // DISPLAY/legacy (demoted)
     val room       = text("room").default("")
     val position   = integer("position").default(0)
+    val validFrom  = date("valid_from").nullable()      // T-101: term-revision window
+    val validTo    = date("valid_to").nullable()
+    val isActive   = bool("is_active").default(true)    // T-101: soft-disable a period
     val createdAt  = timestamp("created_at")
+    init {
+        // Doc 05 §2.1: no double-booking a teacher in the same weekday slot.
+        uniqueIndex("ux_periods_no_double_book", schoolId, teacherId, weekday, startTime)
+    }
+}
+
+/**
+ * T-101 (Doc 05 §2.2) — one-off overrides to the recurring weekly pattern, so
+ * the resolved-day computation for a SPECIFIC date is correct: a normally
+ * scheduled period can be CANCELLED (attendance not expected — Doc 06 edge
+ * case), RESCHEDULED, have a ROOM_CHANGE, a SUBSTITUTION inserted, or an EXTRA
+ * period added for one date only.
+ */
+object PeriodExceptionsTable : UUIDTable("period_exceptions", "id") {
+    val schoolId            = uuid("school_id")
+    val periodId            = uuid("period_id").nullable()   // FK teacher_periods.id (null for EXTRA)
+    val date                = date("date")                   // the specific date this applies to
+    val kind                = varchar("kind", 16)            // CANCELLED|RESCHEDULED|ROOM_CHANGE|SUBSTITUTION|EXTRA
+    val newStart            = time("new_start").nullable()
+    val newEnd              = time("new_end").nullable()
+    val newRoom             = text("new_room").nullable()
+    val substituteTeacherId = uuid("substitute_teacher_id").nullable()  // FK app_users.id
+    // EXTRA periods aren't tied to a recurring row, so they carry their own
+    // assignment binding + display fallback (same demotion rule as periods).
+    val assignmentId        = uuid("assignment_id").nullable()          // FK teacher_subject_assignments.id
+    val note                = text("note").default("")
+    val createdAt           = timestamp("created_at")
+    val updatedAt           = timestamp("updated_at")
+    init {
+        uniqueIndex("ux_period_exceptions_unique", schoolId, periodId, date, kind)
+    }
 }
 
 // =====================================================================

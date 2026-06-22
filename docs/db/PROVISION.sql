@@ -82,6 +82,7 @@
 --     \i docs/db/migration_008_enrollments.sql
 --     \i docs/db/migration_009_tsa_fks.sql
 --     \i docs/db/migration_010_typed_dates.sql
+--     \i docs/db/migration_011_periods.sql
 --     \i scripts/seed-2026-06-07.sql
 --
 -- ----------------------------------------------------------------------------

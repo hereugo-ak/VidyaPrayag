@@ -146,6 +146,7 @@ object DatabaseFactory {
         HomeworkTable,
         HomeworkSubmissionsTable,
         TeacherPeriodsTable,
+        PeriodExceptionsTable,   // T-101: one-off overrides to the weekly pattern (Doc 05 §2.2)
         // Parent scholarships (audit §4.2/§5.2 — DB-backed, replaces hardcoded list)
         ScholarshipsTable,
         ScholarshipApplicationsTable,

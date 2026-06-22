@@ -46,6 +46,11 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
+import java.time.format.DateTimeFormatter
+
+// T-101: teacher_periods.start_time/end_time are now typed `time` (LocalTime).
+// Format back to the "HH:mm" wire contract this endpoint's DTOs expect.
+private val TT_HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
 // ───────────────────────────────── DTOs ──────────────────────────────────────
 
@@ -100,8 +105,8 @@ fun Route.schoolTimetableRouting() {
                         val tId = r[TeacherPeriodsTable.teacherId]
                         TimetablePeriodDto(
                             id = r[TeacherPeriodsTable.id].value.toString(),
-                            startTime = r[TeacherPeriodsTable.startTime],
-                            endTime = r[TeacherPeriodsTable.endTime],
+                            startTime = r[TeacherPeriodsTable.startTime].format(TT_HHMM),
+                            endTime = r[TeacherPeriodsTable.endTime].format(TT_HHMM),
                             className = r[TeacherPeriodsTable.className],
                             section = r[TeacherPeriodsTable.section],
                             subject = r[TeacherPeriodsTable.subject],

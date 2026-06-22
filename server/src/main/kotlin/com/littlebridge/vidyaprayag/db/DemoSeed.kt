@@ -599,21 +599,27 @@ object DemoSeed {
      */
     private fun seedTeacherPeriods() {
         val now = Instant.now()
+        // T-101: start_time/end_time are now typed `time` (LocalTime); each
+        // period binds to the TSA it implements (assignment_id) so "current
+        // period → authorized scope" resolves automatically.
         data class Period(
             val weekday: Int,
-            val start: String,
-            val end: String,
+            val start: java.time.LocalTime,
+            val end: java.time.LocalTime,
+            val assignmentId: java.util.UUID,
             val className: String,
             val subject: String,
             val room: String,
             val position: Int
         )
-        // A compact but realistic Mon–Fri timetable for the demo teacher.
+        fun t(s: String): java.time.LocalTime = java.time.LocalTime.parse(s)
+        // A compact but realistic Mon–Fri timetable for the demo teacher. Each
+        // slot points at one of the demo teacher's three TSA assignments.
         val periods = mutableListOf<Period>()
         for (wd in DayOfWeek.MONDAY.value..DayOfWeek.FRIDAY.value) {
-            periods += Period(wd, "09:00", "09:45", DEMO_CLASS, "Mathematics", "R-101", 0)
-            periods += Period(wd, "10:00", "10:45", DEMO_CLASS, "Science",     "R-101", 1)
-            periods += Period(wd, "11:30", "12:15", "Grade 5",  "Mathematics", "R-205", 2)
+            periods += Period(wd, t("09:00"), t("09:45"), TSA_G4_MATH_ID,    DEMO_CLASS, "Mathematics", "R-101", 0)
+            periods += Period(wd, t("10:00"), t("10:45"), TSA_G4_SCIENCE_ID, DEMO_CLASS, "Science",     "R-101", 1)
+            periods += Period(wd, t("11:30"), t("12:15"), TSA_G5_MATH_ID,    "Grade 5",  "Mathematics", "R-205", 2)
         }
         periods.forEach { p ->
             val exists = TeacherPeriodsTable.selectAll()
@@ -630,11 +636,13 @@ object DemoSeed {
                 it[weekday] = p.weekday
                 it[startTime] = p.start
                 it[endTime] = p.end
+                it[assignmentId] = p.assignmentId
                 it[className] = p.className
                 it[section] = DEMO_SECTION
                 it[subject] = p.subject
                 it[room] = p.room
                 it[position] = p.position
+                it[isActive] = true
                 it[createdAt] = now
             }
         }
