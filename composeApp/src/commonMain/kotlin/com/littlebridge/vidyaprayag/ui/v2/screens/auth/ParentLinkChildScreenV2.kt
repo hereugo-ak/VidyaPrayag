@@ -342,11 +342,18 @@ private fun ParentLinkChildContent(
                                     // ISSUE 2d: a phone mismatch lands in the school's
                                     // "needs review" queue — say so explicitly so the
                                     // parent knows it may take an extra check.
+                                    // Prefer the school the SERVER matched the child to
+                                    // (linked.schoolName). The matcher can self-heal a
+                                    // wrong/duplicate school pick by binding to the
+                                    // student's REAL school, so this name is authoritative
+                                    // over the one the parent tapped in step 2.
+                                    val matchedSchool = linked.schoolName.takeIf { it.isNotBlank() }
+                                        ?: state.selectedSchool?.name ?: "the school"
                                     val msg = if (state.linkNeedsReview) {
                                         "We found your child but the phone number didn't match — " +
-                                            "${state.selectedSchool?.name ?: "the school"} will review and confirm."
+                                            "$matchedSchool will review and confirm."
                                     } else {
-                                        "Request sent — awaiting ${state.selectedSchool?.name ?: "school"} approval"
+                                        "Request sent — awaiting $matchedSchool approval"
                                     }
                                     Text(msg, style = VTheme.type.caption.colored(c.ink2))
                                 }
