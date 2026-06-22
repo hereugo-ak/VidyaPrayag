@@ -25,7 +25,7 @@
 --
 -- COLUMN FIDELITY
 --   The column names / types / nullability / defaults below match
---   server/src/main/kotlin/com/littlebridge/vidyaprayag/db/Tables.kt
+--   server/src/main/kotlin/com.littlebridge.enrollplus/db/Tables.kt
 --   (DeviceTokensTable) EXACTLY so the Exposed ORM mapping lines up with the
 --   real Postgres schema. The shared client DTO (RegisterDeviceTokenRequest)
 --   and the server DTO round-trip through this schema unchanged.

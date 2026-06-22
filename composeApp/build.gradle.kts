@@ -116,17 +116,17 @@ kotlin {
         }
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
-            implementation(libs.kotlinx.coroutinesSwing)
+            implementation(libs.kotlinxCoroutinesSwing)
         }
     }
 }
 
 android {
-    namespace = "com.littlebridge.vidyaprayag"
+    namespace = "com.littlebridge.enrollplus"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "com.littlebridge.vidyaprayag"
+        applicationId = "com.littlebridge.enrollplus"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 2
@@ -217,11 +217,11 @@ tasks.matching { task ->
 
 compose.desktop {
     application {
-        mainClass = "com.littlebridge.vidyaprayag.MainKt"
+        mainClass = "com.littlebridge.enrollplus.MainKt"
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "com.littlebridge.vidyaprayag"
+            packageName = "com.littlebridge.enrollplus"
             packageVersion = "1.0.0"
         }
     }

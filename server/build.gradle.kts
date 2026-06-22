@@ -51,10 +51,10 @@ kotlin {
     }
 }
 
-group = "com.littlebridge.vidyaprayag"
+group = "com.littlebridge.enrollplus"
 version = "1.0.0"
 application {
-    mainClass.set("com.littlebridge.vidyaprayag.ApplicationKt")
+    mainClass.set("com.littlebridge.enrollplus.ApplicationKt")
     
     val isDevelopment: Boolean = project.ext.has("development")
     applicationDefaultJvmArgs = listOf(
@@ -76,7 +76,7 @@ dependencies {
     // which on a cold clone downloads gigabytes of artifacts and can take 30+
     // minutes on average hardware/internet. `:server` only used two trivial
     // symbols from `:shared` (SERVER_PORT, Greeting), which are now inlined in
-    // `server/src/main/kotlin/com/littlebridge/vidyaprayag/ServerEntry.kt`.
+    // `server/src/main/kotlin/com.littlebridge.enrollplus/ServerEntry.kt`.
     //
     // If you ever need to share more code between server and the mobile/web
     // apps, prefer creating a JVM-only sub-module (e.g. `:shared-jvm`) instead
