@@ -159,7 +159,11 @@ object DatabaseFactory {
         ParentAchievementsTable,
         // Academic Calendar platform (VP-CAL — centralized planning & scheduling)
         CalendarEventsTable,
-        AcademicYearsTable
+        AcademicYearsTable,
+        // Teacher Portal Rebuild — Doc 11 T-001: typed class membership (enrollments).
+        // Applied by docs/db/migration_008_enrollments.sql (must run before deploy;
+        // AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates boot on it).
+        EnrollmentsTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

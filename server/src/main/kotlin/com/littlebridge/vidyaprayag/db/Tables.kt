@@ -14,11 +14,16 @@
  *      schools lat/long now live in the BASE schema per §1.3, so this only re-asserts them
  *      via ADD COLUMN IF NOT EXISTS — a harmless no-op)
  *   4. docs/backend/sql/02_teacher_schema.sql
+ *   5. docs/db/migration_005_class_normalization_and_student_code_standard.sql
+ *   6. docs/db/migration_006_parent_link_review_fields.sql
+ *   7. docs/db/migration_007_child_link_robustness.sql
+ *   8. docs/db/migration_008_enrollments.sql   (Teacher Portal Rebuild T-001:
+ *      typed class membership — EnrollmentsTable)
  *
- * Run all four in Supabase → SQL Editor before pointing the backend at
+ * Run all in Supabase → SQL Editor before pointing the backend at
  * production. For local-dev SQLite fallback, Exposed auto-creates the tables
  * in the order declared in DatabaseFactory.allTables. In Postgres, boot-time
- * validation (DatabaseFactory.validateSchema) logs any of the 38 tables that
+ * validation (DatabaseFactory.validateSchema) logs any of the registered tables that
  * are missing and refuses to start when AUTO_CREATE_TABLES is not enabled.
  *
  * IMPORTANT DESIGN CHOICES
@@ -38,6 +43,7 @@ package com.littlebridge.vidyaprayag.db
 
 import org.jetbrains.exposed.dao.id.UUIDTable
 import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.sql.javatime.date
 import org.jetbrains.exposed.sql.javatime.timestamp
 
 // =====================================================================
@@ -457,6 +463,47 @@ object StudentsTable : UUIDTable("students", "id") {
     val profilePhotoUrl = text("profile_photo_url").nullable()
     val isActive   = bool("is_active").default(true)
     val createdAt  = timestamp("created_at")
+}
+
+// =====================================================================
+// enrollments  (Teacher Portal Rebuild — Doc 11 T-001 / Doc 09 §1)
+//   The TYPED class-membership bridge: a student is enrolled in a
+//   class+section for a period. This replaces the in-memory
+//   ClassNaming.sameClassSection() heuristic (X-1/X-2) and the packed
+//   attendance_records.grade "<class>-<section>" string (D-STU) as the
+//   source of truth for "who is in class 7B".
+//
+//   FK: student_id -> students.id, class_id -> school_classes.id.
+//   Uniqueness: (student_id, class_id, section, start_date) so re-running
+//   the backfill is idempotent and historical/transfer rows coexist.
+//
+//   Created/applied by docs/db/migration_008_enrollments.sql. Registered in
+//   DatabaseFactory.allTables — AUTO_CREATE_TABLES is OFF in production, so
+//   that migration MUST be applied in Supabase before the matching deploy or
+//   validateSchema() refuses to boot.
+//
+//   NOTE (per LAWS): Doc 01 §11.2 sketched (from_date/to_date/is_active) but
+//   Doc 11 T-001 "Details" cites Doc 09 §1, whose shape (school_id, section,
+//   roll_number, status, start_date, end_date) is authoritative and modelled
+//   here. start_date/end_date are real DATE columns (not the varchar(12) date
+//   convention used by pre-T-004 tables).
+// =====================================================================
+object EnrollmentsTable : UUIDTable("enrollments", "id") {
+    val schoolId   = uuid("school_id")
+    val studentId  = uuid("student_id")                 // FK students.id
+    val classId    = uuid("class_id")                   // FK school_classes.id
+    val section    = varchar("section", 8).default("A")
+    val rollNumber = integer("roll_number").nullable()
+    val status     = varchar("status", 16).default("active") // active|transferred|withdrawn
+    val startDate  = date("start_date")
+    val endDate    = date("end_date").nullable()        // transfers/withdrawals (Doc 06 E4/E5)
+    val createdAt  = timestamp("created_at")
+    init {
+        uniqueIndex(
+            "ux_enrollments_unique",
+            studentId, classId, section, startDate
+        )
+    }
 }
 
 // =====================================================================

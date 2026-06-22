@@ -79,13 +79,14 @@
 --     \i docs/db/migration_005_class_normalization_and_student_code_standard.sql
 --     \i docs/db/migration_006_parent_link_review_fields.sql
 --     \i docs/db/migration_007_child_link_robustness.sql
+--     \i docs/db/migration_008_enrollments.sql
 --     \i scripts/seed-2026-06-07.sql
 --
 -- ----------------------------------------------------------------------------
 -- ALTERNATIVE: let the backend self-create everything
 -- ----------------------------------------------------------------------------
 -- Set AUTO_CREATE_TABLES=true on first boot and Exposed will run
--- createMissingTablesAndColumns() for the 38 registered tables. After it
+-- createMissingTablesAndColumns() for all registered tables. After it
 -- succeeds you can flip the env var back to false.
 -- ============================================================================
 
