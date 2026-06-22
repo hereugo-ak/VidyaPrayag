@@ -43,7 +43,6 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.isNull
 import org.jetbrains.exposed.sql.lowerCase
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
@@ -144,10 +143,10 @@ fun Route.parentLinkRouting() {
                 val matches = dbQuery {
                     SchoolsTable.selectAll()
                         .where {
-                            // Include is_active IS NULL as well as true — a newly onboarded
-                            // school may have is_active set before the NOT NULL default is
-                            // applied, and we never want to hide a school from its parents.
-                            val active = (SchoolsTable.isActive eq true) or (SchoolsTable.isActive.isNull())
+                            // Only active schools are searchable. migration_007 backfills
+                            // is_active + makes it NOT NULL, so a plain `eq true` no longer
+                            // risks hiding a school whose is_active was NULL.
+                            val active = (SchoolsTable.isActive eq true)
                             if (query.isBlank()) {
                                 active
                             } else {
@@ -192,9 +191,14 @@ fun Route.parentLinkRouting() {
                     val totalActive = StudentsTable.selectAll()
                         .where { (StudentsTable.schoolId eq schoolUuid) and (StudentsTable.isActive eq true) }
                         .count()
-                    val totalNullActive = StudentsTable.selectAll()
-                        .where { (StudentsTable.schoolId eq schoolUuid) and (StudentsTable.isActive.isNull()) }
+                    val totalInactive = StudentsTable.selectAll()
+                        .where { (StudentsTable.schoolId eq schoolUuid) and (StudentsTable.isActive eq false) }
                         .count()
+                    // Any rows that are neither true nor false are NULL is_active. After
+                    // migration_007 (backfill + NOT NULL) this is always 0; we derive it
+                    // rather than querying IS NULL so it compiles against the non-nullable
+                    // Exposed column mapping.
+                    val totalNullActive = totalAll - totalActive - totalInactive
                     val sample = StudentsTable.selectAll()
                         .where { StudentsTable.schoolId eq schoolUuid }
                         .limit(5)
@@ -215,7 +219,7 @@ fun Route.parentLinkRouting() {
                         "students_total" to totalAll,
                         "students_active_true" to totalActive,
                         "students_active_null" to totalNullActive,
-                        "students_active_false" to (totalAll - totalActive - totalNullActive),
+                        "students_active_false" to totalInactive,
                         "sample_students" to sample
                     )
                 }
@@ -253,7 +257,7 @@ fun Route.parentLinkRouting() {
                     val schoolRow = SchoolsTable.selectAll()
                         .where {
                             (SchoolsTable.id eq schoolUuid) and
-                                ((SchoolsTable.isActive eq true) or (SchoolsTable.isActive.isNull()))
+                                ((SchoolsTable.isActive eq true))
                         }
                         .singleOrNull() ?: return@dbQuery LinkResult.SchoolNotFound
                     val schoolNameVal = schoolRow[SchoolsTable.name]
@@ -295,7 +299,7 @@ fun Route.parentLinkRouting() {
                     val roster = StudentsTable.selectAll()
                         .where {
                             (StudentsTable.schoolId eq schoolUuid) and
-                                ((StudentsTable.isActive eq true) or (StudentsTable.isActive.isNull()))
+                                ((StudentsTable.isActive eq true))
                         }
                         .toList()
 
@@ -419,7 +423,7 @@ fun Route.parentLinkRouting() {
                                 val elsewhere = StudentsTable.selectAll()
                                     .where {
                                         (StudentsTable.schoolId neq schoolUuid) and
-                                            ((StudentsTable.isActive eq true) or (StudentsTable.isActive.isNull()))
+                                            ((StudentsTable.isActive eq true))
                                     }
                                     .toList()
                                     .filter { r ->
@@ -452,7 +456,7 @@ fun Route.parentLinkRouting() {
                                     val realSchool = SchoolsTable.selectAll()
                                         .where {
                                             (SchoolsTable.id eq realSchoolId) and
-                                                ((SchoolsTable.isActive eq true) or (SchoolsTable.isActive.isNull()))
+                                                ((SchoolsTable.isActive eq true))
                                         }
                                         .singleOrNull()
                                     if (realSchool != null) {
