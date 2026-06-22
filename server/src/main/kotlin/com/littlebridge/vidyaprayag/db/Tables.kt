@@ -19,6 +19,8 @@
  *   7. docs/db/migration_007_child_link_robustness.sql
  *   8. docs/db/migration_008_enrollments.sql   (Teacher Portal Rebuild T-001:
  *      typed class membership — EnrollmentsTable)
+ *   9. docs/db/migration_009_tsa_fks.sql        (Teacher Portal Rebuild T-002:
+ *      TSA class_id/subject_id FKs + is_class_teacher)
  *
  * Run all in Supabase → SQL Editor before pointing the backend at
  * production. For local-dev SQLite fallback, Exposed auto-creates the tables
@@ -287,14 +289,20 @@ object SchoolSubjectsTable : UUIDTable("school_subjects", "id") {
 // =====================================================================
 object TeacherSubjectAssignmentsTable : UUIDTable("teacher_subject_assignments", "id") {
     val schoolId  = uuid("school_id")
-    val classId   = uuid("class_id").nullable()          // FK school_classes.id (optional pre-migration)
-    val className = text("class_name")                   // denormalised for fast reads / display
+    // T-002: class_id / subject_id are now FK-backed and backfilled
+    // (migration_009_tsa_fks.sql) — the AUTHORITATIVE typed scope. className /
+    // section / subject below are DISPLAY-only denormalised columns; the scoping
+    // core (TeacherAccess, T-003) is id-first and treats ClassNaming as fallback.
+    val classId   = uuid("class_id").nullable()          // FK school_classes.id (fk_tsa_class)
+    val className = text("class_name")                   // DISPLAY only (denormalised)
     val section   = varchar("section", 8).default("A")
-    val subjectId = uuid("subject_id").nullable()        // FK school_subjects.id (optional)
-    val subject   = text("subject")                      // denormalised subject name
+    val subjectId = uuid("subject_id").nullable()        // FK school_subjects.id (fk_tsa_subject)
+    val subject   = text("subject")                      // DISPLAY only (denormalised)
     val teacherId = uuid("teacher_id").nullable()        // FK faculty.id / app_users.id
     val teacherName = text("teacher_name").nullable()    // display fallback when no FK
     val isActive  = bool("is_active").default(true)
+    // T-002: real "class teacher of this class+section" signal (B-CLS-3/F-CLS-3).
+    val isClassTeacher = bool("is_class_teacher").default(false)
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
     init {
