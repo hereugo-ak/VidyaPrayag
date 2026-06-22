@@ -1068,8 +1068,10 @@ private fun AddStudentPeopleDialog(
     var parentPhone by remember { mutableStateOf("") }
 
     val phoneDigits = parentPhone.count { it.isDigit() }
+    // Parent phone is optional — only validate when the admin has entered something.
+    val phoneOk = parentPhone.isBlank() || phoneDigits >= 10
     val canSubmit = name.isNotBlank() && className.isNotBlank() && roll.isNotBlank() &&
-        phoneDigits >= 10 && !isSubmitting
+        phoneOk && !isSubmitting
 
     Dialog(onDismissRequest = onDismiss) {
         VCard(modifier = Modifier.fillMaxWidth()) {
@@ -1082,7 +1084,7 @@ private fun AddStudentPeopleDialog(
                 VInput(
                     parentPhone,
                     { parentPhone = it },
-                    label = "Parent/guardian phone",
+                    label = "Parent/guardian phone (optional)",
                     placeholder = "e.g. 9876543210",
                     keyboardType = KeyboardType.Phone,
                 )

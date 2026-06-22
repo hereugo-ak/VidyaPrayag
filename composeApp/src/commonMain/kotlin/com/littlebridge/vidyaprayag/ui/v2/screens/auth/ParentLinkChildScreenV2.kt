@@ -311,10 +311,12 @@ private fun ParentLinkChildContent(
                 )
                 Spacer(Modifier.height(d.md))
                 // 4) Parent phone — used to verify against the student's record.
+                //    Optional: if your school doesn't have your number on record,
+                //    you can leave this blank. A school admin will still review the request.
                 VInput(
                     value = state.parentPhone,
                     onValueChange = onParentPhoneChange,
-                    label = "Your phone number",
+                    label = "Your phone number (optional)",
                     placeholder = "e.g. 98765 43210",
                     keyboardType = KeyboardType.Phone,
                     modifier = Modifier.fillMaxWidth(),

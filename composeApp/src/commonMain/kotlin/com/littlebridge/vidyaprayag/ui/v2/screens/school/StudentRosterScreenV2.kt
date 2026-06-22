@@ -299,13 +299,14 @@ private fun AddStudentDialog(
     var className by remember { mutableStateOf("") }
     var section by remember { mutableStateOf("") }
     var roll by remember { mutableStateOf("") }
-    // ISSUE 2b: capture parent/guardian phone, digits-only, validated >= 10.
+    // ISSUE 2b: parent phone is OPTIONAL — capture it when available but don't block submission.
     var parentPhone by remember { mutableStateOf("") }
     val phoneDigits = parentPhone.filter { it.isDigit() }
-    val phoneValid = phoneDigits.length >= 10
+    // Only validate when the admin entered something — blank = skip
+    val phoneOk = parentPhone.isBlank() || phoneDigits.length >= 10
 
     val canSubmit = name.isNotBlank() && className.isNotBlank() &&
-        roll.isNotBlank() && phoneValid && !isSubmitting
+        roll.isNotBlank() && phoneOk && !isSubmitting
 
     Dialog(onDismissRequest = onDismiss) {
         VCard(modifier = Modifier.fillMaxWidth()) {
@@ -315,16 +316,16 @@ private fun AddStudentDialog(
                 VInput(className, { className = it }, label = "Class", placeholder = "e.g. Grade 4")
                 VInput(section, { section = it }, label = "Section", placeholder = "A")
                 VInput(roll, { roll = it }, label = "Roll number", placeholder = "e.g. 12", keyboardType = KeyboardType.Number)
-                // ISSUE 2b: parent phone is mandatory; used by parent-link matching.
+                // ISSUE 2b: parent phone is optional but used by parent-link phone-match.
                 VInput(
                     parentPhone,
                     // keep digits + a leading + and common separators while typing
                     { input -> parentPhone = input.filter { it.isDigit() || it == '+' || it == ' ' || it == '-' } },
-                    label = "Parent/Guardian phone",
+                    label = "Parent/Guardian phone (optional)",
                     placeholder = "e.g. 98765 43210",
                     keyboardType = KeyboardType.Phone,
                 )
-                if (parentPhone.isNotBlank() && !phoneValid) {
+                if (parentPhone.isNotBlank() && !phoneOk) {
                     Text("Phone must have at least 10 digits.", style = VTheme.type.label.colored(c.dangerInk))
                 }
                 if (error != null) {

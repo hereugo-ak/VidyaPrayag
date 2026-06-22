@@ -61,10 +61,14 @@ data class LinkChildState(
     // (e.g. a phone mismatch) so the wizard can show a distinct message.
     val linkNeedsReview: Boolean = false,
 ) {
-    /** ISSUE 2c: step-3 is valid only when every guided field is filled + phone ok. */
+    /**
+     * ISSUE 2c: step-3 is valid when the core matching fields are filled.
+     * Parent phone is OPTIONAL — if blank, the backend will match by name+class+roll
+     * and treat it as a normal pending request (not needs_review). A parent who
+     * doesn't know their phone or is on a shared number is not blocked.
+     */
     val step3Valid: Boolean
-        get() = childName.isNotBlank() && className.isNotBlank() &&
-            rollNumber.isNotBlank() && parentPhone.filter { it.isDigit() }.length >= 10
+        get() = childName.isNotBlank() && className.isNotBlank() && rollNumber.isNotBlank()
 }
 
 /**
@@ -210,8 +214,9 @@ class LinkChildViewModel(
             _state.update { it.copy(linkError = "Roll / admission number is required") }
             return
         }
-        if (s.parentPhone.filter { it.isDigit() }.length < 10) {
-            _state.update { it.copy(linkError = "Enter a valid phone number (at least 10 digits)") }
+        // Phone is optional — only validate when the parent actually entered something.
+        if (s.parentPhone.isNotBlank() && s.parentPhone.filter { it.isDigit() }.length < 10) {
+            _state.update { it.copy(linkError = "That phone number doesn't look right — enter at least 10 digits, or leave it blank") }
             return
         }
         viewModelScope.launch {

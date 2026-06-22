@@ -43,6 +43,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.isNull
 import org.jetbrains.exposed.sql.lowerCase
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
@@ -143,7 +144,10 @@ fun Route.parentLinkRouting() {
                 val matches = dbQuery {
                     SchoolsTable.selectAll()
                         .where {
-                            val active = SchoolsTable.isActive eq true
+                            // Include is_active IS NULL as well as true — a newly onboarded
+                            // school may have is_active set before the NOT NULL default is
+                            // applied, and we never want to hide a school from its parents.
+                            val active = (SchoolsTable.isActive eq true) or (SchoolsTable.isActive.isNull())
                             if (query.isBlank()) {
                                 active
                             } else {
@@ -163,6 +167,63 @@ fun Route.parentLinkRouting() {
                         }
                 }
                 call.ok(SchoolSearchResponse(schools = matches), message = "Found ${matches.size} school(s)")
+            }
+
+            // ---- GET /schools/{id}/roster-debug ----
+            // Diagnostic: return the raw roster count + first 5 student codes for a
+            // school so we can quickly verify the school_id/student linkage in prod.
+            // Authentication required (parent JWT), school must be active.
+            get("/schools/{id}/roster-debug") {
+                call.principalUserId() ?: run {
+                    call.fail("Invalid token", HttpStatusCode.Unauthorized); return@get
+                }
+                val schoolUuid = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                    ?: run { call.fail("Invalid school id"); return@get }
+
+                val info = dbQuery {
+                    val school = SchoolsTable.selectAll()
+                        .where { SchoolsTable.id eq schoolUuid }
+                        .firstOrNull()
+                    if (school == null) return@dbQuery null
+
+                    val totalAll = StudentsTable.selectAll()
+                        .where { StudentsTable.schoolId eq schoolUuid }
+                        .count()
+                    val totalActive = StudentsTable.selectAll()
+                        .where { (StudentsTable.schoolId eq schoolUuid) and (StudentsTable.isActive eq true) }
+                        .count()
+                    val totalNullActive = StudentsTable.selectAll()
+                        .where { (StudentsTable.schoolId eq schoolUuid) and (StudentsTable.isActive.isNull()) }
+                        .count()
+                    val sample = StudentsTable.selectAll()
+                        .where { StudentsTable.schoolId eq schoolUuid }
+                        .limit(5)
+                        .map {
+                            mapOf(
+                                "code" to it[StudentsTable.studentCode],
+                                "name" to it[StudentsTable.fullName],
+                                "class" to it[StudentsTable.className],
+                                "section" to it[StudentsTable.section],
+                                "roll" to it[StudentsTable.rollNumber],
+                                "is_active" to it[StudentsTable.isActive].toString()
+                            )
+                        }
+                    mapOf(
+                        "school_id" to schoolUuid.toString(),
+                        "school_name" to school[SchoolsTable.name],
+                        "school_is_active" to school[SchoolsTable.isActive].toString(),
+                        "students_total" to totalAll,
+                        "students_active_true" to totalActive,
+                        "students_active_null" to totalNullActive,
+                        "students_active_false" to (totalAll - totalActive - totalNullActive),
+                        "sample_students" to sample
+                    )
+                }
+                if (info == null) {
+                    call.fail("School not found", HttpStatusCode.NotFound)
+                } else {
+                    call.ok(info, message = "Roster debug info")
+                }
             }
 
             // ---- POST /link-child ----
@@ -185,9 +246,15 @@ fun Route.parentLinkRouting() {
                 }
 
                 val result = dbQuery {
-                    // 1) Verify school exists & is active.
+                    // 1) Verify school exists. We accept is_active=true OR is_active IS NULL
+                    // so a school that was registered but not yet fully onboarded (or whose
+                    // is_active column defaulted to NULL before the migration hardened it)
+                    // is still reachable for parents whose children are enrolled there.
                     val schoolRow = SchoolsTable.selectAll()
-                        .where { (SchoolsTable.id eq schoolUuid) and (SchoolsTable.isActive eq true) }
+                        .where {
+                            (SchoolsTable.id eq schoolUuid) and
+                                ((SchoolsTable.isActive eq true) or (SchoolsTable.isActive.isNull()))
+                        }
                         .singleOrNull() ?: return@dbQuery LinkResult.SchoolNotFound
                     val schoolNameVal = schoolRow[SchoolsTable.name]
 
@@ -221,10 +288,14 @@ fun Route.parentLinkRouting() {
                     // fetch + in-memory normalisation mirrors the SchoolStudentsRouting
                     // search style and stays Postgres/SQLite-portable.
                     val rollInput = req.rollNumber.trim()
+                    // FIX (rosterSize=0): include rows where is_active IS NULL as well as
+                    // is_active = true, so students inserted directly into Supabase (or via
+                    // older schema that lacked the column default) are not silently excluded.
+                    // We explicitly exclude only rows that are HARD-set to false (admin-deleted).
                     val roster = StudentsTable.selectAll()
                         .where {
                             (StudentsTable.schoolId eq schoolUuid) and
-                                (StudentsTable.isActive eq true)
+                                ((StudentsTable.isActive eq true) or (StudentsTable.isActive.isNull()))
                         }
                         .toList()
 
@@ -339,7 +410,7 @@ fun Route.parentLinkRouting() {
                                 val elsewhere = StudentsTable.selectAll()
                                     .where {
                                         (StudentsTable.schoolId neq schoolUuid) and
-                                            (StudentsTable.isActive eq true)
+                                            ((StudentsTable.isActive eq true) or (StudentsTable.isActive.isNull()))
                                     }
                                     .toList()
                                     .filter { r ->

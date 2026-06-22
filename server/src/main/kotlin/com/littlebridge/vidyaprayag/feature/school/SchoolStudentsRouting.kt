@@ -744,15 +744,22 @@ fun Route.schoolStudentsRouting() {
                     call.fail("Name, class and roll number are required.")
                     return@post
                 }
-                // ISSUE 2b: parent phone is required and must be a plausible number.
-                if (req.parentPhone.isNullOrBlank() || !PhoneNormalizer.isValid(req.parentPhone)) {
-                    call.fail(
-                        "A valid parent/guardian phone number is required.",
-                        HttpStatusCode.BadRequest, "PARENT_PHONE_INVALID"
-                    )
-                    return@post
-                }
-                val canonPhone = PhoneNormalizer.canonical(req.parentPhone)
+                // ISSUE 2b: parent phone is OPTIONAL but validated when provided.
+                // Not blocking — a school may not capture parent phone at enrollment time,
+                // and admin UIs built before this field was added should not break.
+                // Phone-less students can still be matched by name+class+roll in the
+                // parent link flow; they go to the normal pending queue (not needs_review).
+                val canonPhone: String? = if (!req.parentPhone.isNullOrBlank()) {
+                    if (!PhoneNormalizer.isValid(req.parentPhone)) {
+                        call.fail(
+                            "The parent phone number you entered doesn't look right. " +
+                                "Leave it blank if you don't have it, or enter a 10-digit mobile number.",
+                            HttpStatusCode.BadRequest, "PARENT_PHONE_INVALID"
+                        )
+                        return@post
+                    }
+                    PhoneNormalizer.canonical(req.parentPhone)
+                } else null
 
                 val dto = dbQuery {
                     // ISSUE 1: store the canonical class name + section so the derived

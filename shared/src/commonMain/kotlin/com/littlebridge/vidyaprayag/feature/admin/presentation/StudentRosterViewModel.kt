@@ -82,11 +82,13 @@ class StudentRosterViewModel(
             _state.value = _state.value.copy(addError = "Name, class and roll number are required.")
             return
         }
-        // ISSUE 2b: a valid parent/guardian phone is mandatory (>= 10 digits).
+        // ISSUE 2b: parent phone is optional — validate only when the admin entered something.
+        // A school may not capture parent phone at enrollment time; students without a phone
+        // on record can still be matched by name+class+roll during the parent link flow.
         val phoneDigits = parentPhone.filter { it.isDigit() }
-        if (phoneDigits.length < 10) {
+        if (parentPhone.isNotBlank() && phoneDigits.length < 10) {
             _state.value = _state.value.copy(
-                addError = "Enter a valid parent/guardian phone number (at least 10 digits)."
+                addError = "That phone number doesn't look right. Enter at least 10 digits, or leave it blank."
             )
             return
         }
@@ -102,7 +104,7 @@ class StudentRosterViewModel(
                 className = className.trim(),
                 section = section.trim().ifBlank { null },
                 rollNumber = rollNumber.trim(),
-                parentPhone = parentPhone.trim()
+                parentPhone = parentPhone.trim().ifBlank { null }
             )
             when (val r = repository.createStudent(token, req)) {
                 is NetworkResult.Success -> {
