@@ -14,16 +14,22 @@ You only need to run **two** files, **in this order**:
 |---|---|---|
 | 1 | `migration_005_class_normalization_and_student_code_standard.sql` | Adds `students.parent_phone`; canonicalises existing `class_name`/`section` on `students` **and** `teacher_subject_assignments` so the derived join holds (ISSUE 1); regenerates **every** `student_code` into the standard `<CLASS_TOKEN><SECTION>-<ROLL3>` and cascades the new code to all referencing tables (ISSUE 2a). |
 | 2 | `migration_006_parent_link_review_fields.sql` | Adds `class_name`, `section`, `parent_phone`, `review_reason` to `parent_child_links`; widens `status` to hold `needs_review`; adds a `(school_id, status)` index (ISSUE 2c/2d). |
+| 3 | `migration_007_child_link_robustness.sql` | **Fixes the `rosterSize=0` / "No student found" bug.** Backfills `students.is_active = true` where it is `NULL` (rows inserted directly via the Supabase table editor have a NULL `is_active`, which the backend's `WHERE is_active = true` silently dropped → empty roster), then hardens the column with `SET DEFAULT true` + `SET NOT NULL` so future direct inserts behave. Also re-asserts `students.parent_phone` and the `parent_child_links` 2c/2d columns + indexes. Fully idempotent. |
 
 > These run **after** your existing base schema + `migration_001…004`. If your
 > DB is already live (it is), you do **not** re-run the base schema — just run
-> 005 then 006.
+> 005, 006, then **007**.
+>
+> **If you are seeing "No student found" / `rosterSize=0` even though the
+> student is clearly in the `students` table, run `migration_007` — it is the
+> direct fix** (the student's `is_active` is almost certainly `NULL`).
 
 ## How to run (Supabase → SQL Editor)
 
 1. Open **Supabase → SQL Editor → New query**.
 2. Paste the entire contents of **`migration_005_…sql`**, click **Run**.
 3. Paste the entire contents of **`migration_006_…sql`**, click **Run**.
+4. Paste the entire contents of **`migration_007_…sql`**, click **Run**.
 
 That's it. Each file wraps everything in a single `BEGIN; … COMMIT;` so a
 failure rolls back cleanly — you never end up half-applied.
