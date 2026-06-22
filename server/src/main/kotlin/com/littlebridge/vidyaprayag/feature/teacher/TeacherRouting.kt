@@ -206,6 +206,9 @@ fun Route.teacherRouting() {
                 } ?: ""
 
                 val today = todayIso()
+                // T-004: attendance_records.date / homework.due_date are now typed
+                // `date` columns — compare against a LocalDate, not the ISO String.
+                val todayDate = LocalDate.parse(today)
                 val weekday = LocalDate.now().dayOfWeek.value // 1..7
 
                 // Today's periods from the (optional) timetable. Honest empty if none.
@@ -245,7 +248,7 @@ fun Route.teacherRouting() {
                     val marked = dbQuery {
                         AttendanceRecordsTable.selectAll().where {
                             (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
-                                (AttendanceRecordsTable.date eq today) and
+                                (AttendanceRecordsTable.date eq todayDate) and
                                 (AttendanceRecordsTable.type eq "student") and
                                 (AttendanceRecordsTable.grade eq grade)
                         }.limit(1).firstOrNull() != null
@@ -275,7 +278,7 @@ fun Route.teacherRouting() {
                         (HomeworkTable.schoolId eq ctx.schoolId) and
                             (HomeworkTable.teacherId eq ctx.userId) and
                             (HomeworkTable.isActive eq true) and
-                            (HomeworkTable.dueDate greaterEq today)
+                            (HomeworkTable.dueDate greaterEq todayDate)
                     }.count().toInt()
                 }
 

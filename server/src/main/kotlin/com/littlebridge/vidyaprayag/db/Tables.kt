@@ -442,7 +442,7 @@ object FacultyTable : UUIDTable("faculty", "id") {
 
 object AttendanceRecordsTable : UUIDTable("attendance_records", "id") {
     val schoolId   = uuid("school_id")
-    val date       = varchar("date", 12)
+    val date       = date("date")        // T-004: typed `date` (was varchar12)
     val type       = varchar("type", 16) // student | faculty
     val personId   = text("person_id")
     val grade      = text("grade").nullable()
@@ -753,7 +753,7 @@ object AssessmentsTable : UUIDTable("assessments", "id") {
     val subject   = text("subject")
     val name       = text("name")                        // "Unit Test I", "Mid Term", …
     val maxMarks  = integer("max_marks").default(100)
-    val examDate  = varchar("exam_date", 12).nullable()  // YYYY-MM-DD
+    val examDate  = date("exam_date").nullable()         // T-004: typed `date` (was varchar12)
     val isActive  = bool("is_active").default(true)
     // RA-43: marks become parent-visible only once published. The teacher
     // marks-submit can publish; parent reads filter on isPublished = true.
@@ -794,7 +794,7 @@ object SyllabusUnitsTable : UUIDTable("syllabus_units", "id") {
     val title      = text("title")
     val position   = integer("position").default(0)
     val isCovered  = bool("is_covered").default(false)
-    val coveredOn  = varchar("covered_on", 12).nullable()  // YYYY-MM-DD
+    val coveredOn  = date("covered_on").nullable()         // T-004: typed `date` (was varchar12)
     val coveredBy  = uuid("covered_by").nullable()          // FK app_users.id (teacher)
     val createdAt  = timestamp("created_at")
     val updatedAt  = timestamp("updated_at")
@@ -814,7 +814,7 @@ object HomeworkTable : UUIDTable("homework", "id") {
     val subject     = text("subject")
     val title       = text("title")
     val description = text("description").default("")
-    val dueDate     = varchar("due_date", 12)           // YYYY-MM-DD
+    val dueDate     = date("due_date")                  // T-004: typed `date` (was varchar12)
     val isActive    = bool("is_active").default(true)
     val createdAt   = timestamp("created_at")
     val updatedAt   = timestamp("updated_at")
@@ -1084,8 +1084,8 @@ object CalendarEventsTable : UUIDTable("calendar_events", "id") {
     // When source = ANNOUNCEMENT, the originating announcement's event_id so we
     // can keep the two in sync and avoid duplicate workflows.
     val sourceRef       = text("source_ref").nullable()
-    val startDate       = varchar("start_date", 12)             // YYYY-MM-DD
-    val endDate         = varchar("end_date", 12)               // YYYY-MM-DD (== startDate for single-day)
+    val startDate       = date("start_date")                    // T-004: typed `date` (was varchar12)
+    val endDate         = date("end_date")                      // T-004: typed `date` (== startDate for single-day)
     val allDay          = bool("all_day").default(true)
     val bannerUrl       = text("banner_url").nullable()
     val icon            = text("icon").nullable()

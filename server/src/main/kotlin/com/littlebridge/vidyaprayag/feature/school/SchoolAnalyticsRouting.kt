@@ -142,7 +142,7 @@ private fun avgAttendancePct(schoolId: UUID, days: Int = 7): Int? {
     if (rows.isEmpty()) return null
     val recent = rows.filter {
         runCatching {
-            val d = LocalDate.parse(it[AttendanceRecordsTable.date])
+            val d = it[AttendanceRecordsTable.date]
             d.isAfter(LocalDate.now().minusDays(days.toLong()))
         }.getOrDefault(false)
     }
@@ -184,7 +184,7 @@ private fun monthlyAttendanceTrend(
     // Group attendance rows by (year, month).
     val byMonth = rows.groupBy {
         runCatching {
-            val d = LocalDate.parse(it[AttendanceRecordsTable.date])
+            val d = it[AttendanceRecordsTable.date]
             d.year to d.monthValue
         }.getOrNull()
     }
@@ -268,10 +268,11 @@ private fun dailyVolatility(schoolId: UUID, days: Int = 14): List<Double> {
     if (rows.isEmpty()) return emptyList()
 
     val today = LocalDate.now()
+    // T-004: attendance_records.date is now a typed `date` — keys are LocalDate.
     val byDate = rows.groupBy { it[AttendanceRecordsTable.date] }
     val series = ArrayList<Double>(days)
     for (back in (days - 1) downTo 0) {
-        val key = today.minusDays(back.toLong()).toString()
+        val key = today.minusDays(back.toLong())
         val pool = byDate[key].orEmpty()
         if (pool.isEmpty()) {
             series.add(0.0)
@@ -335,7 +336,7 @@ private fun topStarFaculty(schoolId: UUID): JsonArray {
         }
         .toList()
         .filter {
-            runCatching { LocalDate.parse(it[AttendanceRecordsTable.date]).isAfter(cutoff) }
+            runCatching { it[AttendanceRecordsTable.date].isAfter(cutoff) }
                 .getOrDefault(false)
         }
         .groupBy { it[AttendanceRecordsTable.personId] }
@@ -416,7 +417,7 @@ private fun studentSnapshots(schoolId: UUID, classFilter: String? = null): List<
                 (AttendanceRecordsTable.type eq "student")
         }
         .toList()
-        .filter { runCatching { LocalDate.parse(it[AttendanceRecordsTable.date]).isAfter(cutoff) }.getOrDefault(true) }
+        .filter { runCatching { it[AttendanceRecordsTable.date].isAfter(cutoff) }.getOrDefault(true) }
         .groupBy { it[AttendanceRecordsTable.personId] }
 
     return exams.groupBy { it[ExamResultsTable.studentId] }
@@ -478,7 +479,7 @@ private fun facultyAccountability(schoolId: UUID): JsonArray {
                 (AttendanceRecordsTable.type eq "faculty")
         }
         .toList()
-        .filter { runCatching { LocalDate.parse(it[AttendanceRecordsTable.date]).isAfter(cutoff) }.getOrDefault(false) }
+        .filter { runCatching { it[AttendanceRecordsTable.date].isAfter(cutoff) }.getOrDefault(false) }
         .groupBy { it[AttendanceRecordsTable.personId] }
 
     data class Row(val name: String, val dept: String, val score: Int)
@@ -611,7 +612,7 @@ private fun deptEfficiencies(schoolId: UUID): JsonArray {
                 (AttendanceRecordsTable.type eq "faculty")
         }
         .toList()
-        .filter { runCatching { LocalDate.parse(it[AttendanceRecordsTable.date]).isAfter(cutoff) }.getOrDefault(false) }
+        .filter { runCatching { it[AttendanceRecordsTable.date].isAfter(cutoff) }.getOrDefault(false) }
         .groupBy { it[AttendanceRecordsTable.personId] }
 
     // department -> list of per-faculty reliability scores
@@ -867,7 +868,7 @@ fun Route.schoolAnalyticsRouting() {
                         .toList()
                     val recent = attendanceRows.filter {
                         runCatching {
-                            val d = LocalDate.parse(it[AttendanceRecordsTable.date])
+                            val d = it[AttendanceRecordsTable.date]
                             d.isAfter(LocalDate.now().minusDays(30))
                         }.getOrDefault(false)
                     }

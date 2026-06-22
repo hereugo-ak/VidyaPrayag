@@ -1050,7 +1050,7 @@ fun Route.schoolStudentsRouting() {
                             (AttendanceRecordsTable.type eq "student") and
                             (AttendanceRecordsTable.personId eq code)
                     }.orderBy(AttendanceRecordsTable.date, SortOrder.DESC).map {
-                        AttendanceDayDto(it[AttendanceRecordsTable.date], it[AttendanceRecordsTable.status].lowercase())
+                        AttendanceDayDto(it[AttendanceRecordsTable.date].toString(), it[AttendanceRecordsTable.status].lowercase())
                     }
                     val present = attRows.count { it.status == "present" }
                     val absent = attRows.count { it.status == "absent" }
@@ -1073,7 +1073,7 @@ fun Route.schoolStudentsRouting() {
                                 assessmentName = a[AssessmentsTable.name],
                                 marks = mark,
                                 maxMarks = a[AssessmentsTable.maxMarks],
-                                examDate = a[AssessmentsTable.examDate]
+                                examDate = a[AssessmentsTable.examDate]?.toString()
                             )
                         }
 

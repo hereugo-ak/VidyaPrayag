@@ -219,7 +219,7 @@ fun Route.parentAcademicsRouting() {
                             (AttendanceRecordsTable.personId eq child.studentCode)
                     }.orderBy(AttendanceRecordsTable.date, SortOrder.DESC).map {
                         ParentAttendanceDayDto(
-                            date = it[AttendanceRecordsTable.date],
+                            date = it[AttendanceRecordsTable.date].toString(),
                             status = it[AttendanceRecordsTable.status].lowercase(),
                         )
                     }
@@ -294,7 +294,7 @@ fun Route.parentAcademicsRouting() {
                             subject = a[AssessmentsTable.subject],
                             marks = mark,
                             maxMarks = a[AssessmentsTable.maxMarks],
-                            examDate = a[AssessmentsTable.examDate],
+                            examDate = a[AssessmentsTable.examDate]?.toString(),
                         )
                     }
                 }
@@ -330,7 +330,7 @@ fun Route.parentAcademicsRouting() {
                                 ParentSyllabusUnitDto(
                                     title = it[SyllabusUnitsTable.title],
                                     isCovered = it[SyllabusUnitsTable.isCovered],
-                                    coveredOn = it[SyllabusUnitsTable.coveredOn],
+                                    coveredOn = it[SyllabusUnitsTable.coveredOn]?.toString(),
                                 )
                             },
                         )

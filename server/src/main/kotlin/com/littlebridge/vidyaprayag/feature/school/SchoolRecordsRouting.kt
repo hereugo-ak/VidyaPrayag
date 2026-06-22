@@ -141,7 +141,8 @@ fun Route.schoolRecordsRouting() {
                         AttendanceClassRow(grade, p, a, l, t, if (t > 0) ((p + l) * 100) / t else 0)
                     }.sortedBy { it.grade }
 
-                    AttendanceSummaryDto(latest, present, absent, late, total, rate, byClass)
+                    // T-004: latest is now LocalDate; wire DTO carries ISO String.
+                    AttendanceSummaryDto(latest.toString(), present, absent, late, total, rate, byClass)
                 }
             }
             call.ok(dto, message = "Attendance summary")
@@ -170,7 +171,7 @@ fun Route.schoolRecordsRouting() {
                         average = (avg * 100).toLong() / 100.0,   // 2-dp
                         maxMarks = max,
                         gradedCount = marks.size,
-                        examDate = a[AssessmentsTable.examDate],
+                        examDate = a[AssessmentsTable.examDate]?.toString(),
                         isPublished = a[AssessmentsTable.isPublished]
                     )
                 }

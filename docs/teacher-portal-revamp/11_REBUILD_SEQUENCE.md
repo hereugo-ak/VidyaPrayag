@@ -52,10 +52,14 @@ These resolve the cross-cutting root defects (X-1..X-6) that everything else sta
 
 ### T-004 — Migration: typed dates everywhere (attendance/assessment/homework/syllabus/calendar)
 - **Layer:** Migration · **Depends:** —
-- **Touches:** `migration_012_typed_dates.sql`; `db/Tables.kt` (date columns)
+- **Touches:** `docs/db/migration_010_typed_dates.sql` (filename deviation flagged below); `db/Tables.kt` (date columns); + all 14 date consumers (extended touch-list, see note).
 - **Details:** convert `attendance_records.date`, `assessments.exam_date`, `homework.due_date`, `syllabus.covered_on`, `calendar_events.start/end_date` from `varchar12` → `date`. Migrate string values (validate format; quarantine bad rows).
 - **Done when:** applied; all converted columns are `date`; bad-row report empty or triaged.
 - **Closes:** X-3, D-ATT-3, D-ASMT-2, D-HW-2, D-SYL-2.
+- **STATUS (executed):** ✅ Tables.kt flipped to `date()`; migration `docs/db/migration_010_typed_dates.sql` created (idempotent, quarantines bad rows into `vp_bad_dates_010`, aborts loudly on bad NOT-NULL values); all 14 consumer files converted at the type boundary (reads → `LocalDate.toString()` for String DTOs/helpers; writes → `LocalDate.parse(...)`; column comparisons → parsed `LocalDate` locals). Registered in `PROVISION.sql` run-order.
+  - **Note 1 (filename — docs are authority, deviation flagged):** doc named the file `migration_012_typed_dates.sql`; the real chain in `docs/db/` is contiguous and the prior migration is `009`, so the file is `migration_010_typed_dates.sql` (same deviation pattern already documented on `009`, which the doc called `011`).
+  - **Note 2 (extended touch-list — Rule 4):** the doc's "Touches" listed only the migration + `Tables.kt`, but flipping the Exposed column types makes every date consumer fail to compile. To honor Rule 4 (every commit compiles green), T-004 was extended to convert all 14 consumers in the same commit: `feature/calendar/AcademicCalendar{Core,Routing}.kt`, `feature/teacher/TeacherRouting{,Tasks}.kt`, `feature/parent/ParentAcademicsRouting.kt`, and `feature/school/{SchoolAnalytics,SchoolIntelligence,SchoolRecords,SchoolRouting,SchoolStudents,TeacherProvisioning,AdminDashboardOverview,AdminDashboard}Routing.kt` + `StudentAggregationService.kt`.
+  - **Out of scope (left as `varchar`, intentionally):** `academic_years.start_date/end_date` and `fee_records.due_date` are NOT in the T-004 column list and remain string-typed.
 
 ### T-005 — Seed: realistic teacher dataset (the X-5 fix)
 - **Layer:** Seed · **Depends:** T-001, T-002, T-004

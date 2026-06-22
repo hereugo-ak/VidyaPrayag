@@ -81,6 +81,7 @@
 --     \i docs/db/migration_007_child_link_robustness.sql
 --     \i docs/db/migration_008_enrollments.sql
 --     \i docs/db/migration_009_tsa_fks.sql
+--     \i docs/db/migration_010_typed_dates.sql
 --     \i scripts/seed-2026-06-07.sql
 --
 -- ----------------------------------------------------------------------------

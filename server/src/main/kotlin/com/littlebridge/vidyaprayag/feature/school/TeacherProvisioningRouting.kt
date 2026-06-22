@@ -404,7 +404,8 @@ fun Route.teacherProvisioningRouting() {
                                 .toList()
                                 .filter {
                                     runCatching {
-                                        LocalDate.parse(it[AttendanceRecordsTable.date]).isAfter(cutoff)
+                                        // T-004: date is now a typed `date` (LocalDate) — no parse.
+                                        it[AttendanceRecordsTable.date].isAfter(cutoff)
                                     }.getOrDefault(false)
                                 }
                                 .groupBy(

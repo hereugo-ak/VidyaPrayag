@@ -53,6 +53,7 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -199,6 +200,9 @@ fun Route.teacherTaskRoutes() {
             val ctx = call.requireTeacherContext() ?: return@get
             val classId = call.request.queryParameters["class_id"]
             val date = call.request.queryParameters["date"]?.takeIf { it.isNotBlank() } ?: todayIso()
+            // T-004: attendance_records.date is now a typed `date` column. Keep the
+            // String `date` for the wire DTO; parse a LocalDate for column queries.
+            val dateValue = LocalDate.parse(date)
             val asg = call.requireOwnedAssignment(ctx, classId) ?: return@get
             val grade = "${asg.className}-${asg.section}"
 
@@ -208,7 +212,7 @@ fun Route.teacherTaskRoutes() {
 
                 val marked = AttendanceRecordsTable.selectAll().where {
                     (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
-                        (AttendanceRecordsTable.date eq date) and
+                        (AttendanceRecordsTable.date eq dateValue) and
                         (AttendanceRecordsTable.type eq "student") and
                         (AttendanceRecordsTable.grade eq grade)
                 }.associate { it[AttendanceRecordsTable.personId] to it[AttendanceRecordsTable.status] }
@@ -236,6 +240,8 @@ fun Route.teacherTaskRoutes() {
             val asg = call.requireOwnedAssignment(ctx, req.classId) ?: return@post
             val grade = "${asg.className}-${asg.section}"
             val date = req.date.takeIf { it.isNotBlank() } ?: todayIso()
+            // T-004: attendance_records.date is now a typed `date` column.
+            val dateValue = LocalDate.parse(date)
 
             val bad = req.entries.firstOrNull { it.status.lowercase() !in VALID_ATTENDANCE }
             if (bad != null) {
@@ -249,14 +255,14 @@ fun Route.teacherTaskRoutes() {
                     val status = e.status.lowercase()
                     val existing = AttendanceRecordsTable.selectAll().where {
                         (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
-                            (AttendanceRecordsTable.date eq date) and
+                            (AttendanceRecordsTable.date eq dateValue) and
                             (AttendanceRecordsTable.type eq "student") and
                             (AttendanceRecordsTable.personId eq e.studentId)
                     }.firstOrNull()
                     if (existing != null) {
                         AttendanceRecordsTable.update({
                             (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
-                                (AttendanceRecordsTable.date eq date) and
+                                (AttendanceRecordsTable.date eq dateValue) and
                                 (AttendanceRecordsTable.type eq "student") and
                                 (AttendanceRecordsTable.personId eq e.studentId)
                         }) {
@@ -268,7 +274,7 @@ fun Route.teacherTaskRoutes() {
                         AttendanceRecordsTable.insert {
                             it[id] = UUID.randomUUID()
                             it[schoolId] = ctx.schoolId
-                            it[AttendanceRecordsTable.date] = date
+                            it[AttendanceRecordsTable.date] = dateValue
                             it[type] = "student"
                             it[personId] = e.studentId
                             it[AttendanceRecordsTable.grade] = grade
@@ -481,7 +487,7 @@ fun Route.teacherTaskRoutes() {
                         name = a[AssessmentsTable.name],
                         subject = a[AssessmentsTable.subject],
                         maxMarks = a[AssessmentsTable.maxMarks],
-                        examDate = a[AssessmentsTable.examDate],
+                        examDate = a[AssessmentsTable.examDate]?.toString(),
                         isPublished = a[AssessmentsTable.isPublished],
                     )
                 }
@@ -509,7 +515,8 @@ fun Route.teacherTaskRoutes() {
                     it[subject] = asg.subject
                     it[name] = req.name.trim()
                     it[maxMarks] = req.maxMarks ?: 100
-                    it[examDate] = req.examDate
+                    // T-004: assessments.exam_date is now a typed `date` column (nullable).
+                    it[examDate] = req.examDate?.let { d -> LocalDate.parse(d) }
                     it[isActive] = true
                     it[isPublished] = false
                     it[createdAt] = now
@@ -559,7 +566,7 @@ fun Route.teacherTaskRoutes() {
                     id = u[SyllabusUnitsTable.id].value.toString(),
                     title = u[SyllabusUnitsTable.title],
                     isCovered = u[SyllabusUnitsTable.isCovered],
-                    coveredOn = u[SyllabusUnitsTable.coveredOn],
+                    coveredOn = u[SyllabusUnitsTable.coveredOn]?.toString(),
                 )
             }
             val progress = if (dtos.isEmpty()) 0f else dtos.count { it.isCovered }.toFloat() / dtos.size.toFloat()
@@ -604,7 +611,8 @@ fun Route.teacherTaskRoutes() {
             dbQuery {
                 SyllabusUnitsTable.update({ SyllabusUnitsTable.id eq unitId }) {
                     it[isCovered] = req.isCovered
-                    it[coveredOn] = if (req.isCovered) todayIso() else null
+                    // T-004: syllabus_units.covered_on is now a typed `date` column (nullable).
+                    it[coveredOn] = if (req.isCovered) LocalDate.now() else null
                     it[coveredBy] = if (req.isCovered) ctx.userId else null
                     it[updatedAt] = Instant.now()
                 }
@@ -650,7 +658,7 @@ fun Route.teacherTaskRoutes() {
                     description = hw[HomeworkTable.description],
                     className = "$className-$section",
                     subject = hw[HomeworkTable.subject],
-                    dueDate = hw[HomeworkTable.dueDate],
+                    dueDate = hw[HomeworkTable.dueDate].toString(),
                     submittedCount = submitted,
                     totalCount = total,
                 )
@@ -684,7 +692,8 @@ fun Route.teacherTaskRoutes() {
                     it[subject] = asg.subject
                     it[title] = req.title
                     it[description] = req.description
-                    it[dueDate] = req.dueDate
+                    // T-004: homework.due_date is now a typed `date` column.
+                    it[dueDate] = LocalDate.parse(req.dueDate)
                     it[isActive] = true
                     it[createdAt] = now
                     it[updatedAt] = now
