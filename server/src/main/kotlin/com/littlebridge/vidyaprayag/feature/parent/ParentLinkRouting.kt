@@ -390,18 +390,27 @@ fun Route.parentLinkRouting() {
                         }
                     }
 
+                    // effectiveSchoolId / effectiveSchoolName are what the rest of the
+                    // transaction (link insert + admin notifications) bind to. They
+                    // start as the parent's pick and are REBOUND if we have to find the
+                    // student at a different school in the cross-school self-heal below.
+                    var effectiveSchoolId = schoolUuid
+                    var effectiveSchoolName = schoolNameVal
+
                     val studentRow = when {
                         matches.isEmpty() -> {
-                            // ROOT FIX (the persistent "No student found"): the dominant
+                            // ROOT FIX (the persistent "No student found"): a very common
                             // real-world cause is the parent landing on the WRONG school
-                            // in step 2 — the child genuinely exists, just under another
-                            // school_id. Before failing, probe the WHOLE platform for a
-                            // student that matches (name + class/section + roll). If we
-                            // find exactly that child at a DIFFERENT school, tell the
-                            // parent precisely which school to pick instead of a dead-end.
-                            val wrongSchool = run {
-                                // Capture into non-null locals so smart-casts hold inside
-                                // the filter lambda below (avoids nullable-capture issues).
+                            // record in step 2 (duplicate / same-named / stale school rows)
+                            // — the child genuinely exists, just under a different
+                            // school_id. Instead of dead-ending OR making the parent
+                            // navigate back, we SELF-HEAL: probe the WHOLE platform for a
+                            // student matching (name + class/section + roll|code). If
+                            // EXACTLY one such student exists, we rebind the link to THAT
+                            // student's real school and continue. The request still goes to
+                            // that school's admin approval queue, so auto-rebinding is safe.
+                            val crossSchoolHit: org.jetbrains.exposed.sql.ResultRow? = run {
+                                // Need enough identity to be confident — name AND class.
                                 val typedName = req.childName?.trim()?.lowercase()?.replace(Regex("\\s+"), " ")
                                 val reqClass = req.className
                                 if (typedName.isNullOrBlank() || reqClass.isNullOrBlank()) return@run null
@@ -427,28 +436,51 @@ fun Route.parentLinkRouting() {
                                             normaliseCode(r[StudentsTable.studentCode]) == rollInputCode
                                         nameOk && classOk && rollOk
                                     }
-                                // Only confident when exactly one other-school student fits.
-                                elsewhere.singleOrNull()?.let { hit ->
-                                    val sid = hit[StudentsTable.schoolId]
-                                    val sName = SchoolsTable.selectAll()
-                                        .where { SchoolsTable.id eq sid }
-                                        .firstOrNull()?.get(SchoolsTable.name)
-                                    sName
-                                }
+                                // Several students across schools fit → too risky to
+                                // auto-bind. Surface AmbiguousRoll so the parent uses the
+                                // unique admission code instead of guessing.
+                                if (elsewhere.size > 1) return@dbQuery LinkResult.AmbiguousRoll(elsewhere.size)
+                                elsewhere.singleOrNull()
                             }
-                            linkLog.warn(
-                                "link-child NO MATCH: school='{}' ({}) rosterSize={} roll='{}' " +
-                                    "class='{}' section='{}' childName='{}' — {}{}",
-                                schoolNameVal, schoolUuid, roster.size, rollInput,
-                                req.className, req.section, req.childName,
-                                if (roster.isEmpty()) "school roster is EMPTY (likely WRONG school selected)"
-                                else "roster has ${roster.size} student(s) but none matched the roll/code/name",
-                                wrongSchool?.let { " — but a matching child exists at '$it'" } ?: "",
-                            )
-                            if (wrongSchool != null) {
-                                return@dbQuery LinkResult.WrongSchool(wrongSchool)
+
+                            // Resolve the real school for a cross-school hit (active OR
+                            // null is_active). A null result here means the student row
+                            // exists but its school is hard-deactivated — not linkable.
+                            val healedRow: org.jetbrains.exposed.sql.ResultRow? =
+                                if (crossSchoolHit != null) {
+                                    val realSchoolId = crossSchoolHit[StudentsTable.schoolId]
+                                    val realSchool = SchoolsTable.selectAll()
+                                        .where {
+                                            (SchoolsTable.id eq realSchoolId) and
+                                                ((SchoolsTable.isActive eq true) or (SchoolsTable.isActive.isNull()))
+                                        }
+                                        .singleOrNull()
+                                    if (realSchool != null) {
+                                        effectiveSchoolId = realSchoolId
+                                        effectiveSchoolName = realSchool[SchoolsTable.name]
+                                        linkLog.warn(
+                                            "link-child SELF-HEAL: parent picked '{}' ({}) but child is at '{}' ({}). " +
+                                                "Binding link to the student's REAL school. roll='{}' class='{}' name='{}'",
+                                            schoolNameVal, schoolUuid, effectiveSchoolName, effectiveSchoolId,
+                                            rollInput, req.className, req.childName,
+                                        )
+                                        crossSchoolHit
+                                    } else null
+                                } else null
+
+                            if (healedRow != null) {
+                                healedRow
+                            } else {
+                                linkLog.warn(
+                                    "link-child NO MATCH anywhere: school='{}' ({}) rosterSize={} roll='{}' " +
+                                        "class='{}' section='{}' childName='{}' — {}",
+                                    schoolNameVal, schoolUuid, roster.size, rollInput,
+                                    req.className, req.section, req.childName,
+                                    if (roster.isEmpty()) "selected-school roster EMPTY and no cross-school identity match"
+                                    else "roster has ${roster.size} student(s) but none matched, and no cross-school identity match",
+                                )
+                                return@dbQuery LinkResult.StudentNotFound(emptyRoster = roster.isEmpty())
                             }
-                            return@dbQuery LinkResult.StudentNotFound(emptyRoster = roster.isEmpty())
                         }
                         matches.size > 1 -> return@dbQuery LinkResult.AmbiguousRoll(matches.size)
                         else -> matches.single()
@@ -489,10 +521,11 @@ fun Route.parentLinkRouting() {
                         "Parent phone does not match the number on record for this student." else null
 
                     // If a link already exists for this (parent, school, student) in
-                    // any non-final state, reuse it (don't duplicate).
+                    // any non-final state, reuse it (don't duplicate). Scoped to the
+                    // EFFECTIVE school (the student's real school, after self-heal).
                     val existingLink = ParentChildLinksTable.selectAll().where {
                         (ParentChildLinksTable.parentId eq uid) and
-                            (ParentChildLinksTable.schoolId eq schoolUuid) and
+                            (ParentChildLinksTable.schoolId eq effectiveSchoolId) and
                             (ParentChildLinksTable.studentCode eq studentCodeVal) and
                             ((ParentChildLinksTable.status eq "pending") or
                                 (ParentChildLinksTable.status eq "approved") or
@@ -506,7 +539,7 @@ fun Route.parentLinkRouting() {
                         ParentChildLinksTable.insert {
                             it[id] = newId
                             it[parentId] = uid
-                            it[schoolId] = schoolUuid
+                            it[schoolId] = effectiveSchoolId
                             // Store the school's CANONICAL roll/class/section (not the
                             // raw parent input) so the admin queue shows the roster value.
                             it[rollNumber] = studentRow[StudentsTable.rollNumber]
@@ -527,37 +560,33 @@ fun Route.parentLinkRouting() {
                         childName = childNameVal,
                         className = classNameVal,
                         roll = studentRow[StudentsTable.rollNumber],
-                        schoolName = schoolNameVal,
+                        // Report the EFFECTIVE school (the student's real one) so the
+                        // parent's confirmation names the right school after a self-heal.
+                        schoolName = effectiveSchoolName,
                         profilePhotoUrl = photoVal,
                         status = targetStatus,
                     )
                     if (isPhoneMismatch) {
-                        LinkResult.NeedsReview(linkId, childDto, reviewReasonVal ?: "Needs review")
+                        LinkResult.NeedsReview(linkId, effectiveSchoolId, childDto, reviewReasonVal ?: "Needs review")
                     } else {
-                        LinkResult.Pending(linkId, childDto)
+                        LinkResult.Pending(linkId, effectiveSchoolId, childDto)
                     }
                 }
 
                 when (result) {
                     is LinkResult.SchoolNotFound -> call.fail("School not found", HttpStatusCode.NotFound)
                     is LinkResult.StudentNotFound ->
+                        // We searched the selected school AND every other school on the
+                        // platform by name + class/section + roll/code, and the cross-
+                        // school self-heal would have rebound automatically on a unique
+                        // hit — so this genuinely means no such student exists. Guide the
+                        // parent to the exact fields to re-check.
                         call.fail(
-                            if (result.emptyRoster)
-                                "We couldn't find your child at this school — it has no students on " +
-                                    "VidyaPrayag yet. Please go back and make sure you picked the right " +
-                                    "school in the previous step."
-                            else
-                                "No student found with that name and roll number at this school. " +
-                                    "Double-check the class, section and roll number on the school ID — " +
-                                    "or go back and confirm you selected the right school.",
+                            "We couldn't find your child anywhere on VidyaPrayag with that name, " +
+                                "class/section and roll number. Please double-check the spelling of " +
+                                "the name, the class and section, and the roll/admission number " +
+                                "exactly as printed on the school ID, then try again.",
                             HttpStatusCode.NotFound
-                        )
-                    is LinkResult.WrongSchool ->
-                        call.fail(
-                            "We found your child at \"${result.schoolName}\", not the school you picked. " +
-                                "Please go back to the previous step and select \"${result.schoolName}\", then try again.",
-                            HttpStatusCode.NotFound,
-                            "WRONG_SCHOOL"
                         )
                     is LinkResult.AmbiguousRoll ->
                         call.fail(
@@ -570,14 +599,16 @@ fun Route.parentLinkRouting() {
                         call.fail("You have too many pending link requests for this school. Please wait for them to be reviewed.", HttpStatusCode.TooManyRequests, "LINK_THROTTLED")
                     is LinkResult.Pending -> {
                         // RA-48 + RA-41: notify the school admins that a parent wants to link.
-                        val admins = NotifyRecipients.adminsInSchool(schoolUuid)
+                        // Use the EFFECTIVE school (where the student really is, after a
+                        // possible self-heal) so the RIGHT admins are notified.
+                        val admins = NotifyRecipients.adminsInSchool(result.schoolId)
                         if (admins.isNotEmpty()) {
                             Notify.toUsers(
                                 userIds = admins,
                                 category = "link_request",
                                 title = "New child-link request",
                                 body = "A parent requested to link to roll ${req.rollNumber}.",
-                                schoolId = schoolUuid,
+                                schoolId = result.schoolId,
                                 actorId = uid,
                                 deepLink = "admin/link-requests",
                                 refType = "link_request",
@@ -590,14 +621,14 @@ fun Route.parentLinkRouting() {
                         // ISSUE 2d: the claim matched the student EXCEPT the phone.
                         // Flag it into the admin "needs review" queue instead of the
                         // normal pending queue, and tell the admins it needs a closer look.
-                        val admins = NotifyRecipients.adminsInSchool(schoolUuid)
+                        val admins = NotifyRecipients.adminsInSchool(result.schoolId)
                         if (admins.isNotEmpty()) {
                             Notify.toUsers(
                                 userIds = admins,
                                 category = "link_request",
                                 title = "Child-link request needs review",
                                 body = "A parent's phone didn't match the number on record for roll ${req.rollNumber}.",
-                                schoolId = schoolUuid,
+                                schoolId = result.schoolId,
                                 actorId = uid,
                                 deepLink = "admin/link-requests",
                                 refType = "link_request",
@@ -892,26 +923,26 @@ private sealed interface DecisionResult {
 private sealed interface LinkResult {
     data object SchoolNotFound : LinkResult
     /**
-     * No canonical student matched. [emptyRoster] is true when the selected
-     * school has NO active students at all — a strong signal the parent picked
-     * the WRONG school in step 2 (so we say so instead of blaming their roll).
+     * No canonical student matched ANYWHERE on the platform (the selected school
+     * AND every other school were searched, and the cross-school self-heal would
+     * have rebound on a unique hit). [emptyRoster] reports whether the selected
+     * school had any active students — useful context only.
      */
     data class StudentNotFound(val emptyRoster: Boolean = false) : LinkResult
-    /**
-     * The child wasn't at the SELECTED school but an exact match (name + class/
-     * section + roll) was found at [schoolName] — the parent picked the wrong
-     * school in step 2. We name the right one so they can go back and fix it.
-     */
-    data class WrongSchool(val schoolName: String) : LinkResult
     /** Several classes share this roll number — the parent must use the unique admission code. */
     data class AmbiguousRoll(val count: Int) : LinkResult
     data object Throttled : LinkResult
-    /** Full match (name + class/section/roll + parent phone) → standard pending queue. */
-    data class Pending(val linkId: UUID, val child: LinkedChildDto) : LinkResult
+    /**
+     * Full match (name + class/section/roll + parent phone) → standard pending
+     * queue. [schoolId] is the student's REAL school (after a possible self-heal
+     * from a wrongly-picked school), used for the link row + admin notification.
+     */
+    data class Pending(val linkId: UUID, val schoolId: UUID, val child: LinkedChildDto) : LinkResult
     /**
      * ISSUE 2d: name + class/section/roll matched but the parent phone did NOT
      * match the number on record. Routed to the "needs review" queue (flagged,
-     * never silently dropped) for an admin to verify out-of-band.
+     * never silently dropped) for an admin to verify out-of-band. [schoolId] is
+     * the student's REAL school (after a possible self-heal).
      */
-    data class NeedsReview(val linkId: UUID, val child: LinkedChildDto, val reason: String) : LinkResult
+    data class NeedsReview(val linkId: UUID, val schoolId: UUID, val child: LinkedChildDto, val reason: String) : LinkResult
 }
