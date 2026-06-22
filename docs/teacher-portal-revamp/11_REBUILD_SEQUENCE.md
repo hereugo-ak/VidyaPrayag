@@ -25,9 +25,15 @@ Each task is an **atomic commit** with:
 
 ---
 
-## PHASE 0 — FOUNDATION (typed identity + scope)
+## PHASE 0 — FOUNDATION (typed identity + scope) — ✅ COMPLETED
 
 These resolve the cross-cutting root defects (X-1..X-6) that everything else stands on. Nothing user-visible ships until P1, but **none of the later phases are safe without these**.
+
+> **STATUS:** ✅ **Phase 0 complete.** All foundation tasks executed and pushed to `backend-by-abuzar_v1.0.3`:
+> T-001 (`enrollments` table, commit `02ac955`), T-002 (TSA typed FKs + `is_class_teacher`, commit `a7f26cd`),
+> T-003 (TeacherAccess id-first scope, commit `1242d34`), T-004 (typed dates everywhere, commit `364146a` + run guide `3a723c1`),
+> T-005 (realistic teacher demo dataset, this commit). The typed-identity + scope spine (X-1..X-3, X-5) is now in place;
+> Phase 1 (schedule & today) can build on it safely.
 
 ### T-001 — Migration: enrollments table (typed class membership)
 - **Layer:** Migration · **Depends:** —
@@ -67,6 +73,8 @@ These resolve the cross-cutting root defects (X-1..X-6) that everything else sta
 - **Details:** seed for a demo teacher: TSA assignments (incl. 1 class-teacher), enrollments (e.g. 38 students/class), `teacher_periods` for a full week, `curriculum_units` per subject, a couple of `assessments`, sample `homework` + submissions, a few approved leaves. **Without this every screen lands empty.**
 - **Done when:** fresh DB + demo login → Today shows periods, Classes shows rosters, Planner shows units.
 - **Closes:** X-5, B-FEED-2 (data side), F-SYL-2/F-HOME-3 root cause.
+- **STATUS (executed):** ✅ `DemoSeed.kt` extended with the full teacher operational dataset, all idempotent (deterministic anchor ids / natural-key guards). Seeds in FK-dependency order: 2 demo classes (`school_classes`) + 4 per-class subjects (`school_subjects`) so TSA can carry typed `class_id`/`subject_id`; 3 `teacher_subject_assignments` for the demo teacher incl. **1 class-teacher** (Grade 4/A Math) + Grade 4/A Science + Grade 5/A Math; a **38-student roster** for Grade 4/A (`students` + typed `enrollments`, student #1 = the existing demo child `DEMO-S001`); a full **Mon–Fri `teacher_periods`** timetable (3 periods/day, weekday 1..5); **9 `syllabus_units`** across the subjects (some pre-covered with `covered_on`); **2 published `assessments`** (Unit Test I, Math + Science) with deterministic marks for the whole roster; **2 `homework`** rows (due in +2 days) with ~60% deterministic submissions; **2 approved `leave_requests`**.
+  - **Note (DB-side only — Rule 4):** T-005 is pure seed data; it touches only `DemoSeed.kt` and adds no new types, so no consumer files change. The demo school previously had **zero** classes/subjects, so the seed creates them first (TSA FKs require them) rather than assuming an operator-provisioned school. `leave_requests.date_from/date_to` are still `varchar(12)` (intentionally out of T-004 scope), so leave dates are seeded as `"YYYY-MM-DD"` strings; all other dates use typed `LocalDate` (T-004).
 
 ---
 

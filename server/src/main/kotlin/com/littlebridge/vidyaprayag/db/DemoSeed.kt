@@ -19,6 +19,19 @@
  *   - demo fee_records for the parent (so the Fees tab has real data)
  *   - one demo announcement scoped to the demo school
  *
+ * T-005 (X-5 fix) — realistic teacher dataset so the rebuilt teacher portal
+ * surfaces land with real rows instead of empty/error states:
+ *   - demo classes (school_classes) + per-class subjects (school_subjects) so
+ *     teacher_subject_assignments can carry the typed class_id/subject_id FKs
+ *   - teacher_subject_assignments for the demo teacher (incl. 1 class-teacher)
+ *   - a full class roster (students + enrollments) for the class the demo
+ *     teacher is class-teacher of (so Classes shows a real roster)
+ *   - teacher_periods for a full Mon–Fri week (so Today shows periods)
+ *   - syllabus_units per subject (so the Planner shows units)
+ *   - a couple of assessments (so Results has data)
+ *   - sample homework + submissions (so Homework shows a submitted/total ratio)
+ *   - a few approved leaves (so leave defaults have something to show)
+ *
  * Idempotency: every insert is guarded by a presence check (email / slug /
  * deterministic id) so repeated cold boots never duplicate rows and never
  * overwrite operator edits.
@@ -32,11 +45,14 @@ package com.littlebridge.vidyaprayag.db
 
 import com.littlebridge.vidyaprayag.feature.auth.PasswordHasher
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.time.DayOfWeek
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 object DemoSeed {
@@ -64,6 +80,40 @@ object DemoSeed {
     private val SCHOLARSHIP_ANCHOR_ID = UUID.fromString("00000000-0000-0000-0000-0000000000d1")
     private val APPLICATION_ANCHOR_ID = UUID.fromString("00000000-0000-0000-0000-0000000000e1")
 
+    // ── T-005: deterministic anchors for the teacher operational dataset ──────
+    // The demo teacher (TEACHER_ID) is class-teacher of DEMO_CLASS/DEMO_SECTION
+    // ("Grade 4" / "A") and additionally teaches two more class+subject combos so
+    // Today/Classes/Planner/Results/Homework all have non-trivial rows.
+    private val CLASS_G4_ID = UUID.fromString("00000000-0000-0000-0000-0000000000f1") // Grade 4
+    private val CLASS_G5_ID = UUID.fromString("00000000-0000-0000-0000-0000000000f2") // Grade 5
+
+    // Per-class subject anchors (school_subjects.id) the TSA FKs point at.
+    private val SUBJ_G4_MATH_ID    = UUID.fromString("00000000-0000-0000-0000-000000000201")
+    private val SUBJ_G4_SCIENCE_ID = UUID.fromString("00000000-0000-0000-0000-000000000202")
+    private val SUBJ_G4_ENGLISH_ID = UUID.fromString("00000000-0000-0000-0000-000000000203")
+    private val SUBJ_G5_MATH_ID    = UUID.fromString("00000000-0000-0000-0000-000000000204")
+
+    // TSA assignment anchors (teacher_subject_assignments.id).
+    private val TSA_G4_MATH_ID    = UUID.fromString("00000000-0000-0000-0000-000000000301")
+    private val TSA_G4_SCIENCE_ID = UUID.fromString("00000000-0000-0000-0000-000000000302")
+    private val TSA_G5_MATH_ID    = UUID.fromString("00000000-0000-0000-0000-000000000303")
+
+    // Assessment anchors (assessments.id).
+    private val ASSESS_G4_MATH_ID    = UUID.fromString("00000000-0000-0000-0000-000000000401")
+    private val ASSESS_G4_SCIENCE_ID = UUID.fromString("00000000-0000-0000-0000-000000000402")
+
+    // Homework anchors (homework.id).
+    private val HW_G4_MATH_ID    = UUID.fromString("00000000-0000-0000-0000-000000000501")
+    private val HW_G4_SCIENCE_ID = UUID.fromString("00000000-0000-0000-0000-000000000502")
+
+    // Demo teacher display name (matches seedUser above) — used for the legacy
+    // teacherName denormalised column on TSA rows.
+    private const val DEMO_TEACHER_NAME = "Demo Teacher"
+
+    // Roster size for the class the demo teacher is class-teacher of. The first
+    // student is the existing demo child (DEMO-S001); the rest are generated.
+    private const val DEMO_ROSTER_SIZE = 38
+
     fun ensureDemoData() {
         transaction {
             seedSchool()
@@ -76,6 +126,19 @@ object DemoSeed {
             seedFeeRecords()
             seedAnnouncement()
             seedScholarships()
+            // ── T-005: realistic teacher operational dataset (X-5 fix) ──────
+            // Ordering is FK-dependency-driven: classes+subjects first (TSA needs
+            // their ids), then assignments, then the roster the assignments scope
+            // to, then the day/week/planner/results/homework/leave data on top.
+            seedClasses()
+            seedSubjects()
+            seedTeacherAssignments()
+            seedRoster()
+            seedTeacherPeriods()
+            seedSyllabus()
+            seedAssessments()
+            seedHomework()
+            seedLeaves()
         }
     }
 
@@ -347,5 +410,477 @@ object DemoSeed {
                 }
             }
         }
+    }
+
+    // =====================================================================
+    // T-005 — realistic teacher operational dataset (X-5 fix)
+    //
+    // Every function below follows the same idempotency contract as the rest of
+    // this file: guard on a deterministic anchor id (or a natural key) and
+    // return early if the row(s) already exist, so repeated cold boots never
+    // duplicate and never clobber operator edits.
+    // =====================================================================
+
+    /**
+     * Two demo classes. `school_classes.code` is the natural class key; `name`
+     * is the display label that the denormalised className columns across the
+     * schema (TSA, enrollments-via-section, periods, syllabus, …) mirror.
+     */
+    private fun seedClasses() {
+        val now = Instant.now()
+        data class Klass(val cid: UUID, val code: String, val name: String)
+        val classes = listOf(
+            Klass(CLASS_G4_ID, "G4", DEMO_CLASS),   // "Grade 4"
+            Klass(CLASS_G5_ID, "G5", "Grade 5")
+        )
+        classes.forEach { k ->
+            val exists = SchoolClassesTable.selectAll()
+                .where { SchoolClassesTable.id eq k.cid }
+                .any()
+            if (exists) return@forEach
+            SchoolClassesTable.insert {
+                it[id] = k.cid
+                it[schoolId] = SCHOOL_ID
+                it[code] = k.code
+                it[name] = k.name
+                it[sections] = "[\"A\",\"B\"]"
+                it[createdAt] = now
+            }
+        }
+    }
+
+    /**
+     * Per-class subjects. `school_subjects.class_id` binds each subject to its
+     * class; the structured `teacher_subject_assignments` rows then reference
+     * these by `subject_id`.
+     */
+    private fun seedSubjects() {
+        val now = Instant.now()
+        data class Subj(val sid: UUID, val classId: UUID, val name: String, val code: String)
+        val subjects = listOf(
+            Subj(SUBJ_G4_MATH_ID,    CLASS_G4_ID, "Mathematics", "G4-MATH"),
+            Subj(SUBJ_G4_SCIENCE_ID, CLASS_G4_ID, "Science",     "G4-SCI"),
+            Subj(SUBJ_G4_ENGLISH_ID, CLASS_G4_ID, "English",     "G4-ENG"),
+            Subj(SUBJ_G5_MATH_ID,    CLASS_G5_ID, "Mathematics", "G5-MATH")
+        )
+        subjects.forEach { s ->
+            val exists = SchoolSubjectsTable.selectAll()
+                .where { SchoolSubjectsTable.id eq s.sid }
+                .any()
+            if (exists) return@forEach
+            SchoolSubjectsTable.insert {
+                it[id] = s.sid
+                it[classId] = s.classId
+                it[subName] = s.name
+                it[subCode] = s.code
+                it[teacherAssigned] = DEMO_TEACHER_NAME
+                it[createdAt] = now
+            }
+        }
+    }
+
+    /**
+     * teacher_subject_assignments for the demo teacher. The demo teacher:
+     *   • is CLASS TEACHER of Grade 4 / A and teaches Mathematics there
+     *   • also teaches Science to Grade 4 / A
+     *   • teaches Mathematics to Grade 5 / A (not class teacher)
+     * class_id / subject_id carry the typed FKs (T-002) — className/section/
+     * subject are display-only denormalised mirrors.
+     */
+    private fun seedTeacherAssignments() {
+        val now = Instant.now()
+        data class Tsa(
+            val aid: UUID,
+            val classId: UUID,
+            val className: String,
+            val subjectId: UUID,
+            val subject: String,
+            val isClassTeacher: Boolean
+        )
+        val rows = listOf(
+            Tsa(TSA_G4_MATH_ID,    CLASS_G4_ID, DEMO_CLASS, SUBJ_G4_MATH_ID,    "Mathematics", true),
+            Tsa(TSA_G4_SCIENCE_ID, CLASS_G4_ID, DEMO_CLASS, SUBJ_G4_SCIENCE_ID, "Science",     false),
+            Tsa(TSA_G5_MATH_ID,    CLASS_G5_ID, "Grade 5",  SUBJ_G5_MATH_ID,    "Mathematics", false)
+        )
+        rows.forEach { r ->
+            val exists = TeacherSubjectAssignmentsTable.selectAll()
+                .where { TeacherSubjectAssignmentsTable.id eq r.aid }
+                .any()
+            if (exists) return@forEach
+            TeacherSubjectAssignmentsTable.insert {
+                it[id] = r.aid
+                it[schoolId] = SCHOOL_ID
+                it[classId] = r.classId
+                it[className] = r.className
+                it[section] = DEMO_SECTION
+                it[subjectId] = r.subjectId
+                it[subject] = r.subject
+                it[teacherId] = TEACHER_ID
+                it[teacherName] = DEMO_TEACHER_NAME
+                it[isActive] = true
+                it[isClassTeacher] = r.isClassTeacher
+                it[createdAt] = now
+                it[updatedAt] = now
+            }
+        }
+    }
+
+    /**
+     * A full roster for Grade 4 / A — the class the demo teacher is class-teacher
+     * of — so Classes shows a real roster and attendance/marks have students.
+     *
+     * The first roster member is the EXISTING demo child (STUDENT_ID /
+     * DEMO-S001), so the parent's child appears in the class. The remaining
+     * (DEMO_ROSTER_SIZE - 1) are generated with deterministic ids/codes so the
+     * seed is idempotent. Each student gets a matching `enrollments` row
+     * (typed class_id FK, T-001) for the active term.
+     */
+    private fun seedRoster() {
+        val now = Instant.now()
+        val enrollStart = LocalDate.of(2026, 4, 1)   // start of the demo academic term
+
+        // Student #1 = the demo child (already in `students` via seedStudent()).
+        // Ensure its enrollment exists, then generate the rest.
+        ensureEnrollment(STUDENT_ID, rollNumber = 1, startDate = enrollStart, now = now)
+
+        for (n in 2..DEMO_ROSTER_SIZE) {
+            // Deterministic per-student id: 00000000-0000-0000-0000-0000000010NN
+            val sid = UUID.fromString("00000000-0000-0000-0000-0000000010%02d".format(n))
+            val code = "DEMO-S%03d".format(n)
+            val studentExists = StudentsTable.selectAll()
+                .where { (StudentsTable.id eq sid) or (StudentsTable.studentCode eq code) }
+                .any()
+            if (!studentExists) {
+                StudentsTable.insert {
+                    it[id] = sid
+                    it[schoolId] = SCHOOL_ID
+                    it[studentCode] = code
+                    it[fullName] = "Demo Student %02d".format(n)
+                    it[className] = DEMO_CLASS
+                    it[section] = DEMO_SECTION
+                    it[rollNumber] = n.toString()
+                    it[isActive] = true
+                    it[createdAt] = now
+                }
+            }
+            ensureEnrollment(sid, rollNumber = n, startDate = enrollStart, now = now)
+        }
+    }
+
+    /** Idempotent enrollment insert for the demo Grade 4 / A roster. */
+    private fun ensureEnrollment(studentId: UUID, rollNumber: Int, startDate: LocalDate, now: Instant) {
+        val exists = EnrollmentsTable.selectAll()
+            .where {
+                (EnrollmentsTable.studentId eq studentId) and
+                    (EnrollmentsTable.classId eq CLASS_G4_ID) and
+                    (EnrollmentsTable.section eq DEMO_SECTION) and
+                    (EnrollmentsTable.startDate eq startDate)
+            }
+            .any()
+        if (exists) return
+        EnrollmentsTable.insert {
+            it[schoolId] = SCHOOL_ID
+            it[EnrollmentsTable.studentId] = studentId
+            it[classId] = CLASS_G4_ID
+            it[section] = DEMO_SECTION
+            it[EnrollmentsTable.rollNumber] = rollNumber
+            it[status] = "active"
+            it[EnrollmentsTable.startDate] = startDate
+            it[createdAt] = now
+        }
+    }
+
+    /**
+     * teacher_periods for a full Mon–Fri week so the Today strip is non-empty on
+     * any weekday. Periods map onto the demo teacher's actual assignments
+     * (Grade 4 Math/Science, Grade 5 Math). weekday is 1..7 (Mon..Sun) per
+     * java.time.DayOfWeek.value. Idempotency: guarded on (teacher, weekday,
+     * startTime).
+     */
+    private fun seedTeacherPeriods() {
+        val now = Instant.now()
+        data class Period(
+            val weekday: Int,
+            val start: String,
+            val end: String,
+            val className: String,
+            val subject: String,
+            val room: String,
+            val position: Int
+        )
+        // A compact but realistic Mon–Fri timetable for the demo teacher.
+        val periods = mutableListOf<Period>()
+        for (wd in DayOfWeek.MONDAY.value..DayOfWeek.FRIDAY.value) {
+            periods += Period(wd, "09:00", "09:45", DEMO_CLASS, "Mathematics", "R-101", 0)
+            periods += Period(wd, "10:00", "10:45", DEMO_CLASS, "Science",     "R-101", 1)
+            periods += Period(wd, "11:30", "12:15", "Grade 5",  "Mathematics", "R-205", 2)
+        }
+        periods.forEach { p ->
+            val exists = TeacherPeriodsTable.selectAll()
+                .where {
+                    (TeacherPeriodsTable.teacherId eq TEACHER_ID) and
+                        (TeacherPeriodsTable.weekday eq p.weekday) and
+                        (TeacherPeriodsTable.startTime eq p.start)
+                }
+                .any()
+            if (exists) return@forEach
+            TeacherPeriodsTable.insert {
+                it[schoolId] = SCHOOL_ID
+                it[teacherId] = TEACHER_ID
+                it[weekday] = p.weekday
+                it[startTime] = p.start
+                it[endTime] = p.end
+                it[className] = p.className
+                it[section] = DEMO_SECTION
+                it[subject] = p.subject
+                it[room] = p.room
+                it[position] = p.position
+                it[createdAt] = now
+            }
+        }
+    }
+
+    /**
+     * syllabus_units (curriculum units) per subject the demo teacher owns, so the
+     * Planner lands with content. A handful are pre-marked covered (with a
+     * covered_on date in the past) to make progress non-trivial. Idempotency:
+     * guarded on (school, className, section, subject, title).
+     */
+    private fun seedSyllabus() {
+        val now = Instant.now()
+        val coveredDate = LocalDate.of(2026, 5, 15)
+        data class SylUnit(
+            val className: String,
+            val subject: String,
+            val title: String,
+            val position: Int,
+            val covered: Boolean
+        )
+        val units = listOf(
+            SylUnit(DEMO_CLASS, "Mathematics", "Numbers up to 10,000",        0, true),
+            SylUnit(DEMO_CLASS, "Mathematics", "Addition & Subtraction",      1, true),
+            SylUnit(DEMO_CLASS, "Mathematics", "Multiplication",              2, false),
+            SylUnit(DEMO_CLASS, "Mathematics", "Division",                    3, false),
+            SylUnit(DEMO_CLASS, "Science",     "Living & Non-living Things",  0, true),
+            SylUnit(DEMO_CLASS, "Science",     "Plants Around Us",            1, false),
+            SylUnit(DEMO_CLASS, "Science",     "The Human Body",              2, false),
+            SylUnit("Grade 5",  "Mathematics", "Fractions",                   0, true),
+            SylUnit("Grade 5",  "Mathematics", "Decimals",                    1, false)
+        )
+        units.forEach { u ->
+            val exists = SyllabusUnitsTable.selectAll()
+                .where {
+                    (SyllabusUnitsTable.schoolId eq SCHOOL_ID) and
+                        (SyllabusUnitsTable.className eq u.className) and
+                        (SyllabusUnitsTable.section eq DEMO_SECTION) and
+                        (SyllabusUnitsTable.subject eq u.subject) and
+                        (SyllabusUnitsTable.title eq u.title)
+                }
+                .any()
+            if (exists) return@forEach
+            SyllabusUnitsTable.insert {
+                it[schoolId] = SCHOOL_ID
+                it[className] = u.className
+                it[section] = DEMO_SECTION
+                it[subject] = u.subject
+                it[title] = u.title
+                it[position] = u.position
+                it[isCovered] = u.covered
+                if (u.covered) {
+                    it[coveredOn] = coveredDate
+                    it[coveredBy] = TEACHER_ID
+                }
+                it[createdAt] = now
+                it[updatedAt] = now
+            }
+        }
+    }
+
+    /**
+     * A couple of assessments (Grade 4 Math + Science) with marks for the full
+     * roster, so the Results screen has real published data. Marks are
+     * deterministic (derived from roll number) so cold boots are stable.
+     * Idempotency: guarded on the assessment anchor id; marks guarded on
+     * (assessment, student_code).
+     */
+    private fun seedAssessments() {
+        val now = Instant.now()
+        val examDate = LocalDate.of(2026, 5, 20)
+        data class Exam(val aid: UUID, val subject: String, val name: String, val maxMarks: Int)
+        val exams = listOf(
+            Exam(ASSESS_G4_MATH_ID,    "Mathematics", "Unit Test I", 50),
+            Exam(ASSESS_G4_SCIENCE_ID, "Science",     "Unit Test I", 50)
+        )
+        // Roster (student_code, name, roll) the marks attach to — student #1 is
+        // the demo child, the rest are the generated roster.
+        val roster = buildRosterRefs()
+        exams.forEach { exam ->
+            val assessmentExists = AssessmentsTable.selectAll()
+                .where { AssessmentsTable.id eq exam.aid }
+                .any()
+            if (!assessmentExists) {
+                AssessmentsTable.insert {
+                    it[id] = exam.aid
+                    it[schoolId] = SCHOOL_ID
+                    it[teacherId] = TEACHER_ID
+                    it[className] = DEMO_CLASS
+                    it[section] = DEMO_SECTION
+                    it[subject] = exam.subject
+                    it[name] = exam.name
+                    it[maxMarks] = exam.maxMarks
+                    it[examDate] = examDate
+                    it[isActive] = true
+                    it[isPublished] = true
+                    it[publishedAt] = now
+                    it[createdAt] = now
+                    it[updatedAt] = now
+                }
+            }
+            roster.forEach { ref ->
+                val markExists = AssessmentMarksTable.selectAll()
+                    .where {
+                        (AssessmentMarksTable.assessmentId eq exam.aid) and
+                            (AssessmentMarksTable.studentId eq ref.code)
+                    }
+                    .any()
+                if (markExists) return@forEach
+                // Deterministic, plausible score in [60%, 95%] of maxMarks.
+                val pct = 60 + (ref.roll * 7) % 36
+                val score = (exam.maxMarks * pct / 100.0)
+                AssessmentMarksTable.insert {
+                    it[id] = UUID.randomUUID()
+                    it[assessmentId] = exam.aid
+                    it[studentId] = ref.code
+                    it[studentName] = ref.name
+                    it[marks] = score
+                    it[enteredBy] = TEACHER_ID
+                    it[createdAt] = now
+                    it[updatedAt] = now
+                }
+            }
+        }
+    }
+
+    /**
+     * Sample homework for Grade 4 Math + Science with partial submissions, so the
+     * Homework cards show a real submitted/total ratio. About 60% of the roster
+     * has submitted (deterministic by roll). Idempotency: guarded on the
+     * homework anchor id; submissions guarded on (homework, student_code).
+     */
+    private fun seedHomework() {
+        val now = Instant.now()
+        val dueDate = LocalDate.now().plusDays(2)   // due soon so it shows as active
+        data class Hw(val hid: UUID, val subject: String, val title: String, val desc: String)
+        val homeworks = listOf(
+            Hw(HW_G4_MATH_ID,    "Mathematics", "Multiplication Worksheet", "Complete exercises 1–20 on page 34."),
+            Hw(HW_G4_SCIENCE_ID, "Science",     "Plant Observation",        "Observe a plant at home and note 5 features.")
+        )
+        val roster = buildRosterRefs()
+        homeworks.forEach { hw ->
+            val hwExists = HomeworkTable.selectAll()
+                .where { HomeworkTable.id eq hw.hid }
+                .any()
+            if (!hwExists) {
+                HomeworkTable.insert {
+                    it[id] = hw.hid
+                    it[schoolId] = SCHOOL_ID
+                    it[teacherId] = TEACHER_ID
+                    it[className] = DEMO_CLASS
+                    it[section] = DEMO_SECTION
+                    it[subject] = hw.subject
+                    it[title] = hw.title
+                    it[description] = hw.desc
+                    it[dueDate] = dueDate
+                    it[isActive] = true
+                    it[createdAt] = now
+                    it[updatedAt] = now
+                }
+            }
+            roster.forEach { ref ->
+                // ~60% submitted, deterministic by roll.
+                if (ref.roll % 5 >= 3) return@forEach
+                val subExists = HomeworkSubmissionsTable.selectAll()
+                    .where {
+                        (HomeworkSubmissionsTable.homeworkId eq hw.hid) and
+                            (HomeworkSubmissionsTable.studentId eq ref.code)
+                    }
+                    .any()
+                if (subExists) return@forEach
+                HomeworkSubmissionsTable.insert {
+                    it[id] = UUID.randomUUID()
+                    it[homeworkId] = hw.hid
+                    it[studentId] = ref.code
+                    it[status] = "submitted"
+                    it[submittedAt] = now
+                }
+            }
+        }
+    }
+
+    /**
+     * A few approved leaves for students in the demo class, so leave-default
+     * logic (later phases) has something to surface and the teacher leave inbox
+     * is non-empty. Idempotency: guarded on (school, requesterName, dateFrom).
+     */
+    private fun seedLeaves() {
+        val now = Instant.now()
+        data class Leave(
+            val requesterName: String,
+            val childId: UUID,
+            val from: String,
+            val to: String,
+            val reason: String,
+            val status: String
+        )
+        val leaves = listOf(
+            Leave("Demo Child", CHILD_ID, "2026-06-18", "2026-06-19", "Fever — advised rest by doctor.", "Approved"),
+            Leave("Demo Student 02", STUDENT_ID, "2026-06-15", "2026-06-15", "Family function.", "Approved")
+        )
+        leaves.forEach { lv ->
+            val exists = LeaveRequestsTable.selectAll()
+                .where {
+                    (LeaveRequestsTable.schoolId eq SCHOOL_ID) and
+                        (LeaveRequestsTable.requesterName eq lv.requesterName) and
+                        (LeaveRequestsTable.dateFrom eq lv.from)
+                }
+                .any()
+            if (exists) return@forEach
+            LeaveRequestsTable.insert {
+                it[id] = UUID.randomUUID()
+                it[schoolId] = SCHOOL_ID
+                it[requesterId] = PARENT_ID
+                it[requesterName] = lv.requesterName
+                it[requesterRole] = "student"
+                it[dateFrom] = lv.from
+                it[dateTo] = lv.to
+                it[reason] = lv.reason
+                it[status] = lv.status
+                it[actionedBy] = TEACHER_ID
+                it[actionedAt] = now
+                it[classId] = CLASS_G4_ID
+                it[className] = DEMO_CLASS
+                it[section] = DEMO_SECTION
+                it[teacherId] = TEACHER_ID
+                it[childId] = lv.childId
+                it[parentId] = PARENT_ID
+                it[createdAt] = now
+                it[updatedAt] = now
+            }
+        }
+    }
+
+    /**
+     * The (student_code, name, roll) references for the demo Grade 4 / A roster,
+     * matching exactly what seedRoster() inserts. Used by the assessment + the
+     * homework seeders so marks/submissions line up with real students.
+     */
+    private data class RosterRef(val code: String, val name: String, val roll: Int)
+
+    private fun buildRosterRefs(): List<RosterRef> {
+        val refs = mutableListOf(RosterRef(DEMO_STUDENT_CODE, "Demo Child", 1))
+        for (n in 2..DEMO_ROSTER_SIZE) {
+            refs += RosterRef("DEMO-S%03d".format(n), "Demo Student %02d".format(n), n)
+        }
+        return refs
     }
 }
