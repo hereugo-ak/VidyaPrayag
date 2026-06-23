@@ -93,6 +93,7 @@ import com.littlebridge.vidyaprayag.feature.school.teacherProvisioningRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherAttendanceRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherDayRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherGradebookRouting
+import com.littlebridge.vidyaprayag.feature.teacher.teacherHomeworkRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherLeaveRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherMessagesRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherRouting
@@ -299,6 +300,7 @@ fun Application.module() {
         teacherAttendanceRouting()   // T-203/T-205 /api/v1/teacher/attendance — typed, assignment-scoped attendance load/save (Doc 06 §3.8); legacy packed-grade handler deleted
         teacherGradebookRouting()    // T-303/T-304/T-305 /api/v1/teacher/assessments — typed assessment lifecycle: list/create, marks load/SAVE (no publish, the B-MK-1 fix), publish/unpublish, history (Doc 07 §2/§5/§6); converged from /gradebook to canonical /assessments in T-305 (legacy /marks + /assessments handlers deleted)
         teacherSyllabusRouting()     // T-402/T-403 /api/v1/teacher/syllabus — typed, assignment-scoped syllabus: hierarchical load, create unit (B-SYL-1 fix), rename/reorder, one-tap covered toggle w/ typed covered_on (Doc 08 §1.2/§3); converged from staged /syllabus-typed to canonical /syllabus in T-403 (legacy /syllabus GET+PATCH handler in teacherTaskRoutes deleted)
+        teacherHomeworkRouting()     // T-405 /api/v1/teacher/homework-v2 — typed homework lifecycle: assign (fixes dead button F-HW-1/B-HW-1), roster-joined submissions board (B-HW-3), extend (whole-class/single-student), review/grade, close (Doc 08 Part B); staged at /homework-v2, converges to canonical /homework in T-406 (legacy /homework GET+POST handler in teacherTaskRoutes deleted then)
         teacherLeaveRouting()        // /api/v1/teacher/leave-requests[…] — RA-44 teacher lists/decides leave for their classes
         teacherMessagesRouting()     // /api/v1/teacher/messages[…] — RA-51 teacher↔parent messaging + class broadcast
 

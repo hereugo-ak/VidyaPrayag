@@ -80,6 +80,25 @@ class TeacherRepositoryImpl(
     override suspend fun createHomework(token: String, request: CreateHomeworkRequest): NetworkResult<ApiResponse<Unit>> =
         api.createHomework(token, request)
 
+    // T-405/T-406: typed homework lifecycle.
+    override suspend fun listHomework(token: String, assignmentId: String): NetworkResult<HomeworkListResponse> =
+        api.listHomework(token, assignmentId)
+
+    override suspend fun assignHomework(token: String, request: AssignHomeworkRequest): NetworkResult<AssignHomeworkResponse> =
+        api.assignHomework(token, request)
+
+    override suspend fun getHomeworkBoard(token: String, homeworkId: String, assignmentId: String): NetworkResult<HomeworkBoardResponse> =
+        api.getHomeworkBoard(token, homeworkId, assignmentId)
+
+    override suspend fun grantHomeworkExtension(token: String, homeworkId: String, request: GrantExtensionRequest): NetworkResult<HomeworkMutationResponse> =
+        api.grantHomeworkExtension(token, homeworkId, request)
+
+    override suspend fun reviewHomeworkSubmission(token: String, homeworkId: String, studentId: String, request: ReviewSubmissionRequest): NetworkResult<HomeworkMutationResponse> =
+        api.reviewHomeworkSubmission(token, homeworkId, studentId, request)
+
+    override suspend fun closeHomework(token: String, homeworkId: String, assignmentId: String): NetworkResult<HomeworkMutationResponse> =
+        api.closeHomework(token, homeworkId, assignmentId)
+
     override suspend fun getLeaveRequests(token: String, status: String?): NetworkResult<TeacherLeaveListResponse> =
         api.getLeaveRequests(token, status)
 

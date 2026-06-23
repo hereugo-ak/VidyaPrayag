@@ -694,8 +694,10 @@ data class SyllabusUnitMutationResponse(
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Homework — list assignments + create a new one.
-// Backs Teacher.tsx → Update › Homework.
+// Homework — LEGACY list + create (RETAINED until T-406 — DELETE-don't-patch).
+// Backs the old Teacher.tsx → Update › Homework screen whose Assign button is
+// dead (F-HW-1). The typed lifecycle plane below (HomeworkV2*) replaces it; this
+// pair is removed in T-406 when the screen converges.
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Serializable
@@ -727,6 +729,164 @@ data class CreateHomeworkRequest(
     val title: String,
     val description: String = "",
     @SerialName("due_date") val dueDate: String,
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// T-405/T-406 (Doc 08 Part B) — the canonical, TYPED HOMEWORK LIFECYCLE.
+//   • assign (title/desc/due-date(+time)/allow-late, optional attachments) — the
+//     real fix for the dead Assign button (F-HW-1/B-HW-1).
+//   • a submissions BOARD that is roster-joined so even NOT-SUBMITTED students
+//     appear (B-HW-3/H7), with status columns + counts.
+//   • teacher EXTENSION (whole-class or single-student, the "she was sick" case).
+//   • the no-submit-past-due rule lives server-side on the student path (D-HW-4).
+// Reached PRE-SCOPED by assignmentId (X-1) — no shared picker.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Homework submission lifecycle states (Doc 08 §5.3). */
+object HomeworkSubmissionStatus {
+    const val SUBMITTED = "submitted"
+    const val LATE = "late"
+    const val GRADED = "graded"
+    const val NOT_SUBMITTED = "not_submitted"
+}
+
+@Serializable
+data class HomeworkAttachmentDto(
+    val id: String,
+    val url: String,
+    val filename: String = "",
+    val mime: String = "",
+    @SerialName("size_bytes") val sizeBytes: Long = 0,
+)
+
+/** One homework row in the active list, with scope + live submission ratio. */
+@Serializable
+data class HomeworkItemDto(
+    val id: String,
+    @SerialName("assignment_id") val assignmentId: String? = null,
+    val title: String,
+    val description: String = "",
+    @SerialName("class_name") val className: String = "",
+    val section: String = "",
+    val subject: String = "",
+    @SerialName("due_date") val dueDate: String,
+    @SerialName("due_time") val dueTime: String? = null,
+    @SerialName("allow_late") val allowLate: Boolean = false,
+    @SerialName("is_active") val isActive: Boolean = true,
+    @SerialName("is_past_due") val isPastDue: Boolean = false,
+    @SerialName("submitted_count") val submittedCount: Int = 0,
+    @SerialName("late_count") val lateCount: Int = 0,
+    @SerialName("graded_count") val gradedCount: Int = 0,
+    @SerialName("not_submitted_count") val notSubmittedCount: Int = 0,
+    @SerialName("total_count") val totalCount: Int = 0,
+    val attachments: List<HomeworkAttachmentDto> = emptyList(),
+) {
+    /** Submitted+late+graded over total; honest 0 when no roster. */
+    val turnedInCount: Int get() = submittedCount + lateCount + gradedCount
+}
+
+@Serializable
+data class HomeworkListResponse(
+    val success: Boolean = true,
+    val data: HomeworkListData = HomeworkListData(),
+)
+
+@Serializable
+data class HomeworkListData(
+    val items: List<HomeworkItemDto> = emptyList(),
+)
+
+/** Assign homework — scope is pre-filled (assignmentId), no shared picker. */
+@Serializable
+data class AssignHomeworkRequest(
+    @SerialName("assignment_id") val assignmentId: String,
+    val title: String,
+    val description: String = "",
+    @SerialName("due_date") val dueDate: String,
+    @SerialName("due_time") val dueTime: String? = null,
+    @SerialName("allow_late") val allowLate: Boolean = false,
+    // Optional attachments already uploaded (url/filename/mime/size); attach by
+    // reference so the assign succeeds even if an upload is retried (H6).
+    val attachments: List<AssignHomeworkAttachmentDto> = emptyList(),
+)
+
+@Serializable
+data class AssignHomeworkAttachmentDto(
+    val url: String,
+    val filename: String = "",
+    val mime: String = "",
+    @SerialName("size_bytes") val sizeBytes: Long = 0,
+)
+
+@Serializable
+data class AssignHomeworkResponse(
+    val success: Boolean = true,
+    val data: HomeworkItemDto? = null,
+)
+
+/** One row on the submissions board — every roster student, submitted or not. */
+@Serializable
+data class HomeworkSubmissionRowDto(
+    @SerialName("student_id") val studentId: String,
+    @SerialName("student_code") val studentCode: String = "",
+    val name: String,
+    @SerialName("roll_no") val rollNo: Int? = null,
+    // submitted | late | graded | not_submitted
+    val status: String = HomeworkSubmissionStatus.NOT_SUBMITTED,
+    @SerialName("submitted_at") val submittedAt: String? = null,
+    val grade: String? = null,
+    @SerialName("has_extension") val hasExtension: Boolean = false,
+    @SerialName("extended_to") val extendedTo: String? = null,
+)
+
+@Serializable
+data class HomeworkBoardResponse(
+    val success: Boolean = true,
+    val data: HomeworkBoardData = HomeworkBoardData(),
+)
+
+@Serializable
+data class HomeworkBoardData(
+    @SerialName("homework_id") val homeworkId: String = "",
+    val title: String = "",
+    @SerialName("class_name") val className: String = "",
+    val section: String = "",
+    val subject: String = "",
+    @SerialName("due_date") val dueDate: String = "",
+    @SerialName("due_time") val dueTime: String? = null,
+    @SerialName("allow_late") val allowLate: Boolean = false,
+    @SerialName("is_active") val isActive: Boolean = true,
+    @SerialName("is_past_due") val isPastDue: Boolean = false,
+    val rows: List<HomeworkSubmissionRowDto> = emptyList(),
+    @SerialName("submitted_count") val submittedCount: Int = 0,
+    @SerialName("late_count") val lateCount: Int = 0,
+    @SerialName("graded_count") val gradedCount: Int = 0,
+    @SerialName("not_submitted_count") val notSubmittedCount: Int = 0,
+    @SerialName("total_count") val totalCount: Int = 0,
+)
+
+/** Grant an extension: studentId null = whole class; else that one student (H4). */
+@Serializable
+data class GrantExtensionRequest(
+    @SerialName("assignment_id") val assignmentId: String,
+    @SerialName("student_id") val studentId: String? = null,
+    @SerialName("new_due_date") val newDueDate: String,
+    @SerialName("new_due_time") val newDueTime: String? = null,
+    val reason: String? = null,
+)
+
+/** Mark a student's submission reviewed/graded from the board. */
+@Serializable
+data class ReviewSubmissionRequest(
+    @SerialName("assignment_id") val assignmentId: String,
+    val status: String,                       // graded | submitted | late | not_submitted
+    val grade: String? = null,
+)
+
+@Serializable
+data class HomeworkMutationResponse(
+    val success: Boolean = true,
+    val message: String = "",
 )
 
 // ─────────────────────────────────────────────────────────────────────────────

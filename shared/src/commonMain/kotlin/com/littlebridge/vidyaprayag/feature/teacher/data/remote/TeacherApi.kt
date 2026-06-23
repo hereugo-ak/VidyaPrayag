@@ -268,6 +268,8 @@ class TeacherApi(
         }
     }
 
+    // T-406 (DELETE-don't-patch): the legacy getHomework / createHomework above are
+    // RETAINED until the screen converges; the typed lifecycle below replaces them.
     suspend fun createHomework(
         token: String,
         request: CreateHomeworkRequest,
@@ -275,6 +277,79 @@ class TeacherApi(
         client.post(getUrl("api/v1/teacher/homework")) {
             contentType(ContentType.Application.Json)
             setBody(request)
+        }
+    }
+
+    // ── T-405/T-406: Typed HOMEWORK lifecycle (Doc 08 Part B) ────────────────
+    // Assign (fixes the dead button), roster-joined submissions board (B-HW-3),
+    // teacher extension (whole-class or single-student), review/grade. Every call
+    // is scope-bound to the authorizing assignmentId server-side (X-1).
+
+    /** List active homework for an owned assignment, with per-status counts + attachments. */
+    suspend fun listHomework(
+        token: String,
+        assignmentId: String,
+    ): NetworkResult<HomeworkListResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/homework-v2")) {
+            parameter("assignmentId", assignmentId)
+        }
+    }
+
+    /** Assign homework (pre-scoped; no shared picker). Fixes F-HW-1/B-HW-1. */
+    suspend fun assignHomework(
+        token: String,
+        request: AssignHomeworkRequest,
+    ): NetworkResult<AssignHomeworkResponse> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/homework-v2")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    /** Submissions board — roster-joined so even NOT-SUBMITTED students appear (B-HW-3). */
+    suspend fun getHomeworkBoard(
+        token: String,
+        homeworkId: String,
+        assignmentId: String,
+    ): NetworkResult<HomeworkBoardResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/homework-v2/$homeworkId/submissions")) {
+            parameter("assignmentId", assignmentId)
+        }
+    }
+
+    /** Grant an extension: studentId null = whole class; else that one student (H4). */
+    suspend fun grantHomeworkExtension(
+        token: String,
+        homeworkId: String,
+        request: GrantExtensionRequest,
+    ): NetworkResult<HomeworkMutationResponse> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/homework-v2/$homeworkId/extend")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    /** Mark a student's submission reviewed/graded from the board. */
+    suspend fun reviewHomeworkSubmission(
+        token: String,
+        homeworkId: String,
+        studentId: String,
+        request: ReviewSubmissionRequest,
+    ): NetworkResult<HomeworkMutationResponse> = safeApiCall {
+        client.patch(getUrl("api/v1/teacher/homework-v2/$homeworkId/submissions/$studentId")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    /** Close (deactivate) a homework — board becomes read-only (H9). */
+    suspend fun closeHomework(
+        token: String,
+        homeworkId: String,
+        assignmentId: String,
+    ): NetworkResult<HomeworkMutationResponse> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/homework-v2/$homeworkId/close")) {
+            parameter("assignmentId", assignmentId)
         }
     }
 
