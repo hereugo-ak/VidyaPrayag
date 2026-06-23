@@ -47,6 +47,7 @@
 package com.littlebridge.vidyaprayag.feature.teacher
 
 import com.littlebridge.vidyaprayag.core.TeacherContext
+import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.requireTeacherContext
 import com.littlebridge.vidyaprayag.core.teacherAssignmentsFor
@@ -57,11 +58,14 @@ import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.PeriodExceptionsTable
 import com.littlebridge.vidyaprayag.db.TeacherPeriodsTable
 import com.littlebridge.vidyaprayag.db.TeacherSubjectAssignmentsTable
+import com.littlebridge.vidyaprayag.db.TeacherCheckInsTable
 import com.littlebridge.vidyaprayag.feature.calendar.EventStatus
 import com.littlebridge.vidyaprayag.feature.calendar.EventType
 import com.littlebridge.vidyaprayag.feature.calendar.decodeStringList
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
+import io.ktor.server.request.receive
 import io.ktor.server.routing.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -69,8 +73,10 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -128,9 +134,34 @@ data class ResolvedWeekDto(
     val days: List<ResolvedDayDto> = emptyList(),
 )
 
+// ─────────────────────────────────────────────────────────────────────────────
+// T-106b — Teacher self check-in (Doc 06 §2). Server-side mirrors of the shared
+// CheckInStatusDto / TeacherCheckInRequest (shared/.../teacher/domain/model/
+// TeacherModels.kt). The :server module does not depend on :shared.
+// `checked_in_at` is the server-stamped ISO timestamp (authoritative clock —
+// Doc 06 §2.4). `method` records which rung of the biometric ladder succeeded.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class TeacherCheckInRequest(
+    val method: String,                              // biometric | pin | manual
+    @SerialName("device_id") val deviceId: String? = null,
+)
+
+@Serializable
+data class CheckInStatusDto(
+    @SerialName("checked_in") val checkedIn: Boolean = false,
+    @SerialName("checked_in_at") val checkedInAt: String? = null, // ISO timestamp, server-stamped
+    val method: String? = null,                      // biometric | pin | manual
+    val date: String,                                // ISO date the status is for
+)
+
 private val HHMM_DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
 // period_exceptions.kind values (Doc 05 §3 / Tables.kt PeriodExceptionsTable)
+// Valid teacher check-in methods (Doc 06 §2 biometric ladder).
+private val CHECK_IN_METHODS = setOf("biometric", "pin", "manual")
+
 private const val KIND_CANCELLED = "CANCELLED"
 private const val KIND_RESCHEDULED = "RESCHEDULED"
 private const val KIND_ROOM_CHANGE = "ROOM_CHANGE"
@@ -515,6 +546,103 @@ fun Route.teacherDayRouting() {
                     ResolvedWeekDto(weekStart = weekStart.toString(), days = days),
                     message = "Resolved week loaded",
                 )
+            }
+
+            // ── POST /checkin — teacher self check-in (Doc 06 §2) ─────────────
+            // Idempotent per (school, teacher, date): a second POST for the same
+            // day returns the EXISTING row (UNIQUE ux_teacher_checkins_unique),
+            // it does not duplicate. `checked_in_at` is SERVER-STAMPED with
+            // Instant.now() — the device clock is never trusted (Doc 06 §2.4).
+            // `method` records which rung of the biometric ladder succeeded
+            // (biometric -> PIN -> manual, always-available fallback).
+            post("/checkin") {
+                val ctx = call.requireTeacherContext() ?: return@post
+                val req = runCatching { call.receive<TeacherCheckInRequest>() }.getOrNull()
+                if (req == null) {
+                    call.fail("Invalid request body", HttpStatusCode.BadRequest, "BAD_REQUEST")
+                    return@post
+                }
+                val method = req.method.trim().lowercase()
+                if (method !in CHECK_IN_METHODS) {
+                    call.fail(
+                        "method must be one of: biometric, pin, manual",
+                        HttpStatusCode.BadRequest,
+                        "INVALID_METHOD",
+                    )
+                    return@post
+                }
+                val date = LocalDate.now() // server date — check-in is for "today"
+
+                val data = dbQuery {
+                    // Idempotency: return existing row if already checked in today.
+                    val existing = TeacherCheckInsTable
+                        .selectAll()
+                        .where {
+                            (TeacherCheckInsTable.schoolId eq ctx.schoolId) and
+                            (TeacherCheckInsTable.teacherId eq ctx.userId) and
+                            (TeacherCheckInsTable.date eq date)
+                        }
+                        .singleOrNull()
+                    if (existing != null) {
+                        CheckInStatusDto(
+                            checkedIn = true,
+                            checkedInAt = existing[TeacherCheckInsTable.checkedInAt].toString(),
+                            method = existing[TeacherCheckInsTable.method],
+                            date = existing[TeacherCheckInsTable.date].toString(),
+                        )
+                    } else {
+                        val now = Instant.now() // server clock (authoritative)
+                        TeacherCheckInsTable.insert {
+                            it[TeacherCheckInsTable.schoolId] = ctx.schoolId
+                            it[TeacherCheckInsTable.teacherId] = ctx.userId
+                            it[TeacherCheckInsTable.date] = date
+                            it[TeacherCheckInsTable.checkedInAt] = now
+                            it[TeacherCheckInsTable.method] = method
+                            it[TeacherCheckInsTable.deviceId] = req.deviceId
+                        }
+                        CheckInStatusDto(
+                            checkedIn = true,
+                            checkedInAt = now.toString(),
+                            method = method,
+                            date = date.toString(),
+                        )
+                    }
+                }
+                call.ok(data, message = "Checked in")
+            }
+
+            // ── GET /checkin?date=YYYY-MM-DD — today's check-in status ───────
+            // Returns checked_in=false when no row exists for (school, teacher,
+            // date); checked_in=true + the server-stamped timestamp + method
+            // when it does. Powers the Today-tab check-in band's amber→green
+            // pill flip (Doc 04 §5.1).
+            get("/checkin") {
+                val ctx = call.requireTeacherContext() ?: return@get
+                val date = call.request.queryParameters["date"]?.takeIf { it.isNotBlank() }
+                    ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+                    ?: LocalDate.now()
+
+                val data = dbQuery {
+                    val row = TeacherCheckInsTable
+                        .selectAll()
+                        .where {
+                            (TeacherCheckInsTable.schoolId eq ctx.schoolId) and
+                            (TeacherCheckInsTable.teacherId eq ctx.userId) and
+                            (TeacherCheckInsTable.date eq date)
+                        }
+                        .singleOrNull()
+                    if (row != null) {
+                        CheckInStatusDto(
+                            checkedIn = true,
+                            checkedInAt = row[TeacherCheckInsTable.checkedInAt].toString(),
+                            method = row[TeacherCheckInsTable.method],
+                            date = row[TeacherCheckInsTable.date].toString(),
+                        )
+                    } else {
+                        CheckInStatusDto(checkedIn = false, date = date.toString())
+                    }
+                }
+                call.ok(data, message = "Check-in status loaded")
             }
         }
     }
