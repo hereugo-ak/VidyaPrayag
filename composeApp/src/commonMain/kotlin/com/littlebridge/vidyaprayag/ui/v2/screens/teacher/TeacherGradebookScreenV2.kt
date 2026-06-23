@@ -569,7 +569,10 @@ private fun MarkRow(
 ) {
     val c = VTheme.colors
     // Below-pass coloring only when a pass line exists and a real (non-AB) mark is entered (M11).
-    val belowPass = passMarks != null && !s.isAbsent && s.marks != null && s.marks < passMarks
+    // Capture into a local val so the null-check enables smart-cast — `s.marks` is a public API
+    // property from the `shared` module and cannot be smart-cast directly across the module boundary.
+    val markValue = s.marks
+    val belowPass = passMarks != null && !s.isAbsent && markValue != null && markValue < passMarks
     VCard(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             VAvatar(name = s.name, size = 40.dp)
