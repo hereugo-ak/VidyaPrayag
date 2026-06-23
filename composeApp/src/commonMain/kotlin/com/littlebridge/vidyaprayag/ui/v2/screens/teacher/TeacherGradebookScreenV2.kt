@@ -454,7 +454,7 @@ private fun GradebookMarksContent(
         // Back + assessment guard header.
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(
-                Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(c.ink.copy(alpha = 0.06f)).clickable(onClick = onBack),
+                Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(c.ink.copy(alpha = 0.06f)).clickable(onClick = onBack), // Doc 10 §3 — 48dp tap floor.
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(VIcons.ArrowLeft, contentDescription = "Back to assessments", tint = c.ink, modifier = Modifier.size(18.dp))
@@ -720,7 +720,7 @@ private fun GradebookHistoryContent(
         // Back + scope guard header.
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(
-                Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(c.ink.copy(alpha = 0.06f)).clickable(onClick = onBack),
+                Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(c.ink.copy(alpha = 0.06f)).clickable(onClick = onBack), // Doc 10 §3 — 48dp tap floor.
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(VIcons.ArrowLeft, contentDescription = "Back to assessments", tint = c.ink, modifier = Modifier.size(18.dp))

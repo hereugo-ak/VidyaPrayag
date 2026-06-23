@@ -12,10 +12,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -350,10 +352,11 @@ private fun ProfileLeaveSection(
     SectionHeader(
         title = "My leave",
         trailing = {
-            Text(
-                if (formOpen) "Close" else "Apply",
-                style = VTheme.type.label.colored(c.accent),
-                modifier = Modifier
+            // ≥48dp tap target (Doc 10 §3 hard floor) — the affordance is a small label but
+            // its hit-box is a full 48dp-tall row so it's reliably tappable.
+            Box(
+                Modifier
+                    .heightIn(min = 48.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -362,8 +365,14 @@ private fun ProfileLeaveSection(
                         formOpen = !formOpen
                         if (!formOpen) onClearApply()
                     }
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-            )
+                    .padding(horizontal = 8.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    if (formOpen) "Close" else "Apply",
+                    style = VTheme.type.label.colored(c.accent),
+                )
+            }
         },
     )
 
@@ -528,6 +537,7 @@ private fun ProfileSettingsSection(
             Row(
                 Modifier
                     .fillMaxWidth()
+                    .heightIn(min = 48.dp) // Doc 10 §3 — hard floor for Mr. Rao.
                     .clip(RoundedCornerShape(12.dp))
                     .clickable { onOpenLeaveInbox() }
                     .padding(vertical = 6.dp),
@@ -583,6 +593,7 @@ private fun ThemeSegmentedControl(themeName: String, onSetTheme: (String) -> Uni
             Box(
                 Modifier
                     .weight(1f)
+                    .heightIn(min = 48.dp) // Doc 10 §3 — hard floor for Mr. Rao.
                     .clip(RoundedCornerShape(9.dp))
                     .background(if (active) c.accent else Color.Transparent)
                     .clickable(
@@ -626,6 +637,7 @@ private fun ChangePasswordForm(
     Row(
         Modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp) // Doc 10 §3 — hard floor for Mr. Rao.
             .clip(RoundedCornerShape(12.dp))
             .clickable {
                 open = !open
@@ -665,17 +677,24 @@ private fun ChangePasswordForm(
                 passwordVisible = reveal,
                 leadingIcon = VIcons.ShieldCheck,
                 trailing = {
-                    Icon(
-                        VIcons.Eye,
-                        contentDescription = if (reveal) "Hide passwords" else "Show passwords",
-                        tint = c.ink3,
-                        modifier = Modifier
-                            .size(20.dp)
+                    // ≥48dp tap target around the small Eye glyph (Doc 10 §3).
+                    Box(
+                        Modifier
+                            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                            .clip(RoundedCornerShape(12.dp))
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
                             ) { reveal = !reveal },
-                    )
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            VIcons.Eye,
+                            contentDescription = if (reveal) "Hide passwords" else "Show passwords",
+                            tint = c.ink3,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 },
             )
             VInput(
