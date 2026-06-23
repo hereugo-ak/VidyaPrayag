@@ -1,6 +1,11 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,21 +17,33 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.littlebridge.vidyaprayag.feature.teacher.domain.model.TeacherSelfLeaveDto
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.ActionResult
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.ResolvedDayUi
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherLeaveUiState
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherProfileActionsViewModel
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherProfileState
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherProfileViewModel
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherTodayState
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherTodayViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
@@ -34,7 +51,10 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VConfirmDialog
+import com.littlebridge.vidyaprayag.ui.v2.components.VDatePicker
+import com.littlebridge.vidyaprayag.ui.v2.components.VDivider
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
+import com.littlebridge.vidyaprayag.ui.v2.components.VInput
 import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
@@ -42,12 +62,20 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * TeacherProfileScreenV2 — `Teacher.tsx → Profile`, wired to the real [TeacherProfileViewModel]
- * (`UserProfileApi` → `GET /api/v1/profile`).
+ * TeacherProfileScreenV2 — REBUILT (T-602b, Doc 04 §5.14). DELETE-don't-patch: the old
+ * screen's inert "Notification preferences" / "Change password" rows (F-PROF-1/F-PROF-2)
+ * are gone. The Profile is now the teacher's own data + controls in four honest sections:
  *
- * Centered avatar + name + username + subject badges, a stack of setting rows (using real
- * contact details), and a log-out button. No MockV2 in production; the three UI states come
- * from [VStateHost].
+ *   1. Identity — avatar, name, username, school, subject badges (TeacherProfileViewModel).
+ *   2. My Schedule — the FULL weekly timetable (reuses TeacherTodayViewModel.week, the
+ *      T-104 server-resolved week; honest holiday/empty per day).
+ *   3. My Leave — apply (inline sheet: date-from/to + reason + optional image URL) and the
+ *      live status list (TeacherProfileActionsViewModel over the T-602a /teacher/leave API).
+ *   4. Settings — REAL change-password (inline form → AuthRepository, the RA-54 endpoint),
+ *      theme switch (Warm / Light / Night via the global pref the portal reads), the leave
+ *      inbox shortcut (onOpenLeave), and a confirmed logout.
+ *
+ * Every data surface uses VStateHost; the leave list shows an honest "No leave requests."
  */
 @Composable
 fun TeacherProfileScreenV2(
@@ -55,12 +83,33 @@ fun TeacherProfileScreenV2(
     onOpenLeave: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: TeacherProfileViewModel = koinViewModel(),
+    actionsViewModel: TeacherProfileActionsViewModel = koinViewModel(),
+    scheduleViewModel: TeacherTodayViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
+    val leave by actionsViewModel.leave.collectAsStateV2()
+    val applyResult by actionsViewModel.apply.collectAsStateV2()
+    val passwordResult by actionsViewModel.password.collectAsStateV2()
+    val themeName by actionsViewModel.themeName.collectAsStateV2()
+    val schedule by scheduleViewModel.state.collectAsStateV2()
+
     TeacherProfileContent(
         state = state,
+        leave = leave,
+        applyResult = applyResult,
+        passwordResult = passwordResult,
+        themeName = themeName,
+        schedule = schedule,
         onLogout = onLogout,
+        onOpenLeaveInbox = onOpenLeave,
         onRetry = viewModel::load,
+        onRetrySchedule = scheduleViewModel::load,
+        onRetryLeave = actionsViewModel::loadLeave,
+        onApplyLeave = actionsViewModel::applyLeave,
+        onClearApply = actionsViewModel::clearApplyResult,
+        onChangePassword = actionsViewModel::changePassword,
+        onClearPassword = actionsViewModel::clearPasswordResult,
+        onSetTheme = actionsViewModel::setTheme,
         modifier = modifier,
     )
 }
@@ -68,13 +117,24 @@ fun TeacherProfileScreenV2(
 @Composable
 private fun TeacherProfileContent(
     state: TeacherProfileState,
+    leave: TeacherLeaveUiState,
+    applyResult: ActionResult,
+    passwordResult: ActionResult,
+    themeName: String,
+    schedule: TeacherTodayState,
     onLogout: () -> Unit,
+    onOpenLeaveInbox: () -> Unit,
     onRetry: () -> Unit,
+    onRetrySchedule: () -> Unit,
+    onRetryLeave: () -> Unit,
+    onApplyLeave: (String, String, String, String?) -> Unit,
+    onClearApply: () -> Unit,
+    onChangePassword: (String?, String, String) -> Unit,
+    onClearPassword: () -> Unit,
+    onSetTheme: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
-    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-    // RA-21: logout is destructive — gate it behind a confirmation dialog.
     var showLogoutConfirm by remember { mutableStateOf(false) }
 
     VConfirmDialog(
@@ -82,10 +142,7 @@ private fun TeacherProfileContent(
         title = "Log out?",
         message = "You'll need to sign in again to manage your classes.",
         confirmLabel = "Log out",
-        onConfirm = {
-            showLogoutConfirm = false
-            onLogout()
-        },
+        onConfirm = { showLogoutConfirm = false; onLogout() },
         onDismiss = { showLogoutConfirm = false },
         icon = VIcons.AlertTriangle,
     )
@@ -98,8 +155,7 @@ private fun TeacherProfileContent(
             .statusBarsPadding()
             .imePadding()
             .navigationBarsPadding()
-            .padding(top = 24.dp, bottom = 140.dp),
-
+            .padding(top = 16.dp, bottom = 140.dp),
     ) {
         VStateHost(
             loading = state.isLoading,
@@ -112,93 +168,549 @@ private fun TeacherProfileContent(
             skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonProfile() },
         ) {
             val me = state.profile!!
+
+            // ── 1. Identity ──────────────────────────────────────────────────
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Column(
-                    Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    VAvatar(name = me.name, src = me.photoUrl, size = 88.dp)
-                    Text(
-                        me.name,
-                        style = VTheme.type.h2.colored(c.ink),
-                        modifier = Modifier.padding(top = 12.dp)
-                    )
-                    Text(
-                        me.username,
-                        style = VTheme.type.dataSm.colored(c.ink2).copy(fontSize = 12.sp)
-                    )
-                    if (me.schoolName.isNotBlank()) {
-                        Text(me.schoolName, style = VTheme.type.caption.colored(c.ink3))
-                    }
-                    Spacer(Modifier.height(8.dp))
+                VAvatar(name = me.name, src = me.photoUrl, size = 88.dp, ring = true)
+                Text(me.name, style = VTheme.type.h2.colored(c.ink), modifier = Modifier.padding(top = 12.dp))
+                Text(me.username, style = VTheme.type.dataSm.colored(c.ink2).copy(fontSize = 12.sp))
+                if (me.schoolName.isNotBlank()) {
+                    Text(me.schoolName, style = VTheme.type.caption.colored(c.ink3))
+                }
+                if (me.subjects.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        me.subjects.forEach { VBadge(text = it, tone = VBadgeTone.Arctic) }
+                        me.subjects.forEach { VBadge(text = it, tone = VBadgeTone.Accent) }
                     }
                 }
-                Spacer(Modifier.height(24.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    data class ProfileRow(val title: String, val sub: String, val onClick: (() -> Unit)?)
-                    val rows = listOfNotNull(
-                        ProfileRow(
-                            "Personal details",
-                            listOfNotNull(
-                                me.phone.ifBlank { null },
-                                me.email.ifBlank { null },
-                            ).joinToString(" • ").ifBlank { "Mobile, email, photo" },
-                            null,
-                        ),
-                        ProfileRow(
-                            "Classes",
-                            me.classes.joinToString(", ").ifBlank { "—" },
-                            null,
-                        ).takeIf { me.classes.isNotEmpty() },
-                        ProfileRow("Notification preferences", "Push, WhatsApp, quiet hours", null),
-                        ProfileRow("Change password", "Keep your account secure", null),
-                        ProfileRow(
-                            "Help & support",
-                            "Email ${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}",
-                            {
-                                runCatching {
-                                    uriHandler.openUri(
-                                        "mailto:${com.littlebridge.vidyaprayag.ui.v2.screens.auth.SUPPORT_EMAIL}" +
-                                            "?subject=VidyaSetu%20Support",
-                                    )
-                                }
-                            },
-                        ),
-                    )
-                    rows.forEach { row ->
-                        VCard(onClick = row.onClick) {
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(row.title, style = VTheme.type.bodyStrong.colored(c.ink))
-                                    Text(
-                                        row.sub,
-                                        style = VTheme.type.caption.colored(c.ink2)
-                                            .copy(fontSize = 11.sp)
-                                    )
-                                }
-                                Icon(
-                                    VIcons.ChevronRight,
-                                    contentDescription = null,
-                                    tint = c.ink3,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    }
-                    VButton(
-                        text = "Log out",
-                        onClick = { showLogoutConfirm = true },
-                        full = true,
-                        variant = VButtonVariant.Ghost
-                    )
+            }
+
+            Spacer(Modifier.height(24.dp))
+            ProfileScheduleSection(schedule = schedule, onRetry = onRetrySchedule)
+            Spacer(Modifier.height(20.dp))
+            ProfileLeaveSection(
+                leave = leave,
+                applyResult = applyResult,
+                onRetry = onRetryLeave,
+                onApply = onApplyLeave,
+                onClearApply = onClearApply,
+            )
+            Spacer(Modifier.height(20.dp))
+            ProfileSettingsSection(
+                phone = me.phone,
+                email = me.email,
+                themeName = themeName,
+                passwordResult = passwordResult,
+                onChangePassword = onChangePassword,
+                onClearPassword = onClearPassword,
+                onSetTheme = onSetTheme,
+                onOpenLeaveInbox = onOpenLeaveInbox,
+                onLogout = { showLogoutConfirm = true },
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section header — a small uppercase eyebrow + optional trailing action.
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun SectionHeader(title: String, trailing: (@Composable () -> Unit)? = null) {
+    val c = VTheme.colors
+    Row(
+        Modifier.fillMaxWidth().padding(bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(title.uppercase(), style = VTheme.type.label.colored(c.accentDeep))
+        trailing?.invoke()
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. My Schedule — the FULL weekly timetable (reuses TeacherTodayViewModel.week,
+//    the T-104 server-resolved week). Mon–Sat (weekday 1..6), honest holiday/empty
+//    per day. Mirrors TeacherScheduleCard's WeeklyFace language but rebuilt for the
+//    Profile surface (no expand/collapse — always-open reference view).
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun ProfileScheduleSection(schedule: TeacherTodayState, onRetry: () -> Unit) {
+    val c = VTheme.colors
+    // Mon–Sat, sorted by ISO weekday (1=Mon … 6=Sat). Sunday is intentionally omitted.
+    val days = schedule.week.filter { it.weekday in 1..6 }.sortedBy { it.weekday }
+
+    SectionHeader("My schedule")
+    VCard(padding = 16.dp) {
+        VStateHost(
+            loading = schedule.isLoading && schedule.week.isEmpty(),
+            error = schedule.error.takeIf { schedule.week.isEmpty() },
+            isEmpty = days.isEmpty(),
+            emptyTitle = "No weekly timetable yet",
+            emptyBody = "Your classes for the week haven't been scheduled.",
+            emptyIcon = VIcons.Calendar,
+            onRetry = onRetry,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                days.forEachIndexed { index, d ->
+                    if (index > 0) VDivider()
+                    ScheduleDayRow(d)
                 }
             }
         }
     }
+}
+
+@Composable
+private fun ScheduleDayRow(d: ResolvedDayUi) {
+    val c = VTheme.colors
+    Column(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                weekdayName(d.weekday),
+                style = VTheme.type.labelStrong.colored(c.ink2),
+            )
+            if (d.isHoliday) {
+                VBadge(text = d.holidayName ?: "Holiday", tone = VBadgeTone.Danger)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        when {
+            d.isHoliday -> Text(
+                "Holiday — no classes",
+                style = VTheme.type.caption.colored(c.ink3),
+            )
+            d.periods.isEmpty() -> Text(
+                "No classes",
+                style = VTheme.type.caption.colored(c.ink3),
+            )
+            else -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                d.periods.sortedBy { it.startTime }.forEach { p ->
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(
+                            p.startTime,
+                            style = VTheme.type.dataSm.colored(c.ink3).copy(fontSize = 12.sp),
+                            modifier = Modifier.width(54.dp),
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "${p.subject} · ${p.classLabel}",
+                                style = VTheme.type.body.colored(if (p.isCancelled) c.ink3 else c.ink),
+                            )
+                            if (p.room.isNotBlank()) {
+                                Text(
+                                    "Room ${p.room}",
+                                    style = VTheme.type.caption.colored(c.ink3),
+                                )
+                            }
+                        }
+                        if (p.isCancelled) {
+                            VBadge(text = "Cancelled", tone = VBadgeTone.Danger)
+                        } else if (p.isSubstituteForMe) {
+                            VBadge(text = "Substitute", tone = VBadgeTone.Warning)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. My Leave — apply (inline form: date-from/to + reason + optional image URL)
+//    and the live status list (TeacherProfileActionsViewModel over the T-602a
+//    /teacher/leave API). Honest "No leave requests." empty.
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun ProfileLeaveSection(
+    leave: TeacherLeaveUiState,
+    applyResult: ActionResult,
+    onRetry: () -> Unit,
+    onApply: (String, String, String, String?) -> Unit,
+    onClearApply: () -> Unit,
+) {
+    val c = VTheme.colors
+    var formOpen by remember { mutableStateOf(false) }
+    var dateFrom by remember { mutableStateOf("") }
+    var dateTo by remember { mutableStateOf("") }
+    var reason by remember { mutableStateOf("") }
+    var imageUrl by remember { mutableStateOf("") }
+
+    // On a successful apply, collapse + reset the form, then clear the transient result.
+    LaunchedEffect(applyResult) {
+        if (applyResult is ActionResult.Success) {
+            formOpen = false
+            dateFrom = ""; dateTo = ""; reason = ""; imageUrl = ""
+        }
+    }
+
+    SectionHeader(
+        title = "My leave",
+        trailing = {
+            Text(
+                if (formOpen) "Close" else "Apply",
+                style = VTheme.type.label.colored(c.accent),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) {
+                        formOpen = !formOpen
+                        if (!formOpen) onClearApply()
+                    }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+        },
+    )
+
+    // ── Inline apply form (no bottom-sheet component exists — use an expandable card) ──
+    AnimatedVisibility(visible = formOpen) {
+        VCard(padding = 16.dp) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                VDatePicker(
+                    value = dateFrom,
+                    onValueChange = { dateFrom = it; onClearApply() },
+                    label = "From",
+                    placeholder = "Start date",
+                )
+                VDatePicker(
+                    value = dateTo,
+                    onValueChange = { dateTo = it; onClearApply() },
+                    label = "To",
+                    placeholder = "End date",
+                    isError = dateFrom.isNotBlank() && dateTo.isNotBlank() && dateTo < dateFrom,
+                )
+                VInput(
+                    value = reason,
+                    onValueChange = { reason = it; onClearApply() },
+                    label = "Reason",
+                    placeholder = "Why are you taking leave?",
+                    singleLine = false,
+                    leadingIcon = VIcons.FileText,
+                )
+                VInput(
+                    value = imageUrl,
+                    onValueChange = { imageUrl = it; onClearApply() },
+                    label = "Attachment URL (optional)",
+                    placeholder = "https://…",
+                    leadingIcon = VIcons.Upload,
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri,
+                )
+
+                if (applyResult is ActionResult.Failure) {
+                    Text(applyResult.message, style = VTheme.type.caption.colored(c.dangerInk))
+                }
+
+                VButton(
+                    text = "Submit request",
+                    onClick = { onApply(dateFrom, dateTo, reason, imageUrl.ifBlank { null }) },
+                    variant = VButtonVariant.Primary,
+                    full = true,
+                    loading = applyResult is ActionResult.InFlight,
+                    enabled = applyResult !is ActionResult.InFlight,
+                )
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+
+    // ── Status list ───────────────────────────────────────────────────────────
+    VCard(padding = 16.dp) {
+        VStateHost(
+            loading = leave.isLoading && leave.requests.isEmpty(),
+            error = leave.error.takeIf { leave.requests.isEmpty() },
+            isEmpty = leave.requests.isEmpty(),
+            emptyTitle = "No leave requests",
+            emptyBody = "When you apply for leave it'll show up here with its status.",
+            emptyIcon = VIcons.Calendar,
+            onRetry = onRetry,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                leave.requests.forEachIndexed { index, req ->
+                    if (index > 0) VDivider()
+                    LeaveRequestRow(req)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LeaveRequestRow(req: TeacherSelfLeaveDto) {
+    val c = VTheme.colors
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                if (req.dateFrom == req.dateTo) req.dateFrom else "${req.dateFrom} → ${req.dateTo}",
+                style = VTheme.type.bodyStrong.colored(c.ink),
+            )
+            if (req.reason.isNotBlank()) {
+                Text(req.reason, style = VTheme.type.caption.colored(c.ink3))
+            }
+        }
+        LeaveStatusPill(req.status)
+    }
+}
+
+/** Status pill — colour AND text (never colour-alone, for accessibility). */
+@Composable
+private fun LeaveStatusPill(status: String) {
+    val tone = when (status.uppercase()) {
+        "APPROVED", "ACCEPTED" -> VBadgeTone.Success
+        "REJECTED", "DENIED" -> VBadgeTone.Danger
+        "PENDING" -> VBadgeTone.Warning
+        else -> VBadgeTone.Neutral
+    }
+    val label = when (status.uppercase()) {
+        "APPROVED", "ACCEPTED" -> "Approved"
+        "REJECTED", "DENIED" -> "Rejected"
+        "PENDING" -> "Pending"
+        else -> status.lowercase().replaceFirstChar { it.uppercase() }
+    }
+    VBadge(text = label, tone = tone)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. Settings — REAL change-password (inline form → AuthRepository / RA-54), theme
+//    switch (Warm / Light / Night → global pref the portal reads), the leave inbox
+//    shortcut, and a confirmed logout.
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun ProfileSettingsSection(
+    phone: String,
+    email: String,
+    themeName: String,
+    passwordResult: ActionResult,
+    onChangePassword: (String?, String, String) -> Unit,
+    onClearPassword: () -> Unit,
+    onSetTheme: (String) -> Unit,
+    onOpenLeaveInbox: () -> Unit,
+    onLogout: () -> Unit,
+) {
+    val c = VTheme.colors
+
+    SectionHeader("Settings")
+    VCard(padding = 16.dp) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            // Contact (read-only) — honest display of what the school has on file.
+            if (email.isNotBlank()) {
+                ContactRow(icon = VIcons.Mail, label = "Email", value = email)
+            }
+            if (phone.isNotBlank()) {
+                ContactRow(icon = VIcons.Phone, label = "Phone", value = phone)
+            }
+            if (email.isNotBlank() || phone.isNotBlank()) VDivider()
+
+            // Theme switch — REAL global preference (the portal reads this).
+            Text("Appearance", style = VTheme.type.labelStrong.colored(c.ink2))
+            ThemeSegmentedControl(themeName = themeName, onSetTheme = onSetTheme)
+
+            VDivider()
+
+            // Change password — REAL (RA-54).
+            ChangePasswordForm(
+                passwordResult = passwordResult,
+                onChangePassword = onChangePassword,
+                onClearPassword = onClearPassword,
+            )
+
+            VDivider()
+
+            // Leave inbox shortcut (approve students' leave — the teacher's inbox tab).
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onOpenLeaveInbox() }
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(VIcons.ClipboardList, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(20.dp))
+                Text("Leave inbox", style = VTheme.type.body.colored(c.ink), modifier = Modifier.weight(1f))
+                Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
+            }
+
+            VDivider()
+
+            VButton(
+                text = "Log out",
+                onClick = onLogout,
+                variant = VButtonVariant.Destructive,
+                full = true,
+                soft = true,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ContactRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String) {
+    val c = VTheme.colors
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Icon(icon, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
+        Column(Modifier.weight(1f)) {
+            Text(label, style = VTheme.type.caption.colored(c.ink3))
+            Text(value, style = VTheme.type.body.colored(c.ink))
+        }
+    }
+}
+
+/** Warm / Light / Night segmented control writing the global theme pref. */
+@Composable
+private fun ThemeSegmentedControl(themeName: String, onSetTheme: (String) -> Unit) {
+    val c = VTheme.colors
+    val options = listOf("WARM" to "Warm", "LIGHT" to "Light", "NIGHT" to "Night")
+    val selected = themeName.uppercase()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(c.cream)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        options.forEach { (key, label) ->
+            val active = selected == key
+            Box(
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(if (active) c.accent else Color.Transparent)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { if (!active) onSetTheme(key) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    style = VTheme.type.bodyStrong.colored(if (active) Color.White else c.ink2),
+                )
+            }
+        }
+    }
+}
+
+/** Inline change-password form → AuthRepository.changePassword (RA-54). */
+@Composable
+private fun ChangePasswordForm(
+    passwordResult: ActionResult,
+    onChangePassword: (String?, String, String) -> Unit,
+    onClearPassword: () -> Unit,
+) {
+    val c = VTheme.colors
+    var open by remember { mutableStateOf(false) }
+    var oldPw by remember { mutableStateOf("") }
+    var newPw by remember { mutableStateOf("") }
+    var confirmPw by remember { mutableStateOf("") }
+    var reveal by remember { mutableStateOf(false) }
+
+    // On success, collapse + reset, then clear the transient result.
+    LaunchedEffect(passwordResult) {
+        if (passwordResult is ActionResult.Success) {
+            open = false
+            oldPw = ""; newPw = ""; confirmPw = ""
+        }
+    }
+
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable {
+                open = !open
+                if (!open) onClearPassword()
+            }
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(VIcons.Lock, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(20.dp))
+        Text("Change password", style = VTheme.type.body.colored(c.ink), modifier = Modifier.weight(1f))
+        Icon(
+            if (open) VIcons.ChevronUp else VIcons.ChevronDown,
+            contentDescription = null,
+            tint = c.ink3,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+
+    AnimatedVisibility(visible = open) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 4.dp)) {
+            VInput(
+                value = oldPw,
+                onValueChange = { oldPw = it; onClearPassword() },
+                label = "Current password",
+                placeholder = "Current password",
+                isPassword = true,
+                passwordVisible = reveal,
+                leadingIcon = VIcons.Lock,
+            )
+            VInput(
+                value = newPw,
+                onValueChange = { newPw = it; onClearPassword() },
+                label = "New password",
+                placeholder = "At least 8 characters",
+                isPassword = true,
+                passwordVisible = reveal,
+                leadingIcon = VIcons.ShieldCheck,
+                trailing = {
+                    Icon(
+                        VIcons.Eye,
+                        contentDescription = if (reveal) "Hide passwords" else "Show passwords",
+                        tint = c.ink3,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) { reveal = !reveal },
+                    )
+                },
+            )
+            VInput(
+                value = confirmPw,
+                onValueChange = { confirmPw = it; onClearPassword() },
+                label = "Confirm new password",
+                placeholder = "Re-enter new password",
+                isPassword = true,
+                passwordVisible = reveal,
+                leadingIcon = VIcons.ShieldCheck,
+            )
+            if (confirmPw.isNotBlank() && confirmPw != newPw) {
+                Text("Passwords don't match", style = VTheme.type.caption.colored(c.dangerInk))
+            }
+
+            when (passwordResult) {
+                is ActionResult.Failure -> Text(passwordResult.message, style = VTheme.type.caption.colored(c.dangerInk))
+                is ActionResult.Success -> Text(passwordResult.message, style = VTheme.type.caption.colored(c.successInk))
+                else -> Unit
+            }
+
+            VButton(
+                text = "Update password",
+                onClick = { onChangePassword(oldPw.ifBlank { null }, newPw, confirmPw) },
+                variant = VButtonVariant.Primary,
+                full = true,
+                loading = passwordResult is ActionResult.InFlight,
+                enabled = passwordResult !is ActionResult.InFlight,
+            )
+        }
+    }
+}
+
+/** ISO weekday (1=Mon … 7=Sun) → display name. */
+private fun weekdayName(weekday: Int): String = when (weekday) {
+    1 -> "Monday"; 2 -> "Tuesday"; 3 -> "Wednesday"; 4 -> "Thursday"
+    5 -> "Friday"; 6 -> "Saturday"; 7 -> "Sunday"; else -> "—"
 }

@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
 import com.littlebridge.vidyaprayag.feature.parent.presentation.NotificationsViewModel
 import com.littlebridge.vidyaprayag.feature.teacher.domain.model.ObligationItemDto
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.ResolvedPeriodUi
@@ -42,6 +44,7 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.VPortalTone
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 import com.littlebridge.vidyaprayag.util.nowMinutesOfDay
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays the teacher portal can push above its tab content. */
@@ -80,10 +83,20 @@ fun TeacherPortalV2(
     obligationsViewModel: TeacherObligationsViewModel = koinViewModel(),
     notificationsViewModel: NotificationsViewModel = koinViewModel(),
     todayViewModel: TeacherTodayViewModel = koinViewModel(),
+    preferenceRepository: PreferenceRepository = koinInject(),
 ) {
-    // UI_FIDELITY_AUDIT §0.5 — the teacher portal is WARM-LIGHT (lavender bg, dark ink,
-    // white cards), never Night.
-    VTheme(tone = VPortalTone.Warm) {
+    // T-602b: the portal tone is now driven by the teacher's saved theme preference
+    // (the Profile → Settings → Appearance switch writes it). It DEFAULTS to Warm —
+    // the teacher portal's canonical look (UI_FIDELITY_AUDIT §0.5: lavender bg, dark
+    // ink, white cards) — so behaviour is unchanged until the teacher opts into
+    // Light or Night. The pref is global; reading it here keeps the switch honest.
+    val themeName by preferenceRepository.getThemeName().collectAsState(initial = "WARM")
+    val tone = when (themeName.uppercase()) {
+        "LIGHT" -> VPortalTone.Light
+        "NIGHT" -> VPortalTone.Night
+        else -> VPortalTone.Warm
+    }
+    VTheme(tone = tone) {
         var tab by remember { mutableStateOf("today") }
         var updateSub by remember { mutableStateOf("Attendance") }
         var overlay by remember { mutableStateOf(TeacherOverlay.None) }

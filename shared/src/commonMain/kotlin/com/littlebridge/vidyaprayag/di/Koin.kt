@@ -446,6 +446,9 @@ val viewModelModule = module {
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherSyllabusViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherHomeworkViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherProfileViewModel(get(), get()) }
+    // T-602b: the actionable Profile VM (own-leave list/apply, password change via
+    // AuthRepository, theme pref) — (TeacherRepository, PreferenceRepository, AuthRepository).
+    factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherProfileActionsViewModel(get(), get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherLeaveViewModel(get(), get()) }
 }
 
