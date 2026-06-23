@@ -766,6 +766,25 @@ object MessagesTable : UUIDTable("messages", "id") {
  *
  * Spec ref: school_api_spec.artifact.md §Module: Results
  */
+/**
+ * LEGACY, school-admin string-scored marks model. T-301 / X-6 / D-ASMT-1
+ * designate [AssessmentsTable] + [AssessmentMarksTable] as the SINGLE
+ * canonical marks model; this parallel table is DEPRECATED as a source of
+ * truth.
+ *
+ * It is NOT dropped: 5 school-admin routing files (ResultsRouting,
+ * SchoolAnalyticsRouting, SchoolStudentsRouting, AdminDashboard*Routing) still
+ * read it (78 references). Per the constitution's "schema migrations are
+ * non-destructive; don't break out-of-scope readers" rule (same pattern as the
+ * T-201 attendance `grade`/`person_id` retention), migration_015 MIRRORS the
+ * numeric-scored exam_results rows into `assessments`/`assessment_marks`
+ * (idempotently, marked `type='exam'`, `created_by=NULL`) so the teacher
+ * Gradebook history (T-304/T-306) is complete, while leaving exam_results
+ * itself intact for the admin side. The admin readers will migrate onto the
+ * canonical model in a future admin-portal pass; until then exam_results is
+ * read-only legacy.
+ */
+@Deprecated("T-301 / X-6: superseded by AssessmentsTable + AssessmentMarksTable (the single canonical marks model). Retained read-only for the 5 school-admin readers; migration_015 mirrors numeric rows into assessments. Do NOT write new teacher marks here.")
 object ExamResultsTable : UUIDTable("exam_results", "id") {
     val schoolId   = uuid("school_id")
     val test       = text("test")
@@ -825,6 +844,34 @@ object AssessmentsTable : UUIDTable("assessments", "id") {
     val publishedAt = timestamp("published_at").nullable()
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
+
+    // ---------------------------------------------------------------------
+    // T-301 (Doc 07 §1.3) — canonical, typed, scope-bound assessment model.
+    // These columns make `assessments` the SINGLE marks model (closes X-6,
+    // D-ASMT-1..6). All nullable/defaulted so the migration (migration_015)
+    // is non-destructive and the legacy columns above remain valid readers
+    // (ParentAcademicsRouting, the legacy teacher /marks handler) until those
+    // readers are repointed (T-303 / parent rebuild). Same additive pattern
+    // as the T-201 attendance migration.
+    // ---------------------------------------------------------------------
+    val academicYearId  = uuid("academic_year_id").nullable()   // FK academic_years.id
+    // X-1/D-ASMT-6: provable scope binding instead of free-text class/section/subject.
+    val assignmentId    = uuid("assignment_id").nullable()      // FK teacher_subject_assignments.id
+    val classId         = uuid("class_id").nullable()           // FK school_classes.id (canonical scope)
+    val subjectId       = uuid("subject_id").nullable()         // FK school_subjects.id
+    // D-ASMT-4: assessment type — scheduled|surprise|assignment|project|exam.
+    val type            = varchar("type", 16).default("scheduled")
+    // D-ASMT-4: pass mark (nullable; 0 <= pass_marks <= max_marks enforced by CHECK).
+    val passMarks       = integer("pass_marks").nullable()
+    // D-ASMT-5: calendar tie (an assessment can surface on the school calendar).
+    val calendarEventId = uuid("calendar_event_id").nullable()  // FK calendar_events.id
+    // The publish-discipline state machine (Doc 07 §2 / the B-MK-1 fix lives in T-303):
+    //   draft → scheduled → marks_pending → published → archived.
+    // `isPublished`/`publishedAt` above remain the legacy parent-visibility gate
+    // until parent reads move onto `status='published'`; the migration keeps the
+    // two in sync (status='published' ⇔ is_published=true).
+    val status          = varchar("status", 16).default("draft")
+    val createdBy       = uuid("created_by").nullable()         // FK app_users.id (author audit)
 }
 
 /**
@@ -834,12 +881,32 @@ object AssessmentsTable : UUIDTable("assessments", "id") {
  */
 object AssessmentMarksTable : UUIDTable("assessment_marks", "id") {
     val assessmentId = uuid("assessment_id")             // FK assessments.id
-    val studentId    = text("student_id")                // students.student_code
+    @Deprecated("T-301 / D-ASMT-3: identity moves to studentRef (FK students.id). " +
+        "This student_code text column is retained for the legacy /marks reader + " +
+        "ParentAcademicsRouting until they are repointed (T-303 / parent rebuild).")
+    val studentId    = text("student_id")                // students.student_code (legacy identity)
+    @Deprecated("T-301 / X-4: name is joined from students for display, not stored as truth. " +
+        "Retained nullable until legacy readers stop selecting it.")
     val studentName  = text("student_name")
     val marks        = double("marks").nullable()        // null = not yet entered
     val enteredBy    = uuid("entered_by").nullable()     // FK app_users.id (teacher)
     val createdAt    = timestamp("created_at")
     val updatedAt    = timestamp("updated_at")
+
+    // ---------------------------------------------------------------------
+    // T-301 (Doc 07 §1.3) — typed per-student score.
+    //   • studentRef : FK students.id (D-ASMT-3) — the canonical WHO; the
+    //     student_code text above is kept only for legacy readers.
+    //   • isAbsent   : "AB" distinct from a real 0 (Doc 07 §1.3).
+    //   • remark     : optional per-student note.
+    //   • enteredAt  : when the score was last entered/edited (audit).
+    // Backfilled best-effort from student_code; nullable so the ADD is
+    // non-destructive.
+    // ---------------------------------------------------------------------
+    val studentRef   = uuid("student_ref").nullable()    // FK students.id (typed identity, D-ASMT-3)
+    val isAbsent     = bool("is_absent").default(false)  // AB ≠ 0
+    val remark       = text("remark").nullable()
+    val enteredAt    = timestamp("entered_at").nullable()
     init {
         uniqueIndex("ux_assessment_marks_unique", assessmentId, studentId)
     }
