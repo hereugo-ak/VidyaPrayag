@@ -42,22 +42,28 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentDto
 import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentStatus
+import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentTrendPointDto
 import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentType
+import com.littlebridge.vidyaprayag.feature.teacher.domain.model.MarkBucketDto
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.GradebookMode
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.GradebookStudentMark
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherGradebookState
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherGradebookViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
+import com.littlebridge.vidyaprayag.ui.v2.components.VBars
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
+import com.littlebridge.vidyaprayag.ui.v2.components.VChartDatum
 import com.littlebridge.vidyaprayag.ui.v2.components.VConfirmDialog
 import com.littlebridge.vidyaprayag.ui.v2.components.VDatePicker
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VInput
 import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
+import com.littlebridge.vidyaprayag.ui.v2.components.VLegendDot
+import com.littlebridge.vidyaprayag.ui.v2.components.VSparkline
 import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
@@ -112,6 +118,7 @@ fun TeacherGradebookScreenV2(
             onSetDate = viewModel::setCreateExamDate,
             onCreate = viewModel::createAssessment,
             onOpenMarks = viewModel::openMarks,
+            onOpenHistory = viewModel::openHistory,
             onRetry = viewModel::retryList,
             modifier = modifier,
         )
@@ -124,6 +131,14 @@ fun TeacherGradebookScreenV2(
             onPublish = viewModel::publish,
             onUnpublish = viewModel::unpublish,
             onRetry = viewModel::retryMarks,
+            modifier = modifier,
+        )
+        GradebookMode.History -> GradebookHistoryContent(
+            state = state,
+            scopeHint = scopeHint,
+            onBack = viewModel::backFromHistory,
+            onToggleCompare = viewModel::toggleCompare,
+            onRetry = viewModel::retryHistory,
             modifier = modifier,
         )
     }
@@ -145,11 +160,14 @@ private fun GradebookListContent(
     onSetDate: (String) -> Unit,
     onCreate: () -> Unit,
     onOpenMarks: (AssessmentDto) -> Unit,
+    onOpenHistory: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
     var showCreate by remember { mutableStateOf(false) }
+    // "View trends" is only meaningful once at least one assessment is published.
+    val hasPublished = state.assessments.any { it.isPublished }
     val headerScope = state.assessments.firstOrNull()
         ?.let { listOfNotNull(it.className.takeIf { n -> n.isNotBlank() }, it.subject.takeIf { s -> s.isNotBlank() }).joinToString(" · ") }
         ?.takeIf { it.isNotBlank() }
@@ -197,6 +215,20 @@ private fun GradebookListContent(
                         onSetPass = onSetPass,
                         onSetDate = onSetDate,
                         onCreate = onCreate,
+                    )
+                }
+
+                // Trends entry — surfaced once something is published (B-MK-7, Doc 07 §6).
+                if (hasPublished && !showCreate) {
+                    VButton(
+                        text = "View trends",
+                        onClick = onOpenHistory,
+                        full = true,
+                        variant = VButtonVariant.Secondary,
+                        tone = VButtonTone.Lavender,
+                        leading = {
+                            Icon(VIcons.TrendingUp, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(18.dp))
+                        },
                     )
                 }
 
@@ -657,6 +689,322 @@ private fun MarksFooter(
                     loading = state.isPublishing,
                     enabled = !state.isPublishing && state.canPublish,
                     leading = { Icon(VIcons.Send, contentDescription = null, tint = c.card, modifier = Modifier.size(18.dp)) },
+                )
+            }
+        }
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  HISTORY MODE — T-306 (Doc 07 §6): timeline · distribution · compare two
+// ═════════════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun GradebookHistoryContent(
+    state: TeacherGradebookState,
+    scopeHint: String,
+    onBack: () -> Unit,
+    onToggleCompare: (String) -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+    val h = state.history
+    val headerScope = listOfNotNull(
+        h?.className?.takeIf { it.isNotBlank() },
+        h?.subject?.takeIf { it.isNotBlank() },
+    ).joinToString(" · ").ifBlank { scopeHint.ifBlank { "Trends" } }
+
+    Column(modifier.fillMaxSize().padding(horizontal = 20.dp).padding(top = 12.dp)) {
+
+        // Back + scope guard header.
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(
+                Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(c.ink.copy(alpha = 0.06f)).clickable(onClick = onBack),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(VIcons.ArrowLeft, contentDescription = "Back to assessments", tint = c.ink, modifier = Modifier.size(18.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text("Trends", style = VTheme.type.h3.colored(c.ink).copy(fontWeight = FontWeight.ExtraBold))
+                Text(headerScope, style = VTheme.type.caption.colored(c.ink2))
+            }
+            Icon(VIcons.TrendingUp, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(20.dp))
+        }
+        Spacer(Modifier.height(12.dp))
+
+        VStateHost(
+            loading = state.isHistoryLoading,
+            error = state.historyError,
+            isEmpty = !state.hasHistory,
+            emptyTitle = "Not enough data yet",
+            emptyBody = "Publish a couple of assessments to see class trends, the score distribution, and side-by-side comparisons here.",
+            emptyIcon = VIcons.TrendingUp,
+            onRetry = onRetry,
+        ) {
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                // 1) Class-average timeline (the trend line over published assessments).
+                item { TimelineCard(timeline = state.timeline) }
+
+                // 2) Distribution histogram of the most-recent published assessment.
+                if (state.history?.distribution?.isNotEmpty() == true) {
+                    item { DistributionCard(buckets = state.history!!.distribution, title = state.timeline.lastOrNull()?.name) }
+                }
+
+                // 3) Compare two assessments side-by-side (Doc 07 §6).
+                if (state.timeline.size >= 2) {
+                    item {
+                        CompareCard(
+                            timeline = state.timeline,
+                            leftId = state.compareLeftId,
+                            rightId = state.compareRightId,
+                            left = state.compareLeft,
+                            right = state.compareRight,
+                            onToggle = onToggleCompare,
+                        )
+                    }
+                }
+
+                item { Spacer(Modifier.height(120.dp)) } // clear the dock
+            }
+        }
+    }
+}
+
+/** Class average per published assessment, oldest→newest — sparkline + per-point rows. */
+@Composable
+private fun TimelineCard(timeline: List<AssessmentTrendPointDto>) {
+    val c = VTheme.colors
+    // Normalize each average to a percentage so the sparkline is comparable across
+    // assessments with different max marks (the server keeps raw averages per point).
+    val pcts = timeline.map { p ->
+        val avg = p.average ?: 0f
+        val mx = p.maxMarks.takeIf { it > 0 } ?: 100
+        (avg / mx * 100f).coerceIn(0f, 100f)
+    }
+    val latestPct = pcts.lastOrNull()
+    val firstPct = pcts.firstOrNull()
+    val delta = if (latestPct != null && firstPct != null) latestPct - firstPct else null
+
+    VCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.weight(1f)) {
+                    VLabel("Class average over time")
+                    Text(
+                        "${timeline.size} published assessment${if (timeline.size == 1) "" else "s"}",
+                        style = VTheme.type.caption.colored(c.ink3),
+                    )
+                }
+                latestPct?.let {
+                    Text(
+                        "${it.roundToInt()}%",
+                        style = VTheme.type.dataLg.colored(c.tealDeep).copy(fontWeight = FontWeight.Bold),
+                    )
+                }
+            }
+
+            if (pcts.size >= 2) {
+                // VSparkline sizes its own canvas to width×height; wrap so it stretches.
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    VSparkline(values = pcts, width = 320.dp, height = 56.dp, color = c.tealDeep)
+                }
+            }
+
+            delta?.let { d ->
+                val (ink, word) = when {
+                    d > 1f -> c.successInk to "up ${d.roundToInt()} pts since the first"
+                    d < -1f -> c.dangerInk to "down ${(-d).roundToInt()} pts since the first"
+                    else -> c.ink3 to "broadly flat across the term"
+                }
+                Text("Class average is $word.", style = VTheme.type.caption.colored(ink))
+            }
+
+            // Per-point rows (DM Mono averages, pass-rate where a pass line exists).
+            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                timeline.forEachIndexed { i, p ->
+                    if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))
+                    TimelinePointRow(p)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TimelinePointRow(p: AssessmentTrendPointDto) {
+    val c = VTheme.colors
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(p.name, style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 15.sp))
+            Text(
+                listOfNotNull(
+                    p.examDate?.let { prettyGbStamp(it) },
+                    "${p.enteredCount}/${p.rosterCount} entered",
+                ).joinToString(" · "),
+                style = VTheme.type.caption.colored(c.ink3),
+            )
+        }
+        p.passRate?.let { pr ->
+            val pct = (pr * 100f).roundToInt()
+            val ink = if (pr >= 0.6f) c.successInk else c.dangerInk
+            Text("$pct% pass", style = VTheme.type.dataSm.colored(ink).copy(fontSize = 12.sp))
+        }
+        Text(
+            p.average?.let { "${it.roundToInt()}/${p.maxMarks}" } ?: "—",
+            style = VTheme.type.data.colored(c.ink).copy(fontWeight = FontWeight.Bold),
+        )
+    }
+}
+
+/** Score distribution histogram of one (the most recent) published assessment. */
+@Composable
+private fun DistributionCard(
+    buckets: List<MarkBucketDto>,
+    title: String?,
+) {
+    val c = VTheme.colors
+    val data = buckets.map { VChartDatum(label = it.label.replace("%", ""), value = it.count.toFloat()) }
+    val total = buckets.sumOf { it.count }
+    VCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            VLabel("Score distribution")
+            Text(
+                title?.let { "$it · $total student${if (total == 1) "" else "s"}" }
+                    ?: "$total student${if (total == 1) "" else "s"}",
+                style = VTheme.type.caption.colored(c.ink3),
+            )
+            if (total == 0) {
+                Text("No marks entered for this assessment.", style = VTheme.type.caption.colored(c.ink3))
+            } else {
+                VBars(data = data, modifier = Modifier.fillMaxWidth(), height = 140.dp)
+                Text(
+                    "Bands are % of max marks. The tallest band shows where most of the class landed.",
+                    style = VTheme.type.caption.colored(c.ink3),
+                )
+            }
+        }
+    }
+}
+
+/** Compare any two assessments from the timeline, side-by-side (who improved / dropped). */
+@Composable
+private fun CompareCard(
+    timeline: List<AssessmentTrendPointDto>,
+    leftId: String?,
+    rightId: String?,
+    left: AssessmentTrendPointDto?,
+    right: AssessmentTrendPointDto?,
+    onToggle: (String) -> Unit,
+) {
+    val c = VTheme.colors
+    VCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            VLabel("Compare two assessments")
+            Text(
+                "Tap two assessments to compare their class averages and pass rates.",
+                style = VTheme.type.caption.colored(c.ink3),
+            )
+
+            // Selectable chips, one per timeline point.
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                timeline.forEach { p ->
+                    val sel = p.assessmentId == leftId || p.assessmentId == rightId
+                    CompareChip(label = p.name, selected = sel) { onToggle(p.assessmentId) }
+                }
+            }
+
+            if (left != null && right != null) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CompareColumn(point = left, modifier = Modifier.weight(1f))
+                    CompareColumn(point = right, modifier = Modifier.weight(1f))
+                }
+                // The honest verdict — normalize both to % so different maxes compare fairly.
+                val lp = left.average?.let { it / (left.maxMarks.takeIf { m -> m > 0 } ?: 100) * 100f }
+                val rp = right.average?.let { it / (right.maxMarks.takeIf { m -> m > 0 } ?: 100) * 100f }
+                if (lp != null && rp != null) {
+                    val d = rp - lp
+                    val (ink, word) = when {
+                        d > 1f -> c.successInk to "Class improved by ${d.roundToInt()} pts (% of max)."
+                        d < -1f -> c.dangerInk to "Class dropped by ${(-d).roundToInt()} pts (% of max)."
+                        else -> c.ink2 to "Class performance held steady."
+                    }
+                    Box(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                            .background(ink.copy(alpha = 0.10f)).padding(horizontal = 12.dp, vertical = 10.dp),
+                    ) {
+                        Text(word, style = VTheme.type.bodyStrong.colored(ink).copy(fontSize = 14.sp))
+                    }
+                }
+            } else {
+                Text(
+                    "Pick two to see the comparison.",
+                    style = VTheme.type.caption.colored(c.ink3),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompareChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    val c = VTheme.colors
+    Box(
+        Modifier
+            .heightIn(min = 40.dp)
+            .clip(RoundedCornerShape(999.dp))
+            .background(if (selected) c.accentDeep else c.cream)
+            .border(1.dp, if (selected) c.accentDeep else c.border2, RoundedCornerShape(999.dp))
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = if (selected) "$label, selected for comparison" else "Select $label to compare" }
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            style = VTheme.type.label.colored(if (selected) c.card else c.ink2)
+                .copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
+        )
+    }
+}
+
+@Composable
+private fun CompareColumn(point: AssessmentTrendPointDto, modifier: Modifier = Modifier) {
+    val c = VTheme.colors
+    Box(
+        modifier.clip(RoundedCornerShape(12.dp)).background(c.accentTint).padding(14.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                point.name,
+                style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 14.sp),
+                maxLines = 2,
+            )
+            point.examDate?.let {
+                Text(prettyGbStamp(it), style = VTheme.type.caption.colored(c.ink3))
+            }
+            Spacer(Modifier.height(2.dp))
+            Text(
+                point.average?.let { "${it.roundToInt()}/${point.maxMarks}" } ?: "—",
+                style = VTheme.type.dataLg.colored(c.tealDeep).copy(fontWeight = FontWeight.Bold),
+            )
+            Text("class average", style = VTheme.type.caption.colored(c.ink3))
+            point.passRate?.let { pr ->
+                val pct = (pr * 100f).roundToInt()
+                VLegendDot(
+                    color = if (pr >= 0.6f) c.success else c.danger,
+                    label = "pass rate",
+                    value = "$pct%",
                 )
             }
         }

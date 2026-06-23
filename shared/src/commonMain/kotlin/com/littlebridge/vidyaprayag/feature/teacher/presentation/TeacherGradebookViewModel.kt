@@ -5,7 +5,9 @@ import androidx.lifecycle.viewModelScope
 import com.littlebridge.vidyaprayag.core.network.NetworkResult
 import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
 import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentDto
+import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentHistoryDto
 import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentStatus
+import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentTrendPointDto
 import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentType
 import com.littlebridge.vidyaprayag.feature.teacher.domain.model.CreateAssessmentRequestV2
 import com.littlebridge.vidyaprayag.feature.teacher.domain.model.MarkSaveEntryDto
@@ -41,7 +43,7 @@ import kotlinx.coroutines.launch
  */
 
 /** Which face of the gradebook the screen shows. */
-enum class GradebookMode { List, Marks }
+enum class GradebookMode { List, Marks, History }
 
 /** One editable student row in the marks grid. `marks` is the live local edit. */
 data class GradebookStudentMark(
@@ -86,6 +88,18 @@ data class TeacherGradebookState(
     val isPublishing: Boolean = false,
     val publishError: String? = null,
     val parentsNotified: Int? = null,      // set after a confirmed publish
+
+    // ── History mode (T-306, Doc 07 §6) ───────────────────────────────────────
+    // Server-aggregated trends; everything here is computed server-side (no client
+    // N+1). `history.timeline` is the class-average-per-published-assessment line;
+    // `history.distribution` is the most-recent published assessment's histogram.
+    val history: AssessmentHistoryDto? = null,
+    val isHistoryLoading: Boolean = false,
+    val historyError: String? = null,
+    // Compare-two selection (Doc 07 §6): two assessment ids picked from the timeline.
+    // Both null → no comparison shown; the screen invites the teacher to pick two.
+    val compareLeftId: String? = null,
+    val compareRightId: String? = null,
 ) {
     val enteredCount: Int get() = students.count { it.marks != null || it.isAbsent }
     val rosterCount: Int get() = students.size
@@ -100,6 +114,18 @@ data class TeacherGradebookState(
     val isPublished: Boolean get() = activeAssessment?.isPublished == true
     /** Can publish once at least one student has a mark/AB recorded. */
     val canPublish: Boolean get() = enteredCount > 0 && !isPublished
+
+    // ── History helpers ──────────────────────────────────────────────────────
+    /** The published-assessment timeline (oldest→newest), empty when none yet. */
+    val timeline: List<AssessmentTrendPointDto> get() = history?.timeline.orEmpty()
+    /** TRUE only when the load succeeded AND there is at least one published point. */
+    val hasHistory: Boolean get() = history?.hasData == true
+    /** The resolved left/right comparison points (null until both are chosen). */
+    val compareLeft: AssessmentTrendPointDto?
+        get() = compareLeftId?.let { id -> timeline.firstOrNull { it.assessmentId == id } }
+    val compareRight: AssessmentTrendPointDto?
+        get() = compareRightId?.let { id -> timeline.firstOrNull { it.assessmentId == id } }
+    val canCompare: Boolean get() = compareLeft != null && compareRight != null
 }
 
 class TeacherGradebookViewModel(
@@ -434,6 +460,92 @@ class TeacherGradebookViewModel(
                     _state.update { it.copy(isPublishing = false, publishError = r.message) }
                 is NetworkResult.ConnectionError ->
                     _state.update { it.copy(isPublishing = false, publishError = "Connection error") }
+            }
+        }
+    }
+
+    // ── History mode (T-306, Doc 07 §6) ───────────────────────────────────────
+
+    /**
+     * Open the history/trends view for the current assignment and load its
+     * server-aggregated timeline + distribution. Stays on the same assignment scope
+     * as the list (no re-pick). The compare selection is reset on every open.
+     */
+    fun openHistory() {
+        if (_state.value.assignmentId.isBlank()) return
+        _state.update {
+            it.copy(
+                mode = GradebookMode.History,
+                compareLeftId = null,
+                compareRightId = null,
+            )
+        }
+        loadHistory()
+    }
+
+    private fun loadHistory() {
+        val asg = _state.value.assignmentId
+        if (asg.isBlank()) return
+        viewModelScope.launch {
+            _state.update { it.copy(isHistoryLoading = true, historyError = null) }
+            val t = token() ?: run {
+                _state.update { it.copy(isHistoryLoading = false, historyError = "Not authenticated") }
+                return@launch
+            }
+            when (val r = repository.getAssessmentHistory(t, asg)) {
+                is NetworkResult.Success -> {
+                    val d = r.data.data
+                    // Default the comparison to the two most recent published points so the
+                    // teacher sees a useful side-by-side immediately (still freely re-pickable).
+                    val recent = d.timeline.takeLast(2)
+                    _state.update {
+                        it.copy(
+                            isHistoryLoading = false,
+                            history = d,
+                            compareLeftId = recent.getOrNull(0)?.assessmentId,
+                            compareRightId = recent.getOrNull(1)?.assessmentId,
+                        )
+                    }
+                }
+                is NetworkResult.Error ->
+                    _state.update { it.copy(isHistoryLoading = false, historyError = r.message) }
+                is NetworkResult.ConnectionError ->
+                    _state.update { it.copy(isHistoryLoading = false, historyError = "Connection error") }
+            }
+        }
+    }
+
+    fun retryHistory() = loadHistory()
+
+    /** Back from history to the scoped assessment list. */
+    fun backFromHistory() {
+        _state.update { it.copy(mode = GradebookMode.List) }
+    }
+
+    /**
+     * Pick a timeline point for comparison. Tapping cycles the two slots:
+     * if not yet selected and a slot is free → fill it; if already one of the two →
+     * deselect it. Keeps left "older" than right by exam-date order when both set.
+     */
+    fun toggleCompare(assessmentId: String) {
+        _state.update { s ->
+            when (assessmentId) {
+                s.compareLeftId -> s.copy(compareLeftId = null)
+                s.compareRightId -> s.copy(compareRightId = null)
+                else -> when {
+                    s.compareLeftId == null -> s.copy(compareLeftId = assessmentId)
+                    s.compareRightId == null -> s.copy(compareRightId = assessmentId)
+                    // Both full → replace the right (most-recently chosen) slot.
+                    else -> s.copy(compareRightId = assessmentId)
+                }.let { next ->
+                    // Order the pair oldest→newest by timeline position for a stable read.
+                    val ids = next.timeline.map { it.assessmentId }
+                    val l = next.compareLeftId
+                    val r = next.compareRightId
+                    if (l != null && r != null && ids.indexOf(l) > ids.indexOf(r)) {
+                        next.copy(compareLeftId = r, compareRightId = l)
+                    } else next
+                }
             }
         }
     }
