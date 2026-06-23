@@ -65,6 +65,7 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
+import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -170,7 +171,8 @@ private fun approvedLeaveStudentIds(schoolId: UUID, date: LocalDate): Set<UUID> 
 
     // STEP 2 — children.id -> children.student_code (drop rows without a linked code).
     val studentCodes: Set<String> = ChildrenTable.selectAll().where {
-        ChildrenTable.id inList childIds.toList()
+        // Exposed 0.50: id column is EntityID<UUID>; wrap raw UUIDs.
+        ChildrenTable.id inList childIds.map { EntityID(it, ChildrenTable) }
     }.mapNotNull { it[ChildrenTable.studentCode]?.takeIf { code -> code.isNotBlank() } }
         .toSet()
 
@@ -247,7 +249,7 @@ fun Route.teacherAttendanceRouting() {
                     val students = roster.map { s ->
                         val saved = savedByStudent[s.studentId]
                         val savedStatus = saved?.get(AttendanceRecordsTable.status)
-                        val savedSource = saved?.get(AttendanceRecordsTable.source)
+                        val savedSource = saved?.get(AttendanceRecordsTable.attSource)
                         val isLeaveDefault = saved == null && s.studentId in onLeave
                         AttendanceStudentDto(
                             studentId = s.studentId.toString(),
@@ -358,7 +360,7 @@ fun Route.teacherAttendanceRouting() {
                                     (AttendanceRecordsTable.assignmentId eq assignment.assignmentId)
                             }) {
                                 it[AttendanceRecordsTable.status] = status
-                                it[AttendanceRecordsTable.source] = SOURCE_MANUAL
+                                it[AttendanceRecordsTable.attSource] = SOURCE_MANUAL
                                 it[AttendanceRecordsTable.markedBy] = ctx.userId
                                 it[AttendanceRecordsTable.markedAt] = now
                                 it[AttendanceRecordsTable.enrollmentId] = enrolled.enrollmentId
@@ -373,7 +375,7 @@ fun Route.teacherAttendanceRouting() {
                                 it[enrollmentId] = enrolled.enrollmentId
                                 it[assignmentId] = assignment.assignmentId
                                 it[AttendanceRecordsTable.status] = status
-                                it[source] = SOURCE_MANUAL
+                                it[attSource] = SOURCE_MANUAL
                                 it[markedBy] = ctx.userId
                                 it[markedAt] = now
                                 it[createdAt] = now

@@ -25,8 +25,9 @@
  *   prefix to avoid colliding with the legacy `teacherTaskRoutes()` `/marks` +
  *   `/assessments` handlers (Ktor forbids two handlers on the same method+path) —
  *   the same staging pattern as T-203's `/attendance-typed`. T-305 DELETED those
- *   legacy handlers and converged this plane to the canonical `/api/v1/teacher/
- *   assessments/*` paths from Doc 07 §2 (which the shared TeacherApi client targets).
+ *   legacy handlers and converged this plane to the canonical
+ *   `/api/v1/teacher/assessments/...` paths from Doc 07 §2 (which the shared
+ *   TeacherApi client targets).
  *
  * Scoping is enforced at THREE levels (the constitution): the SQL only ever
  * touches owned assignments + their enrollment roster (query), the response only
@@ -285,7 +286,7 @@ data class GbAssessmentHistoryDto(
 
 fun Route.teacherGradebookRouting() {
     authenticate("jwt") {
-        // T-305: CONVERGED to the canonical `/api/v1/teacher/assessments/*` paths from
+        // T-305: CONVERGED to the canonical `/api/v1/teacher/assessments/...` paths from
         // Doc 07 §2. The legacy `route("/marks")` + `route("/assessments")` handlers in
         // TeacherRoutingTasks.kt are deleted, so this typed plane no longer needs the
         // temporary `/gradebook` prefix (the T-203 `/attendance-typed`→`/attendance`

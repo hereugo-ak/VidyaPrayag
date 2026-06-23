@@ -75,6 +75,7 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
+import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import java.time.LocalDate
@@ -353,7 +354,7 @@ private fun buildClassDetailInTxn(
     val marksByStudent = recentMarksInTxn(ctx, a, studentIds)
     val latestMarkMeta = latestPublishedMarkInTxn(ctx, a, studentIds)
     val photoByStudent = if (studentIds.isEmpty()) emptyMap() else
-        StudentsTable.selectAll().where { StudentsTable.id inList studentIds }
+        StudentsTable.selectAll().where { StudentsTable.id inList studentIds.map { EntityID(it, StudentsTable) } }
             .associate { it[StudentsTable.id].value to it[StudentsTable.profilePhotoUrl] }
 
     val rosterDtos = roster.map { s ->
@@ -455,7 +456,8 @@ internal fun rosterForInTxn(a: OwnedAssignment): List<EnrolledStudent> {
     if (enrollments.isEmpty()) return emptyList()
     val sids = enrollments.map { it[com.littlebridge.vidyaprayag.db.EnrollmentsTable.studentId] }.distinct()
     val studentsById = com.littlebridge.vidyaprayag.db.StudentsTable.selectAll().where {
-        com.littlebridge.vidyaprayag.db.StudentsTable.id inList sids
+        com.littlebridge.vidyaprayag.db.StudentsTable.id inList
+            sids.map { EntityID(it, com.littlebridge.vidyaprayag.db.StudentsTable) }
     }.associateBy { it[com.littlebridge.vidyaprayag.db.StudentsTable.id].value }
     return enrollments.mapNotNull { e ->
         val sid = e[com.littlebridge.vidyaprayag.db.EnrollmentsTable.studentId]

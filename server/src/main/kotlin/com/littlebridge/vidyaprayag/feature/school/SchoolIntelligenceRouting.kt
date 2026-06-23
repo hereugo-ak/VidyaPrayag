@@ -267,7 +267,9 @@ fun Route.schoolIntelligenceRouting() {
                     (AttendanceRecordsTable.schoolId eq schoolId) and
                         (AttendanceRecordsTable.type eq "student")
                 }.forEach { row ->
-                    val code = row[AttendanceRecordsTable.personId]
+                    // person_id is nullable (Tables.kt); rows without a code can't be
+                    // attributed to a student, so skip them.
+                    val code = row[AttendanceRecordsTable.personId] ?: return@forEach
                     val s = row[AttendanceRecordsTable.status].lowercase()
                     val arr = attByStudent.getOrPut(code) { intArrayOf(0, 0) }
                     if (s == "present" || s == "late") arr[0]++

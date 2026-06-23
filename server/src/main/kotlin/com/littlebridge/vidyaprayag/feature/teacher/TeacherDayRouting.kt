@@ -76,6 +76,7 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
+import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.or
@@ -332,7 +333,8 @@ private fun resolveDayInTxn(
     if (missing.isNotEmpty()) {
         TeacherSubjectAssignmentsTable.selectAll().where {
             (TeacherSubjectAssignmentsTable.schoolId eq ctx.schoolId) and
-                (TeacherSubjectAssignmentsTable.id inList missing)
+                (TeacherSubjectAssignmentsTable.id inList
+                    missing.map { EntityID(it, TeacherSubjectAssignmentsTable) })
         }.forEach { row ->
             assignmentScopes[row[TeacherSubjectAssignmentsTable.id].value] = PeriodScope(
                 className = row[TeacherSubjectAssignmentsTable.className],
@@ -348,7 +350,7 @@ private fun resolveDayInTxn(
     val substituteNames: Map<UUID, String> = if (substituteIds.isEmpty()) {
         emptyMap()
     } else {
-        AppUsersTable.selectAll().where { AppUsersTable.id inList substituteIds }
+        AppUsersTable.selectAll().where { AppUsersTable.id inList substituteIds.map { EntityID(it, AppUsersTable) } }
             .associate { it[AppUsersTable.id].value to it[AppUsersTable.fullName] }
     }
 

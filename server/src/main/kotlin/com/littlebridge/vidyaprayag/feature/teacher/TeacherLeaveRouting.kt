@@ -309,7 +309,7 @@ private fun writeLeaveMarksOnApproval(
             // Don't clobber a manual mark a teacher already made for this day-level
             // row (e.g. student on approved leave who actually attended). Only refresh
             // rows that are themselves auto-derived from leave.
-            val curSource = existing[AttendanceRecordsTable.source]
+            val curSource = existing[AttendanceRecordsTable.attSource]
             if (curSource == LEAVE_ATT_SOURCE) {
                 AttendanceRecordsTable.update({
                     (AttendanceRecordsTable.schoolId eq schoolId) and
@@ -319,7 +319,7 @@ private fun writeLeaveMarksOnApproval(
                         (AttendanceRecordsTable.assignmentId.isNull())
                 }) {
                     it[status] = LEAVE_ATT_STATUS
-                    it[source] = LEAVE_ATT_SOURCE
+                    it[attSource] = LEAVE_ATT_SOURCE
                     it[AttendanceRecordsTable.markedBy] = markedBy
                     it[markedAt] = now
                 }
@@ -334,7 +334,7 @@ private fun writeLeaveMarksOnApproval(
                 it[AttendanceRecordsTable.studentId] = studentId
                 // assignment_id / enrollment_id left NULL — this is a day-level leave fact.
                 it[status] = LEAVE_ATT_STATUS
-                it[source] = LEAVE_ATT_SOURCE
+                it[attSource] = LEAVE_ATT_SOURCE
                 it[AttendanceRecordsTable.markedBy] = markedBy
                 it[markedAt] = now
                 it[createdAt] = now

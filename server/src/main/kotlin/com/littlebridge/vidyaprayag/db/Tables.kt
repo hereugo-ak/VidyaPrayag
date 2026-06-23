@@ -502,7 +502,10 @@ object AttendanceRecordsTable : UUIDTable("attendance_records", "id") {
     val facultyId    = uuid("faculty_id").nullable()      // FK app_users.id (type=faculty)
     val assignmentId = uuid("assignment_id").nullable()   // FK teacher_subject_assignments.id
     val status       = varchar("status", 16)              // present | absent | late | leave
-    val source       = varchar("source", 16).default("manual") // manual|leave_auto|bulk|biometric
+    // NOTE: property named `attSource` (not `source`) because Exposed's ColumnSet
+    // now declares a `source` member; a column property of the same name would
+    // hide it and fail to compile. DB column name stays "source".
+    val attSource    = varchar("source", 16).default("manual") // manual|leave_auto|bulk|biometric
     val markedBy     = uuid("marked_by").nullable()
     val markedAt     = timestamp("marked_at").nullable()  // when last written (Doc 06 §1.2)
     val createdAt    = timestamp("created_at")

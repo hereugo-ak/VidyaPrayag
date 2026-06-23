@@ -45,6 +45,7 @@ import com.littlebridge.vidyaprayag.db.StudentsTable
 import com.littlebridge.vidyaprayag.db.TeacherSubjectAssignmentsTable
 import io.ktor.http.*
 import io.ktor.server.application.*
+import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
@@ -247,7 +248,9 @@ suspend fun enrollmentsFor(assignment: OwnedAssignment): List<EnrolledStudent> {
 
         val studentIds = enrollments.map { it[EnrollmentsTable.studentId] }.distinct()
         val studentsById = StudentsTable.selectAll().where {
-            StudentsTable.id inList studentIds
+            // Exposed 0.50: the id column is Column<EntityID<UUID>>, so inList needs
+            // EntityID values, not raw UUIDs.
+            StudentsTable.id inList studentIds.map { EntityID(it, StudentsTable) }
         }.associateBy { it[StudentsTable.id].value }
 
         enrollments.mapNotNull { e ->
