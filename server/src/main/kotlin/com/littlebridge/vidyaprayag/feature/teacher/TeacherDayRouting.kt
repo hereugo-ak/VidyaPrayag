@@ -52,9 +52,13 @@ import com.littlebridge.vidyaprayag.core.ok
 import com.littlebridge.vidyaprayag.core.requireTeacherContext
 import com.littlebridge.vidyaprayag.core.teacherAssignmentsFor
 import com.littlebridge.vidyaprayag.db.AppUsersTable
+import com.littlebridge.vidyaprayag.db.AssessmentsTable
 import com.littlebridge.vidyaprayag.db.AttendanceRecordsTable
 import com.littlebridge.vidyaprayag.db.CalendarEventsTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
+import com.littlebridge.vidyaprayag.db.HomeworkSubmissionsTable
+import com.littlebridge.vidyaprayag.db.HomeworkTable
+import com.littlebridge.vidyaprayag.db.LeaveRequestsTable
 import com.littlebridge.vidyaprayag.db.PeriodExceptionsTable
 import com.littlebridge.vidyaprayag.db.TeacherPeriodsTable
 import com.littlebridge.vidyaprayag.db.TeacherSubjectAssignmentsTable
@@ -154,6 +158,44 @@ data class CheckInStatusDto(
     @SerialName("checked_in_at") val checkedInAt: String? = null, // ISO timestamp, server-stamped
     val method: String? = null,                      // biometric | pin | manual
     val date: String,                                // ISO date the status is for
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// T-107 — Real obligations (Doc 04 §5.5). Server-side mirrors of the shared
+// TeacherObligationsDto / ObligationItemDto (shared/.../teacher/domain/model/
+// TeacherModels.kt). The :server module does not depend on :shared. Counts are
+// REAL — computed from the current schema — not fabricated (kills B-HOME-4):
+//   • unmarked_classes        — today's non-cancelled periods missing attendance
+//   • unpublished_results     — my active assessments not yet published
+//   • submissions_to_review   — homework submissions still "submitted" (ungraded)
+//   • pending_leave_decisions — student leave requests routed to me, Pending
+// HONESTY (Doc 04 §5.5): "all caught up" is true only when EVERY count is zero;
+// the strip never invents work. Counts that depend on phases not yet built
+// (full marks lifecycle T-304, attendance-write semantics T-204) ship from what
+// the schema can honestly answer today and are tightened as those phases land.
+// Each item carries a pre-scoped deep-link target (assignmentId / refId) so the
+// UI jumps straight to the scoped tool, never a shared picker.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class ObligationItemDto(
+    val id: String,
+    val type: String,                                // attendance | marks | homework | leave
+    val title: String,
+    val subtitle: String = "",
+    val count: Int = 0,
+    @SerialName("assignment_id") val assignmentId: String? = null,
+    @SerialName("ref_id") val refId: String? = null,
+)
+
+@Serializable
+data class TeacherObligationsDto(
+    @SerialName("unmarked_classes") val unmarkedClasses: Int = 0,
+    @SerialName("classes_today_total") val classesTodayTotal: Int = 0,
+    @SerialName("unpublished_results") val unpublishedResults: Int = 0,
+    @SerialName("submissions_to_review") val submissionsToReview: Int = 0,
+    @SerialName("pending_leave_decisions") val pendingLeaveDecisions: Int = 0,
+    val items: List<ObligationItemDto> = emptyList(),
 )
 
 private val HHMM_DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
@@ -643,6 +685,184 @@ fun Route.teacherDayRouting() {
                     }
                 }
                 call.ok(data, message = "Check-in status loaded")
+            }
+
+            // ── GET /obligations — real "what needs me" strip (Doc 04 §5.5) ───
+            // T-107. REAL counts, scoped to this teacher's allocation at the
+            // QUERY level (the third scoping level, per the constitution):
+            //   • unmarked_classes        — today's non-cancelled, attendance-
+            //     bearing periods whose attendance isn't marked yet (reuses the
+            //     T-104 resolver so the count exactly matches the schedule card);
+            //   • unpublished_results     — my active assessments not published;
+            //   • submissions_to_review   — homework submissions still in the
+            //     "submitted" state (not yet graded) on homework I authored;
+            //   • pending_leave_decisions — student leave requests routed to me
+            //     (direct teacher_id OR one of my class/section pairs), Pending.
+            // HONESTY: every count is a live aggregate; nothing is fabricated and
+            // "all caught up" is left for the client to infer ONLY when all are
+            // zero (TeacherObligationsDto carries no fake floor). Items deep-link
+            // pre-scoped (assignmentId / refId) so taps land on the scoped tool.
+            get("/obligations") {
+                val ctx = call.requireTeacherContext() ?: return@get
+                val today = LocalDate.now()
+                val owned = teacherAssignmentsFor(ctx)
+                val ownedIds = owned.map { it.assignmentId }.toSet()
+                val ownedPairs = owned.map { it.className to it.section }.toSet()
+                val privileged = ctx.role == "school_admin" || ctx.role == "admin"
+
+                val data = dbQuery {
+                    // ── 1. Unmarked classes today (reuse the authoritative resolver) ──
+                    val day = resolveDayInTxn(
+                        ctx = ctx,
+                        date = today,
+                        ownedAssignmentIds = ownedIds,
+                        assignmentScopes = HashMap(),
+                        nowProvider = LocalTime.now(),
+                    )
+                    // Attendance-bearing periods = scheduled/active, not cancelled,
+                    // with a real class scope. A holiday yields no periods → zero.
+                    val attendancePeriods = day.periods.filter {
+                        it.status != KIND_CANCELLED && it.className.isNotBlank()
+                    }
+                    val classesTodayTotal = attendancePeriods.size
+                    val unmarkedPeriods = attendancePeriods.filter { !it.attendanceMarked }
+                    val unmarkedClasses = unmarkedPeriods.size
+
+                    // ── 2. Unpublished results — my active, not-yet-published assessments ──
+                    // Scoped by authorship (teacher_id) or, for privileged roles, the
+                    // whole school. Matches the marks lifecycle (isPublished, RA-43).
+                    val assessmentRows = AssessmentsTable.selectAll().where {
+                        if (privileged) {
+                            (AssessmentsTable.schoolId eq ctx.schoolId) and
+                                (AssessmentsTable.isActive eq true) and
+                                (AssessmentsTable.isPublished eq false)
+                        } else {
+                            (AssessmentsTable.schoolId eq ctx.schoolId) and
+                                (AssessmentsTable.teacherId eq ctx.userId) and
+                                (AssessmentsTable.isActive eq true) and
+                                (AssessmentsTable.isPublished eq false)
+                        }
+                    }.toList()
+                    val unpublishedResults = assessmentRows.size
+
+                    // ── 3. Submissions to review — ungraded submissions on my homework ──
+                    // First the homework I authored (or all, if privileged), then the
+                    // count of submissions still in the "submitted" (ungraded) state.
+                    val homeworkRows = HomeworkTable.selectAll().where {
+                        if (privileged) {
+                            (HomeworkTable.schoolId eq ctx.schoolId) and (HomeworkTable.isActive eq true)
+                        } else {
+                            (HomeworkTable.schoolId eq ctx.schoolId) and
+                                (HomeworkTable.teacherId eq ctx.userId) and
+                                (HomeworkTable.isActive eq true)
+                        }
+                    }.toList()
+                    val homeworkIds = homeworkRows.map { it[HomeworkTable.id].value }
+                    val submissionsToReview = if (homeworkIds.isEmpty()) {
+                        0
+                    } else {
+                        HomeworkSubmissionsTable.selectAll().where {
+                            (HomeworkSubmissionsTable.homeworkId inList homeworkIds) and
+                                (HomeworkSubmissionsTable.status eq "submitted")
+                        }.count().toInt()
+                    }
+
+                    // ── 4. Pending leave decisions — student requests routed to me ──
+                    // Mirrors TeacherLeaveRouting's scope: direct teacher_id match OR
+                    // one of my (class, section) pairs; privileged sees the school.
+                    val leaveRows = LeaveRequestsTable.selectAll().where {
+                        (LeaveRequestsTable.schoolId eq ctx.schoolId) and
+                            (LeaveRequestsTable.requesterRole eq "student") and
+                            (LeaveRequestsTable.status eq "Pending")
+                    }.toList()
+                    val pendingLeaveRows = leaveRows.filter { row ->
+                        if (privileged) return@filter true
+                        val direct = row[LeaveRequestsTable.teacherId] == ctx.userId
+                        val byClass =
+                            (row[LeaveRequestsTable.className] to row[LeaveRequestsTable.section]) in ownedPairs
+                        direct || byClass
+                    }
+                    val pendingLeaveDecisions = pendingLeaveRows.size
+
+                    // ── 5. Build deep-linkable items (only for non-zero work) ──────
+                    val items = buildList {
+                        // One attendance item per unmarked class, pre-scoped by the
+                        // period's assignmentId so the CTA opens the scoped marker.
+                        unmarkedPeriods.forEach { p ->
+                            val sectionLabel = if (p.section.isBlank()) p.className else "${p.className}-${p.section}"
+                            add(
+                                ObligationItemDto(
+                                    id = "attendance:${p.assignmentId ?: p.periodId ?: sectionLabel}",
+                                    type = "attendance",
+                                    title = "Mark attendance — $sectionLabel",
+                                    subtitle = listOfNotNull(
+                                        p.subject.takeIf { it.isNotBlank() },
+                                        "${p.startTime}–${p.endTime}",
+                                    ).joinToString(" · "),
+                                    count = 1,
+                                    assignmentId = p.assignmentId,
+                                    refId = p.periodId,
+                                ),
+                            )
+                        }
+                        // Unpublished results — one item per assessment, deep-linked
+                        // by the assessment id (refId) for the Gradebook publish flow.
+                        assessmentRows.forEach { a ->
+                            val cls = a[AssessmentsTable.className]
+                            val sec = a[AssessmentsTable.section]
+                            val clsLabel = if (sec.isBlank()) cls else "$cls-$sec"
+                            add(
+                                ObligationItemDto(
+                                    id = "marks:${a[AssessmentsTable.id].value}",
+                                    type = "marks",
+                                    title = "Publish results — ${a[AssessmentsTable.name]}",
+                                    subtitle = listOfNotNull(
+                                        clsLabel.takeIf { it.isNotBlank() },
+                                        a[AssessmentsTable.subject].takeIf { it.isNotBlank() },
+                                    ).joinToString(" · "),
+                                    count = 1,
+                                    refId = a[AssessmentsTable.id].value.toString(),
+                                ),
+                            )
+                        }
+                        // Submissions to review — a single rolled-up item (per-
+                        // homework breakdown is the Gradebook/Homework surface's job).
+                        if (submissionsToReview > 0) {
+                            add(
+                                ObligationItemDto(
+                                    id = "homework:review",
+                                    type = "homework",
+                                    title = "Review homework submissions",
+                                    subtitle = "$submissionsToReview awaiting grading",
+                                    count = submissionsToReview,
+                                ),
+                            )
+                        }
+                        // Pending leave decisions — a single rolled-up item routed to
+                        // the teacher's leave inbox.
+                        if (pendingLeaveDecisions > 0) {
+                            add(
+                                ObligationItemDto(
+                                    id = "leave:pending",
+                                    type = "leave",
+                                    title = "Decide leave requests",
+                                    subtitle = "$pendingLeaveDecisions pending your decision",
+                                    count = pendingLeaveDecisions,
+                                ),
+                            )
+                        }
+                    }
+
+                    TeacherObligationsDto(
+                        unmarkedClasses = unmarkedClasses,
+                        classesTodayTotal = classesTodayTotal,
+                        unpublishedResults = unpublishedResults,
+                        submissionsToReview = submissionsToReview,
+                        pendingLeaveDecisions = pendingLeaveDecisions,
+                        items = items,
+                    )
+                }
+                call.ok(data, message = "Obligations loaded")
             }
         }
     }
