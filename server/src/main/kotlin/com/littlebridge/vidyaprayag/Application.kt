@@ -40,6 +40,7 @@
  *   - teacherAssignmentRouting()          — /api/v1/school/teacher-assignments[…]
  *   - mediaRouting()                      — /api/v1/school/media/upload[…] (binary → Supabase Storage)
  *   - teacherRouting()                    — /api/v1/teacher/{home,classes,profile,attendance,marks,syllabus,homework}
+ *   - teacherDayRouting()                 — /api/v1/teacher/{day,week} (T-104 resolved schedule)
  *
  * On boot:
  *   DatabaseFactory.init() creates/migrates all tables and seeds CMS + demo data.
@@ -89,6 +90,7 @@ import com.littlebridge.vidyaprayag.feature.school.nonTeachingStaffRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRouting
 import com.littlebridge.vidyaprayag.feature.school.teacherAssignmentRouting
 import com.littlebridge.vidyaprayag.feature.school.teacherProvisioningRouting
+import com.littlebridge.vidyaprayag.feature.teacher.teacherDayRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherLeaveRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherMessagesRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherRouting
@@ -290,6 +292,7 @@ fun Application.module() {
 
         // Teacher vertical (master rebuild doc Step 7 / gap G1)
         teacherRouting()             // /api/v1/teacher/{home,classes,profile,attendance,marks,syllabus,homework}
+        teacherDayRouting()          // T-104 /api/v1/teacher/{day,week} — resolved schedule (periods+exceptions+holidays+calendar, server now/next)
         teacherLeaveRouting()        // /api/v1/teacher/leave-requests[…] — RA-44 teacher lists/decides leave for their classes
         teacherMessagesRouting()     // /api/v1/teacher/messages[…] — RA-51 teacher↔parent messaging + class broadcast
 
