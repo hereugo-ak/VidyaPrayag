@@ -429,7 +429,8 @@ val viewModelModule = module {
     factory { com.littlebridge.vidyaprayag.feature.content.presentation.LandingViewModel(get()) }
     factory { com.littlebridge.vidyaprayag.feature.auth.presentation.AuthViewModel(get()) }
     // Teacher vertical (master doc G1) — all (TeacherRepository, PreferenceRepository)
-    factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherHomeViewModel(get(), get()) }
+    // T-601 (DELETE-don't-patch): TeacherHomeViewModel factory removed — the legacy
+    // Home tab is replaced by the Today tab (Doc 04 §4). See TeacherTodayViewModel below.
     // T-105: the new Today tab (server-resolved schedule).
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherTodayViewModel(get(), get()) }
     // T-106c: teacher self check-in (Doc 06 §2) — backs the Today greeting band pill.

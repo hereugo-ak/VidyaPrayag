@@ -28,9 +28,9 @@ class TeacherApi(
 
     // ── Reads ───────────────────────────────────────────────────────────────
 
-    suspend fun getHome(token: String): NetworkResult<TeacherHomeResponse> = safeApiCall {
-        client.get(getUrl("api/v1/teacher/home"))
-    }
+    // T-601 (DELETE-don't-patch): getHome (GET /teacher/home) removed — the Today
+    // tab (getDay/getWeek) is the canonical day surface (Doc 04 §4). The legacy
+    // /home server handler is deleted alongside in TeacherRouting.
 
     // T-501 (Doc 09 §2): the aggregated class list — student count (enrollments),
     // real is_class_teacher (B-CLS-3), next period, today-marked, atRiskCount, all

@@ -52,6 +52,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun TeacherProfileScreenV2(
     onLogout: () -> Unit = {},
+    onOpenLeave: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: TeacherProfileViewModel = koinViewModel(),
 ) {

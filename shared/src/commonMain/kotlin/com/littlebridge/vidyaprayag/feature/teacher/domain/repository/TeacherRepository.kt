@@ -6,7 +6,8 @@ import com.littlebridge.vidyaprayag.feature.teacher.domain.model.*
 
 interface TeacherRepository {
     // Reads
-    suspend fun getHome(token: String): NetworkResult<TeacherHomeResponse>
+    // T-601 (DELETE-don't-patch): getHome removed — the legacy Home tab is replaced
+    // by the Today tab (getDay/getWeek below), Doc 04 §4.
 
     // T-501 (Doc 09 §2): aggregated class list (single query set; real flags).
     suspend fun listClassesV2(token: String): NetworkResult<TeacherClassesV2Response>

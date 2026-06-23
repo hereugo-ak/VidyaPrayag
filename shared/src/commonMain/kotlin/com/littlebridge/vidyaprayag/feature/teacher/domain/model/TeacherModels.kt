@@ -4,48 +4,12 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Teacher Home — dashboard glance + today's periods + pending task counts
-// Backs Teacher.tsx → Home tab.
+// Teacher Home — DELETED (T-601, DELETE-don't-patch).
+// The legacy Home dashboard (TeacherHomeResponse / TeacherHomeData /
+// TeacherPeriodDto / TeacherTaskDto) is replaced by the Today tab (Doc 04 §4),
+// whose resolved day/week DTOs live below. The GET /teacher/home server handler
+// and TeacherHomeViewModel were deleted alongside.
 // ─────────────────────────────────────────────────────────────────────────────
-
-@Serializable
-data class TeacherHomeResponse(
-    val success: Boolean,
-    val data: TeacherHomeData,
-)
-
-@Serializable
-data class TeacherHomeData(
-    @SerialName("teacher_name") val teacherName: String,
-    @SerialName("school_name") val schoolName: String,
-    @SerialName("classes_today") val classesToday: Int,
-    @SerialName("pending_attendance") val pendingAttendance: Int,
-    @SerialName("pending_marks") val pendingMarks: Int,
-    @SerialName("homework_due") val homeworkDue: Int,
-    @SerialName("today_periods") val todayPeriods: List<TeacherPeriodDto> = emptyList(),
-    val tasks: List<TeacherTaskDto> = emptyList(),
-)
-
-@Serializable
-data class TeacherPeriodDto(
-    val id: String,
-    val time: String,
-    @SerialName("class_name") val className: String,
-    val subject: String,
-    val room: String = "",
-    @SerialName("is_current") val isCurrent: Boolean = false,
-    val status: String = "upcoming", // "done" | "current" | "upcoming"
-)
-
-@Serializable
-data class TeacherTaskDto(
-    val id: String,
-    val title: String,
-    val subtitle: String = "",
-    val type: String, // "attendance" | "marks" | "syllabus" | "homework"
-    @SerialName("class_name") val className: String = "",
-    @SerialName("is_done") val isDone: Boolean = false,
-)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Teacher Today — the resolved day & week (Teacher Portal Rebuild, Doc 05 §4).

@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -16,10 +14,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.littlebridge.vidyaprayag.feature.teacher.domain.model.TeacherClassSummaryDto
-import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
 import com.littlebridge.vidyaprayag.ui.v2.components.VTopTabs
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
-import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 
 /**
  * PlannerScreen — T-403 (Doc 04 §5.12, Doc 08). The real Planner tab, replacing the staged
@@ -43,15 +39,17 @@ fun PlannerScreen(modifier: Modifier = Modifier) {
     var selectedScope by remember { mutableStateOf("") }
 
     Column(modifier.fillMaxSize().background(c.background)) {
-        Column(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp).padding(top = 16.dp)) {
-            VLabel("Planner")
-            Text("Plan & track", style = VTheme.type.h1.colored(c.ink), modifier = Modifier.padding(top = 4.dp))
+        // T-601: the greeting/identity now lives in the ONE canonical TeacherHeader (mounted by
+        // TeacherPortalV2), so the Planner no longer carries its own greeting band — just the
+        // sub-tab switcher + its own per-tool class picker (the deliberate scoping path; only the
+        // SHARED cross-tool picker is eliminated, Doc 04 §7).
+        Box(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            VTopTabs(
+                tabs = listOf("Syllabus", "Homework"),
+                selected = sub,
+                onSelect = { sub = it },
+            )
         }
-        VTopTabs(
-            tabs = listOf("Syllabus", "Homework"),
-            selected = sub,
-            onSelect = { sub = it },
-        )
 
         // Shared class picker — selecting a class pins its TSA id + a scope label.
         TeacherClassPicker(

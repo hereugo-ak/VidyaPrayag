@@ -9,8 +9,8 @@ import com.littlebridge.vidyaprayag.feature.teacher.domain.repository.TeacherRep
 class TeacherRepositoryImpl(
     private val api: TeacherApi,
 ) : TeacherRepository {
-    override suspend fun getHome(token: String): NetworkResult<TeacherHomeResponse> =
-        api.getHome(token)
+    // T-601 (DELETE-don't-patch): getHome override removed — Today tab (getDay/getWeek)
+    // replaces the legacy Home tab (Doc 04 §4).
 
     override suspend fun listClassesV2(token: String): NetworkResult<TeacherClassesV2Response> =
         api.listClassesV2(token)

@@ -8,7 +8,6 @@
  *   shared/.../feature/teacher/domain/model/TeacherModels.kt
  *
  * Routes (all JWT-guarded + scoped via core/TeacherAccess):
- *   GET   /api/v1/teacher/home
  *   GET   /api/v1/teacher/classes
  *   GET   /api/v1/teacher/profile
  *   GET   /api/v1/teacher/attendance?class_id=&date=
@@ -29,8 +28,9 @@
  * timetable, no syllabus units) we return honest empty lists — never fabricated
  * rows.
  *
- * This file holds the READ surface (home / classes / profile). Attendance,
- * marks, syllabus and homework live in TeacherRoutingTasks.kt.
+ * This file holds the READ surface (profile; legacy /home + /classes list
+ * deleted — see T-601 / T-504 notes inside). Attendance, marks, syllabus and
+ * homework live in TeacherRoutingTasks.kt.
  */
 package com.littlebridge.vidyaprayag.feature.teacher
 
@@ -63,40 +63,12 @@ import java.time.format.DateTimeFormatter
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Server-side DTOs — field names mirror the client (TeacherModels.kt) exactly.
+//
+// T-601 (DELETE-don't-patch): TeacherPeriodDto / TeacherTaskDto / TeacherHomeData
+// (the legacy /home dashboard shapes) were DELETED with the GET /home handler.
+// The Today tab (GET /day, GET /week in TeacherTodayRouting) is the canonical
+// day surface now (Doc 04 §4).
 // ─────────────────────────────────────────────────────────────────────────────
-
-@Serializable
-data class TeacherPeriodDto(
-    val id: String,
-    val time: String,
-    @SerialName("class_name") val className: String,
-    val subject: String,
-    val room: String = "",
-    @SerialName("is_current") val isCurrent: Boolean = false,
-    val status: String = "upcoming",
-)
-
-@Serializable
-data class TeacherTaskDto(
-    val id: String,
-    val title: String,
-    val subtitle: String = "",
-    val type: String,
-    @SerialName("class_name") val className: String = "",
-    @SerialName("is_done") val isDone: Boolean = false,
-)
-
-@Serializable
-data class TeacherHomeData(
-    @SerialName("teacher_name") val teacherName: String,
-    @SerialName("school_name") val schoolName: String,
-    @SerialName("classes_today") val classesToday: Int,
-    @SerialName("pending_attendance") val pendingAttendance: Int,
-    @SerialName("pending_marks") val pendingMarks: Int,
-    @SerialName("homework_due") val homeworkDue: Int,
-    @SerialName("today_periods") val todayPeriods: List<TeacherPeriodDto> = emptyList(),
-    val tasks: List<TeacherTaskDto> = emptyList(),
-)
 
 // T-504: TeacherClassDto / TeacherClassesData (the legacy /classes list shape) were
 // DELETED with the legacy handler. The canonical class list is now served by
@@ -170,123 +142,12 @@ fun Route.teacherRouting() {
     authenticate("jwt") {
         route("/api/v1/teacher") {
 
-            // ── GET /home ───────────────────────────────────────────────────
-            get("/home") {
-                val ctx = call.requireTeacherContext() ?: return@get
-                val assignments = teacherAssignmentsFor(ctx)
-
-                val schoolName = dbQuery {
-                    SchoolsTable.selectAll().where { SchoolsTable.id eq ctx.schoolId }
-                        .singleOrNull()?.get(SchoolsTable.name)
-                } ?: ""
-
-                val today = todayIso()
-                // T-004: attendance_records.date / homework.due_date are now typed
-                // `date` columns — compare against a LocalDate, not the ISO String.
-                val todayDate = LocalDate.parse(today)
-                val weekday = LocalDate.now().dayOfWeek.value // 1..7
-
-                // Today's periods from the (optional) timetable. Honest empty if none.
-                val periods = dbQuery {
-                    TeacherPeriodsTable.selectAll().where {
-                        (TeacherPeriodsTable.schoolId eq ctx.schoolId) and
-                            (TeacherPeriodsTable.teacherId eq ctx.userId) and
-                            (TeacherPeriodsTable.weekday eq weekday)
-                    }.toList()
-                }.sortedBy { it[TeacherPeriodsTable.startTime] }
-
-                val now = java.time.LocalTime.now()
-                val periodDtos = periods.map { r ->
-                    // T-101: start_time/end_time are now typed `time` (LocalTime),
-                    // so compare directly (no string parsing) and format to "HH:mm"
-                    // at the wire boundary to preserve the contract.
-                    val start = r[TeacherPeriodsTable.startTime]
-                    val end = r[TeacherPeriodsTable.endTime]
-                    val status = when {
-                        !now.isBefore(start) && now.isBefore(end) -> "current"
-                        !now.isBefore(end) -> "done"
-                        else -> "upcoming"
-                    }
-                    TeacherPeriodDto(
-                        id = r[TeacherPeriodsTable.id].value.toString(),
-                        time = "${start.format(HHMM)} - ${end.format(HHMM)}",
-                        className = "${r[TeacherPeriodsTable.className]}-${r[TeacherPeriodsTable.section]}",
-                        subject = r[TeacherPeriodsTable.subject],
-                        room = r[TeacherPeriodsTable.room],
-                        isCurrent = status == "current",
-                        status = status,
-                    )
-                }
-
-                // Pending attendance: classes the teacher handles that have NO
-                // student attendance row for today.
-                var pendingAttendance = 0
-                for (a in assignments) {
-                    val grade = "${a.className}-${a.section}"
-                    val marked = dbQuery {
-                        AttendanceRecordsTable.selectAll().where {
-                            (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
-                                (AttendanceRecordsTable.date eq todayDate) and
-                                (AttendanceRecordsTable.type eq "student") and
-                                (AttendanceRecordsTable.grade eq grade)
-                        }.limit(1).firstOrNull() != null
-                    }
-                    if (!marked) pendingAttendance++
-                }
-
-                // Pending marks: active assessments owned by this teacher that
-                // still have at least one student without a score.
-                val pendingMarks = dbQuery {
-                    val mine = AssessmentsTable.selectAll().where {
-                        (AssessmentsTable.schoolId eq ctx.schoolId) and
-                            (AssessmentsTable.teacherId eq ctx.userId) and
-                            (AssessmentsTable.isActive eq true)
-                    }.toList()
-                    mine.count { asg ->
-                        AssessmentMarksTable.selectAll().where {
-                            (AssessmentMarksTable.assessmentId eq asg[AssessmentsTable.id].value) and
-                                (AssessmentMarksTable.marks eq null)
-                        }.limit(1).firstOrNull() != null
-                    }
-                }
-
-                // Homework due today or later, authored by this teacher.
-                val homeworkDue = dbQuery {
-                    HomeworkTable.selectAll().where {
-                        (HomeworkTable.schoolId eq ctx.schoolId) and
-                            (HomeworkTable.teacherId eq ctx.userId) and
-                            (HomeworkTable.isActive eq true) and
-                            (HomeworkTable.dueDate greaterEq todayDate)
-                    }.count().toInt()
-                }
-
-                // Actionable task cards — one per class still needing attendance.
-                val tasks = assignments
-                    .map { a ->
-                        TeacherTaskDto(
-                            id = "att-${a.assignmentId}",
-                            title = "Mark attendance",
-                            subtitle = "${a.className}-${a.section} · ${a.subject}",
-                            type = "attendance",
-                            className = "${a.className}-${a.section}",
-                            isDone = false,
-                        )
-                    }
-
-                call.ok(
-                    TeacherHomeData(
-                        teacherName = ctx.fullName,
-                        schoolName = schoolName,
-                        classesToday = periodDtos.size.takeIf { it > 0 } ?: assignments.map { "${it.className}-${it.section}" }.distinct().size,
-                        pendingAttendance = pendingAttendance,
-                        pendingMarks = pendingMarks,
-                        homeworkDue = homeworkDue,
-                        todayPeriods = periodDtos,
-                        tasks = tasks,
-                    ),
-                    message = "Teacher home loaded",
-                )
-            }
+            // ── GET /home — DELETED (T-601, DELETE-don't-patch) ───────────────
+            // The legacy Home dashboard (counts + today periods + task cards) is
+            // replaced by the Today tab (GET /day, GET /week in TeacherTodayRouting),
+            // which resolves the real day from timetable + exceptions + calendar and
+            // joins per-period attendance state (Doc 04 §4, Doc 05 §4). The matching
+            // client getHome/TeacherHomeViewModel/TeacherHomeScreenV2 were deleted too.
 
             // ── GET /classes — DELETED (T-504) ────────────────────────────────
             // The legacy looping list (N+1 per class via studentCountFor /
