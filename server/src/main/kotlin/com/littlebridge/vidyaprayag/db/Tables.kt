@@ -421,6 +421,22 @@ object AcademicCalendarTable : UUIDTable("academic_calendar", "id") {
     val createdAt        = timestamp("created_at")
 }
 
+/**
+ * LEGACY holiday source. DEPRECATED by Teacher Portal Rebuild T-102 (Doc 05
+ * §2.3, closes D-TT-5): `calendar_events(type=HOLIDAY, status=PUBLISHED)` is now
+ * the SINGLE source of holiday truth, and the resolved-day computation (T-104)
+ * reads holidays ONLY from there. migration_012_holidays_merge.sql forward-fills
+ * every holiday_list row into calendar_events (idempotent via source_ref
+ * 'HL:<id>').
+ *
+ * The table + this mapping are KEPT (not dropped) only so the two surviving
+ * legacy readers compile+work in this release:
+ *   - feature/parent/ParentAcademicsRouting.kt (parent academics holidays)
+ *   - feature/school/SchoolRouting.kt          (school holidays screen)
+ * A later phase repoints those readers at calendar_events and then drops this
+ * table + mapping. Do NOT add new readers of this table — read calendar_events.
+ */
+@Deprecated("D-TT-5 / T-102: holidays now live in calendar_events(HOLIDAY,PUBLISHED). Read CalendarEventsTable instead; holiday_list is migrated by migration_012 and will be dropped once the two legacy readers are repointed.")
 object HolidayListTable : UUIDTable("holiday_list", "id") {
     val schoolId  = uuid("school_id")
     val date      = varchar("date", 12)

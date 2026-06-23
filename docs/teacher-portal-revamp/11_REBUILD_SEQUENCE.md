@@ -97,6 +97,9 @@ These resolve the cross-cutting root defects (X-1..X-6) that everything else sta
 - **Details:** migrate `holiday_list` rows into `calendar_events(type=HOLIDAY,status=PUBLISHED)`; deprecate `HolidayListTable`.
 - **Done when:** applied; holidays read only from calendar_events.
 - **Closes:** D-TT-5.
+- **STATUS (executed):** ✅ `migration_012_holidays_merge.sql` created (idempotent; per-row tolerant date cast varchar→`date`; forward-fills every `holiday_list` row into `calendar_events(type=HOLIDAY,status=PUBLISHED,source=MANUAL)` guarded by `source_ref='HL:<id>'` so a re-run never duplicates; post-run report of the canonical published-holiday view). `Tables.kt`: `HolidayListTable` annotated `@Deprecated` (legacy read-only). Registered in `PROVISION.sql` (step 12). The resolved-day computation (T-104) reads holidays ONLY from `calendar_events`.
+  - **Note 1 (filename — docs are authority, deviation flagged):** doc named it `migration_014_holidays_merge.sql`; the on-disk chain is contiguous and the prior migration is `011`, so the file is `migration_012_holidays_merge.sql` (same documented deviation pattern as 009/010/011).
+  - **Note 2 (HolidayListTable NOT dropped yet — Rule 4):** the doc says "deprecate HolidayListTable". The data is migrated and the mapping `@Deprecated`, but the table + mapping are KEPT (not dropped) so the two surviving legacy readers — `feature/parent/ParentAcademicsRouting.kt` and `feature/school/SchoolRouting.kt` — keep compiling green in this release. A later phase repoints both readers at `calendar_events` and then drops the table (same demotion pattern as T-101's legacy period columns).
 
 ### T-103 — Shared DTO: ResolvedDay / ResolvedWeek models
 - **Layer:** Shared-DTO · **Depends:** —
