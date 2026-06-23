@@ -8,6 +8,11 @@
  * (requireOwnedAssignment), so scope is PROVABLE (Doc 05 binding), not parsed
  * from a "<class>-<section>" string.
  *
+ * T-205: this plane now OWNS the canonical /api/v1/teacher/attendance path — the
+ * legacy packed-`grade` GET/POST handler in TeacherRoutingTasks.kt was deleted
+ * (DELETE-don't-patch), so the prior `-typed` suffix is retired. Absent/late saves
+ * fan out parent alerts (RA-41), preserved from the deleted handler.
+ *
  * Routes (JWT-guarded, scoped via core/TeacherAccess):
  *   GET  /api/v1/teacher/attendance?assignmentId=…&date=YYYY-MM-DD
  *        → AttendanceLoadDto: the enrollment roster (active on `date`),
@@ -48,6 +53,8 @@ import com.littlebridge.vidyaprayag.db.LeaveRequestsTable
 import com.littlebridge.vidyaprayag.db.StudentsTable
 import com.littlebridge.vidyaprayag.feature.calendar.EventStatus
 import com.littlebridge.vidyaprayag.feature.calendar.EventType
+import com.littlebridge.vidyaprayag.feature.notifications.Notify
+import com.littlebridge.vidyaprayag.feature.notifications.NotifyRecipients
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -183,7 +190,10 @@ fun Route.teacherAttendanceRouting() {
         route("/api/v1/teacher") {
 
             // ── GET /attendance?assignmentId=…&date=YYYY-MM-DD ────────────────
-            get("/attendance-typed") {
+            // T-205: converged to the canonical `/attendance` path. The legacy
+            // packed-`grade` handler in TeacherRoutingTasks.kt is now DELETED, so
+            // there is no method+path collision and this typed plane owns it.
+            get("/attendance") {
                 val ctx = call.requireTeacherContext() ?: return@get
                 val assignmentParam = call.request.queryParameters["assignmentId"]
                     ?: call.request.queryParameters["assignment_id"]
@@ -283,7 +293,8 @@ fun Route.teacherAttendanceRouting() {
             }
 
             // ── POST /attendance — upsert scoped marks ────────────────────────
-            post("/attendance-typed") {
+            // T-205: converged to the canonical `/attendance` path (legacy handler deleted).
+            post("/attendance") {
                 val ctx = call.requireTeacherContext() ?: return@post
                 val req = runCatching { call.receive<AttendanceSaveRequest>() }.getOrNull()
                 if (req == null) {
@@ -315,6 +326,11 @@ fun Route.teacherAttendanceRouting() {
                 // can be marked) and the valid state space.
                 val rosterById = enrollmentsFor(assignment).associateBy { it.studentId }
                 val now = Instant.now()
+                // Collect students newly flagged absent/late so we can alert their
+                // parents after the transaction commits (preserves the legacy
+                // RA-41 alert behaviour the deleted handler had). Keyed by
+                // student_code, since NotifyRecipients.parentsOfStudent expects it.
+                val flaggedCodes = mutableListOf<Pair<String, String>>() // (studentCode, status)
                 val saved = dbQuery {
                     var count = 0
                     for (m in req.marks) {
@@ -322,6 +338,9 @@ fun Route.teacherAttendanceRouting() {
                         if (status !in VALID_ATTENDANCE) continue // skip invalid silently-safe
                         val sid = runCatching { UUID.fromString(m.studentId) }.getOrNull() ?: continue
                         val enrolled = rosterById[sid] ?: continue // not in this class → ignore
+                        if (status == "absent" || status == "late") {
+                            flaggedCodes += enrolled.studentCode to status
+                        }
                         // Upsert on (school, date, type, student, assignment).
                         val existing = AttendanceRecordsTable.selectAll().where {
                             (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
@@ -363,6 +382,32 @@ fun Route.teacherAttendanceRouting() {
                         count++
                     }
                     count
+                }
+
+                // RA-41 (preserved from the deleted legacy handler): alert each
+                // affected parent when their child is absent/late. Recipients are
+                // resolved per student_code within this school (multi-tenant safe).
+                val scopeLabel = listOfNotNull(
+                    "${assignment.className}-${assignment.section}".takeIf { assignment.className.isNotBlank() },
+                    assignment.subject.takeIf { it.isNotBlank() },
+                ).joinToString(" · ")
+                for ((code, status) in flaggedCodes) {
+                    val parents = NotifyRecipients.parentsOfStudent(ctx.schoolId, code)
+                    if (parents.isNotEmpty()) {
+                        val verb = if (status == "absent") "marked absent" else "marked late"
+                        val context = if (scopeLabel.isNotBlank()) " in $scopeLabel" else ""
+                        Notify.toUsers(
+                            userIds = parents,
+                            category = "attendance",
+                            title = "Attendance update",
+                            body = "Your child was $verb$context on ${date}.",
+                            schoolId = ctx.schoolId,
+                            actorId = ctx.userId,
+                            deepLink = "parent/academics/attendance",
+                            refType = "attendance",
+                            refId = code,
+                        )
+                    }
                 }
 
                 call.ok(

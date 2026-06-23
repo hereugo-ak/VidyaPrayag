@@ -87,12 +87,19 @@ fun TeacherPortalV2(
         var selectedClassId by remember { mutableStateOf("") }
         var selectedSubject by remember { mutableStateOf("") }
         var selectedExamId by remember { mutableStateOf("") }
+        // T-205: the pre-known scope label for the attendance wrong-class guard header
+        // (E15), shown instantly while the server load confirms scope.
+        var selectedScope by remember { mutableStateOf("") }
 
         // Open the Update write-plane on a specific sub-tab, pre-seeded from a Today
         // period's pre-authorized assignment (so no class re-pick is needed — Doc 04 §4).
         fun openUpdate(period: ResolvedPeriodUi, sub: String) {
             selectedClassId = period.assignmentId.orEmpty()
             selectedSubject = period.subject
+            selectedScope = listOfNotNull(
+                period.classLabel.takeIf { period.className.isNotBlank() },
+                period.subject.takeIf { it.isNotBlank() },
+            ).joinToString(" · ")
             selectedExamId = ""
             updateSub = sub
             overlay = TeacherOverlay.Update
@@ -110,6 +117,7 @@ fun TeacherPortalV2(
                 "attendance" -> {
                     selectedClassId = item.assignmentId.orEmpty()
                     selectedSubject = ""
+                    selectedScope = item.title
                     selectedExamId = ""
                     updateSub = "Attendance"
                     overlay = TeacherOverlay.Update
@@ -144,8 +152,9 @@ fun TeacherPortalV2(
                     onSelectSub = { updateSub = it },
                     selectedClassId = selectedClassId,
                     selectedSubject = selectedSubject,
+                    selectedScope = selectedScope,
                     selectedExamId = selectedExamId,
-                    onSelectClass = { id, subject -> selectedClassId = id; selectedSubject = subject; selectedExamId = "" },
+                    onSelectClass = { id, subject -> selectedClassId = id; selectedSubject = subject; selectedScope = ""; selectedExamId = "" },
                     onSelectExam = { selectedExamId = it },
                     onBack = { overlay = TeacherOverlay.None },
                     modifier = modifier,
@@ -209,6 +218,7 @@ private fun TeacherUpdatePlane(
     onSelectSub: (String) -> Unit,
     selectedClassId: String,
     selectedSubject: String,
+    selectedScope: String,
     selectedExamId: String,
     onSelectClass: (String, String) -> Unit,
     onSelectExam: (String) -> Unit,
@@ -244,15 +254,23 @@ private fun TeacherUpdatePlane(
         }
 
         Column(Modifier.fillMaxSize()) {
-            // Homework authors its own class field; the shared picker fronts the others.
-            if (sub != "Homework") {
+            // T-205 (F-ATT-1): Attendance is reached PRE-SCOPED from a Today/Classes/obligations
+            // CTA via the pre-authorized assignmentId — it must NOT front the shared class
+            // picker (that buried it 2-3 taps and reset scope every visit). Homework authors
+            // its own class field; the shared picker still fronts Marks/Syllabus until their
+            // own rebuilds (P3/P4).
+            if (sub != "Homework" && sub != "Attendance") {
                 TeacherClassPicker(
                     selectedClassId = selectedClassId,
                     onSelectClass = { cls -> onSelectClass(cls.id, cls.subject) },
                 )
             }
             when (sub) {
-                "Attendance" -> TeacherAttendanceScreenV2(classId = selectedClassId, date = "")
+                "Attendance" -> TeacherAttendanceScreenV2(
+                    assignmentId = selectedClassId,
+                    date = "",
+                    scopeHint = selectedScope,
+                )
                 "Marks" -> {
                     if (selectedClassId.isNotBlank()) {
                         TeacherExamPicker(classId = selectedClassId, onSelectExam = onSelectExam)

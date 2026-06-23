@@ -21,8 +21,8 @@ class TeacherRepositoryImpl(
     override suspend fun getWeek(token: String, date: String?): NetworkResult<ResolvedWeekResponse> =
         api.getWeek(token, date)
 
-    override suspend fun getAttendance(token: String, classId: String, date: String): NetworkResult<TeacherAttendanceResponse> =
-        api.getAttendance(token, classId, date)
+    override suspend fun loadAttendance(token: String, assignmentId: String, date: String?): NetworkResult<AttendanceLoadResponse> =
+        api.loadAttendance(token, assignmentId, date)
 
     override suspend fun getMarks(token: String, classId: String, examId: String): NetworkResult<TeacherMarksResponse> =
         api.getMarks(token, classId, examId)
@@ -48,8 +48,8 @@ class TeacherRepositoryImpl(
     override suspend fun getObligations(token: String): NetworkResult<TeacherObligationsResponse> =
         api.getObligations(token)
 
-    override suspend fun submitAttendance(token: String, request: SubmitAttendanceRequest): NetworkResult<ApiResponse<Unit>> =
-        api.submitAttendance(token, request)
+    override suspend fun saveAttendance(token: String, request: AttendanceSaveRequest): NetworkResult<AttendanceSaveResponse> =
+        api.saveAttendance(token, request)
 
     override suspend fun submitMarks(token: String, request: SubmitMarksRequest): NetworkResult<ApiResponse<Unit>> =
         api.submitMarks(token, request)

@@ -57,14 +57,19 @@ class TeacherApi(
         }
     }
 
-    suspend fun getAttendance(
+    // T-205 (Doc 06 §3.8): the TYPED, SCOPED attendance load. Keyed by the
+    // authorizing assignmentId (Doc 05 binding) — never a free-text class/grade.
+    // Returns the enrollment roster with approved-leave pre-defaults, alreadyMarked
+    // + last-marked audit (load-for-EDIT), holiday/cancelled flags and the
+    // back-date window. Replaces the legacy class_id+grade getAttendance.
+    suspend fun loadAttendance(
         token: String,
-        classId: String,
-        date: String,
-    ): NetworkResult<TeacherAttendanceResponse> = safeApiCall {
+        assignmentId: String,
+        date: String? = null,
+    ): NetworkResult<AttendanceLoadResponse> = safeApiCall {
         client.get(getUrl("api/v1/teacher/attendance")) {
-            parameter("class_id", classId)
-            parameter("date", date)
+            parameter("assignmentId", assignmentId)
+            if (date != null) parameter("date", date)
         }
     }
 
@@ -132,10 +137,15 @@ class TeacherApi(
 
     // ── Writes ──────────────────────────────────────────────────────────────
 
-    suspend fun submitAttendance(
+    // T-205 (Doc 06 §3.7): the TYPED attendance save. Upserts on (school, date,
+    // type, student, assignment); server stamps marked_by/marked_at/source and
+    // enforces the future/back-date window (E9/E10). No publish side effects —
+    // attendance just saves (contrast the marks B-MK-1 bug). Replaces the legacy
+    // submitAttendance (classId + entries).
+    suspend fun saveAttendance(
         token: String,
-        request: SubmitAttendanceRequest,
-    ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
+        request: AttendanceSaveRequest,
+    ): NetworkResult<AttendanceSaveResponse> = safeApiCall {
         client.post(getUrl("api/v1/teacher/attendance")) {
             contentType(ContentType.Application.Json)
             setBody(request)

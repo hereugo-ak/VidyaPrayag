@@ -12,7 +12,9 @@ interface TeacherRepository {
     // T-104/T-105: server-resolved schedule for the Today tab.
     suspend fun getDay(token: String, date: String? = null): NetworkResult<ResolvedDayResponse>
     suspend fun getWeek(token: String, date: String? = null): NetworkResult<ResolvedWeekResponse>
-    suspend fun getAttendance(token: String, classId: String, date: String): NetworkResult<TeacherAttendanceResponse>
+    // T-205: typed, assignment-scoped attendance (Doc 06 §3.8). Replaces the legacy
+    // getAttendance(classId, date) / submitAttendance(SubmitAttendanceRequest).
+    suspend fun loadAttendance(token: String, assignmentId: String, date: String? = null): NetworkResult<AttendanceLoadResponse>
     suspend fun getMarks(token: String, classId: String, examId: String): NetworkResult<TeacherMarksResponse>
     suspend fun getSyllabus(token: String, classId: String, subject: String): NetworkResult<TeacherSyllabusResponse>
     suspend fun getHomework(token: String): NetworkResult<TeacherHomeworkResponse>
@@ -25,7 +27,7 @@ interface TeacherRepository {
     suspend fun getObligations(token: String): NetworkResult<TeacherObligationsResponse>
 
     // Writes
-    suspend fun submitAttendance(token: String, request: SubmitAttendanceRequest): NetworkResult<ApiResponse<Unit>>
+    suspend fun saveAttendance(token: String, request: AttendanceSaveRequest): NetworkResult<AttendanceSaveResponse>
     suspend fun submitMarks(token: String, request: SubmitMarksRequest): NetworkResult<ApiResponse<Unit>>
     suspend fun updateSyllabus(token: String, request: UpdateSyllabusRequest): NetworkResult<ApiResponse<Unit>>
     suspend fun createHomework(token: String, request: CreateHomeworkRequest): NetworkResult<ApiResponse<Unit>>

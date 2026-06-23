@@ -34,7 +34,6 @@ import com.littlebridge.vidyaprayag.core.requireTeacherContext
 import com.littlebridge.vidyaprayag.core.teacherAssignmentsFor
 import com.littlebridge.vidyaprayag.db.AssessmentMarksTable
 import com.littlebridge.vidyaprayag.db.AssessmentsTable
-import com.littlebridge.vidyaprayag.db.AttendanceRecordsTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.HomeworkSubmissionsTable
 import com.littlebridge.vidyaprayag.db.HomeworkTable
@@ -58,35 +57,15 @@ import java.util.UUID
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DTOs — mirror shared/.../teacher/domain/model/TeacherModels.kt field-for-field.
+//
+// T-205 (Doc 06 §3, Doc 11): the legacy packed-`grade` attendance DTOs
+// (AttendanceEntryDto / TeacherAttendanceData / AttendanceMarkDto /
+// SubmitAttendanceRequest) and the legacy `route("/attendance") { get/post }`
+// handler that lived here are DELETED — not patched. The typed, assignment-scoped
+// attendance plane (TeacherAttendanceRouting.kt, T-203) now OWNS `GET/POST
+// /api/v1/teacher/attendance`. This file keeps only the marks/syllabus/homework
+// child routes. (DELETE-don't-patch law.)
 // ─────────────────────────────────────────────────────────────────────────────
-
-@Serializable
-data class AttendanceEntryDto(
-    @SerialName("student_id") val studentId: String,
-    val name: String,
-    @SerialName("roll_no") val rollNo: String = "",
-    val status: String = "present",
-)
-
-@Serializable
-data class TeacherAttendanceData(
-    @SerialName("class_name") val className: String,
-    val date: String,
-    val students: List<AttendanceEntryDto> = emptyList(),
-)
-
-@Serializable
-data class AttendanceMarkDto(
-    @SerialName("student_id") val studentId: String,
-    val status: String,
-)
-
-@Serializable
-data class SubmitAttendanceRequest(
-    @SerialName("class_id") val classId: String,
-    val date: String,
-    val entries: List<AttendanceMarkDto> = emptyList(),
-)
 
 @Serializable
 data class MarksEntryDto(
@@ -188,128 +167,14 @@ data class CreateAssessmentRequest(
     @SerialName("exam_date") val examDate: String? = null,
 )
 
-private val VALID_ATTENDANCE = setOf("present", "absent", "late")
-
-/** Mounts the attendance/marks/syllabus/homework child routes under /api/v1/teacher. */
+/** Mounts the marks/syllabus/homework child routes under /api/v1/teacher.
+ *  (Attendance moved to TeacherAttendanceRouting.kt — typed & scoped, T-203/T-205.) */
 fun Route.teacherTaskRoutes() {
 
     // ── Attendance ──────────────────────────────────────────────────────────
-    route("/attendance") {
-        // GET ?class_id=&date= → roster pre-filled with the day's status.
-        get {
-            val ctx = call.requireTeacherContext() ?: return@get
-            val classId = call.request.queryParameters["class_id"]
-            val date = call.request.queryParameters["date"]?.takeIf { it.isNotBlank() } ?: todayIso()
-            // T-004: attendance_records.date is now a typed `date` column. Keep the
-            // String `date` for the wire DTO; parse a LocalDate for column queries.
-            val dateValue = LocalDate.parse(date)
-            val asg = call.requireOwnedAssignment(ctx, classId) ?: return@get
-            val grade = "${asg.className}-${asg.section}"
-
-            val data = dbQuery {
-                // ROOT FIX (ISSUE 1): normalised roster match (was raw eq).
-                val students = studentsForAssignment(ctx.schoolId, asg.className, asg.section)
-
-                val marked = AttendanceRecordsTable.selectAll().where {
-                    (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
-                        (AttendanceRecordsTable.date eq dateValue) and
-                        (AttendanceRecordsTable.type eq "student") and
-                        (AttendanceRecordsTable.grade eq grade)
-                }.associate { it[AttendanceRecordsTable.personId] to it[AttendanceRecordsTable.status] }
-
-                students.map { s ->
-                    val code = s[StudentsTable.studentCode]
-                    AttendanceEntryDto(
-                        studentId = code,
-                        name = s[StudentsTable.fullName],
-                        rollNo = s[StudentsTable.rollNumber],
-                        status = marked[code] ?: "present",
-                    )
-                }
-            }
-            call.ok(
-                TeacherAttendanceData(className = grade, date = date, students = data),
-                message = "Attendance roster loaded",
-            )
-        }
-
-        // POST → upsert one attendance_records row per entry for the day.
-        post {
-            val ctx = call.requireTeacherContext() ?: return@post
-            val req = call.receive<SubmitAttendanceRequest>()
-            val asg = call.requireOwnedAssignment(ctx, req.classId) ?: return@post
-            val grade = "${asg.className}-${asg.section}"
-            val date = req.date.takeIf { it.isNotBlank() } ?: todayIso()
-            // T-004: attendance_records.date is now a typed `date` column.
-            val dateValue = LocalDate.parse(date)
-
-            val bad = req.entries.firstOrNull { it.status.lowercase() !in VALID_ATTENDANCE }
-            if (bad != null) {
-                call.fail("Invalid status '${bad.status}' (expected present|absent|late)", HttpStatusCode.BadRequest)
-                return@post
-            }
-
-            val now = Instant.now()
-            dbQuery {
-                for (e in req.entries) {
-                    val status = e.status.lowercase()
-                    val existing = AttendanceRecordsTable.selectAll().where {
-                        (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
-                            (AttendanceRecordsTable.date eq dateValue) and
-                            (AttendanceRecordsTable.type eq "student") and
-                            (AttendanceRecordsTable.personId eq e.studentId)
-                    }.firstOrNull()
-                    if (existing != null) {
-                        AttendanceRecordsTable.update({
-                            (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
-                                (AttendanceRecordsTable.date eq dateValue) and
-                                (AttendanceRecordsTable.type eq "student") and
-                                (AttendanceRecordsTable.personId eq e.studentId)
-                        }) {
-                            it[AttendanceRecordsTable.status] = status
-                            it[AttendanceRecordsTable.grade] = grade
-                            it[markedBy] = ctx.userId
-                        }
-                    } else {
-                        AttendanceRecordsTable.insert {
-                            it[id] = UUID.randomUUID()
-                            it[schoolId] = ctx.schoolId
-                            it[AttendanceRecordsTable.date] = dateValue
-                            it[type] = "student"
-                            it[personId] = e.studentId
-                            it[AttendanceRecordsTable.grade] = grade
-                            it[AttendanceRecordsTable.status] = status
-                            it[markedBy] = ctx.userId
-                            it[createdAt] = now
-                        }
-                    }
-                }
-            }
-
-            // RA-41: alert each affected parent when their child is absent/late.
-            // Recipients resolved per student_code within this school (multi-tenant).
-            val flagged = req.entries.filter { it.status.lowercase() in setOf("absent", "late") }
-            for (e in flagged) {
-                val parents = NotifyRecipients.parentsOfStudent(ctx.schoolId, e.studentId)
-                if (parents.isNotEmpty()) {
-                    val verb = if (e.status.lowercase() == "absent") "marked absent" else "marked late"
-                    Notify.toUsers(
-                        userIds = parents,
-                        category = "attendance",
-                        title = "Attendance update",
-                        body = "Your child was $verb on $date.",
-                        schoolId = ctx.schoolId,
-                        actorId = ctx.userId,
-                        deepLink = "parent/academics/attendance",
-                        refType = "attendance",
-                        refId = e.studentId,
-                    )
-                }
-            }
-            call.okMessage("Attendance saved for ${req.entries.size} student(s)")
-        }
-    }
-
+    // REMOVED (T-205): the legacy packed-`grade` GET/POST /attendance handler that
+    // lived here is deleted. The typed, assignment-scoped plane in
+    // TeacherAttendanceRouting.kt now owns GET/POST /api/v1/teacher/attendance.
     // ── Marks ─────────────────────────────────────────────────────────────────
     route("/marks") {
         // GET ?class_id=&exam_id= → assessment roster with current scores.

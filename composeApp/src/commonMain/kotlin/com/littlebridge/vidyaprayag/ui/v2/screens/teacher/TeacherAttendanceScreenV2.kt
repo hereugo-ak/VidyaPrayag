@@ -1,6 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -11,10 +12,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,10 +29,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.AttendanceStatus
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.StudentAttendance
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherAttendanceState
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherAttendanceViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
@@ -36,9 +45,8 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
+import com.littlebridge.vidyaprayag.ui.v2.components.VDatePicker
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.components.VInput
-import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
 import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
@@ -46,34 +54,53 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * TeacherAttendanceScreenV2 — `Teacher.tsx → AttendanceFlow`, wired to the real
- * [TeacherAttendanceViewModel] (`TeacherRepository.getAttendance` / `submitAttendance`).
+ * TeacherAttendanceScreenV2 — T-205 (Doc 06 §3, Doc 10 §6.3). The clean rebuild of
+ * the attendance plane, reached PRE-SCOPED from a Today/Classes CTA via [assignmentId]
+ * (Doc 05 binding) — there is no shared class picker (kills F-ATT-1).
  *
- * Class/date selectors, "Mark all present", per-student P/A/L pill row (live edits via the VM),
- * and a sticky submit summary. No MockV2 in production; the three UI states come from [VStateHost].
- * When [classId] is blank the screen shows an empty prompt (selection lands with Phase 3E nav).
+ * Honors the spec end-to-end:
+ *  - **Wrong-class guard header** (E15): a prominent "{class} · {subject} · {date}"
+ *    band so Aanya always knows which class she's in.
+ *  - **Enabled, correctable date** (fixes F-ATT-2): a real [VDatePicker]; the back-date
+ *    window the server accepts is advertised; a blocked save returns a clear message.
+ *  - **4-state pills** P/A/L/Lv (Doc 06 §3.4, D-ATT-1) at ≥48dp, color + LETTER encoded
+ *    (never hue-only — Doc 10 §11), with semantic tokens (success/danger/warning/accentSoft).
+ *  - **Leave defaults** (§3.5): approved-leave students arrive pre-set to leave and are
+ *    badged; still overridable.
+ *  - **Bulk "Mark all present"** (§3.6) preserving manual + leave exceptions.
+ *  - **Running counter** (§3.6): "P · A · L · Lv · unmarked", always visible (sticky).
+ *  - **Load-for-EDIT audit** (E3): "Last marked by … at …".
+ *  - **Holiday warning** (E1) when the date is a published holiday.
+ *  - **Result-driven save** (§3.7) via [VButton] loading/success; no auto-publish.
+ *  - **Three states** via [VStateHost]; long rosters virtualized via [LazyColumn] (Doc 10 §7).
+ *
+ * [scopeHint] is the pre-known label from the launching period (so the guard header
+ * shows instantly while loading); the server load is the source of truth and overrides it.
  */
 @Composable
 fun TeacherAttendanceScreenV2(
-    classId: String = "",
+    assignmentId: String = "",
     date: String = "",
+    scopeHint: String = "",
     modifier: Modifier = Modifier,
     viewModel: TeacherAttendanceViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
 
-    // The portal supplies class/date; load whenever they change and are present.
-    LaunchedEffect(classId, date) {
-        if (classId.isNotBlank()) viewModel.load(classId, date)
+    // Reached pre-scoped: load whenever the assignment changes.
+    LaunchedEffect(assignmentId) {
+        if (assignmentId.isNotBlank()) viewModel.load(assignmentId, date)
     }
 
     TeacherAttendanceContent(
         state = state,
-        hasSelection = classId.isNotBlank(),
-        onMarkAll = { viewModel.markAll(AttendanceStatus.PRESENT) },
+        hasScope = assignmentId.isNotBlank(),
+        scopeHint = scopeHint,
+        onChangeDate = viewModel::changeDate,
+        onMarkAllPresent = viewModel::markAllPresent,
         onSetStatus = viewModel::setStatus,
-        onSubmit = viewModel::submit,
-        onRetry = { if (classId.isNotBlank()) viewModel.load(classId, date) },
+        onSave = viewModel::save,
+        onRetry = viewModel::retry,
         modifier = modifier,
     )
 }
@@ -81,109 +108,262 @@ fun TeacherAttendanceScreenV2(
 @Composable
 private fun TeacherAttendanceContent(
     state: TeacherAttendanceState,
-    hasSelection: Boolean,
-    onMarkAll: () -> Unit,
+    hasScope: Boolean,
+    scopeHint: String,
+    onChangeDate: (String) -> Unit,
+    onMarkAllPresent: () -> Unit,
     onSetStatus: (String, String) -> Unit,
-    onSubmit: () -> Unit,
+    onSave: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
-    Column(
-        modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
-            .padding(top = 16.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            VInput(value = state.className.ifBlank { "Select class" }, onValueChange = {}, modifier = Modifier.weight(1f), enabled = false)
-            VInput(value = state.date.ifBlank { "Today" }, onValueChange = {}, modifier = Modifier.weight(1f), enabled = false)
+    val headerScope = state.scope.ifBlank { scopeHint }
+
+    Column(modifier.fillMaxSize().padding(horizontal = 20.dp).padding(top = 12.dp)) {
+
+        // ── Wrong-class guard header (E15) ──────────────────────────────────
+        // Always visible, even while loading — Aanya's reassurance she's in the
+        // right class. class · subject · date, in calm accent ink.
+        if (headerScope.isNotBlank() || state.date.isNotBlank()) {
+            GuardHeader(scope = headerScope, date = state.date)
+            Spacer(Modifier.height(12.dp))
         }
 
         VStateHost(
             loading = state.isLoading,
             error = state.error,
-            isEmpty = !hasSelection || state.students.isEmpty(),
-            emptyTitle = if (hasSelection) "No students" else "Choose a class",
-            emptyBody = if (hasSelection) "This class has no students to mark yet."
-            else "Pick a class to start marking attendance.",
+            isEmpty = !hasScope || (state.students.isEmpty() && !state.isHoliday),
+            emptyTitle = if (!hasScope) "Choose a class" else "No students enrolled",
+            emptyBody = if (!hasScope) "Open attendance from a class on Today to start marking."
+            else "No students are enrolled in this class yet.",
             emptyIcon = VIcons.Users,
             onRetry = onRetry,
         ) {
-            VButton(text = "Mark all present", onClick = onMarkAll, full = true, variant = VButtonVariant.Secondary)
-            VCard {
-                state.students.forEachIndexed { i, s ->
-                    if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(c.border1))
-                    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        VAvatar(name = s.name, size = 32.dp)
-                        Column(Modifier.weight(1f)) {
-                            Text(s.name, style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 13.sp))
-                            Text("Roll ${s.rollNo}", style = VTheme.type.dataSm.colored(c.ink3).copy(fontSize = 11.sp))
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            PalPill("P", s.status == AttendanceStatus.PRESENT, c.success) { onSetStatus(s.studentId, AttendanceStatus.PRESENT) }
-                            PalPill("A", s.status == AttendanceStatus.ABSENT, c.danger) { onSetStatus(s.studentId, AttendanceStatus.ABSENT) }
-                            PalPill("L", s.status == AttendanceStatus.LATE, c.warning) { onSetStatus(s.studentId, AttendanceStatus.LATE) }
-                        }
-                    }
-                }
-            }
-            VCard {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    val marked = state.presentCount + state.absentCount + state.lateCount
-                    val total = state.students.size
-                    val remaining = (total - marked).coerceAtLeast(0)
-                    val pct = if (total == 0) 0f else marked.toFloat() / total * 100f
-                    Column(Modifier.weight(1f)) {
-                        Text("$marked marked • $remaining remaining", style = VTheme.type.caption.colored(c.ink2))
-                        Spacer(Modifier.height(4.dp))
-                        VProgressBar(value = pct)
-                    }
-                    Spacer(Modifier.height(0.dp))
-                    // RA-S18: result-driven Submit. No fake `stateful` timer — the spinner shows
-                    // only while the request is in flight (`isSubmitting`) and the "Submitted" check
-                    // shows only after the VM confirms the write (`submitSuccess`). Disabled while
-                    // submitting or after a confirmed save (re-enables when the roster is edited).
-                    VButton(
-                        text = if (state.submitSuccess) "Submitted" else "Submit",
-                        onClick = onSubmit,
-                        size = VButtonSize.Lg,
-                        tone = VButtonTone.Lavender,
-                        loading = state.isSubmitting,
-                        success = state.submitSuccess,
-                        enabled = !state.isSubmitting && !state.submitSuccess,
-                        successLabel = "Submitted",
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+
+                // ── Holiday warning (E1) ────────────────────────────────────
+                if (state.isHoliday) {
+                    WarnBanner(
+                        text = "This is a holiday${state.holidayName?.let { " ($it)" } ?: ""}. " +
+                            "Attendance isn't usually marked today — only mark if there's a special session.",
                     )
                 }
-            }
-            // RA-S18: surface a submit error inline (the VStateHost error channel covers the
-            // load path; a failed submit must not silently look like nothing happened, nor wipe
-            // the marked roster the teacher is mid-way through).
-            state.submitError?.let { err ->
+
+                // ── Date (enabled, correctable — fixes F-ATT-2) + bulk ──────
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+                    VDatePicker(
+                        value = state.date,
+                        onValueChange = onChangeDate,
+                        label = "Date",
+                        modifier = Modifier.weight(1f),
+                    )
+                }
                 Text(
-                    err,
-                    style = VTheme.type.caption.colored(c.danger),
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    "You can correct attendance up to ${state.backDateWindowDays} days back.",
+                    style = VTheme.type.caption.colored(c.ink3),
                 )
+
+                VButton(
+                    text = "Mark all present",
+                    onClick = onMarkAllPresent,
+                    full = true,
+                    variant = VButtonVariant.Secondary,
+                    leading = { Icon(VIcons.Check, contentDescription = null, tint = c.successInk, modifier = Modifier.size(18.dp)) },
+                )
+
+                // ── Last-marked audit (E3) ──────────────────────────────────
+                if (state.alreadyMarked && state.lastMarkedBy != null) {
+                    Text(
+                        "Last marked by ${state.lastMarkedBy}${state.lastMarkedAt?.let { " · ${prettyStamp(it)}" } ?: ""}",
+                        style = VTheme.type.caption.colored(c.ink2),
+                    )
+                }
+
+                // ── Virtualized roster (Doc 10 §7) ──────────────────────────
+                LazyColumn(
+                    Modifier.weight(1f).fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(state.students, key = { it.studentId }) { s ->
+                        StudentRow(s = s, onSetStatus = onSetStatus)
+                    }
+                    item { Spacer(Modifier.height(140.dp)) } // clear the sticky footer + dock
+                }
+
+                // ── Sticky running counter + result-driven Save (§3.6/§3.7) ──
+                SaveFooter(state = state, onSave = onSave)
+
+                state.saveError?.let { err ->
+                    Text(err, style = VTheme.type.caption.colored(c.danger), modifier = Modifier.fillMaxWidth())
+                }
             }
         }
     }
 }
 
 @Composable
-private fun PalPill(letter: String, active: Boolean, tone: Color, onClick: () -> Unit) {
+private fun GuardHeader(scope: String, date: String) {
+    val c = VTheme.colors
+    Box(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.accentTint).padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(
+                Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(c.accent.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(VIcons.Users, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(18.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    scope.ifBlank { "Attendance" },
+                    style = VTheme.type.h3.colored(c.ink).copy(fontWeight = FontWeight.ExtraBold),
+                )
+                if (date.isNotBlank()) {
+                    Text(prettyStamp(date), style = VTheme.type.caption.colored(c.accentDeep))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WarnBanner(text: String) {
+    val c = VTheme.colors
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.warning.copy(alpha = 0.22f))
+            .border(1.dp, c.warning, RoundedCornerShape(12.dp)).padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(VIcons.AlertTriangle, contentDescription = null, tint = c.warningInk, modifier = Modifier.size(18.dp))
+        Text(text, style = VTheme.type.caption.colored(c.warningInk).copy(fontSize = 12.sp))
+    }
+}
+
+@Composable
+private fun StudentRow(s: StudentAttendance, onSetStatus: (String, String) -> Unit) {
+    val c = VTheme.colors
+    VCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                VAvatar(name = s.name, size = 40.dp)
+                Column(Modifier.weight(1f)) {
+                    // bodyLarge equivalent: primary roster name at 16sp (Doc 10 §2, 58yo floor).
+                    Text(s.name, style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 16.sp))
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Roll ${s.rollNo.ifBlank { "—" }}", style = VTheme.type.dataSm.colored(c.ink3).copy(fontSize = 12.sp))
+                        if (s.isOnApprovedLeave) {
+                            LeaveBadge()
+                        }
+                    }
+                }
+            }
+            // The four status pills — ≥48dp tall, equal width, letter + color encoded.
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusPill("P", "Present", s.status == AttendanceStatus.PRESENT, c.success, c.successInk, Modifier.weight(1f)) {
+                    onSetStatus(s.studentId, AttendanceStatus.PRESENT)
+                }
+                StatusPill("A", "Absent", s.status == AttendanceStatus.ABSENT, c.danger, c.dangerInk, Modifier.weight(1f)) {
+                    onSetStatus(s.studentId, AttendanceStatus.ABSENT)
+                }
+                StatusPill("L", "Late", s.status == AttendanceStatus.LATE, c.warning, c.warningInk, Modifier.weight(1f)) {
+                    onSetStatus(s.studentId, AttendanceStatus.LATE)
+                }
+                StatusPill("Lv", "Leave", s.status == AttendanceStatus.LEAVE, c.accentSoft, c.accentDeep, Modifier.weight(1f)) {
+                    onSetStatus(s.studentId, AttendanceStatus.LEAVE)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LeaveBadge() {
+    val c = VTheme.colors
+    Box(
+        Modifier.clip(RoundedCornerShape(999.dp)).background(c.accentSoft.copy(alpha = 0.22f)).padding(horizontal = 8.dp, vertical = 2.dp),
+    ) {
+        Text("On approved leave", style = VTheme.type.label.colored(c.accentDeep).copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold))
+    }
+}
+
+@Composable
+private fun StatusPill(
+    letter: String,
+    label: String,
+    active: Boolean,
+    fill: Color,
+    ink: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
     val c = VTheme.colors
     val interaction = remember { MutableInteractionSource() }
     Box(
-        Modifier
+        modifier
+            .heightIn(min = 48.dp) // Doc 10 §3 — hard floor for Mr. Rao.
             .clip(RoundedCornerShape(999.dp))
-            .background(if (active) tone else c.ink.copy(alpha = 0.06f))
+            .background(if (active) fill else c.cream)
+            .border(1.dp, if (active) fill else c.border2, RoundedCornerShape(999.dp))
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .semantics { contentDescription = if (active) "$label, selected" else label }
+            .padding(vertical = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(letter, style = VTheme.type.label.colored(if (active) c.background else c.ink3).copy(letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified, fontWeight = FontWeight.SemiBold))
+        Text(
+            letter,
+            style = VTheme.type.label.colored(if (active) ink else c.ink3)
+                .copy(fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center),
+        )
     }
 }
+
+@Composable
+private fun SaveFooter(state: TeacherAttendanceState, onSave: () -> Unit) {
+    val c = VTheme.colors
+    VCard(modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f)) {
+                // Running counter — DM Mono tabular figures (Doc 10 §2).
+                Text(
+                    "${state.presentCount} P · ${state.absentCount} A · ${state.lateCount} L · ${state.leaveCount} Lv",
+                    style = VTheme.type.data.colored(c.ink).copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                )
+                val unmarked = state.unmarkedCount
+                Text(
+                    if (unmarked > 0) "$unmarked still on default" else "${state.total} students marked",
+                    style = VTheme.type.caption.colored(if (unmarked > 0) c.ink3 else c.successInk),
+                )
+            }
+            VButton(
+                text = if (state.saveSuccess) "Saved" else "Save",
+                onClick = onSave,
+                size = VButtonSize.Lg,
+                tone = VButtonTone.Lavender,
+                loading = state.isSaving,
+                success = state.saveSuccess,
+                enabled = !state.isSaving && !state.saveSuccess && state.total > 0,
+                successLabel = "Saved",
+                modifier = Modifier.widthIn(min = 120.dp),
+            )
+        }
+    }
+}
+
+/** Render an ISO date / timestamp into a short human label without pulling a date lib. */
+private fun prettyStamp(raw: String): String {
+    // Accept "YYYY-MM-DD" or "YYYY-MM-DDTHH:mm" / ISO instants; show date (+time if present).
+    val datePart = raw.take(10)
+    val parts = datePart.split('-')
+    if (parts.size != 3) return raw
+    val (y, m, d) = parts
+    val month = MONTHS.getOrNull(m.toIntOrNull()?.minus(1) ?: -1) ?: m
+    val day = d.toIntOrNull() ?: return raw
+    val timePart = raw.drop(11).take(5).takeIf { it.length == 5 && it.contains(':') }
+    val base = "$month $day, $y"
+    return if (timePart != null) "$base at $timePart" else base
+}
+
+private val MONTHS = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")

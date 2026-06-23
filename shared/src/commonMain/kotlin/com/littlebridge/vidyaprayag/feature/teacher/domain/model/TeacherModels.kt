@@ -232,48 +232,19 @@ data class TeacherStudentDto(
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Attendance — load the day's roster, then submit marks.
-// Backs Teacher.tsx → Update › Attendance.
+// Attendance — load the day's roster, then save marks.
+//
+// T-205 (Doc 06 §3, Doc 11): the legacy class_id+packed-`grade` attendance DTOs
+// (TeacherAttendanceResponse / TeacherAttendanceData / AttendanceEntryDto /
+// SubmitAttendanceRequest / AttendanceMarkDto) are DELETED. They backed the
+// pre-rebuild Update › Attendance screen, which T-205 replaced from scratch. The
+// only attendance contract now is the typed, assignment-scoped one below (T-202).
+// (admin's own AttendanceEntryDto lives in feature.admin.domain.model — separate.)
 // ─────────────────────────────────────────────────────────────────────────────
 
-@Serializable
-data class TeacherAttendanceResponse(
-    val success: Boolean,
-    val data: TeacherAttendanceData,
-)
-
-@Serializable
-data class TeacherAttendanceData(
-    @SerialName("class_name") val className: String,
-    val date: String,
-    val students: List<AttendanceEntryDto> = emptyList(),
-)
-
-@Serializable
-data class AttendanceEntryDto(
-    @SerialName("student_id") val studentId: String,
-    val name: String,
-    @SerialName("roll_no") val rollNo: String = "",
-    val status: String = "present", // "present" | "absent" | "late"
-)
-
-@Serializable
-data class SubmitAttendanceRequest(
-    @SerialName("class_id") val classId: String,
-    val date: String,
-    val entries: List<AttendanceMarkDto>,
-)
-
-@Serializable
-data class AttendanceMarkDto(
-    @SerialName("student_id") val studentId: String,
-    val status: String,
-)
-
 // ─────────────────────────────────────────────────────────────────────────────
-// T-202 — Typed, SCOPED attendance load/save (Doc 06 §1.2/§3.8). Supersedes the
-// legacy Teacher*Attendance* DTOs above (which the pre-rebuild Update screen
-// still uses until T-205 deletes that screen). The new contract is keyed by the
+// T-202 — Typed, SCOPED attendance load/save (Doc 06 §1.2/§3.8). The new contract
+// is keyed by the
 // authorizing assignmentId (Doc 05 binding), carries the typed roster from
 // enrollments, pre-marks approved-leave students (leaveDefaults / source), and
 // reports alreadyMarked + last-marked audit so the screen can load for EDIT
