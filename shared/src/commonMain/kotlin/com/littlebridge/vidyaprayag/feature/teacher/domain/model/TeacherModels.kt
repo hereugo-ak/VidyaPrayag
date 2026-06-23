@@ -873,6 +873,49 @@ data class TeacherLeaveDto(
 data class TeacherLeaveDecisionRequest(val status: String) // Approved | Rejected
 
 // ─────────────────────────────────────────────────────────────────────────────
+// T-602a (Doc 04 §5.14): the teacher's OWN leave workflow (apply + status list).
+// Mirror server/.../teacher/TeacherSelfLeaveRouting.kt. DISTINCT from the
+// approval-inbox DTOs above — here the teacher is the APPLICANT, so a row has no
+// student/class context, just the teacher's own dates/reason/status.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class CreateTeacherLeaveRequest(
+    @SerialName("date_from") val dateFrom: String, // YYYY-MM-DD
+    @SerialName("date_to") val dateTo: String,      // YYYY-MM-DD
+    val reason: String,
+    @SerialName("image_url") val imageUrl: String? = null,
+)
+
+@Serializable
+data class TeacherSelfLeaveResponse(
+    val success: Boolean = true,
+    val data: TeacherSelfLeaveDto? = null,
+)
+
+@Serializable
+data class TeacherSelfLeaveListResponse(
+    val success: Boolean = true,
+    val data: TeacherSelfLeaveListData = TeacherSelfLeaveListData(),
+)
+
+@Serializable
+data class TeacherSelfLeaveListData(
+    @SerialName("pending_count") val pendingCount: Int = 0,
+    val requests: List<TeacherSelfLeaveDto> = emptyList(),
+)
+
+@Serializable
+data class TeacherSelfLeaveDto(
+    val id: String,
+    @SerialName("date_from") val dateFrom: String,
+    @SerialName("date_to") val dateTo: String,
+    val reason: String,
+    @SerialName("image_url") val imageUrl: String? = null,
+    val status: String, // Pending | Approved | Rejected
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
 // RA-51 — teacher messaging (1:1 + "message class parents" broadcast).
 // ─────────────────────────────────────────────────────────────────────────────
 

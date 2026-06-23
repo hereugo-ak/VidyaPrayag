@@ -99,6 +99,7 @@ import com.littlebridge.vidyaprayag.feature.teacher.teacherHomeworkRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherLeaveRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherMessagesRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherRouting
+import com.littlebridge.vidyaprayag.feature.teacher.teacherSelfLeaveRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherSyllabusRouting
 import com.littlebridge.vidyaprayag.feature.user.parentRouting
 import com.littlebridge.vidyaprayag.feature.user.parentMessagesRouting
@@ -305,7 +306,8 @@ fun Application.module() {
         teacherClassesRouting()      // T-501/T-502/T-504 /api/v1/teacher/classes[/{id}] — single-aggregated-query class list (kills B-CLS-1 N+1), real is_class_teacher (B-CLS-3), composite class detail w/ real roster (F-CLS-5); CONVERGED from staged /classes-v2 to canonical /classes[/{id}] in T-504 (legacy looping /classes handler in teacherRouting DELETED)
         teacherStudentRouting()      // T-503/T-504 /api/v1/teacher/students/{id} — scoped student profile (403 if teacher doesn't teach the student; B-PROF-1/2/F-PROF-3); CONVERGED from staged /students-v2 to canonical /students/{id} in T-504
         teacherHomeworkRouting()     // T-405/T-406 /api/v1/teacher/homework — typed homework lifecycle: assign (fixes dead button F-HW-1/B-HW-1), roster-joined submissions board (B-HW-3), extend (whole-class/single-student), review/grade, close (Doc 08 Part B); CONVERGED from staged /homework-v2 to canonical /homework in T-406 (legacy /homework GET+POST handler in teacherTaskRoutes DELETED)
-        teacherLeaveRouting()        // /api/v1/teacher/leave-requests[…] — RA-44 teacher lists/decides leave for their classes
+        teacherLeaveRouting()        // /api/v1/teacher/leave-requests[…] — RA-44 teacher lists/decides STUDENT leave routed to their classes
+        teacherSelfLeaveRouting()    // T-602a /api/v1/teacher/leave[…] — the teacher's OWN leave: apply (requester_role=teacher, routed to school admins) + list-own-status (Doc 04 §5.14)
         teacherMessagesRouting()     // /api/v1/teacher/messages[…] — RA-51 teacher↔parent messaging + class broadcast
 
         // Cross-user notification spine (audit part-2 RA-41/42/46/50) — role-aware

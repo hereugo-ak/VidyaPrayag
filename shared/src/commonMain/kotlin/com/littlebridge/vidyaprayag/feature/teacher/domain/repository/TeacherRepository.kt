@@ -66,9 +66,13 @@ interface TeacherRepository {
     suspend fun reviewHomeworkSubmission(token: String, homeworkId: String, studentId: String, request: ReviewSubmissionRequest): NetworkResult<HomeworkMutationResponse>
     suspend fun closeHomework(token: String, homeworkId: String, assignmentId: String): NetworkResult<HomeworkMutationResponse>
 
-    // RA-44: teacher leave workflow.
+    // RA-44: teacher leave workflow (STUDENT leave routed to my classes).
     suspend fun getLeaveRequests(token: String, status: String? = null): NetworkResult<TeacherLeaveListResponse>
     suspend fun decideLeaveRequest(token: String, id: String, request: TeacherLeaveDecisionRequest): NetworkResult<ApiResponse<Unit>>
+
+    // T-602a (Doc 04 §5.14): the teacher's OWN leave (apply + status list).
+    suspend fun getMyLeave(token: String, status: String? = null): NetworkResult<TeacherSelfLeaveListResponse>
+    suspend fun applyMyLeave(token: String, request: CreateTeacherLeaveRequest): NetworkResult<TeacherSelfLeaveResponse>
 
     // RA-51: message all parents of an owned class.
     suspend fun broadcastToClass(token: String, request: TeacherClassBroadcastRequest): NetworkResult<TeacherClassBroadcastResponse>

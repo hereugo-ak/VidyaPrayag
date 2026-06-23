@@ -397,6 +397,29 @@ class TeacherApi(
         }
     }
 
+    // ── T-602a: the teacher's OWN leave (apply + status list) ─────────────────
+
+    /** The teacher's own submitted leave requests (optionally status-filtered). */
+    suspend fun getMyLeave(
+        token: String,
+        status: String? = null,
+    ): NetworkResult<TeacherSelfLeaveListResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/leave")) {
+            if (status != null) parameter("status", status)
+        }
+    }
+
+    /** Apply for the teacher's own leave (routed to school admins). */
+    suspend fun applyMyLeave(
+        token: String,
+        request: CreateTeacherLeaveRequest,
+    ): NetworkResult<TeacherSelfLeaveResponse> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/leave")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
     /** RA-51: broadcast a message to every parent of an owned class. */
     suspend fun broadcastToClass(
         token: String,

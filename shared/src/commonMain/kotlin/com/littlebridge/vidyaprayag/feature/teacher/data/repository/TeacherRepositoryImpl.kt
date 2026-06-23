@@ -109,6 +109,13 @@ class TeacherRepositoryImpl(
     override suspend fun decideLeaveRequest(token: String, id: String, request: TeacherLeaveDecisionRequest): NetworkResult<ApiResponse<Unit>> =
         api.decideLeaveRequest(token, id, request)
 
+    // T-602a: the teacher's OWN leave (apply + status list).
+    override suspend fun getMyLeave(token: String, status: String?): NetworkResult<TeacherSelfLeaveListResponse> =
+        api.getMyLeave(token, status)
+
+    override suspend fun applyMyLeave(token: String, request: CreateTeacherLeaveRequest): NetworkResult<TeacherSelfLeaveResponse> =
+        api.applyMyLeave(token, request)
+
     override suspend fun broadcastToClass(token: String, request: TeacherClassBroadcastRequest): NetworkResult<TeacherClassBroadcastResponse> =
         api.broadcastToClass(token, request)
 }
