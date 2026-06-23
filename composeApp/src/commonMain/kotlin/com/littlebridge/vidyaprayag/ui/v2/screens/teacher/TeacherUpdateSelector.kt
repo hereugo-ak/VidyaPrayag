@@ -58,7 +58,7 @@ fun TeacherClassPicker(
         when {
             state.isLoading -> Text("Loading classes…", style = VTheme.type.body.copy(color = c.ink3))
             state.error != null -> Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Text(state.error ?: "Couldn't load classes", style = VTheme.type.body.copy(color = c.danger))
+                Text(state.error ?: "Couldn't load classes", style = VTheme.type.body.copy(color = c.dangerInk))
                 VButton(
                     text = "Retry",
                     onClick = { classesViewModel.refresh() },

@@ -304,7 +304,7 @@ private fun CreateAssessmentCard(
                 label = "Exam date (optional)",
             )
             state.createError?.let { err ->
-                Text(err, style = VTheme.type.caption.colored(c.danger))
+                Text(err, style = VTheme.type.caption.colored(c.dangerInk))
             }
             VButton(
                 text = "Create assessment",

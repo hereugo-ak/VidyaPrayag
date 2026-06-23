@@ -346,7 +346,7 @@ private fun AddUnitDialog(
                     enabled = !isAdding,
                 )
                 if (error != null) {
-                    Text(error, style = VTheme.type.caption.colored(c.danger))
+                    Text(error, style = VTheme.type.caption.colored(c.dangerInk))
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     VButton(

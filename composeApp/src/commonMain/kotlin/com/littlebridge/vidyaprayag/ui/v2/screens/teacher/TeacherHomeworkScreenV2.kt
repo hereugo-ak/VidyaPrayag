@@ -686,7 +686,7 @@ private fun AssignHomeworkDialog(
                 )
                 AllowLateToggle(checked = state.composerAllowLate, enabled = !state.isAssigning, onToggle = onAllowLate)
                 if (state.composerError != null) {
-                    Text(state.composerError, style = VTheme.type.caption.colored(c.danger))
+                    Text(state.composerError, style = VTheme.type.caption.colored(c.dangerInk))
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     VButton(
@@ -785,7 +785,7 @@ private fun GrantExtensionDialog(
                     enabled = !state.isGrantingExtension,
                 )
                 if (state.extensionError != null) {
-                    Text(state.extensionError, style = VTheme.type.caption.colored(c.danger))
+                    Text(state.extensionError, style = VTheme.type.caption.colored(c.dangerInk))
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     VButton(

@@ -571,7 +571,7 @@ private fun ClassBroadcastComposer(
                     enabled = !sending,
                     singleLine = false,
                 )
-                if (error != null) Text(error, style = VTheme.type.caption.colored(c.danger))
+                if (error != null) Text(error, style = VTheme.type.caption.colored(c.dangerInk))
                 VButton(
                     text = "Send to parents",
                     onClick = { if (body.isNotBlank()) onSend(body) },
