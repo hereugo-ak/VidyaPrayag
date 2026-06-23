@@ -15,6 +15,9 @@ class TeacherRepositoryImpl(
     override suspend fun getClasses(token: String): NetworkResult<TeacherClassesResponse> =
         api.getClasses(token)
 
+    override suspend fun listClassesV2(token: String): NetworkResult<TeacherClassesV2Response> =
+        api.listClassesV2(token)
+
     override suspend fun getDay(token: String, date: String?): NetworkResult<ResolvedDayResponse> =
         api.getDay(token, date)
 

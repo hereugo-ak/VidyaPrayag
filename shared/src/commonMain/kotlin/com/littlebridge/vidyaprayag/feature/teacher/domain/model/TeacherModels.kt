@@ -948,3 +948,195 @@ data class TeacherClassBroadcastResponse(
     val message: String? = null,
     val data: TeacherClassBroadcastData? = null,
 )
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PHASE 5 — CLASSES (Doc 09). The typed, single-aggregated-query class plane.
+// These mirror the server DTOs in feature/teacher/TeacherClassesRouting.kt
+// field-for-field. The wire path converges from the staged `…-v2` to the
+// canonical `/classes[/{id}]` + `/students/{id}` in T-504.
+//
+// Flag codes (Doc 09 §5): "low_attendance"/"recent_absences"/"failing_trend"
+// (danger), "dropping" (warning), "no_data" (neutral). Plain-language labels +
+// severity are resolved on the client so the UI is the single styling authority.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class NextPeriodDto(
+    val weekday: Int,
+    @SerialName("day_label") val dayLabel: String,
+    @SerialName("start_time") val startTime: String,
+    @SerialName("end_time") val endTime: String,
+    val room: String = "",
+    @SerialName("is_today") val isToday: Boolean = false,
+)
+
+// ── T-501 — class list summary ───────────────────────────────────────────────
+
+@Serializable
+data class TeacherClassSummaryDto(
+    @SerialName("assignment_id") val assignmentId: String,
+    @SerialName("class_id") val classId: String? = null,
+    @SerialName("class_name") val className: String,
+    val section: String,
+    @SerialName("subject_id") val subjectId: String? = null,
+    val subject: String,
+    @SerialName("student_count") val studentCount: Int,
+    @SerialName("is_class_teacher") val isClassTeacher: Boolean,
+    @SerialName("next_period") val nextPeriod: NextPeriodDto? = null,
+    @SerialName("today_attendance_marked") val todayAttendanceMarked: Boolean,
+    @SerialName("at_risk_count") val atRiskCount: Int,
+)
+
+@Serializable
+data class TeacherClassesV2Data(
+    val classes: List<TeacherClassSummaryDto> = emptyList(),
+)
+
+@Serializable
+data class TeacherClassesV2Response(
+    val success: Boolean = false,
+    val message: String? = null,
+    val data: TeacherClassesV2Data? = null,
+)
+
+// ── T-502 — composite class detail ───────────────────────────────────────────
+
+@Serializable
+data class ClassDetailHeaderDto(
+    @SerialName("assignment_id") val assignmentId: String,
+    @SerialName("class_id") val classId: String? = null,
+    @SerialName("class_name") val className: String,
+    val section: String,
+    @SerialName("subject_id") val subjectId: String? = null,
+    val subject: String,
+    @SerialName("is_class_teacher") val isClassTeacher: Boolean,
+    @SerialName("student_count") val studentCount: Int,
+)
+
+@Serializable
+data class WeeklyPeriodDto(
+    val weekday: Int,
+    @SerialName("day_label") val dayLabel: String,
+    @SerialName("start_time") val startTime: String,
+    @SerialName("end_time") val endTime: String,
+    val room: String = "",
+    @SerialName("is_today") val isToday: Boolean = false,
+)
+
+@Serializable
+data class AttendanceSummaryDto(
+    @SerialName("today_marked") val todayMarked: Boolean,
+    @SerialName("present_today") val presentToday: Int,
+    @SerialName("absent_today") val absentToday: Int,
+    @SerialName("late_today") val lateToday: Int,
+    @SerialName("leave_today") val leaveToday: Int,
+    @SerialName("week_rate") val weekRate: Double? = null,   // 0..1, null = no data
+    @SerialName("month_rate") val monthRate: Double? = null, // 0..1, null = no data
+)
+
+@Serializable
+data class ClassAssessmentDto(
+    @SerialName("assessment_id") val assessmentId: String,
+    val name: String,
+    val type: String,
+    @SerialName("exam_date") val examDate: String? = null,
+    val status: String,
+)
+
+@Serializable
+data class ClassHomeworkDto(
+    @SerialName("homework_id") val homeworkId: String,
+    val title: String,
+    @SerialName("due_date") val dueDate: String? = null,
+    @SerialName("submitted_count") val submittedCount: Int,
+    @SerialName("not_submitted_count") val notSubmittedCount: Int,
+)
+
+@Serializable
+data class LatestMarkDto(
+    val name: String,
+    val marks: Double,
+    val max: Int,
+)
+
+@Serializable
+data class RosterStudentDto(
+    @SerialName("student_id") val studentId: String,
+    val name: String,
+    val roll: Int? = null,
+    @SerialName("photo_url") val photoUrl: String? = null,
+    @SerialName("attendance_rate") val attendanceRate: Double? = null, // 0..1, null = no data
+    @SerialName("latest_mark") val latestMark: LatestMarkDto? = null,
+    val flags: List<String> = emptyList(),
+)
+
+@Serializable
+data class ClassDetailData(
+    val header: ClassDetailHeaderDto,
+    @SerialName("next_period") val nextPeriod: NextPeriodDto? = null,
+    @SerialName("weekly_timetable") val weeklyTimetable: List<WeeklyPeriodDto> = emptyList(),
+    @SerialName("attendance_summary") val attendanceSummary: AttendanceSummaryDto,
+    @SerialName("assessment_schedule") val assessmentSchedule: List<ClassAssessmentDto> = emptyList(),
+    @SerialName("active_homework") val activeHomework: List<ClassHomeworkDto> = emptyList(),
+    val roster: List<RosterStudentDto> = emptyList(),
+)
+
+@Serializable
+data class ClassDetailResponse(
+    val success: Boolean = false,
+    val message: String? = null,
+    val data: ClassDetailData? = null,
+)
+
+// ── T-503 — scoped student profile ───────────────────────────────────────────
+
+@Serializable
+data class StudentAttendanceDayDto(
+    val date: String,
+    val status: String, // present | absent | late | leave
+)
+
+@Serializable
+data class StudentAttendanceDto(
+    val rate: Double? = null,            // 0..1, null = no data
+    val recent: List<StudentAttendanceDayDto> = emptyList(),
+    val trend: String = "flat",          // improving | declining | flat | none
+)
+
+@Serializable
+data class StudentPerformanceDto(
+    @SerialName("assessment_id") val assessmentId: String,
+    @SerialName("assessment_name") val assessmentName: String,
+    val subject: String,
+    val marks: Double? = null,           // null = absent (is_absent) or not entered
+    val max: Int,
+    @SerialName("is_absent") val isAbsent: Boolean = false,
+    val date: String? = null,
+)
+
+@Serializable
+data class ParentContactDto(
+    val name: String? = null,
+    val phone: String? = null,
+)
+
+@Serializable
+data class StudentProfileData(
+    @SerialName("student_id") val studentId: String,
+    val name: String,
+    val roll: Int? = null,
+    @SerialName("photo_url") val photoUrl: String? = null,
+    @SerialName("class_name") val className: String,
+    val section: String,
+    val attendance: StudentAttendanceDto,
+    val performance: List<StudentPerformanceDto> = emptyList(),
+    val flags: List<String> = emptyList(),
+    @SerialName("parent_contact") val parentContact: ParentContactDto? = null,
+)
+
+@Serializable
+data class StudentProfileResponse(
+    val success: Boolean = false,
+    val message: String? = null,
+    val data: StudentProfileData? = null,
+)

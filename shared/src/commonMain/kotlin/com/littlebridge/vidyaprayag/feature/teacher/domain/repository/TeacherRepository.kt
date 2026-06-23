@@ -9,6 +9,9 @@ interface TeacherRepository {
     suspend fun getHome(token: String): NetworkResult<TeacherHomeResponse>
     suspend fun getClasses(token: String): NetworkResult<TeacherClassesResponse>
 
+    // T-501 (Doc 09 §2): aggregated class list (single query set; real flags).
+    suspend fun listClassesV2(token: String): NetworkResult<TeacherClassesV2Response>
+
     // T-104/T-105: server-resolved schedule for the Today tab.
     suspend fun getDay(token: String, date: String? = null): NetworkResult<ResolvedDayResponse>
     suspend fun getWeek(token: String, date: String? = null): NetworkResult<ResolvedWeekResponse>

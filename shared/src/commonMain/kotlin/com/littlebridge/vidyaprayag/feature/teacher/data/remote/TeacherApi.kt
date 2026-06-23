@@ -36,6 +36,14 @@ class TeacherApi(
         client.get(getUrl("api/v1/teacher/classes"))
     }
 
+    // T-501 (Doc 09 §2): the aggregated class list — student count (enrollments),
+    // real is_class_teacher (B-CLS-3), next period, today-marked, atRiskCount, all
+    // resolved server-side in one batched query set (kills the B-CLS-1 N+1). Path
+    // staged at `/classes-v2`; converges to canonical `/classes` in T-504.
+    suspend fun listClassesV2(token: String): NetworkResult<TeacherClassesV2Response> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/classes-v2"))
+    }
+
     // T-104/T-105: the server-resolved schedule. `/day` merges periods +
     // exceptions + holidays + calendar + per-period attendanceMarked and carries
     // authoritative now/next indices; `/week` returns Mon–Sat resolved.
