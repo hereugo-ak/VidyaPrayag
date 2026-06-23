@@ -932,6 +932,55 @@ object SyllabusUnitsTable : UUIDTable("syllabus_units", "id") {
 }
 
 /**
+ * T-401 (Doc 08 §1.2) — the syllabus **template** (split from per-section
+ * progress). A curriculum unit is a chapter or topic for a class+subject; a
+ * NULL [parentId] is a top-level chapter, a non-null parent is a topic under it
+ * (the chapter ▸ topic hierarchy that fixes D-SYL-4). The template is authored
+ * once (per class+subject) and shared by every section, so two sections of the
+ * same class track coverage independently in [SyllabusProgressTable]. This
+ * resolves the free-text scope defect (D-SYL-3 / X-1) by binding to typed
+ * class_id/subject_id.
+ *
+ * The legacy [SyllabusUnitsTable] is RETAINED (not dropped) until T-403 repoints
+ * its readers — DELETE-don't-patch keeps the old screen compiling green until
+ * its replacement lands.
+ */
+object CurriculumUnitsTable : UUIDTable("curriculum_units", "id") {
+    val schoolId  = uuid("school_id")
+    val classId   = uuid("class_id")                     // FK school_classes.id (typed scope, X-1)
+    val subjectId = uuid("subject_id")                   // FK school_subjects.id
+    val parentId  = uuid("parent_id").nullable()         // FK curriculum_units.id — chapter ▸ topic (D-SYL-4)
+    val title     = text("title")
+    val position  = integer("position").default(0)
+    val isActive  = bool("is_active").default(true)
+    val createdAt = timestamp("created_at")
+    val updatedAt = timestamp("updated_at")
+}
+
+/**
+ * T-401 (Doc 08 §1.2) — per-section coverage **state** for a curriculum unit.
+ * Keyed UNIQUE on (unit, section, assignment) so the same template unit can be
+ * "covered" independently for each section a teacher owns. [coveredOn] is typed
+ * `date` (D-SYL-2 / X-3). The one-tap toggle (T-402 PATCH /syllabus/progress)
+ * upserts a row here; [assignmentId] binds the write to a TSA the teacher owns
+ * (X-1, enforced via requireOwnedAssignment).
+ */
+object SyllabusProgressTable : UUIDTable("syllabus_progress", "id") {
+    val unitId       = uuid("unit_id")                   // FK curriculum_units.id
+    val section      = varchar("section", 8).default("A")
+    val assignmentId = uuid("assignment_id")             // FK teacher_subject_assignments.id (scope, X-1)
+    val isCovered    = bool("is_covered").default(false)
+    val coveredOn    = date("covered_on").nullable()     // TYPED (D-SYL-2)
+    val coveredBy    = uuid("covered_by").nullable()     // FK app_users.id (teacher who toggled)
+    val note         = text("note").nullable()
+    val createdAt    = timestamp("created_at")
+    val updatedAt    = timestamp("updated_at")
+    init {
+        uniqueIndex("ux_syllabus_progress_unique", unitId, section, assignmentId)
+    }
+}
+
+/**
  * A homework/assignment authored by a teacher for one class+section+subject.
  * `submittedCount` is derived live from [HomeworkSubmissionsTable] at read
  * time; `totalCount` is the headcount of the target class (computed from

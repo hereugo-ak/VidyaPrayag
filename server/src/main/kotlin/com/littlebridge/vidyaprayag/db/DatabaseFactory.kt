@@ -143,6 +143,11 @@ object DatabaseFactory {
         AssessmentsTable,
         AssessmentMarksTable,
         SyllabusUnitsTable,
+        // Teacher Portal Rebuild — Doc 11 T-401 (Doc 08 §1.2): syllabus template/
+        // progress split. Applied by docs/db/migration_016_syllabus.sql (must run
+        // before deploy; AUTO_CREATE_TABLES is OFF in prod). Closes D-SYL-1..4.
+        CurriculumUnitsTable,
+        SyllabusProgressTable,
         HomeworkTable,
         HomeworkSubmissionsTable,
         TeacherPeriodsTable,
