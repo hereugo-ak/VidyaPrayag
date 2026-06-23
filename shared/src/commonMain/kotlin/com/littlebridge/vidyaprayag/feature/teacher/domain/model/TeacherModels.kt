@@ -201,27 +201,9 @@ data class ObligationItemDto(
 // Backs Teacher.tsx → MyClasses tab + ClassDetail.
 // ─────────────────────────────────────────────────────────────────────────────
 
-@Serializable
-data class TeacherClassesResponse(
-    val success: Boolean,
-    val data: TeacherClassesData,
-)
-
-@Serializable
-data class TeacherClassesData(
-    val classes: List<TeacherClassDto> = emptyList(),
-)
-
-@Serializable
-data class TeacherClassDto(
-    val id: String,
-    @SerialName("class_name") val className: String,
-    val subject: String,
-    @SerialName("student_count") val studentCount: Int,
-    @SerialName("is_class_teacher") val isClassTeacher: Boolean = false,
-    @SerialName("syllabus_progress") val syllabusProgress: Float = 0f,
-    @SerialName("avg_attendance") val avgAttendance: Float = 0f,
-)
+// T-504: the legacy TeacherClassesResponse / TeacherClassesData / TeacherClassDto
+// (the old looping /classes list shape) were DELETED. The canonical class list is
+// TeacherClassesV2Response / TeacherClassSummaryDto (see PHASE 5 CLASSES below).
 
 @Serializable
 data class TeacherStudentDto(

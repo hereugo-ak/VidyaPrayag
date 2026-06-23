@@ -32,37 +32,33 @@ class TeacherApi(
         client.get(getUrl("api/v1/teacher/home"))
     }
 
-    suspend fun getClasses(token: String): NetworkResult<TeacherClassesResponse> = safeApiCall {
-        client.get(getUrl("api/v1/teacher/classes"))
-    }
-
     // T-501 (Doc 09 §2): the aggregated class list — student count (enrollments),
     // real is_class_teacher (B-CLS-3), next period, today-marked, atRiskCount, all
-    // resolved server-side in one batched query set (kills the B-CLS-1 N+1). Path
-    // staged at `/classes-v2`; converges to canonical `/classes` in T-504.
+    // resolved server-side in one batched query set (kills the B-CLS-1 N+1).
+    // Canonical `/classes` since T-504 (replaced the deleted legacy looping list).
     suspend fun listClassesV2(token: String): NetworkResult<TeacherClassesV2Response> = safeApiCall {
-        client.get(getUrl("api/v1/teacher/classes-v2"))
+        client.get(getUrl("api/v1/teacher/classes"))
     }
 
     // T-502 (Doc 09 §3): the composite class detail — header, next period, weekly
     // timetable, attendance summary, assessment schedule, active homework, and the
     // REAL roster (per-student attendance rate, latest mark, flags) in ONE call
-    // (no client N+1). Path staged at `/classes-v2/{id}`; converges in T-504.
+    // (no client N+1). Canonical `/classes/{id}` since T-504.
     suspend fun getClassDetailV2(
         token: String,
         assignmentId: String,
     ): NetworkResult<ClassDetailResponse> = safeApiCall {
-        client.get(getUrl("api/v1/teacher/classes-v2/$assignmentId"))
+        client.get(getUrl("api/v1/teacher/classes/$assignmentId"))
     }
 
     // T-503 (Doc 09 §4): scoped student profile — attendance, performance, flags,
     // privacy-gated parent contact. 403 if the teacher doesn't teach the student.
-    // Path staged at `/students-v2/{id}`; converges to `/students/{id}` in T-504.
+    // Canonical `/students/{id}` since T-504.
     suspend fun getStudentProfileV2(
         token: String,
         studentId: String,
     ): NetworkResult<StudentProfileResponse> = safeApiCall {
-        client.get(getUrl("api/v1/teacher/students-v2/$studentId"))
+        client.get(getUrl("api/v1/teacher/students/$studentId"))
     }
 
     // T-104/T-105: the server-resolved schedule. `/day` merges periods +

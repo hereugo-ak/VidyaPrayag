@@ -12,9 +12,6 @@ class TeacherRepositoryImpl(
     override suspend fun getHome(token: String): NetworkResult<TeacherHomeResponse> =
         api.getHome(token)
 
-    override suspend fun getClasses(token: String): NetworkResult<TeacherClassesResponse> =
-        api.getClasses(token)
-
     override suspend fun listClassesV2(token: String): NetworkResult<TeacherClassesV2Response> =
         api.listClassesV2(token)
 

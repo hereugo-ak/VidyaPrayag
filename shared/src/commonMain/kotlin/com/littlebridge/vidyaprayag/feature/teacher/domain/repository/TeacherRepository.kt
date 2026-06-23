@@ -7,7 +7,6 @@ import com.littlebridge.vidyaprayag.feature.teacher.domain.model.*
 interface TeacherRepository {
     // Reads
     suspend fun getHome(token: String): NetworkResult<TeacherHomeResponse>
-    suspend fun getClasses(token: String): NetworkResult<TeacherClassesResponse>
 
     // T-501 (Doc 09 §2): aggregated class list (single query set; real flags).
     suspend fun listClassesV2(token: String): NetworkResult<TeacherClassesV2Response>

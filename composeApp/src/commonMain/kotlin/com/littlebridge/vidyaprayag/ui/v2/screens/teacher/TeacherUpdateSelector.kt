@@ -19,7 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClass
+import com.littlebridge.vidyaprayag.feature.teacher.domain.model.TeacherClassSummaryDto
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClassesViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
@@ -43,7 +43,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun TeacherClassPicker(
     classesViewModel: TeacherClassesViewModel = koinViewModel(),
     selectedClassId: String,
-    onSelectClass: (TeacherClass) -> Unit,
+    onSelectClass: (TeacherClassSummaryDto) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by classesViewModel.state.collectAsStateV2()
@@ -61,7 +61,7 @@ fun TeacherClassPicker(
                 Text(state.error ?: "Couldn't load classes", style = VTheme.type.body.copy(color = c.danger))
                 VButton(
                     text = "Retry",
-                    onClick = { classesViewModel.load() },
+                    onClick = { classesViewModel.refresh() },
                     variant = VButtonVariant.Ghost,
                     size = VButtonSize.Sm,
                     modifier = Modifier.padding(start = 8.dp),
@@ -76,7 +76,7 @@ fun TeacherClassPicker(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 state.classes.forEach { cls ->
-                    val selected = cls.id == selectedClassId
+                    val selected = cls.assignmentId == selectedClassId
                     val label = "${cls.className} · ${cls.subject}"
                     Box(
                         Modifier

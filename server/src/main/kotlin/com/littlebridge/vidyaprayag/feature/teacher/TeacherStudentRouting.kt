@@ -20,10 +20,9 @@
  * blanket-exposed"). A future per-school policy can widen this without a contract
  * change (the field is already optional/nullable).
  *
- * PATH NOTE (converges in T-504): mounts under the staged `/students-v2/{id}`
- * prefix (the `…-v2` sibling of T-501/502's `/classes-v2`) and converges to the
- * canonical `/api/v1/teacher/students/{id}` when T-504 deletes the legacy looping
- * /classes handler and re-points the whole classes plane.
+ * PATH (canonical since T-504): `/api/v1/teacher/students/{id}`. It was staged
+ * under `/students-v2/{id}` until T-504 deleted the legacy looping /classes
+ * handler; the whole typed classes plane now owns its canonical paths.
  *
  * Reuses the `internal` helpers in TeacherClassesRouting.kt (same package):
  * scopedAssessmentsInTxn, computeFlags, ClassFlags, StudentAttendanceWindow,
@@ -63,8 +62,8 @@ fun Route.teacherStudentRouting() {
     authenticate("jwt") {
         route("/api/v1/teacher") {
 
-            // ── GET /students-v2/{studentId} — scoped student profile (T-503) ────
-            get("/students-v2/{studentId}") {
+            // ── GET /students/{studentId} — scoped student profile (T-503) ──────
+            get("/students/{studentId}") {
                 val ctx = call.requireTeacherContext() ?: return@get
                 val studentId = call.parameters["studentId"]
                     ?.let { runCatching { UUID.fromString(it) }.getOrNull() }

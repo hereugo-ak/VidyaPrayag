@@ -62,7 +62,7 @@ import kotlin.math.roundToInt
  * deliberate affordances (add unit, rename) live behind an **edit-mode** toggle so they never
  * clutter the one-tap path.
  *
- * Reached PRE-SCOPED via [assignmentId] (the TSA id = TeacherClass.id) — no shared picker here
+ * Reached PRE-SCOPED via [assignmentId] (the TSA id = TeacherClassSummaryDto.assignmentId) — no shared picker here
  * (the Planner host owns class selection). When empty (no curriculum seeded) the honest
  * "No syllabus yet — add your first unit" state offers a single Add affordance (fixes B-SYL-1
  * dead-empty F-SYL-2). Closes F-SYL-1..4. Three states via [VStateHost].

@@ -24,9 +24,13 @@
  * carries that scope (API); the screen reaches each surface pre-scoped (UI, T-504/505).
  *
  * Endpoints (all JWT-guarded + scoped via core/TeacherAccess):
- *   GET /api/v1/teacher/classes-v2                 (T-501 — list, staged path)
- *   GET /api/v1/teacher/classes-v2/{assignmentId}  (T-502 — composite detail)
- *   GET /api/v1/teacher/students-v2/{studentId}    (T-503 — scoped profile)
+ *   GET /api/v1/teacher/classes                 (T-501 — list; canonical since T-504)
+ *   GET /api/v1/teacher/classes/{assignmentId}  (T-502 — composite detail)
+ *   GET /api/v1/teacher/students/{studentId}    (T-503 — scoped profile)
+ *
+ * T-504 CONVERGENCE: these were staged under /classes-v2 (Ktor forbids two
+ * handlers on the same method+path) until the legacy looping /classes handler in
+ * TeacherRouting was DELETED; they now own the canonical paths.
  *
  * PATH NOTE (converges in T-504): these mount under a temporary `…-v2` prefix
  * because `teacherRouting()` still binds `GET /api/v1/teacher/classes` (Ktor
@@ -205,11 +209,11 @@ fun Route.teacherClassesRouting() {
     authenticate("jwt") {
         route("/api/v1/teacher") {
 
-            // ── GET /classes-v2 — the aggregated class list (T-501) ──────────────
+            // ── GET /classes — the aggregated class list (T-501) ─────────────────
             // One batched query set: assignments → enrollments (counts) →
             // attendance-today → marks (for atRisk) → periods (next). NO per-class
             // loop of independent queries (B-CLS-1).
-            get("/classes-v2") {
+            get("/classes") {
                 val ctx = call.requireTeacherContext() ?: return@get
                 val assignments = teacherAssignmentsFor(ctx)
                 if (assignments.isEmpty()) {
@@ -233,13 +237,13 @@ fun Route.teacherClassesRouting() {
                 call.ok(TeacherClassesV2Data(summaries), message = "Classes loaded")
             }
 
-            // ── GET /classes-v2/{assignmentId} — composite class detail (T-502) ──
+            // ── GET /classes/{assignmentId} — composite class detail (T-502) ─────
             // Doc 09 §3 — ONE composite endpoint (no client N+1): header, next
             // period, weekly timetable, attendance summary (today + week/month
             // rates), assessment schedule, active homework, and the REAL roster
             // (each student: attendance rate, latest published mark, Doc 09 §5
             // flags). Replaces the VComingSoon placeholder (F-CLS-5, rendered T-504).
-            get("/classes-v2/{assignmentId}") {
+            get("/classes/{assignmentId}") {
                 val ctx = call.requireTeacherContext() ?: return@get
                 val a = call.requireOwnedAssignment(ctx, call.parameters["assignmentId"]) ?: return@get
 

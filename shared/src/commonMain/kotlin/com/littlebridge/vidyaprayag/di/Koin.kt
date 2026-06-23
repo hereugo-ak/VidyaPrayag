@@ -437,6 +437,7 @@ val viewModelModule = module {
     // T-107: real obligations strip (Doc 04 §5.5) — backs the Today "what needs me" strip.
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherObligationsViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClassesViewModel(get(), get()) }
+    factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherStudentProfileViewModel(get(), get()) } // T-505
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherAttendanceViewModel(get(), get()) }
     // T-305: the rebuilt gradebook state holder (replaces the legacy split of
     // TeacherMarksViewModel + TeacherAssessmentsViewModel, both deleted in T-305).

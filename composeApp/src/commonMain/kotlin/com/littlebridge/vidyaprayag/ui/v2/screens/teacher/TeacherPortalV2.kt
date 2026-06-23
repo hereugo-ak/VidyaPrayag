@@ -82,6 +82,13 @@ fun TeacherPortalV2(
         var updateSub by remember { mutableStateOf("Attendance") }
         var overlay by remember { mutableStateOf(TeacherOverlay.None) }
 
+        // T-505: the scoped student-profile overlay. Reached from a Classes-tab roster
+        // row tap (each row carries the already-scoped studentId). A non-null id pushes
+        // [TeacherStudentProfileScreenV2] full-screen above the tab content; back clears it.
+        // Scope is enforced server-side — a forbidden id renders the screen's own
+        // ForbiddenState rather than leaking another teacher's student.
+        var selectedStudentId by remember { mutableStateOf<String?>(null) }
+
         // The Update write-plane needs real ids. These hold the teacher's current
         // class/subject/exam selection. When the Update overlay is opened from a Today
         // CTA, they are pre-seeded from the tapped (already pre-authorized) period.
@@ -144,6 +151,19 @@ fun TeacherPortalV2(
             overlay = TeacherOverlay.None
         }
 
+        // T-505: the student-profile overlay sits ABOVE the tab content (and above the
+        // other overlays it is reached from the Classes tab, which has overlay == None).
+        // A non-null selectedStudentId short-circuits the whole portal to the profile.
+        selectedStudentId?.let { studentId ->
+            BackHandler(enabled = true) { selectedStudentId = null }
+            TeacherStudentProfileScreenV2(
+                studentId = studentId,
+                onBack = { selectedStudentId = null },
+                modifier = modifier,
+            )
+            return@VTheme
+        }
+
         when (overlay) {
             TeacherOverlay.Notifications -> {
                 NotificationsScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
@@ -198,7 +218,9 @@ fun TeacherPortalV2(
                         onOpenNotifications = { overlay = TeacherOverlay.Notifications },
                         onOpenProfile = { tab = "profile" },
                     )
-                    "classes" -> TeacherClassesScreenV2()
+                    "classes" -> TeacherClassesScreenV2(
+                        onOpenStudent = { studentId -> selectedStudentId = studentId },
+                    )
                     // T-305: the real Gradebook — scoped assessment list + create + a
                     // validated marks grid with distinct Save (private) vs Publish (notifies
                     // parents). Reached pre-scoped from a Today/obligation CTA; a blank id
@@ -273,7 +295,7 @@ private fun TeacherUpdatePlane(
             if (sub != "Homework" && sub != "Attendance") {
                 TeacherClassPicker(
                     selectedClassId = selectedClassId,
-                    onSelectClass = { cls -> onSelectClass(cls.id, cls.subject) },
+                    onSelectClass = { cls -> onSelectClass(cls.assignmentId, cls.subject) },
                 )
             }
             when (sub) {

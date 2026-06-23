@@ -98,21 +98,9 @@ data class TeacherHomeData(
     val tasks: List<TeacherTaskDto> = emptyList(),
 )
 
-@Serializable
-data class TeacherClassDto(
-    val id: String,
-    @SerialName("class_name") val className: String,
-    val subject: String,
-    @SerialName("student_count") val studentCount: Int,
-    @SerialName("is_class_teacher") val isClassTeacher: Boolean = false,
-    @SerialName("syllabus_progress") val syllabusProgress: Float = 0f,
-    @SerialName("avg_attendance") val avgAttendance: Float = 0f,
-)
-
-@Serializable
-data class TeacherClassesData(
-    val classes: List<TeacherClassDto> = emptyList(),
-)
+// T-504: TeacherClassDto / TeacherClassesData (the legacy /classes list shape) were
+// DELETED with the legacy handler. The canonical class list is now served by
+// TeacherClassSummaryDto / TeacherClassesV2Data in TeacherClassesRouting.
 
 @Serializable
 data class TeacherProfileData(
@@ -173,23 +161,10 @@ internal fun studentsForAssignment(
         )
     }.sortedBy { it[StudentsTable.rollNumber] }
 
-/** Overall syllabus progress (covered / total) for a class+section+subject; 0f if none. */
-internal suspend fun syllabusProgressFor(
-    schoolId: java.util.UUID, className: String, section: String, subject: String,
-): Float = dbQuery {
-    // ROOT FIX (ISSUE 1): subject is exact, but (class, section) is matched via
-    // the ClassNaming key so syllabus progress isn't lost to format drift.
-    val units = SyllabusUnitsTable.selectAll().where {
-        (SyllabusUnitsTable.schoolId eq schoolId) and
-            (SyllabusUnitsTable.subject eq subject)
-    }.filter {
-        ClassNaming.sameClassSection(
-            it[SyllabusUnitsTable.className], it[SyllabusUnitsTable.section], className, section
-        )
-    }
-    if (units.isEmpty()) 0f
-    else units.count { it[SyllabusUnitsTable.isCovered] }.toFloat() / units.size.toFloat()
-}
+// T-504: syllabusProgressFor / avgAttendanceFor were DELETED with the legacy
+// /classes handler (their only caller). The rebuilt class plane computes
+// attendance rates from typed enrollments + typed date in TeacherClassesRouting,
+// not by parsing grade strings or ClassNaming heuristics (B-CLS-2 fix).
 
 fun Route.teacherRouting() {
     authenticate("jwt") {
@@ -313,27 +288,13 @@ fun Route.teacherRouting() {
                 )
             }
 
-            // ── GET /classes ──────────────────────────────────────────────────
-            get("/classes") {
-                val ctx = call.requireTeacherContext() ?: return@get
-                val assignments = teacherAssignmentsFor(ctx)
-
-                val classes = assignments.map { a ->
-                    val count = studentCountFor(ctx.schoolId, a.className, a.section)
-                    val progress = syllabusProgressFor(ctx.schoolId, a.className, a.section, a.subject)
-                    val avgAtt = avgAttendanceFor(ctx.schoolId, a.className, a.section)
-                    TeacherClassDto(
-                        id = a.assignmentId.toString(),
-                        className = "${a.className}-${a.section}",
-                        subject = a.subject,
-                        studentCount = count,
-                        isClassTeacher = false,
-                        syllabusProgress = progress,
-                        avgAttendance = avgAtt,
-                    )
-                }
-                call.ok(TeacherClassesData(classes), message = "Classes loaded")
-            }
+            // ── GET /classes — DELETED (T-504) ────────────────────────────────
+            // The legacy looping list (N+1 per class via studentCountFor /
+            // syllabusProgressFor / avgAttendanceFor, hardcoded isClassTeacher=false,
+            // grade-string attendance parsing) is GONE. The canonical
+            // GET /api/v1/teacher/classes[/{id}] now resolves via the single
+            // aggregated query set in TeacherClassesRouting (converged from the
+            // staged /classes-v2 paths). Closes B-CLS-1/2/3 + F-CLS-5.
 
             // ── GET /profile ──────────────────────────────────────────────────
             get("/profile") {
@@ -375,23 +336,4 @@ fun Route.teacherRouting() {
     }
 }
 
-/** Average attendance ratio (present / total marked) for a class over its history; 0f if none. */
-internal suspend fun avgAttendanceFor(schoolId: java.util.UUID, className: String, section: String): Float = dbQuery {
-    // ROOT FIX (ISSUE 1): attendance rows store a "grade" string ("<class>-<section>").
-    // Match it to the teacher's class via the ClassNaming key (split on the LAST
-    // '-' so class labels containing a hyphen still parse) instead of raw eq.
-    val want = ClassNaming.key(className, section).composite
-    val rows = AttendanceRecordsTable.selectAll().where {
-        (AttendanceRecordsTable.schoolId eq schoolId) and
-            (AttendanceRecordsTable.type eq "student")
-    }.filter { row ->
-        val grade = row[AttendanceRecordsTable.grade] ?: return@filter false
-        val idx = grade.lastIndexOf('-')
-        val cls = if (idx >= 0) grade.substring(0, idx) else grade
-        val sec = if (idx >= 0) grade.substring(idx + 1) else ""
-        ClassNaming.key(cls, sec).composite == want
-    }
-    if (rows.isEmpty()) 0f
-    else rows.count { it[AttendanceRecordsTable.status].equals("present", ignoreCase = true) }
-        .toFloat() / rows.size.toFloat()
-}
+// avgAttendanceFor — DELETED (T-504). See note above teacherRouting().

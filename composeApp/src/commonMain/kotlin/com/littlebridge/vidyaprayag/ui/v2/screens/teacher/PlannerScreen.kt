@@ -15,7 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClass
+import com.littlebridge.vidyaprayag.feature.teacher.domain.model.TeacherClassSummaryDto
 import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
 import com.littlebridge.vidyaprayag.ui.v2.components.VTopTabs
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
@@ -27,7 +27,7 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.colored
  * surfaces: **Syllabus** (this phase) and **Homework** (lands in T-406).
  *
  * Because Planner is reached from the dock (not a pre-scoped CTA), it fronts a lightweight
- * class picker — once a class is chosen its TSA id (`TeacherClass.id`) scopes the syllabus
+ * class picker — once a class is chosen its TSA id (`TeacherClassSummaryDto.assignmentId`) scopes the syllabus
  * screen exactly like a Today deep-link would (X-1). The picker reuses [TeacherClassPicker]
  * (the same owned-classes source as the Update plane), so the scope contract is identical.
  *
@@ -56,8 +56,8 @@ fun PlannerScreen(modifier: Modifier = Modifier) {
         // Shared class picker — selecting a class pins its TSA id + a scope label.
         TeacherClassPicker(
             selectedClassId = selectedClassId,
-            onSelectClass = { cls: TeacherClass ->
-                selectedClassId = cls.id
+            onSelectClass = { cls: TeacherClassSummaryDto ->
+                selectedClassId = cls.assignmentId
                 selectedScope = "${cls.className} · ${cls.subject}"
             },
         )

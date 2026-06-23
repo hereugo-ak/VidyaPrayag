@@ -17,7 +17,7 @@
  *     - an assignment-scope check so a teacher can only read/write the classes
  *       they are actually assigned to (teacher_subject_assignments)
  *
- * The `classId` exchanged with the client (TeacherClassDto.id) is the
+ * The `assignmentId` exchanged with the client (TeacherClassSummaryDto.assignmentId) is the
  * teacher_subject_assignments row id. Every scoped endpoint resolves that id
  * back to its assignment, asserts it belongs to the caller's school AND is
  * assigned to the caller (by teacher_id OR teacher_name fallback), and only then
