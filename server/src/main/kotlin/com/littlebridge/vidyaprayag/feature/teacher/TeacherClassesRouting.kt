@@ -52,13 +52,16 @@ import com.littlebridge.vidyaprayag.core.EnrolledStudent
 import com.littlebridge.vidyaprayag.core.OwnedAssignment
 import com.littlebridge.vidyaprayag.core.TeacherContext
 import com.littlebridge.vidyaprayag.core.ok
+import com.littlebridge.vidyaprayag.core.requireOwnedAssignment
 import com.littlebridge.vidyaprayag.core.requireTeacherContext
 import com.littlebridge.vidyaprayag.core.teacherAssignmentsFor
 import com.littlebridge.vidyaprayag.db.AssessmentMarksTable
 import com.littlebridge.vidyaprayag.db.AssessmentsTable
 import com.littlebridge.vidyaprayag.db.AttendanceRecordsTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
+import com.littlebridge.vidyaprayag.db.HomeworkSubmissionsTable
 import com.littlebridge.vidyaprayag.db.HomeworkTable
+import com.littlebridge.vidyaprayag.db.StudentsTable
 import com.littlebridge.vidyaprayag.db.TeacherPeriodsTable
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -67,6 +70,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import java.time.LocalDate
@@ -228,8 +232,158 @@ fun Route.teacherClassesRouting() {
                 }
                 call.ok(TeacherClassesV2Data(summaries), message = "Classes loaded")
             }
+
+            // ── GET /classes-v2/{assignmentId} — composite class detail (T-502) ──
+            // Doc 09 §3 — ONE composite endpoint (no client N+1): header, next
+            // period, weekly timetable, attendance summary (today + week/month
+            // rates), assessment schedule, active homework, and the REAL roster
+            // (each student: attendance rate, latest published mark, Doc 09 §5
+            // flags). Replaces the VComingSoon placeholder (F-CLS-5, rendered T-504).
+            get("/classes-v2/{assignmentId}") {
+                val ctx = call.requireTeacherContext() ?: return@get
+                val a = call.requireOwnedAssignment(ctx, call.parameters["assignmentId"]) ?: return@get
+
+                val today = LocalDate.now()
+                val weekday = today.dayOfWeek.value
+                val monthStart = today.minusDays(30)
+                val weekStart = today.minusDays(6)
+
+                val data = dbQuery {
+                    buildClassDetailInTxn(ctx, a, today, weekday, weekStart, monthStart)
+                }
+                call.ok(data, message = "Class detail loaded")
+            }
         }
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// T-502 composite detail builder — runs inside the caller's dbQuery transaction.
+// ─────────────────────────────────────────────────────────────────────────────
+private fun buildClassDetailInTxn(
+    ctx: TeacherContext,
+    a: OwnedAssignment,
+    today: LocalDate,
+    weekday: Int,
+    weekStart: LocalDate,
+    monthStart: LocalDate,
+): ClassDetailData {
+    val roster = rosterForInTxn(a)
+    val studentIds = roster.map { it.studentId }
+
+    // ── attendance summary (today counts + week/month rates) ─────────────────
+    val attRows = AttendanceRecordsTable.selectAll().where {
+        (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
+            (AttendanceRecordsTable.type eq "student") and
+            (AttendanceRecordsTable.assignmentId eq a.assignmentId) and
+            (AttendanceRecordsTable.date greaterEq monthStart)
+    }.toList()
+
+    val todayRows = attRows.filter { it[AttendanceRecordsTable.date] == today }
+    fun countStatus(rows: List<org.jetbrains.exposed.sql.ResultRow>, s: String) =
+        rows.count { it[AttendanceRecordsTable.status].equals(s, ignoreCase = true) }
+
+    val weekRows = attRows.filter { !it[AttendanceRecordsTable.date].isBefore(weekStart) }
+    fun rate(rows: List<org.jetbrains.exposed.sql.ResultRow>): Double? {
+        if (rows.isEmpty()) return null
+        val present = rows.count { it[AttendanceRecordsTable.status].equals("present", ignoreCase = true) }
+        return present.toDouble() / rows.size
+    }
+
+    val attendanceSummary = AttendanceSummaryDto(
+        todayMarked = todayRows.isNotEmpty(),
+        presentToday = countStatus(todayRows, "present"),
+        absentToday = countStatus(todayRows, "absent"),
+        lateToday = countStatus(todayRows, "late"),
+        leaveToday = countStatus(todayRows, "leave"),
+        weekRate = rate(weekRows),
+        monthRate = rate(attRows),
+    )
+
+    // ── assessment schedule (scoped, newest exam_date first) ─────────────────
+    val assessments = scopedAssessmentsInTxn(ctx, a, publishedOnly = false)
+    val assessmentSchedule = assessments
+        .sortedByDescending { it[AssessmentsTable.examDate] ?: LocalDate.MIN }
+        .map { row ->
+            ClassAssessmentDto(
+                assessmentId = row[AssessmentsTable.id].value.toString(),
+                name = row[AssessmentsTable.name],
+                type = row[AssessmentsTable.type],
+                examDate = row[AssessmentsTable.examDate]?.toString(),
+                status = row[AssessmentsTable.status],
+            )
+        }
+
+    // ── active homework (submitted / not-submitted counts) ───────────────────
+    val homeworkRows = HomeworkTable.selectAll().where {
+        (HomeworkTable.schoolId eq ctx.schoolId) and
+            (HomeworkTable.isActive eq true)
+    }.filter { hw ->
+        val asgId = hw[HomeworkTable.assignmentId]
+        if (asgId != null) asgId == a.assignmentId
+        else hw[HomeworkTable.teacherId] == ctx.userId &&
+            hw[HomeworkTable.className] == a.className &&
+            hw[HomeworkTable.section] == a.section &&
+            hw[HomeworkTable.subject] == a.subject
+    }
+    val rosterSize = roster.size
+    val activeHomework = homeworkRows
+        .sortedBy { it[HomeworkTable.dueDate] }
+        .map { hw ->
+            val hwId = hw[HomeworkTable.id].value
+            val submitted = HomeworkSubmissionsTable.selectAll().where {
+                (HomeworkSubmissionsTable.homeworkId eq hwId) and
+                    (HomeworkSubmissionsTable.status neq "not_submitted")
+            }.count().toInt()
+            ClassHomeworkDto(
+                homeworkId = hwId.toString(),
+                title = hw[HomeworkTable.title],
+                dueDate = hw[HomeworkTable.dueDate].toString(),
+                submittedCount = submitted,
+                notSubmittedCount = (rosterSize - submitted).coerceAtLeast(0),
+            )
+        }
+
+    // ── roster with per-student attendance rate + latest mark + flags ────────
+    val attByStudent = attendanceWindowsInTxn(ctx, a, studentIds, monthStart, today)
+    val marksByStudent = recentMarksInTxn(ctx, a, studentIds)
+    val latestMarkMeta = latestPublishedMarkInTxn(ctx, a, studentIds)
+    val photoByStudent = if (studentIds.isEmpty()) emptyMap() else
+        StudentsTable.selectAll().where { StudentsTable.id inList studentIds }
+            .associate { it[StudentsTable.id].value to it[StudentsTable.profilePhotoUrl] }
+
+    val rosterDtos = roster.map { s ->
+        val win = attByStudent[s.studentId]
+        val flags = computeFlags(win, marksByStudent[s.studentId] ?: emptyList())
+        RosterStudentDto(
+            studentId = s.studentId.toString(),
+            name = s.fullName,
+            roll = s.rollNumber,
+            photoUrl = photoByStudent[s.studentId],
+            attendanceRate = win?.monthRate,
+            latestMark = latestMarkMeta[s.studentId],
+            flags = flags,
+        )
+    }
+
+    return ClassDetailData(
+        header = ClassDetailHeaderDto(
+            assignmentId = a.assignmentId.toString(),
+            classId = a.classId?.toString(),
+            className = a.className,
+            section = a.section,
+            subjectId = a.subjectId?.toString(),
+            subject = a.subject,
+            isClassTeacher = a.isClassTeacher,
+            studentCount = roster.size,
+        ),
+        nextPeriod = nextPeriodForInTxn(ctx, a, today, weekday),
+        weeklyTimetable = weeklyTimetableInTxn(ctx, a, weekday),
+        attendanceSummary = attendanceSummary,
+        assessmentSchedule = assessmentSchedule,
+        activeHomework = activeHomework,
+        roster = rosterDtos,
+    )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -351,23 +505,21 @@ internal fun attendanceWindowsInTxn(
 }
 
 /**
- * Per-student recent PUBLISHED marks for the teacher's assignment scope, newest
- * first (by exam_date). One batched query joining assessments → marks for this
- * assignment's class+subject. Keyed by students.id.
+ * Assessments in the teacher's assignment scope. Prefer the typed assignment
+ * binding (T-301); fall back to author + display class/section/subject for
+ * legacy/mirrored unbound rows (no fabrication of a binding). `publishedOnly`
+ * narrows to parent-visible results.
  */
-internal fun recentMarksInTxn(
+internal fun scopedAssessmentsInTxn(
     ctx: TeacherContext,
     a: OwnedAssignment,
-    studentIds: List<UUID>,
-): Map<UUID, List<StudentMarkPoint>> {
-    if (studentIds.isEmpty()) return emptyMap()
-    // Published assessments in scope. Prefer typed assignment binding; fall back
-    // to author + class/subject display for legacy/mirrored rows (no fabrication).
-    val assessments = AssessmentsTable.selectAll().where {
+    publishedOnly: Boolean,
+): List<org.jetbrains.exposed.sql.ResultRow> =
+    AssessmentsTable.selectAll().where {
         (AssessmentsTable.schoolId eq ctx.schoolId) and
-            (AssessmentsTable.isActive eq true) and
-            (AssessmentsTable.isPublished eq true)
+            (AssessmentsTable.isActive eq true)
     }.filter { row ->
+        if (publishedOnly && !row[AssessmentsTable.isPublished]) return@filter false
         val asgId = row[AssessmentsTable.assignmentId]
         if (asgId != null) {
             asgId == a.assignmentId
@@ -379,6 +531,19 @@ internal fun recentMarksInTxn(
                 row[AssessmentsTable.subject] == a.subject
         }
     }
+
+/**
+ * Per-student recent PUBLISHED marks for the teacher's assignment scope, newest
+ * first (by exam_date). One batched query joining scoped published assessments →
+ * marks. Keyed by students.id.
+ */
+internal fun recentMarksInTxn(
+    ctx: TeacherContext,
+    a: OwnedAssignment,
+    studentIds: List<UUID>,
+): Map<UUID, List<StudentMarkPoint>> {
+    if (studentIds.isEmpty()) return emptyMap()
+    val assessments = scopedAssessmentsInTxn(ctx, a, publishedOnly = true)
     if (assessments.isEmpty()) return emptyMap()
     val byId = assessments.associateBy { it[AssessmentsTable.id].value }
     val assessmentIds = byId.keys.toList()
@@ -405,6 +570,74 @@ internal fun recentMarksInTxn(
             sid to points
         }.toMap()
 }
+
+/**
+ * The single most-recent PUBLISHED mark per student (name + marks + max), for the
+ * roster's "latest performance" column (Doc 09 §3.7). Newest by exam_date; AB and
+ * not-yet-entered rows are excluded.
+ */
+internal fun latestPublishedMarkInTxn(
+    ctx: TeacherContext,
+    a: OwnedAssignment,
+    studentIds: List<UUID>,
+): Map<UUID, LatestMarkDto> {
+    if (studentIds.isEmpty()) return emptyMap()
+    val assessments = scopedAssessmentsInTxn(ctx, a, publishedOnly = true)
+    if (assessments.isEmpty()) return emptyMap()
+    val byId = assessments.associateBy { it[AssessmentsTable.id].value }
+    val assessmentIds = byId.keys.toList()
+
+    val markRows = AssessmentMarksTable.selectAll().where {
+        (AssessmentMarksTable.assessmentId inList assessmentIds) and
+            (AssessmentMarksTable.studentRef inList studentIds)
+    }.toList()
+
+    return markRows.groupBy { it[AssessmentMarksTable.studentRef] }
+        .mapNotNull { (sid, recs) ->
+            if (sid == null) return@mapNotNull null
+            val latest = recs
+                .filter { it[AssessmentMarksTable.marks] != null && !it[AssessmentMarksTable.isAbsent] }
+                .maxByOrNull { byId[it[AssessmentMarksTable.assessmentId]]?.get(AssessmentsTable.examDate) ?: LocalDate.MIN }
+                ?: return@mapNotNull null
+            val asg = byId[latest[AssessmentMarksTable.assessmentId]] ?: return@mapNotNull null
+            sid to LatestMarkDto(
+                name = asg[AssessmentsTable.name],
+                marks = latest[AssessmentMarksTable.marks]!!,
+                max = asg[AssessmentsTable.maxMarks],
+            )
+        }.toMap()
+}
+
+/**
+ * The weekly timetable for THIS class (the periods I teach it across the week),
+ * ordered by weekday then start time. Today's slots flagged.
+ */
+internal fun weeklyTimetableInTxn(
+    ctx: TeacherContext,
+    a: OwnedAssignment,
+    todayWeekday: Int,
+): List<WeeklyPeriodDto> {
+    val periods = TeacherPeriodsTable.selectAll().where {
+        (TeacherPeriodsTable.schoolId eq ctx.schoolId) and
+            (TeacherPeriodsTable.teacherId eq ctx.userId) and
+            (TeacherPeriodsTable.assignmentId eq a.assignmentId) and
+            (TeacherPeriodsTable.isActive eq true)
+    }.toList()
+    return periods
+        .sortedWith(compareBy({ it[TeacherPeriodsTable.weekday] }, { it[TeacherPeriodsTable.startTime] }))
+        .map { r ->
+            val wd = r[TeacherPeriodsTable.weekday]
+            WeeklyPeriodDto(
+                weekday = wd,
+                dayLabel = DAY_NAMES.getOrElse(wd) { "" },
+                startTime = r[TeacherPeriodsTable.startTime].format(HHMM_CLS),
+                endTime = r[TeacherPeriodsTable.endTime].format(HHMM_CLS),
+                room = r[TeacherPeriodsTable.room],
+                isToday = wd == todayWeekday,
+            )
+        }
+}
+
 
 /**
  * The next period for an assignment within this week (today onward). Scans the

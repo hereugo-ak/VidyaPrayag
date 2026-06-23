@@ -44,6 +44,17 @@ class TeacherApi(
         client.get(getUrl("api/v1/teacher/classes-v2"))
     }
 
+    // T-502 (Doc 09 §3): the composite class detail — header, next period, weekly
+    // timetable, attendance summary, assessment schedule, active homework, and the
+    // REAL roster (per-student attendance rate, latest mark, flags) in ONE call
+    // (no client N+1). Path staged at `/classes-v2/{id}`; converges in T-504.
+    suspend fun getClassDetailV2(
+        token: String,
+        assignmentId: String,
+    ): NetworkResult<ClassDetailResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/classes-v2/$assignmentId"))
+    }
+
     // T-104/T-105: the server-resolved schedule. `/day` merges periods +
     // exceptions + holidays + calendar + per-period attendanceMarked and carries
     // authoritative now/next indices; `/week` returns Mon–Sat resolved.

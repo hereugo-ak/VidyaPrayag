@@ -12,6 +12,9 @@ interface TeacherRepository {
     // T-501 (Doc 09 §2): aggregated class list (single query set; real flags).
     suspend fun listClassesV2(token: String): NetworkResult<TeacherClassesV2Response>
 
+    // T-502 (Doc 09 §3): composite class detail (roster + signals + summaries).
+    suspend fun getClassDetailV2(token: String, assignmentId: String): NetworkResult<ClassDetailResponse>
+
     // T-104/T-105: server-resolved schedule for the Today tab.
     suspend fun getDay(token: String, date: String? = null): NetworkResult<ResolvedDayResponse>
     suspend fun getWeek(token: String, date: String? = null): NetworkResult<ResolvedWeekResponse>
