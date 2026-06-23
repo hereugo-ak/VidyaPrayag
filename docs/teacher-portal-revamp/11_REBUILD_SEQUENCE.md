@@ -309,32 +309,39 @@ These resolve the cross-cutting root defects (X-1..X-6) that everything else sta
 
 ---
 
-## PHASE 5 — CLASSES
+## PHASE 5 — CLASSES — ✅ COMPLETED
+
+> **STATUS:** ✅ **Phase 5 complete.** T-501..T-505 executed and pushed to `backend-by-abuzar_v1.0.3` (commits `a07b808`, `0e074c1`, `2f23636`, `437dd22`). The Classes plane is rebuilt end-to-end: one-query class list (B-CLS-1/2/3), composite class detail with real roster (B-CLS-4/5, F-CLS-5), scoped student profile with a 403 forbidden state (B-PROF-1/2, F-PROF-3) — scope enforced at all three constitution levels (SQL query, API response, UI). Staged `-v2` paths converged to canonical `/classes[/{id}]` + `/students/{id}`; the legacy looping `/classes` handler is deleted.
 
 ### T-501 — Backend: GET /teacher/classes (single aggregated query, real is_class_teacher, atRisk)
 - **Layer:** Backend · **Depends:** T-001, T-002, T-201, T-301 · **Touches:** `feature/teacher/TeacherRouting.kt`
 - **Details:** Doc 09 §2 — replace 3× N+1 loop with one aggregated query set; real class-teacher flag; student count from enrollments; next period; today-marked; atRiskCount.
 - **Closes:** B-CLS-1, B-CLS-2, B-CLS-3.
+- **STATUS (executed):** ✅ New file `feature/teacher/TeacherClassesRouting.kt` (NOT a patch of the legacy looping `/classes` handler — DELETE-don't-patch; legacy handler deleted in T-504). `GET /classes` builds the whole list from ONE batched query set (assignments → enrollment counts → today's attendance → marks for atRisk → next periods), killing the B-CLS-1 3×N+1 loop; `is_class_teacher` is the REAL TSA flag (B-CLS-3) not a name-match heuristic. **DEVIATION (flagged):** staged under `/classes-v2` because Ktor forbids two handlers on the same method+path while the legacy `/classes` still lived; converged to canonical `/classes` in T-504. Commit `a07b808`.
 
 ### T-502 — Backend: GET /teacher/classes/{id} composite (roster+signals+summaries)
 - **Layer:** Backend · **Depends:** T-501 · **Touches:** `TeacherRouting.kt`
 - **Details:** Doc 09 §3 — composite endpoint: roster (attendance rate, latest mark, flags), weekly timetable, next period, attendance summary, assessment schedule, active homework. Flags computed (Doc 09 §5).
 - **Closes:** B-CLS-4/5.
+- **STATUS (executed):** ✅ `GET /classes/{assignmentId}` in `TeacherClassesRouting.kt` — ONE composite `dbQuery` (no client N+1): header, next period, weekly timetable, attendance summary (today P/A/L/Lv + week/month rates), assessment schedule, active homework, and the REAL roster (per student: attendance rate, latest published mark, Doc 09 §5 flags via `computeFlags`/`ClassFlags`). Internal helpers (`scopedAssessmentsInTxn`, `rosterForInTxn`, `attendanceWindowsInTxn`, `recentMarksInTxn`, `latestPublishedMarkInTxn`, `nextPeriodForInTxn`, `weeklyTimetableInTxn`, `buildClassDetailInTxn`) are `internal` so T-503 reuses them. **BUG FIXED in flight (T-503 commit):** the 8 composite server DTOs (`ClassDetailData`/`RosterStudentDto`/`ClassDetailHeaderDto`/`WeeklyPeriodDto`/`AttendanceSummaryDto`/`ClassAssessmentDto`/`ClassHomeworkDto`/`LatestMarkDto`) were referenced but never defined server-side (`:server` doesn't depend on `:shared`) — added as `@Serializable` server DTOs mirroring the shared models field-for-field. Commits `0e074c1` (endpoint) + `2f23636` (DTO compile-fix). Staged `/classes-v2/{id}`, converged to `/classes/{id}` in T-504.
 
 ### T-503 — Backend: GET /teacher/students/{id} (scoped profile)
 - **Layer:** Backend · **Depends:** T-502 · **Touches:** new `TeacherStudentRouting.kt`
 - **Details:** Doc 09 §4 — scoped student profile (attendance, performance, flags, gated parent contact); 403 if teacher doesn't teach student.
 - **Closes:** B-PROF-1, B-PROF-2.
+- **STATUS (executed):** ✅ New file `feature/teacher/TeacherStudentRouting.kt` — `GET /students/{studentId}` resolves attendance window, performance (published marks), Doc 09 §5 flags, and a privacy-gated parent contact, reusing the T-502 `internal` helpers (same package). Scope law enforced at the QUERY level: the student must appear in a roster the caller teaches, else **403** (B-PROF-1/2; surfaced as the T-505 forbidden state, never a leak). 5 profile server DTOs (`StudentAttendanceDayDto`/`StudentAttendanceDto`/`StudentPerformanceDto`/`ParentContactDto`/`StudentProfileData`) added (same `:server`-no-`:shared` reason as T-502). **BUG FIXED in flight:** `resolveParentContact` matched on `children.school_id` (nullable) → could miss legitimately-linked parents; now matches by `student_code`, preferring same-school then first. Commit `2f23636`. Staged `/students-v2/{id}`, converged to `/students/{id}` in T-504.
 
 ### T-504 — Frontend: Classes list + class detail (real roster, replaces VComingSoon)
 - **Layer:** Frontend · **Depends:** T-502, T-105 · **Touches:** `ui/v2/screens/teacher/TeacherClassesScreenV2.kt`
 - **Details:** Doc 09 §2/§3 + Doc 10 §6.5 — class list with badges; class detail sections; **real roster replacing `VComingSoon`**; long-list virtualization.
 - **Closes:** **F-CLS-5** (VComingSoon), F-CLS-1..4/6.
+- **STATUS (executed):** ✅ Classes plane rebuilt from scratch (parents portal as design system). `TeacherClassesViewModel` rewritten to the V2 list+detail planes (`listClassesV2`/`getClassDetailV2`) with a per-id detail cache, search + class-teacher/subject filter chips, RA-51 broadcast preserved; dead `TeacherClass` UI model + `TeacherClassDto.toUi()` removed. `TeacherClassesScreenV2` rewritten: list (search `VInput` + 3 filter `VTag`s + `ClassCard` badges) and `ClassDetailScreen` (mini-stats, message-parents, next period, today attendance P/A/L/Lv, weekly timetable, assessments, homework, and the **REAL roster** — `VComingSoon` removed, closes F-CLS-5); each roster row → student profile via `onOpenStudent`. **Backend path convergence + legacy delete:** `/classes-v2[/{id}]`→`/classes[/{id}]` and `/students-v2/{id}`→`/students/{id}`; the legacy looping `GET /classes` handler + orphaned `TeacherClassDto`/`TeacherClassesData` + `syllabusProgressFor`/`avgAttendanceFor` DELETED from `TeacherRouting.kt` (kept `studentCountFor` — still used by assignment routing). Shared: orphaned `getClasses` plane removed (API/repo/impl/interface) + 3 dead DTOs; consumers `PlannerScreen`/`TeacherUpdateSelector`/`TeacherPortalV2` picker migrated `TeacherClass(.id)`→`TeacherClassSummaryDto(.assignmentId)`. Commit `437dd22`.
 
 ### T-505 — Frontend: student profile drill-down
 - **Layer:** Frontend · **Depends:** T-503, T-504 · **Touches:** new `TeacherStudentProfileScreen.kt`
 - **Details:** Doc 09 §4 — header, attendance, performance trajectory, flags, gated contact.
 - **Closes:** F-PROF-3.
+- **STATUS (executed):** ✅ New `TeacherStudentProfileViewModel` (`load(studentId)` via `getStudentProfileV2`; a **403** — or a `teach`-mentioning message — surfaces a dedicated forbidden state, not a raw error: the scope law at the UI level) + Koin factory. New `TeacherStudentProfileScreenV2`: header (`VAvatar` Large + class/section/roll), attendance (rate + 30-day recent dots + trend badge), performance (published marks or honest "No marks recorded yet"), server-computed flags (paint-only, never recomputed), privacy-gated parent contact (rendered ONLY when the server returns it). Portal navigation wired in `TeacherPortalV2.kt`: a Classes roster-row tap sets `selectedStudentId` → pushes the profile full-screen above the tabs; back clears it. **DEVIATION (flagged):** the file landed as `TeacherStudentProfileScreenV2.kt` (V2 suffix, matching the sibling `…ScreenV2` naming convention) rather than the doc's `TeacherStudentProfileScreen.kt`. Commit `437dd22`.
 
 ---
 
