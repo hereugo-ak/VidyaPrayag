@@ -15,13 +15,11 @@ interface TeacherRepository {
     // T-205: typed, assignment-scoped attendance (Doc 06 §3.8). Replaces the legacy
     // getAttendance(classId, date) / submitAttendance(SubmitAttendanceRequest).
     suspend fun loadAttendance(token: String, assignmentId: String, date: String? = null): NetworkResult<AttendanceLoadResponse>
-    suspend fun getMarks(token: String, classId: String, examId: String): NetworkResult<TeacherMarksResponse>
     suspend fun getSyllabus(token: String, classId: String, subject: String): NetworkResult<TeacherSyllabusResponse>
     suspend fun getHomework(token: String): NetworkResult<TeacherHomeworkResponse>
     suspend fun getProfile(token: String): NetworkResult<TeacherProfileResponse>
-    suspend fun getAssessments(token: String, classId: String): NetworkResult<TeacherAssessmentsResponse>
 
-    // T-302/T-303/T-304: Gradebook lifecycle (Doc 07 §2/§5/§6). The canonical
+    // T-302/T-303/T-304/T-305: Gradebook lifecycle (Doc 07 §2/§5/§6). The canonical
     // assessment + marks contract — scoped list, roster-with-marks, SAVE (no
     // publish), explicit publish/unpublish, server-aggregated history.
     suspend fun listAssessments(token: String, assignmentId: String, status: String? = null): NetworkResult<AssessmentListResponse>
@@ -38,11 +36,12 @@ interface TeacherRepository {
     suspend fun getObligations(token: String): NetworkResult<TeacherObligationsResponse>
 
     // Writes
+    // T-305: legacy getMarks/submitMarks/getAssessments/createAssessment removed — the
+    // canonical scoped gradebook lifecycle above (listAssessments/createAssessmentV2/
+    // getAssessmentMarks/saveAssessmentMarks/publish/unpublish/history) replaces them.
     suspend fun saveAttendance(token: String, request: AttendanceSaveRequest): NetworkResult<AttendanceSaveResponse>
-    suspend fun submitMarks(token: String, request: SubmitMarksRequest): NetworkResult<ApiResponse<Unit>>
     suspend fun updateSyllabus(token: String, request: UpdateSyllabusRequest): NetworkResult<ApiResponse<Unit>>
     suspend fun createHomework(token: String, request: CreateHomeworkRequest): NetworkResult<ApiResponse<Unit>>
-    suspend fun createAssessment(token: String, request: CreateAssessmentRequest): NetworkResult<ApiResponse<TeacherAssessmentDto>>
 
     // RA-44: teacher leave workflow.
     suspend fun getLeaveRequests(token: String, status: String? = null): NetworkResult<TeacherLeaveListResponse>

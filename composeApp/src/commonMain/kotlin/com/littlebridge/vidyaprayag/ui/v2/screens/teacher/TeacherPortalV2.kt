@@ -57,16 +57,17 @@ private enum class TeacherOverlay { None, Notifications, Calendar, Leave, Update
  *
  *   Today     — [TodayScreen]: greeting + live 3-face schedule card (T-105, server-resolved).
  *   Classes   — [TeacherClassesScreenV2] (existing).
- *   Gradebook — STAGED (P3 / T-301..306). Honest "coming in this phase" placeholder for now.
+ *   Gradebook — [TeacherGradebookScreenV2] (T-305): scoped assessment list + create + a
+ *               validated marks grid with distinct Save (private) vs Publish (notifies parents).
  *   Planner   — STAGED (P4 / T-401..406). Honest placeholder for now.
  *   Profile   — [TeacherProfileScreenV2] (existing; logout lives here).
  *
  * Notifications / AcademicCalendar / Leave / the Update write-plane are full-screen
  * overlays. The portal is `tone = Warm`.
  *
- * NOTE (Doc 11 deviation): Gradebook & Planner are placeholders by SEQUENCE design — their
- * real screens land in P3/P4. Wiring them as honest staged tabs now (rather than hiding the
- * tabs) keeps the 5-tab IA visible and avoids a disruptive nav reshuffle later.
+ * NOTE (Doc 11 deviation): Planner is a placeholder by SEQUENCE design — its real screen
+ * lands in P4. Wiring it as an honest staged tab now (rather than hiding the tab) keeps the
+ * 5-tab IA visible and avoids a disruptive nav reshuffle later.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -86,10 +87,16 @@ fun TeacherPortalV2(
         // CTA, they are pre-seeded from the tapped (already pre-authorized) period.
         var selectedClassId by remember { mutableStateOf("") }
         var selectedSubject by remember { mutableStateOf("") }
-        var selectedExamId by remember { mutableStateOf("") }
         // T-205: the pre-known scope label for the attendance wrong-class guard header
         // (E15), shown instantly while the server load confirms scope.
         var selectedScope by remember { mutableStateOf("") }
+
+        // T-305: the Gradebook tab is reached PRE-SCOPED from a Today/Classes CTA or a
+        // "marks" obligation (Doc 04 §5.5). These hold the pre-authorized assignment +
+        // its scope label so [TeacherGradebookScreenV2] opens directly on the right class
+        // (a blank id falls back to the screen's "Choose a class" empty state).
+        var gradebookAssignmentId by remember { mutableStateOf("") }
+        var gradebookScope by remember { mutableStateOf("") }
 
         // Open the Update write-plane on a specific sub-tab, pre-seeded from a Today
         // period's pre-authorized assignment (so no class re-pick is needed — Doc 04 §4).
@@ -100,7 +107,6 @@ fun TeacherPortalV2(
                 period.classLabel.takeIf { period.className.isNotBlank() },
                 period.subject.takeIf { it.isNotBlank() },
             ).joinToString(" · ")
-            selectedExamId = ""
             updateSub = sub
             overlay = TeacherOverlay.Update
         }
@@ -110,7 +116,7 @@ fun TeacherPortalV2(
         // directly on the tool — never a picker (Doc 04 §5.5 deep-link contract):
         //   • attendance → Update plane on Attendance, pre-seeded by assignment id
         //   • leave      → the teacher Leave inbox overlay
-        //   • marks      → Gradebook tab (real publish flow lands in P3 — staged)
+        //   • marks      → Gradebook tab, pre-scoped to the assignment (T-305 — real flow)
         //   • homework   → Planner tab (real review flow lands in P4 — staged)
         fun openObligation(item: ObligationItemDto) {
             when (item.type) {
@@ -118,12 +124,17 @@ fun TeacherPortalV2(
                     selectedClassId = item.assignmentId.orEmpty()
                     selectedSubject = ""
                     selectedScope = item.title
-                    selectedExamId = ""
                     updateSub = "Attendance"
                     overlay = TeacherOverlay.Update
                 }
                 "leave" -> overlay = TeacherOverlay.Leave
-                "marks" -> tab = "gradebook"
+                "marks" -> {
+                    // Pre-seed the Gradebook tab with the pre-authorized assignment so it
+                    // opens directly on the right class (Doc 04 §5.5 deep-link contract).
+                    gradebookAssignmentId = item.assignmentId.orEmpty()
+                    gradebookScope = item.title
+                    tab = "gradebook"
+                }
                 "homework" -> tab = "planner"
                 else -> Unit
             }
@@ -153,9 +164,7 @@ fun TeacherPortalV2(
                     selectedClassId = selectedClassId,
                     selectedSubject = selectedSubject,
                     selectedScope = selectedScope,
-                    selectedExamId = selectedExamId,
-                    onSelectClass = { id, subject -> selectedClassId = id; selectedSubject = subject; selectedScope = ""; selectedExamId = "" },
-                    onSelectExam = { selectedExamId = it },
+                    onSelectClass = { id, subject -> selectedClassId = id; selectedSubject = subject; selectedScope = "" },
                     onBack = { overlay = TeacherOverlay.None },
                     modifier = modifier,
                 )
@@ -190,10 +199,13 @@ fun TeacherPortalV2(
                         onOpenProfile = { tab = "profile" },
                     )
                     "classes" -> TeacherClassesScreenV2()
-                    "gradebook" -> StagedTab(
-                        title = "Gradebook",
-                        body = "Assessments, marks entry and grade analytics arrive in the Gradebook phase.",
-                        icon = VIcons.GraduationCap,
+                    // T-305: the real Gradebook — scoped assessment list + create + a
+                    // validated marks grid with distinct Save (private) vs Publish (notifies
+                    // parents). Reached pre-scoped from a Today/obligation CTA; a blank id
+                    // shows the screen's own "Choose a class" empty state.
+                    "gradebook" -> TeacherGradebookScreenV2(
+                        assignmentId = gradebookAssignmentId,
+                        scopeHint = gradebookScope,
                     )
                     "planner" -> StagedTab(
                         title = "Planner",
@@ -219,9 +231,7 @@ private fun TeacherUpdatePlane(
     selectedClassId: String,
     selectedSubject: String,
     selectedScope: String,
-    selectedExamId: String,
     onSelectClass: (String, String) -> Unit,
-    onSelectExam: (String) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -246,8 +256,11 @@ private fun TeacherUpdatePlane(
                     modifier = Modifier.padding(start = 4.dp),
                 )
             }
+            // T-305: "Marks" is no longer a write-plane leaf — it graduated to its own
+            // Gradebook tab (assessment list → marks grid → publish). The Update plane
+            // keeps only Attendance / Syllabus / Homework.
             VTopTabs(
-                tabs = listOf("Attendance", "Marks", "Syllabus", "Homework"),
+                tabs = listOf("Attendance", "Syllabus", "Homework"),
                 selected = sub,
                 onSelect = onSelectSub,
             )
@@ -257,8 +270,8 @@ private fun TeacherUpdatePlane(
             // T-205 (F-ATT-1): Attendance is reached PRE-SCOPED from a Today/Classes/obligations
             // CTA via the pre-authorized assignmentId — it must NOT front the shared class
             // picker (that buried it 2-3 taps and reset scope every visit). Homework authors
-            // its own class field; the shared picker still fronts Marks/Syllabus until their
-            // own rebuilds (P3/P4).
+            // its own class field; the shared picker still fronts Syllabus until its own
+            // rebuild (P4). (Marks moved out to the Gradebook tab — T-305.)
             if (sub != "Homework" && sub != "Attendance") {
                 TeacherClassPicker(
                     selectedClassId = selectedClassId,
@@ -271,12 +284,6 @@ private fun TeacherUpdatePlane(
                     date = "",
                     scopeHint = selectedScope,
                 )
-                "Marks" -> {
-                    if (selectedClassId.isNotBlank()) {
-                        TeacherExamPicker(classId = selectedClassId, onSelectExam = onSelectExam)
-                    }
-                    TeacherMarksScreenV2(classId = selectedClassId, examId = selectedExamId)
-                }
                 "Syllabus" -> TeacherSyllabusScreenV2(classId = selectedClassId, subject = selectedSubject)
                 "Homework" -> TeacherHomeworkScreenV2()
             }

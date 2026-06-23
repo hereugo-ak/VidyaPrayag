@@ -73,17 +73,6 @@ class TeacherApi(
         }
     }
 
-    suspend fun getMarks(
-        token: String,
-        classId: String,
-        examId: String,
-    ): NetworkResult<TeacherMarksResponse> = safeApiCall {
-        client.get(getUrl("api/v1/teacher/marks")) {
-            parameter("class_id", classId)
-            parameter("exam_id", examId)
-        }
-    }
-
     suspend fun getSyllabus(
         token: String,
         classId: String,
@@ -99,18 +88,10 @@ class TeacherApi(
         client.get(getUrl("api/v1/teacher/homework"))
     }
 
-    // RA-40: list the exams a teacher can mark for an owned class. The marks
-    // plane requires a valid exam_id; this is where the exam selector sources it.
-    suspend fun getAssessments(
-        token: String,
-        classId: String,
-    ): NetworkResult<TeacherAssessmentsResponse> = safeApiCall {
-        client.get(getUrl("api/v1/teacher/assessments")) {
-            parameter("class_id", classId)
-        }
-    }
+    // T-305: legacy getMarks / getAssessments (the RA-40 exam-picker GET) removed —
+    // the canonical scoped gradebook lifecycle below replaces them at /assessments/*.
 
-    // ── T-302/T-303/T-304: Gradebook lifecycle (Doc 07 §2/§5/§6) ─────────────
+    // ── T-302/T-303/T-304/T-305: Gradebook lifecycle (Doc 07 §2/§5/§6) ───────
     // The canonical assessment + marks contract: scoped list, roster-with-marks
     // load, SAVE (no publish — the B-MK-1 fix), explicit publish/unpublish, and
     // server-aggregated history. All scoped to the authorizing assignmentId.
@@ -230,16 +211,6 @@ class TeacherApi(
         }
     }
 
-    suspend fun submitMarks(
-        token: String,
-        request: SubmitMarksRequest,
-    ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
-        client.post(getUrl("api/v1/teacher/marks")) {
-            contentType(ContentType.Application.Json)
-            setBody(request)
-        }
-    }
-
     // T-106c: record the teacher's self check-in. Idempotent per (teacher, date);
     // `method` is the biometric-ladder rung that succeeded (biometric|pin|manual,
     // Doc 06 §2.1). The server stamps the authoritative timestamp and echoes the
@@ -274,17 +245,9 @@ class TeacherApi(
         }
     }
 
-    // RA-40: create a new exam for an owned class. Server replies 201 with the
-    // created assessment in `data`, so the UI can immediately select it.
-    suspend fun createAssessment(
-        token: String,
-        request: CreateAssessmentRequest,
-    ): NetworkResult<ApiResponse<TeacherAssessmentDto>> = safeApiCall {
-        client.post(getUrl("api/v1/teacher/assessments")) {
-            contentType(ContentType.Application.Json)
-            setBody(request)
-        }
-    }
+    // T-305: legacy submitMarks (POST /marks, force-publish) + createAssessment
+    // (POST /assessments, free-text) removed. The gradebook lifecycle above owns
+    // PUT /assessments/{id}/marks (SAVE, no publish) + POST /assessments (typed create).
 
     // ── RA-44: teacher leave workflow ─────────────────────────────────────────
 

@@ -325,57 +325,22 @@ data class AttendanceSaveResultDto(
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Marks — load students for an exam/subject, then submit scores.
-// Backs Teacher.tsx → Update › Marks.
+// Marks — the canonical gradebook contract (below).
+//
+// T-305 (DELETE-don't-patch): the legacy free-text marks DTOs
+// (TeacherMarksResponse / TeacherMarksData / MarksEntryDto / SubmitMarksRequest /
+// MarkScoreDto) that backed the deleted force-publishing `/marks` flow are GONE —
+// replaced by the scope-bound, lifecycle-aware models below in the SAME commit
+// that removed their consumers (TeacherApi/TeacherRepository(+Impl) + the screen).
 // ─────────────────────────────────────────────────────────────────────────────
 
-@Serializable
-data class TeacherMarksResponse(
-    val success: Boolean,
-    val data: TeacherMarksData,
-)
-
-@Serializable
-data class TeacherMarksData(
-    @SerialName("class_name") val className: String,
-    val subject: String,
-    @SerialName("exam_name") val examName: String,
-    @SerialName("max_marks") val maxMarks: Int,
-    val students: List<MarksEntryDto> = emptyList(),
-)
-
-@Serializable
-data class MarksEntryDto(
-    @SerialName("student_id") val studentId: String,
-    val name: String,
-    @SerialName("roll_no") val rollNo: String = "",
-    val marks: Float? = null,
-)
-
-@Serializable
-data class SubmitMarksRequest(
-    @SerialName("class_id") val classId: String,
-    @SerialName("exam_id") val examId: String,
-    val entries: List<MarkScoreDto>,
-)
-
-@Serializable
-data class MarkScoreDto(
-    @SerialName("student_id") val studentId: String,
-    val marks: Float,
-)
-
 // ═════════════════════════════════════════════════════════════════════════════
-// T-302 — ASSESSMENT + MARKS LIFECYCLE (the canonical gradebook contract)
+// T-302/T-305 — ASSESSMENT + MARKS LIFECYCLE (the canonical gradebook contract)
 // Doc 07 §1.3 (canonical model), §2 (draft→…→published machine, the B-MK-1 fix),
 // §3 (scoped create), §5 (validated entry), §6 (history/comparison).
 //
-// These models REPLACE the legacy free-text marks contract above
-// (TeacherMarksData / SubmitMarksRequest / TeacherAssessmentDto). The legacy
-// types are retained until T-303 deletes the legacy `/marks` handler and T-305
-// reworks the screen (DELETE-don't-patch: the old contract stays valid until its
-// replacement lands in the SAME commit that removes it). Everything here is
-// snake_case `@SerialName` matching the server wire surface field-for-field, and
+// These models REPLACE the legacy free-text marks contract (now DELETED, T-305).
+// Everything here is
 // scope-bound to the authorizing `assignment_id` (X-1 / D-ASMT-6) — never a
 // free-text class/section/subject.
 //
@@ -734,39 +699,14 @@ data class TeacherProfileData(
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Assessments (exams) — list + create. RA-40: the marks plane needs a valid
-// exam_id; these models back the exam selector that feeds SubmitMarksRequest.
-// Mirror server TeacherAssessmentDto / TeacherAssessmentsData / CreateAssessmentRequest.
+// Assessments (exams) — legacy exam-selector contract REMOVED (T-305,
+// DELETE-don't-patch). The old free-text TeacherAssessmentsResponse /
+// TeacherAssessmentsData / TeacherAssessmentDto / CreateAssessmentRequest backed
+// the deleted TeacherExamPicker + force-publishing `/assessments` flow; they are
+// GONE in the SAME commit that removed their consumers. The canonical scope-bound
+// assessment models live in the "T-302/T-305 — ASSESSMENT + MARKS LIFECYCLE"
+// block above (AssessmentDto / CreateAssessmentRequestV2 / …).
 // ─────────────────────────────────────────────────────────────────────────────
-
-@Serializable
-data class TeacherAssessmentsResponse(
-    val success: Boolean,
-    val data: TeacherAssessmentsData,
-)
-
-@Serializable
-data class TeacherAssessmentsData(
-    val assessments: List<TeacherAssessmentDto> = emptyList(),
-)
-
-@Serializable
-data class TeacherAssessmentDto(
-    val id: String,
-    val name: String,
-    val subject: String,
-    @SerialName("max_marks") val maxMarks: Int,
-    @SerialName("exam_date") val examDate: String? = null,
-    @SerialName("is_published") val isPublished: Boolean = false,
-)
-
-@Serializable
-data class CreateAssessmentRequest(
-    @SerialName("class_id") val classId: String,
-    val name: String,
-    @SerialName("max_marks") val maxMarks: Int? = null,
-    @SerialName("exam_date") val examDate: String? = null,
-)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RA-44: teacher leave workflow. Mirror server/.../teacher/TeacherLeaveRouting.kt.

@@ -39,7 +39,7 @@
  *   - resultsRouting()                    — /api/v1/school/results
  *   - teacherAssignmentRouting()          — /api/v1/school/teacher-assignments[…]
  *   - mediaRouting()                      — /api/v1/school/media/upload[…] (binary → Supabase Storage)
- *   - teacherRouting()                    — /api/v1/teacher/{home,classes,profile,attendance,marks,syllabus,homework}
+ *   - teacherRouting()                    — /api/v1/teacher/{home,classes,profile,syllabus,homework}
  *   - teacherDayRouting()                 — /api/v1/teacher/{day,week} (T-104 resolved schedule)
  *
  * On boot:
@@ -293,10 +293,10 @@ fun Application.module() {
         academicYearRouting()        // /api/admin/academic-years[…] — real Academic Year management (replaces "Coming Soon")
 
         // Teacher vertical (master rebuild doc Step 7 / gap G1)
-        teacherRouting()             // /api/v1/teacher/{home,classes,profile,attendance,marks,syllabus,homework}
+        teacherRouting()             // /api/v1/teacher/{home,classes,profile,syllabus,homework}
         teacherDayRouting()          // T-104 /api/v1/teacher/{day,week} — resolved schedule (periods+exceptions+holidays+calendar, server now/next)
         teacherAttendanceRouting()   // T-203/T-205 /api/v1/teacher/attendance — typed, assignment-scoped attendance load/save (Doc 06 §3.8); legacy packed-grade handler deleted
-        teacherGradebookRouting()    // T-303/T-304 /api/v1/teacher/gradebook — typed assessment lifecycle: list/create, marks load/SAVE (no publish, the B-MK-1 fix), publish/unpublish, history (Doc 07 §2/§5/§6); converges to /assessments in T-305
+        teacherGradebookRouting()    // T-303/T-304/T-305 /api/v1/teacher/assessments — typed assessment lifecycle: list/create, marks load/SAVE (no publish, the B-MK-1 fix), publish/unpublish, history (Doc 07 §2/§5/§6); converged from /gradebook to canonical /assessments in T-305 (legacy /marks + /assessments handlers deleted)
         teacherLeaveRouting()        // /api/v1/teacher/leave-requests[…] — RA-44 teacher lists/decides leave for their classes
         teacherMessagesRouting()     // /api/v1/teacher/messages[…] — RA-51 teacher↔parent messaging + class broadcast
 

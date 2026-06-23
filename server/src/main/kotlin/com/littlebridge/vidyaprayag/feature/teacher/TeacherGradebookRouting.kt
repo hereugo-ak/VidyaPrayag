@@ -20,13 +20,13 @@
  * subject. Roster comes from enrollments (typed, roll-ordered). Entry validation
  * (≤max, ≥0, AB≠0) is enforced SERVER-side (§5.2), not just in the grid.
  *
- * PATH NOTE (deviation, flagged in 11_REBUILD_SEQUENCE):
- *   The legacy `teacherTaskRoutes()` still binds GET/POST `/api/v1/teacher/marks`
- *   and GET/POST `/api/v1/teacher/assessments`; Ktor forbids two handlers on the
- *   same method+path. So this new plane is mounted under `/api/v1/teacher/gradebook`
- *   for now (same convergence pattern as T-203's `/attendance-typed`). T-305
- *   deletes the legacy handlers and converges these to the canonical
- *   `/assessments` paths from Doc 07 §2.
+ * PATH NOTE (converged in T-305):
+ *   This plane originally mounted under a temporary `/api/v1/teacher/gradebook`
+ *   prefix to avoid colliding with the legacy `teacherTaskRoutes()` `/marks` +
+ *   `/assessments` handlers (Ktor forbids two handlers on the same method+path) —
+ *   the same staging pattern as T-203's `/attendance-typed`. T-305 DELETED those
+ *   legacy handlers and converged this plane to the canonical `/api/v1/teacher/
+ *   assessments/*` paths from Doc 07 §2 (which the shared TeacherApi client targets).
  *
  * Scoping is enforced at THREE levels (the constitution): the SQL only ever
  * touches owned assignments + their enrollment roster (query), the response only
@@ -285,7 +285,12 @@ data class GbAssessmentHistoryDto(
 
 fun Route.teacherGradebookRouting() {
     authenticate("jwt") {
-        route("/api/v1/teacher/gradebook") {
+        // T-305: CONVERGED to the canonical `/api/v1/teacher/assessments/*` paths from
+        // Doc 07 §2. The legacy `route("/marks")` + `route("/assessments")` handlers in
+        // TeacherRoutingTasks.kt are deleted, so this typed plane no longer needs the
+        // temporary `/gradebook` prefix (the T-203 `/attendance-typed`→`/attendance`
+        // convergence precedent). The shared TeacherApi client already targets these paths.
+        route("/api/v1/teacher") {
             assessmentHistory()        // literal /assessments/history before {id}
             assessmentListAndCreate()
             assessmentMarksLoadAndSave()
@@ -295,7 +300,7 @@ fun Route.teacherGradebookRouting() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /gradebook/assessments/history?assignmentId=   (server-aggregated trends)
+// GET /api/v1/teacher/assessments/history?assignmentId=   (server-aggregated trends)
 // Doc 07 §6 — class average per published assessment (timeline) + the latest
 // assessment's score distribution (histogram). Everything computed server-side
 // in ONE transaction (no client N+1; contrast the B-CLS aggregate bugs).
@@ -394,8 +399,8 @@ private fun Route.assessmentHistory() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET  /gradebook/assessments?assignmentId=&status=   (list, scoped)
-// POST /gradebook/assessments                          (create, returns draft)
+// GET  /api/v1/teacher/assessments?assignmentId=&status=   (list, scoped)
+// POST /api/v1/teacher/assessments                          (create, returns draft)
 // Doc 07 §2/§3.
 // ─────────────────────────────────────────────────────────────────────────────
 private fun Route.assessmentListAndCreate() {
@@ -550,8 +555,8 @@ private fun Route.assessmentListAndCreate() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /gradebook/assessments/{id}/marks   (roster + existing marks)
-// PUT /gradebook/assessments/{id}/marks   (SAVE ONLY — the B-MK-1 fix)
+// GET /api/v1/teacher/assessments/{id}/marks   (roster + existing marks)
+// PUT /api/v1/teacher/assessments/{id}/marks   (SAVE ONLY — the B-MK-1 fix)
 // Doc 07 §2/§5.
 // ─────────────────────────────────────────────────────────────────────────────
 private fun Route.assessmentMarksLoadAndSave() {
@@ -749,8 +754,8 @@ private fun Route.assessmentMarksLoadAndSave() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// POST /gradebook/assessments/{id}/publish     (the ONLY notify path)
-// POST /gradebook/assessments/{id}/unpublish   (retract, audited, no notify)
+// POST /api/v1/teacher/assessments/{id}/publish     (the ONLY notify path)
+// POST /api/v1/teacher/assessments/{id}/unpublish   (retract, audited, no notify)
 // Doc 07 §2.
 // ─────────────────────────────────────────────────────────────────────────────
 private fun Route.assessmentPublishUnpublish() {

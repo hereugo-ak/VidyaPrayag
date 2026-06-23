@@ -32,12 +32,9 @@ import com.littlebridge.vidyaprayag.core.okMessage
 import com.littlebridge.vidyaprayag.core.requireOwnedAssignment
 import com.littlebridge.vidyaprayag.core.requireTeacherContext
 import com.littlebridge.vidyaprayag.core.teacherAssignmentsFor
-import com.littlebridge.vidyaprayag.db.AssessmentMarksTable
-import com.littlebridge.vidyaprayag.db.AssessmentsTable
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.HomeworkSubmissionsTable
 import com.littlebridge.vidyaprayag.db.HomeworkTable
-import com.littlebridge.vidyaprayag.db.StudentsTable
 import com.littlebridge.vidyaprayag.db.SyllabusUnitsTable
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -67,35 +64,12 @@ import java.util.UUID
 // child routes. (DELETE-don't-patch law.)
 // ─────────────────────────────────────────────────────────────────────────────
 
-@Serializable
-data class MarksEntryDto(
-    @SerialName("student_id") val studentId: String,
-    val name: String,
-    @SerialName("roll_no") val rollNo: String = "",
-    val marks: Float? = null,
-)
-
-@Serializable
-data class TeacherMarksData(
-    @SerialName("class_name") val className: String,
-    val subject: String,
-    @SerialName("exam_name") val examName: String,
-    @SerialName("max_marks") val maxMarks: Int,
-    val students: List<MarksEntryDto> = emptyList(),
-)
-
-@Serializable
-data class MarkScoreDto(
-    @SerialName("student_id") val studentId: String,
-    val marks: Float,
-)
-
-@Serializable
-data class SubmitMarksRequest(
-    @SerialName("class_id") val classId: String,
-    @SerialName("exam_id") val examId: String,
-    val entries: List<MarkScoreDto> = emptyList(),
-)
+// T-305 (DELETE-don't-patch): the legacy marks DTOs (MarksEntryDto / TeacherMarksData /
+// MarkScoreDto / SubmitMarksRequest) and assessment DTOs (TeacherAssessmentDto /
+// TeacherAssessmentsData / CreateAssessmentRequest) that mirrored the deleted `/marks`
+// and `/assessments` handlers are GONE. The typed gradebook plane in
+// TeacherGradebookRouting.kt defines its own Gb* DTOs (the :server module mirrors shared
+// field-for-field).
 
 @Serializable
 data class SyllabusUnitDto(
@@ -144,30 +118,7 @@ data class CreateHomeworkRequest(
     @SerialName("due_date") val dueDate: String,
 )
 
-@kotlinx.serialization.Serializable
-data class TeacherAssessmentDto(
-    val id: String,
-    val name: String,
-    val subject: String,
-    @SerialName("max_marks") val maxMarks: Int,
-    @SerialName("exam_date") val examDate: String? = null,
-    @SerialName("is_published") val isPublished: Boolean = false,
-)
-
-@kotlinx.serialization.Serializable
-data class TeacherAssessmentsData(
-    val assessments: List<TeacherAssessmentDto> = emptyList(),
-)
-
-@kotlinx.serialization.Serializable
-data class CreateAssessmentRequest(
-    @SerialName("class_id") val classId: String,
-    val name: String,
-    @SerialName("max_marks") val maxMarks: Int? = null,
-    @SerialName("exam_date") val examDate: String? = null,
-)
-
-/** Mounts the marks/syllabus/homework child routes under /api/v1/teacher.
+/** Mounts the syllabus/homework child routes under /api/v1/teacher.
  *  (Attendance moved to TeacherAttendanceRouting.kt — typed & scoped, T-203/T-205.) */
 fun Route.teacherTaskRoutes() {
 
@@ -175,232 +126,14 @@ fun Route.teacherTaskRoutes() {
     // REMOVED (T-205): the legacy packed-`grade` GET/POST /attendance handler that
     // lived here is deleted. The typed, assignment-scoped plane in
     // TeacherAttendanceRouting.kt now owns GET/POST /api/v1/teacher/attendance.
-    // ── Marks ─────────────────────────────────────────────────────────────────
-    route("/marks") {
-        // GET ?class_id=&exam_id= → assessment roster with current scores.
-        get {
-            val ctx = call.requireTeacherContext() ?: return@get
-            val classId = call.request.queryParameters["class_id"]
-            val examId = call.request.queryParameters["exam_id"]
-            val asg = call.requireOwnedAssignment(ctx, classId) ?: return@get
-            val grade = "${asg.className}-${asg.section}"
-
-            val assessmentId = examId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-            if (assessmentId == null) {
-                call.fail("A valid exam_id is required", HttpStatusCode.BadRequest, "BAD_EXAM_ID")
-                return@get
-            }
-
-            val assessment = dbQuery {
-                AssessmentsTable.selectAll().where {
-                    (AssessmentsTable.id eq assessmentId) and
-                        (AssessmentsTable.schoolId eq ctx.schoolId)
-                }.singleOrNull()
-            }
-            if (assessment == null) {
-                call.fail("Exam not found in your school", HttpStatusCode.NotFound, "EXAM_NOT_FOUND")
-                return@get
-            }
-
-            val data = dbQuery {
-                val existing = AssessmentMarksTable.selectAll().where {
-                    AssessmentMarksTable.assessmentId eq assessmentId
-                }.associateBy { it[AssessmentMarksTable.studentId] }
-
-                // ROOT FIX (ISSUE 1): normalised roster match (was raw eq).
-                val students = studentsForAssignment(ctx.schoolId, asg.className, asg.section)
-
-                students.map { s ->
-                    val code = s[StudentsTable.studentCode]
-                    MarksEntryDto(
-                        studentId = code,
-                        name = s[StudentsTable.fullName],
-                        rollNo = s[StudentsTable.rollNumber],
-                        marks = existing[code]?.get(AssessmentMarksTable.marks)?.toFloat(),
-                    )
-                }
-            }
-            call.ok(
-                TeacherMarksData(
-                    className = grade,
-                    subject = assessment[AssessmentsTable.subject],
-                    examName = assessment[AssessmentsTable.name],
-                    maxMarks = assessment[AssessmentsTable.maxMarks],
-                    students = data,
-                ),
-                message = "Marks roster loaded",
-            )
-        }
-
-        // POST → upsert one assessment_marks row per entry, clamped to maxMarks.
-        post {
-            val ctx = call.requireTeacherContext() ?: return@post
-            val req = call.receive<SubmitMarksRequest>()
-            val asg = call.requireOwnedAssignment(ctx, req.classId) ?: return@post
-
-            val assessmentId = runCatching { UUID.fromString(req.examId) }.getOrNull()
-            if (assessmentId == null) {
-                call.fail("A valid exam_id is required", HttpStatusCode.BadRequest, "BAD_EXAM_ID")
-                return@post
-            }
-
-            val assessment = dbQuery {
-                AssessmentsTable.selectAll().where {
-                    (AssessmentsTable.id eq assessmentId) and
-                        (AssessmentsTable.schoolId eq ctx.schoolId)
-                }.singleOrNull()
-            }
-            if (assessment == null) {
-                call.fail("Exam not found in your school", HttpStatusCode.NotFound, "EXAM_NOT_FOUND")
-                return@post
-            }
-            val maxMarks = assessment[AssessmentsTable.maxMarks].toDouble()
-
-            // Map student_code → display name for denormalised storage.
-            // ROOT FIX (ISSUE 1): normalised roster match incl. inactive (was raw eq).
-            val names = dbQuery {
-                studentsForAssignment(ctx.schoolId, asg.className, asg.section, includeInactive = true)
-                    .associate { it[StudentsTable.studentCode] to it[StudentsTable.fullName] }
-            }
-
-            val now = Instant.now()
-            dbQuery {
-                for (e in req.entries) {
-                    val clamped = e.marks.toDouble().coerceIn(0.0, maxMarks)
-                    val existing = AssessmentMarksTable.selectAll().where {
-                        (AssessmentMarksTable.assessmentId eq assessmentId) and
-                            (AssessmentMarksTable.studentId eq e.studentId)
-                    }.firstOrNull()
-                    if (existing != null) {
-                        AssessmentMarksTable.update({
-                            (AssessmentMarksTable.assessmentId eq assessmentId) and
-                                (AssessmentMarksTable.studentId eq e.studentId)
-                        }) {
-                            it[marks] = clamped
-                            it[enteredBy] = ctx.userId
-                            it[updatedAt] = now
-                        }
-                    } else {
-                        AssessmentMarksTable.insert {
-                            it[id] = UUID.randomUUID()
-                            it[AssessmentMarksTable.assessmentId] = assessmentId
-                            it[studentId] = e.studentId
-                            it[studentName] = names[e.studentId] ?: e.studentId
-                            it[marks] = clamped
-                            it[enteredBy] = ctx.userId
-                            it[createdAt] = now
-                            it[updatedAt] = now
-                        }
-                    }
-                }
-                // RA-43: entering marks publishes the assessment so parents can read
-                // it. The parent marks endpoint filters on isPublished = true, so an
-                // unpublished (draft) assessment stays invisible until a teacher submits.
-                AssessmentsTable.update({ AssessmentsTable.id eq assessmentId }) {
-                    it[isPublished] = true
-                    it[publishedAt] = now
-                    it[updatedAt] = now
-                }
-            }
-
-            // RA-41: notify the class parents that a result was published. Scoped
-            // to the owned class within this school (multi-tenant isolation).
-            val examName = assessment[AssessmentsTable.name]
-            val parents = NotifyRecipients.parentsOfClass(ctx.schoolId, asg.className)
-            if (parents.isNotEmpty()) {
-                Notify.toUsers(
-                    userIds = parents,
-                    category = "marks",
-                    title = "Results published",
-                    body = "Marks for \"$examName\" (${asg.subject}) have been published.",
-                    schoolId = ctx.schoolId,
-                    actorId = ctx.userId,
-                    deepLink = "parent/academics/marks",
-                    refType = "assessment",
-                    refId = assessmentId.toString(),
-                )
-            }
-            call.okMessage("Marks saved for ${req.entries.size} student(s)")
-        }
-    }
-
-    // ── Assessments (exams) — list + create, so the marks flow is reachable ───
-    // RA-40: the marks screen needs a valid exam_id. Without a way to list or
-    // create assessments the teacher could never get one, so the marks plane
-    // was unreachable even once a class was selected. These two routes close it.
-    route("/assessments") {
-        // GET ?class_id= → exams the teacher can mark for this owned class.
-        get {
-            val ctx = call.requireTeacherContext() ?: return@get
-            val classId = call.request.queryParameters["class_id"]
-            val asg = call.requireOwnedAssignment(ctx, classId) ?: return@get
-            val rows = dbQuery {
-                // ROOT FIX (ISSUE 1): subject exact, (class, section) normalised.
-                AssessmentsTable.selectAll().where {
-                    (AssessmentsTable.schoolId eq ctx.schoolId) and
-                        (AssessmentsTable.subject eq asg.subject) and
-                        (AssessmentsTable.isActive eq true)
-                }.orderBy(AssessmentsTable.createdAt, SortOrder.DESC)
-                    .filter {
-                        ClassNaming.sameClassSection(
-                            it[AssessmentsTable.className], it[AssessmentsTable.section],
-                            asg.className, asg.section
-                        )
-                    }.map { a ->
-                    TeacherAssessmentDto(
-                        id = a[AssessmentsTable.id].value.toString(),
-                        name = a[AssessmentsTable.name],
-                        subject = a[AssessmentsTable.subject],
-                        maxMarks = a[AssessmentsTable.maxMarks],
-                        examDate = a[AssessmentsTable.examDate]?.toString(),
-                        isPublished = a[AssessmentsTable.isPublished],
-                    )
-                }
-            }
-            call.ok(TeacherAssessmentsData(assessments = rows), message = "Assessments loaded")
-        }
-
-        // POST → create a new assessment for an owned class.
-        post {
-            val ctx = call.requireTeacherContext() ?: return@post
-            val req = call.receive<CreateAssessmentRequest>()
-            val asg = call.requireOwnedAssignment(ctx, req.classId) ?: return@post
-            if (req.name.isBlank()) {
-                call.fail("Exam name is required", HttpStatusCode.BadRequest, "BAD_NAME"); return@post
-            }
-            val now = Instant.now()
-            val newId = UUID.randomUUID()
-            dbQuery {
-                AssessmentsTable.insert {
-                    it[id] = newId
-                    it[schoolId] = ctx.schoolId
-                    it[teacherId] = ctx.userId
-                    it[className] = asg.className
-                    it[section] = asg.section
-                    it[subject] = asg.subject
-                    it[name] = req.name.trim()
-                    it[maxMarks] = req.maxMarks ?: 100
-                    // T-004: assessments.exam_date is now a typed `date` column (nullable).
-                    it[examDate] = req.examDate?.let { d -> LocalDate.parse(d) }
-                    it[isActive] = true
-                    it[isPublished] = false
-                    it[createdAt] = now
-                    it[updatedAt] = now
-                }
-            }
-            call.created(
-                TeacherAssessmentDto(
-                    id = newId.toString(),
-                    name = req.name.trim(),
-                    subject = asg.subject,
-                    maxMarks = req.maxMarks ?: 100,
-                    examDate = req.examDate,
-                    isPublished = false,
-                ),
-                message = "Assessment created",
-            )
-        }
-    }
+    // ── Marks & Assessments ───────────────────────────────────────────────────
+    // REMOVED (T-305): the legacy force-publishing `route("/marks")` (POST set
+    // isPublished=true and notified parents on EVERY save — the B-MK-1 bug) and the
+    // free-text `route("/assessments")` (list + create) handlers that lived here are
+    // DELETED. The canonical, typed, lifecycle-aware GRADEBOOK plane in
+    // TeacherGradebookRouting.kt now owns GET/POST /api/v1/teacher/assessments,
+    // GET/PUT …/{id}/marks (SAVE never publishes), POST …/{id}/publish (the ONLY
+    // notify path), POST …/{id}/unpublish, and GET …/assessments/history.
 
     // ── Syllabus ────────────────────────────────────────────────────────────
     route("/syllabus") {

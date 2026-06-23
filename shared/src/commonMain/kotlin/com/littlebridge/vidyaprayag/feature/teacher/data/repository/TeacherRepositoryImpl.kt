@@ -24,9 +24,6 @@ class TeacherRepositoryImpl(
     override suspend fun loadAttendance(token: String, assignmentId: String, date: String?): NetworkResult<AttendanceLoadResponse> =
         api.loadAttendance(token, assignmentId, date)
 
-    override suspend fun getMarks(token: String, classId: String, examId: String): NetworkResult<TeacherMarksResponse> =
-        api.getMarks(token, classId, examId)
-
     override suspend fun getSyllabus(token: String, classId: String, subject: String): NetworkResult<TeacherSyllabusResponse> =
         api.getSyllabus(token, classId, subject)
 
@@ -36,10 +33,7 @@ class TeacherRepositoryImpl(
     override suspend fun getProfile(token: String): NetworkResult<TeacherProfileResponse> =
         api.getProfile(token)
 
-    override suspend fun getAssessments(token: String, classId: String): NetworkResult<TeacherAssessmentsResponse> =
-        api.getAssessments(token, classId)
-
-    // T-302/T-303/T-304: Gradebook lifecycle (Doc 07 §2/§5/§6).
+    // T-302/T-303/T-304/T-305: Gradebook lifecycle (Doc 07 §2/§5/§6).
     override suspend fun listAssessments(token: String, assignmentId: String, status: String?): NetworkResult<AssessmentListResponse> =
         api.listAssessments(token, assignmentId, status)
 
@@ -73,17 +67,11 @@ class TeacherRepositoryImpl(
     override suspend fun saveAttendance(token: String, request: AttendanceSaveRequest): NetworkResult<AttendanceSaveResponse> =
         api.saveAttendance(token, request)
 
-    override suspend fun submitMarks(token: String, request: SubmitMarksRequest): NetworkResult<ApiResponse<Unit>> =
-        api.submitMarks(token, request)
-
     override suspend fun updateSyllabus(token: String, request: UpdateSyllabusRequest): NetworkResult<ApiResponse<Unit>> =
         api.updateSyllabus(token, request)
 
     override suspend fun createHomework(token: String, request: CreateHomeworkRequest): NetworkResult<ApiResponse<Unit>> =
         api.createHomework(token, request)
-
-    override suspend fun createAssessment(token: String, request: CreateAssessmentRequest): NetworkResult<ApiResponse<TeacherAssessmentDto>> =
-        api.createAssessment(token, request)
 
     override suspend fun getLeaveRequests(token: String, status: String?): NetworkResult<TeacherLeaveListResponse> =
         api.getLeaveRequests(token, status)
