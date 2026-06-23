@@ -226,11 +226,15 @@ BEGIN
 
     -- 6c. homework_submissions.student_uuid from the legacy text student_id
     --     (students.student_code), scoped to the homework's school.
+    --     NOTE: in UPDATE ... FROM, the target table (hs) may NOT appear on the
+    --     right side of a JOIN — doing so raises 42P01 "invalid reference to
+    --     FROM-clause entry for table hs". Both extra relations therefore live in
+    --     the FROM list and are correlated through the WHERE clause instead.
     UPDATE homework_submissions hs
        SET student_uuid = s.id
-      FROM students s
-      JOIN homework h ON h.id = hs.homework_id
-     WHERE s.school_id    = h.school_id
+      FROM students s, homework h
+     WHERE h.id          = hs.homework_id
+       AND s.school_id    = h.school_id
        AND s.student_code = hs.student_id
        AND hs.student_uuid IS NULL;
 END $$;

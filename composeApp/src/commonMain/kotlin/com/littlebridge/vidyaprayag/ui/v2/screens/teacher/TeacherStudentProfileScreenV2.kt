@@ -206,11 +206,12 @@ private fun PerformanceSection(performance: List<StudentPerformanceDto>) {
                                 style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
                             )
                         }
-                        if (m.isAbsent || m.marks == null) {
+                        val marks = m.marks
+                        if (m.isAbsent || marks == null) {
                             VBadge(text = "Absent", tone = VBadgeTone.Neutral)
                         } else {
                             Text(
-                                "${formatMarksP(m.marks)}/${m.max}",
+                                "${formatMarksP(marks)}/${m.max}",
                                 style = VTheme.type.data.colored(c.ink).copy(fontSize = 16.sp),
                             )
                         }

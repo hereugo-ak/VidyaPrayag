@@ -104,6 +104,31 @@ WHERE t.subject_id IS NULL
   AND vp_subject_key(ss.sub_name) = vp_subject_key(t.subject);
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- 3b) Scrub ORPHANED typed FKs before constraining (fixes 23503).
+--     class_id / subject_id are pre-existing nullable columns (migration_002)
+--     that were never FK-validated, so a stale row can already hold an id whose
+--     parent row was deleted or never existed (e.g. a subject deleted before
+--     this migration ran). Adding the FK over such a row raises
+--       23503 ... Key (subject_id)=(…) is not present in table "school_subjects".
+--     These rows still work via their display text + the ClassNaming fallback,
+--     so we demote the dangling id to NULL (same effect as ON DELETE SET NULL)
+--     rather than blocking the whole migration. Idempotent + safe to re-run.
+-- ─────────────────────────────────────────────────────────────────────────────
+UPDATE public.teacher_subject_assignments t
+SET class_id = NULL
+WHERE t.class_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM public.school_classes sc WHERE sc.id = t.class_id
+  );
+
+UPDATE public.teacher_subject_assignments t
+SET subject_id = NULL
+WHERE t.subject_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM public.school_subjects ss WHERE ss.id = t.subject_id
+  );
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- 4) FK constraints on the now-backfilled typed columns. Both columns stay
 --    NULLABLE (a row that couldn't be resolved keeps a NULL FK + display text),
 --    so the FK only validates the non-NULL values. Guarded so re-runs skip.
