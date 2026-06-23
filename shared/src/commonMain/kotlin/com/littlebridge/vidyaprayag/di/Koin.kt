@@ -428,8 +428,10 @@ val viewModelModule = module {
     factory { ResultsViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.content.presentation.LandingViewModel(get()) }
     factory { com.littlebridge.vidyaprayag.feature.auth.presentation.AuthViewModel(get()) }
-    // Teacher vertical (master doc G1) — 7 VMs, all (TeacherRepository, PreferenceRepository)
+    // Teacher vertical (master doc G1) — all (TeacherRepository, PreferenceRepository)
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherHomeViewModel(get(), get()) }
+    // T-105: the new Today tab (server-resolved schedule).
+    factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherTodayViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClassesViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherAttendanceViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherMarksViewModel(get(), get()) }

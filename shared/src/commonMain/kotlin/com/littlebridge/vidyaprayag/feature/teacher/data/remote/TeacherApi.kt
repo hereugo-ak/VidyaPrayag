@@ -36,6 +36,27 @@ class TeacherApi(
         client.get(getUrl("api/v1/teacher/classes"))
     }
 
+    // T-104/T-105: the server-resolved schedule. `/day` merges periods +
+    // exceptions + holidays + calendar + per-period attendanceMarked and carries
+    // authoritative now/next indices; `/week` returns Mon–Sat resolved.
+    suspend fun getDay(
+        token: String,
+        date: String? = null,
+    ): NetworkResult<ResolvedDayResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/day")) {
+            if (date != null) parameter("date", date)
+        }
+    }
+
+    suspend fun getWeek(
+        token: String,
+        date: String? = null,
+    ): NetworkResult<ResolvedWeekResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/week")) {
+            if (date != null) parameter("date", date)
+        }
+    }
+
     suspend fun getAttendance(
         token: String,
         classId: String,
