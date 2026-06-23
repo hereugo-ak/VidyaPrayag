@@ -164,7 +164,12 @@ object DatabaseFactory {
         // Teacher Portal Rebuild — Doc 11 T-001: typed class membership (enrollments).
         // Applied by docs/db/migration_008_enrollments.sql (must run before deploy;
         // AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates boot on it).
-        EnrollmentsTable
+        EnrollmentsTable,
+        // Teacher Portal Rebuild — Doc 11 T-106a: teacher self check-in (teacher_check_ins).
+        // Applied by docs/db/migration_013_teacher_checkins.sql (must run before deploy;
+        // AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates boot on it).
+        // Closes B-ATT-5 (teacher self check-in) at the schema layer.
+        TeacherCheckInsTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

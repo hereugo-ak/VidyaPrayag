@@ -1195,3 +1195,46 @@ object AcademicYearsTable : UUIDTable("academic_years", "id") {
     val createdAt     = timestamp("created_at")
     val updatedAt     = timestamp("updated_at")
 }
+
+// =====================================================================
+// teacher_check_ins  (Teacher Portal Rebuild — Doc 11 T-106a / Doc 06 §1.3)
+//   The authoritative one-row-per-teacher-per-day self check-in record that
+//   powers the Today-tab check-in band (Doc 04 §5.1) and the biometric ladder
+//   (Doc 06 §2: biometric -> PIN -> manual, always-available fallback, never a
+//   hard gate). Closes B-ATT-5 (teacher self check-in).
+//
+//   `checked_in_at` is SERVER-STAMPED by POST /api/v1/teacher/checkin (T-106b)
+//   with the server clock — NOT the device clock (Doc 06 §2.4 clock-skew edge).
+//   `method` records which rung of the ladder succeeded.
+//   UNIQUE (school_id, teacher_id, date) is the idempotency key: a second POST
+//   for the same (school, teacher, date) returns the existing row, it does not
+//   duplicate.
+//
+//   FK: teacher_id -> app_users.id. `device_id` is optional (the DTO makes it
+//   nullable and the prefs layer has no device-id accessor, so callers pass
+//   null for now).
+//
+//   Created/applied by docs/db/migration_013_teacher_checkins.sql. Registered in
+//   DatabaseFactory.allTables — AUTO_CREATE_TABLES is OFF in production, so
+//   that migration MUST be applied in Supabase before the matching deploy or
+//   validateSchema() refuses to boot.
+//
+//   NOTE (per LAWS): Doc 06 §1.3 specifies exactly the columns below — no
+//   separate `created_at` audit column (the row IS the check-in event, its
+//   authoritative timestamp is `checked_in_at`). This mapping is faithful to
+//   the authority.
+// =====================================================================
+object TeacherCheckInsTable : UUIDTable("teacher_check_ins", "id") {
+    val schoolId    = uuid("school_id")
+    val teacherId   = uuid("teacher_id")                 // FK app_users.id
+    val date        = date("date")
+    val checkedInAt = timestamp("checked_in_at")         // server-stamped (authoritative clock)
+    val method      = varchar("method", 16)              // biometric | pin | manual
+    val deviceId    = text("device_id").nullable()
+    init {
+        uniqueIndex(
+            "ux_teacher_checkins_unique",
+            schoolId, teacherId, date
+        )
+    }
+}

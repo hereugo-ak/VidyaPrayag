@@ -84,6 +84,7 @@
 --     \i docs/db/migration_010_typed_dates.sql
 --     \i docs/db/migration_011_periods.sql
 --     \i docs/db/migration_012_holidays_merge.sql
+--     \i docs/db/migration_013_teacher_checkins.sql
 --     \i scripts/seed-2026-06-07.sql
 --
 -- ----------------------------------------------------------------------------
