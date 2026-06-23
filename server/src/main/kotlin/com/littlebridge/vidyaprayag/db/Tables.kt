@@ -457,17 +457,64 @@ object FacultyTable : UUIDTable("faculty", "id") {
     val createdAt  = timestamp("created_at")
 }
 
+// =====================================================================
+// attendance_records  (Teacher Portal Rebuild — Doc 11 T-201 / Doc 06 §1.2)
+//   The TYPED student/faculty attendance record. T-201 migrates the legacy
+//   shape (packed `grade` "<class>-<section>" + free `person_id`, status
+//   present|absent|late) to a provably-scoped one:
+//     • student_id / enrollment_id   — typed FK identity of WHO + which exact
+//       class membership (kills D-ATT-2 / X-1 / D-STU for attendance).
+//     • faculty_id                   — the app_users id when type='faculty'.
+//     • assignment_id                — the authorizing TSA (Doc 05 binding) so
+//       the mark's class/section/subject scope is provable, not parsed from a
+//       string (kills D-ATT-4 / X-1).
+//     • status now includes `leave`  — an approved leave can be reflected
+//       (D-ATT-1); leave approval auto-writes it (B-LV-2, T-204).
+//     • source                       — manual | leave_auto | bulk | biometric.
+//     • marked_at                    — when the mark was last written.
+//   The packed `grade` column is DROPPED (class/section derive via
+//   assignment_id → TSA). `person_id` is retained NULLABLE only so the T-201
+//   migration can quarantine un-resolvable legacy rows without data loss; new
+//   writes use the typed FKs. Applied by docs/db/migration_014_attendance.sql.
+//   UNIQUE moves to (school, date, type, student_id, assignment_id): one mark
+//   per student per class per day (Doc 06 §1.2).
+// =====================================================================
 object AttendanceRecordsTable : UUIDTable("attendance_records", "id") {
-    val schoolId   = uuid("school_id")
-    val date       = date("date")        // T-004: typed `date` (was varchar12)
-    val type       = varchar("type", 16) // student | faculty
-    val personId   = text("person_id")
-    val grade      = text("grade").nullable()
-    val status     = varchar("status", 16)
-    val markedBy   = uuid("marked_by").nullable()
-    val createdAt  = timestamp("created_at")
+    val schoolId     = uuid("school_id")
+    val date         = date("date")        // T-004: typed `date` (was varchar12)
+    val type         = varchar("type", 16) // student | faculty
+    // Legacy free identifier — retained NULLABLE for migration/quarantine only.
+    val personId     = text("person_id").nullable()
+    // DEPRECATED (T-201): the packed "<class>-<section>" grade string. Doc 06 §1.2
+    // calls for it to be DROPPED (class/section derive via assignment_id → TSA).
+    // It is kept here as a NULLABLE deprecated column ONLY so the pre-rebuild
+    // readers (admin dashboards, parent academics, the legacy TeacherRouting
+    // attendance path, and the T-104 resolver's attendanceMarked join) keep
+    // compiling and working until they are migrated to the typed columns in
+    // T-203/T-205. The migration (014) ADDS the typed columns + new UNIQUE but
+    // does NOT physically drop `grade` yet — the DROP is deferred to a follow-up
+    // once every reader is off it (flagged deviation, see migration_014 header).
+    val grade        = text("grade").nullable()
+    // T-201 typed identity (Doc 06 §1.2). All nullable: a student row fills
+    // student_id/enrollment_id/assignment_id; a faculty row fills faculty_id.
+    val studentId    = uuid("student_id").nullable()      // FK students.id (type=student)
+    val enrollmentId = uuid("enrollment_id").nullable()   // FK enrollments.id (exact membership)
+    val facultyId    = uuid("faculty_id").nullable()      // FK app_users.id (type=faculty)
+    val assignmentId = uuid("assignment_id").nullable()   // FK teacher_subject_assignments.id
+    val status       = varchar("status", 16)              // present | absent | late | leave
+    val source       = varchar("source", 16).default("manual") // manual|leave_auto|bulk|biometric
+    val markedBy     = uuid("marked_by").nullable()
+    val markedAt     = timestamp("marked_at").nullable()  // when last written (Doc 06 §1.2)
+    val createdAt    = timestamp("created_at")
     init {
-        uniqueIndex("ux_att_records_unique", schoolId, date, type, personId)
+        // Doc 06 §1.2: one mark per student per class (assignment) per day. NULLs
+        // in student_id/assignment_id are treated distinct by Postgres; the legacy
+        // ux_att_records_unique (school,date,type,person_id) is replaced by the
+        // migration. New student writes always carry both, so the key is real.
+        uniqueIndex(
+            "ux_att_records_typed_unique",
+            schoolId, date, type, studentId, assignmentId
+        )
     }
 }
 
