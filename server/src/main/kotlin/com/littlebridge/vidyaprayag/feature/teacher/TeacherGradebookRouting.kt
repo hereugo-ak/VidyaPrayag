@@ -508,7 +508,7 @@ private fun Route.assessmentListAndCreate() {
                     it[subject] = asg.subject
                     it[AssessmentsTable.name] = name
                     it[maxMarks] = req.maxMarks
-                    it[examDate] = examDate
+                    it[AssessmentsTable.examDate] = examDate
                     it[isActive] = true
                     // The lifecycle is now the source of truth; is_published mirrors it.
                     it[isPublished] = false

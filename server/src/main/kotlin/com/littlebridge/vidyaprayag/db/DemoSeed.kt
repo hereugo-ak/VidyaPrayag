@@ -736,7 +736,7 @@ object DemoSeed {
                     it[subject] = exam.subject
                     it[name] = exam.name
                     it[maxMarks] = exam.maxMarks
-                    it[examDate] = examDate
+                    it[AssessmentsTable.examDate] = examDate
                     it[isActive] = true
                     it[isPublished] = true
                     it[publishedAt] = now
@@ -798,7 +798,7 @@ object DemoSeed {
                     it[subject] = hw.subject
                     it[title] = hw.title
                     it[description] = hw.desc
-                    it[dueDate] = dueDate
+                    it[HomeworkTable.dueDate] = dueDate
                     it[isActive] = true
                     it[createdAt] = now
                     it[updatedAt] = now
