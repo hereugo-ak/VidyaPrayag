@@ -30,6 +30,19 @@ class TeacherRepositoryImpl(
     override suspend fun getHomework(token: String): NetworkResult<TeacherHomeworkResponse> =
         api.getHomework(token)
 
+    // T-402: typed, assignment-scoped syllabus (Doc 08 §1.2/§3).
+    override suspend fun loadSyllabus(token: String, assignmentId: String): NetworkResult<SyllabusLoadResponse> =
+        api.loadSyllabus(token, assignmentId)
+
+    override suspend fun createSyllabusUnit(token: String, request: CreateSyllabusUnitRequest): NetworkResult<SyllabusUnitMutationResponse> =
+        api.createSyllabusUnit(token, request)
+
+    override suspend fun updateSyllabusUnit(token: String, unitId: String, request: UpdateSyllabusUnitRequest): NetworkResult<SyllabusUnitMutationResponse> =
+        api.updateSyllabusUnit(token, unitId, request)
+
+    override suspend fun toggleSyllabusProgress(token: String, request: ToggleSyllabusProgressRequest): NetworkResult<SyllabusUnitMutationResponse> =
+        api.toggleSyllabusProgress(token, request)
+
     override suspend fun getProfile(token: String): NetworkResult<TeacherProfileResponse> =
         api.getProfile(token)
 

@@ -17,6 +17,14 @@ interface TeacherRepository {
     suspend fun loadAttendance(token: String, assignmentId: String, date: String? = null): NetworkResult<AttendanceLoadResponse>
     suspend fun getSyllabus(token: String, classId: String, subject: String): NetworkResult<TeacherSyllabusResponse>
     suspend fun getHomework(token: String): NetworkResult<TeacherHomeworkResponse>
+
+    // T-402: typed, assignment-scoped syllabus (Doc 08 §1.2/§3). The template/
+    // progress-split contract — hierarchical load, create unit (B-SYL-1 fix),
+    // rename/reorder, one-tap covered toggle. Reached pre-scoped by assignmentId.
+    suspend fun loadSyllabus(token: String, assignmentId: String): NetworkResult<SyllabusLoadResponse>
+    suspend fun createSyllabusUnit(token: String, request: CreateSyllabusUnitRequest): NetworkResult<SyllabusUnitMutationResponse>
+    suspend fun updateSyllabusUnit(token: String, unitId: String, request: UpdateSyllabusUnitRequest): NetworkResult<SyllabusUnitMutationResponse>
+    suspend fun toggleSyllabusProgress(token: String, request: ToggleSyllabusProgressRequest): NetworkResult<SyllabusUnitMutationResponse>
     suspend fun getProfile(token: String): NetworkResult<TeacherProfileResponse>
 
     // T-302/T-303/T-304/T-305: Gradebook lifecycle (Doc 07 §2/§5/§6). The canonical

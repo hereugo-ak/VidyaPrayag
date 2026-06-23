@@ -88,6 +88,62 @@ class TeacherApi(
         client.get(getUrl("api/v1/teacher/homework"))
     }
 
+    // ── T-402: Typed, scoped syllabus (Doc 08 §1.2/§3) ───────────────────────
+    // The template/progress-split contract. Reached PRE-SCOPED by assignmentId
+    // (X-1) — never a free-text class/subject (contrast the legacy getSyllabus).
+    //
+    // PATH NOTE (staged): the legacy `teacherTaskRoutes()` still binds GET/PATCH
+    // `/api/v1/teacher/syllabus`, and Ktor forbids two handlers on the same
+    // method+path. So this typed plane mounts under a temporary
+    // `/api/v1/teacher/syllabus-typed` prefix until T-403 deletes the legacy
+    // handler and converges to the canonical `/syllabus` paths from Doc 08 §3
+    // (the T-203 `/attendance-typed`→`/attendance` and T-303 `/gradebook`→
+    // `/assessments` convergence precedent).
+
+    /** Units + per-section progress, hierarchical (chapter ▸ topic). Scoped by assignmentId. */
+    suspend fun loadSyllabus(
+        token: String,
+        assignmentId: String,
+    ): NetworkResult<SyllabusLoadResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/syllabus-typed")) {
+            parameter("assignmentId", assignmentId)
+        }
+    }
+
+    /** Create a unit (chapter or topic). parentId null → chapter. Fixes B-SYL-1. */
+    suspend fun createSyllabusUnit(
+        token: String,
+        request: CreateSyllabusUnitRequest,
+    ): NetworkResult<SyllabusUnitMutationResponse> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/syllabus-typed/units")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    /** Rename / reorder a unit (edit-mode, deliberate). */
+    suspend fun updateSyllabusUnit(
+        token: String,
+        unitId: String,
+        request: UpdateSyllabusUnitRequest,
+    ): NetworkResult<SyllabusUnitMutationResponse> = safeApiCall {
+        client.patch(getUrl("api/v1/teacher/syllabus-typed/units/$unitId")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    /** The one-tap toggle — idempotent, optimistic; stamps typed covered_on. */
+    suspend fun toggleSyllabusProgress(
+        token: String,
+        request: ToggleSyllabusProgressRequest,
+    ): NetworkResult<SyllabusUnitMutationResponse> = safeApiCall {
+        client.patch(getUrl("api/v1/teacher/syllabus-typed/progress")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
     // T-305: legacy getMarks / getAssessments (the RA-40 exam-picker GET) removed —
     // the canonical scoped gradebook lifecycle below replaces them at /assessments/*.
 

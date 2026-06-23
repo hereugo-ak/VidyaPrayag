@@ -638,6 +638,82 @@ data class UpdateSyllabusRequest(
     @SerialName("is_covered") val isCovered: Boolean,
 )
 
+// ── Typed, scoped syllabus — T-402 (Doc 08 §1.2/§2/§3) ───────────────────────
+// The template/progress-split contract: a unit list is HIERARCHICAL (chapters
+// carry topics), each row carrying its own per-section coverage state. The
+// one-tap toggle (PATCH /syllabus/progress) flips is_covered + stamps a typed
+// covered_on. Reached PRE-SCOPED by assignmentId (X-1) — no shared picker.
+
+@Serializable
+data class SyllabusLoadResponse(
+    val success: Boolean = true,
+    val data: SyllabusLoadDto = SyllabusLoadDto(),
+)
+
+@Serializable
+data class SyllabusLoadDto(
+    @SerialName("assignment_id") val assignmentId: String? = null,
+    @SerialName("class_name") val className: String = "",
+    val section: String = "",
+    val subject: String = "",
+    // Flat, ordered list; each node carries depth + parentId so the screen can
+    // render the chapter ▸ topic hierarchy without a second call.
+    val units: List<SyllabusNodeDto> = emptyList(),
+    @SerialName("covered_count") val coveredCount: Int = 0,
+    @SerialName("total_count") val totalCount: Int = 0,
+) {
+    /** 0..1; 0 when nothing to cover yet (honest, not NaN). */
+    val progress: Float get() = if (totalCount == 0) 0f else coveredCount.toFloat() / totalCount
+    val hasUnits: Boolean get() = units.isNotEmpty()
+}
+
+@Serializable
+data class SyllabusNodeDto(
+    val id: String,
+    @SerialName("parent_id") val parentId: String? = null,
+    val title: String,
+    val position: Int = 0,
+    // 0 = chapter (top-level), 1 = topic. The hierarchy is at most 2 deep (Doc 08).
+    val depth: Int = 0,
+    @SerialName("is_chapter") val isChapter: Boolean = false,
+    @SerialName("is_covered") val isCovered: Boolean = false,
+    @SerialName("covered_on") val coveredOn: String? = null,
+    val note: String? = null,
+)
+
+/** Create a unit (chapter or topic). parentId null → chapter. Fixes B-SYL-1. */
+@Serializable
+data class CreateSyllabusUnitRequest(
+    @SerialName("assignment_id") val assignmentId: String,
+    val title: String,
+    @SerialName("parent_id") val parentId: String? = null,
+)
+
+/** Rename / reorder a unit (edit-mode, deliberate). */
+@Serializable
+data class UpdateSyllabusUnitRequest(
+    val title: String? = null,
+    val position: Int? = null,
+)
+
+/** The one-tap toggle — idempotent, optimistic; stamps typed covered_on=today. */
+@Serializable
+data class ToggleSyllabusProgressRequest(
+    @SerialName("assignment_id") val assignmentId: String,
+    @SerialName("unit_id") val unitId: String,
+    @SerialName("is_covered") val isCovered: Boolean,
+    // Optional explicit date (edit-mode "covered on a past date", Doc 08 §4);
+    // blank/absent → server stamps today.
+    @SerialName("covered_on") val coveredOn: String? = null,
+    val note: String? = null,
+)
+
+@Serializable
+data class SyllabusUnitMutationResponse(
+    val success: Boolean = true,
+    val data: SyllabusNodeDto? = null,
+)
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Homework — list assignments + create a new one.
 // Backs Teacher.tsx → Update › Homework.
