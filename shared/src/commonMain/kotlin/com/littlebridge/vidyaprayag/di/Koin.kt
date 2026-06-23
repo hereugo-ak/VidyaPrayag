@@ -434,6 +434,8 @@ val viewModelModule = module {
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherTodayViewModel(get(), get()) }
     // T-106c: teacher self check-in (Doc 06 §2) — backs the Today greeting band pill.
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherCheckInViewModel(get(), get()) }
+    // T-107: real obligations strip (Doc 04 §5.5) — backs the Today "what needs me" strip.
+    factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherObligationsViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClassesViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherAttendanceViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherMarksViewModel(get(), get()) }
