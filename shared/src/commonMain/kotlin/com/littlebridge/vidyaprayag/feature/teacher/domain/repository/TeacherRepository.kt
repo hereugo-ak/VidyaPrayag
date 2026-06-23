@@ -15,6 +15,9 @@ interface TeacherRepository {
     // T-502 (Doc 09 §3): composite class detail (roster + signals + summaries).
     suspend fun getClassDetailV2(token: String, assignmentId: String): NetworkResult<ClassDetailResponse>
 
+    // T-503 (Doc 09 §4): scoped student profile (403 if not taught).
+    suspend fun getStudentProfileV2(token: String, studentId: String): NetworkResult<StudentProfileResponse>
+
     // T-104/T-105: server-resolved schedule for the Today tab.
     suspend fun getDay(token: String, date: String? = null): NetworkResult<ResolvedDayResponse>
     suspend fun getWeek(token: String, date: String? = null): NetworkResult<ResolvedWeekResponse>

@@ -55,6 +55,16 @@ class TeacherApi(
         client.get(getUrl("api/v1/teacher/classes-v2/$assignmentId"))
     }
 
+    // T-503 (Doc 09 §4): scoped student profile — attendance, performance, flags,
+    // privacy-gated parent contact. 403 if the teacher doesn't teach the student.
+    // Path staged at `/students-v2/{id}`; converges to `/students/{id}` in T-504.
+    suspend fun getStudentProfileV2(
+        token: String,
+        studentId: String,
+    ): NetworkResult<StudentProfileResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/students-v2/$studentId"))
+    }
+
     // T-104/T-105: the server-resolved schedule. `/day` merges periods +
     // exceptions + holidays + calendar + per-period attendanceMarked and carries
     // authoritative now/next indices; `/week` returns Mon–Sat resolved.

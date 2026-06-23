@@ -685,3 +685,88 @@ internal fun nextPeriodForInTxn(
         isToday = best.distance == 0,
     )
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// T-502 — composite class-detail DTOs (mirror shared ClassDetail* / RosterStudentDto
+// field-for-field; :server does NOT depend on :shared, so these are the wire truth).
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class ClassDetailHeaderDto(
+    @SerialName("assignment_id") val assignmentId: String,
+    @SerialName("class_id") val classId: String? = null,
+    @SerialName("class_name") val className: String,
+    val section: String,
+    @SerialName("subject_id") val subjectId: String? = null,
+    val subject: String,
+    @SerialName("is_class_teacher") val isClassTeacher: Boolean,
+    @SerialName("student_count") val studentCount: Int,
+)
+
+@Serializable
+data class WeeklyPeriodDto(
+    val weekday: Int,
+    @SerialName("day_label") val dayLabel: String,
+    @SerialName("start_time") val startTime: String,
+    @SerialName("end_time") val endTime: String,
+    val room: String = "",
+    @SerialName("is_today") val isToday: Boolean = false,
+)
+
+@Serializable
+data class AttendanceSummaryDto(
+    @SerialName("today_marked") val todayMarked: Boolean,
+    @SerialName("present_today") val presentToday: Int,
+    @SerialName("absent_today") val absentToday: Int,
+    @SerialName("late_today") val lateToday: Int,
+    @SerialName("leave_today") val leaveToday: Int,
+    @SerialName("week_rate") val weekRate: Double? = null,
+    @SerialName("month_rate") val monthRate: Double? = null,
+)
+
+@Serializable
+data class ClassAssessmentDto(
+    @SerialName("assessment_id") val assessmentId: String,
+    val name: String,
+    val type: String,
+    @SerialName("exam_date") val examDate: String? = null,
+    val status: String,
+)
+
+@Serializable
+data class ClassHomeworkDto(
+    @SerialName("homework_id") val homeworkId: String,
+    val title: String,
+    @SerialName("due_date") val dueDate: String? = null,
+    @SerialName("submitted_count") val submittedCount: Int,
+    @SerialName("not_submitted_count") val notSubmittedCount: Int,
+)
+
+@Serializable
+data class LatestMarkDto(
+    val name: String,
+    val marks: Double,
+    val max: Int,
+)
+
+@Serializable
+data class RosterStudentDto(
+    @SerialName("student_id") val studentId: String,
+    val name: String,
+    val roll: Int? = null,
+    @SerialName("photo_url") val photoUrl: String? = null,
+    @SerialName("attendance_rate") val attendanceRate: Double? = null,
+    @SerialName("latest_mark") val latestMark: LatestMarkDto? = null,
+    val flags: List<String> = emptyList(),
+)
+
+@Serializable
+data class ClassDetailData(
+    val header: ClassDetailHeaderDto,
+    @SerialName("next_period") val nextPeriod: NextPeriodDto? = null,
+    @SerialName("weekly_timetable") val weeklyTimetable: List<WeeklyPeriodDto> = emptyList(),
+    @SerialName("attendance_summary") val attendanceSummary: AttendanceSummaryDto,
+    @SerialName("assessment_schedule") val assessmentSchedule: List<ClassAssessmentDto> = emptyList(),
+    @SerialName("active_homework") val activeHomework: List<ClassHomeworkDto> = emptyList(),
+    val roster: List<RosterStudentDto> = emptyList(),
+)
