@@ -90,6 +90,7 @@ import com.littlebridge.vidyaprayag.feature.school.nonTeachingStaffRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRouting
 import com.littlebridge.vidyaprayag.feature.school.teacherAssignmentRouting
 import com.littlebridge.vidyaprayag.feature.school.teacherProvisioningRouting
+import com.littlebridge.vidyaprayag.feature.teacher.teacherAttendanceRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherDayRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherLeaveRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherMessagesRouting
@@ -293,6 +294,7 @@ fun Application.module() {
         // Teacher vertical (master rebuild doc Step 7 / gap G1)
         teacherRouting()             // /api/v1/teacher/{home,classes,profile,attendance,marks,syllabus,homework}
         teacherDayRouting()          // T-104 /api/v1/teacher/{day,week} — resolved schedule (periods+exceptions+holidays+calendar, server now/next)
+        teacherAttendanceRouting()   // T-203 /api/v1/teacher/attendance-typed — typed, assignment-scoped attendance load/save (Doc 06 §3.8)
         teacherLeaveRouting()        // /api/v1/teacher/leave-requests[…] — RA-44 teacher lists/decides leave for their classes
         teacherMessagesRouting()     // /api/v1/teacher/messages[…] — RA-51 teacher↔parent messaging + class broadcast
 
