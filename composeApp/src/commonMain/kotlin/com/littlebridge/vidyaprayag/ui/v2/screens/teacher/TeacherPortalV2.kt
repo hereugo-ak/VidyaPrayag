@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.littlebridge.vidyaprayag.feature.teacher.domain.model.ObligationItemDto
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.ResolvedPeriodUi
 import com.littlebridge.vidyaprayag.ui.v2.components.VBottomNav
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
@@ -97,6 +98,29 @@ fun TeacherPortalV2(
             overlay = TeacherOverlay.Update
         }
 
+        // T-107: route an obligations-strip tap to the right SCOPED surface. The
+        // item already carries the pre-authorized assignment/ref ids, so taps land
+        // directly on the tool — never a picker (Doc 04 §5.5 deep-link contract):
+        //   • attendance → Update plane on Attendance, pre-seeded by assignment id
+        //   • leave      → the teacher Leave inbox overlay
+        //   • marks      → Gradebook tab (real publish flow lands in P3 — staged)
+        //   • homework   → Planner tab (real review flow lands in P4 — staged)
+        fun openObligation(item: ObligationItemDto) {
+            when (item.type) {
+                "attendance" -> {
+                    selectedClassId = item.assignmentId.orEmpty()
+                    selectedSubject = ""
+                    selectedExamId = ""
+                    updateSub = "Attendance"
+                    overlay = TeacherOverlay.Update
+                }
+                "leave" -> overlay = TeacherOverlay.Leave
+                "marks" -> tab = "gradebook"
+                "homework" -> tab = "planner"
+                else -> Unit
+            }
+        }
+
         BackHandler(enabled = overlay != TeacherOverlay.None) {
             overlay = TeacherOverlay.None
         }
@@ -152,6 +176,7 @@ fun TeacherPortalV2(
                         onMarkAttendance = { openUpdate(it, "Attendance") },
                         onOpenSyllabus = { openUpdate(it, "Syllabus") },
                         onOpenHomework = { openUpdate(it, "Homework") },
+                        onOpenObligation = { openObligation(it) },
                         onOpenNotifications = { overlay = TeacherOverlay.Notifications },
                         onOpenProfile = { tab = "profile" },
                     )

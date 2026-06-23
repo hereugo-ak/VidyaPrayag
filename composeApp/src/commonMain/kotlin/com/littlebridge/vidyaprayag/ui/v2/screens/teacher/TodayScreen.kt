@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import com.littlebridge.vidyaprayag.feature.teacher.domain.model.ObligationItemDto
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.ResolvedPeriodUi
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherTodayState
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherTodayViewModel
@@ -51,6 +52,7 @@ fun TodayScreen(
     onOpenSyllabus: (ResolvedPeriodUi) -> Unit,
     onOpenHomework: (ResolvedPeriodUi) -> Unit,
     modifier: Modifier = Modifier,
+    onOpenObligation: (ObligationItemDto) -> Unit = {},
     onOpenNotifications: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
     viewModel: TeacherTodayViewModel = koinViewModel(),
@@ -61,6 +63,7 @@ fun TodayScreen(
         onMarkAttendance = onMarkAttendance,
         onOpenSyllabus = onOpenSyllabus,
         onOpenHomework = onOpenHomework,
+        onOpenObligation = onOpenObligation,
         onOpenNotifications = onOpenNotifications,
         onOpenProfile = onOpenProfile,
         onRetry = viewModel::load,
@@ -74,6 +77,7 @@ private fun TodayContent(
     onMarkAttendance: (ResolvedPeriodUi) -> Unit,
     onOpenSyllabus: (ResolvedPeriodUi) -> Unit,
     onOpenHomework: (ResolvedPeriodUi) -> Unit,
+    onOpenObligation: (ObligationItemDto) -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenProfile: () -> Unit,
     onRetry: () -> Unit,
@@ -123,6 +127,17 @@ private fun TodayContent(
         // Owns its own VM; the device biometric prompt is platform-abstracted and
         // never a hard gate (manual confirm always available).
         TeacherCheckInCard(modifier = Modifier.fillMaxWidth())
+
+        // ── Real obligations strip ("what needs me") ────────────────────────
+        // T-107 / Doc 04 §5.5: live, allocation-scoped counts (unmarked classes,
+        // unpublished results, homework to review, leave decisions). Replaces the
+        // fabricated Today tasks (B-HOME-4). Each row deep-links pre-scoped; the
+        // strip hides itself on read-failure and shows "all caught up" only when
+        // genuinely zero. Owns its own VM.
+        TeacherObligationsStrip(
+            onOpenObligation = onOpenObligation,
+            modifier = Modifier.fillMaxWidth(),
+        )
 
         // ── The live schedule card (3 faces) ────────────────────────────────
         VStateHost(
