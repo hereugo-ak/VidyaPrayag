@@ -365,6 +365,281 @@ data class MarkScoreDto(
     val marks: Float,
 )
 
+// ═════════════════════════════════════════════════════════════════════════════
+// T-302 — ASSESSMENT + MARKS LIFECYCLE (the canonical gradebook contract)
+// Doc 07 §1.3 (canonical model), §2 (draft→…→published machine, the B-MK-1 fix),
+// §3 (scoped create), §5 (validated entry), §6 (history/comparison).
+//
+// These models REPLACE the legacy free-text marks contract above
+// (TeacherMarksData / SubmitMarksRequest / TeacherAssessmentDto). The legacy
+// types are retained until T-303 deletes the legacy `/marks` handler and T-305
+// reworks the screen (DELETE-don't-patch: the old contract stays valid until its
+// replacement lands in the SAME commit that removes it). Everything here is
+// snake_case `@SerialName` matching the server wire surface field-for-field, and
+// scope-bound to the authorizing `assignment_id` (X-1 / D-ASMT-6) — never a
+// free-text class/section/subject.
+//
+// Wire endpoints (Doc 07 §2):
+//   POST   /api/v1/teacher/assessments               → create (returns draft)
+//   GET    /api/v1/teacher/assessments?assignmentId=&status=
+//   GET    /api/v1/teacher/assessments/{id}/marks     → roster + existing marks
+//   PUT    /api/v1/teacher/assessments/{id}/marks     → SAVE only (no publish)
+//   POST   /api/v1/teacher/assessments/{id}/publish   → explicit publish (+notify)
+//   POST   /api/v1/teacher/assessments/{id}/unpublish
+//   GET    /api/v1/teacher/assessments/history?assignmentId=
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * The five lifecycle states (Doc 07 §2). Save NEVER advances to `published`;
+ * only the explicit publish endpoint does (the B-MK-1 fix). `archived` is a
+ * soft-retire. Kept as string constants (not an enum) so an unknown server value
+ * can't crash deserialization — the UI treats anything unrecognised as `draft`.
+ */
+object AssessmentStatus {
+    const val DRAFT = "draft"
+    const val SCHEDULED = "scheduled"
+    const val MARKS_PENDING = "marks_pending"
+    const val PUBLISHED = "published"
+    const val ARCHIVED = "archived"
+    val ALL = listOf(DRAFT, SCHEDULED, MARKS_PENDING, PUBLISHED, ARCHIVED)
+}
+
+/** The assessment types (Doc 07 §1.3 / D-ASMT-4). */
+object AssessmentType {
+    const val SCHEDULED = "scheduled"
+    const val SURPRISE = "surprise"
+    const val ASSIGNMENT = "assignment"
+    const val PROJECT = "project"
+    const val EXAM = "exam"
+    val ALL = listOf(SCHEDULED, SURPRISE, ASSIGNMENT, PROJECT, EXAM)
+}
+
+// ── Assessment summary (list rows + create echo) ─────────────────────────────
+
+@Serializable
+data class AssessmentListResponse(
+    val success: Boolean = true,
+    val data: AssessmentListData = AssessmentListData(),
+)
+
+@Serializable
+data class AssessmentListData(
+    val assessments: List<AssessmentDto> = emptyList(),
+)
+
+/**
+ * One assessment — the scope-bound, typed, lifecycle-aware shape (Doc 07 §1.3).
+ * `className`/`section`/`subject` are JOINED for display (X-4: never the source
+ * of truth); the truth is `assignmentId`/`classId`/`subjectId`.
+ *
+ * `enteredCount`/`rosterCount` let the list show "entered 31/38" without a second
+ * round-trip; `passMarks` drives below-pass danger-ink coloring (null → disabled).
+ */
+@Serializable
+data class AssessmentDto(
+    val id: String,
+    @SerialName("assignment_id") val assignmentId: String? = null,
+    @SerialName("class_id") val classId: String? = null,
+    @SerialName("subject_id") val subjectId: String? = null,
+    // Display-only (joined). Carried so a list row needs no extra lookups.
+    @SerialName("class_name") val className: String = "",
+    val section: String = "",
+    val subject: String = "",
+    val name: String,
+    // scheduled | surprise | assignment | project | exam  (AssessmentType)
+    val type: String = AssessmentType.SCHEDULED,
+    @SerialName("max_marks") val maxMarks: Int = 100,
+    @SerialName("pass_marks") val passMarks: Int? = null,
+    @SerialName("exam_date") val examDate: String? = null,    // typed `date` → "YYYY-MM-DD"
+    @SerialName("calendar_event_id") val calendarEventId: String? = null,
+    // draft | scheduled | marks_pending | published | archived  (AssessmentStatus)
+    val status: String = AssessmentStatus.DRAFT,
+    @SerialName("published_at") val publishedAt: String? = null,
+    // Entry progress for the list ("entered k/n"); server-computed.
+    @SerialName("entered_count") val enteredCount: Int = 0,
+    @SerialName("roster_count") val rosterCount: Int = 0,
+) {
+    val isPublished: Boolean get() = status == AssessmentStatus.PUBLISHED
+    val isDraft: Boolean get() = status == AssessmentStatus.DRAFT
+    /** Pass/fail coloring only makes sense when a pass line is set (M11). */
+    val hasPassLine: Boolean get() = passMarks != null
+}
+
+// ── Create assessment (scoped) — Doc 07 §3 ───────────────────────────────────
+
+/**
+ * Create payload. Scope arrives PRE-FILLED from the launch context (class detail
+ * or Gradebook create-with-scope) — never re-picked (F-SHELL-3). `assignmentId`
+ * is the authorization the server validates via `requireOwnedAssignment`.
+ * Validation (max>0, 0≤pass≤max, name non-empty) is echoed server-side (§3).
+ */
+@Serializable
+data class CreateAssessmentRequestV2(
+    @SerialName("assignment_id") val assignmentId: String,
+    val name: String,
+    val type: String = AssessmentType.SCHEDULED,
+    @SerialName("max_marks") val maxMarks: Int,
+    @SerialName("pass_marks") val passMarks: Int? = null,
+    @SerialName("exam_date") val examDate: String? = null,    // "YYYY-MM-DD"; surprise → today
+    // Optional: tie to / create a calendar EXAM event (Doc 07 §4.1, D-ASMT-5).
+    @SerialName("calendar_event_id") val calendarEventId: String? = null,
+    @SerialName("link_to_calendar") val linkToCalendar: Boolean = false,
+)
+
+@Serializable
+data class AssessmentCreateResponse(
+    val success: Boolean = true,
+    val message: String? = null,
+    val data: AssessmentDto? = null,
+)
+
+// ── Load roster + existing marks — Doc 07 §5 (GET …/{id}/marks) ──────────────
+
+@Serializable
+data class MarksLoadResponse(
+    val success: Boolean = true,
+    val data: MarksLoadDto,
+)
+
+/**
+ * The marks-entry payload: the assessment header + the roster (from enrollments,
+ * roll-ordered) with any already-entered values restored (§5.3 — reopening a
+ * `marks_pending` assessment is NOT a blank slate; contrast attendance E3).
+ * New students added after creation appear with an empty mark (M4); transferred-
+ * out students are absent from the enrollment roster (M5).
+ */
+@Serializable
+data class MarksLoadDto(
+    val assessment: AssessmentDto,
+    val students: List<MarkEntryDto> = emptyList(),
+    // Convenience aggregates so the sticky header needs no client recompute.
+    @SerialName("entered_count") val enteredCount: Int = 0,
+    @SerialName("roster_count") val rosterCount: Int = 0,
+)
+
+/**
+ * One student's entry row. `studentId` is the typed FK identity (students.id,
+ * D-ASMT-3); `name`/`rollNo` are joined for display. `isAbsent` (AB) is a state
+ * distinct from a real 0 (§5.2) and is excluded from averages server-side.
+ */
+@Serializable
+data class MarkEntryDto(
+    @SerialName("student_id") val studentId: String,
+    val name: String,
+    @SerialName("roll_no") val rollNo: String = "",
+    val marks: Float? = null,           // null = not yet entered
+    @SerialName("is_absent") val isAbsent: Boolean = false,
+    val remark: String? = null,
+)
+
+// ── Save marks (no publish) — Doc 07 §2/§5 (PUT …/{id}/marks) ────────────────
+
+/**
+ * SAVE payload — writes `assessment_marks` and keeps status `marks_pending`
+ * (or `draft`). Carries NO publish flag: there is no way to publish from a save
+ * (the structural B-MK-1 fix). Per-entry max/≥0 validation is enforced both in
+ * the grid and server-side (§5.2).
+ */
+@Serializable
+data class MarksSaveRequest(
+    val entries: List<MarkSaveEntryDto> = emptyList(),
+)
+
+@Serializable
+data class MarkSaveEntryDto(
+    @SerialName("student_id") val studentId: String,
+    // null when absent or cleared; server clamps to [0, max_marks] and rejects >max.
+    val marks: Float? = null,
+    @SerialName("is_absent") val isAbsent: Boolean = false,
+    val remark: String? = null,
+)
+
+@Serializable
+data class MarksSaveResponse(
+    val success: Boolean = true,
+    val message: String? = null,
+    val data: MarksSaveResultDto = MarksSaveResultDto(),
+)
+
+@Serializable
+data class MarksSaveResultDto(
+    val saved: Int = 0,
+    // Echo the (unchanged) lifecycle status so the UI proves "saved, NOT published".
+    val status: String = AssessmentStatus.MARKS_PENDING,
+    @SerialName("entered_count") val enteredCount: Int = 0,
+    @SerialName("roster_count") val rosterCount: Int = 0,
+)
+
+// ── Publish / Unpublish — Doc 07 §2 (the ONLY paths that notify parents) ─────
+
+/**
+ * Publish confirmation echo. The UI confirm dialog names the parent-notify count
+ * BEFORE this is called ("Publish to {n} parents?"); the response confirms how
+ * many were actually notified.
+ */
+@Serializable
+data class PublishResponse(
+    val success: Boolean = true,
+    val message: String? = null,
+    val data: PublishResultDto = PublishResultDto(),
+)
+
+@Serializable
+data class PublishResultDto(
+    val status: String = AssessmentStatus.PUBLISHED,
+    @SerialName("published_at") val publishedAt: String? = null,
+    // How many parents were notified on publish (0 on unpublish).
+    @SerialName("parents_notified") val parentsNotified: Int = 0,
+)
+
+// ── History & comparison — Doc 07 §6 (server-aggregated, no client N+1) ──────
+
+@Serializable
+data class AssessmentHistoryResponse(
+    val success: Boolean = true,
+    val data: AssessmentHistoryDto = AssessmentHistoryDto(),
+)
+
+/**
+ * Server-computed trends for an assignment (Doc 07 §6). Everything here is
+ * aggregated server-side (contrast the B-CLS N+1 bugs). `timeline` is the
+ * per-assessment class average over the term; `distribution` is the latest
+ * (or a selected) assessment's histogram; both feed the Gradebook history view
+ * (T-306). Empty → the screen shows "Not enough data yet".
+ */
+@Serializable
+data class AssessmentHistoryDto(
+    @SerialName("assignment_id") val assignmentId: String? = null,
+    @SerialName("class_name") val className: String = "",
+    val subject: String = "",
+    // Class average per published assessment, oldest→newest (the timeline/sparkline).
+    val timeline: List<AssessmentTrendPointDto> = emptyList(),
+    // Histogram buckets for one assessment (difficulty gauge).
+    val distribution: List<MarkBucketDto> = emptyList(),
+) {
+    val hasData: Boolean get() = timeline.isNotEmpty()
+}
+
+@Serializable
+data class AssessmentTrendPointDto(
+    @SerialName("assessment_id") val assessmentId: String,
+    val name: String,
+    @SerialName("exam_date") val examDate: String? = null,
+    @SerialName("max_marks") val maxMarks: Int = 100,
+    // Class average over present (non-absent) students; null when nobody entered.
+    val average: Float? = null,
+    @SerialName("pass_rate") val passRate: Float? = null,   // 0..1, null when no pass line
+    @SerialName("entered_count") val enteredCount: Int = 0,
+    @SerialName("roster_count") val rosterCount: Int = 0,
+)
+
+/** One histogram bucket: "label" e.g. "0–24%", count of students. */
+@Serializable
+data class MarkBucketDto(
+    val label: String,
+    val count: Int = 0,
+)
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Syllabus — chapter/topic coverage per class+subject, with progress update.
 // Backs Teacher.tsx → Update › Syllabus.

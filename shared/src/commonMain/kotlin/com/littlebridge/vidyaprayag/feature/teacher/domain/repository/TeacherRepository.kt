@@ -21,6 +21,17 @@ interface TeacherRepository {
     suspend fun getProfile(token: String): NetworkResult<TeacherProfileResponse>
     suspend fun getAssessments(token: String, classId: String): NetworkResult<TeacherAssessmentsResponse>
 
+    // T-302/T-303/T-304: Gradebook lifecycle (Doc 07 §2/§5/§6). The canonical
+    // assessment + marks contract — scoped list, roster-with-marks, SAVE (no
+    // publish), explicit publish/unpublish, server-aggregated history.
+    suspend fun listAssessments(token: String, assignmentId: String, status: String? = null): NetworkResult<AssessmentListResponse>
+    suspend fun createAssessmentV2(token: String, request: CreateAssessmentRequestV2): NetworkResult<AssessmentCreateResponse>
+    suspend fun getAssessmentMarks(token: String, assessmentId: String): NetworkResult<MarksLoadResponse>
+    suspend fun saveAssessmentMarks(token: String, assessmentId: String, request: MarksSaveRequest): NetworkResult<MarksSaveResponse>
+    suspend fun publishAssessment(token: String, assessmentId: String): NetworkResult<PublishResponse>
+    suspend fun unpublishAssessment(token: String, assessmentId: String): NetworkResult<PublishResponse>
+    suspend fun getAssessmentHistory(token: String, assignmentId: String): NetworkResult<AssessmentHistoryResponse>
+
     // T-106c: teacher self check-in (Doc 06 §2).
     suspend fun getCheckInStatus(token: String, date: String? = null): NetworkResult<CheckInStatusResponse>
     suspend fun checkIn(token: String, request: TeacherCheckInRequest): NetworkResult<CheckInStatusResponse>

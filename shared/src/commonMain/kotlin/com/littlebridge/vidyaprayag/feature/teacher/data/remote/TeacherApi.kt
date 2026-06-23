@@ -110,6 +110,84 @@ class TeacherApi(
         }
     }
 
+    // ── T-302/T-303/T-304: Gradebook lifecycle (Doc 07 §2/§5/§6) ─────────────
+    // The canonical assessment + marks contract: scoped list, roster-with-marks
+    // load, SAVE (no publish — the B-MK-1 fix), explicit publish/unpublish, and
+    // server-aggregated history. All scoped to the authorizing assignmentId.
+
+    /** List assessments for an owned assignment, optionally filtered by lifecycle status. */
+    suspend fun listAssessments(
+        token: String,
+        assignmentId: String,
+        status: String? = null,
+    ): NetworkResult<AssessmentListResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/assessments")) {
+            parameter("assignmentId", assignmentId)
+            if (status != null) parameter("status", status)
+        }
+    }
+
+    /** Create a scoped assessment (returns a draft). Doc 07 §3. */
+    suspend fun createAssessmentV2(
+        token: String,
+        request: CreateAssessmentRequestV2,
+    ): NetworkResult<AssessmentCreateResponse> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/assessments")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    /** Roster (enrollment-ordered) + any already-entered marks for an assessment. Doc 07 §5. */
+    suspend fun getAssessmentMarks(
+        token: String,
+        assessmentId: String,
+    ): NetworkResult<MarksLoadResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/assessments/$assessmentId/marks"))
+    }
+
+    /** SAVE marks — writes `assessment_marks`, status stays marks_pending. NO publish (B-MK-1 fix). */
+    suspend fun saveAssessmentMarks(
+        token: String,
+        assessmentId: String,
+        request: MarksSaveRequest,
+    ): NetworkResult<MarksSaveResponse> = safeApiCall {
+        client.put(getUrl("api/v1/teacher/assessments/$assessmentId/marks")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    /** Explicit publish — the ONLY path that notifies parents. Doc 07 §2. */
+    suspend fun publishAssessment(
+        token: String,
+        assessmentId: String,
+    ): NetworkResult<PublishResponse> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/assessments/$assessmentId/publish")) {
+            contentType(ContentType.Application.Json)
+        }
+    }
+
+    /** Unpublish (audited) — retracts a published assessment; no re-notify. Doc 07 §2. */
+    suspend fun unpublishAssessment(
+        token: String,
+        assessmentId: String,
+    ): NetworkResult<PublishResponse> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/assessments/$assessmentId/unpublish")) {
+            contentType(ContentType.Application.Json)
+        }
+    }
+
+    /** Server-aggregated trends (timeline + distribution) for an assignment. Doc 07 §6. */
+    suspend fun getAssessmentHistory(
+        token: String,
+        assignmentId: String,
+    ): NetworkResult<AssessmentHistoryResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/assessments/history")) {
+            parameter("assignmentId", assignmentId)
+        }
+    }
+
     suspend fun getProfile(token: String): NetworkResult<TeacherProfileResponse> = safeApiCall {
         client.get(getUrl("api/v1/teacher/profile"))
     }

@@ -39,6 +39,28 @@ class TeacherRepositoryImpl(
     override suspend fun getAssessments(token: String, classId: String): NetworkResult<TeacherAssessmentsResponse> =
         api.getAssessments(token, classId)
 
+    // T-302/T-303/T-304: Gradebook lifecycle (Doc 07 §2/§5/§6).
+    override suspend fun listAssessments(token: String, assignmentId: String, status: String?): NetworkResult<AssessmentListResponse> =
+        api.listAssessments(token, assignmentId, status)
+
+    override suspend fun createAssessmentV2(token: String, request: CreateAssessmentRequestV2): NetworkResult<AssessmentCreateResponse> =
+        api.createAssessmentV2(token, request)
+
+    override suspend fun getAssessmentMarks(token: String, assessmentId: String): NetworkResult<MarksLoadResponse> =
+        api.getAssessmentMarks(token, assessmentId)
+
+    override suspend fun saveAssessmentMarks(token: String, assessmentId: String, request: MarksSaveRequest): NetworkResult<MarksSaveResponse> =
+        api.saveAssessmentMarks(token, assessmentId, request)
+
+    override suspend fun publishAssessment(token: String, assessmentId: String): NetworkResult<PublishResponse> =
+        api.publishAssessment(token, assessmentId)
+
+    override suspend fun unpublishAssessment(token: String, assessmentId: String): NetworkResult<PublishResponse> =
+        api.unpublishAssessment(token, assessmentId)
+
+    override suspend fun getAssessmentHistory(token: String, assignmentId: String): NetworkResult<AssessmentHistoryResponse> =
+        api.getAssessmentHistory(token, assignmentId)
+
     override suspend fun getCheckInStatus(token: String, date: String?): NetworkResult<CheckInStatusResponse> =
         api.getCheckInStatus(token, date)
 
