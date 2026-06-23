@@ -694,42 +694,12 @@ data class SyllabusUnitMutationResponse(
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Homework — LEGACY list + create (RETAINED until T-406 — DELETE-don't-patch).
-// Backs the old Teacher.tsx → Update › Homework screen whose Assign button is
-// dead (F-HW-1). The typed lifecycle plane below (HomeworkV2*) replaces it; this
-// pair is removed in T-406 when the screen converges.
+// Homework — LEGACY list + create REMOVED (T-406, DELETE-don't-patch).
+// The old TeacherHomeworkResponse / TeacherHomeworkData / HomeworkDto /
+// CreateHomeworkRequest pair (which backed the dead-Assign-button screen, F-HW-1)
+// is GONE — replaced field-for-field by the typed lifecycle DTOs below
+// (HomeworkListResponse / AssignHomeworkRequest / HomeworkBoardResponse / …).
 // ─────────────────────────────────────────────────────────────────────────────
-
-@Serializable
-data class TeacherHomeworkResponse(
-    val success: Boolean,
-    val data: TeacherHomeworkData,
-)
-
-@Serializable
-data class TeacherHomeworkData(
-    val items: List<HomeworkDto> = emptyList(),
-)
-
-@Serializable
-data class HomeworkDto(
-    val id: String,
-    val title: String,
-    val description: String = "",
-    @SerialName("class_name") val className: String,
-    val subject: String,
-    @SerialName("due_date") val dueDate: String,
-    @SerialName("submitted_count") val submittedCount: Int = 0,
-    @SerialName("total_count") val totalCount: Int = 0,
-)
-
-@Serializable
-data class CreateHomeworkRequest(
-    @SerialName("class_id") val classId: String,
-    val title: String,
-    val description: String = "",
-    @SerialName("due_date") val dueDate: String,
-)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // T-405/T-406 (Doc 08 Part B) — the canonical, TYPED HOMEWORK LIFECYCLE.

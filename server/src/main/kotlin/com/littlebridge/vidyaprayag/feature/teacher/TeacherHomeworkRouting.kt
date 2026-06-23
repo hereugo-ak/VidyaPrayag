@@ -7,21 +7,21 @@
  * TeacherRoutingTasks.kt (which could list + create only by free-text class,
  * surfaced NO submissions board, had NO extension, NO attachments, and whose
  * UI Assign button was dead — F-HW-1). This plane:
- *   • GET  …/homework-v2?assignmentId=        → active homework for an owned
+ *   • GET  …/homework?assignmentId=           → active homework for an owned
  *                                                assignment, per-status counts +
  *                                                attachments + is_past_due.
- *   • POST …/homework-v2                       → ASSIGN (title/desc/typed due-date
+ *   • POST …/homework                          → ASSIGN (title/desc/typed due-date
  *                                                (+time)/allow-late + attachments);
  *                                                ≥ today guard (H1); notifies parents.
  *                                                The real fix for B-HW-1/F-HW-1.
- *   • GET  …/homework-v2/{id}/submissions      → the BOARD, ROSTER-JOINED so even
+ *   • GET  …/homework/{id}/submissions         → the BOARD, ROSTER-JOINED so even
  *                                                NOT-SUBMITTED students appear
  *                                                (B-HW-3/H7); status columns + counts.
- *   • POST …/homework-v2/{id}/extend           → teacher EXTENSION — whole class
+ *   • POST …/homework/{id}/extend              → teacher EXTENSION — whole class
  *                                                (student_id NULL, H5) or one student
  *                                                (the "she was sick" case, H4); logged.
- *   • PATCH …/homework-v2/{id}/submissions/{studentId} → mark reviewed/graded.
- *   • POST …/homework-v2/{id}/close            → deactivate; board read-only (H9).
+ *   • PATCH …/homework/{id}/submissions/{studentId} → mark reviewed/graded.
+ *   • POST …/homework/{id}/close               → deactivate; board read-only (H9).
  *
  * The no-submit-past-due rule (D-HW-4/H2/H3) is enforced on the STUDENT submission
  * path (parent/student side), not here; this teacher plane sets the policy
@@ -37,14 +37,14 @@
  * response only carries that scope (API), and the screen reaches this pre-scoped
  * (UI, T-406).
  *
- * PATH NOTE (staged, converges in T-406):
- *   This plane mounts under a temporary `/api/v1/teacher/homework-v2` prefix
- *   because the legacy `teacherTaskRoutes()` still binds `GET/POST
+ * PATH NOTE (converged in T-406):
+ *   This plane was staged under a temporary `/api/v1/teacher/homework-v2` prefix
+ *   in T-405 because the legacy `teacherTaskRoutes()` still bound `GET/POST
  *   /api/v1/teacher/homework` (Ktor forbids two handlers on the same
  *   method+path) — the same staging precedent as T-203's `/attendance-typed`,
- *   T-303's `/gradebook`, and T-402's `/syllabus-typed`. T-406 DELETES the
- *   legacy handler and CONVERGES this plane to the canonical `/api/v1/teacher/
- *   homework` paths from Doc 08.
+ *   T-303's `/gradebook`, and T-402's `/syllabus-typed`. T-406 DELETED the
+ *   legacy handler and CONVERGED this plane onto the canonical
+ *   `/api/v1/teacher/homework` paths from Doc 08.
  *
  * DTOs are defined server-side (the :server module does NOT depend on :shared)
  * and mirror shared/.../teacher/domain/model/TeacherModels.kt field-for-field.
@@ -378,10 +378,11 @@ private data class BoardRaw(
 // ─────────────────────────────────────────────────────────────────────────────
 fun Route.teacherHomeworkRouting() {
     authenticate("jwt") {
-        // STAGED under `/homework-v2` (converges to `/homework` in T-406 once the
-        // legacy handler in teacherTaskRoutes() is deleted) — the T-203/T-303/T-402
-        // staging precedent.
-        route("/api/v1/teacher/homework-v2") {
+        // CANONICAL (T-406): converged from the T-405 staging prefix `/homework-v2`
+        // to `/api/v1/teacher/homework` now that the legacy GET+POST handler in
+        // teacherTaskRoutes() is DELETED — completing the T-203/T-303/T-402 staging
+        // precedent for this plane.
+        route("/api/v1/teacher/homework") {
             homeworkListAndAssign()
             homeworkBoard()
             homeworkExtend()
@@ -392,8 +393,8 @@ fun Route.teacherHomeworkRouting() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET  …/homework-v2?assignmentId=   (active homework, per-status counts)
-// POST …/homework-v2                 (ASSIGN — fixes F-HW-1)
+// GET  …/homework?assignmentId=   (active homework, per-status counts)
+// POST …/homework                 (ASSIGN — fixes F-HW-1)
 // ─────────────────────────────────────────────────────────────────────────────
 private fun Route.homeworkListAndAssign() {
     get {
@@ -571,7 +572,7 @@ private fun Route.homeworkListAndAssign() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET …/homework-v2/{id}/submissions   (the roster-joined board — B-HW-3)
+// GET …/homework/{id}/submissions   (the roster-joined board — B-HW-3)
 // ─────────────────────────────────────────────────────────────────────────────
 private fun Route.homeworkBoard() {
     get("/{id}/submissions") {
@@ -590,7 +591,7 @@ private fun Route.homeworkBoard() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// POST …/homework-v2/{id}/extend   (teacher extension — whole class or one student)
+// POST …/homework/{id}/extend   (teacher extension — whole class or one student)
 // Doc 08 §7 / H4 / H5.
 // ─────────────────────────────────────────────────────────────────────────────
 private fun Route.homeworkExtend() {
@@ -661,7 +662,7 @@ private fun Route.homeworkExtend() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PATCH …/homework-v2/{id}/submissions/{studentId}   (mark reviewed/graded)
+// PATCH …/homework/{id}/submissions/{studentId}   (mark reviewed/graded)
 // ─────────────────────────────────────────────────────────────────────────────
 private fun Route.homeworkReview() {
     patch("/{id}/submissions/{studentId}") {
@@ -723,7 +724,7 @@ private fun Route.homeworkReview() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// POST …/homework-v2/{id}/close   (deactivate — board read-only, H9)
+// POST …/homework/{id}/close   (deactivate — board read-only, H9)
 // ─────────────────────────────────────────────────────────────────────────────
 private fun Route.homeworkClose() {
     post("/{id}/close") {

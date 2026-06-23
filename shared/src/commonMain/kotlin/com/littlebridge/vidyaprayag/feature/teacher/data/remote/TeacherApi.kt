@@ -73,9 +73,8 @@ class TeacherApi(
         }
     }
 
-    suspend fun getHomework(token: String): NetworkResult<TeacherHomeworkResponse> = safeApiCall {
-        client.get(getUrl("api/v1/teacher/homework"))
-    }
+    // T-406 (DELETE-don't-patch): legacy getHomework (GET /homework → TeacherHomeworkResponse)
+    // REMOVED. The typed listHomework (GET /homework?assignmentId=) below owns it now.
 
     // ── T-402/T-403: Typed, scoped syllabus (Doc 08 §1.2/§3) ─────────────────
     // The template/progress-split contract. Reached PRE-SCOPED by assignmentId
@@ -268,29 +267,21 @@ class TeacherApi(
         }
     }
 
-    // T-406 (DELETE-don't-patch): the legacy getHomework / createHomework above are
-    // RETAINED until the screen converges; the typed lifecycle below replaces them.
-    suspend fun createHomework(
-        token: String,
-        request: CreateHomeworkRequest,
-    ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
-        client.post(getUrl("api/v1/teacher/homework")) {
-            contentType(ContentType.Application.Json)
-            setBody(request)
-        }
-    }
-
     // ── T-405/T-406: Typed HOMEWORK lifecycle (Doc 08 Part B) ────────────────
     // Assign (fixes the dead button), roster-joined submissions board (B-HW-3),
     // teacher extension (whole-class or single-student), review/grade. Every call
     // is scope-bound to the authorizing assignmentId server-side (X-1).
+    //
+    // T-406 (DELETE-don't-patch): the legacy createHomework (POST /homework, free-text class)
+    // is REMOVED — assignHomework below owns it. Paths CONVERGED from the T-405 staging prefix
+    // `/homework-v2` to the canonical `/api/v1/teacher/homework[/...]`.
 
     /** List active homework for an owned assignment, with per-status counts + attachments. */
     suspend fun listHomework(
         token: String,
         assignmentId: String,
     ): NetworkResult<HomeworkListResponse> = safeApiCall {
-        client.get(getUrl("api/v1/teacher/homework-v2")) {
+        client.get(getUrl("api/v1/teacher/homework")) {
             parameter("assignmentId", assignmentId)
         }
     }
@@ -300,7 +291,7 @@ class TeacherApi(
         token: String,
         request: AssignHomeworkRequest,
     ): NetworkResult<AssignHomeworkResponse> = safeApiCall {
-        client.post(getUrl("api/v1/teacher/homework-v2")) {
+        client.post(getUrl("api/v1/teacher/homework")) {
             contentType(ContentType.Application.Json)
             setBody(request)
         }
@@ -312,7 +303,7 @@ class TeacherApi(
         homeworkId: String,
         assignmentId: String,
     ): NetworkResult<HomeworkBoardResponse> = safeApiCall {
-        client.get(getUrl("api/v1/teacher/homework-v2/$homeworkId/submissions")) {
+        client.get(getUrl("api/v1/teacher/homework/$homeworkId/submissions")) {
             parameter("assignmentId", assignmentId)
         }
     }
@@ -323,7 +314,7 @@ class TeacherApi(
         homeworkId: String,
         request: GrantExtensionRequest,
     ): NetworkResult<HomeworkMutationResponse> = safeApiCall {
-        client.post(getUrl("api/v1/teacher/homework-v2/$homeworkId/extend")) {
+        client.post(getUrl("api/v1/teacher/homework/$homeworkId/extend")) {
             contentType(ContentType.Application.Json)
             setBody(request)
         }
@@ -336,7 +327,7 @@ class TeacherApi(
         studentId: String,
         request: ReviewSubmissionRequest,
     ): NetworkResult<HomeworkMutationResponse> = safeApiCall {
-        client.patch(getUrl("api/v1/teacher/homework-v2/$homeworkId/submissions/$studentId")) {
+        client.patch(getUrl("api/v1/teacher/homework/$homeworkId/submissions/$studentId")) {
             contentType(ContentType.Application.Json)
             setBody(request)
         }
@@ -348,7 +339,7 @@ class TeacherApi(
         homeworkId: String,
         assignmentId: String,
     ): NetworkResult<HomeworkMutationResponse> = safeApiCall {
-        client.post(getUrl("api/v1/teacher/homework-v2/$homeworkId/close")) {
+        client.post(getUrl("api/v1/teacher/homework/$homeworkId/close")) {
             parameter("assignmentId", assignmentId)
         }
     }

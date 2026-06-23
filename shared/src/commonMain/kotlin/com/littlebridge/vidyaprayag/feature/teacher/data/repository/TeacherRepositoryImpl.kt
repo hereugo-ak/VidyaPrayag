@@ -24,8 +24,7 @@ class TeacherRepositoryImpl(
     override suspend fun loadAttendance(token: String, assignmentId: String, date: String?): NetworkResult<AttendanceLoadResponse> =
         api.loadAttendance(token, assignmentId, date)
 
-    override suspend fun getHomework(token: String): NetworkResult<TeacherHomeworkResponse> =
-        api.getHomework(token)
+    // T-406: legacy getHomework override removed (listHomework replaces it).
 
     // T-402: typed, assignment-scoped syllabus (Doc 08 §1.2/§3).
     override suspend fun loadSyllabus(token: String, assignmentId: String): NetworkResult<SyllabusLoadResponse> =
@@ -77,8 +76,7 @@ class TeacherRepositoryImpl(
     override suspend fun saveAttendance(token: String, request: AttendanceSaveRequest): NetworkResult<AttendanceSaveResponse> =
         api.saveAttendance(token, request)
 
-    override suspend fun createHomework(token: String, request: CreateHomeworkRequest): NetworkResult<ApiResponse<Unit>> =
-        api.createHomework(token, request)
+    // T-406: legacy createHomework override removed (assignHomework replaces it).
 
     // T-405/T-406: typed homework lifecycle.
     override suspend fun listHomework(token: String, assignmentId: String): NetworkResult<HomeworkListResponse> =

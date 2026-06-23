@@ -15,7 +15,7 @@ interface TeacherRepository {
     // T-205: typed, assignment-scoped attendance (Doc 06 §3.8). Replaces the legacy
     // getAttendance(classId, date) / submitAttendance(SubmitAttendanceRequest).
     suspend fun loadAttendance(token: String, assignmentId: String, date: String? = null): NetworkResult<AttendanceLoadResponse>
-    suspend fun getHomework(token: String): NetworkResult<TeacherHomeworkResponse>
+    // T-406: legacy getHomework removed — listHomework(assignmentId) below replaces it.
 
     // T-402: typed, assignment-scoped syllabus (Doc 08 §1.2/§3). The template/
     // progress-split contract — hierarchical load, create unit (B-SYL-1 fix),
@@ -47,9 +47,9 @@ interface TeacherRepository {
     // canonical scoped gradebook lifecycle above (listAssessments/createAssessmentV2/
     // getAssessmentMarks/saveAssessmentMarks/publish/unpublish/history) replaces them.
     suspend fun saveAttendance(token: String, request: AttendanceSaveRequest): NetworkResult<AttendanceSaveResponse>
-    suspend fun createHomework(token: String, request: CreateHomeworkRequest): NetworkResult<ApiResponse<Unit>>
 
     // T-405/T-406: typed homework lifecycle (assign, board, extend, review, close).
+    // T-406: legacy createHomework removed — assignHomework below replaces it.
     suspend fun listHomework(token: String, assignmentId: String): NetworkResult<HomeworkListResponse>
     suspend fun assignHomework(token: String, request: AssignHomeworkRequest): NetworkResult<AssignHomeworkResponse>
     suspend fun getHomeworkBoard(token: String, homeworkId: String, assignmentId: String): NetworkResult<HomeworkBoardResponse>
