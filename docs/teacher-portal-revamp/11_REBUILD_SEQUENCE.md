@@ -106,6 +106,8 @@ These resolve the cross-cutting root defects (X-1..X-6) that everything else sta
 - **Touches:** `shared/.../feature/teacher/domain/model/TeacherModels.kt`
 - **Details:** add `ResolvedDayDto`, `ResolvedPeriodDto`, `CalendarOverlayDto`, `CheckInStatusDto` (Doc 05 §4) with `@SerialName`.
 - **Done when:** serialization round-trips in shared tests.
+- **STATUS (executed):** ✅ Added to `TeacherModels.kt`: `ResolvedDayResponse`/`ResolvedDayDto`, `ResolvedPeriodDto` (with status, `attendance_marked`, substitute + overlap flags), `CalendarOverlayDto` (with `assessment_id` deep-link), `ResolvedWeekResponse`/`ResolvedWeekDto`, `CheckInStatusResponse`/`CheckInStatusDto` + `TeacherCheckInRequest` (T-106 shared side), and `TeacherObligationsResponse`/`TeacherObligationsDto`/`ObligationItemDto` (T-107 shared side, with an honest `isAllCaughtUp` helper). All snake_case `@SerialName` matching the wire contract. Round-trip test `shared/.../commonTest/.../TeacherTodayModelsTest.kt` asserts encode/decode equality + snake_case field names + the all-caught-up honesty rule.
+  - **Note (scope — Rule 4):** the doc's "Touches" listed only the four core resolved-day DTOs; the check-in (T-106) and obligations (T-107) shared models are added here too since they share the Today wire surface and keep the later frontend commits from re-touching this file. The matching server DTOs land with their endpoints (T-104/106/107).
 
 ### T-104 — Backend: GET /teacher/day + /teacher/week (resolved schedule)
 - **Layer:** Backend · **Depends:** T-101, T-102, T-103, T-003

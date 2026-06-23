@@ -48,6 +48,155 @@ data class TeacherTaskDto(
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Teacher Today — the resolved day & week (Teacher Portal Rebuild, Doc 05 §4).
+//
+// These power the new Today tab's 3-face schedule card (Doc 05 §5) and the
+// Profile → My Schedule full-week view. The SERVER resolves the day for a
+// SPECIFIC date — merging the recurring teacher_periods pattern with one-off
+// period_exceptions (cancel/reschedule/room-change/substitution/extra), the
+// published HOLIDAY calendar events, and the relevant published calendar
+// overlay (EXAM/PTM/EVENT) — and joins per-period attendance state so the
+// "marked ✓ / unmarked !" badge is REAL, not fabricated (kills B-HOME-4).
+//
+// Mirrors server DTOs in feature/teacher/TeacherDayRouting.kt field-for-field.
+// Times serialize as "HH:mm"; dates as ISO "YYYY-MM-DD".
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class ResolvedDayResponse(
+    val success: Boolean,
+    val data: ResolvedDayDto,
+)
+
+@Serializable
+data class ResolvedDayDto(
+    val date: String,                                   // ISO YYYY-MM-DD (server-authoritative)
+    val weekday: Int,                                   // 1=Mon … 7=Sun (ISO)
+    @SerialName("is_holiday") val isHoliday: Boolean = false,
+    @SerialName("holiday_name") val holidayName: String? = null,
+    val periods: List<ResolvedPeriodDto> = emptyList(),
+    val calendar: List<CalendarOverlayDto> = emptyList(),
+    // Server-clock authoritative indices into [periods] (no device-clock drift).
+    // null when there is no current/next period (before first / after last / holiday).
+    @SerialName("now_index") val nowIndex: Int? = null,
+    @SerialName("next_index") val nextIndex: Int? = null,
+)
+
+@Serializable
+data class ResolvedPeriodDto(
+    @SerialName("period_id") val periodId: String? = null,   // null for an EXTRA (exception-only) period
+    @SerialName("assignment_id") val assignmentId: String? = null, // the TSA that authorizes scoped actions
+    @SerialName("class_name") val className: String,
+    val section: String = "",
+    val subject: String = "",
+    val room: String = "",
+    @SerialName("start_time") val startTime: String,         // "HH:mm"
+    @SerialName("end_time") val endTime: String,             // "HH:mm"
+    // SCHEDULED | CANCELLED | RESCHEDULED | SUBSTITUTION | ROOM_CHANGE | EXTRA
+    val status: String = "SCHEDULED",
+    @SerialName("attendance_marked") val attendanceMarked: Boolean = false,
+    @SerialName("substitute_teacher_name") val substituteTeacherName: String? = null,
+    // True when THIS teacher is the inserted substitute for this date (so the
+    // period appears in MY day and I may mark it) — Doc 06 E14.
+    @SerialName("is_substitute_for_me") val isSubstituteForMe: Boolean = false,
+    // Data-quality flag: this slot overlaps another (server never silently drops
+    // one — Doc 05 §6 "two periods overlap"). UI shows a warning chip.
+    @SerialName("has_overlap") val hasOverlap: Boolean = false,
+    val note: String = "",
+)
+
+@Serializable
+data class CalendarOverlayDto(
+    @SerialName("event_id") val eventId: String,
+    val type: String,                                   // EXAM | HOLIDAY | PTM | SCHOOL_EVENT | …
+    val title: String,
+    val audience: String = "ALL_SCHOOL",
+    // When an EXAM is tied to one of the teacher's assessments, the assessment id
+    // so Today can deep-link to its marks entry (Doc 05 §3.3 / Doc 07 §4.1).
+    @SerialName("assessment_id") val assessmentId: String? = null,
+    @SerialName("class_ref") val classRef: String? = null,
+)
+
+@Serializable
+data class ResolvedWeekResponse(
+    val success: Boolean,
+    val data: ResolvedWeekDto,
+)
+
+@Serializable
+data class ResolvedWeekDto(
+    @SerialName("week_start") val weekStart: String,    // ISO date of Monday of the resolved week
+    val days: List<ResolvedDayDto> = emptyList(),       // Mon..Sat (or Sun) resolved
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Teacher self check-in (Doc 06 §2). Surfaced on Today's greeting band; the
+// biometric ladder (biometric → PIN → manual) records WHICH method succeeded.
+// Mirrors server feature/teacher/TeacherDayRouting.kt check-in handlers.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class CheckInStatusResponse(
+    val success: Boolean,
+    val data: CheckInStatusDto,
+)
+
+@Serializable
+data class CheckInStatusDto(
+    @SerialName("checked_in") val checkedIn: Boolean = false,
+    @SerialName("checked_in_at") val checkedInAt: String? = null, // ISO timestamp, server-stamped
+    val method: String? = null,                          // biometric | pin | manual
+    val date: String,                                    // ISO date the status is for
+)
+
+@Serializable
+data class TeacherCheckInRequest(
+    val method: String,                                  // biometric | pin | manual
+    @SerialName("device_id") val deviceId: String? = null,
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Today obligations strip (Doc 04 §5.5). REAL outstanding work, replacing the
+// fabricated "Today's tasks" (B-HOME-4). Each obligation deep-links to its
+// scoped surface. Mirrors server feature/teacher/TeacherDayRouting.kt.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class TeacherObligationsResponse(
+    val success: Boolean,
+    val data: TeacherObligationsDto,
+)
+
+@Serializable
+data class TeacherObligationsDto(
+    @SerialName("unmarked_classes") val unmarkedClasses: Int = 0,
+    @SerialName("classes_today_total") val classesTodayTotal: Int = 0,
+    @SerialName("unpublished_results") val unpublishedResults: Int = 0,
+    @SerialName("submissions_to_review") val submissionsToReview: Int = 0,
+    @SerialName("pending_leave_decisions") val pendingLeaveDecisions: Int = 0,
+    val items: List<ObligationItemDto> = emptyList(),
+) {
+    /** True only when there is genuinely nothing outstanding (earned "all caught up"). */
+    val isAllCaughtUp: Boolean
+        get() = items.isEmpty() &&
+            unmarkedClasses == 0 && unpublishedResults == 0 &&
+            submissionsToReview == 0 && pendingLeaveDecisions == 0
+}
+
+@Serializable
+data class ObligationItemDto(
+    val id: String,
+    // attendance | marks | homework | leave
+    val type: String,
+    val title: String,
+    val subtitle: String = "",
+    val count: Int = 0,
+    // Pre-scoped deep-link target so the UI jumps straight to the scoped tool.
+    @SerialName("assignment_id") val assignmentId: String? = null,
+    @SerialName("ref_id") val refId: String? = null,
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
 // My Classes — list of classes the teacher handles, + class detail roster
 // Backs Teacher.tsx → MyClasses tab + ClassDetail.
 // ─────────────────────────────────────────────────────────────────────────────
