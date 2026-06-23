@@ -452,7 +452,10 @@ private fun HomeworkSubmissionRowDto.toUi() = HomeworkBoardRow(
 )
 
 // Re-export the status constants for screen-side `when` exhaustiveness without a second import.
-internal val HOMEWORK_STATUS_SUBMITTED = HomeworkSubmissionStatus.SUBMITTED
-internal val HOMEWORK_STATUS_LATE = HomeworkSubmissionStatus.LATE
-internal val HOMEWORK_STATUS_GRADED = HomeworkSubmissionStatus.GRADED
-internal val HOMEWORK_STATUS_NOT_SUBMITTED = HomeworkSubmissionStatus.NOT_SUBMITTED
+// Must be `public` (not `internal`): they are consumed cross-module from :composeApp
+// (TeacherHomeworkScreenV2). `internal` is module-scoped, which fails the Android build with
+// "Cannot access 'val HOMEWORK_STATUS_*': it is internal in ...".
+val HOMEWORK_STATUS_SUBMITTED = HomeworkSubmissionStatus.SUBMITTED
+val HOMEWORK_STATUS_LATE = HomeworkSubmissionStatus.LATE
+val HOMEWORK_STATUS_GRADED = HomeworkSubmissionStatus.GRADED
+val HOMEWORK_STATUS_NOT_SUBMITTED = HomeworkSubmissionStatus.NOT_SUBMITTED

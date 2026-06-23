@@ -685,8 +685,12 @@ private fun AssignHomeworkDialog(
                     enabled = !state.isAssigning,
                 )
                 AllowLateToggle(checked = state.composerAllowLate, enabled = !state.isAssigning, onToggle = onAllowLate)
-                if (state.composerError != null) {
-                    Text(state.composerError, style = VTheme.type.caption.colored(c.dangerInk))
+                // Capture into a local val so the null-check enables smart-cast — `composerError`
+                // is a public API property from the :shared module and cannot be smart-cast
+                // directly across the module boundary.
+                val composerError = state.composerError
+                if (composerError != null) {
+                    Text(composerError, style = VTheme.type.caption.colored(c.dangerInk))
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     VButton(
@@ -784,8 +788,12 @@ private fun GrantExtensionDialog(
                     placeholder = "e.g. Was unwell",
                     enabled = !state.isGrantingExtension,
                 )
-                if (state.extensionError != null) {
-                    Text(state.extensionError, style = VTheme.type.caption.colored(c.dangerInk))
+                // Capture into a local val so the null-check enables smart-cast — `extensionError`
+                // is a public API property from the :shared module and cannot be smart-cast
+                // directly across the module boundary.
+                val extensionError = state.extensionError
+                if (extensionError != null) {
+                    Text(extensionError, style = VTheme.type.caption.colored(c.dangerInk))
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     VButton(
