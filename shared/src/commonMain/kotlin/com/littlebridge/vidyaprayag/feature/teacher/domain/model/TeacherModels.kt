@@ -606,37 +606,16 @@ data class MarkBucketDto(
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Syllabus — chapter/topic coverage per class+subject, with progress update.
-// Backs Teacher.tsx → Update › Syllabus.
+// Syllabus — chapter/topic coverage scoped to a teacher allocation.
+// Backs Teacher portal → Planner › Syllabus.
+//
+// T-403: the legacy flat DTOs (TeacherSyllabusResponse / TeacherSyllabusData /
+// SyllabusUnitDto / UpdateSyllabusRequest) were DELETED here. They backed the
+// old class+subject GET/PATCH /syllabus contract, which has been fully replaced
+// by the typed, hierarchical, assignment-scoped plane below (T-402/T-403). Their
+// only consumers (legacy TeacherApi.getSyllabus/updateSyllabus, the repository
+// overrides, and the old ViewModel path) were removed in the same commit.
 // ─────────────────────────────────────────────────────────────────────────────
-
-@Serializable
-data class TeacherSyllabusResponse(
-    val success: Boolean,
-    val data: TeacherSyllabusData,
-)
-
-@Serializable
-data class TeacherSyllabusData(
-    @SerialName("class_name") val className: String,
-    val subject: String,
-    @SerialName("overall_progress") val overallProgress: Float = 0f,
-    val units: List<SyllabusUnitDto> = emptyList(),
-)
-
-@Serializable
-data class SyllabusUnitDto(
-    val id: String,
-    val title: String,
-    @SerialName("is_covered") val isCovered: Boolean = false,
-    @SerialName("covered_on") val coveredOn: String? = null,
-)
-
-@Serializable
-data class UpdateSyllabusRequest(
-    @SerialName("unit_id") val unitId: String,
-    @SerialName("is_covered") val isCovered: Boolean,
-)
 
 // ── Typed, scoped syllabus — T-402 (Doc 08 §1.2/§2/§3) ───────────────────────
 // The template/progress-split contract: a unit list is HIERARCHICAL (chapters

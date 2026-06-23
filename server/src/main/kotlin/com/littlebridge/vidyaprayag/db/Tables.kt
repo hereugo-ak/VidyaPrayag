@@ -914,8 +914,15 @@ object AssessmentMarksTable : UUIDTable("assessment_marks", "id") {
 
 /**
  * Syllabus unit (chapter/topic) for a class+section+subject, with a covered
- * flag + the date it was marked covered. Backs TeacherSyllabusData / the
- * PATCH /teacher/syllabus toggle. `position` orders units within a subject.
+ * flag + the date it was marked covered. `position` orders units within a subject.
+ *
+ * T-403: this LEGACY flat table no longer backs the teacher syllabus surface —
+ * the teacher plane moved to the typed [CurriculumUnitsTable] template +
+ * [SyllabusProgressTable] per-section progress (see TeacherSyllabusRouting.kt).
+ * It is RETAINED (not dropped) because it still backs read-only consumers:
+ * ParentAcademicsRouting (parent syllabus view), SchoolIntelligenceRouting
+ * (school-wide coverage), and the TeacherRouting dashboard progress rollup.
+ * A future migration can backfill those onto the typed tables and drop this.
  */
 object SyllabusUnitsTable : UUIDTable("syllabus_units", "id") {
     val schoolId   = uuid("school_id")
@@ -941,9 +948,10 @@ object SyllabusUnitsTable : UUIDTable("syllabus_units", "id") {
  * resolves the free-text scope defect (D-SYL-3 / X-1) by binding to typed
  * class_id/subject_id.
  *
- * The legacy [SyllabusUnitsTable] is RETAINED (not dropped) until T-403 repoints
- * its readers — DELETE-don't-patch keeps the old screen compiling green until
- * its replacement lands.
+ * T-403 repointed the TEACHER readers/writers onto this typed pair and deleted
+ * the legacy `/syllabus` handler. The legacy [SyllabusUnitsTable] is still
+ * RETAINED (not dropped) because parent/school read-only consumers remain on it;
+ * a future migration can backfill + drop it.
  */
 object CurriculumUnitsTable : UUIDTable("curriculum_units", "id") {
     val schoolId  = uuid("school_id")

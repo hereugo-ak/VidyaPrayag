@@ -2,10 +2,12 @@
  * File: TeacherSyllabusRouting.kt
  * Module: feature.teacher
  *
- * T-402 (Doc 08 §1.2/§2/§3) — the canonical, typed, lifecycle-aware SYLLABUS
- * plane that will replace the legacy free-text `/syllabus` GET+PATCH handlers in
- * TeacherRoutingTasks.kt (which support only a coverage toggle — NO create, the
- * B-SYL-1 dead-empty defect; and scope by free-text class_name/subject, D-SYL-3).
+ * T-402/T-403 (Doc 08 §1.2/§2/§3) — the canonical, typed, lifecycle-aware
+ * SYLLABUS plane. It REPLACED the legacy free-text `/syllabus` GET+PATCH handlers
+ * that lived in TeacherRoutingTasks.kt (which supported only a coverage toggle —
+ * NO create, the B-SYL-1 dead-empty defect; and scoped by free-text
+ * class_name/subject, D-SYL-3). Those legacy handlers are DELETED (T-403) and this
+ * plane now OWNS the canonical `/api/v1/teacher/syllabus` paths.
  *
  * THE TEMPLATE/PROGRESS SPLIT LIVES HERE (Doc 08 §1.2). A unit is a row in
  * `curriculum_units` (the template, per class+subject, hierarchical chapter ▸
@@ -30,14 +32,14 @@
  * progress (query), the response only carries that scope (API), and the screen
  * reaches this pre-scoped (UI, T-403).
  *
- * PATH NOTE (staged, converges in T-403):
- *   The legacy `teacherTaskRoutes()` still binds `GET/PATCH /api/v1/teacher/
- *   syllabus`, and Ktor forbids two handlers on the same method+path. So this
- *   typed plane mounts under a temporary `/api/v1/teacher/syllabus-typed` prefix
- *   (the T-203 `/attendance-typed`→`/attendance` and T-303 `/gradebook`→
- *   `/assessments` staging precedent). T-403 DELETES the legacy handler and
- *   converges this plane to the canonical `/syllabus` paths from Doc 08 §3 (which
- *   the shared TeacherApi client's `syllabus-typed` calls will be repointed to).
+ * PATH NOTE (converged, T-403):
+ *   This plane was staged under a temporary `/api/v1/teacher/syllabus`
+ *   prefix in T-402 to avoid colliding with the legacy `teacherTaskRoutes()`
+ *   `GET/PATCH /api/v1/teacher/syllabus` (Ktor forbids two handlers on the same
+ *   method+path) — the T-203 `/attendance-typed`→`/attendance` and T-303
+ *   `/gradebook`→`/assessments` staging precedent. T-403 DELETED the legacy
+ *   handler and CONVERGED this plane to the canonical `/api/v1/teacher/syllabus`
+ *   paths from Doc 08 §3; the shared TeacherApi client points here.
  *
  * DTOs are defined server-side (the :server module does NOT depend on :shared)
  * and mirror shared/.../teacher/domain/model/TeacherModels.kt field-for-field
@@ -264,12 +266,11 @@ private suspend fun nodeForUnit(asg: OwnedAssignment, unitId: UUID): SylNodeDto?
 
 fun Route.teacherSyllabusRouting() {
     authenticate("jwt") {
-        // STAGED under `/syllabus-typed` to avoid colliding with the legacy
-        // `teacherTaskRoutes()` `/syllabus` GET+PATCH handlers (Ktor forbids two
-        // handlers on the same method+path). T-403 deletes the legacy handler and
-        // converges this plane to the canonical `/syllabus` paths (Doc 08 §3) —
-        // the T-203/T-303 staging precedent.
-        route("/api/v1/teacher/syllabus-typed") {
+        // CONVERGED (T-403) to the canonical `/api/v1/teacher/syllabus` paths
+        // (Doc 08 §3). The legacy `teacherTaskRoutes()` `/syllabus` GET+PATCH
+        // handlers have been DELETED, so this typed plane now solely OWNS this
+        // method+path space — the T-203/T-303 convergence precedent.
+        route("/api/v1/teacher/syllabus") {
             syllabusLoad()
             syllabusCreateUnit()
             syllabusUpdateUnit()
@@ -279,7 +280,7 @@ fun Route.teacherSyllabusRouting() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/v1/teacher/syllabus-typed?assignmentId=   (units + progress, hierarchical)
+// GET /api/v1/teacher/syllabus?assignmentId=   (units + progress, hierarchical)
 // Doc 08 §3.
 // ─────────────────────────────────────────────────────────────────────────────
 private fun Route.syllabusLoad() {
@@ -307,7 +308,7 @@ private fun Route.syllabusLoad() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// POST /api/v1/teacher/syllabus-typed/units   (create a chapter or topic) — B-SYL-1 fix.
+// POST /api/v1/teacher/syllabus/units   (create a chapter or topic) — B-SYL-1 fix.
 // Doc 08 §3. parentId null → chapter; otherwise a topic under that chapter (the
 // parent must be an owned chapter in the same scope).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -377,7 +378,7 @@ private fun Route.syllabusCreateUnit() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PATCH /api/v1/teacher/syllabus-typed/units/{id}   (rename / reorder)
+// PATCH /api/v1/teacher/syllabus/units/{id}   (rename / reorder)
 // Doc 08 §3.
 // ─────────────────────────────────────────────────────────────────────────────
 private fun Route.syllabusUpdateUnit() {
@@ -419,7 +420,7 @@ private fun Route.syllabusUpdateUnit() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PATCH /api/v1/teacher/syllabus-typed/progress   (the ONE-TAP toggle)
+// PATCH /api/v1/teacher/syllabus/progress   (the ONE-TAP toggle)
 // Doc 08 §3. Idempotent upsert on (unit, section, assignment); stamps typed
 // covered_on (today unless an explicit past date is given) + covered_by.
 // ─────────────────────────────────────────────────────────────────────────────

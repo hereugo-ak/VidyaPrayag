@@ -15,7 +15,6 @@ interface TeacherRepository {
     // T-205: typed, assignment-scoped attendance (Doc 06 §3.8). Replaces the legacy
     // getAttendance(classId, date) / submitAttendance(SubmitAttendanceRequest).
     suspend fun loadAttendance(token: String, assignmentId: String, date: String? = null): NetworkResult<AttendanceLoadResponse>
-    suspend fun getSyllabus(token: String, classId: String, subject: String): NetworkResult<TeacherSyllabusResponse>
     suspend fun getHomework(token: String): NetworkResult<TeacherHomeworkResponse>
 
     // T-402: typed, assignment-scoped syllabus (Doc 08 §1.2/§3). The template/
@@ -23,7 +22,7 @@ interface TeacherRepository {
     // rename/reorder, one-tap covered toggle. Reached pre-scoped by assignmentId.
     suspend fun loadSyllabus(token: String, assignmentId: String): NetworkResult<SyllabusLoadResponse>
     suspend fun createSyllabusUnit(token: String, request: CreateSyllabusUnitRequest): NetworkResult<SyllabusUnitMutationResponse>
-    suspend fun updateSyllabusUnit(token: String, unitId: String, request: UpdateSyllabusUnitRequest): NetworkResult<SyllabusUnitMutationResponse>
+    suspend fun updateSyllabusUnit(token: String, assignmentId: String, unitId: String, request: UpdateSyllabusUnitRequest): NetworkResult<SyllabusUnitMutationResponse>
     suspend fun toggleSyllabusProgress(token: String, request: ToggleSyllabusProgressRequest): NetworkResult<SyllabusUnitMutationResponse>
     suspend fun getProfile(token: String): NetworkResult<TeacherProfileResponse>
 
@@ -48,7 +47,6 @@ interface TeacherRepository {
     // canonical scoped gradebook lifecycle above (listAssessments/createAssessmentV2/
     // getAssessmentMarks/saveAssessmentMarks/publish/unpublish/history) replaces them.
     suspend fun saveAttendance(token: String, request: AttendanceSaveRequest): NetworkResult<AttendanceSaveResponse>
-    suspend fun updateSyllabus(token: String, request: UpdateSyllabusRequest): NetworkResult<ApiResponse<Unit>>
     suspend fun createHomework(token: String, request: CreateHomeworkRequest): NetworkResult<ApiResponse<Unit>>
 
     // RA-44: teacher leave workflow.

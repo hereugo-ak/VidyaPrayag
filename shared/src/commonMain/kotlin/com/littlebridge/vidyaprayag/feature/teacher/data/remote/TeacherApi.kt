@@ -73,39 +73,24 @@ class TeacherApi(
         }
     }
 
-    suspend fun getSyllabus(
-        token: String,
-        classId: String,
-        subject: String,
-    ): NetworkResult<TeacherSyllabusResponse> = safeApiCall {
-        client.get(getUrl("api/v1/teacher/syllabus")) {
-            parameter("class_id", classId)
-            parameter("subject", subject)
-        }
-    }
-
     suspend fun getHomework(token: String): NetworkResult<TeacherHomeworkResponse> = safeApiCall {
         client.get(getUrl("api/v1/teacher/homework"))
     }
 
-    // ── T-402: Typed, scoped syllabus (Doc 08 §1.2/§3) ───────────────────────
+    // ── T-402/T-403: Typed, scoped syllabus (Doc 08 §1.2/§3) ─────────────────
     // The template/progress-split contract. Reached PRE-SCOPED by assignmentId
-    // (X-1) — never a free-text class/subject (contrast the legacy getSyllabus).
-    //
-    // PATH NOTE (staged): the legacy `teacherTaskRoutes()` still binds GET/PATCH
-    // `/api/v1/teacher/syllabus`, and Ktor forbids two handlers on the same
-    // method+path. So this typed plane mounts under a temporary
-    // `/api/v1/teacher/syllabus-typed` prefix until T-403 deletes the legacy
-    // handler and converges to the canonical `/syllabus` paths from Doc 08 §3
-    // (the T-203 `/attendance-typed`→`/attendance` and T-303 `/gradebook`→
-    // `/assessments` convergence precedent).
+    // (X-1) — never a free-text class/subject (contrast the deleted getSyllabus).
+    // T-403 CONVERGED these onto the canonical `/api/v1/teacher/syllabus[/...]`
+    // paths after deleting the legacy `/syllabus` GET+PATCH handler (the T-203
+    // `/attendance-typed`→`/attendance` and T-303 `/gradebook`→`/assessments`
+    // convergence precedent).
 
     /** Units + per-section progress, hierarchical (chapter ▸ topic). Scoped by assignmentId. */
     suspend fun loadSyllabus(
         token: String,
         assignmentId: String,
     ): NetworkResult<SyllabusLoadResponse> = safeApiCall {
-        client.get(getUrl("api/v1/teacher/syllabus-typed")) {
+        client.get(getUrl("api/v1/teacher/syllabus")) {
             parameter("assignmentId", assignmentId)
         }
     }
@@ -115,19 +100,21 @@ class TeacherApi(
         token: String,
         request: CreateSyllabusUnitRequest,
     ): NetworkResult<SyllabusUnitMutationResponse> = safeApiCall {
-        client.post(getUrl("api/v1/teacher/syllabus-typed/units")) {
+        client.post(getUrl("api/v1/teacher/syllabus/units")) {
             contentType(ContentType.Application.Json)
             setBody(request)
         }
     }
 
-    /** Rename / reorder a unit (edit-mode, deliberate). */
+    /** Rename / reorder a unit (edit-mode, deliberate). assignmentId scopes the owned unit. */
     suspend fun updateSyllabusUnit(
         token: String,
+        assignmentId: String,
         unitId: String,
         request: UpdateSyllabusUnitRequest,
     ): NetworkResult<SyllabusUnitMutationResponse> = safeApiCall {
-        client.patch(getUrl("api/v1/teacher/syllabus-typed/units/$unitId")) {
+        client.patch(getUrl("api/v1/teacher/syllabus/units/$unitId")) {
+            parameter("assignmentId", assignmentId)
             contentType(ContentType.Application.Json)
             setBody(request)
         }
@@ -138,7 +125,7 @@ class TeacherApi(
         token: String,
         request: ToggleSyllabusProgressRequest,
     ): NetworkResult<SyllabusUnitMutationResponse> = safeApiCall {
-        client.patch(getUrl("api/v1/teacher/syllabus-typed/progress")) {
+        client.patch(getUrl("api/v1/teacher/syllabus/progress")) {
             contentType(ContentType.Application.Json)
             setBody(request)
         }
@@ -276,16 +263,6 @@ class TeacherApi(
         request: TeacherCheckInRequest,
     ): NetworkResult<CheckInStatusResponse> = safeApiCall {
         client.post(getUrl("api/v1/teacher/checkin")) {
-            contentType(ContentType.Application.Json)
-            setBody(request)
-        }
-    }
-
-    suspend fun updateSyllabus(
-        token: String,
-        request: UpdateSyllabusRequest,
-    ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
-        client.patch(getUrl("api/v1/teacher/syllabus")) {
             contentType(ContentType.Application.Json)
             setBody(request)
         }

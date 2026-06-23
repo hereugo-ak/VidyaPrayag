@@ -24,9 +24,6 @@ class TeacherRepositoryImpl(
     override suspend fun loadAttendance(token: String, assignmentId: String, date: String?): NetworkResult<AttendanceLoadResponse> =
         api.loadAttendance(token, assignmentId, date)
 
-    override suspend fun getSyllabus(token: String, classId: String, subject: String): NetworkResult<TeacherSyllabusResponse> =
-        api.getSyllabus(token, classId, subject)
-
     override suspend fun getHomework(token: String): NetworkResult<TeacherHomeworkResponse> =
         api.getHomework(token)
 
@@ -37,8 +34,8 @@ class TeacherRepositoryImpl(
     override suspend fun createSyllabusUnit(token: String, request: CreateSyllabusUnitRequest): NetworkResult<SyllabusUnitMutationResponse> =
         api.createSyllabusUnit(token, request)
 
-    override suspend fun updateSyllabusUnit(token: String, unitId: String, request: UpdateSyllabusUnitRequest): NetworkResult<SyllabusUnitMutationResponse> =
-        api.updateSyllabusUnit(token, unitId, request)
+    override suspend fun updateSyllabusUnit(token: String, assignmentId: String, unitId: String, request: UpdateSyllabusUnitRequest): NetworkResult<SyllabusUnitMutationResponse> =
+        api.updateSyllabusUnit(token, assignmentId, unitId, request)
 
     override suspend fun toggleSyllabusProgress(token: String, request: ToggleSyllabusProgressRequest): NetworkResult<SyllabusUnitMutationResponse> =
         api.toggleSyllabusProgress(token, request)
@@ -79,9 +76,6 @@ class TeacherRepositoryImpl(
 
     override suspend fun saveAttendance(token: String, request: AttendanceSaveRequest): NetworkResult<AttendanceSaveResponse> =
         api.saveAttendance(token, request)
-
-    override suspend fun updateSyllabus(token: String, request: UpdateSyllabusRequest): NetworkResult<ApiResponse<Unit>> =
-        api.updateSyllabus(token, request)
 
     override suspend fun createHomework(token: String, request: CreateHomeworkRequest): NetworkResult<ApiResponse<Unit>> =
         api.createHomework(token, request)

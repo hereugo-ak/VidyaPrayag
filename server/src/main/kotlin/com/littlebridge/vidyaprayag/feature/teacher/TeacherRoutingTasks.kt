@@ -22,20 +22,16 @@
  */
 package com.littlebridge.vidyaprayag.feature.teacher
 
-import com.littlebridge.vidyaprayag.core.ClassNaming
 import com.littlebridge.vidyaprayag.core.created
 import com.littlebridge.vidyaprayag.feature.notifications.Notify
 import com.littlebridge.vidyaprayag.feature.notifications.NotifyRecipients
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
-import com.littlebridge.vidyaprayag.core.okMessage
 import com.littlebridge.vidyaprayag.core.requireOwnedAssignment
 import com.littlebridge.vidyaprayag.core.requireTeacherContext
-import com.littlebridge.vidyaprayag.core.teacherAssignmentsFor
 import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
 import com.littlebridge.vidyaprayag.db.HomeworkSubmissionsTable
 import com.littlebridge.vidyaprayag.db.HomeworkTable
-import com.littlebridge.vidyaprayag.db.SyllabusUnitsTable
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -47,7 +43,6 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.update
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
@@ -71,27 +66,12 @@ import java.util.UUID
 // TeacherGradebookRouting.kt defines its own Gb* DTOs (the :server module mirrors shared
 // field-for-field).
 
-@Serializable
-data class SyllabusUnitDto(
-    val id: String,
-    val title: String,
-    @SerialName("is_covered") val isCovered: Boolean = false,
-    @SerialName("covered_on") val coveredOn: String? = null,
-)
-
-@Serializable
-data class TeacherSyllabusData(
-    @SerialName("class_name") val className: String,
-    val subject: String,
-    @SerialName("overall_progress") val overallProgress: Float = 0f,
-    val units: List<SyllabusUnitDto> = emptyList(),
-)
-
-@Serializable
-data class UpdateSyllabusRequest(
-    @SerialName("unit_id") val unitId: String,
-    @SerialName("is_covered") val isCovered: Boolean,
-)
+// T-403 (DELETE-don't-patch): the legacy flat syllabus DTOs (SyllabusUnitDto /
+// TeacherSyllabusData / UpdateSyllabusRequest) and the `route("/syllabus")`
+// GET/PATCH handler that mirrored the old class+subject contract are GONE. The
+// typed, hierarchical, assignment-scoped syllabus plane in TeacherSyllabusRouting.kt
+// (T-402/T-403) now OWNS GET/POST/PATCH /api/v1/teacher/syllabus(/units|/progress)
+// and defines its own Syl* DTOs (the :server module mirrors shared field-for-field).
 
 @Serializable
 data class HomeworkDto(
@@ -136,88 +116,13 @@ fun Route.teacherTaskRoutes() {
     // notify path), POST …/{id}/unpublish, and GET …/assessments/history.
 
     // ── Syllabus ────────────────────────────────────────────────────────────
-    route("/syllabus") {
-        // GET ?class_id=&subject= → unit list + overall progress.
-        get {
-            val ctx = call.requireTeacherContext() ?: return@get
-            val classId = call.request.queryParameters["class_id"]
-            val asg = call.requireOwnedAssignment(ctx, classId) ?: return@get
-            // subject param defaults to the assignment's own subject.
-            val subject = call.request.queryParameters["subject"]?.takeIf { it.isNotBlank() } ?: asg.subject
-            val grade = "${asg.className}-${asg.section}"
-
-            val units = dbQuery {
-                // ROOT FIX (ISSUE 1): subject exact, (class, section) normalised.
-                SyllabusUnitsTable.selectAll().where {
-                    (SyllabusUnitsTable.schoolId eq ctx.schoolId) and
-                        (SyllabusUnitsTable.subject eq subject)
-                }.orderBy(SyllabusUnitsTable.position, SortOrder.ASC)
-                    .filter {
-                        ClassNaming.sameClassSection(
-                            it[SyllabusUnitsTable.className], it[SyllabusUnitsTable.section],
-                            asg.className, asg.section
-                        )
-                    }
-            }
-            val dtos = units.map { u ->
-                SyllabusUnitDto(
-                    id = u[SyllabusUnitsTable.id].value.toString(),
-                    title = u[SyllabusUnitsTable.title],
-                    isCovered = u[SyllabusUnitsTable.isCovered],
-                    coveredOn = u[SyllabusUnitsTable.coveredOn]?.toString(),
-                )
-            }
-            val progress = if (dtos.isEmpty()) 0f else dtos.count { it.isCovered }.toFloat() / dtos.size.toFloat()
-            call.ok(
-                TeacherSyllabusData(className = grade, subject = subject, overallProgress = progress, units = dtos),
-                message = "Syllabus loaded",
-            )
-        }
-
-        // PATCH → toggle one unit's covered flag (scoped via its assignment).
-        patch {
-            val ctx = call.requireTeacherContext() ?: return@patch
-            val req = call.receive<UpdateSyllabusRequest>()
-            val unitId = runCatching { UUID.fromString(req.unitId) }.getOrNull()
-            if (unitId == null) {
-                call.fail("A valid unit_id is required", HttpStatusCode.BadRequest, "BAD_UNIT_ID")
-                return@patch
-            }
-
-            val unit = dbQuery {
-                SyllabusUnitsTable.selectAll().where {
-                    (SyllabusUnitsTable.id eq unitId) and
-                        (SyllabusUnitsTable.schoolId eq ctx.schoolId)
-                }.singleOrNull()
-            }
-            if (unit == null) {
-                call.fail("Syllabus unit not found in your school", HttpStatusCode.NotFound, "UNIT_NOT_FOUND")
-                return@patch
-            }
-
-            // Authz: the teacher must be assigned to this unit's class+subject.
-            val owns = teacherAssignmentsFor(ctx).any {
-                it.className == unit[SyllabusUnitsTable.className] &&
-                    it.section == unit[SyllabusUnitsTable.section] &&
-                    it.subject == unit[SyllabusUnitsTable.subject]
-            } || ctx.role == "school_admin" || ctx.role == "admin"
-            if (!owns) {
-                call.fail("You are not assigned to this class/subject", HttpStatusCode.Forbidden, "NOT_ASSIGNED")
-                return@patch
-            }
-
-            dbQuery {
-                SyllabusUnitsTable.update({ SyllabusUnitsTable.id eq unitId }) {
-                    it[isCovered] = req.isCovered
-                    // T-004: syllabus_units.covered_on is now a typed `date` column (nullable).
-                    it[coveredOn] = if (req.isCovered) LocalDate.now() else null
-                    it[coveredBy] = if (req.isCovered) ctx.userId else null
-                    it[updatedAt] = Instant.now()
-                }
-            }
-            call.okMessage(if (req.isCovered) "Unit marked covered" else "Unit marked not covered")
-        }
-    }
+    // REMOVED (T-403): the legacy class+subject `route("/syllabus") { get/patch }`
+    // handler that lived here is DELETED — not patched. It read the flat
+    // syllabus_units table, matched class/section by string normalisation, and
+    // toggled coverage by a free unit_id. The typed, hierarchical, assignment-scoped
+    // plane in TeacherSyllabusRouting.kt now OWNS GET /api/v1/teacher/syllabus
+    // (hierarchical load), POST …/syllabus/units (B-SYL-1), PATCH …/syllabus/units/{id},
+    // and PATCH …/syllabus/progress (one-tap covered toggle). (DELETE-don't-patch law.)
 
     // ── Homework ──────────────────────────────────────────────────────────────
     route("/homework") {

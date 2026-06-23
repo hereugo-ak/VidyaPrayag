@@ -207,11 +207,9 @@ fun TeacherPortalV2(
                         assignmentId = gradebookAssignmentId,
                         scopeHint = gradebookScope,
                     )
-                    "planner" -> StagedTab(
-                        title = "Planner",
-                        body = "Lesson plans, syllabus tracking and homework authoring arrive in the Planner phase.",
-                        icon = VIcons.Edit3,
-                    )
+                    // T-403: the real Planner — class-pick → typed, scoped Syllabus (one-tap
+                    // coverage). Homework sub-tab is still staged until T-406.
+                    "planner" -> PlannerScreen()
                     "profile" -> TeacherProfileScreenV2(onLogout = onLogout)
                 }
             }
@@ -284,43 +282,9 @@ private fun TeacherUpdatePlane(
                     date = "",
                     scopeHint = selectedScope,
                 )
-                "Syllabus" -> TeacherSyllabusScreenV2(classId = selectedClassId, subject = selectedSubject)
+                // T-403: the typed, assignment-scoped syllabus (selectedClassId IS the TSA id).
+                "Syllabus" -> TeacherSyllabusScreenV2(assignmentId = selectedClassId, scopeHint = selectedScope)
                 "Homework" -> TeacherHomeworkScreenV2()
-            }
-        }
-    }
-}
-
-/** An honest "coming in this phase" placeholder for a staged bottom-nav tab. */
-@Composable
-private fun StagedTab(title: String, body: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    val c = VTheme.colors
-    Column(
-        Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp).padding(top = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        Column {
-            VLabel(title)
-            Text(title, style = VTheme.type.h1.colored(c.ink), modifier = Modifier.padding(top = 4.dp))
-        }
-        VCard(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Box(
-                    Modifier.size(44.dp).clip(CircleShape).background(c.accent.copy(alpha = 0.12f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(icon, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(22.dp))
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "Coming soon",
-                        style = VTheme.type.bodyStrong.colored(c.ink).copy(fontWeight = FontWeight.ExtraBold, fontSize = 15.sp),
-                    )
-                    Text(body, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp))
-                }
             }
         }
     }
