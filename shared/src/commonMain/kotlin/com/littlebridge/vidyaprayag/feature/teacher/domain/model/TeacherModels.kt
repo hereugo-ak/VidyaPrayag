@@ -271,6 +271,89 @@ data class AttendanceMarkDto(
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
+// T-202 — Typed, SCOPED attendance load/save (Doc 06 §1.2/§3.8). Supersedes the
+// legacy Teacher*Attendance* DTOs above (which the pre-rebuild Update screen
+// still uses until T-205 deletes that screen). The new contract is keyed by the
+// authorizing assignmentId (Doc 05 binding), carries the typed roster from
+// enrollments, pre-marks approved-leave students (leaveDefaults / source), and
+// reports alreadyMarked + last-marked audit so the screen can load for EDIT
+// rather than silently overwrite (E3). Mirrors server feature/teacher.
+// Status space: present | absent | late | leave (VALID_ATTENDANCE, D-ATT-1).
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class AttendanceLoadResponse(
+    val success: Boolean,
+    val data: AttendanceLoadDto,
+)
+
+@Serializable
+data class AttendanceLoadDto(
+    @SerialName("assignment_id") val assignmentId: String,
+    val date: String,
+    // Human scope label for the wrong-class guard header (e.g. "7B · Mathematics").
+    val scope: String = "",
+    @SerialName("class_name") val className: String = "",
+    val section: String = "",
+    val subject: String = "",
+    // The typed roster, sourced from enrollments active on `date` (E4/E5 honored).
+    val students: List<AttendanceStudentDto> = emptyList(),
+    // True when any mark already exists for (school,date,assignment) → load for EDIT.
+    @SerialName("already_marked") val alreadyMarked: Boolean = false,
+    // Last-marked audit for the "Last marked by {name} at {time}" line (E3).
+    @SerialName("last_marked_by") val lastMarkedBy: String? = null,
+    @SerialName("last_marked_at") val lastMarkedAt: String? = null,
+    // Student ids pre-defaulted to `leave` from an Approved leave covering `date`
+    // (§3.5). They arrive with status=leave/source=leave_auto in `students` too;
+    // this list is the explicit set so the UI can badge them "on approved leave".
+    @SerialName("leave_defaults") val leaveDefaults: List<String> = emptyList(),
+    // Edge-case flags so the screen can warn without re-deriving (§4).
+    @SerialName("is_holiday") val isHoliday: Boolean = false,
+    @SerialName("holiday_name") val holidayName: String? = null,
+    @SerialName("is_cancelled") val isCancelled: Boolean = false,
+    // Back-date window (days) the server will accept a save for; UI disables older.
+    @SerialName("back_date_window_days") val backDateWindowDays: Int = 7,
+)
+
+@Serializable
+data class AttendanceStudentDto(
+    @SerialName("student_id") val studentId: String,
+    val name: String,
+    @SerialName("roll_no") val rollNo: String = "",
+    // Current/default mark for this student on this date. Defaults to present for
+    // a fresh sheet; `leave` when on approved leave; the saved value on edit.
+    val status: String = "present",
+    // Origin of the current status: manual | leave_auto | bulk | biometric.
+    val source: String? = null,
+    @SerialName("enrollment_id") val enrollmentId: String? = null,
+)
+
+@Serializable
+data class AttendanceSaveRequest(
+    @SerialName("assignment_id") val assignmentId: String,
+    val date: String,
+    val marks: List<AttendanceSaveMarkDto> = emptyList(),
+)
+
+@Serializable
+data class AttendanceSaveMarkDto(
+    @SerialName("student_id") val studentId: String,
+    val status: String, // present | absent | late | leave
+)
+
+@Serializable
+data class AttendanceSaveResponse(
+    val success: Boolean,
+    val data: AttendanceSaveResultDto,
+)
+
+@Serializable
+data class AttendanceSaveResultDto(
+    val saved: Int = 0,
+    val date: String,
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Marks — load students for an exam/subject, then submit scores.
 // Backs Teacher.tsx → Update › Marks.
 // ─────────────────────────────────────────────────────────────────────────────

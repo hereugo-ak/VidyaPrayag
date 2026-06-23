@@ -1,5 +1,10 @@
 package com.littlebridge.vidyaprayag
 
+import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AttendanceLoadDto
+import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AttendanceSaveMarkDto
+import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AttendanceSaveRequest
+import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AttendanceSaveResultDto
+import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AttendanceStudentDto
 import com.littlebridge.vidyaprayag.feature.teacher.domain.model.CalendarOverlayDto
 import com.littlebridge.vidyaprayag.feature.teacher.domain.model.CheckInStatusDto
 import com.littlebridge.vidyaprayag.feature.teacher.domain.model.ObligationItemDto
@@ -126,5 +131,82 @@ class TeacherTodayModelsTest {
         assertTrue(encoded.contains("\"unmarked_classes\""))
         val decoded = json.decodeFromString(TeacherObligationsDto.serializer(), encoded)
         assertEquals(withWork, decoded)
+    }
+
+    // ── T-202: typed, scoped attendance load/save (Doc 06 §1.2/§3.8) ───────────
+
+    @Test
+    fun attendanceLoad_roundTrips_withLeaveDefaults() {
+        val original = AttendanceLoadDto(
+            assignmentId = "a1",
+            date = "2026-06-23",
+            scope = "7B · Mathematics",
+            className = "Grade 7",
+            section = "B",
+            subject = "Mathematics",
+            students = listOf(
+                AttendanceStudentDto(studentId = "s1", name = "Asha", rollNo = "1", status = "present"),
+                AttendanceStudentDto(
+                    studentId = "s2",
+                    name = "Bilal",
+                    rollNo = "2",
+                    status = "leave",
+                    source = "leave_auto",
+                    enrollmentId = "e2",
+                ),
+            ),
+            alreadyMarked = true,
+            lastMarkedBy = "Mr. Rao",
+            lastMarkedAt = "2026-06-23T09:05:00Z",
+            leaveDefaults = listOf("s2"),
+            backDateWindowDays = 7,
+        )
+        val encoded = json.encodeToString(AttendanceLoadDto.serializer(), original)
+        // snake_case wire names
+        assertTrue(encoded.contains("\"assignment_id\""))
+        assertTrue(encoded.contains("\"already_marked\""))
+        assertTrue(encoded.contains("\"leave_defaults\""))
+        assertTrue(encoded.contains("\"back_date_window_days\""))
+        val decoded = json.decodeFromString(AttendanceLoadDto.serializer(), encoded)
+        assertEquals(original, decoded)
+    }
+
+    @Test
+    fun attendanceLoad_decodesServerEnvelope_ignoringMessage() {
+        // The server replies { success, message, data:{…} }; the shared response
+        // wrapper has only { success, data } — ignoreUnknownKeys must drop message.
+        val wire = """
+            {"success":true,"message":"Attendance loaded",
+             "data":{"assignment_id":"a1","date":"2026-06-23","students":[],
+                     "already_marked":false,"leave_defaults":[]}}
+        """.trimIndent()
+        val decoded = json.decodeFromString(
+            com.littlebridge.vidyaprayag.feature.teacher.domain.model.AttendanceLoadResponse.serializer(),
+            wire,
+        )
+        assertTrue(decoded.success)
+        assertEquals("a1", decoded.data.assignmentId)
+        assertFalse(decoded.data.alreadyMarked)
+    }
+
+    @Test
+    fun attendanceSave_roundTrips() {
+        val req = AttendanceSaveRequest(
+            assignmentId = "a1",
+            date = "2026-06-23",
+            marks = listOf(
+                AttendanceSaveMarkDto(studentId = "s1", status = "present"),
+                AttendanceSaveMarkDto(studentId = "s2", status = "leave"),
+            ),
+        )
+        val encoded = json.encodeToString(AttendanceSaveRequest.serializer(), req)
+        assertTrue(encoded.contains("\"assignment_id\""))
+        assertTrue(encoded.contains("\"student_id\""))
+        val decoded = json.decodeFromString(AttendanceSaveRequest.serializer(), encoded)
+        assertEquals(req, decoded)
+
+        val result = AttendanceSaveResultDto(saved = 2, date = "2026-06-23")
+        val re = json.encodeToString(AttendanceSaveResultDto.serializer(), result)
+        assertEquals(result, json.decodeFromString(AttendanceSaveResultDto.serializer(), re))
     }
 }
