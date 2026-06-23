@@ -992,35 +992,96 @@ object SyllabusProgressTable : UUIDTable("syllabus_progress", "id") {
  * A homework/assignment authored by a teacher for one class+section+subject.
  * `submittedCount` is derived live from [HomeworkSubmissionsTable] at read
  * time; `totalCount` is the headcount of the target class (computed from
- * `students`). Backs TeacherHomeworkData / CreateHomeworkRequest.
+ * enrollments).
+ *
+ * T-404 (Doc 08 §5.3) — added the TYPED SCOPE spine ([assignmentId]/[classId]/
+ * [subjectId], X-1) so the T-405 backend can enforce allocation via
+ * requireOwnedAssignment instead of free-text class/section/subject (D-HW-1);
+ * an optional [dueTime] so "is it past due?" is real date+time math (D-HW-2);
+ * and the [allowLate] teacher policy that drives the no-submit-past-due rule
+ * (D-HW-4). The legacy display columns ([className]/[section]/[subject]) are
+ * RETAINED (not dropped) so the existing /homework GET+POST handler/screen keep
+ * compiling green until T-405/T-406 repoint them (DELETE-don't-patch); the typed
+ * ids are nullable + best-effort backfilled in migration_017_homework.sql.
  */
 object HomeworkTable : UUIDTable("homework", "id") {
     val schoolId    = uuid("school_id")
     val teacherId   = uuid("teacher_id").nullable()     // FK app_users.id (author)
+    // T-404: typed scope (X-1) — authoritative once backfilled; nullable for
+    // back-compat with rows written before the binding existed.
+    val assignmentId = uuid("assignment_id").nullable() // FK teacher_subject_assignments.id
+    val classId      = uuid("class_id").nullable()      // FK school_classes.id
+    val subjectId    = uuid("subject_id").nullable()    // FK school_subjects.id
+    // Legacy DISPLAY columns (demoted; retained until T-405/T-406 — Rule 4).
     val className   = text("class_name")
     val section     = varchar("section", 8).default("A")
     val subject     = text("subject")
     val title       = text("title")
     val description = text("description").default("")
     val dueDate     = date("due_date")                  // T-004: typed `date` (was varchar12)
+    val dueTime     = time("due_time").nullable()       // T-404: optional cutoff time (D-HW-2)
+    val allowLate   = bool("allow_late").default(false) // T-404: teacher policy (D-HW-4)
     val isActive    = bool("is_active").default(true)
     val createdAt   = timestamp("created_at")
     val updatedAt   = timestamp("updated_at")
 }
 
 /**
+ * T-404 (Doc 08 §5.3) — a file/image attached to a homework (D-HW-3 / B-HW-5).
+ * One homework can carry several. [uploadedBy] is the author (app_users.id).
+ */
+object HomeworkAttachmentsTable : UUIDTable("homework_attachments", "id") {
+    val homeworkId  = uuid("homework_id")               // FK homework.id (CASCADE)
+    val url         = text("url")
+    val filename    = text("filename").default("")
+    val mime        = text("mime").default("")
+    val sizeBytes   = long("size_bytes").default(0)
+    val uploadedBy  = uuid("uploaded_by").nullable()    // FK app_users.id
+    val createdAt   = timestamp("created_at")
+}
+
+/**
  * One student's submission against a [HomeworkTable] row. Used to compute the
- * submitted/total ratio shown on the teacher's homework cards. Unique on
+ * submitted/total ratio AND the submissions board (T-405). Unique on
  * (homework, student).
+ *
+ * T-404 (Doc 08 §5.3) — added a TYPED [studentUuid] FK to students (B-HW-6;
+ * the legacy text [studentId] = student_code is retained for back-compat until
+ * T-405 repoints readers), plus the lifecycle columns the board reads/writes:
+ * [grade], [reviewedBy], [reviewedAt]. `status` now includes 'not_submitted'
+ * (the board mostly derives that set by roster LEFT JOIN at read time, but the
+ * column tolerates a materialised value). [submittedAt] is nullable (a
+ * not-submitted/late-pending row has no submission time).
  */
 object HomeworkSubmissionsTable : UUIDTable("homework_submissions", "id") {
-    val homeworkId  = uuid("homework_id")               // FK homework.id
-    val studentId   = text("student_id")                // students.student_code
-    val status      = varchar("status", 16).default("submitted") // submitted | graded | late
-    val submittedAt = timestamp("submitted_at")
+    val homeworkId  = uuid("homework_id")               // FK homework.id (CASCADE)
+    val studentId   = text("student_id")                // legacy: students.student_code
+    val studentUuid = uuid("student_uuid").nullable()   // T-404: typed FK students.id (B-HW-6)
+    // submitted | late | graded | not_submitted  (T-404 widened to text + check).
+    val status      = text("status").default("submitted")
+    val submittedAt = timestamp("submitted_at").nullable()
+    val grade       = text("grade").nullable()          // T-404: optional grade/feedback
+    val reviewedBy  = uuid("reviewed_by").nullable()    // T-404: FK app_users.id
+    val reviewedAt  = timestamp("reviewed_at").nullable()
     init {
         uniqueIndex("ux_homework_submissions_unique", homeworkId, studentId)
     }
+}
+
+/**
+ * T-404 (Doc 08 §5.3 / §7) — a teacher override of a homework's cutoff (D-HW-5).
+ * [studentId] NULL = a whole-class extension (moves the cutoff for everyone);
+ * non-null = reopen submission for that one student (the "she was sick" case).
+ * Logged with [grantedBy]/[createdAt]/[reason] and reflected on the board.
+ */
+object HomeworkExtensionsTable : UUIDTable("homework_extensions", "id") {
+    val homeworkId  = uuid("homework_id")               // FK homework.id (CASCADE)
+    val studentId   = uuid("student_id").nullable()     // NULL = whole class; else FK students.id
+    val newDueDate  = date("new_due_date")
+    val newDueTime  = time("new_due_time").nullable()
+    val grantedBy   = uuid("granted_by").nullable()     // FK app_users.id
+    val reason      = text("reason").nullable()
+    val createdAt   = timestamp("created_at")
 }
 
 /**

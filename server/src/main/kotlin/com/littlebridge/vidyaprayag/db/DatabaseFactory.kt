@@ -150,6 +150,11 @@ object DatabaseFactory {
         SyllabusProgressTable,
         HomeworkTable,
         HomeworkSubmissionsTable,
+        // T-404 (Doc 08 §5.3): typed homework attachments + teacher cutoff
+        // extensions (migration_017_homework.sql applies these in Supabase
+        // before deploy; AUTO_CREATE_TABLES is OFF in prod). Closes D-HW-1..5.
+        HomeworkAttachmentsTable,
+        HomeworkExtensionsTable,
         TeacherPeriodsTable,
         PeriodExceptionsTable,   // T-101: one-off overrides to the weekly pattern (Doc 05 §2.2)
         // Parent scholarships (audit §4.2/§5.2 — DB-backed, replaces hardcoded list)

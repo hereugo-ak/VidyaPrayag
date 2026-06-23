@@ -88,6 +88,7 @@
 --     \i docs/db/migration_014_attendance.sql
 --     \i docs/db/migration_015_assessments.sql
 --     \i docs/db/migration_016_syllabus.sql
+--     \i docs/db/migration_017_homework.sql
 --     \i scripts/seed-2026-06-07.sql
 --
 -- ----------------------------------------------------------------------------
