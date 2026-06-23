@@ -45,6 +45,9 @@ class TeacherRepositoryImpl(
     override suspend fun checkIn(token: String, request: TeacherCheckInRequest): NetworkResult<CheckInStatusResponse> =
         api.checkIn(token, request)
 
+    override suspend fun getObligations(token: String): NetworkResult<TeacherObligationsResponse> =
+        api.getObligations(token)
+
     override suspend fun submitAttendance(token: String, request: SubmitAttendanceRequest): NetworkResult<ApiResponse<Unit>> =
         api.submitAttendance(token, request)
 

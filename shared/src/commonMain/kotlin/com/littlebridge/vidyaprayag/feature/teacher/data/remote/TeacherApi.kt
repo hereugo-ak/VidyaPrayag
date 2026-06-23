@@ -120,6 +120,16 @@ class TeacherApi(
         }
     }
 
+    // T-107: real "what needs me" obligations for the Today strip (Doc 04 §5.5).
+    // Counts are live + scoped to the teacher's allocation server-side; the strip
+    // shows "all caught up" only when every count is zero (TeacherObligationsDto
+    // .isAllCaughtUp). Replaces the fabricated Today tasks (B-HOME-4).
+    suspend fun getObligations(
+        token: String,
+    ): NetworkResult<TeacherObligationsResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/obligations"))
+    }
+
     // ── Writes ──────────────────────────────────────────────────────────────
 
     suspend fun submitAttendance(
