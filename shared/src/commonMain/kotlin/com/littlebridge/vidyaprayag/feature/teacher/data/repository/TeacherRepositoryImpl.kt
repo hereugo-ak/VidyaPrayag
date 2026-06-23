@@ -39,6 +39,12 @@ class TeacherRepositoryImpl(
     override suspend fun getAssessments(token: String, classId: String): NetworkResult<TeacherAssessmentsResponse> =
         api.getAssessments(token, classId)
 
+    override suspend fun getCheckInStatus(token: String, date: String?): NetworkResult<CheckInStatusResponse> =
+        api.getCheckInStatus(token, date)
+
+    override suspend fun checkIn(token: String, request: TeacherCheckInRequest): NetworkResult<CheckInStatusResponse> =
+        api.checkIn(token, request)
+
     override suspend fun submitAttendance(token: String, request: SubmitAttendanceRequest): NetworkResult<ApiResponse<Unit>> =
         api.submitAttendance(token, request)
 

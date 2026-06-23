@@ -97,6 +97,9 @@ kotlin {
             implementation(libs.androidx.core.splashscreen)
             implementation(libs.koin.android)
             implementation(libs.koin.androidx.compose)
+            // T-106c: AndroidX BiometricPrompt (+ device-credential fallback) for
+            // the teacher self check-in biometric ladder (Doc 06 §2.1).
+            implementation(libs.androidx.biometric)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)

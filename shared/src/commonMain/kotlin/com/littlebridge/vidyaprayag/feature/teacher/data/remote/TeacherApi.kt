@@ -109,6 +109,17 @@ class TeacherApi(
         client.get(getUrl("api/v1/teacher/profile"))
     }
 
+    // T-106c: teacher self check-in status for a date (default today). Powers the
+    // Today greeting band's amber→green pill (Doc 06 §2.3, §2.4 server-stamped).
+    suspend fun getCheckInStatus(
+        token: String,
+        date: String? = null,
+    ): NetworkResult<CheckInStatusResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/checkin")) {
+            if (date != null) parameter("date", date)
+        }
+    }
+
     // ── Writes ──────────────────────────────────────────────────────────────
 
     suspend fun submitAttendance(
@@ -126,6 +137,20 @@ class TeacherApi(
         request: SubmitMarksRequest,
     ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
         client.post(getUrl("api/v1/teacher/marks")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    // T-106c: record the teacher's self check-in. Idempotent per (teacher, date);
+    // `method` is the biometric-ladder rung that succeeded (biometric|pin|manual,
+    // Doc 06 §2.1). The server stamps the authoritative timestamp and echoes the
+    // (possibly pre-existing) status back in `data`.
+    suspend fun checkIn(
+        token: String,
+        request: TeacherCheckInRequest,
+    ): NetworkResult<CheckInStatusResponse> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/checkin")) {
             contentType(ContentType.Application.Json)
             setBody(request)
         }

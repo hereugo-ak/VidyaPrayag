@@ -118,6 +118,12 @@ private fun TodayContent(
             }
         }
 
+        // ── Self check-in band (biometric ladder + manual fallback) ──────────
+        // T-106c / Doc 04 §5.1: record the teacher's own presence first thing.
+        // Owns its own VM; the device biometric prompt is platform-abstracted and
+        // never a hard gate (manual confirm always available).
+        TeacherCheckInCard(modifier = Modifier.fillMaxWidth())
+
         // ── The live schedule card (3 faces) ────────────────────────────────
         VStateHost(
             loading = state.isLoading,

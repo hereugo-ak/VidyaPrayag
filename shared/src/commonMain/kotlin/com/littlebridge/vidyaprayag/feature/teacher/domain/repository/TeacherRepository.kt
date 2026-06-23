@@ -19,6 +19,10 @@ interface TeacherRepository {
     suspend fun getProfile(token: String): NetworkResult<TeacherProfileResponse>
     suspend fun getAssessments(token: String, classId: String): NetworkResult<TeacherAssessmentsResponse>
 
+    // T-106c: teacher self check-in (Doc 06 §2).
+    suspend fun getCheckInStatus(token: String, date: String? = null): NetworkResult<CheckInStatusResponse>
+    suspend fun checkIn(token: String, request: TeacherCheckInRequest): NetworkResult<CheckInStatusResponse>
+
     // Writes
     suspend fun submitAttendance(token: String, request: SubmitAttendanceRequest): NetworkResult<ApiResponse<Unit>>
     suspend fun submitMarks(token: String, request: SubmitMarksRequest): NetworkResult<ApiResponse<Unit>>
