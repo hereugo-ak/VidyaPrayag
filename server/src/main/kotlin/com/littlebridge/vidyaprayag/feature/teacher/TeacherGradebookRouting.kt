@@ -256,13 +256,140 @@ private fun countEntered(assessmentId: UUID): Int =
         row[AssessmentMarksTable.isAbsent] || row[AssessmentMarksTable.marks] != null
     }
 
+@Serializable
+data class GbTrendPointDto(
+    @SerialName("assessment_id") val assessmentId: String,
+    val name: String,
+    @SerialName("exam_date") val examDate: String? = null,
+    @SerialName("max_marks") val maxMarks: Int = 100,
+    val average: Float? = null,
+    @SerialName("pass_rate") val passRate: Float? = null,
+    @SerialName("entered_count") val enteredCount: Int = 0,
+    @SerialName("roster_count") val rosterCount: Int = 0,
+)
+
+@Serializable
+data class GbMarkBucketDto(
+    val label: String,
+    val count: Int = 0,
+)
+
+@Serializable
+data class GbAssessmentHistoryDto(
+    @SerialName("assignment_id") val assignmentId: String? = null,
+    @SerialName("class_name") val className: String = "",
+    val subject: String = "",
+    val timeline: List<GbTrendPointDto> = emptyList(),
+    val distribution: List<GbMarkBucketDto> = emptyList(),
+)
+
 fun Route.teacherGradebookRouting() {
     authenticate("jwt") {
         route("/api/v1/teacher/gradebook") {
+            assessmentHistory()        // literal /assessments/history before {id}
             assessmentListAndCreate()
             assessmentMarksLoadAndSave()
             assessmentPublishUnpublish()
         }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /gradebook/assessments/history?assignmentId=   (server-aggregated trends)
+// Doc 07 §6 — class average per published assessment (timeline) + the latest
+// assessment's score distribution (histogram). Everything computed server-side
+// in ONE transaction (no client N+1; contrast the B-CLS aggregate bugs).
+// ─────────────────────────────────────────────────────────────────────────────
+private fun Route.assessmentHistory() {
+    get("/assessments/history") {
+        val ctx = call.requireTeacherContext() ?: return@get
+        val assignmentParam = call.request.queryParameters["assignmentId"]
+            ?: call.request.queryParameters["assignment_id"]
+        val asg = call.requireOwnedAssignment(ctx, assignmentParam) ?: return@get
+
+        val rosterCount = enrollmentsFor(asg).size
+
+        val data = dbQuery {
+            // Published assessments for this assignment, oldest → newest (timeline order).
+            // History is built from PUBLISHED assessments only (Doc 07 §6 "publish a
+            // couple of assessments to see trends") — drafts/pending are still being
+            // entered and would skew the trend.
+            val published = AssessmentsTable.selectAll().where {
+                (AssessmentsTable.schoolId eq ctx.schoolId) and
+                    (AssessmentsTable.assignmentId eq asg.assignmentId) and
+                    (AssessmentsTable.isActive eq true) and
+                    (AssessmentsTable.status eq GbStatus.PUBLISHED)
+            }.toList()
+                // Oldest first; undated rows sink to the end by created order.
+                .sortedWith(
+                    compareBy(
+                        { it[AssessmentsTable.examDate]?.toString() ?: "9999-12-31" },
+                        { it[AssessmentsTable.createdAt] },
+                    ),
+                )
+
+            val timeline = published.map { a ->
+                val aId = a[AssessmentsTable.id].value
+                val max = a[AssessmentsTable.maxMarks]
+                val passMark = a[AssessmentsTable.passMarks]
+                val marks = AssessmentMarksTable.selectAll().where {
+                    AssessmentMarksTable.assessmentId eq aId
+                }.toList()
+                // Present (non-absent) numeric scores only — AB is excluded from the
+                // average (Doc 07 §5.2 / M3).
+                val scored = marks.filter { !it[AssessmentMarksTable.isAbsent] }
+                    .mapNotNull { it[AssessmentMarksTable.marks] }
+                val avg = if (scored.isNotEmpty()) (scored.sum() / scored.size).toFloat() else null
+                val passRate = if (passMark != null && scored.isNotEmpty()) {
+                    scored.count { it >= passMark.toDouble() }.toFloat() / scored.size
+                } else null
+                val entered = marks.count { it[AssessmentMarksTable.isAbsent] || it[AssessmentMarksTable.marks] != null }
+                GbTrendPointDto(
+                    assessmentId = aId.toString(),
+                    name = a[AssessmentsTable.name],
+                    examDate = a[AssessmentsTable.examDate]?.toString(),
+                    maxMarks = max,
+                    average = avg,
+                    passRate = passRate,
+                    enteredCount = entered,
+                    rosterCount = rosterCount,
+                )
+            }
+
+            // Distribution of the most-recent published assessment (difficulty gauge).
+            // Five fixed percentage bands so two assessments are comparable.
+            val distribution = published.lastOrNull()?.let { latest ->
+                val aId = latest[AssessmentsTable.id].value
+                val max = latest[AssessmentsTable.maxMarks].toDouble().coerceAtLeast(1.0)
+                val scored = AssessmentMarksTable.selectAll().where {
+                    AssessmentMarksTable.assessmentId eq aId
+                }.filter { !it[AssessmentMarksTable.isAbsent] }
+                    .mapNotNull { it[AssessmentMarksTable.marks] }
+                val bands = listOf("0–24%", "25–49%", "50–74%", "75–99%", "100%")
+                val counts = IntArray(bands.size)
+                for (m in scored) {
+                    val pct = (m / max) * 100.0
+                    val idx = when {
+                        pct >= 100.0 -> 4
+                        pct >= 75.0 -> 3
+                        pct >= 50.0 -> 2
+                        pct >= 25.0 -> 1
+                        else -> 0
+                    }
+                    counts[idx]++
+                }
+                bands.mapIndexed { i, label -> GbMarkBucketDto(label = label, count = counts[i]) }
+            } ?: emptyList()
+
+            GbAssessmentHistoryDto(
+                assignmentId = asg.assignmentId.toString(),
+                className = "${asg.className}-${asg.section}".trim('-'),
+                subject = asg.subject,
+                timeline = timeline,
+                distribution = distribution,
+            )
+        }
+        call.ok(data, message = "Assessment history loaded")
     }
 }
 
