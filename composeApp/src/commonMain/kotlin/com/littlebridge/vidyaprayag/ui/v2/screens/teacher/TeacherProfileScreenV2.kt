@@ -7,6 +7,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +36,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -152,6 +157,19 @@ private fun TeacherProfileContent(
     Column(
         modifier
             .fillMaxSize()
+            // Same aurora wash as the parents portal home — a barely-there lavender whisper
+            // top-left over the website background token, so Profile reads as part of the
+            // same surface (not a floating dialog).
+            .background(c.background)
+            .drawBehind {
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(c.accent.copy(alpha = 0.04f), Color.Transparent),
+                        center = Offset(size.width * 0.12f, size.height * 0.02f),
+                        radius = size.width * 0.9f,
+                    ),
+                )
+            }
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
             .statusBarsPadding()
@@ -171,23 +189,20 @@ private fun TeacherProfileContent(
         ) {
             val me = state.profile!!
 
-            // ── 1. Identity ──────────────────────────────────────────────────
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                VAvatar(name = me.name, src = me.photoUrl, size = 88.dp, ring = true)
-                Text(me.name, style = VTheme.type.h2.colored(c.ink), modifier = Modifier.padding(top = 12.dp))
-                Text(me.username, style = VTheme.type.dataSm.colored(c.ink2).copy(fontSize = 12.sp))
-                if (me.schoolName.isNotBlank()) {
-                    Text(me.schoolName, style = VTheme.type.caption.colored(c.ink3))
-                }
-                if (me.subjects.isNotEmpty()) {
-                    Spacer(Modifier.height(10.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        me.subjects.forEach { VBadge(text = it, tone = VBadgeTone.Accent) }
-                    }
-                }
-            }
+            // ── 1. Identity hero ─────────────────────────────────────────────
+            // A proper flagship card (parent-grade) so the identity never reads as a bare
+            // floating block: avatar ring + name + username + school, then subject and class
+            // chips. The card framing + aurora behind it is what makes this feel premium.
+            ProfileIdentityHero(
+                name = me.name,
+                username = me.username,
+                schoolName = me.schoolName,
+                photoUrl = me.photoUrl,
+                subjects = me.subjects,
+                classes = me.classes,
+            )
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(20.dp))
             ProfileScheduleSection(schedule = schedule, onRetry = onRetrySchedule)
             Spacer(Modifier.height(20.dp))
             ProfileLeaveSection(
@@ -210,6 +225,67 @@ private fun TeacherProfileContent(
                 onLogout = { showLogoutConfirm = true },
             )
         }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. Identity hero — a flagship card (parent-grade) so the teacher's identity reads
+//    as a premium surface, never a bare floating block.
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun ProfileIdentityHero(
+    name: String,
+    username: String,
+    schoolName: String,
+    photoUrl: String?,
+    subjects: List<String>,
+    classes: List<String>,
+) {
+    val c = VTheme.colors
+    VCard(padding = 20.dp) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            VAvatar(name = name, src = photoUrl, size = 72.dp, ring = true)
+            Column(Modifier.weight(1f)) {
+                Text(name.ifBlank { "Teacher" }, style = VTheme.type.h2.colored(c.ink))
+                if (username.isNotBlank()) {
+                    Text("@$username", style = VTheme.type.dataSm.colored(c.ink2).copy(fontSize = 12.sp))
+                }
+                if (schoolName.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Icon(VIcons.School, contentDescription = null, tint = c.ink3, modifier = Modifier.size(13.dp))
+                        Text(schoolName, style = VTheme.type.caption.colored(c.ink3))
+                    }
+                }
+            }
+        }
+
+        if (subjects.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            Text("SUBJECTS", style = VTheme.type.label.colored(c.ink3))
+            Spacer(Modifier.height(8.dp))
+            ChipFlow(items = subjects, tone = VBadgeTone.Accent)
+        }
+
+        if (classes.isNotEmpty()) {
+            Spacer(Modifier.height(14.dp))
+            Text("CLASSES", style = VTheme.type.label.colored(c.ink3))
+            Spacer(Modifier.height(8.dp))
+            ChipFlow(items = classes, tone = VBadgeTone.Neutral)
+        }
+    }
+}
+
+/** A wrapping row of chips (subjects / classes) — wraps to multiple lines instead of clipping. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ChipFlow(items: List<String>, tone: VBadgeTone) {
+    FlowRow(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        items.forEach { VBadge(text = it, tone = tone) }
     }
 }
 
