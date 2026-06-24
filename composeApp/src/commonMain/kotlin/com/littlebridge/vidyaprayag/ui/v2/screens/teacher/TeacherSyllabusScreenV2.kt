@@ -27,7 +27,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -311,7 +310,7 @@ private fun CoverToggle(covered: Boolean, updating: Boolean, isChapter: Boolean)
         contentAlignment = Alignment.Center,
     ) {
         if (covered) {
-            Icon(VIcons.Check, contentDescription = null, tint = Color(0xFF080808), modifier = Modifier.size(if (isChapter) 16.dp else 14.dp))
+            Icon(VIcons.Check, contentDescription = null, tint = c.successInk, modifier = Modifier.size(if (isChapter) 16.dp else 14.dp))
         }
     }
 }
