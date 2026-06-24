@@ -77,97 +77,92 @@ fun TeacherHeader(
             .fillMaxWidth()
             .background(c.card)
             .statusBarsPadding()
-            .padding(horizontal = 20.dp)
-            .padding(top = 16.dp, bottom = 10.dp),
+            .padding(horizontal = 16.dp)
+            .padding(top = 14.dp, bottom = 10.dp),
     ) {
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            // ── Greeting + school (or class-context chip) ────────────────────────
-            Column(Modifier.weight(1f).padding(end = 12.dp)) {
-                Text(
-                    greeting,
-                    style = VTheme.type.caption.colored(c.accentDeep).copy(fontSize = 11.sp),
-                )
-                Text(
-                    firstName,
-                    style = VTheme.type.h2.colored(c.ink),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 1.dp),
-                )
-                if (classContext != null && classContext.isNotBlank()) {
-                    // The class-context chip (operational tabs). Replaces the old shared picker:
-                    // it shows the current scope and, when tappable, changes it in one tap.
-                    Spacer(Modifier.height(6.dp))
-                    val chipInteraction = remember { MutableInteractionSource() }
-                    Row(
-                        Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(c.accentTint)
-                            .let { base ->
-                                if (onChangeScope != null) {
-                                    base.clickable(
-                                        interactionSource = chipInteraction,
-                                        indication = null,
-                                    ) { onChangeScope() }
-                                } else base
-                            }
-                            .padding(start = 10.dp, end = if (onChangeScope != null) 8.dp else 12.dp, top = 5.dp, bottom = 5.dp)
-                            .semantics {
-                                contentDescription = "Current class: $classContext" +
-                                    if (onChangeScope != null) ". Tap to change class." else ""
-                            },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Icon(VIcons.Users, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(13.dp))
-                        Text(
-                            classContext,
-                            style = VTheme.type.label.colored(c.accentDeep).copy(fontSize = 11.sp),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.widthIn(max = 180.dp),
-                        )
-                        if (onChangeScope != null) {
-                            Icon(VIcons.ChevronDown, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(14.dp))
-                        }
-                    }
-                } else if (schoolName.isNotBlank()) {
+            // ── Premium identity chip (avatar + greeting + name) — mirrors the parents
+            //    portal header so a parent and a teacher perceive one product. The whole
+            //    chip is the tap target into Profile.
+            val idInteraction = remember { MutableInteractionSource() }
+            Row(
+                Modifier
+                    .weight(1f)
+                    .padding(end = 10.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(c.cream)
+                    .clickable(interactionSource = idInteraction, indication = null) { onOpenProfile() }
+                    .padding(start = 6.dp, end = 14.dp, top = 6.dp, bottom = 6.dp)
+                    .semantics { contentDescription = "Open profile" },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                VAvatar(name = teacherName.ifBlank { "Teacher" }, src = photoUrl, size = 40.dp, ring = true)
+                Column(Modifier.weight(1f)) {
                     Text(
-                        schoolName,
-                        style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
+                        greeting,
+                        style = VTheme.type.caption.colored(c.accentDeep).copy(fontSize = 10.5.sp),
+                        maxLines = 1,
+                    )
+                    Text(
+                        firstName,
+                        style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 16.sp, fontWeight = FontWeight.ExtraBold),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 2.dp),
                     )
                 }
             }
 
-            // ── Icon cluster: notifications · account ────────────────────────────
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box {
-                    HeaderIconButton(VIcons.Bell, "Notifications", onOpenNotifications)
-                    // Real unread dot only — never a permanent cry-wolf indicator.
-                    if (unreadCount > 0) {
-                        VStatusDot(color = c.dangerInk, size = 7.dp, modifier = Modifier.align(Alignment.TopEnd).padding(7.dp))
-                    }
-                }
-                val avatarInteraction = remember { MutableInteractionSource() }
-                Box(
-                    Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .clickable(interactionSource = avatarInteraction, indication = null) { onOpenProfile() }
-                        .semantics { contentDescription = "Open profile" },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    VAvatar(name = teacherName.ifBlank { "Teacher" }, src = photoUrl, size = 38.dp, ring = true)
+            // ── Icon cluster: notifications only (account lives in the identity chip) ─
+            Box {
+                HeaderIconButton(VIcons.Bell, "Notifications", onOpenNotifications)
+                // Real unread dot only — never a permanent cry-wolf indicator.
+                if (unreadCount > 0) {
+                    VStatusDot(color = c.dangerInk, size = 7.dp, modifier = Modifier.align(Alignment.TopEnd).padding(7.dp))
                 }
             }
         }
+
+        // ── Optional class-context chip (operational tabs only) — full-width row below
+        //    the identity, so it never crowds the name. Tappable to change scope.
+        if (classContext != null && classContext.isNotBlank()) {
+            Spacer(Modifier.height(10.dp))
+            val chipInteraction = remember { MutableInteractionSource() }
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(c.accentTint)
+                    .let { base ->
+                        if (onChangeScope != null) {
+                            base.clickable(interactionSource = chipInteraction, indication = null) { onChangeScope() }
+                        } else base
+                    }
+                    .padding(start = 12.dp, end = if (onChangeScope != null) 10.dp else 14.dp, top = 6.dp, bottom = 6.dp)
+                    .semantics {
+                        contentDescription = "Current class: $classContext" +
+                            if (onChangeScope != null) ". Tap to change class." else ""
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(VIcons.Users, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(14.dp))
+                Text(
+                    classContext,
+                    style = VTheme.type.label.colored(c.accentDeep).copy(fontSize = 11.sp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 220.dp),
+                )
+                if (onChangeScope != null) {
+                    Icon(VIcons.ChevronDown, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(15.dp))
+                }
+            }
+        }
+
         Spacer(Modifier.height(10.dp))
         VDivider()
     }

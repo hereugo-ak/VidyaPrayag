@@ -154,7 +154,7 @@ private fun TeacherProfileContent(
         icon = VIcons.AlertTriangle,
     )
 
-    Column(
+    Box(
         modifier
             .fillMaxSize()
             // Same aurora wash as the parents portal home — a barely-there lavender whisper
@@ -169,62 +169,95 @@ private fun TeacherProfileContent(
                         radius = size.width * 0.9f,
                     ),
                 )
-            }
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
-            .statusBarsPadding()
-            .imePadding()
-            .navigationBarsPadding()
-            .padding(top = 16.dp, bottom = 140.dp),
+            },
     ) {
-        VStateHost(
-            loading = state.isLoading,
-            error = state.error,
-            isEmpty = state.profile == null,
-            emptyTitle = "Profile unavailable",
-            emptyBody = "We couldn't load your profile. Please try again.",
-            emptyIcon = VIcons.User,
-            onRetry = onRetry,
-            skeleton = { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonProfile() },
-        ) {
-            val me = state.profile!!
+        // CRITICAL LAYOUT FIX (carried from ParentHomeScreenV2): the body used to live inside
+        // VStateHost, whose loading leg drives an AnimatedContent. AnimatedContent lays out
+        // Box-like (it STACKS children to crossfade), and nested inside a verticalScroll (an
+        // UNBOUNDED-height parent) the settled Content child COLLAPSED — every section painted
+        // on top of each other at y=0, so only the last (Settings) card was visible floating in
+        // dead space (exactly the screenshot bug). The state legs are now resolved OUTSIDE the
+        // scroll in bounded centered Boxes, and the real content is a plain verticalScroll Column
+        // with NO AnimatedContent in its parentage.
+        val me = state.profile
+        when {
+            state.isLoading && me == null ->
+                ProfileCenterState { com.littlebridge.vidyaprayag.ui.v2.screens.SkeletonProfile() }
 
-            // ── 1. Identity hero ─────────────────────────────────────────────
-            // A proper flagship card (parent-grade) so the identity never reads as a bare
-            // floating block: avatar ring + name + username + school, then subject and class
-            // chips. The card framing + aurora behind it is what makes this feel premium.
-            ProfileIdentityHero(
-                name = me.name,
-                username = me.username,
-                schoolName = me.schoolName,
-                photoUrl = me.photoUrl,
-                subjects = me.subjects,
-                classes = me.classes,
-            )
+            state.error != null && me == null ->
+                ProfileCenterState {
+                    com.littlebridge.vidyaprayag.ui.v2.screens.VErrorState(message = state.error ?: "", onRetry = onRetry)
+                }
 
-            Spacer(Modifier.height(20.dp))
-            ProfileScheduleSection(schedule = schedule, onRetry = onRetrySchedule)
-            Spacer(Modifier.height(20.dp))
-            ProfileLeaveSection(
-                leave = leave,
-                applyResult = applyResult,
-                onRetry = onRetryLeave,
-                onApply = onApplyLeave,
-                onClearApply = onClearApply,
-            )
-            Spacer(Modifier.height(20.dp))
-            ProfileSettingsSection(
-                phone = me.phone,
-                email = me.email,
-                themeName = themeName,
-                passwordResult = passwordResult,
-                onChangePassword = onChangePassword,
-                onClearPassword = onClearPassword,
-                onSetTheme = onSetTheme,
-                onOpenLeaveInbox = onOpenLeaveInbox,
-                onLogout = { showLogoutConfirm = true },
-            )
+            me == null ->
+                ProfileCenterState {
+                    com.littlebridge.vidyaprayag.ui.v2.components.VEmptyState(
+                        icon = VIcons.User,
+                        title = "Profile unavailable",
+                        body = "We couldn't load your profile. Please try again.",
+                    )
+                }
+
+            else -> {
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp)
+                        .statusBarsPadding()
+                        .imePadding()
+                        .navigationBarsPadding()
+                        .padding(top = 16.dp, bottom = 140.dp),
+                ) {
+                    // ── 1. Identity hero ─────────────────────────────────────────
+                    ProfileIdentityHero(
+                        name = me.name,
+                        username = me.username,
+                        schoolName = me.schoolName,
+                        photoUrl = me.photoUrl,
+                        subjects = me.subjects,
+                        classes = me.classes,
+                    )
+
+                    Spacer(Modifier.height(20.dp))
+                    ProfileScheduleSection(schedule = schedule, onRetry = onRetrySchedule)
+                    Spacer(Modifier.height(20.dp))
+                    ProfileLeaveSection(
+                        leave = leave,
+                        applyResult = applyResult,
+                        onRetry = onRetryLeave,
+                        onApply = onApplyLeave,
+                        onClearApply = onClearApply,
+                    )
+                    Spacer(Modifier.height(20.dp))
+                    ProfileSettingsSection(
+                        phone = me.phone,
+                        email = me.email,
+                        themeName = themeName,
+                        passwordResult = passwordResult,
+                        onChangePassword = onChangePassword,
+                        onClearPassword = onClearPassword,
+                        onSetTheme = onSetTheme,
+                        onOpenLeaveInbox = onOpenLeaveInbox,
+                        onLogout = { showLogoutConfirm = true },
+                    )
+                }
+            }
         }
+    }
+}
+
+/** Bounded, centered state slot — fills the canvas once, OUTSIDE any scroll (the layout fix). */
+@Composable
+private fun ProfileCenterState(content: @Composable () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 24.dp, vertical = 48.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
     }
 }
 
