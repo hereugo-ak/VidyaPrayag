@@ -102,15 +102,44 @@ fun TeacherGradebookScreenV2(
 ) {
     val state by viewModel.state.collectAsStateV2()
 
-    LaunchedEffect(assignmentId) {
-        if (assignmentId.isNotBlank()) viewModel.load(assignmentId, scopeHint)
+    // When reached from the dock with no pre-scoped class (the Gradebook tab is a browse
+    // entry, not always a deep-link), let the teacher PICK a class here — same contract as
+    // PlannerScreen — instead of dead-ending on a "open it from Today" empty state. A real
+    // deep-link still wins: a non-blank [assignmentId] pins the scope and hides the picker.
+    var pickedClassId by remember { mutableStateOf("") }
+    var pickedScope by remember { mutableStateOf("") }
+    val effectiveAssignmentId = assignmentId.ifBlank { pickedClassId }
+    val effectiveScope = scopeHint.ifBlank { pickedScope }
+
+    LaunchedEffect(effectiveAssignmentId) {
+        if (effectiveAssignmentId.isNotBlank()) viewModel.load(effectiveAssignmentId, effectiveScope)
     }
 
+    // No external scope AND nothing picked yet → front the class picker (not a dead end).
+    if (assignmentId.isBlank() && pickedClassId.isBlank()) {
+        Column(modifier.fillMaxSize().background(VTheme.colors.background)) {
+            ScopeGuardHeader(scope = "Gradebook", subtitle = "Pick a class to manage its assessments")
+            TeacherClassPicker(
+                selectedClassId = pickedClassId,
+                onSelectClass = { cls ->
+                    pickedClassId = cls.assignmentId
+                    pickedScope = "${cls.className} · ${cls.subject}"
+                },
+            )
+        }
+        return
+    }
+
+    // A class is in scope (either deep-linked or just picked above). Render the gradebook
+    // against the effective scope. A locally-picked scope can be changed with the "Change
+    // class" affordance in the list header.
     when (state.mode) {
         GradebookMode.List -> GradebookListContent(
             state = state,
-            hasScope = assignmentId.isNotBlank(),
-            scopeHint = scopeHint,
+            hasScope = effectiveAssignmentId.isNotBlank(),
+            scopeHint = effectiveScope,
+            canRescope = assignmentId.isBlank(),
+            onRescope = { pickedClassId = ""; pickedScope = "" },
             onSetName = viewModel::setCreateName,
             onSetType = viewModel::setCreateType,
             onSetMax = viewModel::setCreateMaxMarks,
@@ -135,7 +164,7 @@ fun TeacherGradebookScreenV2(
         )
         GradebookMode.History -> GradebookHistoryContent(
             state = state,
-            scopeHint = scopeHint,
+            scopeHint = effectiveScope,
             onBack = viewModel::backFromHistory,
             onToggleCompare = viewModel::toggleCompare,
             onRetry = viewModel::retryHistory,
@@ -153,6 +182,8 @@ private fun GradebookListContent(
     state: TeacherGradebookState,
     hasScope: Boolean,
     scopeHint: String,
+    canRescope: Boolean,
+    onRescope: () -> Unit,
     onSetName: (String) -> Unit,
     onSetType: (String) -> Unit,
     onSetMax: (String) -> Unit,
@@ -176,6 +207,20 @@ private fun GradebookListContent(
     Column(modifier.fillMaxSize().padding(horizontal = 20.dp).padding(top = 12.dp)) {
 
         ScopeGuardHeader(scope = headerScope.ifBlank { "Gradebook" }, subtitle = "Assessments & marks")
+        if (canRescope && hasScope) {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(onClick = onRescope)
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(VIcons.ChevronLeft, contentDescription = null, tint = c.accent, modifier = Modifier.size(16.dp))
+                Text("Change class", style = VTheme.type.labelStrong.colored(c.accent))
+            }
+        }
         Spacer(Modifier.height(12.dp))
 
         VStateHost(
