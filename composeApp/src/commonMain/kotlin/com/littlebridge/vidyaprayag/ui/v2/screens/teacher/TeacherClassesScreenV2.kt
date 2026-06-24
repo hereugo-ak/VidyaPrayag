@@ -23,6 +23,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -159,6 +163,18 @@ private fun TeacherClassesContent(
     Column(
         modifier
             .fillMaxSize()
+            // Same lavender aurora wash as the parents portal browse surfaces (Home /
+            // Academics) so the Classes tab reads as the same product, not a flat list.
+            .background(c.background)
+            .drawBehind {
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(c.accent.copy(alpha = 0.04f), Color.Transparent),
+                        center = Offset(size.width * 0.12f, size.height * 0.02f),
+                        radius = size.width * 0.9f,
+                    ),
+                )
+            }
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
             .padding(top = 24.dp, bottom = 140.dp),
