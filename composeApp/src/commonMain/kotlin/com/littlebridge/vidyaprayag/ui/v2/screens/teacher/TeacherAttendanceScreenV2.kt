@@ -1,5 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -7,14 +9,19 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,7 +31,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +42,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.AttendanceStatus
@@ -43,10 +53,10 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VDatePicker
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
+import com.littlebridge.vidyaprayag.ui.v2.components.VInput
 import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
@@ -54,28 +64,30 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * TeacherAttendanceScreenV2 — T-205 (Doc 06 §3, Doc 10 §6.3). The clean rebuild of
- * the attendance plane, reached PRE-SCOPED from a Today/Classes CTA via [assignmentId]
- * (Doc 05 binding) — there is no shared class picker (kills F-ATT-1).
+ * TeacherAttendanceScreenV2 — T-205 (Doc 06 §3, Doc 10 §6.3). REDESIGNED (2026-06) around the
+ * real-world flow: **most students are present, so you tap only the exceptions.**
  *
- * Honors the spec end-to-end:
- *  - **Wrong-class guard header** (E15): a prominent "{class} · {subject} · {date}"
- *    band so Aanya always knows which class she's in.
- *  - **Enabled, correctable date** (fixes F-ATT-2): a real [VDatePicker]; the back-date
- *    window the server accepts is advertised; a blocked save returns a clear message.
- *  - **4-state pills** P/A/L/Lv (Doc 06 §3.4, D-ATT-1) at ≥48dp, color + LETTER encoded
- *    (never hue-only — Doc 10 §11), with semantic tokens (success/danger/warning/accentSoft).
- *  - **Leave defaults** (§3.5): approved-leave students arrive pre-set to leave and are
- *    badged; still overridable.
- *  - **Bulk "Mark all present"** (§3.6) preserving manual + leave exceptions.
- *  - **Running counter** (§3.6): "P · A · L · Lv · unmarked", always visible (sticky).
- *  - **Load-for-EDIT audit** (E3): "Last marked by … at …".
- *  - **Holiday warning** (E1) when the date is a published holiday.
- *  - **Result-driven save** (§3.7) via [VButton] loading/success; no auto-publish.
+ * The old screen made every student a tall card with four stacked full-width pills, so a
+ * 40-student class meant ~40 long cards and a sea of scrolling — slow, hard to scan, easy to
+ * lose your place. This rebuild keeps the same ViewModel/contract but reorganises the UX:
+ *
+ *  - **Present-first**: a prominent hero "Mark everyone present" sets the floor in one tap, then
+ *    the teacher only touches the few absent/late/leave students. A running "X unmarked" nudge
+ *    makes the remaining work explicit.
+ *  - **Compact, scannable rows**: each student is a slim row (avatar + name + roll on the left) with
+ *    a single inline **segmented P · A · L · Lv selector** on the right — color + LETTER encoded
+ *    (never hue-only, Doc 10 §11), ≥44dp targets (Doc 10 §3). No more giant per-student cards.
+ *  - **Sticky live summary**: a single always-visible bar shows P/A/L/Lv counts as tappable FILTER
+ *    chips, so the teacher can jump straight to "unmarked" or "absent" in a big class.
+ *  - **Search** (client-side, name or roll) for fast lookup in large rosters.
+ *  - **Wrong-class guard header** (E15), **enabled correctable date** (fixes F-ATT-2),
+ *    **approved-leave defaults + badge** (§3.5), **load-for-EDIT audit** (E3), **holiday warning**
+ *    (E1), and a **result-driven sticky Save** (§3.7) are all preserved.
  *  - **Three states** via [VStateHost]; long rosters virtualized via [LazyColumn] (Doc 10 §7).
  *
- * [scopeHint] is the pre-known label from the launching period (so the guard header
- * shows instantly while loading); the server load is the source of truth and overrides it.
+ * Reached PRE-SCOPED from a Today/Classes CTA via [assignmentId] (Doc 05 binding) — there is no
+ * shared class picker (kills F-ATT-1). [scopeHint] shows the guard header instantly while loading;
+ * the server load is the source of truth and overrides it.
  */
 @Composable
 fun TeacherAttendanceScreenV2(
@@ -105,6 +117,9 @@ fun TeacherAttendanceScreenV2(
     )
 }
 
+/** Roster filter chips on the summary bar. */
+private enum class RosterFilter { ALL, UNMARKED, PRESENT, ABSENT, LATE, LEAVE }
+
 @Composable
 private fun TeacherAttendanceContent(
     state: TeacherAttendanceState,
@@ -120,16 +135,10 @@ private fun TeacherAttendanceContent(
     val c = VTheme.colors
     val headerScope = state.scope.ifBlank { scopeHint }
 
-    Column(modifier.fillMaxSize().padding(horizontal = 20.dp).padding(top = 12.dp)) {
+    var query by remember { mutableStateOf("") }
+    var filter by remember { mutableStateOf(RosterFilter.ALL) }
 
-        // ── Wrong-class guard header (E15) ──────────────────────────────────
-        // Always visible, even while loading — Aanya's reassurance she's in the
-        // right class. class · subject · date, in calm accent ink.
-        if (headerScope.isNotBlank() || state.date.isNotBlank()) {
-            GuardHeader(scope = headerScope, date = state.date)
-            Spacer(Modifier.height(12.dp))
-        }
-
+    Box(modifier.fillMaxSize().background(c.background)) {
         VStateHost(
             loading = state.isLoading,
             error = state.error,
@@ -140,85 +149,154 @@ private fun TeacherAttendanceContent(
             emptyIcon = VIcons.Users,
             onRetry = onRetry,
         ) {
-            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Apply the search + filter to derive the visible roster (declarative; never mutates VM).
+            val visible = remember(state.students, query, filter) {
+                state.students.filter { s ->
+                    val q = query.trim().lowercase()
+                    val matchQ = q.isEmpty() ||
+                        s.name.lowercase().contains(q) ||
+                        s.rollNo.lowercase().contains(q)
+                    val matchF = when (filter) {
+                        RosterFilter.ALL -> true
+                        RosterFilter.UNMARKED -> s.status == AttendanceStatus.PRESENT && s.source == null
+                        RosterFilter.PRESENT -> s.status == AttendanceStatus.PRESENT
+                        RosterFilter.ABSENT -> s.status == AttendanceStatus.ABSENT
+                        RosterFilter.LATE -> s.status == AttendanceStatus.LATE
+                        RosterFilter.LEAVE -> s.status == AttendanceStatus.LEAVE
+                    }
+                    matchQ && matchF
+                }
+            }
+
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = 20.dp, end = 20.dp, top = 12.dp, bottom = 150.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                // ── Wrong-class guard header (E15) ──────────────────────────
+                item(key = "guard") {
+                    GuardHeader(scope = headerScope, date = state.date)
+                }
 
                 // ── Holiday warning (E1) ────────────────────────────────────
                 if (state.isHoliday) {
-                    WarnBanner(
-                        text = "This is a holiday${state.holidayName?.let { " ($it)" } ?: ""}. " +
-                            "Attendance isn't usually marked today — only mark if there's a special session.",
-                    )
+                    item(key = "holiday") {
+                        WarnBanner(
+                            text = "This is a holiday${state.holidayName?.let { " ($it)" } ?: ""}. " +
+                                "Attendance isn't usually marked today — only mark if there's a special session.",
+                        )
+                    }
                 }
 
-                // ── Date (enabled, correctable — fixes F-ATT-2) + bulk ──────
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-                    VDatePicker(
-                        value = state.date,
-                        onValueChange = onChangeDate,
-                        label = "Date",
-                        modifier = Modifier.weight(1f),
-                    )
+                // ── Date (enabled, correctable — fixes F-ATT-2) ─────────────
+                item(key = "date") {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        VDatePicker(
+                            value = state.date,
+                            onValueChange = onChangeDate,
+                            label = "Date",
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            "You can correct attendance up to ${state.backDateWindowDays} days back.",
+                            style = VTheme.type.caption.colored(c.ink3),
+                        )
+                    }
                 }
-                Text(
-                    "You can correct attendance up to ${state.backDateWindowDays} days back.",
-                    style = VTheme.type.caption.colored(c.ink3),
-                )
-
-                VButton(
-                    text = "Mark all present",
-                    onClick = onMarkAllPresent,
-                    full = true,
-                    variant = VButtonVariant.Secondary,
-                    leading = { Icon(VIcons.Check, contentDescription = null, tint = c.successInk, modifier = Modifier.size(18.dp)) },
-                )
 
                 // ── Last-marked audit (E3) ──────────────────────────────────
                 if (state.alreadyMarked && state.lastMarkedBy != null) {
-                    Text(
-                        "Last marked by ${state.lastMarkedBy}${state.lastMarkedAt?.let { " · ${prettyStamp(it)}" } ?: ""}",
-                        style = VTheme.type.caption.colored(c.ink2),
+                    item(key = "audit") {
+                        AuditPill(
+                            text = "Last marked by ${state.lastMarkedBy}" +
+                                (state.lastMarkedAt?.let { " · ${prettyStamp(it)}" } ?: ""),
+                        )
+                    }
+                }
+
+                // ── Present-first hero + live summary / filter bar ──────────
+                item(key = "summary") {
+                    SummaryBoard(
+                        state = state,
+                        filter = filter,
+                        onFilter = { filter = if (filter == it) RosterFilter.ALL else it },
+                        onMarkAllPresent = onMarkAllPresent,
                     )
                 }
 
-                // ── Virtualized roster (Doc 10 §7) ──────────────────────────
-                LazyColumn(
-                    Modifier.weight(1f).fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(state.students, key = { it.studentId }) { s ->
-                        StudentRow(s = s, onSetStatus = onSetStatus)
+                // ── Search (client-side; appears for any non-trivial roster) ─
+                if (state.students.size > 6) {
+                    item(key = "search") {
+                        VInput(
+                            value = query,
+                            onValueChange = { query = it },
+                            placeholder = "Search name or roll number",
+                            leadingIcon = VIcons.Search,
+                            modifier = Modifier.fillMaxWidth(),
+                            trailing = if (query.isNotEmpty()) {
+                                {
+                                    val ix = remember { MutableInteractionSource() }
+                                    Icon(
+                                        VIcons.Close,
+                                        contentDescription = "Clear search",
+                                        tint = c.ink3,
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clickable(interactionSource = ix, indication = null) { query = "" },
+                                    )
+                                }
+                            } else null,
+                        )
                     }
-                    item { Spacer(Modifier.height(140.dp)) } // clear the sticky footer + dock
                 }
 
-                // ── Sticky running counter + result-driven Save (§3.6/§3.7) ──
-                SaveFooter(state = state, onSave = onSave)
-
-                state.saveError?.let { err ->
-                    Text(err, style = VTheme.type.caption.colored(c.danger), modifier = Modifier.fillMaxWidth())
+                // ── Roster (compact rows, virtualized) ──────────────────────
+                if (visible.isEmpty()) {
+                    item(key = "no-match") { NoMatchRow(filter = filter, query = query) }
+                } else {
+                    items(visible, key = { it.studentId }) { s ->
+                        StudentRow(s = s, onSetStatus = onSetStatus)
+                    }
                 }
             }
         }
+
+        // ── Sticky running counter + result-driven Save (§3.6/§3.7) ──────────
+        // Floats over the list so it's always reachable; the list's bottom contentPadding
+        // (150dp) clears it.
+        SaveBar(
+            state = state,
+            onSave = onSave,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Wrong-class guard header (E15)
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun GuardHeader(scope: String, date: String) {
     val c = VTheme.colors
     Box(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.accentTint).padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.accentTint)
+            .padding(horizontal = 16.dp, vertical = 13.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
-                Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(c.accent.copy(alpha = 0.14f)),
+                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(c.accent.copy(alpha = 0.16f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(VIcons.Users, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(18.dp))
+                Icon(VIcons.ListChecks, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(20.dp))
             }
             Column(Modifier.weight(1f)) {
                 Text(
                     scope.ifBlank { "Attendance" },
                     style = VTheme.type.h3.colored(c.ink).copy(fontWeight = FontWeight.ExtraBold),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 if (date.isNotBlank()) {
                     Text(prettyStamp(date), style = VTheme.type.caption.colored(c.accentDeep))
@@ -232,8 +310,8 @@ private fun GuardHeader(scope: String, date: String) {
 private fun WarnBanner(text: String) {
     val c = VTheme.colors
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.warning.copy(alpha = 0.22f))
-            .border(1.dp, c.warning, RoundedCornerShape(12.dp)).padding(horizontal = 14.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.warning.copy(alpha = 0.22f))
+            .border(1.dp, c.warning, RoundedCornerShape(14.dp)).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -243,39 +321,205 @@ private fun WarnBanner(text: String) {
 }
 
 @Composable
+private fun AuditPill(text: String) {
+    val c = VTheme.colors
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.cream)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(VIcons.Clock, contentDescription = null, tint = c.ink3, modifier = Modifier.size(14.dp))
+        Text(text, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp))
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Present-first hero + live summary / filter board
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun SummaryBoard(
+    state: TeacherAttendanceState,
+    filter: RosterFilter,
+    onFilter: (RosterFilter) -> Unit,
+    onMarkAllPresent: () -> Unit,
+) {
+    val c = VTheme.colors
+    val unmarked = state.unmarkedCount
+    VCard(modifier = Modifier.fillMaxWidth(), padding = 14.dp) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // The present-first hero CTA. The label flips to a calm "All present" confirmation
+            // once the floor is set, so the teacher knows the bulk action landed.
+            VButton(
+                text = if (unmarked == 0 && state.total > 0) "Everyone marked present" else "Mark everyone present",
+                onClick = onMarkAllPresent,
+                full = true,
+                size = VButtonSize.Lg,
+                tone = VButtonTone.Lavender,
+                leading = {
+                    Icon(VIcons.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                },
+            )
+            Text(
+                if (unmarked > 0)
+                    "$unmarked still unmarked — tap below, then mark only the exceptions."
+                else "Tap a student below to change their status.",
+                style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 12.sp),
+            )
+
+            // Live, tappable status breakdown. Each chip filters the roster (tap again to clear).
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SummaryChip("All", state.total, c.accentDeep, c.accentTint, filter == RosterFilter.ALL, Modifier.weight(1f)) { onFilter(RosterFilter.ALL) }
+                SummaryChip("P", state.presentCount, c.successInk, c.success.copy(alpha = 0.5f), filter == RosterFilter.PRESENT, Modifier.weight(1f)) { onFilter(RosterFilter.PRESENT) }
+                SummaryChip("A", state.absentCount, c.dangerInk, c.danger.copy(alpha = 0.45f), filter == RosterFilter.ABSENT, Modifier.weight(1f)) { onFilter(RosterFilter.ABSENT) }
+                SummaryChip("L", state.lateCount, c.warningInk, c.warning.copy(alpha = 0.5f), filter == RosterFilter.LATE, Modifier.weight(1f)) { onFilter(RosterFilter.LATE) }
+                SummaryChip("Lv", state.leaveCount, c.accentDeep, c.accentSoft.copy(alpha = 0.4f), filter == RosterFilter.LEAVE, Modifier.weight(1f)) { onFilter(RosterFilter.LEAVE) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SummaryChip(
+    label: String,
+    count: Int,
+    ink: Color,
+    tint: Color,
+    active: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val c = VTheme.colors
+    val ix = remember { MutableInteractionSource() }
+    Column(
+        modifier
+            .heightIn(min = 56.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (active) tint else c.cream)
+            .border(if (active) 1.5.dp else 1.dp, if (active) ink.copy(alpha = 0.5f) else c.border2, RoundedCornerShape(12.dp))
+            .clickable(interactionSource = ix, indication = null, onClick = onClick)
+            .semantics { contentDescription = "$label $count" + if (active) ", filter active" else "" }
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(count.toString(), style = VTheme.type.data.colored(ink).copy(fontSize = 18.sp, fontWeight = FontWeight.ExtraBold))
+        Text(label, style = VTheme.type.label.colored(ink.copy(alpha = 0.85f)).copy(fontSize = 10.sp, fontWeight = FontWeight.Bold))
+    }
+}
+
+@Composable
+private fun NoMatchRow(filter: RosterFilter, query: String) {
+    val c = VTheme.colors
+    val msg = when {
+        query.isNotBlank() -> "No students match \"$query\"."
+        filter == RosterFilter.UNMARKED -> "Everyone has been marked."
+        filter == RosterFilter.ABSENT -> "No absent students."
+        filter == RosterFilter.LATE -> "No students marked late."
+        filter == RosterFilter.LEAVE -> "No students on leave."
+        filter == RosterFilter.PRESENT -> "No students marked present yet."
+        else -> "No students to show."
+    }
+    Box(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.cream).padding(vertical = 28.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(msg, style = VTheme.type.body.colored(c.ink3))
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Compact student row with an inline segmented P · A · L · Lv selector
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
 private fun StudentRow(s: StudentAttendance, onSetStatus: (String, String) -> Unit) {
     val c = VTheme.colors
-    VCard(modifier = Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                VAvatar(name = s.name, size = 40.dp)
-                Column(Modifier.weight(1f)) {
-                    // bodyLarge equivalent: primary roster name at 16sp (Doc 10 §2, 58yo floor).
-                    Text(s.name, style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 16.sp))
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Roll ${s.rollNo.ifBlank { "—" }}", style = VTheme.type.dataSm.colored(c.ink3).copy(fontSize = 12.sp))
-                        if (s.isOnApprovedLeave) {
-                            LeaveBadge()
+    // A thin status-colored strip down the left edge, matching the current status, so a quick
+    // downward glance reads the whole class at once (Doc 10 §11 — color reinforces, the segmented
+    // selector below carries the explicit letter cue so it's never hue-only).
+    val statusInk = when (s.status) {
+        AttendanceStatus.ABSENT -> c.dangerInk
+        AttendanceStatus.LATE -> c.warningInk
+        AttendanceStatus.LEAVE -> c.accentDeep
+        else -> c.successInk
+    }
+    VCard(modifier = Modifier.fillMaxWidth(), padding = 0.dp) {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Box(Modifier.width(4.dp).fillMaxHeight().background(statusInk))
+            Column(Modifier.weight(1f).padding(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Small avatar for a human touch; the roll is what teachers actually call out.
+                    VAvatar(name = s.name, size = 38.dp)
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            s.name,
+                            style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 15.sp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Roll ${s.rollNo.ifBlank { "—" }}", style = VTheme.type.dataSm.colored(c.ink3).copy(fontSize = 12.sp))
+                            if (s.isOnApprovedLeave) LeaveBadge()
                         }
                     }
                 }
-            }
-            // The four status pills — ≥48dp tall, equal width, letter + color encoded.
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatusPill("P", "Present", s.status == AttendanceStatus.PRESENT, c.success, c.successInk, Modifier.weight(1f)) {
-                    onSetStatus(s.studentId, AttendanceStatus.PRESENT)
-                }
-                StatusPill("A", "Absent", s.status == AttendanceStatus.ABSENT, c.danger, c.dangerInk, Modifier.weight(1f)) {
-                    onSetStatus(s.studentId, AttendanceStatus.ABSENT)
-                }
-                StatusPill("L", "Late", s.status == AttendanceStatus.LATE, c.warning, c.warningInk, Modifier.weight(1f)) {
-                    onSetStatus(s.studentId, AttendanceStatus.LATE)
-                }
-                StatusPill("Lv", "Leave", s.status == AttendanceStatus.LEAVE, c.accentSoft, c.accentDeep, Modifier.weight(1f)) {
-                    onSetStatus(s.studentId, AttendanceStatus.LEAVE)
-                }
+                Spacer(Modifier.height(10.dp))
+                // Inline segmented selector — one connected control, 4 equal segments, ≥44dp tall,
+                // letter + color encoded. The active segment fills with its semantic color.
+                SegmentedStatus(
+                    status = s.status,
+                    onSet = { onSetStatus(s.studentId, it) },
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun SegmentedStatus(status: String, onSet: (String) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        val c = VTheme.colors
+        Segment("P", "Present", status == AttendanceStatus.PRESENT, c.success, c.successInk, Modifier.weight(1f)) { onSet(AttendanceStatus.PRESENT) }
+        Segment("A", "Absent", status == AttendanceStatus.ABSENT, c.danger, c.dangerInk, Modifier.weight(1f)) { onSet(AttendanceStatus.ABSENT) }
+        Segment("L", "Late", status == AttendanceStatus.LATE, c.warning, c.warningInk, Modifier.weight(1f)) { onSet(AttendanceStatus.LATE) }
+        Segment("Lv", "Leave", status == AttendanceStatus.LEAVE, c.accentSoft, c.accentDeep, Modifier.weight(1f)) { onSet(AttendanceStatus.LEAVE) }
+    }
+}
+
+@Composable
+private fun Segment(
+    letter: String,
+    label: String,
+    active: Boolean,
+    fill: Color,
+    ink: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val c = VTheme.colors
+    val ix = remember { MutableInteractionSource() }
+    val bg by animateColorAsState(if (active) fill else c.cream, label = "segBg")
+    val borderW by animateDpAsState(if (active) 1.5.dp else 1.dp, label = "segBorder")
+    Row(
+        modifier
+            .heightIn(min = 46.dp) // ≥44dp accessible target (Doc 10 §3).
+            .clip(RoundedCornerShape(12.dp))
+            .background(bg)
+            .border(borderW, if (active) fill else c.border2, RoundedCornerShape(12.dp))
+            .clickable(interactionSource = ix, indication = null, onClick = onClick)
+            .semantics { contentDescription = if (active) "$label, selected" else "Set $label" }
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            letter,
+            style = VTheme.type.label.colored(if (active) ink else c.ink3)
+                .copy(fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center),
+        )
     }
 }
 
@@ -289,49 +533,38 @@ private fun LeaveBadge() {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Sticky save bar — floats over the list, always reachable (§3.6 / §3.7)
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
-private fun StatusPill(
-    letter: String,
-    label: String,
-    active: Boolean,
-    fill: Color,
-    ink: Color,
+private fun SaveBar(
+    state: TeacherAttendanceState,
+    onSave: () -> Unit,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit,
 ) {
     val c = VTheme.colors
-    val interaction = remember { MutableInteractionSource() }
-    Box(
+    val unmarked = state.unmarkedCount
+    Column(
         modifier
-            .heightIn(min = 48.dp) // Doc 10 §3 — hard floor for Mr. Rao.
-            .clip(RoundedCornerShape(999.dp))
-            .background(if (active) fill else c.cream)
-            .border(1.dp, if (active) fill else c.border2, RoundedCornerShape(999.dp))
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .semantics { contentDescription = if (active) "$label, selected" else label }
-            .padding(vertical = 12.dp),
-        contentAlignment = Alignment.Center,
+            .fillMaxWidth()
+            .background(c.card)
+            .navigationBarsPadding()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
     ) {
-        Text(
-            letter,
-            style = VTheme.type.label.colored(if (active) ink else c.ink3)
-                .copy(fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center),
-        )
-    }
-}
-
-@Composable
-private fun SaveFooter(state: TeacherAttendanceState, onSave: () -> Unit) {
-    val c = VTheme.colors
-    VCard(modifier = Modifier.fillMaxWidth()) {
+        state.saveError?.let { err ->
+            Text(
+                err,
+                style = VTheme.type.caption.colored(c.danger),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            )
+        }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.weight(1f)) {
-                // Running counter — DM Mono tabular figures (Doc 10 §2).
                 Text(
                     "${state.presentCount} P · ${state.absentCount} A · ${state.lateCount} L · ${state.leaveCount} Lv",
                     style = VTheme.type.data.colored(c.ink).copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                    maxLines = 1,
                 )
-                val unmarked = state.unmarkedCount
                 Text(
                     if (unmarked > 0) "$unmarked still on default" else "${state.total} students marked",
                     style = VTheme.type.caption.colored(if (unmarked > 0) c.ink3 else c.successInk),
