@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -40,7 +41,6 @@ import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClassesS
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClassesViewModel
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherTodayState
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherTodayViewModel
-import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -233,58 +233,53 @@ private fun TeacherTodayHero(state: TeacherTodayState, modifier: Modifier = Modi
     val progressPct = if (total > 0) ((done.toFloat() / total) * 100f).toInt().coerceIn(0, 100) else 0
 
     val context = heroContext(state, done, total)
+    val dateLine = todayLongLabel()
 
-    VCard(modifier = modifier, padding = 18.dp) {
-        Column {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                VAvatar(name = name, src = null, size = 54.dp, ring = true)
+    // A premium gradient hero (the brand-accent moment) — a deep violet→navy wash with the
+    // day-journey ring on the right, mirroring the parents portal TodayCard's flagship weight.
+    // The header already owns the small "greeting · name" chrome chip; this is the flagship
+    // welcome (one personal greeting + live date + today's teaching context). White ink on the
+    // gradient; everything is real day data, nothing fabricated.
+    VCard(modifier = modifier, padding = 0.dp, border = false) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .background(Brush.linearGradient(listOf(c.accentDeep, c.navyDeep)))
+                .padding(18.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        greeting,
-                        style = VTheme.type.label.colored(c.accentDeep).copy(
-                            fontWeight = FontWeight.ExtraBold, fontSize = 10.sp, letterSpacing = 0.9.sp,
-                        ),
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        firstName,
-                        style = VTheme.type.h2.colored(c.navyDeep).copy(fontWeight = FontWeight.ExtraBold, fontSize = 19.sp),
+                        "$greeting, $firstName",
+                        style = VTheme.type.h2.colored(Color.White).copy(fontWeight = FontWeight.ExtraBold, fontSize = 20.sp),
                         maxLines = 1,
-                    )
-                }
-                // Day-context chip — color carries meaning (holiday=danger, otherwise the
-                // calm brand tint for a working day). Never a fabricated state.
-                HeroDayChip(state = state, total = total)
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            // Journey row: a real violet day-progress ring (brand accent moment) + a context line.
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                DayJourneyRing(percent = progressPct, label = if (total > 0) "$done/$total" else "—", modifier = Modifier.size(68.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "TODAY'S TEACHING",
-                        style = VTheme.type.label.colored(c.accentDeep).copy(
-                            fontWeight = FontWeight.ExtraBold, fontSize = 10.sp, letterSpacing = 0.9.sp,
-                        ),
                     )
                     Spacer(Modifier.height(3.dp))
                     Text(
+                        dateLine,
+                        style = VTheme.type.caption.colored(Color.White.copy(alpha = 0.7f)).copy(fontSize = 11.5.sp),
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    // Day-context headline (e.g. "3 classes ahead" / "All classes done").
+                    Text(
                         context.headline,
-                        style = VTheme.type.bodyStrong.colored(c.navyDeep).copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                        style = VTheme.type.bodyStrong.colored(Color.White).copy(fontSize = 15.sp, fontWeight = FontWeight.Bold),
                     )
                     if (context.sub.isNotBlank()) {
                         Spacer(Modifier.height(2.dp))
                         Text(
                             context.sub,
-                            style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
+                            style = VTheme.type.caption.colored(Color.White.copy(alpha = 0.75f)).copy(fontSize = 11.sp),
                         )
                     }
                 }
+                Spacer(Modifier.width(14.dp))
+                DayJourneyRing(
+                    percent = progressPct,
+                    label = if (total > 0) "$done/$total" else "—",
+                    onDark = true,
+                    modifier = Modifier.size(76.dp),
+                )
             }
         }
     }
@@ -397,41 +392,13 @@ private fun ActionTile(icon: ImageVector, label: String, accent: Color, onClick:
     }
 }
 
-/** The day-context chip on the hero. Color is semantic: holiday=danger plate, working day=brand tint. */
+/**
+ * Day-progress ring (the brand-accent moment), mirroring the parent JourneyRing.
+ * [onDark] paints a white ring + white label for use on the gradient hero; otherwise the
+ * violet brand sweep on a light surface.
+ */
 @Composable
-private fun HeroDayChip(state: TeacherTodayState, total: Int) {
-    val c = VTheme.colors
-    val (label, bg, fg, icon) = when {
-        state.day?.isHoliday == true ->
-            HeroChip(state.day?.holidayName?.takeIf { it.isNotBlank() } ?: "Holiday", c.danger.copy(alpha = 0.45f), c.dangerInk, VIcons.Calendar)
-        total > 0 ->
-            HeroChip("$total ${if (total == 1) "class" else "classes"}", c.accent.copy(alpha = 0.12f), c.accentDeep, VIcons.BookOpen)
-        else ->
-            HeroChip("Free day", c.cream, c.ink3, VIcons.Calendar)
-    }
-    Row(
-        Modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(bg)
-            .padding(horizontal = 10.dp, vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(11.dp))
-        Text(label, style = VTheme.type.label.colored(fg).copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp))
-    }
-}
-
-private data class HeroChip(
-    val label: String,
-    val bg: Color,
-    val fg: Color,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-)
-
-/** Violet day-progress ring (the brand-accent moment), mirroring the parent JourneyRing. */
-@Composable
-private fun DayJourneyRing(percent: Int, label: String, modifier: Modifier = Modifier) {
+private fun DayJourneyRing(percent: Int, label: String, modifier: Modifier = Modifier, onDark: Boolean = false) {
     val c = VTheme.colors
     val sweep by animateFloatAsState(targetValue = percent / 100f, label = "teacherJourneySweep")
     Box(modifier, contentAlignment = Alignment.Center) {
@@ -441,13 +408,17 @@ private fun DayJourneyRing(percent: Int, label: String, modifier: Modifier = Mod
             val arcSize = Size(size.width - stroke, size.height - stroke)
             val topLeft = Offset(inset, inset)
             drawArc(
-                color = c.accent.copy(alpha = 0.16f),
+                color = if (onDark) Color.White.copy(alpha = 0.22f) else c.accent.copy(alpha = 0.16f),
                 startAngle = 0f, sweepAngle = 360f, useCenter = false,
                 topLeft = topLeft, size = arcSize,
                 style = Stroke(width = stroke, cap = StrokeCap.Round),
             )
             drawArc(
-                brush = Brush.sweepGradient(listOf(c.accentSoft, c.accent, c.accentDeep)),
+                brush = if (onDark) {
+                    Brush.sweepGradient(listOf(Color.White.copy(alpha = 0.85f), Color.White, Color.White))
+                } else {
+                    Brush.sweepGradient(listOf(c.accentSoft, c.accent, c.accentDeep))
+                },
                 startAngle = -90f, sweepAngle = 360f * sweep, useCenter = false,
                 topLeft = topLeft, size = arcSize,
                 style = Stroke(width = stroke, cap = StrokeCap.Round),
@@ -455,9 +426,22 @@ private fun DayJourneyRing(percent: Int, label: String, modifier: Modifier = Mod
         }
         Text(
             label,
-            style = VTheme.type.dataLg.colored(c.accentDeep).copy(fontWeight = FontWeight.ExtraBold, fontSize = 15.sp),
+            style = VTheme.type.dataLg.colored(if (onDark) Color.White else c.accentDeep).copy(fontWeight = FontWeight.ExtraBold, fontSize = 16.sp),
         )
     }
+}
+
+/** Friendly "Tuesday, 24 June" label from today's ISO date — for the hero. */
+private fun todayLongLabel(): String {
+    val iso = com.littlebridge.vidyaprayag.util.todayIso()
+    val parsed = com.littlebridge.vidyaprayag.util.parseIsoDate(iso) ?: return ""
+    val (y, m, d) = parsed
+    val weekday = when (com.littlebridge.vidyaprayag.util.dayOfWeek(y, m, d)) {
+        0 -> "Sunday"; 1 -> "Monday"; 2 -> "Tuesday"; 3 -> "Wednesday"
+        4 -> "Thursday"; 5 -> "Friday"; else -> "Saturday"
+    }
+    val month = com.littlebridge.vidyaprayag.util.MONTH_LONG.getOrElse(m - 1) { "" }
+    return "$weekday, $d $month"
 }
 
 private data class HeroContext(val headline: String, val sub: String)
