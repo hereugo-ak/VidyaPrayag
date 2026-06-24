@@ -258,6 +258,17 @@ fun TeacherPortalV2(
                     )
                     "classes" -> TeacherClassesScreenV2(
                         onOpenStudent = { studentId -> selectedStudentId = studentId },
+                        // Attendance is an ACTION, not a tab — but it must also be reachable when
+                        // Today has no schedule (holiday / off-timetable). The Classes tab is the
+                        // canonical roster surface, so each class can open the pre-scoped
+                        // Attendance write-plane directly.
+                        onMarkAttendance = { assignmentId, scope ->
+                            selectedClassId = assignmentId
+                            selectedSubject = ""
+                            selectedScope = scope
+                            updateSub = "Attendance"
+                            overlay = TeacherOverlay.Update
+                        },
                     )
                     "gradebook" -> TeacherGradebookScreenV2(
                         assignmentId = gradebookAssignmentId,

@@ -42,6 +42,8 @@ import com.littlebridge.vidyaprayag.ui.v2.components.VBackHeader
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
+import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
@@ -72,6 +74,7 @@ import kotlin.math.roundToInt
 @Composable
 fun TeacherClassesScreenV2(
     onOpenStudent: (String) -> Unit = {},
+    onMarkAttendance: (assignmentId: String, scope: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
     viewModel: TeacherClassesViewModel = koinViewModel(),
 ) {
@@ -85,6 +88,7 @@ fun TeacherClassesScreenV2(
         onSearch = viewModel::setSearch,
         onFilter = viewModel::setFilter,
         onOpenStudent = onOpenStudent,
+        onMarkAttendance = onMarkAttendance,
         onMessageParents = viewModel::openBroadcast,
         onSendBroadcast = viewModel::sendBroadcast,
         onCloseBroadcast = viewModel::closeBroadcast,
@@ -102,6 +106,7 @@ private fun TeacherClassesContent(
     onSearch: (String) -> Unit,
     onFilter: (Boolean?) -> Unit,
     onOpenStudent: (String) -> Unit,
+    onMarkAttendance: (assignmentId: String, scope: String) -> Unit,
     onMessageParents: (String) -> Unit,
     onSendBroadcast: (String) -> Unit,
     onCloseBroadcast: () -> Unit,
@@ -134,6 +139,17 @@ private fun TeacherClassesContent(
             onBack = onCloseClass,
             onRetry = onRetryDetail,
             onOpenStudent = onOpenStudent,
+            onMarkAttendance = {
+                summary?.let {
+                    onMarkAttendance(
+                        it.assignmentId,
+                        listOfNotNull(
+                            "${it.className} ${it.section}".trim().takeIf { s -> s.isNotBlank() },
+                            it.subject.takeIf { s -> s.isNotBlank() },
+                        ).joinToString(" · "),
+                    )
+                }
+            },
             onMessageParents = { summary?.let { onMessageParents(it.className) } },
             modifier = modifier,
         )
@@ -180,7 +196,19 @@ private fun TeacherClassesContent(
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     visible.forEach { cls ->
-                        ClassCard(cls = cls, onClick = { onOpenClass(cls.assignmentId) })
+                        ClassCard(
+                            cls = cls,
+                            onClick = { onOpenClass(cls.assignmentId) },
+                            onMarkAttendance = {
+                                onMarkAttendance(
+                                    cls.assignmentId,
+                                    listOfNotNull(
+                                        "${cls.className} ${cls.section}".trim().takeIf { it.isNotBlank() },
+                                        cls.subject.takeIf { it.isNotBlank() },
+                                    ).joinToString(" · "),
+                                )
+                            },
+                        )
                     }
                 }
             }
@@ -189,7 +217,11 @@ private fun TeacherClassesContent(
 }
 
 @Composable
-private fun ClassCard(cls: TeacherClassSummaryDto, onClick: () -> Unit) {
+private fun ClassCard(
+    cls: TeacherClassSummaryDto,
+    onClick: () -> Unit,
+    onMarkAttendance: () -> Unit,
+) {
     val c = VTheme.colors
     VCard(onClick = onClick) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
@@ -227,6 +259,26 @@ private fun ClassCard(cls: TeacherClassSummaryDto, onClick: () -> Unit) {
                 Text(nextPeriodLabel(np), style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp))
             }
         }
+
+        // Attendance is always one tap from the class — independent of today's schedule
+        // (this is the path that makes attendance reachable on holidays / off-timetable days).
+        Spacer(Modifier.height(12.dp))
+        VButton(
+            text = if (cls.todayAttendanceMarked) "Update attendance" else "Mark attendance",
+            onClick = onMarkAttendance,
+            full = true,
+            size = VButtonSize.Sm,
+            variant = if (cls.todayAttendanceMarked) VButtonVariant.Secondary else VButtonVariant.Primary,
+            tone = VButtonTone.Lavender,
+            leading = {
+                Icon(
+                    VIcons.Check,
+                    contentDescription = null,
+                    tint = if (cls.todayAttendanceMarked) c.ink2 else c.card,
+                    modifier = Modifier.size(16.dp),
+                )
+            },
+        )
     }
 }
 
@@ -259,6 +311,7 @@ private fun ClassDetailScreen(
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onOpenStudent: (String) -> Unit,
+    onMarkAttendance: () -> Unit,
     onMessageParents: () -> Unit,
     modifier: Modifier,
 ) {
@@ -284,6 +337,17 @@ private fun ClassDetailScreen(
                     MiniStat(rateText(d.attendanceSummary.weekRate), "Week att.", Modifier.weight(1f))
                 }
                 if (d.header.isClassTeacher) VBadge(text = "You are the class teacher", tone = VBadgeTone.Accent)
+
+                VButton(
+                    text = "Mark attendance",
+                    onClick = onMarkAttendance,
+                    full = true,
+                    variant = VButtonVariant.Primary,
+                    tone = VButtonTone.Lavender,
+                    leading = {
+                        Icon(VIcons.Check, contentDescription = null, tint = VTheme.colors.card, modifier = Modifier.size(18.dp))
+                    },
+                )
 
                 VButton(
                     text = "Message class parents",
