@@ -154,8 +154,8 @@ data class HwAssignRequest(
     val attachments: List<HwAssignAttachmentDto> = emptyList(),
 )
 
-@Serializable
-data class HwAssignData(val success: Boolean = true, val data: HwItemDto? = null)
+// (HwAssignData removed — assign now returns the HwItemDto directly via call.created,
+//  letting the canonical envelope provide the single { success, message, data } layer.)
 
 @Serializable
 data class HwSubmissionRowDto(
@@ -567,7 +567,12 @@ private fun Route.homeworkListAndAssign() {
             totalCount = rosterSize,
             attachments = attachmentsFor(newId),
         )
-        call.created(HwAssignData(success = true, data = dto), message = "Homework assigned")
+        // Pass the item DIRECTLY — call.created already wraps it in the canonical
+        // { success, message, data } envelope, so AssignHomeworkResponse.data resolves to
+        // the item. (Previously this wrapped dto a SECOND time in HwAssignData, producing
+        // { data: { success, data: item } }; the client then crashed deserializing
+        // HomeworkItemDto: "Fields [id, title, due_date] missing at path $.data".)
+        call.created(dto, message = "Homework assigned")
     }
 }
 

@@ -129,11 +129,9 @@ data class SylToggleProgressRequest(
     val note: String? = null,
 )
 
-@Serializable
-data class SylMutationData(
-    val success: Boolean = true,
-    val data: SylNodeDto? = null,
-)
+// (SylMutationData removed — unit create/update/toggle now return the SylNodeDto directly
+//  via call.ok/created, letting the canonical envelope provide the single
+//  { success, message, data } layer the client's SyllabusUnitMutationResponse expects.)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers.
@@ -370,8 +368,17 @@ private fun Route.syllabusCreateUnit() {
             }
         }
         val node = nodeForUnit(asg, newId)
+        if (node == null) {
+            call.fail("Unit created but could not be reloaded", HttpStatusCode.InternalServerError, "RELOAD_FAILED")
+            return@post
+        }
+        // Pass the node DIRECTLY to call.created — call.ok/created already wrap it in the
+        // canonical { success, message, data } envelope, so the client's
+        // SyllabusUnitMutationResponse.data resolves to the node. (Previously this wrapped
+        // the node a SECOND time in SylMutationData, producing { data: { success, data: node } }
+        // and the client crashed: "Fields [id, title] missing at path $.data".)
         call.created(
-            SylMutationData(success = true, data = node),
+            node,
             message = if (parentUuid == null) "Chapter added" else "Topic added",
         )
     }
@@ -415,7 +422,12 @@ private fun Route.syllabusUpdateUnit() {
             }
         }
         val node = nodeForUnit(asg, unitId)
-        call.ok(SylMutationData(success = true, data = node), message = "Unit updated")
+        if (node == null) {
+            call.fail("Unit updated but could not be reloaded", HttpStatusCode.InternalServerError, "RELOAD_FAILED")
+            return@patch
+        }
+        // Direct payload — single envelope (see syllabusCreateUnit for the double-wrap bug fixed here).
+        call.ok(node, message = "Unit updated")
     }
 }
 
@@ -492,8 +504,13 @@ private fun Route.syllabusToggleProgress() {
             }
         }
         val node = nodeForUnit(asg, unitId)
+        if (node == null) {
+            call.fail("Progress saved but unit could not be reloaded", HttpStatusCode.InternalServerError, "RELOAD_FAILED")
+            return@patch
+        }
+        // Direct payload — single envelope (see syllabusCreateUnit for the double-wrap bug fixed here).
         call.ok(
-            SylMutationData(success = true, data = node),
+            node,
             message = if (req.isCovered) "Marked covered" else "Marked not covered",
         )
     }
