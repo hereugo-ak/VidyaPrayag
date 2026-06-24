@@ -36,11 +36,14 @@ import androidx.compose.ui.unit.sp
 import com.littlebridge.vidyaprayag.feature.teacher.domain.model.ObligationItemDto
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.ResolvedDayUi
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.ResolvedPeriodUi
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClassesState
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClassesViewModel
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherTodayState
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherTodayViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
@@ -77,15 +80,24 @@ fun TodayScreen(
     onOpenHomework: (ResolvedPeriodUi) -> Unit,
     modifier: Modifier = Modifier,
     onOpenObligation: (ObligationItemDto) -> Unit = {},
+    onGoToClasses: () -> Unit = {},
+    onGoToPlanner: () -> Unit = {},
+    onGoToGradebook: () -> Unit = {},
     viewModel: TeacherTodayViewModel = koinViewModel(),
+    classesViewModel: TeacherClassesViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
+    val classesState by classesViewModel.state.collectAsStateV2()
     TodayContent(
         state = state,
+        classesState = classesState,
         onMarkAttendance = onMarkAttendance,
         onOpenSyllabus = onOpenSyllabus,
         onOpenHomework = onOpenHomework,
         onOpenObligation = onOpenObligation,
+        onGoToClasses = onGoToClasses,
+        onGoToPlanner = onGoToPlanner,
+        onGoToGradebook = onGoToGradebook,
         onRetry = viewModel::load,
         modifier = modifier,
     )
@@ -94,10 +106,14 @@ fun TodayScreen(
 @Composable
 private fun TodayContent(
     state: TeacherTodayState,
+    classesState: TeacherClassesState,
     onMarkAttendance: (ResolvedPeriodUi) -> Unit,
     onOpenSyllabus: (ResolvedPeriodUi) -> Unit,
     onOpenHomework: (ResolvedPeriodUi) -> Unit,
     onOpenObligation: (ObligationItemDto) -> Unit,
+    onGoToClasses: () -> Unit,
+    onGoToPlanner: () -> Unit,
+    onGoToGradebook: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -135,6 +151,25 @@ private fun TodayContent(
             // (server-resolved), and the context line adapts honestly to holiday/unseeded
             // days. Nothing here is hardcoded.
             TeacherTodayHero(state = state, modifier = Modifier.fillMaxWidth())
+
+            // ── At-a-glance stats (ALWAYS useful, never blank) ───────────────────
+            // Even on a holiday / off-timetable day, these four facts give the teacher a
+            // real reason to open Home: how many classes & students they're responsible for,
+            // today's attendance-marking progress, and the live at-risk headcount. Sourced
+            // from the same classes feed the Classes tab uses (server-computed).
+            TeacherStatsStrip(classesState = classesState, modifier = Modifier.fillMaxWidth())
+
+            // ── Quick actions (schedule-independent entry to the work) ───────────
+            // The brief: attendance must be reachable even with no schedule. These tiles
+            // route to the self-sufficient tabs (each fronts its own class picker), so the
+            // four core teaching jobs are always one tap away.
+            TeacherQuickActions(
+                onMarkAttendance = onGoToClasses,
+                onAssignHomework = onGoToPlanner,
+                onUpdateSyllabus = onGoToPlanner,
+                onOpenGradebook = onGoToGradebook,
+                modifier = Modifier.fillMaxWidth(),
+            )
 
             // ── Self check-in band (biometric ladder + manual fallback) ──────────
             // T-106c / Doc 04 §5.1: record the teacher's own presence first thing.
@@ -251,6 +286,113 @@ private fun TeacherTodayHero(state: TeacherTodayState, modifier: Modifier = Modi
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * TeacherStatsStrip — four at-a-glance facts that are useful EVERY day (including holidays),
+ * so Home is never blank: classes I teach, total students, today's attendance progress
+ * (marked/total), and the live at-risk headcount. All server-computed via the classes feed.
+ */
+@Composable
+private fun TeacherStatsStrip(classesState: TeacherClassesState, modifier: Modifier = Modifier) {
+    val c = VTheme.colors
+    val classes = classesState.classes
+    val classCount = classes.size
+    val studentTotal = classes.sumOf { it.studentCount }
+    val markedToday = classes.count { it.todayAttendanceMarked }
+    val atRiskTotal = classes.sumOf { it.atRiskCount }
+
+    // While the classes feed is still loading, render a calm skeleton row (never collapse).
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        StatTile(
+            icon = VIcons.Users,
+            value = if (classCount == 0 && classesState.isLoading) "—" else classCount.toString(),
+            label = if (classCount == 1) "Class" else "Classes",
+            tint = c.accentDeep,
+            modifier = Modifier.weight(1f),
+        )
+        StatTile(
+            icon = VIcons.GraduationCap,
+            value = if (classCount == 0 && classesState.isLoading) "—" else studentTotal.toString(),
+            label = "Students",
+            tint = c.tealDeep,
+            modifier = Modifier.weight(1f),
+        )
+        StatTile(
+            icon = VIcons.Check,
+            value = if (classCount == 0) "—" else "$markedToday/$classCount",
+            label = "Marked",
+            tint = if (classCount > 0 && markedToday >= classCount) c.successInk else c.warningInk,
+            modifier = Modifier.weight(1f),
+        )
+        StatTile(
+            icon = VIcons.AlertTriangle,
+            value = if (classCount == 0 && classesState.isLoading) "—" else atRiskTotal.toString(),
+            label = "At risk",
+            tint = if (atRiskTotal > 0) c.dangerInk else c.ink3,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun StatTile(icon: ImageVector, value: String, label: String, tint: Color, modifier: Modifier = Modifier) {
+    val c = VTheme.colors
+    VCard(modifier = modifier, padding = 12.dp) {
+        Column(horizontalAlignment = Alignment.Start) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.height(8.dp))
+            Text(value, style = VTheme.type.dataLg.colored(c.navyDeep).copy(fontWeight = FontWeight.ExtraBold, fontSize = 18.sp), maxLines = 1)
+            Text(label, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 10.sp), maxLines = 1)
+        }
+    }
+}
+
+/**
+ * TeacherQuickActions — a 2×2 grid of the four core teaching jobs. Schedule-independent:
+ * each tile routes to a self-sufficient tab (which fronts its own class picker), so the work
+ * is always reachable even when today has no timetable. Solves the "attendance unreachable on
+ * a holiday" gap at the Home level, mirroring the parents portal's action-tile language.
+ */
+@Composable
+private fun TeacherQuickActions(
+    onMarkAttendance: () -> Unit,
+    onAssignHomework: () -> Unit,
+    onUpdateSyllabus: () -> Unit,
+    onOpenGradebook: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            "QUICK ACTIONS",
+            style = VTheme.type.label.colored(c.accentDeep).copy(fontWeight = FontWeight.ExtraBold, fontSize = 10.sp, letterSpacing = 0.9.sp),
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ActionTile(VIcons.Check, "Mark attendance", c.accent, onMarkAttendance, Modifier.weight(1f))
+            ActionTile(VIcons.Edit3, "Assign homework", c.teal, onAssignHomework, Modifier.weight(1f))
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ActionTile(VIcons.BookOpen, "Update syllabus", c.accentSoft, onUpdateSyllabus, Modifier.weight(1f))
+            ActionTile(VIcons.GraduationCap, "Gradebook", c.tealDeep, onOpenGradebook, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun ActionTile(icon: ImageVector, label: String, accent: Color, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val c = VTheme.colors
+    VCard(modifier = modifier, padding = 14.dp, onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(
+                Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(accent.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(17.dp))
+            }
+            Text(label, style = VTheme.type.bodyStrong.colored(c.navyDeep).copy(fontSize = 13.sp), maxLines = 2)
         }
     }
 }

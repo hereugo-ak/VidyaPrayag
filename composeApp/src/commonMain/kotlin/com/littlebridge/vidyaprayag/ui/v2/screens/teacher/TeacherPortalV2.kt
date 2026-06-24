@@ -255,6 +255,12 @@ fun TeacherPortalV2(
                         onOpenSyllabus = { openUpdate(it, "Syllabus") },
                         onOpenHomework = { openUpdate(it, "Homework") },
                         onOpenObligation = { openObligation(it) },
+                        // Schedule-independent quick actions — route to the self-sufficient tabs
+                        // (each fronts its own class picker), so the work is always one tap away
+                        // even on a holiday / off-timetable day.
+                        onGoToClasses = { tab = "classes" },
+                        onGoToPlanner = { tab = "planner" },
+                        onGoToGradebook = { tab = "gradebook" },
                     )
                     "classes" -> TeacherClassesScreenV2(
                         onOpenStudent = { studentId -> selectedStudentId = studentId },
