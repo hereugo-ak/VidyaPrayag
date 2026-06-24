@@ -331,7 +331,7 @@ private fun TeacherUpdatePlane(
                     scopeHint = selectedScope,
                 )
                 "Syllabus" -> TeacherSyllabusScreenV2(assignmentId = selectedClassId, scopeHint = selectedScope)
-                "Homework" -> TeacherHomeworkScreenV2()
+                "Homework" -> TeacherHomeworkScreenV2(assignmentId = selectedClassId, scopeHint = selectedScope)
             }
         }
     }
