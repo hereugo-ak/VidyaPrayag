@@ -11,9 +11,9 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P7-T3 — TeacherNavRouter.messageParentDestination (Gradebook → ChatThread) (Phase 7 in progress)
-LAST COMMIT: feat(teacher-portal): add Gradebook Message Parent → ChatThread deep link router (loop P7-T3)
-CURRENT PHASE: Phase 7 — Cross-Tab Connectivity (P7-T3 done → P7-T4 next)
+LAST COMPLETED TASK: P7-T4 — TeacherNavRouter.routeNotification + NoticeDetailScreen (Phase 7 in progress)
+LAST COMMIT: feat(teacher-portal): add routeNotification router + NoticeDetailScreen (loop P7-T4)
+CURRENT PHASE: Phase 7 — Cross-Tab Connectivity (P7-T4 done → P7-T5 next)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
     ships a complete, mature, fully token-driven design system — VTheme → VColors
@@ -908,12 +908,25 @@ and track if students submitted homework — all in one place.
         never targets a bad thread. Doc updated on the sheet param noting the router contract. No
         new hex; braces 4/4, parens 33/33.
 
-- [ ] **P7-T4**: Notification tap (from NotificationSheet) routes to:
+- [x] **P7-T4**: Notification tap (from NotificationSheet) routes to:
       - Attendance alert → AttendanceScreen
       - Mark update → GradebookTab filtered to that class
       - Parent message → ChatThreadScreen for that parent
       - System notice → a `NoticeDetailScreen` (simple text view)
       Implement a `NotificationRouter` utility: `fun routeNotification(nav, notification)`.
+      ↳ DONE — `TeacherNavRouter.routeNotification(notification): TeacherDestination` + new
+        `NoticeDetailScreen.kt`. The router signature is `(notification)` not `(nav, notification)`
+        because the app has no NavController — it returns a typed destination the host applies
+        (same pattern as the rest of Phase 7). Exhaustive `when` over `NotificationType`:
+        Attendance → Attendance(periodId), Grade → Gradebook(classId), Message →
+        ChatThread(threadId/studentId), Announcement/Homework/General → NoticeDetail(id, title,
+        body). Exhaustiveness is compiler-checked so no type ever falls through to a dead end;
+        missing ids degrade to the safe tab-level destination. Added nullable payload fields
+        (`classId/periodId/studentId/parentThreadId`) to `TeacherNotification` in P7-T1's spirit
+        (defaults null). `NoticeDetailScreen(title, body, onBack, modifier, timeLabel?)` — calm-
+        canvas read-only reader: custom back top-bar (ChatTopBar idiom, no Material3 TopAppBar) over
+        one EnrollCard (Megaphone plate + headingMedium title + optional caption + hairline +
+        scrollable bodyLarge body). No new hex; braces 5/5 + 12/12, parens 45/45 + 67/67.
 
 - [ ] **P7-T5**: Profile stats "Classes Taught" tap → GradebookTab.
       "Total Students" tap → a student list screen (stub with correct navigation).
@@ -1011,6 +1024,7 @@ BEGIN.
 | 30 | P7-T1  | `feat(teacher-portal): add TeacherDestination intents + nudge Add Now router (loop P7-T1)` | `composeApp/.../ui/v2/screens/teacher/TeacherDestination.kt` (new), `TeacherNavRouter.kt` (new), `SmartNudgeSection.kt` (edit), `TEACHER_PORTAL_LOOP.md` | Deep-link foundation. App has no Jetpack NavController (NavGraphV2 uses hoisted route enum + callbacks), so Phase 7 uses a `sealed interface TeacherDestination` (Gradebook/Attendance/ChatThread/NoticeDetail/StudentList) with typed args + a pure `TeacherNavRouter`. `nudgeDestination(nudge)`: MarksNotEntered Add Now u2192 Gradebook(classId,examId) pre-selected; AttendanceNotTaken u2192 Attendance; ParentUnread u2192 ChatThread; HomeworkUngraded u2192 Gradebook. Added nullable id payloads to TeacherNudge (defaults null). No new hex; braces 3/3+2/2, parens 23/23+20/20. |
 | 31 | P7-T2  | `feat(teacher-portal): add TodayStrip period u2192 Attendance deep link router (loop P7-T2)` | `composeApp/.../ui/v2/screens/teacher/TeacherNavRouter.kt` (edit), `TEACHER_PORTAL_LOOP.md` | TodayStripu2192Attendance. Added `periodDestination(period: ResolvedPeriodUi): TeacherDestination?` u2014 returns `Attendance(periodId)` only when !attendanceMarked && !isCancelled && periodId!=null, else null (period stays inert, no dead-end Take Attendance button). Reuses existing TodayClassStrip onTakeAttendance(ResolvedPeriodUi) + shared periodId/attendanceMarked fields u2014 no model change. No new hex; braces 3/3, parens 27/27. |
 | 32 | P7-T3  | `feat(teacher-portal): add Gradebook Message Parent u2192 ChatThread deep link router (loop P7-T3)` | `composeApp/.../ui/v2/screens/teacher/TeacherNavRouter.kt` (edit), `StudentMarksList.kt` (doc), `TEACHER_PORTAL_LOOP.md` | Gradebooku2192Chat. Added `messageParentDestination(studentId: String?): TeacherDestination?` u2192 `ChatThread(studentId=...)` (passes STUDENT id per spec; host ChatViewModel resolves studentu2192parent thread, creating if absent). Null when no studentId so button never targets a bad thread. Reuses existing StudentMarkDetailSheet onMessageParent VButton; doc'd the router contract on the param. No new hex; braces 4/4, parens 33/33. |
+| 33 | P7-T4  | `feat(teacher-portal): add routeNotification router + NoticeDetailScreen (loop P7-T4)` | `composeApp/.../ui/v2/screens/teacher/TeacherNavRouter.kt` (edit), `NoticeDetailScreen.kt` (new), `NotificationSheet.kt` (edit), `TEACHER_PORTAL_LOOP.md` | NotificationRouter. `routeNotification(notification): TeacherDestination` (no nav arg u2014 app has no NavController) exhaustive over NotificationType: Attendanceu2192Attendance, Gradeu2192Gradebook(class), Messageu2192ChatThread, Announcement/Homework/Generalu2192NoticeDetail(id,title,body). Compiler-checked exhaustive = no dead ends; missing ids degrade safely. Added nullable payload fields to TeacherNotification. New `NoticeDetailScreen`: calm read-only reader, custom back top-bar + EnrollCard (Megaphone plate, title, caption, scrollable body). No new hex; braces 5/5+12/12, parens 45/45+67/67. |
 
 ---
 

@@ -82,4 +82,41 @@ object TeacherNavRouter {
         if (studentId.isNullOrBlank()) return null
         return TeacherDestination.ChatThread(studentId = studentId)
     }
+
+    /**
+     * P7-T4 — the central notification router: a tap on any [TeacherNotification] row
+     * in the NotificationSheet resolves to the destination for its type.
+     *
+     * Spec mapping:
+     *   • Attendance → [TeacherDestination.Attendance] for the alert's period
+     *   • Grade      → [TeacherDestination.Gradebook] filtered to the class (mark update)
+     *   • Message    → [TeacherDestination.ChatThread] for the parent (thread or student)
+     *   • Announcement / Homework / General (system notices) → [TeacherDestination.NoticeDetail]
+     *     a simple read-only text view, carrying the notification's own title + message
+     *     as the body so the detail screen never shows an empty shell.
+     *
+     * This is exhaustive over [NotificationType] (compiler-checked), so a new type can
+     * never silently fall through to a dead end. When a typed notification is missing
+     * its id payload we degrade to the safe tab-level destination (e.g. an Attendance
+     * alert with no `periodId` still opens Attendance) rather than dropping the tap.
+     */
+    fun routeNotification(notification: TeacherNotification): TeacherDestination = when (notification.type) {
+        NotificationType.Attendance ->
+            TeacherDestination.Attendance(periodId = notification.periodId.orEmpty())
+        NotificationType.Grade ->
+            TeacherDestination.Gradebook(classId = notification.classId)
+        NotificationType.Message ->
+            TeacherDestination.ChatThread(
+                threadId = notification.parentThreadId,
+                studentId = notification.studentId,
+            )
+        NotificationType.Announcement,
+        NotificationType.Homework,
+        NotificationType.General ->
+            TeacherDestination.NoticeDetail(
+                noticeId = notification.id,
+                title = notification.title,
+                body = notification.message,
+            )
+    }
 }
