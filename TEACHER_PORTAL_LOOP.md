@@ -11,9 +11,9 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P6-T1 — TeacherProfileHeader gradient hero (Phase 6 in progress)
-LAST COMMIT: feat(teacher-portal): add gradient TeacherProfileHeader (loop P6-T1)
-CURRENT PHASE: Phase 6 — Profile Tab (P6-T1 done → P6-T2 next)
+LAST COMPLETED TASK: P6-T2 — TeacherStatsRow 4-up profile stats card (Phase 6 in progress)
+LAST COMMIT: feat(teacher-portal): add 4-up TeacherStatsRow profile stats card (loop P6-T2)
+CURRENT PHASE: Phase 6 — Profile Tab (P6-T2 done → P6-T3 next)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
     ships a complete, mature, fully token-driven design system — VTheme → VColors
@@ -804,7 +804,7 @@ and track if students submitted homework — all in one place.
         (EditProfileScreen host stub). Mirrors TeacherHomeHeader's gradient/ring/glass language
         for hero parity. No new hex; braces 15/15, parens 65/65.
 
-- [ ] **P6-T2 — Stats Row**:
+- [x] **P6-T2 — Stats Row**:
       Below header: a `Row` of 4 `StatColumn` composables.
       `StatColumn(value: String, label: String)`:
         - `DataLarge` value (TextPrimary)
@@ -812,6 +812,15 @@ and track if students submitted homework — all in one place.
       Stats: Classes Taught | Total Students | Subjects | Attendance %
       Dividers between columns: 1dp `SurfaceSubtle`.
       `EnrollCard` container for the whole row.
+      ↳ DONE — `TeacherStatsRow.kt`. `data class TeacherProfileStat(value, label, onClick?)`
+        + `TeacherStatsRow(stats, modifier)`: one `EnrollCard` wrapping a `SpaceBetween` Row
+        of `StatColumn`s (each `weight(1f)`) — `dataLarge` value in `textPrimary` over
+        `labelCaps` label in `textSecondary`, centred. 1dp `StatDivider` (height 32dp,
+        `surfaceSubtle`) between columns, never trailing. Each column is tappable ONLY when
+        its stat carries `onClick` (the deep-linkable Classes Taught / Total Students reserved
+        for P7-T5) — unlinked stats stay inert. Renders whatever stats list the host passes
+        (canonical 4: Classes Taught | Total Students | Subjects | Attendance %). No new hex;
+        braces 15/15, parens 42/42.
 
 - [ ] **P6-T3 — Teaching Assignment Card**:
       `EnrollCard` titled "MY CLASSES".
@@ -945,6 +954,7 @@ BEGIN.
 | 24 | P5-T2  | `feat(teacher-portal): add ChatThreadScreen with bubbles + QuickReplySheet (loop P5-T2)` | `composeApp/.../ui/v2/screens/teacher/ChatThreadScreen.kt` (new), `TEACHER_PORTAL_LOOP.md` | Parent conversation. `ChatMessage` model. `ChatThreadScreen(studentName, parentName, messages, onBack, onVideoCall, onSend)` = custom `ChatTopBar` (back + student + parent subtitle + Phone stub), a reverseLayout keyed LazyColumn of `MessageBubble` (teacher = End primarySoft + textPrimary, parent = Start surfaceSubtle + textSecondary; bodyMedium text + bodySmall time; teacher Check read-receipt primary/tertiary), and a `ReplyBar` (FileText templates → QuickReplySheet, surfaceSubtle pill BasicTextField, Send enabled only when non-blank). `QuickReplySheet` = Dialog with the 4 spec templates as EnrollCards + "+ Add custom template". No new hex; tokens via `Enroll.*`; braces 38/38, parens 156/156; all imports used. |
 | 25 | P5-T3  | `feat(teacher-portal): add live Chat unread badge overload to EnrollBottomNav (loop P5-T3)` | `composeApp/.../ui/v2/screens/teacher/EnrollBottomNav.kt` (edit), `TEACHER_PORTAL_LOOP.md` | Reactive nav badge. Added `EnrollBottomNav(items, selectedId, onSelect, chatUnread, modifier)` that overlays the live `chatUnread` onto the `EnrollTab.Chat` item (`copy(badge=…)`) before rendering, so the badge tracks `ChatViewModel.unreadCount` without rebuilding the tab list. The dock's `VNavItem.badge` count badge is the spec's `BadgedBox`. No new hex; braces 4/4, parens 40/40. **PHASE 5 COMPLETE.** |
 | 26 | P6-T1  | `feat(teacher-portal): add gradient TeacherProfileHeader (loop P6-T1)` | `composeApp/.../ui/v2/screens/teacher/TeacherProfileHeader.kt` (new), `TEACHER_PORTAL_LOOP.md` | Profile hero. `TeacherProfileHeader(teacherName, photoUrl, designation, schoolName, onPickAvatar, onEdit, modifier)`: 200dp full-width `Enroll.colors.headerGradient` banner clipped to `shape.sheet`, `statusBarsPadding`. Centre col: 72dp `VAvatar(ring=true)` (white 3dp ring) clickable→`onPickAvatar` (commonMain picker stub — no Android launcher in shared code), name `headingLarge` white, designation·school middot-joined `bodyMedium` white 80%. Glassy 36dp `Edit3` pencil top-end→`onEdit` (EditProfileScreen host stub). Mirrors TeacherHomeHeader gradient/ring/glass for hero parity. No new hex; braces 15/15, parens 65/65. |
+| 27 | P6-T2  | `feat(teacher-portal): add 4-up TeacherStatsRow profile stats card (loop P6-T2)` | `composeApp/.../ui/v2/screens/teacher/TeacherStatsRow.kt` (new), `TEACHER_PORTAL_LOOP.md` | Profile stats. `data class TeacherProfileStat(value, label, onClick?)` + `TeacherStatsRow(stats, modifier)`: one `EnrollCard` wrapping a SpaceBetween Row of weight(1f) `StatColumn`s u2014 `dataLarge` value (textPrimary) over `labelCaps` label (textSecondary), centred. 1dp `StatDivider` (h32, surfaceSubtle) between columns, never trailing. Columns tappable only when stat has onClick (Classes Taught / Total Students deep links reserved for P7-T5). No new hex; braces 15/15, parens 42/42. |
 
 ---
 
