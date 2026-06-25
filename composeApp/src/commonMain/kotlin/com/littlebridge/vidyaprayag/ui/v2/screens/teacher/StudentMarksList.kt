@@ -262,7 +262,10 @@ data class ExamScorePoint(
  * @param history      exam-score history (oldest→newest) for the line chart
  * @param remark       current teacher note
  * @param onRemarkChange edit the note
- * @param onMessageParent jump to this student's parent chat thread (P7)
+ * @param onMessageParent jump to this student's parent chat thread (P7-T3). The host
+ *                        builds the destination from this student's id via
+ *                        [TeacherNavRouter.messageParentDestination]; nothing here
+ *                        needs to know about navigation, keeping the sheet pure.
  * @param onDismiss    close the sheet
  */
 @Composable

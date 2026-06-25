@@ -67,4 +67,19 @@ object TeacherNavRouter {
         if (period.attendanceMarked || period.isCancelled || id.isNullOrBlank()) return null
         return TeacherDestination.Attendance(periodId = id)
     }
+
+    /**
+     * P7-T3 — resolve a Gradebook "Message Parent" tap to the parent chat thread.
+     *
+     * From the expanded `StudentMarkDetailSheet`, "Message Parent" deep-links into the
+     * Chat tab and opens the [TeacherDestination.ChatThread] for this student. We pass
+     * the `studentId` (not a thread id): the host's `ChatViewModel` resolves the
+     * student → their linked parent's thread (creating it if it doesn't exist yet), so
+     * the Gradebook never needs to know thread identifiers. Returns `null` only when no
+     * student id is available, so the button is never a dead end with a bad target.
+     */
+    fun messageParentDestination(studentId: String?): TeacherDestination? {
+        if (studentId.isNullOrBlank()) return null
+        return TeacherDestination.ChatThread(studentId = studentId)
+    }
 }
