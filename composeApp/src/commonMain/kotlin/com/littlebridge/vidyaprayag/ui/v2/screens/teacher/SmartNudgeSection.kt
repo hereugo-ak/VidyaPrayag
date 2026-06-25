@@ -56,24 +56,30 @@ sealed class TeacherNudge {
         val className: String,
         val subjectName: String,
         val examName: String,
+        val classId: String? = null,
+        val examId: String? = null,
     ) : TeacherNudge()
 
     /** A period's attendance was never taken. */
     data class AttendanceNotTaken(
         val className: String,
         val periodTime: String,
+        val periodId: String? = null,
     ) : TeacherNudge()
 
     /** A parent message is waiting for a reply. */
     data class ParentUnread(
         val parentName: String,
         val studentName: String,
+        val threadId: String? = null,
+        val studentId: String? = null,
     ) : TeacherNudge()
 
     /** Submitted homework is still ungraded. */
     data class HomeworkUngraded(
         val className: String,
         val count: Int,
+        val classId: String? = null,
     ) : TeacherNudge()
 }
 

@@ -11,9 +11,9 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P6-T4 — TeacherSettingsSection + VToggle + logout confirm (Phase 6 COMPLETE)
-LAST COMMIT: feat(teacher-portal): add PREFERENCES TeacherSettingsSection with VToggle + logout dialog (loop P6-T4)
-CURRENT PHASE: Phase 6 COMPLETE → Phase 7 — Cross-Tab Connectivity (P7-T1 next)
+LAST COMPLETED TASK: P7-T1 — TeacherDestination + TeacherNavRouter.nudgeDestination (Phase 7 in progress)
+LAST COMMIT: feat(teacher-portal): add TeacherDestination intents + nudge Add Now router (loop P7-T1)
+CURRENT PHASE: Phase 7 — Cross-Tab Connectivity (P7-T1 done → P7-T2 next)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
     ships a complete, mature, fully token-driven design system — VTheme → VColors
@@ -868,9 +868,21 @@ and track if students submitted homework — all in one place.
 ### PHASE 7 — CROSS-TAB CONNECTIVITY
 > Ensure all deep links between tabs work. No isolated dead ends.
 
-- [ ] **P7-T1**: Nudge "Add Now" on Home → navigates to GradebookTab,
+- [x] **P7-T1**: Nudge "Add Now" on Home → navigates to GradebookTab,
       pre-selects the class+exam from nudge data.
       Implement via `NavController` with route arguments.
+      ↳ DONE — `TeacherDestination.kt` + `TeacherNavRouter.kt`. NOTE: the app has NO Jetpack
+        `NavController` — `NavGraphV2.kt` navigates with a hoisted `route by remember` enum +
+        callbacks. So Phase 7 deep links use the portal-native pattern: a single exhaustive
+        `sealed interface TeacherDestination` (Gradebook(classId?, examId?), Attendance(periodId),
+        ChatThread(threadId?, studentId?), NoticeDetail(id, title, body), StudentList(classId?))
+        carrying typed args, applied by the host's portal shell in one `when`. `TeacherNavRouter
+        .nudgeDestination(nudge)` maps each Home `TeacherNudge` to its target: MarksNotEntered
+        "Add Now" → `Gradebook(classId, examId)` (pre-selected, the headline case), AttendanceNotTaken
+        → Attendance(periodId), ParentUnread → ChatThread, HomeworkUngraded → Gradebook(classId).
+        Added nullable `classId/examId/periodId/threadId/studentId` payload fields to the
+        `TeacherNudge` data classes (defaults null — host populates; existing data still valid).
+        No new hex; braces 3/3 + 2/2, parens 23/23 + 20/20.
 
 - [ ] **P7-T2**: Period tap on TodayStrip (Home) → if attendance not taken →
       "Take Attendance" button navigates to AttendanceScreen for that specific period.
@@ -980,6 +992,7 @@ BEGIN.
 | 27 | P6-T2  | `feat(teacher-portal): add 4-up TeacherStatsRow profile stats card (loop P6-T2)` | `composeApp/.../ui/v2/screens/teacher/TeacherStatsRow.kt` (new), `TEACHER_PORTAL_LOOP.md` | Profile stats. `data class TeacherProfileStat(value, label, onClick?)` + `TeacherStatsRow(stats, modifier)`: one `EnrollCard` wrapping a SpaceBetween Row of weight(1f) `StatColumn`s u2014 `dataLarge` value (textPrimary) over `labelCaps` label (textSecondary), centred. 1dp `StatDivider` (h32, surfaceSubtle) between columns, never trailing. Columns tappable only when stat has onClick (Classes Taught / Total Students deep links reserved for P7-T5). No new hex; braces 15/15, parens 42/42. |
 | 28 | P6-T3  | `feat(teacher-portal): add MY CLASSES TeacherAssignmentCard (loop P6-T3)` | `composeApp/.../ui/v2/screens/teacher/TeacherAssignmentCard.kt` (new), `TEACHER_PORTAL_LOOP.md` | Teaching roster. `data class TeacherClassAssignment(classId, className, section, subjects, studentCount)` + `TeacherAssignmentCard(assignments, onOpenClass, modifier)`: `SectionHeader(MY CLASSES)` over one EnrollCard of `ClassAssignmentRow`s built with a plain Column.forEach (CMP-safe "non-scrolling list"; a nested userScrollEnabled=false LazyColumn would crash on infinite height). Each row: classu00b7section labelBold, subjects as wrapping FlowRow SubjectChips (primarySoft/primaryDeep), GraduationCap + pluralised count, trailing ChevronRight, hairline between rows. Tap u2192 onOpenClass(classId) Gradebook deep link. No new hex; braces 20/20, parens 67/67. |
 | 29 | P6-T4  | `feat(teacher-portal): add PREFERENCES TeacherSettingsSection with VToggle + logout dialog (loop P6-T4)` | `composeApp/.../ui/v2/screens/teacher/TeacherSettingsSection.kt` (new), `TEACHER_PORTAL_LOOP.md` | Settings block. `TeacherSettingsSection(...)` fully-hoisted: SectionHeader(PREFERENCES) over an EnrollCard of `SettingsRow`s (icon|label|trailing, hairline between). Bespoke `VToggle` (44u00d726 track surfaceSubtleu2192primary, sliding 20dp white thumb u2014 not Material3 Switch) for Notification Preferences, Smart Nudges (gate for P4-T4 nudges), Dark Mode. Language = value+ChevronRightu2192onOpenLanguage; Help & Support = chevronu2192onOpenHelp. Log Out row statusAbsent-tinted u2192 custom confirm Dialog (Secondary Cancel + Destructive/Rose Log Out u2192 onLogOut). No new hex; braces 32/32, parens 128/128. **PHASE 6 COMPLETE.** |
+| 30 | P7-T1  | `feat(teacher-portal): add TeacherDestination intents + nudge Add Now router (loop P7-T1)` | `composeApp/.../ui/v2/screens/teacher/TeacherDestination.kt` (new), `TeacherNavRouter.kt` (new), `SmartNudgeSection.kt` (edit), `TEACHER_PORTAL_LOOP.md` | Deep-link foundation. App has no Jetpack NavController (NavGraphV2 uses hoisted route enum + callbacks), so Phase 7 uses a `sealed interface TeacherDestination` (Gradebook/Attendance/ChatThread/NoticeDetail/StudentList) with typed args + a pure `TeacherNavRouter`. `nudgeDestination(nudge)`: MarksNotEntered Add Now u2192 Gradebook(classId,examId) pre-selected; AttendanceNotTaken u2192 Attendance; ParentUnread u2192 ChatThread; HomeworkUngraded u2192 Gradebook. Added nullable id payloads to TeacherNudge (defaults null). No new hex; braces 3/3+2/2, parens 23/23+20/20. |
 
 ---
 

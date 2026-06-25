@@ -62,7 +62,16 @@ enum class NotificationGroup(val label: String) {
     Today("TODAY"), Yesterday("YESTERDAY"), Earlier("EARLIER")
 }
 
-/** One row in the notification sheet. `timeLabel` is pre-formatted (e.g. "9:14 AM"). */
+/**
+ * One row in the notification sheet. `timeLabel` is pre-formatted (e.g. "9:14 AM").
+ *
+ * The optional `*Id` payload fields are the deep-link targets the P7-T4
+ * [routeNotification] router reads to resolve a tap into a concrete
+ * [TeacherDestination] (e.g. a Message notification carries `parentThreadId` /
+ * `studentId`; a Grade/Attendance notification carries `classId`/`periodId`). They
+ * are nullable and default to null so existing callers/data stay valid — the router
+ * degrades gracefully to a safe destination when a payload is absent.
+ */
 data class TeacherNotification(
     val id: String,
     val type: NotificationType,
@@ -71,6 +80,10 @@ data class TeacherNotification(
     val timeLabel: String,
     val group: NotificationGroup,
     val unread: Boolean = false,
+    val classId: String? = null,
+    val periodId: String? = null,
+    val studentId: String? = null,
+    val parentThreadId: String? = null,
 )
 
 private fun NotificationType.icon(): ImageVector = when (this) {
