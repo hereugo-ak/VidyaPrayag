@@ -11,8 +11,8 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P1-T2 — shared EnrollCard composable (flat, border-defined, press-reactive)
-LAST COMMIT: feat(teacher-portal): add shared flat EnrollCard composable (loop P1-T2)
+LAST COMPLETED TASK: P1-T3 — shared SectionHeader composable (ergonomic string-action contract)
+LAST COMMIT: feat(teacher-portal): add shared SectionHeader composable (loop P1-T3)
 CURRENT PHASE: Phase 1 — Design System Foundation
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
@@ -55,6 +55,18 @@ AGENT NOTES:
   • All colours/shapes via `Enroll.*` bridge → VTheme (no new hex; only geometry
     literal is `1.dp` border width). Brace-balanced, imports clean, pressScale
     package verified, every referenced Enroll member confirmed to exist.
+
+  ── P1-T3 (this iteration) ──
+  • Added `ui/v2/components/SectionHeader.kt`: the loop's ergonomic string-action
+    header — `SectionHeader(title, action: String? = null, onAction: (() -> Unit)? = null)`.
+    Title = `labelCaps` (11/700 ALL-CAPS) in `textSecondary`; action = ripple-free
+    text button in `primaryMid` with a subtle pill press surface.
+  • The portal's existing `VSectionHeader` takes a @Composable action *slot*; this is
+    the loop's terser string variant (used everywhere: `SectionHeader("TODAY'S SCHEDULE")`,
+    `SectionHeader("NOTIFICATIONS", action = "Mark all read") { }`). Layout/typography
+    rhythm matches VSectionHeader exactly for visual parity.
+  • Removed an unused `background` import after self-review; braces 5/5; `colored`
+    extension + all `Enroll.*` members verified. No hardcoded hex.
 ```
 
 ### DONE CRITERIA (Static Analysis Only — No Build Required)
@@ -218,10 +230,14 @@ ScreenPadding = 16.dp
         Kept SEPARATE from the elevated `VCard`. "Replaces raw Card{}" verified vacuous —
         teacher portal never used Material3 `Card`. All tokens via `Enroll.*` bridge.
 
-- [ ] **P1-T3**: Create `ui/components/SectionHeader.kt` — a shared section header:
+- [x] **P1-T3**: Create `ui/components/SectionHeader.kt` — a shared section header:
       `SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)? = null)`
       Title uses `LabelCaps` style in `TextSecondary`. Action is a text button in `PrimaryIndigoMid`.
       Used before every section block across all tabs.
+      ↳ DONE. Added `ui/v2/components/SectionHeader.kt` with the exact string-action
+        signature. Title `labelCaps`/`textSecondary`; action ripple-free text button in
+        `primaryMid`. Terser sibling of the existing `VSectionHeader` (composable-slot);
+        layout/type rhythm matched for parity. All tokens via `Enroll.*`.
 
 - [ ] **P1-T4**: Create `ui/components/EnrollBottomNav.kt` — redesigned bottom nav bar:
       Tabs: Home | Gradebook | Planner | Chat | Profile.
@@ -605,6 +621,7 @@ BEGIN.
 | 1 | —       | —      | —             | Loop initialized |
 | 2 | P1-T1   | `feat(teacher-portal): add Enroll semantic token bridge over the existing VTheme design system` | `composeApp/.../ui/v2/theme/EnrollTokens.kt` (new), `TEACHER_PORTAL_LOOP.md` | Foundation satisfied by INTENT: bridged loop token vocabulary onto existing VTheme rather than forking an off-pattern indigo theme. Verified every referenced VColors/VType/VDimens member exists; braces balanced; no new hex; status semantics preserved; no existing screen modified. |
 | 3 | P1-T2   | `feat(teacher-portal): add shared flat EnrollCard composable (loop P1-T2)` | `composeApp/.../ui/v2/components/EnrollCard.kt` (new), `TEACHER_PORTAL_LOOP.md` | Flat border-defined card, no shadow, 0.98f press via existing `pressScale`; optional `tint` for nudges. Separate from elevated `VCard`. Raw-Card replacement verified vacuous. All tokens via `Enroll.*`; imports clean; braces balanced. |
+| 4 | P1-T3   | `feat(teacher-portal): add shared SectionHeader composable (loop P1-T3)` | `composeApp/.../ui/v2/components/SectionHeader.kt` (new), `TEACHER_PORTAL_LOOP.md` | Ergonomic string-action header (title/action/onAction). `labelCaps`+`textSecondary` title, `primaryMid` ripple-free text-button action. Terser sibling of `VSectionHeader`. Unused import removed on review; tokens via `Enroll.*`; braces 5/5. |
 
 ---
 
