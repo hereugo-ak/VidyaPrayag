@@ -1075,30 +1075,75 @@ BEGIN.
   `TeacherHomeHeader` is the hero there) — every other tab keeps the single header, so
   there is no double chrome.
 
-### What was DELETED (loop stubs that duplicated working VM-backed screens)
-The loop's Gradebook/Planner/Chat/Profile/Notification components were static UI-model
-stubs (`TODO(host)` for all data) that, if mounted, would **regress** the existing
-server-backed `TeacherGradebookScreenV2` / `PlannerScreen` / `TeacherProfileScreenV2` /
-`NotificationsScreenV2`. They were unreachable from the live shell and nothing else
-referenced them in code, so they were removed to keep the tree honest (23 files):
+### Round 2 — every remaining tab reskinned to the loop visual language (NOT just Home)
+The first pass only touched Home, which (correctly) drew the complaint that the rest of
+the portal still looked unchanged — the same gap PR #22 had. This round carries the loop's
+`Enroll*` / `EnrollCard` indigo vocabulary into the other tabs **driven by their real
+ViewModels**, with the iron rule: *reskin the surface, never fabricate data and never drop
+a working feature.*
+
+- **Profile tab (`TeacherProfileScreenV2`)** — the bespoke identity card is replaced by the
+  loop trio, all fed from the real `TeacherProfileViewModel` (`state.profile`):
+  - `TeacherProfileHeader` (P6-T1) — gradient identity hero; `teacherName/photoUrl/schoolName`
+    are real, `designation` is derived honestly from the teacher's own first subject
+    (e.g. "Mathematics Teacher") since the DTO has no title field. `onPickAvatar`/`onEdit`
+    are honest no-ops (no commonMain image-picker / edit-profile host exists yet).
+  - `TeacherStatsRow` (P6-T2) — real counts: classes, subjects, username.
+  - `TeacherAssignmentCard` (P6-T3) — real `profile.classes`; `onOpenClass` is inert because
+    the bare class-name strings carry no class-id deep link (routing to a guessed scope would
+    be a lie). The preserved VM-backed Schedule / Leave / Settings sections live unchanged
+    below in one padded column.
+- **Gradebook marks (`TeacherGradebookScreenV2`)** — the marks-entry row (the screen's primary
+  interaction) now renders through the loop's `StudentMarkRow` (P3-T4: EnrollCard row, roll ·
+  name · auto-derived grade chip · debounced mark pill), driven by the real
+  `TeacherGradebookViewModel.students`. The **AB (absent) toggle the loop row lacks is KEPT
+  alongside** so marking a student absent — a real feature — is not lost. Trend/detail are
+  honest no-ops (`MarkTrend.None`, empty `onOpenDetail`) because the VM exposes no per-student
+  history; we don't fake an arrow. The score-distribution view stays on `VBars` (it renders
+  whatever `%` buckets the server actually returns) rather than force-fit the loop's rigid
+  fixed A–F bar, which would misrepresent the data.
+- **Planner → Homework (`TeacherHomeworkScreenV2`)** — the homework list card shell is swapped
+  from `VCard` to the loop's `EnrollCard` (indigo-token border + card radius + native click),
+  carrying the SAME VM-driven content (progress bar, status strip, attachments). The full
+  assign-composer + roster submissions board + extensions flow downstream of the tap is
+  untouched. The loop's read-only `HomeworkTrackerView` was deliberately **not** mounted —
+  it would have deleted the composer/board.
+- **Planner → Schedule/Syllabus & Chat — deliberately NOT reskinned (honesty call):** the
+  loop's `WeekViewHeader`/`DailyPlanView`/`LessonPlanSheet` model a lesson-plan calendar that
+  **has no backend ViewModel**, and the Chat screens have **no chat backend at all**. Mounting
+  either would require fabricated data — exactly the dishonesty this whole pass exists to fix —
+  so those loop files were deleted instead of faked.
+
+### What was DELETED (loop stubs with no honest data source / would regress a feature)
+20 loop files were unreachable from the live shell, had no backing ViewModel, and nothing
+referenced them in code. Keeping them would repeat PR #22's "added but never wired" pattern,
+so they were removed:
 `AttendanceSummaryCard`, `BulkActionsBar`, `ChatThreadScreen`, `DailyPlanView`,
 `ExamSelector`, `GradeDistributionBar`, `GradebookExport`, `GradebookSelector`,
 `HomeworkTracker`, `NoticeDetailScreen`, `NotificationSheet`, `PendingTasksCard`,
-`PlannerNudge`, `StudentMarksList`, `TeacherAssignmentCard`, `TeacherChatScreen`,
-`TeacherDestination`, `TeacherNavRouter`, `TeacherProfileHeader`,
-`TeacherSettingsSection`, `TeacherStatsRow`, `TeacherStudentListScreen`, `WeekViewHeader`.
+`PlannerNudge`, `TeacherChatScreen`, `TeacherDestination`, `TeacherNavRouter`,
+`TeacherSettingsSection`, `TeacherStudentListScreen`, `WeekViewHeader`. (Chat ×2 dropped
+for no backend; planner-calendar dropped for no VM; the rest were duplicate stubs of
+working server-backed screens.)
 
-### Kept (now live consumers, not dead code)
-`EnrollTokens.kt`, `EnrollCard.kt`, `SectionHeader.kt`, and the five wired components
-`EnrollBottomNav`, `TeacherHomeHeader`, `QuickActionRow`, `SmartNudgeSection`,
-`TodayClassStrip` — all reachable from `TeacherPortalV2` → `TodayScreen`.
+### Kept (now LIVE consumers, not dead code)
+Design system: `EnrollTokens.kt`, `EnrollCard.kt`, `SectionHeader.kt`.
+Home (round 1): `EnrollBottomNav`, `TeacherHomeHeader`, `QuickActionRow`,
+`SmartNudgeSection`, `TodayClassStrip`.
+Round 2 reskins: `TeacherProfileHeader`, `TeacherStatsRow`, `TeacherAssignmentCard`
+(→ Profile), `StudentMarksList` (`StudentMarkRow` → Gradebook). Every one of these is now
+reachable from `TeacherPortalV2` and fed by a real ViewModel.
 
 ### Verification (static only — no Gradle build per constraint)
-- Brace/paren/bracket balance OK on every changed file.
-- No unused imports in changed files.
+- Brace/paren/bracket balance OK on every changed/kept file (state-aware check that ignores
+  char-literal braces: Profile, Gradebook, Homework, Portal, Today + the 4 kept components).
+- Orphaned imports removed where reskins displaced the old code (`ProfileIdentityHero`/
+  `ChipFlow` + `VAvatar`/`FlowRow`/`ExperimentalLayoutApi` in Profile; `VAvatar`/
+  `GradebookStudentMark` in Gradebook).
 - Whole-repo scan (`composeApp` + `shared`): **zero remaining code references** to any
-  deleted symbol; no kept file imports a deleted file.
-- All same-package symbols and all imported VM/state members confirmed to exist.
+  deleted symbol (comment-only mentions ignored); no kept file imports a deleted file.
+- All same-package symbols and every imported VM/state member confirmed to exist
+  (`TeacherProfile`, `GradebookStudentMark`, `HomeworkSummary`, `Enroll`, `colored`, …).
 
 ---
 
