@@ -11,8 +11,8 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P2-T2 — TodayClassStrip (signature period timeline + inline expansion)
-LAST COMMIT: feat(teacher-portal): add signature TodayClassStrip period timeline (loop P2-T2)
+LAST COMPLETED TASK: P2-T3 — QuickActionRow (three core-action pills)
+LAST COMMIT: feat(teacher-portal): add QuickActionRow three-up action pills (loop P2-T3)
 CURRENT PHASE: Phase 2 — Home Tab Premium Redesign (in progress)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
@@ -323,7 +323,7 @@ ScreenPadding = 16.dp
         the device clock). Reuses shared `parseHourMinute`/`formatClock12h`. Status
         colours preserved; all tokens via `Enroll.*`; braces 34/34; imports clean.
 
-- [ ] **P2-T3 — Quick Action Row**:
+- [x] **P2-T3 — Quick Action Row**:
       Three action pills in a `Row` with `SpaceMD` gap, horizontally centered.
       `QuickActionPill(icon, label, onClick)`:
         - "Take Attendance" → navigates to AttendanceScreen for active/next period
@@ -331,6 +331,10 @@ ScreenPadding = 16.dp
         - "Message Parent" → navigates to ChatTab
       Pill style: `PrimaryIndigoSoft` background, `PrimaryIndigoMid` icon+text,
       `ShapeCard` corners, `SpaceMD` vertical padding, `SpaceLG` horizontal padding.
+      ↳ DONE. Added `ui/v2/screens/teacher/QuickActionRow.kt` — `QuickActionRow` +
+        `QuickActionPill` (Check/GraduationCap/Chat icons). primarySoft bg, primaryMid
+        icon+text, shape.card, SpaceMD/SpaceLG padding, pressScale give. Callbacks
+        onTakeAttendance/onAddMarks/onMessageParent wired for P7. All tokens via Enroll.*.
 
 - [ ] **P2-T4 — Attendance Summary Card**:
       `AttendanceSummaryCard(todayStats: AttendanceDaySummary)` composable.
@@ -667,6 +671,7 @@ BEGIN.
 | 5 | P1-T4   | `feat(teacher-portal): add EnrollBottomNav over the premium TeacherDock (loop P1-T4)` | `composeApp/.../ui/v2/screens/teacher/EnrollBottomNav.kt` (new), `TEACHER_PORTAL_LOOP.md` | Canonical nav entry point: `EnrollBottomNav` + `EnrollTab` ids + `loopTabs()`. Delegates to premium `TeacherDock` instead of a regressive pill bar (preserves spring lozenge/haptics/badges/ParentDock parity). Chat badge via `VNavItem.badge`. Placed in teacher pkg for clean layering. **PHASE 1 COMPLETE.** |
 | 6 | P2-T1   | `feat(teacher-portal): add gradient TeacherHomeHeader for the Home tab (loop P2-T1)` | `composeApp/.../ui/v2/screens/teacher/TeacherHomeHeader.kt` (new), `TEACHER_PORTAL_LOOP.md` | Signature 120dp violet-gradient Home header: time-aware greeting + first name (headingLarge) + date (bodyMedium 70%); 40dp avatar ring → Profile; glassy bell + unread badge → NotificationSheet. Additive (keeps TeacherHeader on other tabs). Reuses `teacherGreeting`; util date + Enroll members verified; braces 22/22. |
 | 7 | P2-T2   | `feat(teacher-portal): add signature TodayClassStrip period timeline (loop P2-T2)` | `composeApp/.../ui/v2/screens/teacher/TodayClassStrip.kt` (new), `TEACHER_PORTAL_LOOP.md` | Horizontal period-pill day timeline (keyed LazyRow), past/active/future states with active accent glow, tap → inline AnimatedVisibility detail (room, attendance dot, pre-scoped Take-attendance CTA). Server `ResolvedDayUi.nowIndex`-driven. Reuses shared clock utils; status colours preserved; braces 34/34. |
+| 8 | P2-T3   | `feat(teacher-portal): add QuickActionRow three-up action pills (loop P2-T3)` | `composeApp/.../ui/v2/screens/teacher/QuickActionRow.kt` (new), `TEACHER_PORTAL_LOOP.md` | Three centered action pills (Take Attendance / Add Marks / Message Parent): primarySoft bg, primaryMid icon+text, shape.card, SpaceMD gap + padding, pressScale. Callbacks set up for P7 deep links. Tokens via `Enroll.*`; braces 5/5. |
 
 ---
 
