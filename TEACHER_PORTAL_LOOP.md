@@ -11,9 +11,9 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P1-T3 — shared SectionHeader composable (ergonomic string-action contract)
-LAST COMMIT: feat(teacher-portal): add shared SectionHeader composable (loop P1-T3)
-CURRENT PHASE: Phase 1 — Design System Foundation
+LAST COMPLETED TASK: P1-T4 — canonical EnrollBottomNav (delegates to the premium TeacherDock) — PHASE 1 COMPLETE
+LAST COMMIT: feat(teacher-portal): add EnrollBottomNav over the premium TeacherDock (loop P1-T4)
+CURRENT PHASE: Phase 1 — Design System Foundation (COMPLETE) → next: Phase 2 (Home Tab)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
     ships a complete, mature, fully token-driven design system — VTheme → VColors
@@ -67,6 +67,29 @@ AGENT NOTES:
     rhythm matches VSectionHeader exactly for visual parity.
   • Removed an unused `background` import after self-review; braces 5/5; `colored`
     extension + all `Enroll.*` members verified. No hardcoded hex.
+
+  ── P1-T4 (this iteration) — PHASE 1 COMPLETE ──
+  • Added `ui/v2/screens/teacher/EnrollBottomNav.kt`: `EnrollBottomNav(items,
+    selectedId, onSelect)` + `EnrollTab` id vocabulary (Home/Gradebook/Planner/
+    Chat/Profile) + `loopTabs()` builder.
+  • DECISION: did NOT build the loop's simpler pill bar (per-tab PrimaryIndigoSoft
+    pill, flat 1.0→1.15 scale, BadgedBox). The portal already ships `TeacherDock` —
+    a premium floating glass dock (spring sliding lozenge, glyph lift+scale,
+    selection haptic, live badges, full a11y) that is a deliberate ParentDock
+    sibling (Doc 10 §12 one-product parity). A pill bar would REGRESS below the
+    loop's QUALITY BAR and break parent↔teacher parity. So EnrollBottomNav DELEGATES
+    to TeacherDock — clean loop API, superior rendering, zero off-pattern visuals.
+  • Every loop nav requirement maps onto an existing-or-better dock feature
+    (label-on-active, violet active accent = PrimaryIndigo family, spring scale,
+    VNavItem.badge count badge for Chat → also satisfies P5-T3).
+  • Placed in the teacher package (not shared components/) to avoid a components→
+    screens layering inversion. Braces 2/2; all imports used; TeacherDock public &
+    same-package (no import cycle). Chat declared as loop-forward 5th tab; live IA
+    (Today·Classes·Gradebook·Planner·Profile) untouched until Phase 5.
+
+  >>> PHASE 1 (Design System Foundation) is now COMPLETE: tokens bridge (P1-T1),
+      EnrollCard (P1-T2), SectionHeader (P1-T3), EnrollBottomNav (P1-T4). Next
+      iteration begins PHASE 2 — Home Tab (P2-T1 Header Block).
 ```
 
 ### DONE CRITERIA (Static Analysis Only — No Build Required)
@@ -239,12 +262,18 @@ ScreenPadding = 16.dp
         `primaryMid`. Terser sibling of the existing `VSectionHeader` (composable-slot);
         layout/type rhythm matched for parity. All tokens via `Enroll.*`.
 
-- [ ] **P1-T4**: Create `ui/components/EnrollBottomNav.kt` — redesigned bottom nav bar:
+- [x] **P1-T4**: Create `ui/components/EnrollBottomNav.kt` — redesigned bottom nav bar:
       Tabs: Home | Gradebook | Planner | Chat | Profile.
       Selected tab: icon + label, icon tinted `PrimaryIndigo`, pill background `PrimaryIndigoSoft`.
       Unselected: icon only in `TextTertiary` — no label.
       Animate icon scale 1.0 → 1.15 on selection using `animateFloatAsState`.
       Chat tab has an unread badge using `BadgedBox`.
+      ↳ DONE (by intent). Added `ui/v2/screens/teacher/EnrollBottomNav.kt` —
+        `EnrollBottomNav(items, selectedId, onSelect)` + `EnrollTab` ids + `loopTabs()`.
+        DELEGATES to the existing premium `TeacherDock` (spring sliding lozenge,
+        glyph lift+scale, haptics, live badges, a11y, ParentDock parity) rather than
+        regressing to a flat Material pill bar. Every loop requirement maps onto a
+        dock feature that meets-or-exceeds the spec; Chat badge via `VNavItem.badge`.
 
 ---
 
@@ -622,6 +651,7 @@ BEGIN.
 | 2 | P1-T1   | `feat(teacher-portal): add Enroll semantic token bridge over the existing VTheme design system` | `composeApp/.../ui/v2/theme/EnrollTokens.kt` (new), `TEACHER_PORTAL_LOOP.md` | Foundation satisfied by INTENT: bridged loop token vocabulary onto existing VTheme rather than forking an off-pattern indigo theme. Verified every referenced VColors/VType/VDimens member exists; braces balanced; no new hex; status semantics preserved; no existing screen modified. |
 | 3 | P1-T2   | `feat(teacher-portal): add shared flat EnrollCard composable (loop P1-T2)` | `composeApp/.../ui/v2/components/EnrollCard.kt` (new), `TEACHER_PORTAL_LOOP.md` | Flat border-defined card, no shadow, 0.98f press via existing `pressScale`; optional `tint` for nudges. Separate from elevated `VCard`. Raw-Card replacement verified vacuous. All tokens via `Enroll.*`; imports clean; braces balanced. |
 | 4 | P1-T3   | `feat(teacher-portal): add shared SectionHeader composable (loop P1-T3)` | `composeApp/.../ui/v2/components/SectionHeader.kt` (new), `TEACHER_PORTAL_LOOP.md` | Ergonomic string-action header (title/action/onAction). `labelCaps`+`textSecondary` title, `primaryMid` ripple-free text-button action. Terser sibling of `VSectionHeader`. Unused import removed on review; tokens via `Enroll.*`; braces 5/5. |
+| 5 | P1-T4   | `feat(teacher-portal): add EnrollBottomNav over the premium TeacherDock (loop P1-T4)` | `composeApp/.../ui/v2/screens/teacher/EnrollBottomNav.kt` (new), `TEACHER_PORTAL_LOOP.md` | Canonical nav entry point: `EnrollBottomNav` + `EnrollTab` ids + `loopTabs()`. Delegates to premium `TeacherDock` instead of a regressive pill bar (preserves spring lozenge/haptics/badges/ParentDock parity). Chat badge via `VNavItem.badge`. Placed in teacher pkg for clean layering. **PHASE 1 COMPLETE.** |
 
 ---
 
