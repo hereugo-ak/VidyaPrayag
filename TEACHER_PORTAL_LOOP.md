@@ -705,7 +705,7 @@ and track if students submitted homework — all in one place.
 
 **Teacher mental model:** I don't think of "chats" — I think "Class 9B → Rohan's parents."
 
-- [ ] **P5-T1 — Chat List — Organized by Class**:
+- [x] **P5-T1 — Chat List — Organized by Class**:
       Remove chronological flat list. Replace with class-grouped structure.
       Top: `SearchBar` (single-line, `SurfaceSubtle` background, "Search parent or student…")
       Below: `LazyColumn` of `ClassChatGroup(className, threads)`.
@@ -718,6 +718,21 @@ and track if students submitted homework — all in one place.
         - Unread badge (count pill, `PrimaryIndigo` bg, white text)
         - Category badge chip: "Academic" / "Attendance" / "Behavioral" / "General"
       Tap → navigates to `ChatThreadScreen(threadId)`
+      ↳ DONE. Added `ui/v2/screens/teacher/TeacherChatScreen.kt`. Defined `ChatCategory`
+        {Academic/Attendance/Behavioral/General} + `ParentChatThread(id, className,
+        studentName, parentName, avatarUrl, lastMessage, timeLabel, unreadCount, category)`.
+        `TeacherChatScreen(threads, onOpenThread)` fronts a single-line `VInput` search bar
+        (Search leading icon, surfaceSubtle bg, "Search parent or student…") that filters by
+        student/parent name, then a `LazyColumn` grouped by `className` — each group = keyed
+        `SectionHeader(className)` + keyed `ParentThreadRow`s (NO flat recency feed — the
+        thread-first IA from Design Spec §SIGNATURE #4). Each `ParentThreadRow` =
+        `EnrollCard`: 40dp `VAvatar` (initials fallback when no photo), studentName labelBold
+        + `CategoryBadge` chip, parentName bodySmall, 1-line ellipsised last-message preview,
+        and a right rail with timeLabel + an `UnreadPill` (primary fill, "99+" cap). Empty /
+        no-match states included. `CategoryBadge` soft-tints per type (Academic→primarySoft,
+        Attendance→statusPresentSoft, Behavioral→accentSoft, General→surfaceSubtle) — no new
+        hex. Tap row → `onOpenThread(threadId)` (→ P5-T2). Tokens via `Enroll.*`; braces
+        27/27, parens 103/103; unused `size` import trimmed.
 
 - [ ] **P5-T2 — Chat Thread Screen**:
       File: `ui/screens/teacher/ChatThreadScreen.kt`
