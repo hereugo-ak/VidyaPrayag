@@ -46,10 +46,8 @@ import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentTrend
 import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentType
 import com.littlebridge.vidyaprayag.feature.teacher.domain.model.MarkBucketDto
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.GradebookMode
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.GradebookStudentMark
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherGradebookState
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherGradebookViewModel
-import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBars
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
@@ -545,13 +543,27 @@ private fun GradebookMarksContent(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(state.students, key = { it.studentId }) { s ->
-                        MarkRow(
-                            s = s,
-                            maxMarks = state.maxMarks,
-                            passMarks = a?.passMarks,
-                            onSetMark = onSetMark,
-                            onToggleAbsent = onToggleAbsent,
-                        )
+                        // Loop P3-T4 visual language (EnrollCard row: roll · name · grade chip ·
+                        // trend · debounced mark pill) driven by the REAL gradebook VM. The AB
+                        // toggle the loop row lacks is KEPT alongside so marking absent — a real
+                        // feature — isn't lost in the reskin. Trend/detail are honest no-ops:
+                        // the VM exposes no per-student history, so we don't fake an arrow.
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            StudentMarkRow(
+                                student = s,
+                                maxMarks = state.maxMarks,
+                                trend = MarkTrend.None,
+                                saveState = MarkSaveState.Idle,
+                                onMarkChanged = { value -> onSetMark(s.studentId, value) },
+                                onOpenDetail = {},
+                                modifier = Modifier.weight(1f),
+                            )
+                            AbToggle(active = s.isAbsent) { onToggleAbsent(s.studentId) }
+                        }
                     }
                     item { Spacer(Modifier.height(180.dp)) } // clear footer + dock
                 }
@@ -602,61 +614,6 @@ private fun GradebookMarksContent(
         onConfirm = { showUnpublishConfirm = false; onUnpublish() },
         onDismiss = { showUnpublishConfirm = false },
     )
-}
-
-@Composable
-private fun MarkRow(
-    s: GradebookStudentMark,
-    maxMarks: Int,
-    passMarks: Int?,
-    onSetMark: (String, Float?) -> Unit,
-    onToggleAbsent: (String) -> Unit,
-) {
-    val c = VTheme.colors
-    // Below-pass coloring only when a pass line exists and a real (non-AB) mark is entered (M11).
-    // Capture into a local val so the null-check enables smart-cast — `s.marks` is a public API
-    // property from the `shared` module and cannot be smart-cast directly across the module boundary.
-    val markValue = s.marks
-    val belowPass = passMarks != null && !s.isAbsent && markValue != null && markValue < passMarks
-    VCard(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            VAvatar(name = s.name, size = 40.dp)
-            Column(Modifier.weight(1f)) {
-                Text(s.name, style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 16.sp))
-                Text("Roll ${s.rollNo.ifBlank { "—" }}", style = VTheme.type.dataSm.colored(c.ink3).copy(fontSize = 12.sp))
-            }
-
-            // Marks field — DM Mono, validated/clamped in the VM; dimmed when AB.
-            Box(
-                Modifier
-                    .width(72.dp)
-                    .heightIn(min = 48.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .border(
-                        1.dp,
-                        if (belowPass) c.danger else c.border2,
-                        RoundedCornerShape(8.dp),
-                    )
-                    .background(if (s.isAbsent) c.cream else c.card),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (s.isAbsent) {
-                    Text("AB", style = VTheme.type.data.colored(c.ink3).copy(fontWeight = FontWeight.Bold))
-                } else {
-                    VInput(
-                        value = s.marks?.let { if (it % 1f == 0f) it.toInt().toString() else it.toString() } ?: "",
-                        onValueChange = { raw -> onSetMark(s.studentId, raw.trim().toFloatOrNull()) },
-                        placeholder = "—",
-                        keyboardType = KeyboardType.Number,
-                    )
-                }
-            }
-            Text("/$maxMarks", style = VTheme.type.dataSm.colored(c.ink3).copy(fontSize = 12.sp))
-
-            // AB toggle — ≥48dp, letter + color encoded (Doc 10 §3/§11).
-            AbToggle(active = s.isAbsent) { onToggleAbsent(s.studentId) }
-        }
-    }
 }
 
 @Composable

@@ -45,6 +45,7 @@ import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherHomework
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherHomeworkViewModel
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
+import com.littlebridge.vidyaprayag.ui.v2.components.EnrollCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
@@ -280,7 +281,10 @@ private fun HomeworkListSurface(
 private fun HomeworkCard(hw: HomeworkSummary, onClick: () -> Unit) {
     val c = VTheme.colors
     val allTurnedIn = hw.totalCount > 0 && hw.turnedInCount >= hw.totalCount
-    VCard(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick)) {
+    // Loop P5 visual language: EnrollCard shell (indigo-token border + card radius +
+    // native onClick) carrying the SAME VM-driven content — no data fabricated, the
+    // full board/composer flow downstream of onClick is untouched.
+    EnrollCard(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
                 Text(hw.title, style = VTheme.type.bodyStrong.colored(c.ink))

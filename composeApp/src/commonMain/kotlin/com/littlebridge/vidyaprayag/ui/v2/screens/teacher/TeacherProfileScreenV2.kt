@@ -7,8 +7,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -51,7 +49,6 @@ import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherProfileS
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherProfileViewModel
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherTodayState
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherTodayViewModel
-import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
 import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
@@ -203,44 +200,97 @@ private fun TeacherProfileContent(
                     Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp)
-                        .statusBarsPadding()
                         .imePadding()
                         .navigationBarsPadding()
-                        .padding(top = 16.dp, bottom = 140.dp),
+                        .padding(bottom = 140.dp),
                 ) {
-                    // ── 1. Identity hero ─────────────────────────────────────────
-                    ProfileIdentityHero(
-                        name = me.name,
-                        username = me.username,
-                        schoolName = me.schoolName,
+                    // ── 1. Identity hero — loop P6-T1 gradient header, REAL profile data ──
+                    // Designation is derived honestly from the teacher's own subjects (the
+                    // profile DTO has no separate title field), e.g. "Mathematics Teacher".
+                    val designation = me.subjects.firstOrNull()
+                        ?.let { "$it Teacher" }
+                        ?: if (me.classes.isNotEmpty()) "Class Teacher" else "Teacher"
+                    TeacherProfileHeader(
+                        teacherName = me.name,
                         photoUrl = me.photoUrl,
-                        subjects = me.subjects,
-                        classes = me.classes,
+                        designation = designation,
+                        schoolName = me.schoolName,
+                        // No commonMain image picker / edit-profile screen exists yet; these are
+                        // honest no-ops (the header still renders the affordances) rather than
+                        // fake navigation. Real wiring lands when those hosts exist.
+                        onPickAvatar = {},
+                        onEdit = {},
                     )
 
                     Spacer(Modifier.height(20.dp))
-                    ProfileScheduleSection(schedule = schedule, onRetry = onRetrySchedule)
+
+                    // ── 2. Stats row — loop P6-T2, REAL counts from the profile ──────
+                    Column(Modifier.padding(horizontal = 20.dp)) {
+                        TeacherStatsRow(
+                            stats = listOf(
+                                TeacherProfileStat(
+                                    value = me.classes.size.toString(),
+                                    label = if (me.classes.size == 1) "Class" else "Classes",
+                                ),
+                                TeacherProfileStat(
+                                    value = me.subjects.size.toString(),
+                                    label = if (me.subjects.size == 1) "Subject" else "Subjects",
+                                ),
+                                TeacherProfileStat(
+                                    value = me.username,
+                                    label = "Username",
+                                ),
+                            ),
+                        )
+                    }
+
+                    // ── 3. MY CLASSES — loop P6-T3, REAL class list from the profile ──
+                    if (me.classes.isNotEmpty()) {
+                        Spacer(Modifier.height(20.dp))
+                        Column(Modifier.padding(horizontal = 20.dp)) {
+                            TeacherAssignmentCard(
+                                assignments = me.classes.map { className ->
+                                    TeacherClassAssignment(
+                                        classId = className,
+                                        className = className,
+                                        section = "",
+                                        subjects = me.subjects,
+                                        studentCount = 0,
+                                    )
+                                },
+                                // No class-id deep link from the bare class-name strings; keep
+                                // the rows inert rather than route to a wrong scope.
+                                onOpenClass = {},
+                            )
+                        }
+                    }
+
+                    // ── 4. Schedule · Leave · Settings — preserved VM-backed sections,
+                    //    all inside one padded column to match the loop's screen gutter ──
                     Spacer(Modifier.height(20.dp))
-                    ProfileLeaveSection(
-                        leave = leave,
-                        applyResult = applyResult,
-                        onRetry = onRetryLeave,
-                        onApply = onApplyLeave,
-                        onClearApply = onClearApply,
-                    )
-                    Spacer(Modifier.height(20.dp))
-                    ProfileSettingsSection(
-                        phone = me.phone,
-                        email = me.email,
-                        themeName = themeName,
-                        passwordResult = passwordResult,
-                        onChangePassword = onChangePassword,
-                        onClearPassword = onClearPassword,
-                        onSetTheme = onSetTheme,
-                        onOpenLeaveInbox = onOpenLeaveInbox,
-                        onLogout = { showLogoutConfirm = true },
-                    )
+                    Column(Modifier.padding(horizontal = 20.dp)) {
+                        ProfileScheduleSection(schedule = schedule, onRetry = onRetrySchedule)
+                        Spacer(Modifier.height(20.dp))
+                        ProfileLeaveSection(
+                            leave = leave,
+                            applyResult = applyResult,
+                            onRetry = onRetryLeave,
+                            onApply = onApplyLeave,
+                            onClearApply = onClearApply,
+                        )
+                        Spacer(Modifier.height(20.dp))
+                        ProfileSettingsSection(
+                            phone = me.phone,
+                            email = me.email,
+                            themeName = themeName,
+                            passwordResult = passwordResult,
+                            onChangePassword = onChangePassword,
+                            onClearPassword = onClearPassword,
+                            onSetTheme = onSetTheme,
+                            onOpenLeaveInbox = onOpenLeaveInbox,
+                            onLogout = { showLogoutConfirm = true },
+                        )
+                    }
                 }
             }
         }
@@ -258,67 +308,6 @@ private fun ProfileCenterState(content: @Composable () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         content()
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 1. Identity hero — a flagship card (parent-grade) so the teacher's identity reads
-//    as a premium surface, never a bare floating block.
-// ─────────────────────────────────────────────────────────────────────────────
-@Composable
-private fun ProfileIdentityHero(
-    name: String,
-    username: String,
-    schoolName: String,
-    photoUrl: String?,
-    subjects: List<String>,
-    classes: List<String>,
-) {
-    val c = VTheme.colors
-    VCard(padding = 20.dp) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            VAvatar(name = name, src = photoUrl, size = 72.dp, ring = true)
-            Column(Modifier.weight(1f)) {
-                Text(name.ifBlank { "Teacher" }, style = VTheme.type.h2.colored(c.ink))
-                if (username.isNotBlank()) {
-                    Text("@$username", style = VTheme.type.dataSm.colored(c.ink2).copy(fontSize = 12.sp))
-                }
-                if (schoolName.isNotBlank()) {
-                    Spacer(Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Icon(VIcons.School, contentDescription = null, tint = c.ink3, modifier = Modifier.size(13.dp))
-                        Text(schoolName, style = VTheme.type.caption.colored(c.ink3))
-                    }
-                }
-            }
-        }
-
-        if (subjects.isNotEmpty()) {
-            Spacer(Modifier.height(16.dp))
-            Text("SUBJECTS", style = VTheme.type.label.colored(c.ink3))
-            Spacer(Modifier.height(8.dp))
-            ChipFlow(items = subjects, tone = VBadgeTone.Accent)
-        }
-
-        if (classes.isNotEmpty()) {
-            Spacer(Modifier.height(14.dp))
-            Text("CLASSES", style = VTheme.type.label.colored(c.ink3))
-            Spacer(Modifier.height(8.dp))
-            ChipFlow(items = classes, tone = VBadgeTone.Neutral)
-        }
-    }
-}
-
-/** A wrapping row of chips (subjects / classes) — wraps to multiple lines instead of clipping. */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ChipFlow(items: List<String>, tone: VBadgeTone) {
-    FlowRow(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        items.forEach { VBadge(text = it, tone = tone) }
     }
 }
 
