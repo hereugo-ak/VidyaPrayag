@@ -69,6 +69,37 @@ fun EnrollBottomNav(
 }
 
 /**
+ * EnrollBottomNav with a LIVE Chat unread badge (Loop task P5-T3).
+ *
+ * Overlays the reactive `chatUnread` count onto the [EnrollTab.Chat] item just
+ * before rendering, so the badge updates whenever `ChatViewModel.unreadCount`
+ * changes — without the caller having to rebuild the whole tab list. The dock's
+ * [VNavItem.badge] machinery renders the real count (this is the spec's
+ * `BadgedBox` requirement, satisfied by the dock's superior count badge).
+ *
+ * @param chatUnread the live unread total (e.g. `chatVm.unreadCount.collectAsState()`).
+ *   0 hides the badge.
+ */
+@Composable
+fun EnrollBottomNav(
+    items: List<VNavItem>,
+    selectedId: String,
+    onSelect: (String) -> Unit,
+    chatUnread: Int,
+    modifier: Modifier = Modifier,
+) {
+    val withBadge = items.map { item ->
+        if (item.id == EnrollTab.Chat) item.copy(badge = chatUnread) else item
+    }
+    EnrollBottomNav(
+        items = withBadge,
+        selectedId = selectedId,
+        onSelect = onSelect,
+        modifier = modifier,
+    )
+}
+
+/**
  * The loop's bottom-nav tab vocabulary (P1-T4). Stable string ids so navigation
  * actions and later loop tasks (e.g. P5-T3 Chat unread badge, P7 deep links)
  * reference real symbols instead of magic strings.

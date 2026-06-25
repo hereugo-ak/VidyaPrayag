@@ -11,9 +11,9 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P4-T4 — PlannerNudge (Phase 4 COMPLETE)
-LAST COMMIT: feat(teacher-portal): add PlannerNudge unplanned-periods amber prompt (loop P4-T4)
-CURRENT PHASE: Phase 4 COMPLETE → Phase 5 — Chat Tab (next)
+LAST COMPLETED TASK: P5-T3 — EnrollBottomNav live Chat unread badge (Phase 5 COMPLETE)
+LAST COMMIT: feat(teacher-portal): add live Chat unread badge overload to EnrollBottomNav (loop P5-T3)
+CURRENT PHASE: Phase 5 COMPLETE → Phase 6 — Profile Tab (next)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
     ships a complete, mature, fully token-driven design system — VTheme → VColors
@@ -769,9 +769,17 @@ and track if students submitted homework — all in one place.
         template" affordance. Honours IMPORTANT NOTE (primarySoft for PrimaryIndigoSoft, no
         new hex). Tokens via `Enroll.*`; braces 38/38, parens 156/156; every import used.
 
-- [ ] **P5-T3 — Unread Count Badge on BottomNav**:
+- [x] **P5-T3 — Unread Count Badge on BottomNav**:
       Chat tab in `EnrollBottomNav` shows live unread count from `ChatViewModel.unreadCount`.
       Update `BadgedBox` count reactively.
+      ↳ DONE. Extended `ui/v2/screens/teacher/EnrollBottomNav.kt` with a reactive overload
+        `EnrollBottomNav(items, selectedId, onSelect, chatUnread, modifier)` that overlays
+        the live `chatUnread` onto the `EnrollTab.Chat` item (`item.copy(badge = chatUnread)`)
+        just before rendering — so the badge tracks `ChatViewModel.unreadCount` without the
+        caller rebuilding the whole tab list. The premium `TeacherDock`'s existing
+        `VNavItem.badge` count badge IS the spec's `BadgedBox` (already wired in P1-T4 and
+        `loopTabs(chatUnread=…)`); this overload makes the live update ergonomic. No new hex;
+        braces 4/4, parens 40/40. **PHASE 5 COMPLETE.**
 
 ---
 
@@ -923,6 +931,9 @@ BEGIN.
 | 20 | P4-T2  | `feat(teacher-portal): add DailyPlanView day sections + LessonPlanSheet (loop P4-T2)` | `composeApp/.../ui/v2/screens/teacher/DailyPlanView.kt` (new), `TEACHER_PORTAL_LOOP.md` | Planner daily plan list. Models `PlannerPeriod`/`PlannerDay`/`LessonPlanDraft`. `DailyPlanView` = keyed LazyColumn (key=day.iso) of `PlanDaySection` w/ hoisted `LazyListState` (so WeekViewHeader.onSelectDay scrolls to a day). `PeriodPlanCard` = tappable EnrollCard: amber `accent` left rail + "EXAM" badge when isExam, 64dp P#/time rail, class·subject labelBold, inline `LessonTopicField` (BasicTextField placeholder), `HomeworkRow` ("x / y submitted" green when complete / amber pending). `LessonPlanSheet` = Dialog (topic/objective/materials/homework VInputs + full-width VButton → `LessonPlanDraft`). Default VButton tone (no Violet exists); no new hex; tokens via `Enroll.*`. Braces 45/45; 4 unused imports trimmed. |
 | 21 | P4-T3  | `feat(teacher-portal): add HomeworkTracker class-grouped view + toggle (loop P4-T3)` | `composeApp/.../ui/v2/screens/teacher/HomeworkTracker.kt` (new), `TEACHER_PORTAL_LOOP.md` | Planner Homework sub-view. `HomeworkAssignment` model + `PlannerSubView{Schedule,Homework}`. `PlannerSubToggle` = pill "Schedule \| Homework" switch (active=primary fill). `HomeworkTrackerView` = LazyColumn grouped by class (keyed SectionHeader per group + keyed cards; empty state). `HomeworkCard` = tappable EnrollCard w/ subject + `OverdueBadge`, description (2 lines), due-date (statusAbsent ink when overdue) + "x / y submitted", and a custom `SubmissionBar` (surfaceSubtle track + animated fill: statusPresent on track / statusAbsent overdue — exact semantic, not a VBadgeTone). Status colours preserved; no new hex; tokens via `Enroll.*`. Braces 26/26. |
 | 22 | P4-T4  | `feat(teacher-portal): add PlannerNudge unplanned-periods amber prompt (loop P4-T4)` | `composeApp/.../ui/v2/screens/teacher/PlannerNudge.kt` (new), `TEACHER_PORTAL_LOOP.md` | Planner smart nudge. `PlannerNudge(unplannedCount, dismissed, onPlanNow, onDismiss)` shows only when `count>0 && !dismissed` (AnimatedVisibility fade/shrink). Amber `accentSoft`-tinted EnrollCard: 36dp Calendar disc, pluralised real copy ("You haven't planned N period(s) for next week."), dismiss Close X, "Plan Now" primary pill → onPlanNow. Dismissed state hoisted; `TODO(host)` for DataStore persistence (loop-sanctioned). Amber = warning family (no new hex). Tokens via `Enroll.*`. Braces 7/7, parens 46/46. **PHASE 4 COMPLETE.** |
+| 23 | P5-T1  | `feat(teacher-portal): add class-grouped TeacherChatScreen list (loop P5-T1)` | `composeApp/.../ui/v2/screens/teacher/TeacherChatScreen.kt` (new), `TEACHER_PORTAL_LOOP.md` | Thread-first chat list. `ChatCategory` enum + `ParentChatThread` model. `TeacherChatScreen(threads, onOpenThread)` = a VInput search bar (surfaceSubtle, "Search parent or student…", filters by name) + a LazyColumn grouped by `className` (keyed SectionHeader + keyed `ParentThreadRow`s; NO flat recency feed). `ParentThreadRow` = EnrollCard with 40dp VAvatar (initials fallback), studentName labelBold + `CategoryBadge`, parentName bodySmall, 1-line preview, right rail timeLabel + `UnreadPill` (primary, "99+" cap). Empty/no-match states. CategoryBadge soft-tints per type (no new hex). Tap → onOpenThread (P5-T2). Tokens via `Enroll.*`; braces 27/27; unused `size` import trimmed. |
+| 24 | P5-T2  | `feat(teacher-portal): add ChatThreadScreen with bubbles + QuickReplySheet (loop P5-T2)` | `composeApp/.../ui/v2/screens/teacher/ChatThreadScreen.kt` (new), `TEACHER_PORTAL_LOOP.md` | Parent conversation. `ChatMessage` model. `ChatThreadScreen(studentName, parentName, messages, onBack, onVideoCall, onSend)` = custom `ChatTopBar` (back + student + parent subtitle + Phone stub), a reverseLayout keyed LazyColumn of `MessageBubble` (teacher = End primarySoft + textPrimary, parent = Start surfaceSubtle + textSecondary; bodyMedium text + bodySmall time; teacher Check read-receipt primary/tertiary), and a `ReplyBar` (FileText templates → QuickReplySheet, surfaceSubtle pill BasicTextField, Send enabled only when non-blank). `QuickReplySheet` = Dialog with the 4 spec templates as EnrollCards + "+ Add custom template". No new hex; tokens via `Enroll.*`; braces 38/38, parens 156/156; all imports used. |
+| 25 | P5-T3  | `feat(teacher-portal): add live Chat unread badge overload to EnrollBottomNav (loop P5-T3)` | `composeApp/.../ui/v2/screens/teacher/EnrollBottomNav.kt` (edit), `TEACHER_PORTAL_LOOP.md` | Reactive nav badge. Added `EnrollBottomNav(items, selectedId, onSelect, chatUnread, modifier)` that overlays the live `chatUnread` onto the `EnrollTab.Chat` item (`copy(badge=…)`) before rendering, so the badge tracks `ChatViewModel.unreadCount` without rebuilding the tab list. The dock's `VNavItem.badge` count badge is the spec's `BadgedBox`. No new hex; braces 4/4, parens 40/40. **PHASE 5 COMPLETE.** |
 
 ---
 
