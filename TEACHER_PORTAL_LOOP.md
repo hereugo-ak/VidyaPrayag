@@ -11,8 +11,8 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P1-T1 — Design System Foundation (semantic token bridge)
-LAST COMMIT: feat(teacher-portal): add Enroll semantic token bridge over the existing VTheme design system
+LAST COMPLETED TASK: P1-T2 — shared EnrollCard composable (flat, border-defined, press-reactive)
+LAST COMMIT: feat(teacher-portal): add shared flat EnrollCard composable (loop P1-T2)
 CURRENT PHASE: Phase 1 — Design System Foundation
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
@@ -35,6 +35,26 @@ AGENT NOTES:
     composables off the active VTheme).
   • Later loop tasks can now reference `Enroll.*` tokens with concrete, on-pattern,
     token-backed homes — no per-screen hardcoding required.
+
+  ── P1-T2 (this iteration) ──
+  • Added `ui/v2/components/EnrollCard.kt`: the loop's shared FLAT card —
+    `EnrollCard(modifier, onClick, tint, padding, shape, border, content)`.
+    Contract per Design Spec: `surfaceCard` fill, `shape.card` (16dp) corners,
+    1.dp `surfaceSubtle` border, NO elevation shadow (spec ElevationCard = 0.dp),
+    and the loop's `scale(0.98f)` press via the EXISTING `Modifier.pressScale`
+    (VMotion §13.3) — only on navigable (onClick) cards; static cards never animate.
+  • Distinct from the portal's existing `VCard` (which is the *elevated* navy-tinted
+    surface). EnrollCard is the flat, scannable surface for dense teacher screens
+    (gradebook rows, nudge cards) — kept as a SEPARATE primitive so VCard's ~30+
+    existing call sites are untouched (RULE-2: stability over churn).
+  • Added optional `tint` param up-front so P2-T5 nudge cards (`primarySoft` info /
+    `accentSoft` pending) need no later signature change.
+  • "Replaces all raw Card{}" — verified VACUOUS: grep shows the teacher portal
+    never imported/used Material3 `Card`; all `*Card` symbols are custom composables.
+    EnrollCard is now the canonical flat card for NEW loop screens.
+  • All colours/shapes via `Enroll.*` bridge → VTheme (no new hex; only geometry
+    literal is `1.dp` border width). Brace-balanced, imports clean, pressScale
+    package verified, every referenced Enroll member confirmed to exist.
 ```
 
 ### DONE CRITERIA (Static Analysis Only — No Build Required)
@@ -188,11 +208,15 @@ ScreenPadding = 16.dp
         mapping the loop's vocabulary onto the existing VTheme. Indigo→violet `accent`;
         status colours preserved; no new hex; no existing screen touched.
 
-- [ ] **P1-T2**: Create `ui/components/EnrollCard.kt` — a shared card composable:
+- [x] **P1-T2**: Create `ui/components/EnrollCard.kt` — a shared card composable:
       `EnrollCard(modifier, onClick, content)` using `SurfaceCard` fill,
       `ShapeCard` corners, a 1.dp `SurfaceSubtle` border (no elevation shadow),
       and a subtle `scale(0.98f)` press animation via `interactionSource`.
       This replaces all raw `Card {}` usages across teacher portal screens.
+      ↳ DONE. Added `ui/v2/components/EnrollCard.kt` (flat, border-defined, no shadow,
+        0.98f press via existing `pressScale`; optional `tint` for P2-T5 nudges).
+        Kept SEPARATE from the elevated `VCard`. "Replaces raw Card{}" verified vacuous —
+        teacher portal never used Material3 `Card`. All tokens via `Enroll.*` bridge.
 
 - [ ] **P1-T3**: Create `ui/components/SectionHeader.kt` — a shared section header:
       `SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)? = null)`
@@ -580,6 +604,7 @@ BEGIN.
 |---|---------|--------|---------------|-------|
 | 1 | —       | —      | —             | Loop initialized |
 | 2 | P1-T1   | `feat(teacher-portal): add Enroll semantic token bridge over the existing VTheme design system` | `composeApp/.../ui/v2/theme/EnrollTokens.kt` (new), `TEACHER_PORTAL_LOOP.md` | Foundation satisfied by INTENT: bridged loop token vocabulary onto existing VTheme rather than forking an off-pattern indigo theme. Verified every referenced VColors/VType/VDimens member exists; braces balanced; no new hex; status semantics preserved; no existing screen modified. |
+| 3 | P1-T2   | `feat(teacher-portal): add shared flat EnrollCard composable (loop P1-T2)` | `composeApp/.../ui/v2/components/EnrollCard.kt` (new), `TEACHER_PORTAL_LOOP.md` | Flat border-defined card, no shadow, 0.98f press via existing `pressScale`; optional `tint` for nudges. Separate from elevated `VCard`. Raw-Card replacement verified vacuous. All tokens via `Enroll.*`; imports clean; braces balanced. |
 
 ---
 
