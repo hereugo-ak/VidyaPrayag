@@ -119,4 +119,19 @@ object TeacherNavRouter {
                 body = notification.message,
             )
     }
+
+    /**
+     * P7-T5 — the "Classes Taught" profile stat → the Gradebook tab (all classes).
+     * No filter argument: the stat is the teacher's whole teaching load, so it opens
+     * the Gradebook at its class picker rather than pre-selecting one class.
+     */
+    fun classesTaughtDestination(): TeacherDestination = TeacherDestination.Gradebook()
+
+    /**
+     * P7-T5 — the "Total Students" profile stat → the student-list screen
+     * ([TeacherStudentListScreen]). No `classId` so it lists every student the teacher
+     * teaches across classes; the host can later pass a class filter without changing
+     * this contract.
+     */
+    fun totalStudentsDestination(): TeacherDestination = TeacherDestination.StudentList()
 }

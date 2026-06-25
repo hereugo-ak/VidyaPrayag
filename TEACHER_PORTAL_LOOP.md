@@ -11,9 +11,9 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P7-T4 — TeacherNavRouter.routeNotification + NoticeDetailScreen (Phase 7 in progress)
-LAST COMMIT: feat(teacher-portal): add routeNotification router + NoticeDetailScreen (loop P7-T4)
-CURRENT PHASE: Phase 7 — Cross-Tab Connectivity (P7-T4 done → P7-T5 next)
+LAST COMPLETED TASK: P7-T5 — profile-stat deep links + TeacherStudentListScreen (Phase 7 COMPLETE — LOOP COMPLETE)
+LAST COMMIT: feat(teacher-portal): add profile stat deep links + TeacherStudentListScreen stub (loop P7-T5)
+CURRENT PHASE: ALL PHASES COMPLETE (P1–P7) — ready for PR finalisation
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
     ships a complete, mature, fully token-driven design system — VTheme → VColors
@@ -928,8 +928,20 @@ and track if students submitted homework — all in one place.
         one EnrollCard (Megaphone plate + headingMedium title + optional caption + hairline +
         scrollable bodyLarge body). No new hex; braces 5/5 + 12/12, parens 45/45 + 67/67.
 
-- [ ] **P7-T5**: Profile stats "Classes Taught" tap → GradebookTab.
+- [x] **P7-T5**: Profile stats "Classes Taught" tap → GradebookTab.
       "Total Students" tap → a student list screen (stub with correct navigation).
+      ↳ DONE — `TeacherNavRouter.classesTaughtDestination()` → `Gradebook()` (whole teaching
+        load, opens at the class picker, no pre-filter) and `totalStudentsDestination()` →
+        `StudentList()`. These plug straight into the P6-T2 `TeacherProfileStat.onClick` hooks the
+        host already wires on the Classes Taught / Total Students columns. New
+        `TeacherStudentListScreen.kt`: `data class TeacherStudentListItem(studentId, name,
+        classLabel, rollNumber?, avatarUrl?)` + `TeacherStudentListScreen(students, onBack,
+        onOpenStudent, modifier, title)` — token-correct list (custom back top-bar with live count,
+        LazyColumn of EnrollCard StudentRows: VAvatar + name + class/roll caption + ChevronRight,
+        calm empty state). Per spec it's a STUB: real UI + correct navigation, but `students` is
+        host-supplied and `onOpenStudent` carries a TODO(host) for the future student-detail screen
+        — no dead end (rows + back work today). No new hex; braces 23/23, parens 84/84.
+        **PHASE 7 COMPLETE. ALL LOOP TASKS (P1-T1 … P7-T5) DONE.**
 
 ---
 
@@ -1025,6 +1037,7 @@ BEGIN.
 | 31 | P7-T2  | `feat(teacher-portal): add TodayStrip period u2192 Attendance deep link router (loop P7-T2)` | `composeApp/.../ui/v2/screens/teacher/TeacherNavRouter.kt` (edit), `TEACHER_PORTAL_LOOP.md` | TodayStripu2192Attendance. Added `periodDestination(period: ResolvedPeriodUi): TeacherDestination?` u2014 returns `Attendance(periodId)` only when !attendanceMarked && !isCancelled && periodId!=null, else null (period stays inert, no dead-end Take Attendance button). Reuses existing TodayClassStrip onTakeAttendance(ResolvedPeriodUi) + shared periodId/attendanceMarked fields u2014 no model change. No new hex; braces 3/3, parens 27/27. |
 | 32 | P7-T3  | `feat(teacher-portal): add Gradebook Message Parent u2192 ChatThread deep link router (loop P7-T3)` | `composeApp/.../ui/v2/screens/teacher/TeacherNavRouter.kt` (edit), `StudentMarksList.kt` (doc), `TEACHER_PORTAL_LOOP.md` | Gradebooku2192Chat. Added `messageParentDestination(studentId: String?): TeacherDestination?` u2192 `ChatThread(studentId=...)` (passes STUDENT id per spec; host ChatViewModel resolves studentu2192parent thread, creating if absent). Null when no studentId so button never targets a bad thread. Reuses existing StudentMarkDetailSheet onMessageParent VButton; doc'd the router contract on the param. No new hex; braces 4/4, parens 33/33. |
 | 33 | P7-T4  | `feat(teacher-portal): add routeNotification router + NoticeDetailScreen (loop P7-T4)` | `composeApp/.../ui/v2/screens/teacher/TeacherNavRouter.kt` (edit), `NoticeDetailScreen.kt` (new), `NotificationSheet.kt` (edit), `TEACHER_PORTAL_LOOP.md` | NotificationRouter. `routeNotification(notification): TeacherDestination` (no nav arg u2014 app has no NavController) exhaustive over NotificationType: Attendanceu2192Attendance, Gradeu2192Gradebook(class), Messageu2192ChatThread, Announcement/Homework/Generalu2192NoticeDetail(id,title,body). Compiler-checked exhaustive = no dead ends; missing ids degrade safely. Added nullable payload fields to TeacherNotification. New `NoticeDetailScreen`: calm read-only reader, custom back top-bar + EnrollCard (Megaphone plate, title, caption, scrollable body). No new hex; braces 5/5+12/12, parens 45/45+67/67. |
+| 34 | P7-T5  | `feat(teacher-portal): add profile stat deep links + TeacherStudentListScreen stub (loop P7-T5)` | `composeApp/.../ui/v2/screens/teacher/TeacherNavRouter.kt` (edit), `TeacherStudentListScreen.kt` (new), `TEACHER_PORTAL_LOOP.md` | Profile stat links. `classesTaughtDestination()`u2192Gradebook() (no filter), `totalStudentsDestination()`u2192StudentList() u2014 plug into the P6-T2 TeacherProfileStat.onClick hooks. New `TeacherStudentListScreen` (+ `TeacherStudentListItem`): token-correct list u2014 custom back top-bar w/ live count, LazyColumn of EnrollCard StudentRows (VAvatar+name+class/roll+ChevronRight), empty state. STUB per spec: real UI + nav, host-supplied students, onOpenStudent TODO(host). No dead end. No new hex; braces 23/23, parens 84/84. **PHASE 7 + LOOP COMPLETE.** |
 
 ---
 
