@@ -11,8 +11,8 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P3-T3 — ExamSelector + AddExamSheet (exam chip row + create form)
-LAST COMMIT: feat(teacher-portal): add ExamSelector with AddExamSheet (loop P3-T3)
+LAST COMPLETED TASK: P3-T4 — StudentMarkRow + StudentMarkDetailSheet (fast-entry grid)
+LAST COMMIT: feat(teacher-portal): add StudentMarkRow + detail sheet (loop P3-T4)
 CURRENT PHASE: Phase 3 — Gradebook Tab (in progress)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
@@ -514,7 +514,7 @@ No extra taps. No loading spinners after every entry. Auto-save silently.
         (TODO wiring in host). Tokens via `Enroll.*`; Alignment import trimmed; braces
         30/30.
 
-- [ ] **P3-T4 — Student Marks List**:
+- [x] **P3-T4 — Student Marks List**:
       `LazyColumn` with `key = { student.id }`.
       Each `StudentMarkRow(student, mark, onMarkChanged)`:
         - Roll number (LabelBold, TextTertiary, 32dp wide)
@@ -532,6 +532,23 @@ No extra taps. No loading spinners after every entry. Auto-save silently.
         - All exams history as a simple `LineChart` (use `Canvas`)
         - Remark text field (optional teacher note)
         - "Message Parent" button → navigates to that student's parent chat thread
+      ↳ DONE. Added `ui/v2/screens/teacher/StudentMarksList.kt` (the premium fast-entry
+        row; distinct from the existing terse `MarkRow` in TeacherGradebookScreenV2). Each
+        `StudentMarkRow(student, maxMarks, trend, saveState, onMarkChanged, onOpenDetail)`
+        consumes the real `GradebookStudentMark`: 32dp roll# (labelBold textTertiary),
+        name (bodyLarge textPrimary) + an `AutoSaveHint` ("saving…" → "✓ saved" green,
+        AnimatedVisibility), an auto-derived `GradeChip` (gradeForPercent → A/B green,
+        C/D amber, F red on a 16%-alpha disc), a `TrendArrow` (TrendingUp green / rotated
+        180° red / flat dash / none), and a `MarkField` pill — `BasicTextField` styled
+        SurfaceSubtle + shape.chip, dataMedium centred, focus border `primary` 2dp, digit/
+        dot filtered, **debounce 800ms via LaunchedEffect(text)+delay → onMarkChanged**
+        (no save button). Whole row taps → `onOpenDetail`. Added `StudentMarkDetailSheet`
+        (Dialog): VAvatar + name header, `SectionHeader("SCORE HISTORY")` + a custom
+        Canvas `MarksHistoryChart` (Path line + end dot over `ExamScorePoint` %s, graceful
+        <2-point copy), a multi-line `VInput` remark, and a full-width "Message Parent"
+        `VButton` (Chat icon → P7 thread). Enums `MarkSaveState`/`MarkTrend` +
+        `gradeForPercent` exposed for host wiring. Tokens via `Enroll.*`; 3 unused imports
+        trimmed; braces 37/37.
 
 - [ ] **P3-T5 — Bulk Actions Bar**:
       Appears at bottom (above FAB) when any student row is long-pressed.
@@ -778,6 +795,7 @@ BEGIN.
 | 13 | P3-T1  | `feat(teacher-portal): add GradebookSelector class + subject chip rows (loop P3-T1)` | `composeApp/.../ui/v2/screens/teacher/GradebookSelector.kt` (new), `TEACHER_PORTAL_LOOP.md` | Sticky two-row scope picker for the gradebook. Defined VM-agnostic options `GradebookClassOption`/`GradebookSubjectOption`. Row 1 classes always; Row 2 subjects only when present; both `horizontalScroll`. `SelectorChip` with animated bg/fg: selected → primary + white, unselected → surfaceSubtle + textSecondary; pill, labelBold, pressScale. Built a custom chip (no portal chip existed). Tokens via `Enroll.*`; braces 11/11. |
 | 14 | P3-T2  | `feat(teacher-portal): add GradeDistributionBar segmented bar (loop P3-T2)` | `composeApp/.../ui/v2/screens/teacher/GradeDistributionBar.kt` (new), `TEACHER_PORTAL_LOOP.md` | Segmented A–F distribution bar. Defined `GradeBand` + `defaultGradeBands(a,b,c,d,f)` mapping grades onto the status palette (no new hex). `GradeDistributionBar` = single Canvas (surfaceSubtle base + gapless count-share segments, animated 700ms, clipped shape.card, 8dp) + a per-band dot/count legend in bodySmall. Returns early when empty (host hides in All-Exams). Tokens via `Enroll.*`; braces 11/11. |
 | 15 | P3-T3  | `feat(teacher-portal): add ExamSelector with AddExamSheet (loop P3-T3)` | `composeApp/.../ui/v2/screens/teacher/ExamSelector.kt` (new), `TEACHER_PORTAL_LOOP.md` | Exam chip row over the marks list. `ExamSelector` = LazyRow with "All" chip + keyed `ExamChip`s (name labelBold + date bodySmall, selected→primary) + outlined "+ Add Exam" chip (primaryMid border). `AddExamSheet` = Dialog form reusing `VInput` (name/date/Number max-marks) + 3 `ExamTypeChip`s (Unit Test/Term/Assignment → AssessmentType) + full-width `VButton` (enabled when valid), emits `NewExamDraft`. Consumes real `AssessmentDto`. Tokens via `Enroll.*`; braces 30/30. |
+| 16 | P3-T4  | `feat(teacher-portal): add StudentMarkRow + detail sheet (loop P3-T4)` | `composeApp/.../ui/v2/screens/teacher/StudentMarksList.kt` (new), `TEACHER_PORTAL_LOOP.md` | Premium fast-entry marks row over real `GradebookStudentMark`. Roll# + name + `AutoSaveHint` (saving→✓), auto `GradeChip` (A/B green, C/D amber, F red), `TrendArrow`, and a `MarkField` `BasicTextField` pill (surfaceSubtle, focus border primary 2dp) with **800ms debounce auto-save** (LaunchedEffect+delay, no button). Tap row → `StudentMarkDetailSheet` (VAvatar header, Canvas score-history line chart over `ExamScorePoint`, remark VInput, Message-Parent VButton → P7). Enums `MarkSaveState`/`MarkTrend` + `gradeForPercent`. Tokens via `Enroll.*`; braces 37/37. |
 
 ---
 
