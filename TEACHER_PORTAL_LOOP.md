@@ -11,9 +11,9 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P6-T2 — TeacherStatsRow 4-up profile stats card (Phase 6 in progress)
-LAST COMMIT: feat(teacher-portal): add 4-up TeacherStatsRow profile stats card (loop P6-T2)
-CURRENT PHASE: Phase 6 — Profile Tab (P6-T2 done → P6-T3 next)
+LAST COMPLETED TASK: P6-T3 — TeacherAssignmentCard "MY CLASSES" roster (Phase 6 in progress)
+LAST COMMIT: feat(teacher-portal): add MY CLASSES TeacherAssignmentCard (loop P6-T3)
+CURRENT PHASE: Phase 6 — Profile Tab (P6-T3 done → P6-T4 next)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
     ships a complete, mature, fully token-driven design system — VTheme → VColors
@@ -822,13 +822,24 @@ and track if students submitted homework — all in one place.
         (canonical 4: Classes Taught | Total Students | Subjects | Attendance %). No new hex;
         braces 15/15, parens 42/42.
 
-- [ ] **P6-T3 — Teaching Assignment Card**:
+- [x] **P6-T3 — Teaching Assignment Card**:
       `EnrollCard` titled "MY CLASSES".
       `LazyColumn` (non-scrolling, `userScrollEnabled = false`) of `ClassAssignmentRow`:
         - Class name + section
         - Subjects taught in that class (comma-separated chips)
         - Student count
       Tap row → navigates to GradebookTab filtered to that class.
+      ↳ DONE — `TeacherAssignmentCard.kt`. `data class TeacherClassAssignment(classId,
+        className, section, subjects, studentCount)` + `TeacherAssignmentCard(assignments,
+        onOpenClass, modifier)`: `SectionHeader("MY CLASSES")` over one `EnrollCard`. NOTE on the
+        spec's non-scrolling `LazyColumn`: a nested lazy list with userScrollEnabled=false inside
+        the profile's outer scroll measures with infinite height and crashes in CMP — the
+        CMP-safe equivalent is a plain `Column.forEach` (rosters are short, never paginated),
+        which is exactly the "non-scrolling list" intended. Each `ClassAssignmentRow`: class·section
+        (`labelBold`), subjects as wrapping `FlowRow` of `SubjectChip`s (primarySoft fill /
+        primaryDeep ink), `GraduationCap` + pluralised student count, trailing `ChevronRight`;
+        hairline divider between rows. Tap → `onOpenClass(classId)` deep-links Gradebook filtered
+        to that class (host wires nav arg). No new hex; braces 20/20, parens 67/67.
 
 - [ ] **P6-T4 — Settings Section**:
       `SectionHeader("PREFERENCES")`
@@ -955,6 +966,7 @@ BEGIN.
 | 25 | P5-T3  | `feat(teacher-portal): add live Chat unread badge overload to EnrollBottomNav (loop P5-T3)` | `composeApp/.../ui/v2/screens/teacher/EnrollBottomNav.kt` (edit), `TEACHER_PORTAL_LOOP.md` | Reactive nav badge. Added `EnrollBottomNav(items, selectedId, onSelect, chatUnread, modifier)` that overlays the live `chatUnread` onto the `EnrollTab.Chat` item (`copy(badge=…)`) before rendering, so the badge tracks `ChatViewModel.unreadCount` without rebuilding the tab list. The dock's `VNavItem.badge` count badge is the spec's `BadgedBox`. No new hex; braces 4/4, parens 40/40. **PHASE 5 COMPLETE.** |
 | 26 | P6-T1  | `feat(teacher-portal): add gradient TeacherProfileHeader (loop P6-T1)` | `composeApp/.../ui/v2/screens/teacher/TeacherProfileHeader.kt` (new), `TEACHER_PORTAL_LOOP.md` | Profile hero. `TeacherProfileHeader(teacherName, photoUrl, designation, schoolName, onPickAvatar, onEdit, modifier)`: 200dp full-width `Enroll.colors.headerGradient` banner clipped to `shape.sheet`, `statusBarsPadding`. Centre col: 72dp `VAvatar(ring=true)` (white 3dp ring) clickable→`onPickAvatar` (commonMain picker stub — no Android launcher in shared code), name `headingLarge` white, designation·school middot-joined `bodyMedium` white 80%. Glassy 36dp `Edit3` pencil top-end→`onEdit` (EditProfileScreen host stub). Mirrors TeacherHomeHeader gradient/ring/glass for hero parity. No new hex; braces 15/15, parens 65/65. |
 | 27 | P6-T2  | `feat(teacher-portal): add 4-up TeacherStatsRow profile stats card (loop P6-T2)` | `composeApp/.../ui/v2/screens/teacher/TeacherStatsRow.kt` (new), `TEACHER_PORTAL_LOOP.md` | Profile stats. `data class TeacherProfileStat(value, label, onClick?)` + `TeacherStatsRow(stats, modifier)`: one `EnrollCard` wrapping a SpaceBetween Row of weight(1f) `StatColumn`s u2014 `dataLarge` value (textPrimary) over `labelCaps` label (textSecondary), centred. 1dp `StatDivider` (h32, surfaceSubtle) between columns, never trailing. Columns tappable only when stat has onClick (Classes Taught / Total Students deep links reserved for P7-T5). No new hex; braces 15/15, parens 42/42. |
+| 28 | P6-T3  | `feat(teacher-portal): add MY CLASSES TeacherAssignmentCard (loop P6-T3)` | `composeApp/.../ui/v2/screens/teacher/TeacherAssignmentCard.kt` (new), `TEACHER_PORTAL_LOOP.md` | Teaching roster. `data class TeacherClassAssignment(classId, className, section, subjects, studentCount)` + `TeacherAssignmentCard(assignments, onOpenClass, modifier)`: `SectionHeader(MY CLASSES)` over one EnrollCard of `ClassAssignmentRow`s built with a plain Column.forEach (CMP-safe "non-scrolling list"; a nested userScrollEnabled=false LazyColumn would crash on infinite height). Each row: classu00b7section labelBold, subjects as wrapping FlowRow SubjectChips (primarySoft/primaryDeep), GraduationCap + pluralised count, trailing ChevronRight, hairline between rows. Tap u2192 onOpenClass(classId) Gradebook deep link. No new hex; braces 20/20, parens 67/67. |
 
 ---
 
