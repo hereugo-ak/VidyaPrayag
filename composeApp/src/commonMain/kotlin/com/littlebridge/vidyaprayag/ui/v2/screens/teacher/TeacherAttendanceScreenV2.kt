@@ -129,7 +129,7 @@ private fun AttendanceBody(
                     if (state.alreadyMarked && state.lastMarkedBy != null) {
                         Spacer(Modifier.height(10.dp))
                         Text(
-                            "Last marked by ${state.lastMarkedBy}${state.lastMarkedAt?.let { " · ${prettyDate(it.take(10))}" } ?: ""}",
+                            "Last marked by ${state.lastMarkedBy ?: ""}${state.lastMarkedAt?.let { " · ${prettyDate(it.take(10))}" } ?: ""}",
                             style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
                         )
                     }

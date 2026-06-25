@@ -309,7 +309,7 @@ private fun LeaveCard(
             when {
                 leave.isLoading && leave.requests.isEmpty() -> Box(Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.Center) { TeacherSpinner(24.dp) }
                 leave.error != null && leave.requests.isEmpty() -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(leave.error, style = VTheme.type.caption.colored(c.ink3), modifier = Modifier.weight(1f))
+                    Text(leave.error ?: "", style = VTheme.type.caption.colored(c.ink3), modifier = Modifier.weight(1f))
                     VButton("Retry", onClick = onRetry, size = VButtonSize.Sm, variant = VButtonVariant.Ghost)
                 }
                 leave.requests.isEmpty() -> Text("No leave requests yet.", style = VTheme.type.body.colored(c.ink3))

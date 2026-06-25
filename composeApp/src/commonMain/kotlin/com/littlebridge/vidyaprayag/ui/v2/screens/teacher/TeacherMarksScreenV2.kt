@@ -197,7 +197,8 @@ private fun AssessmentRow(a: AssessmentDto, viewModel: TeacherGradebookViewModel
     val c = VTheme.colors
     // Per directive: marks open only once the exam date has passed (a scheduled future test is locked).
     val today = todayIso()
-    val examPassed = a.examDate == null || a.examDate <= today
+    val examDate = a.examDate
+    val examPassed = examDate == null || examDate <= today
     val canEnter = examPassed && !a.isPublished
     val statusTint: Color
     val statusLabel: String
@@ -220,7 +221,7 @@ private fun AssessmentRow(a: AssessmentDto, viewModel: TeacherGradebookViewModel
                 Text(
                     buildString {
                         append("Max ${a.maxMarks}")
-                        if (a.examDate != null) append(" · ${prettyDateShort(a.examDate)}")
+                        if (examDate != null) append(" · ${prettyDateShort(examDate)}")
                         if (a.rosterCount > 0) append(" · entered ${a.enteredCount}/${a.rosterCount}")
                     },
                     style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.5.sp),

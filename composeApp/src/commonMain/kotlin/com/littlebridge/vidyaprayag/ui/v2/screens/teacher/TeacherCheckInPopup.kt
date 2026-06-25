@@ -153,9 +153,10 @@ fun TeacherCheckInPopup(
                             style = VTheme.type.body.colored(c.ink2).copy(fontSize = 13.5.sp),
                             textAlign = TextAlign.Center,
                         )
-                        if (state.error != null) {
+                        val errorText = state.error
+                        if (errorText != null) {
                             Spacer(Modifier.height(8.dp))
-                            Text(state.error, style = VTheme.type.caption.colored(c.dangerInk).copy(fontSize = 12.sp), textAlign = TextAlign.Center)
+                            Text(errorText, style = VTheme.type.caption.colored(c.dangerInk).copy(fontSize = 12.sp), textAlign = TextAlign.Center)
                         }
                         Spacer(Modifier.height(18.dp))
 

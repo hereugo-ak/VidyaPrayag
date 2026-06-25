@@ -376,7 +376,8 @@ private fun HolidayRow(day: ResolvedDayUi) {
         TIconDisc(VIcons.Calendar, tint = c.navy, bg = c.navy.copy(alpha = 0.12f), size = 36.dp, glyph = 18.dp)
         Column {
             Text("Holiday", style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 14.sp, fontWeight = FontWeight.Bold))
-            if (!day.holidayName.isNullOrBlank()) Text(day.holidayName, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 12.sp))
+            val holidayName = day.holidayName
+            if (!holidayName.isNullOrBlank()) Text(holidayName, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 12.sp))
         }
     }
 }
@@ -409,13 +410,14 @@ private fun SchedulePeriodRow(p: ResolvedPeriodUi, isNow: Boolean, isNext: Boole
                 if (isNow) TPill("NOW", bg = accent.copy(alpha = 0.18f), fg = accent)
                 else if (isNext) TPill("NEXT", bg = c.accent.copy(alpha = 0.10f), fg = c.accentDeep)
             }
-            if (p.room.isNotBlank() || p.substituteTeacherName != null) {
+            val sub = p.substituteTeacherName
+            if (p.room.isNotBlank() || sub != null) {
                 Text(
                     buildString {
                         if (p.room.isNotBlank()) append(p.room)
-                        if (p.substituteTeacherName != null) {
+                        if (sub != null) {
                             if (isNotEmpty()) append(" · ")
-                            append("Sub: ${p.substituteTeacherName}")
+                            append("Sub: $sub")
                         }
                     },
                     style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),

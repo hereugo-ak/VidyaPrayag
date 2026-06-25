@@ -128,7 +128,7 @@ private fun ClassListPane(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Couldn't load your classes", style = VTheme.type.bodyStrong.colored(c.navyDeep))
                 Spacer(Modifier.height(4.dp))
-                Text(state.error, style = VTheme.type.caption.colored(c.ink3))
+                Text(state.error ?: "", style = VTheme.type.caption.colored(c.ink3))
                 Spacer(Modifier.height(14.dp))
                 VButton("Try again", onClick = onRefresh, size = VButtonSize.Sm, tone = VButtonTone.Lavender)
             }
@@ -308,7 +308,7 @@ private fun ClassDetailPane(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Couldn't load this class", style = VTheme.type.bodyStrong.colored(c.navyDeep))
                     Spacer(Modifier.height(4.dp))
-                    Text(state.detailError, style = VTheme.type.caption.colored(c.ink3))
+                    Text(state.detailError ?: "", style = VTheme.type.caption.colored(c.ink3))
                     Spacer(Modifier.height(14.dp))
                     VButton("Try again", onClick = onRetry, size = VButtonSize.Sm, tone = VButtonTone.Lavender)
                 }
