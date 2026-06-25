@@ -1,10 +1,13 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,10 +15,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,820 +31,299 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.HOMEWORK_STATUS_GRADED
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.HOMEWORK_STATUS_LATE
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.HOMEWORK_STATUS_NOT_SUBMITTED
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.HOMEWORK_STATUS_SUBMITTED
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.HomeworkBoard
+import com.littlebridge.vidyaprayag.feature.teacher.domain.model.HomeworkSubmissionStatus
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.HomeworkBoardRow
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.HomeworkMode
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.HomeworkSummary
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherHomeworkState
 import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherHomeworkViewModel
-import com.littlebridge.vidyaprayag.ui.v2.components.VBadge
-import com.littlebridge.vidyaprayag.ui.v2.components.VBadgeTone
-import com.littlebridge.vidyaprayag.ui.v2.components.EnrollCard
 import com.littlebridge.vidyaprayag.ui.v2.components.VButton
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
 import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
-import com.littlebridge.vidyaprayag.ui.v2.components.VCard
-import com.littlebridge.vidyaprayag.ui.v2.components.VConfirmDialog
 import com.littlebridge.vidyaprayag.ui.v2.components.VDatePicker
-import com.littlebridge.vidyaprayag.ui.v2.components.VEmptyState
 import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
 import com.littlebridge.vidyaprayag.ui.v2.components.VInput
-import com.littlebridge.vidyaprayag.ui.v2.components.VLabel
-import com.littlebridge.vidyaprayag.ui.v2.components.VProgressBar
-import com.littlebridge.vidyaprayag.ui.v2.screens.VStateHost
 import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
 import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
 import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
-import kotlin.math.roundToInt
 
 /**
- * TeacherHomeworkScreenV2 — T-406 (Doc 08 §6–§9). The clean rebuild of the Planner › Homework
- * plane on the typed lifecycle contract (T-405), replacing the legacy screen whose **Assign
- * button was dead** (F-HW-1) and whose holder had no scope, no board, no extensions.
- *
- * Two surfaces (driven by [HomeworkMode]):
- *   • LIST  — this assignment's active homework, each a card with a live turned-in ratio +
- *             status counts and a "past due" / "just assigned" badge; a primary
- *             "Assign new homework" CTA opens the assign composer (title / description /
- *             due-date(+optional time) / allow-late). This is the **real** fix for F-HW-1.
- *   • BOARD — one homework's roster-joined submissions board (every enrolled student appears,
- *             even NOT-SUBMITTED — B-HW-3/H7) with status pills + counts, per-row review/grade,
- *             grant-extension (whole-class or single-student), and close.
- *
- * Reached PRE-SCOPED by [assignmentId] (X-1) — the Planner host owns class selection; there's no
- * picker here. Empty/loading/error are all designed via [VStateHost] + [VEmptyState] (never
- * defaulted). All numbers come from the backend. Closes F-HW-1..4.
+ * TeacherHomeworkScreenV2 — the scoped homework lifecycle (Doc 08 §6–§8). Reached PRE-SCOPED with a
+ * pre-authorized [assignmentId]. Two faces:
+ *   • LIST  — this class's active homework (each with a live turned-in ratio) + an assign composer
+ *             (title / description / due date(+time) / allow-late).
+ *   • BOARD — one homework's roster-joined submissions board (every enrolled student, incl. NOT
+ *             SUBMITTED), grant extension (whole-class or one student), per-row review, and close.
  */
 @Composable
 fun TeacherHomeworkScreenV2(
-    assignmentId: String = "",
-    scopeHint: String = "",
+    assignmentId: String,
+    scopeLabel: String,
     modifier: Modifier = Modifier,
     viewModel: TeacherHomeworkViewModel = koinViewModel(),
 ) {
+    val c = VTheme.colors
     val state by viewModel.state.collectAsStateV2()
 
-    LaunchedEffectLoad(assignmentId, viewModel)
-
-    TeacherHomeworkContent(
-        state = state,
-        hasScope = assignmentId.isNotBlank(),
-        scopeHint = scopeHint,
-        onRetry = viewModel::retry,
-        onOpenComposer = viewModel::openComposer,
-        onCloseComposer = viewModel::closeComposer,
-        onComposerTitle = viewModel::setComposerTitle,
-        onComposerDescription = viewModel::setComposerDescription,
-        onComposerDueDate = viewModel::setComposerDueDate,
-        onComposerDueTime = viewModel::setComposerDueTime,
-        onComposerAllowLate = viewModel::setComposerAllowLate,
-        onAssign = viewModel::assign,
-        onOpenBoard = viewModel::openBoard,
-        onCloseBoard = viewModel::closeBoard,
-        onReview = viewModel::reviewSubmission,
-        onOpenExtension = viewModel::openExtension,
-        onCloseExtension = viewModel::closeExtension,
-        onExtensionDate = viewModel::setExtensionDate,
-        onExtensionTime = viewModel::setExtensionTime,
-        onExtensionReason = viewModel::setExtensionReason,
-        onGrantExtension = viewModel::grantExtension,
-        onCloseHomework = viewModel::closeHomework,
-        modifier = modifier,
-    )
-}
-
-@Composable
-private fun LaunchedEffectLoad(assignmentId: String, viewModel: TeacherHomeworkViewModel) {
     LaunchedEffect(assignmentId) {
-        if (assignmentId.isNotBlank()) viewModel.load(assignmentId)
-    }
-}
-
-@Composable
-private fun TeacherHomeworkContent(
-    state: TeacherHomeworkState,
-    hasScope: Boolean,
-    scopeHint: String,
-    onRetry: () -> Unit,
-    onOpenComposer: () -> Unit,
-    onCloseComposer: () -> Unit,
-    onComposerTitle: (String) -> Unit,
-    onComposerDescription: (String) -> Unit,
-    onComposerDueDate: (String) -> Unit,
-    onComposerDueTime: (String) -> Unit,
-    onComposerAllowLate: (Boolean) -> Unit,
-    onAssign: () -> Unit,
-    onOpenBoard: (String) -> Unit,
-    onCloseBoard: () -> Unit,
-    onReview: (String, String, String?) -> Unit,
-    onOpenExtension: (String?, String) -> Unit,
-    onCloseExtension: () -> Unit,
-    onExtensionDate: (String) -> Unit,
-    onExtensionTime: (String) -> Unit,
-    onExtensionReason: (String) -> Unit,
-    onGrantExtension: () -> Unit,
-    onCloseHomework: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    when (state.mode) {
-        HomeworkMode.List -> HomeworkListSurface(
-            state = state,
-            hasScope = hasScope,
-            scopeHint = scopeHint,
-            onRetry = onRetry,
-            onOpenComposer = onOpenComposer,
-            onOpenBoard = onOpenBoard,
-            modifier = modifier,
-        )
-        HomeworkMode.Board -> HomeworkBoardSurface(
-            state = state,
-            onBack = onCloseBoard,
-            onReview = onReview,
-            onOpenExtension = onOpenExtension,
-            onCloseHomework = onCloseHomework,
-            modifier = modifier,
-        )
+        if (assignmentId.isNotBlank() && state.assignmentId != assignmentId) viewModel.load(assignmentId)
     }
 
-    // Assign composer (list mode) — a light sheet, result-driven (Assign spins, surfaces error).
-    if (state.isComposerOpen) {
-        AssignHomeworkDialog(
-            state = state,
-            onTitle = onComposerTitle,
-            onDescription = onComposerDescription,
-            onDueDate = onComposerDueDate,
-            onDueTime = onComposerDueTime,
-            onAllowLate = onComposerAllowLate,
-            onConfirm = onAssign,
-            onDismiss = onCloseComposer,
-        )
-    }
-
-    // Extension composer (board mode).
-    if (state.isExtensionOpen) {
-        GrantExtensionDialog(
-            state = state,
-            onDate = onExtensionDate,
-            onTime = onExtensionTime,
-            onReason = onExtensionReason,
-            onConfirm = onGrantExtension,
-            onDismiss = onCloseExtension,
-        )
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  LIST SURFACE
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun HomeworkListSurface(
-    state: TeacherHomeworkState,
-    hasScope: Boolean,
-    scopeHint: String,
-    onRetry: () -> Unit,
-    onOpenComposer: () -> Unit,
-    onOpenBoard: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val c = VTheme.colors
-    val scopeLabel = remember(scopeHint, state.items) {
-        state.items.firstOrNull()?.let { listOf(it.className, it.subject).filter { s -> s.isNotBlank() }.joinToString(" · ") }
-            ?.ifBlank { scopeHint } ?: scopeHint
-    }
-
-    Column(modifier.fillMaxSize()) {
-        if (scopeLabel.isNotBlank()) {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 16.dp, bottom = 4.dp)) {
-                VLabel("Homework")
-                Text(scopeLabel, style = VTheme.type.h3.colored(c.ink), modifier = Modifier.padding(top = 2.dp))
-            }
+    Box(modifier.fillMaxSize().background(c.background)) {
+        when (state.mode) {
+            HomeworkMode.List -> HomeworkListMode(viewModel, scopeLabel)
+            HomeworkMode.Board -> HomeworkBoardMode(viewModel)
         }
+    }
+}
 
-        VStateHost(
-            loading = state.isLoading,
-            error = state.error,
-            // No scope yet → VStateHost's own "choose a class". When scoped, even zero homework
-            // is CONTENT (we render an actionable empty WITH an Assign affordance inside).
-            isEmpty = !hasScope,
-            emptyTitle = "Choose a class",
-            emptyBody = "Pick a class to assign and track homework.",
-            emptyIcon = VIcons.ClipboardList,
-            onRetry = null,
-        ) {
-            Column(
-                Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp).padding(top = 8.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                if (!state.hasItems) {
-                    VEmptyState(
-                        title = "No homework yet",
-                        body = "Assign your first homework — it'll appear here with a live submissions board.",
-                        icon = VIcons.ClipboardList,
-                        action = {
-                            VButton(
-                                text = "Assign homework",
-                                onClick = onOpenComposer,
-                                variant = VButtonVariant.Primary,
-                                tone = VButtonTone.Lavender,
-                                size = VButtonSize.Md,
-                                leading = { Icon(VIcons.Plus, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                            )
-                        },
-                    )
-                } else {
-                    state.items.forEach { hw -> HomeworkCard(hw, onClick = { onOpenBoard(hw.id) }) }
+// ─────────────────────────────────────────────────────────────────────────────
+// LIST mode
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun HomeworkListMode(viewModel: TeacherHomeworkViewModel, scopeLabel: String) {
+    val c = VTheme.colors
+    val state by viewModel.state.collectAsStateV2()
+
+    LazyColumn(
+        Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(top = 14.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            TCard(padding = 16.dp) {
+                Column {
+                    TEyebrow("HOMEWORK", dot = c.tealDeep)
+                    Spacer(Modifier.height(6.dp))
+                    Text(scopeLabel.ifBlank { state.scopeLabel }, style = VTheme.type.h3.colored(c.navyDeep).copy(fontWeight = FontWeight.ExtraBold))
+                    Spacer(Modifier.height(12.dp))
                     VButton(
-                        text = "Assign new homework",
-                        onClick = onOpenComposer,
+                        text = if (state.isComposerOpen) "Close" else "Assign homework",
+                        onClick = { if (state.isComposerOpen) viewModel.closeComposer() else viewModel.openComposer() },
                         full = true,
-                        size = VButtonSize.Lg,
-                        tone = VButtonTone.Lavender,
-                        leading = { Icon(VIcons.Plus, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                        variant = if (state.isComposerOpen) VButtonVariant.Ghost else VButtonVariant.Primary,
+                        tone = VButtonTone.Teal,
+                        leading = { Icon(if (state.isComposerOpen) VIcons.Close else VIcons.Plus, contentDescription = null, modifier = Modifier.size(15.dp)) },
                     )
                 }
             }
         }
+
+        if (state.isComposerOpen) item { HomeworkComposer(viewModel) }
+
+        when {
+            state.isLoading && state.items.isEmpty() -> item { Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) { TeacherSpinner() } }
+            state.error != null && state.items.isEmpty() -> item {
+                TCard { Column {
+                    Text("Couldn't load homework", style = VTheme.type.bodyStrong.colored(c.ink))
+                    Spacer(Modifier.height(8.dp))
+                    VButton("Retry", onClick = { viewModel.retry() }, tone = VButtonTone.Teal, size = VButtonSize.Sm)
+                } }
+            }
+            state.items.isEmpty() -> item {
+                TCard { Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    TIconDisc(VIcons.FileText, tint = c.tealDeep, bg = c.teal.copy(alpha = 0.14f), size = 48.dp, glyph = 24.dp)
+                    Spacer(Modifier.height(10.dp))
+                    Text("No active homework", style = VTheme.type.h3.colored(c.ink))
+                    Text("Assign your first homework for this class.", style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 12.sp))
+                } }
+            }
+            else -> items(state.items, key = { it.id }) { hw -> HomeworkRow(hw) { viewModel.openBoard(hw.id) } }
+        }
     }
 }
 
 @Composable
-private fun HomeworkCard(hw: HomeworkSummary, onClick: () -> Unit) {
+private fun HomeworkComposer(viewModel: TeacherHomeworkViewModel) {
     val c = VTheme.colors
-    val allTurnedIn = hw.totalCount > 0 && hw.turnedInCount >= hw.totalCount
-    // Loop P5 visual language: EnrollCard shell (indigo-token border + card radius +
-    // native onClick) carrying the SAME VM-driven content — no data fabricated, the
-    // full board/composer flow downstream of onClick is untouched.
-    EnrollCard(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
+    val state by viewModel.state.collectAsStateV2()
+    TCard(padding = 16.dp) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("New homework", style = VTheme.type.h3.colored(c.navyDeep).copy(fontWeight = FontWeight.ExtraBold))
+            VInput(value = state.composerTitle, onValueChange = viewModel::setComposerTitle, label = "Title", placeholder = "e.g. Chapter 4 exercises")
+            VInput(value = state.composerDescription, onValueChange = viewModel::setComposerDescription, label = "Details (optional)", placeholder = "Instructions for students", singleLine = false)
+            VDatePicker(value = state.composerDueDate, onValueChange = viewModel::setComposerDueDate, label = "Due date")
+            // Allow-late toggle
+            val late = state.composerAllowLate
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.cream).border(1.dp, c.hairline, RoundedCornerShape(12.dp))
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { viewModel.setComposerAllowLate(!late) }.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier.size(22.dp).clip(RoundedCornerShape(6.dp)).background(if (late) c.tealDeep else c.card).border(1.dp, if (late) c.tealDeep else c.hairline, RoundedCornerShape(6.dp)),
+                    contentAlignment = Alignment.Center,
+                ) { if (late) Icon(VIcons.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp)) }
+                Spacer(Modifier.width(10.dp))
+                Text("Allow late submissions", style = VTheme.type.body.colored(c.ink).copy(fontSize = 13.5.sp))
+            }
+            if (state.composerError != null) Text(state.composerError ?: "", style = VTheme.type.caption.colored(c.dangerInk).copy(fontSize = 12.sp))
+            VButton("Assign homework", onClick = { viewModel.assign() }, full = true, tone = VButtonTone.Teal, loading = state.isAssigning, enabled = state.canAssign)
+        }
+    }
+}
+
+@Composable
+private fun HomeworkRow(hw: HomeworkSummary, onOpen: () -> Unit) {
+    val c = VTheme.colors
+    val pct = (hw.turnedInRatio * 100).toInt()
+    TCard(padding = 14.dp, onClick = onOpen) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            TRing(percent = pct, modifier = Modifier.size(52.dp), accent = c.tealDeep, label = "$pct%", labelSize = 12.sp, stroke = 5.dp)
             Column(Modifier.weight(1f)) {
-                Text(hw.title, style = VTheme.type.bodyStrong.colored(c.ink))
+                Text(hw.title, style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 15.sp, fontWeight = FontWeight.ExtraBold), maxLines = 1)
+                Spacer(Modifier.height(2.dp))
                 Text(
-                    listOfNotNull(
-                        hw.subject.ifBlank { null },
-                        hw.className.ifBlank { null },
-                        dueLabel(hw.dueDate, hw.dueTime),
-                    ).joinToString(" • "),
-                    style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp),
+                    "Due ${prettyDateShort(hw.dueDate)}${if (hw.isPastDue) " · past due" else ""} · ${hw.turnedInCount}/${hw.totalCount} turned in",
+                    style = VTheme.type.caption.colored(if (hw.isPastDue) c.warningInk else c.ink3).copy(fontSize = 11.5.sp),
                 )
             }
-            when {
-                hw.isPastDue && !allTurnedIn -> VBadge(text = "Past due", tone = VBadgeTone.Danger)
-                hw.totalCount > 0 -> VBadge(
-                    text = "${hw.turnedInCount} / ${hw.totalCount} in",
-                    tone = if (allTurnedIn) VBadgeTone.Success else VBadgeTone.Warning,
-                )
-                else -> VBadge(text = "Just assigned", tone = VBadgeTone.Arctic)
-            }
-        }
-        if (hw.totalCount > 0) {
-            Spacer(Modifier.height(10.dp))
-            VProgressBar(value = (hw.turnedInRatio * 100f).roundToInt().toFloat())
-            Spacer(Modifier.height(8.dp))
-            StatusCountStrip(
-                submitted = hw.submittedCount,
-                late = hw.lateCount,
-                graded = hw.gradedCount,
-                notSubmitted = hw.notSubmittedCount,
-            )
-        }
-        if (hw.attachments.isNotEmpty()) {
-            Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Icon(VIcons.FileText, contentDescription = null, tint = c.ink3, modifier = Modifier.size(13.dp))
-                Text(
-                    "${hw.attachments.size} attachment${if (hw.attachments.size == 1) "" else "s"}",
-                    style = VTheme.type.dataSm.colored(c.ink3).copy(fontSize = 10.sp),
-                )
-            }
+            Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(20.dp))
         }
     }
 }
 
-/** Inline status legend — four soft pills with live counts (Doc 08 §8). */
-@Composable
-private fun StatusCountStrip(submitted: Int, late: Int, graded: Int, notSubmitted: Int) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (graded > 0) StatusDotCount("Graded", graded, VBadgeTone.Accent)
-        if (submitted > 0) StatusDotCount("Submitted", submitted, VBadgeTone.Success)
-        if (late > 0) StatusDotCount("Late", late, VBadgeTone.Warning)
-        if (notSubmitted > 0) StatusDotCount("Pending", notSubmitted, VBadgeTone.Neutral)
-    }
-}
-
-@Composable
-private fun StatusDotCount(label: String, count: Int, tone: VBadgeTone) {
-    VBadge(text = "$count $label", tone = tone)
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-//  BOARD SURFACE
+// BOARD mode
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun HomeworkBoardSurface(
-    state: TeacherHomeworkState,
-    onBack: () -> Unit,
-    onReview: (String, String, String?) -> Unit,
-    onOpenExtension: (String?, String) -> Unit,
-    onCloseHomework: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun HomeworkBoardMode(viewModel: TeacherHomeworkViewModel) {
     val c = VTheme.colors
-    var confirmClose by remember { mutableStateOf(false) }
+    val state by viewModel.state.collectAsStateV2()
+    val board = state.board
+    var closeConfirm by remember { mutableStateOf(false) }
 
-    Column(modifier.fillMaxSize()) {
-        // Back row + close.
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 12.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            VButton(
-                text = "Back",
-                onClick = onBack,
-                variant = VButtonVariant.Ghost,
-                size = VButtonSize.Sm,
-                leading = { Icon(VIcons.ArrowLeft, contentDescription = null, modifier = Modifier.size(14.dp)) },
-            )
-            VButton(
-                text = "Close homework",
-                onClick = { confirmClose = true },
-                variant = VButtonVariant.Ghost,
-                tone = VButtonTone.Rose,
-                size = VButtonSize.Sm,
-                loading = state.isClosing,
-            )
-        }
-
-        VStateHost(
-            loading = state.isBoardLoading,
-            error = state.boardError,
-            isEmpty = false,   // a loaded board is always content (roster-joined, never blank)
-            onRetry = null,
-        ) {
-            val board = state.board
-            if (board != null) {
-                Column(
-                    Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp).padding(bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    BoardHeader(board)
-                    BoardSummaryCard(board, onExtendAll = { onOpenExtension(null, "") })
-                    if (board.rows.isEmpty()) {
-                        VEmptyState(
-                            title = "No students enrolled",
-                            body = "Once students are enrolled in this class they'll appear here.",
-                            icon = VIcons.Users,
-                        )
-                    } else {
-                        BoardRosterCard(
-                            board = board,
-                            updatingStudentId = state.updatingStudentId,
-                            onReview = onReview,
-                            onExtendStudent = { row -> onOpenExtension(row.studentId, row.name) },
-                        )
+    LazyColumn(
+        Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(top = 14.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item {
+            TCard(padding = 16.dp) {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(30.dp).clip(RoundedCornerShape(999.dp)).background(c.cream)
+                                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { viewModel.closeBoard() },
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(VIcons.ArrowLeft, contentDescription = "Back", tint = c.ink, modifier = Modifier.size(15.dp)) }
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(board?.title ?: "Submissions", style = VTheme.type.h3.colored(c.navyDeep).copy(fontWeight = FontWeight.ExtraBold), maxLines = 1)
+                            Text("Due ${prettyDateShort(board?.dueDate)}", style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))
+                        }
+                    }
+                    if (board != null) {
+                        Spacer(Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TMetricTile(board.submittedCount.toString(), "Submitted", c.successInk, Modifier.weight(1f))
+                            TMetricTile(board.lateCount.toString(), "Late", c.warningInk, Modifier.weight(1f))
+                            TMetricTile(board.gradedCount.toString(), "Graded", c.accent, Modifier.weight(1f))
+                            TMetricTile(board.notSubmittedCount.toString(), "Pending", c.dangerInk, Modifier.weight(1f))
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            VButton("Extend for class", onClick = { viewModel.openExtension(null) }, modifier = Modifier.weight(1f), variant = VButtonVariant.Secondary, tone = VButtonTone.Sky, size = VButtonSize.Sm, leading = { Icon(VIcons.Clock, contentDescription = null, modifier = Modifier.size(14.dp)) })
+                            VButton("Close", onClick = { closeConfirm = true }, modifier = Modifier.weight(1f), variant = VButtonVariant.Ghost, size = VButtonSize.Sm)
+                        }
                     }
                 }
             }
         }
+
+        when {
+            state.isBoardLoading && board == null -> item { Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) { TeacherSpinner() } }
+            board == null -> item { TCard { Text("Couldn't load the board.", style = VTheme.type.body.colored(c.ink2)) } }
+            else -> items(board.rows, key = { it.studentId }) { row ->
+                BoardStudentRow(row, updating = state.updatingStudentId == row.studentId, onReview = { st -> viewModel.reviewSubmission(row.studentId, st) }, onExtend = { viewModel.openExtension(row.studentId, row.name) })
+            }
+        }
     }
 
-    VConfirmDialog(
-        visible = confirmClose,
-        title = "Close this homework?",
-        message = "Students will no longer be able to submit. You can still see the board from your records.",
-        confirmLabel = "Close homework",
-        onConfirm = { confirmClose = false; onCloseHomework() },
-        onDismiss = { confirmClose = false },
-        icon = VIcons.AlertTriangle,
-    )
+    if (state.isExtensionOpen) ExtensionSheet(viewModel)
+    if (closeConfirm) {
+        TeacherConfirmDialog(
+            title = "Close this homework?",
+            body = "Closing archives the homework. Students can no longer submit.",
+            confirmLabel = "Close it",
+            destructive = true,
+            onConfirm = { closeConfirm = false; viewModel.closeHomework() },
+            onDismiss = { closeConfirm = false },
+        )
+    }
 }
 
 @Composable
-private fun BoardHeader(board: HomeworkBoard) {
+private fun BoardStudentRow(row: HomeworkBoardRow, updating: Boolean, onReview: (String) -> Unit, onExtend: () -> Unit) {
     val c = VTheme.colors
-    Box(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.accentTint).padding(horizontal = 16.dp, vertical = 12.dp),
+    val (tint, label) = when (row.status) {
+        HomeworkSubmissionStatus.SUBMITTED -> c.successInk to "Submitted"
+        HomeworkSubmissionStatus.LATE -> c.warningInk to "Late"
+        HomeworkSubmissionStatus.GRADED -> c.accent to "Graded"
+        else -> c.dangerInk to "Not submitted"
+    }
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.card).border(1.dp, c.hairline, RoundedCornerShape(16.dp)).padding(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Box(
-                Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(c.accent.copy(alpha = 0.14f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(VIcons.ClipboardList, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(18.dp))
-            }
             Column(Modifier.weight(1f)) {
-                Text(board.title, style = VTheme.type.h3.colored(c.ink).copy(fontWeight = FontWeight.ExtraBold))
+                Text(row.name, style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 14.sp, fontWeight = FontWeight.Bold), maxLines = 1)
                 Text(
-                    listOfNotNull(
-                        listOf(board.className, board.subject).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { null },
-                        dueLabel(board.dueDate, board.dueTime),
-                    ).joinToString(" • "),
-                    style = VTheme.type.caption.colored(c.accentDeep),
+                    buildString {
+                        append(if (row.rollNo != null) "Roll ${row.rollNo}" else row.studentCode)
+                        if (row.hasExtension && !row.extendedTo.isNullOrBlank()) append(" · extended to ${prettyDateShort(row.extendedTo)}")
+                    },
+                    style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
                 )
             }
-            if (board.isPastDue) VBadge(text = "Past due", tone = VBadgeTone.Danger)
+            if (updating) TeacherSpinner(16.dp) else TPill(label.uppercase(), bg = tint.copy(alpha = 0.14f), fg = tint)
+        }
+        // Review actions only when there's something turned in.
+        if (row.status == HomeworkSubmissionStatus.SUBMITTED || row.status == HomeworkSubmissionStatus.LATE) {
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                VButton("Mark graded", onClick = { onReview(HomeworkSubmissionStatus.GRADED) }, modifier = Modifier.weight(1f), variant = VButtonVariant.Secondary, tone = VButtonTone.Mint, size = VButtonSize.Sm)
+                VButton("Extend", onClick = onExtend, modifier = Modifier.weight(1f), variant = VButtonVariant.Ghost, size = VButtonSize.Sm)
+            }
+        } else if (row.status == HomeworkSubmissionStatus.NOT_SUBMITTED) {
+            Spacer(Modifier.height(8.dp))
+            VButton("Grant extension", onClick = onExtend, full = true, variant = VButtonVariant.Ghost, size = VButtonSize.Sm, leading = { Icon(VIcons.Clock, contentDescription = null, modifier = Modifier.size(14.dp)) })
         }
     }
 }
 
 @Composable
-private fun BoardSummaryCard(board: HomeworkBoard, onExtendAll: () -> Unit) {
+private fun ExtensionSheet(viewModel: TeacherHomeworkViewModel) {
     val c = VTheme.colors
-    val turnedIn = board.submittedCount + board.lateCount + board.gradedCount
-    val ratio = if (board.totalCount == 0) 0f else turnedIn.toFloat() / board.totalCount
-    VCard {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            VLabel("Submissions")
-            Text(
-                "$turnedIn / ${board.totalCount} turned in · ${(ratio * 100).roundToInt()}%",
-                style = VTheme.type.dataSm.colored(c.ink2).copy(fontSize = 11.sp),
-            )
-        }
-        Spacer(Modifier.height(8.dp))
-        VProgressBar(value = ratio * 100f)
-        Spacer(Modifier.height(10.dp))
-        StatusCountStrip(
-            submitted = board.submittedCount,
-            late = board.lateCount,
-            graded = board.gradedCount,
-            notSubmitted = board.notSubmittedCount,
-        )
-        Spacer(Modifier.height(10.dp))
-        VButton(
-            text = "Extend for whole class",
-            onClick = onExtendAll,
-            variant = VButtonVariant.Secondary,
-            tone = VButtonTone.Sky,
-            size = VButtonSize.Sm,
-            leading = { Icon(VIcons.Clock, contentDescription = null, modifier = Modifier.size(14.dp)) },
-        )
-    }
-}
-
-@Composable
-private fun BoardRosterCard(
-    board: HomeworkBoard,
-    updatingStudentId: String?,
-    onReview: (String, String, String?) -> Unit,
-    onExtendStudent: (HomeworkBoardRow) -> Unit,
-) {
-    VCard {
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            board.rows.forEach { row ->
-                BoardRow(
-                    row = row,
-                    updating = updatingStudentId == row.studentId,
-                    enabled = updatingStudentId == null,
-                    onMarkGraded = { onReview(row.studentId, HOMEWORK_STATUS_GRADED, null) },
-                    onMarkSubmitted = { onReview(row.studentId, HOMEWORK_STATUS_SUBMITTED, null) },
-                    onExtend = { onExtendStudent(row) },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun BoardRow(
-    row: HomeworkBoardRow,
-    updating: Boolean,
-    enabled: Boolean,
-    onMarkGraded: () -> Unit,
-    onMarkSubmitted: () -> Unit,
-    onExtend: () -> Unit,
-) {
-    val c = VTheme.colors
-    Row(
-        Modifier.fillMaxWidth().padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        // Roll badge.
-        Box(
-            Modifier.size(30.dp).clip(CircleShape).background(c.cream),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                row.rollNo?.toString() ?: "–",
-                style = VTheme.type.dataSm.colored(c.ink2).copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
-            )
-        }
-        Column(Modifier.weight(1f)) {
-            Text(row.name, style = VTheme.type.body.colored(c.ink).copy(fontSize = 13.sp))
-            val sub = listOfNotNull(
-                statusVerb(row.status),
-                row.grade?.takeIf { it.isNotBlank() }?.let { "Grade $it" },
-                row.extendedTo?.takeIf { row.hasExtension && it.isNotBlank() }?.let { "Extended to $it" },
-            ).joinToString(" • ")
-            if (sub.isNotBlank()) {
-                Text(sub, style = VTheme.type.dataSm.colored(c.ink3).copy(fontSize = 10.sp))
-            }
-        }
-        StatusPill(row.status)
-        // Per-row affordances (deliberate, compact). Marking graded/submitted + extend.
-        BoardRowActions(
-            row = row,
-            updating = updating,
-            enabled = enabled,
-            onMarkGraded = onMarkGraded,
-            onMarkSubmitted = onMarkSubmitted,
-            onExtend = onExtend,
-        )
-    }
-}
-
-@Composable
-private fun BoardRowActions(
-    row: HomeworkBoardRow,
-    updating: Boolean,
-    enabled: Boolean,
-    onMarkGraded: () -> Unit,
-    onMarkSubmitted: () -> Unit,
-    onExtend: () -> Unit,
-) {
-    val c = VTheme.colors
-    // A submitted/late student can be moved to graded; a not-submitted student can be granted
-    // an extension (the "she was sick" case) or marked submitted (offline turn-in).
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-        when (row.status) {
-            HOMEWORK_STATUS_SUBMITTED, HOMEWORK_STATUS_LATE -> RowIconButton(
-                icon = VIcons.Check, tint = c.successInk, bg = c.success.copy(alpha = 0.4f),
-                enabled = enabled, busy = updating, onClick = onMarkGraded, label = "Mark graded",
-            )
-            HOMEWORK_STATUS_NOT_SUBMITTED -> {
-                RowIconButton(
-                    icon = VIcons.Clock, tint = c.accentDeep, bg = c.accent.copy(alpha = 0.12f),
-                    enabled = enabled, busy = false, onClick = onExtend, label = "Grant extension",
-                )
-                RowIconButton(
-                    icon = VIcons.Check, tint = c.tealDeep, bg = c.teal.copy(alpha = 0.16f),
-                    enabled = enabled, busy = updating, onClick = onMarkSubmitted, label = "Mark submitted",
-                )
-            }
-            HOMEWORK_STATUS_GRADED -> Unit   // already terminal
-        }
-    }
-}
-
-@Composable
-private fun RowIconButton(
-    icon: ImageVector,
-    tint: Color,
-    bg: Color,
-    enabled: Boolean,
-    busy: Boolean,
-    onClick: () -> Unit,
-    label: String,
-) {
+    val state by viewModel.state.collectAsStateV2()
     Box(
-        Modifier.size(32.dp).clip(CircleShape).background(bg)
-            .clickable(enabled = enabled && !busy, onClick = onClick),
+        Modifier.fillMaxSize().background(c.navyDeep.copy(alpha = 0.42f))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { viewModel.closeExtension() },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            if (busy) VIcons.Spinner else icon,
-            contentDescription = label,
-            tint = tint,
-            modifier = Modifier.size(15.dp),
-        )
-    }
-}
-
-@Composable
-private fun StatusPill(status: String) {
-    val (label, tone) = when (status) {
-        HOMEWORK_STATUS_GRADED -> "Graded" to VBadgeTone.Accent
-        HOMEWORK_STATUS_SUBMITTED -> "Submitted" to VBadgeTone.Success
-        HOMEWORK_STATUS_LATE -> "Late" to VBadgeTone.Warning
-        else -> "Pending" to VBadgeTone.Neutral
-    }
-    VBadge(text = label, tone = tone)
-}
-
-private fun statusVerb(status: String): String? = when (status) {
-    HOMEWORK_STATUS_GRADED -> "Reviewed"
-    HOMEWORK_STATUS_SUBMITTED -> "Turned in"
-    HOMEWORK_STATUS_LATE -> "Turned in late"
-    else -> null
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  ASSIGN COMPOSER
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun AssignHomeworkDialog(
-    state: TeacherHomeworkState,
-    onTitle: (String) -> Unit,
-    onDescription: (String) -> Unit,
-    onDueDate: (String) -> Unit,
-    onDueTime: (String) -> Unit,
-    onAllowLate: (Boolean) -> Unit,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val c = VTheme.colors
-    Dialog(onDismissRequest = onDismiss) {
-        VCard(modifier = Modifier.fillMaxWidth()) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Assign homework", style = VTheme.type.h3.colored(c.ink))
-                VInput(
-                    value = state.composerTitle,
-                    onValueChange = onTitle,
-                    label = "Title",
-                    placeholder = "e.g. Chapter 4 — exercises 1–10",
-                    enabled = !state.isAssigning,
-                )
-                VInput(
-                    value = state.composerDescription,
-                    onValueChange = onDescription,
-                    label = "Instructions (optional)",
-                    placeholder = "What should students do?",
-                    singleLine = false,
-                    enabled = !state.isAssigning,
-                )
-                VDatePicker(
-                    value = state.composerDueDate,
-                    onValueChange = onDueDate,
-                    label = "Due date",
-                    enabled = !state.isAssigning,
-                )
-                VInput(
-                    value = state.composerDueTime,
-                    onValueChange = onDueTime,
-                    label = "Due time (optional)",
-                    placeholder = "e.g. 17:00",
-                    enabled = !state.isAssigning,
-                )
-                AllowLateToggle(checked = state.composerAllowLate, enabled = !state.isAssigning, onToggle = onAllowLate)
-                // Capture into a local val so the null-check enables smart-cast — `composerError`
-                // is a public API property from the :shared module and cannot be smart-cast
-                // directly across the module boundary.
-                val composerError = state.composerError
-                if (composerError != null) {
-                    Text(composerError, style = VTheme.type.caption.colored(c.dangerInk))
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    VButton(
-                        text = "Cancel",
-                        onClick = onDismiss,
-                        variant = VButtonVariant.Ghost,
-                        size = VButtonSize.Md,
-                        enabled = !state.isAssigning,
-                        modifier = Modifier.weight(1f),
-                    )
-                    VButton(
-                        text = "Assign",
-                        onClick = onConfirm,
-                        variant = VButtonVariant.Primary,
-                        tone = VButtonTone.Lavender,
-                        size = VButtonSize.Md,
-                        loading = state.isAssigning,
-                        enabled = !state.isAssigning && state.canAssign,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AllowLateToggle(checked: Boolean, enabled: Boolean, onToggle: (Boolean) -> Unit) {
-    val c = VTheme.colors
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.cream)
-            .clickable(enabled = enabled) { onToggle(!checked) }
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
         Box(
-            Modifier.size(22.dp).clip(RoundedCornerShape(6.dp))
-                .background(if (checked) c.success else c.ink.copy(alpha = 0.06f)),
-            contentAlignment = Alignment.Center,
+            Modifier.padding(24.dp).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+                .clip(RoundedCornerShape(24.dp)).background(c.card).border(1.dp, c.hairline, RoundedCornerShape(24.dp)).padding(20.dp),
         ) {
-            if (checked) Icon(VIcons.Check, contentDescription = null, tint = c.successInk, modifier = Modifier.size(15.dp))
-        }
-        Column(Modifier.weight(1f)) {
-            Text("Allow late submissions", style = VTheme.type.body.colored(c.ink).copy(fontSize = 13.sp))
-            Text("Students can still turn in after the due date (marked Late).", style = VTheme.type.dataSm.colored(c.ink3).copy(fontSize = 10.sp))
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  EXTENSION COMPOSER
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun GrantExtensionDialog(
-    state: TeacherHomeworkState,
-    onDate: (String) -> Unit,
-    onTime: (String) -> Unit,
-    onReason: (String) -> Unit,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val c = VTheme.colors
-    val wholeClass = state.extensionStudentId == null
-    Dialog(onDismissRequest = onDismiss) {
-        VCard(modifier = Modifier.fillMaxWidth()) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    if (wholeClass) "Extend for whole class" else "Grant extension",
-                    style = VTheme.type.h3.colored(c.ink),
+                    if (state.extensionStudentId == null) "Extend for the whole class" else "Extend for ${state.extensionStudentName}",
+                    style = VTheme.type.h3.colored(c.navyDeep).copy(fontWeight = FontWeight.ExtraBold),
                 )
-                Text(
-                    if (wholeClass) "Moves the due date for everyone in this class."
-                    else "Gives ${state.extensionStudentName.ifBlank { "this student" }} more time — the class due date doesn't change.",
-                    style = VTheme.type.caption.colored(c.ink3),
-                )
-                VDatePicker(
-                    value = state.extensionDate,
-                    onValueChange = onDate,
-                    label = "New due date",
-                    enabled = !state.isGrantingExtension,
-                )
-                VInput(
-                    value = state.extensionTime,
-                    onValueChange = onTime,
-                    label = "New due time (optional)",
-                    placeholder = "e.g. 17:00",
-                    enabled = !state.isGrantingExtension,
-                )
-                VInput(
-                    value = state.extensionReason,
-                    onValueChange = onReason,
-                    label = "Reason (optional)",
-                    placeholder = "e.g. Was unwell",
-                    enabled = !state.isGrantingExtension,
-                )
-                // Capture into a local val so the null-check enables smart-cast — `extensionError`
-                // is a public API property from the :shared module and cannot be smart-cast
-                // directly across the module boundary.
-                val extensionError = state.extensionError
-                if (extensionError != null) {
-                    Text(extensionError, style = VTheme.type.caption.colored(c.dangerInk))
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    VButton(
-                        text = "Cancel",
-                        onClick = onDismiss,
-                        variant = VButtonVariant.Ghost,
-                        size = VButtonSize.Md,
-                        enabled = !state.isGrantingExtension,
-                        modifier = Modifier.weight(1f),
-                    )
-                    VButton(
-                        text = "Grant",
-                        onClick = onConfirm,
-                        variant = VButtonVariant.Primary,
-                        tone = VButtonTone.Sky,
-                        size = VButtonSize.Md,
-                        loading = state.isGrantingExtension,
-                        enabled = !state.isGrantingExtension && state.extensionDate.isNotBlank(),
-                        modifier = Modifier.weight(1f),
-                    )
+                VDatePicker(value = state.extensionDate, onValueChange = viewModel::setExtensionDate, label = "New due date")
+                VInput(value = state.extensionReason, onValueChange = viewModel::setExtensionReason, label = "Reason (optional)", placeholder = "Why the extension?")
+                if (state.extensionError != null) Text(state.extensionError ?: "", style = VTheme.type.caption.colored(c.dangerInk).copy(fontSize = 12.sp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    VButton("Cancel", onClick = { viewModel.closeExtension() }, modifier = Modifier.weight(1f), variant = VButtonVariant.Ghost, size = VButtonSize.Md)
+                    VButton("Grant", onClick = { viewModel.grantExtension() }, modifier = Modifier.weight(1f), tone = VButtonTone.Sky, size = VButtonSize.Md, loading = state.isGrantingExtension)
                 }
             }
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** "Due Mon D" / "Due Mon D · 17:00" without a date lib. Blank-safe. */
-private fun dueLabel(dueDate: String, dueTime: String?): String? {
-    if (dueDate.isBlank()) return null
-    val pretty = prettyDate(dueDate)
-    return if (!dueTime.isNullOrBlank()) "Due $pretty · ${dueTime.take(5)}" else "Due $pretty"
-}
-
-private fun prettyDate(raw: String): String {
-    val parts = raw.take(10).split('-')
-    if (parts.size != 3) return raw
-    val (y, m, d) = parts
-    val month = HW_MONTHS.getOrNull((m.toIntOrNull() ?: 0) - 1) ?: m
-    val day = d.toIntOrNull() ?: return raw
-    return "$month $day, $y"
-}
-
-private val HW_MONTHS = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
