@@ -1,5 +1,7 @@
 package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
 
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.ResolvedPeriodUi
+
 /**
  * TeacherNavRouter — the Teacher Portal's cross-tab deep-link resolver
  * (Loop Phase 7 — Cross-Tab Connectivity).
@@ -44,5 +46,25 @@ object TeacherNavRouter {
             TeacherDestination.ChatThread(threadId = nudge.threadId, studentId = nudge.studentId)
         is TeacherNudge.HomeworkUngraded ->
             TeacherDestination.Gradebook(classId = nudge.classId)
+    }
+
+    /**
+     * P7-T2 — resolve a TodayStrip period tap to an Attendance destination.
+     *
+     * The spec: tapping a period on the Home strip whose attendance is **not yet
+     * taken** offers "Take Attendance" → the [TeacherDestination.Attendance] screen for
+     * *that specific period* (`periodId` as the typed arg). When attendance is already
+     * marked (or the period was cancelled, or it has no stable `periodId`) there is no
+     * attendance action to take, so this returns `null` and the host leaves the period
+     * inert — deliberately NOT a dead-end button.
+     *
+     * Returning a nullable destination (rather than always navigating) is what keeps
+     * the "no isolated dead ends" goal honest: the affordance only exists when the
+     * action is real.
+     */
+    fun periodDestination(period: ResolvedPeriodUi): TeacherDestination? {
+        val id = period.periodId
+        if (period.attendanceMarked || period.isCancelled || id.isNullOrBlank()) return null
+        return TeacherDestination.Attendance(periodId = id)
     }
 }
