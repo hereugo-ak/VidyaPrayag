@@ -11,8 +11,8 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P3-T1 — GradebookSelector (two-row class + subject chips)
-LAST COMMIT: feat(teacher-portal): add GradebookSelector class + subject chip rows (loop P3-T1)
+LAST COMPLETED TASK: P3-T2 — GradeDistributionBar (segmented A–F bar + legend)
+LAST COMMIT: feat(teacher-portal): add GradeDistributionBar segmented bar (loop P3-T2)
 CURRENT PHASE: Phase 3 — Gradebook Tab (in progress)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
@@ -475,12 +475,23 @@ No extra taps. No loading spinners after every entry. Auto-save silently.
         (violet primary stands in for PrimaryIndigo — no new hex). Tokens via `Enroll.*`;
         unused `dp` import trimmed; braces 11/11.
 
-- [ ] **P3-T2 — Grade Distribution Bar**:
+- [x] **P3-T2 — Grade Distribution Bar**:
       Below selector, above student list.
       A horizontal bar showing A/B/C/D/F distribution for the current class+exam.
       `Canvas`-drawn segmented bar, 8dp height, `ShapeCard` corners, no gaps between segments.
       Below bar: labels with count. e.g. "A · 12   B · 8   C · 4   D · 2   F · 1"
       Only visible when an exam is selected. Hidden in "All Exams" view.
+      ↳ DONE. Added `ui/v2/screens/teacher/GradeDistributionBar.kt`. Defined
+        `GradeBand(label, count, color)` + a `@Composable defaultGradeBands(a,b,c,d,f)`
+        helper that maps A/B/C/D/F onto the portal status palette (A→statusPresent,
+        B→statusPresentSoft, C→statusLate, D→statusLateSoft, F→statusAbsent) so the bar
+        reads good→bad like every other surface — NO new "AccentAmber" hex (IMPORTANT
+        NOTE). `GradeDistributionBar(bands, modifier)` returns early when total ≤ 0 (host
+        hides it in All-Exams). The bar is a single `Canvas`: a surfaceSubtle base rect +
+        gapless left→right segment rects sized by count share (animated 700ms), clipped to
+        `shape.card`, 8dp tall. Legend Row below = per-band dot + "A · 12" in bodySmall
+        textSecondary. Tokens via `Enroll.*`; only literals are bar geometry (8dp); braces
+        11/11.
 
 - [ ] **P3-T3 — Exam Selector**:
       A horizontal `LazyRow` of `ExamChip(exam)` above the student list.
@@ -751,6 +762,7 @@ BEGIN.
 | 11 | P2-T6  | `feat(teacher-portal): add PendingTasksCard with tap-to-tick tasks (loop P2-T6)` | `composeApp/.../ui/v2/screens/teacher/PendingTasksCard.kt` (new), `TEACHER_PORTAL_LOOP.md` | Home "PENDING" to-do card. Defined `TeacherTask(id, description, dueLabel, done)`. EnrollCard + `SectionHeader("PENDING", action="See All")` (See-All shows only when >3); max-3 collapsed. Each `TaskRow` = whole-row toggle with a custom `TaskCheckbox` (hairline square → statusPresent tick), bodyMedium description (strikethrough + textTertiary when done), bodySmall due-date that animates away when ticked. Custom checkbox (no Material3 default). Tokens via `Enroll.*`; braces 14/14. |
 | 12 | P2-T7  | `feat(teacher-portal): add NotificationSheet with grouped swipe rows (loop P2-T7)` | `composeApp/.../ui/v2/screens/teacher/NotificationSheet.kt` (new), `TEACHER_PORTAL_LOOP.md` | Bell-icon bottom sheet (custom, built on `Dialog` since portal has no Material3 ModalBottomSheet). ShapeSheet corners + 32×4 handle bar + `SectionHeader("NOTIFICATIONS", action="Mark all read")`. Defined `NotificationType`/`NotificationGroup`/`TeacherNotification`. Grouped LazyColumn (TODAY/YESTERDAY/EARLIER), each `NotificationRow` = 8dp primary unread dot + 36dp type-icon disc + labelBold title + bodyMedium message + bodySmall timeLabel, swipe-right-220px to dismiss (draggable + graphicsLayer), tap → onOpen (P7). Empty state included. Tokens via `Enroll.*`; braces 31/31. **PHASE 2 COMPLETE.** |
 | 13 | P3-T1  | `feat(teacher-portal): add GradebookSelector class + subject chip rows (loop P3-T1)` | `composeApp/.../ui/v2/screens/teacher/GradebookSelector.kt` (new), `TEACHER_PORTAL_LOOP.md` | Sticky two-row scope picker for the gradebook. Defined VM-agnostic options `GradebookClassOption`/`GradebookSubjectOption`. Row 1 classes always; Row 2 subjects only when present; both `horizontalScroll`. `SelectorChip` with animated bg/fg: selected → primary + white, unselected → surfaceSubtle + textSecondary; pill, labelBold, pressScale. Built a custom chip (no portal chip existed). Tokens via `Enroll.*`; braces 11/11. |
+| 14 | P3-T2  | `feat(teacher-portal): add GradeDistributionBar segmented bar (loop P3-T2)` | `composeApp/.../ui/v2/screens/teacher/GradeDistributionBar.kt` (new), `TEACHER_PORTAL_LOOP.md` | Segmented A–F distribution bar. Defined `GradeBand` + `defaultGradeBands(a,b,c,d,f)` mapping grades onto the status palette (no new hex). `GradeDistributionBar` = single Canvas (surfaceSubtle base + gapless count-share segments, animated 700ms, clipped shape.card, 8dp) + a per-band dot/count legend in bodySmall. Returns early when empty (host hides in All-Exams). Tokens via `Enroll.*`; braces 11/11. |
 
 ---
 
