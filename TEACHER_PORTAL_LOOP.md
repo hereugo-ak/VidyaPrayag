@@ -11,9 +11,9 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P3-T6 — GradebookExportFab + ExportSheet (PDF / WhatsApp)
-LAST COMMIT: feat(teacher-portal): add GradebookExportFab + ExportSheet (loop P3-T6)
-CURRENT PHASE: Phase 3 COMPLETE → Phase 4 — Planner Tab (next)
+LAST COMPLETED TASK: P4-T1 — WeekViewHeader (swipeable 7-day Mon–Sun week strip)
+LAST COMMIT: feat(teacher-portal): add swipeable WeekViewHeader week strip (loop P4-T1)
+CURRENT PHASE: Phase 4 — Planner Tab (P4-T1 done → P4-T2 Daily Plan View next)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
     ships a complete, mature, fully token-driven design system — VTheme → VColors
@@ -590,13 +590,31 @@ No extra taps. No loading spinners after every entry. Auto-save silently.
 **Teacher mental model:** I want to know what I'm teaching next, plan my lessons,
 and track if students submitted homework — all in one place.
 
-- [ ] **P4-T1 — Week View Header**:
+- [x] **P4-T1 — Week View Header**:
       Custom week strip: 7 columns, Mon–Sun.
       Each column: day abbreviation (LabelCaps, TextTertiary) + date number.
       Today: `PrimaryIndigo` filled circle behind date, white text.
       Days with events: small `AccentAmber` dot below date number.
       Tap day → scrolls the content below to that day's entries.
       Previous/next week: left/right swipe on strip using `HorizontalPager`.
+      ↳ DONE. Added `ui/v2/screens/teacher/WeekViewHeader.kt`. Defined the UI model
+        `PlannerWeekDay(iso, dayLabel, dayNumber, isToday, hasEvents)`. `WeekViewHeader(
+        selectedIso, eventDays, onSelectDay, modifier, onWeekChanged)` renders a
+        `HorizontalPager` (CMP 1.10 stable pager) whose every page is one Mon-first week
+        — left/right swipe = previous/next week, centred on a ±1yr window (page 0 anchor =
+        Monday of the real week). Each page is a 7-up `Row` of weight(1f) `DayColumn`s:
+        day abbrev in `labelCaps`/`textTertiary` over a 32dp date "puck" — TODAY = solid
+        `primary` disc + white number, a selected (non-today) day = `primarySoft` tint +
+        `primary` number (animateColorAsState), others transparent — and a 5dp event dot
+        (`accent` amber when `iso in eventDays`, else a same-size transparent spacer so
+        rows never jitter). Tap a column → `onSelectDay(iso)` (host scrolls the plan list,
+        P4-T2). A `snapshotFlow { currentPage }` emits `onWeekChanged(mondayIso)` so the
+        host can prefetch that week's schedule. Date math is string-first ("YYYY-MM-DD")
+        on the shared DateUtil (`parseIsoDate`/`isoOf`/`dayOfWeek`/`daysInMonth`/`todayIso`)
+        + a local `addDays`/`mondayOf` — no kotlinx-datetime, platform-agnostic. Honours
+        the IMPORTANT NOTE (violet `primary` for PrimaryIndigo, warning `accent` for
+        AccentAmber — no new hex). All tokens via `Enroll.*`; braces 30/30, parens 94/94;
+        every import used; every Enroll + util member verified to exist.
 
 - [ ] **P4-T2 — Daily Plan View**:
       Below week strip: `LazyColumn` of `PlanDaySection(date, periods)`.
@@ -818,6 +836,7 @@ BEGIN.
 | 16 | P3-T4  | `feat(teacher-portal): add StudentMarkRow + detail sheet (loop P3-T4)` | `composeApp/.../ui/v2/screens/teacher/StudentMarksList.kt` (new), `TEACHER_PORTAL_LOOP.md` | Premium fast-entry marks row over real `GradebookStudentMark`. Roll# + name + `AutoSaveHint` (saving→✓), auto `GradeChip` (A/B green, C/D amber, F red), `TrendArrow`, and a `MarkField` `BasicTextField` pill (surfaceSubtle, focus border primary 2dp) with **800ms debounce auto-save** (LaunchedEffect+delay, no button). Tap row → `StudentMarkDetailSheet` (VAvatar header, Canvas score-history line chart over `ExamScorePoint`, remark VInput, Message-Parent VButton → P7). Enums `MarkSaveState`/`MarkTrend` + `gradeForPercent`. Tokens via `Enroll.*`; braces 37/37. |
 | 17 | P3-T5  | `feat(teacher-portal): add BulkActionsBar slide-up selection bar (loop P3-T5)` | `composeApp/.../ui/v2/screens/teacher/BulkActionsBar.kt` (new), `TEACHER_PORTAL_LOOP.md` | Contextual multi-select bar. `AnimatedVisibility(selectedCount > 0)` + slideInVertically/fade rises from bottom; primary-fill card with "$n selected" (labelBold onPrimary) + three white `BulkAction`s (Edit3 Set Mark / ClipboardList Remark / Close Cancel), each pressScale. Tokens via `Enroll.*`; braces 8/8. |
 | 18 | P3-T6  | `feat(teacher-portal): add GradebookExportFab + ExportSheet (loop P3-T6)` | `composeApp/.../ui/v2/screens/teacher/GradebookExport.kt` (new), `TEACHER_PORTAL_LOOP.md` | Export FAB + sheet. `GradebookExportFab` = 56dp primary circular FAB (shape.fab, white Share icon, pressScale). `ExportSheet` = Dialog with two `ExportOption` EnrollCards (FileText "Share as PDF" / Send "Share via WhatsApp") + a `whatsAppSummaryText(...)` copy builder. Host wires PDF util + OS share intent (TODO(host) left in-file). Tokens via `Enroll.*`; braces 15/15. **PHASE 3 COMPLETE.** |
+| 19 | P4-T1  | `feat(teacher-portal): add swipeable WeekViewHeader week strip (loop P4-T1)` | `composeApp/.../ui/v2/screens/teacher/WeekViewHeader.kt` (new), `TEACHER_PORTAL_LOOP.md` | Planner's signature week strip. Defined `PlannerWeekDay(iso, dayLabel, dayNumber, isToday, hasEvents)`. `WeekViewHeader` = `HorizontalPager` (CMP 1.10 stable) — one Mon-first week per page, swipe = prev/next week (±1yr window, centre = real week). Each page = 7-up weight(1f) `DayColumn`s: labelCaps/textTertiary abbrev over a 32dp date puck (TODAY = solid primary + white number; selected = primarySoft tint + primary number via animateColorAsState; else transparent) + a 5dp `accent` amber event dot when `iso in eventDays` (transparent same-size spacer otherwise → no jitter). Tap → `onSelectDay(iso)` (host scrolls plan list, P4-T2); `snapshotFlow{currentPage}` → `onWeekChanged(mondayIso)` for prefetch. String-first date math on shared DateUtil + local addDays/mondayOf (no kotlinx-datetime). Honours IMPORTANT NOTE (violet primary / warning accent, no new hex). Tokens via `Enroll.*`; braces 30/30, parens 94/94; imports + members all verified. |
 
 ---
 
