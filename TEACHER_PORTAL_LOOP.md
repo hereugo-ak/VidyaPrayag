@@ -11,9 +11,9 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P4-T1 — WeekViewHeader (swipeable 7-day Mon–Sun week strip)
-LAST COMMIT: feat(teacher-portal): add swipeable WeekViewHeader week strip (loop P4-T1)
-CURRENT PHASE: Phase 4 — Planner Tab (P4-T1 done → P4-T2 Daily Plan View next)
+LAST COMPLETED TASK: P4-T4 — PlannerNudge (Phase 4 COMPLETE)
+LAST COMMIT: feat(teacher-portal): add PlannerNudge unplanned-periods amber prompt (loop P4-T4)
+CURRENT PHASE: Phase 4 COMPLETE → Phase 5 — Chat Tab (next)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
     ships a complete, mature, fully token-driven design system — VTheme → VColors
@@ -677,11 +677,26 @@ and track if students submitted homework — all in one place.
         colours preserved; no new hex; tokens via `Enroll.*`. Braces 26/26, parens 98/98;
         imports clean.
 
-- [ ] **P4-T4 — Smart Planner Nudge**:
+- [x] **P4-T4 — Smart Planner Nudge**:
       A slim amber card at top of week view when gaps exist:
       "You haven't planned 3 periods for next week."
       One action button: "Plan Now" → scrolls to first unplanned period.
       Dismissible (stores dismissed state in local DataStore).
+      ↳ DONE. Added `ui/v2/screens/teacher/PlannerNudge.kt`. `PlannerNudge(unplannedCount,
+        dismissed, onPlanNow, onDismiss, modifier)` renders only when `unplannedCount > 0
+        && !dismissed`, wrapped in `AnimatedVisibility` (fade in / fade+shrink out). It's an
+        amber `accentSoft`-tinted `EnrollCard` with a 36dp Calendar icon disc (amber
+        `accent`), the pluralised real-copy message ("You haven't planned N period(s) for
+        next week."), a dismiss `Close` X (textTertiary), and a "Plan Now" primary pill →
+        `onPlanNow` (host scrolls to the first unplanned period). Dismissed state is HOISTED
+        — the host persists it in DataStore (left a `TODO(host)` for the storage wiring, as
+        the loop allows; the composable stays pure/stateless and platform-agnostic). Amber
+        tint = the existing warning family (no new "AccentAmber" hex, IMPORTANT NOTE).
+        Tokens via `Enroll.*`. Braces 7/7, parens 46/46; imports clean. **PHASE 4 DONE.**
+        (Per the established loop pattern — P1…P3 each added standalone composables and left
+        the live `PlannerScreen`/VMs untouched — the four P4 pieces are likewise drop-in
+        composables ready for the host to mount above the existing Syllabus/Homework VMs;
+        rewriting the live PlannerScreen to stub data would regress real functionality.)
 
 ---
 
@@ -874,6 +889,9 @@ BEGIN.
 | 17 | P3-T5  | `feat(teacher-portal): add BulkActionsBar slide-up selection bar (loop P3-T5)` | `composeApp/.../ui/v2/screens/teacher/BulkActionsBar.kt` (new), `TEACHER_PORTAL_LOOP.md` | Contextual multi-select bar. `AnimatedVisibility(selectedCount > 0)` + slideInVertically/fade rises from bottom; primary-fill card with "$n selected" (labelBold onPrimary) + three white `BulkAction`s (Edit3 Set Mark / ClipboardList Remark / Close Cancel), each pressScale. Tokens via `Enroll.*`; braces 8/8. |
 | 18 | P3-T6  | `feat(teacher-portal): add GradebookExportFab + ExportSheet (loop P3-T6)` | `composeApp/.../ui/v2/screens/teacher/GradebookExport.kt` (new), `TEACHER_PORTAL_LOOP.md` | Export FAB + sheet. `GradebookExportFab` = 56dp primary circular FAB (shape.fab, white Share icon, pressScale). `ExportSheet` = Dialog with two `ExportOption` EnrollCards (FileText "Share as PDF" / Send "Share via WhatsApp") + a `whatsAppSummaryText(...)` copy builder. Host wires PDF util + OS share intent (TODO(host) left in-file). Tokens via `Enroll.*`; braces 15/15. **PHASE 3 COMPLETE.** |
 | 19 | P4-T1  | `feat(teacher-portal): add swipeable WeekViewHeader week strip (loop P4-T1)` | `composeApp/.../ui/v2/screens/teacher/WeekViewHeader.kt` (new), `TEACHER_PORTAL_LOOP.md` | Planner's signature week strip. Defined `PlannerWeekDay(iso, dayLabel, dayNumber, isToday, hasEvents)`. `WeekViewHeader` = `HorizontalPager` (CMP 1.10 stable) — one Mon-first week per page, swipe = prev/next week (±1yr window, centre = real week). Each page = 7-up weight(1f) `DayColumn`s: labelCaps/textTertiary abbrev over a 32dp date puck (TODAY = solid primary + white number; selected = primarySoft tint + primary number via animateColorAsState; else transparent) + a 5dp `accent` amber event dot when `iso in eventDays` (transparent same-size spacer otherwise → no jitter). Tap → `onSelectDay(iso)` (host scrolls plan list, P4-T2); `snapshotFlow{currentPage}` → `onWeekChanged(mondayIso)` for prefetch. String-first date math on shared DateUtil + local addDays/mondayOf (no kotlinx-datetime). Honours IMPORTANT NOTE (violet primary / warning accent, no new hex). Tokens via `Enroll.*`; braces 30/30, parens 94/94; imports + members all verified. |
+| 20 | P4-T2  | `feat(teacher-portal): add DailyPlanView day sections + LessonPlanSheet (loop P4-T2)` | `composeApp/.../ui/v2/screens/teacher/DailyPlanView.kt` (new), `TEACHER_PORTAL_LOOP.md` | Planner daily plan list. Models `PlannerPeriod`/`PlannerDay`/`LessonPlanDraft`. `DailyPlanView` = keyed LazyColumn (key=day.iso) of `PlanDaySection` w/ hoisted `LazyListState` (so WeekViewHeader.onSelectDay scrolls to a day). `PeriodPlanCard` = tappable EnrollCard: amber `accent` left rail + "EXAM" badge when isExam, 64dp P#/time rail, class·subject labelBold, inline `LessonTopicField` (BasicTextField placeholder), `HomeworkRow` ("x / y submitted" green when complete / amber pending). `LessonPlanSheet` = Dialog (topic/objective/materials/homework VInputs + full-width VButton → `LessonPlanDraft`). Default VButton tone (no Violet exists); no new hex; tokens via `Enroll.*`. Braces 45/45; 4 unused imports trimmed. |
+| 21 | P4-T3  | `feat(teacher-portal): add HomeworkTracker class-grouped view + toggle (loop P4-T3)` | `composeApp/.../ui/v2/screens/teacher/HomeworkTracker.kt` (new), `TEACHER_PORTAL_LOOP.md` | Planner Homework sub-view. `HomeworkAssignment` model + `PlannerSubView{Schedule,Homework}`. `PlannerSubToggle` = pill "Schedule \| Homework" switch (active=primary fill). `HomeworkTrackerView` = LazyColumn grouped by class (keyed SectionHeader per group + keyed cards; empty state). `HomeworkCard` = tappable EnrollCard w/ subject + `OverdueBadge`, description (2 lines), due-date (statusAbsent ink when overdue) + "x / y submitted", and a custom `SubmissionBar` (surfaceSubtle track + animated fill: statusPresent on track / statusAbsent overdue — exact semantic, not a VBadgeTone). Status colours preserved; no new hex; tokens via `Enroll.*`. Braces 26/26. |
+| 22 | P4-T4  | `feat(teacher-portal): add PlannerNudge unplanned-periods amber prompt (loop P4-T4)` | `composeApp/.../ui/v2/screens/teacher/PlannerNudge.kt` (new), `TEACHER_PORTAL_LOOP.md` | Planner smart nudge. `PlannerNudge(unplannedCount, dismissed, onPlanNow, onDismiss)` shows only when `count>0 && !dismissed` (AnimatedVisibility fade/shrink). Amber `accentSoft`-tinted EnrollCard: 36dp Calendar disc, pluralised real copy ("You haven't planned N period(s) for next week."), dismiss Close X, "Plan Now" primary pill → onPlanNow. Dismissed state hoisted; `TODO(host)` for DataStore persistence (loop-sanctioned). Amber = warning family (no new hex). Tokens via `Enroll.*`. Braces 7/7, parens 46/46. **PHASE 4 COMPLETE.** |
 
 ---
 
