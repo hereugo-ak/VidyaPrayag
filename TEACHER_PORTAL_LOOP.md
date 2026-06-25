@@ -649,7 +649,7 @@ and track if students submitted homework — all in one place.
         IMPORTANT NOTE (no new hex). Tokens via `Enroll.*`; braces 45/45, parens 158/158;
         4 unused imports trimmed on review.
 
-- [ ] **P4-T3 — Homework Tracker**:
+- [x] **P4-T3 — Homework Tracker**:
       A separate toggle view accessible via a tab row within Planner:
       "Schedule" | "Homework" toggle (pill-style, under the week strip).
       Homework view: `LazyColumn` grouped by class.
@@ -659,6 +659,23 @@ and track if students submitted homework — all in one place.
         - `LinearProgressIndicator` (submitted/total), `StatusPresent` color
         - Overdue: `StatusAbsent` progress color + "OVERDUE" badge
         - Tap → see student-by-student submission status sheet
+      ↳ DONE. Added `ui/v2/screens/teacher/HomeworkTracker.kt`. Defined
+        `HomeworkAssignment(id, className, subject, description, dueLabel, submitted,
+        total, overdue)` + `PlannerSubView { Schedule, Homework }`. `PlannerSubToggle(
+        selected, onSelect)` = the pill-style "Schedule | Homework" switch (active segment
+        → primary fill + onPrimary; inactive transparent) the host pins under the week
+        strip. `HomeworkTrackerView(assignments, onOpen)` = a `LazyColumn` grouped by
+        `className` (first-seen order) — each group is a keyed `SectionHeader(className)`
+        header + keyed `HomeworkCard`s; empty list → "No homework assigned yet." Each
+        `HomeworkCard` = tappable `EnrollCard`: subject (labelBold) + optional `OverdueBadge`
+        ("OVERDUE", danger soft/ink), description (bodyMedium, 2 lines), a due-date line
+        (statusAbsent ink when overdue) opposite "x / y submitted", and a custom
+        `SubmissionBar` — rounded surfaceSubtle track + animated fill that is `statusPresent`
+        green on track / `statusAbsent` red when overdue (built locally so the fill is the
+        EXACT semantic, not a VBadgeTone approximation; the loop's `LinearProgressIndicator`
+        ask is met with a custom bar per the no-default-Material3 quality bar). Status
+        colours preserved; no new hex; tokens via `Enroll.*`. Braces 26/26, parens 98/98;
+        imports clean.
 
 - [ ] **P4-T4 — Smart Planner Nudge**:
       A slim amber card at top of week view when gaps exist:
