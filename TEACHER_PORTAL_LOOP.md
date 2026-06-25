@@ -616,7 +616,7 @@ and track if students submitted homework — all in one place.
         AccentAmber — no new hex). All tokens via `Enroll.*`; braces 30/30, parens 94/94;
         every import used; every Enroll + util member verified to exist.
 
-- [ ] **P4-T2 — Daily Plan View**:
+- [x] **P4-T2 — Daily Plan View**:
       Below week strip: `LazyColumn` of `PlanDaySection(date, periods)`.
       Each `PlanDaySection` has:
         - Day header: "Monday, 23 June" in `HeadingSmall`
@@ -628,6 +628,26 @@ and track if students submitted homework — all in one place.
           * If exam on this date: `AccentAmber` left border on card + "EXAM" badge chip
         - Tap anywhere on card → expand to full `LessonPlanSheet`
       `LessonPlanSheet`: topic, learning objective, materials needed, homework description.
+      ↳ DONE. Added `ui/v2/screens/teacher/DailyPlanView.kt`. Defined UI models
+        `PlannerPeriod(id, periodNumber, timeRange, className, subject, lessonTopic,
+        homeworkAssigned, homeworkSubmitted, isExam)`, `PlannerDay(iso, header, periods)`
+        and `LessonPlanDraft(...)`. `DailyPlanView(days, onTopicChanged, onOpenPlan,
+        modifier, listState)` is a keyed `LazyColumn` (key = day.iso) of `PlanDaySection`
+        with the hoisted `LazyListState` so P4-T1's `WeekViewHeader.onSelectDay` can scroll
+        to a tapped day. Each section = `headingSmall` day header + `PeriodPlanCard`s (empty
+        day → "No classes scheduled."). `PeriodPlanCard` = tappable `EnrollCard` (→ open
+        sheet): amber `accent` left rail + "EXAM" badge when `isExam`, a 64dp P#/time rail
+        (textTertiary), class·subject (labelBold), an inline `LessonTopicField`
+        (`BasicTextField`, "Tap to add lesson topic…" placeholder, commits on change,
+        primary cursor), and a `HomeworkRow` ("HW: x / y submitted" — statusPresent when
+        complete, amber `accent` while pending; "none" when 0). `LessonPlanSheet(visible,
+        period, draft, onDismiss, onSave)` = `Dialog` sheet (shape.sheet) with
+        `SectionHeader("LESSON PLAN")` + context line + four `VInput`s (topic / objective /
+        materials / homework, multiline where natural) + full-width `VButton` (enabled when
+        topic non-blank) emitting `LessonPlanDraft`. Used the portal's default VButton tone
+        (Navy) — VButtonTone has no Violet; matched StudentMarksList's convention. Honours
+        IMPORTANT NOTE (no new hex). Tokens via `Enroll.*`; braces 45/45, parens 158/158;
+        4 unused imports trimmed on review.
 
 - [ ] **P4-T3 — Homework Tracker**:
       A separate toggle view accessible via a tab row within Planner:
