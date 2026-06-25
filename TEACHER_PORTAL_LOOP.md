@@ -11,8 +11,8 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P3-T4 — StudentMarkRow + StudentMarkDetailSheet (fast-entry grid)
-LAST COMMIT: feat(teacher-portal): add StudentMarkRow + detail sheet (loop P3-T4)
+LAST COMPLETED TASK: P3-T5 — BulkActionsBar (slide-up multi-select bar)
+LAST COMMIT: feat(teacher-portal): add BulkActionsBar slide-up selection bar (loop P3-T5)
 CURRENT PHASE: Phase 3 — Gradebook Tab (in progress)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
@@ -550,11 +550,20 @@ No extra taps. No loading spinners after every entry. Auto-save silently.
         `gradeForPercent` exposed for host wiring. Tokens via `Enroll.*`; 3 unused imports
         trimmed; braces 37/37.
 
-- [ ] **P3-T5 — Bulk Actions Bar**:
+- [x] **P3-T5 — Bulk Actions Bar**:
       Appears at bottom (above FAB) when any student row is long-pressed.
       Shows: "X selected" | "Set Mark" | "Add Remark" | "Cancel"
       `PrimaryIndigo` background, white icons.
       Animate up from bottom using `AnimatedVisibility(visible = selectedCount > 0)`.
+      ↳ DONE. Added `ui/v2/screens/teacher/BulkActionsBar.kt`. `BulkActionsBar(
+        selectedCount, onSetMark, onAddRemark, onCancel, modifier)` wraps everything in
+        `AnimatedVisibility(visible = selectedCount > 0)` with `slideInVertically{ it }` +
+        fade (and the mirror exit) so it rises from the bottom. The bar is a `primary`-fill
+        rounded card (shape.card) with "$selectedCount selected" (labelBold onPrimary) on
+        the left and three `BulkAction` icon+label columns on the right (Edit3 "Set Mark",
+        ClipboardList "Remark", Close "Cancel") — all white (onPrimary), each with a
+        pressScale give. Host long-press flips selectedCount. Tokens via `Enroll.*`; only
+        literal is the 20dp icon size; Arrangement import trimmed; braces 8/8.
 
 - [ ] **P3-T6 — Export / Share**:
       FAB at bottom right: export icon.
@@ -796,6 +805,7 @@ BEGIN.
 | 14 | P3-T2  | `feat(teacher-portal): add GradeDistributionBar segmented bar (loop P3-T2)` | `composeApp/.../ui/v2/screens/teacher/GradeDistributionBar.kt` (new), `TEACHER_PORTAL_LOOP.md` | Segmented A–F distribution bar. Defined `GradeBand` + `defaultGradeBands(a,b,c,d,f)` mapping grades onto the status palette (no new hex). `GradeDistributionBar` = single Canvas (surfaceSubtle base + gapless count-share segments, animated 700ms, clipped shape.card, 8dp) + a per-band dot/count legend in bodySmall. Returns early when empty (host hides in All-Exams). Tokens via `Enroll.*`; braces 11/11. |
 | 15 | P3-T3  | `feat(teacher-portal): add ExamSelector with AddExamSheet (loop P3-T3)` | `composeApp/.../ui/v2/screens/teacher/ExamSelector.kt` (new), `TEACHER_PORTAL_LOOP.md` | Exam chip row over the marks list. `ExamSelector` = LazyRow with "All" chip + keyed `ExamChip`s (name labelBold + date bodySmall, selected→primary) + outlined "+ Add Exam" chip (primaryMid border). `AddExamSheet` = Dialog form reusing `VInput` (name/date/Number max-marks) + 3 `ExamTypeChip`s (Unit Test/Term/Assignment → AssessmentType) + full-width `VButton` (enabled when valid), emits `NewExamDraft`. Consumes real `AssessmentDto`. Tokens via `Enroll.*`; braces 30/30. |
 | 16 | P3-T4  | `feat(teacher-portal): add StudentMarkRow + detail sheet (loop P3-T4)` | `composeApp/.../ui/v2/screens/teacher/StudentMarksList.kt` (new), `TEACHER_PORTAL_LOOP.md` | Premium fast-entry marks row over real `GradebookStudentMark`. Roll# + name + `AutoSaveHint` (saving→✓), auto `GradeChip` (A/B green, C/D amber, F red), `TrendArrow`, and a `MarkField` `BasicTextField` pill (surfaceSubtle, focus border primary 2dp) with **800ms debounce auto-save** (LaunchedEffect+delay, no button). Tap row → `StudentMarkDetailSheet` (VAvatar header, Canvas score-history line chart over `ExamScorePoint`, remark VInput, Message-Parent VButton → P7). Enums `MarkSaveState`/`MarkTrend` + `gradeForPercent`. Tokens via `Enroll.*`; braces 37/37. |
+| 17 | P3-T5  | `feat(teacher-portal): add BulkActionsBar slide-up selection bar (loop P3-T5)` | `composeApp/.../ui/v2/screens/teacher/BulkActionsBar.kt` (new), `TEACHER_PORTAL_LOOP.md` | Contextual multi-select bar. `AnimatedVisibility(selectedCount > 0)` + slideInVertically/fade rises from bottom; primary-fill card with "$n selected" (labelBold onPrimary) + three white `BulkAction`s (Edit3 Set Mark / ClipboardList Remark / Close Cancel), each pressScale. Tokens via `Enroll.*`; braces 8/8. |
 
 ---
 
