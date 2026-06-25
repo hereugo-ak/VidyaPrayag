@@ -1042,5 +1042,65 @@ BEGIN.
 
 ---
 
+## PART 6 — WIRING & CLEANUP (post-loop integration)
+
+> The Phases 1–7 loop above produced 29 new teacher composables + 3 design-system
+> files, but — as the PR #22 body itself stated ("Additive & standalone … existing
+> screens untouched … hosts wire VMs/repos with `TODO(host)`") — **none of them were
+> mounted into the live shell**. The running app still rendered the pre-existing
+> production screens, so the redesign was invisible at runtime. This pass actually
+> wires the loop work into the live portal and removes the dead duplicates so the
+> tree can't drift back into "looks done but isn't".
+
+### What was wired into the LIVE shell (`TeacherPortalV2`)
+- **`EnrollBottomNav` (P1-T4)** — the host now mounts the bottom nav through the loop's
+  canonical `EnrollBottomNav(items, selectedId, onSelect)` entry point (which renders
+  through the same premium `TeacherDock`), instead of calling `TeacherDock` directly.
+- **Home tab redesign — `TodayScreen` rebuilt** to mount the loop's signature Home
+  components, **fed by the real view-models** (no fabricated data, no `TODO(host)` left
+  on the data path):
+  - `TeacherHomeHeader` (P2-T1) — gradient hero, fed by `TeacherTodayState.teacherName`
+    + live `notifications.unreadCount`; avatar→Profile tab, bell→Notifications overlay.
+  - `QuickActionRow` (P2-T3) — routed to the self-sufficient tabs / pre-scoped planes.
+  - `SmartNudgeSection` (P2-T5) — nudges derived **honestly** from the live
+    `TeacherObligationsState.items` (one nudge per outstanding obligation, capped to 3);
+    each action chip routes back through the existing pre-scoped `onOpenObligation`
+    deep-link contract. Empty obligations ⇒ section hides itself.
+  - `TodayClassStrip` (P2-T2) — consumes the server-resolved `ResolvedDayUi` directly
+    (real period order/times/room/attendance status, authoritative `nowIndex`);
+    pill-tap "Take attendance" reuses the host's pre-scoped attendance write-plane.
+  - The working `TeacherCheckInCard` + 3-face `TeacherScheduleCard` are preserved below
+    the loop hero, so no production capability is lost.
+- On the **Today tab the slim canonical `TeacherHeader` is suppressed** (the gradient
+  `TeacherHomeHeader` is the hero there) — every other tab keeps the single header, so
+  there is no double chrome.
+
+### What was DELETED (loop stubs that duplicated working VM-backed screens)
+The loop's Gradebook/Planner/Chat/Profile/Notification components were static UI-model
+stubs (`TODO(host)` for all data) that, if mounted, would **regress** the existing
+server-backed `TeacherGradebookScreenV2` / `PlannerScreen` / `TeacherProfileScreenV2` /
+`NotificationsScreenV2`. They were unreachable from the live shell and nothing else
+referenced them in code, so they were removed to keep the tree honest (23 files):
+`AttendanceSummaryCard`, `BulkActionsBar`, `ChatThreadScreen`, `DailyPlanView`,
+`ExamSelector`, `GradeDistributionBar`, `GradebookExport`, `GradebookSelector`,
+`HomeworkTracker`, `NoticeDetailScreen`, `NotificationSheet`, `PendingTasksCard`,
+`PlannerNudge`, `StudentMarksList`, `TeacherAssignmentCard`, `TeacherChatScreen`,
+`TeacherDestination`, `TeacherNavRouter`, `TeacherProfileHeader`,
+`TeacherSettingsSection`, `TeacherStatsRow`, `TeacherStudentListScreen`, `WeekViewHeader`.
+
+### Kept (now live consumers, not dead code)
+`EnrollTokens.kt`, `EnrollCard.kt`, `SectionHeader.kt`, and the five wired components
+`EnrollBottomNav`, `TeacherHomeHeader`, `QuickActionRow`, `SmartNudgeSection`,
+`TodayClassStrip` — all reachable from `TeacherPortalV2` → `TodayScreen`.
+
+### Verification (static only — no Gradle build per constraint)
+- Brace/paren/bracket balance OK on every changed file.
+- No unused imports in changed files.
+- Whole-repo scan (`composeApp` + `shared`): **zero remaining code references** to any
+  deleted symbol; no kept file imports a deleted file.
+- All same-package symbols and all imported VM/state members confirmed to exist.
+
+---
+
 *Loop Version: 1.0 | Created for Enroll+ Teacher Portal Sprint*
 *Branch: backend-by-abuzar_v1.0.3*

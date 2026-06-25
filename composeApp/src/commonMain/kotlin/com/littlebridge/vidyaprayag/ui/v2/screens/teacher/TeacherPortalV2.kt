@@ -229,23 +229,33 @@ fun TeacherPortalV2(
         VScreenScaffold(
             modifier = modifier,
             topBar = {
-                TeacherHeader(
-                    teacherName = teacherName,
-                    greeting = greeting,
-                    schoolName = schoolName,
-                    photoUrl = photoUrl,
-                    unreadCount = notifications.unreadCount,
-                    onOpenNotifications = { overlay = TeacherOverlay.Notifications },
-                    onOpenProfile = { tab = "profile" },
-                    classContext = classContext,
-                    onChangeScope = if (tab == "gradebook") {
-                        { tab = "classes" }
-                    } else null,
-                )
+                // The Today tab now renders the loop's signature gradient [TeacherHomeHeader]
+                // INSIDE its own content (P2-T1), which already carries greeting + avatar→Profile
+                // + bell→Notifications. Mounting the slim canonical [TeacherHeader] here too would
+                // be double chrome, so on Today the scaffold top bar is intentionally empty; every
+                // OTHER tab keeps the single canonical header.
+                if (tab != "today") {
+                    TeacherHeader(
+                        teacherName = teacherName,
+                        greeting = greeting,
+                        schoolName = schoolName,
+                        photoUrl = photoUrl,
+                        unreadCount = notifications.unreadCount,
+                        onOpenNotifications = { overlay = TeacherOverlay.Notifications },
+                        onOpenProfile = { tab = "profile" },
+                        classContext = classContext,
+                        onChangeScope = if (tab == "gradebook") {
+                            { tab = "classes" }
+                        } else null,
+                    )
+                }
             },
             bottomBar = {
-                // T-601 / Doc 10 §5.1 — the premium floating dock (ParentDock physics).
-                TeacherDock(items = items, selected = tab, onSelect = { tab = it })
+                // T-601 / Doc 10 §5.1 — the premium floating dock (ParentDock physics),
+                // now mounted through the loop's canonical [EnrollBottomNav] entry point
+                // (P1-T4) which renders through the same TeacherDock (no visual change,
+                // loop-API adoption so the bottom nav is wired the loop-native way).
+                EnrollBottomNav(items = items, selectedId = tab, onSelect = { tab = it })
             },
         ) { _ ->
             Box(Modifier.fillMaxSize()) {
@@ -261,6 +271,13 @@ fun TeacherPortalV2(
                         onGoToClasses = { tab = "classes" },
                         onGoToPlanner = { tab = "planner" },
                         onGoToGradebook = { tab = "gradebook" },
+                        // P2-T1 loop Home hero chrome — the gradient header's avatar/bell and the
+                        // "Message Parent" quick action route through the portal's existing
+                        // notification overlay / Profile tab / Classes roster (no dead ends).
+                        onOpenNotifications = { overlay = TeacherOverlay.Notifications },
+                        onOpenProfile = { tab = "profile" },
+                        onMessageParent = { tab = "classes" },
+                        unreadCount = notifications.unreadCount,
                     )
                     "classes" -> TeacherClassesScreenV2(
                         onOpenStudent = { studentId -> selectedStudentId = studentId },
