@@ -73,6 +73,10 @@ fun GradeDistributionBar(
     if (total <= 0) return
 
     val track = Enroll.colors.surfaceSubtle
+    // Capture the brand fallback colour HERE, in the @Composable scope. The Canvas
+    // draw lambda runs in DrawScope (NOT a composable context), so reading the
+    // @Composable `Enroll.colors.primary` inside it is illegal — hoist it out.
+    val fallbackColor = Enroll.colors.primary
     val progress by animateFloatAsState(targetValue = 1f, animationSpec = tween(700), label = "dist")
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -92,7 +96,7 @@ fun GradeDistributionBar(
             bands.forEach { band ->
                 if (band.count <= 0) return@forEach
                 val segW = (band.count.toFloat() / total.toFloat()) * w * progress
-                val segColor = if (band.color == Color.Unspecified) Enroll.colors.primary else band.color
+                val segColor = if (band.color == Color.Unspecified) fallbackColor else band.color
                 drawRect(color = segColor, topLeft = Offset(x, 0f), size = Size(segW, h))
                 x += (band.count.toFloat() / total.toFloat()) * w
             }
