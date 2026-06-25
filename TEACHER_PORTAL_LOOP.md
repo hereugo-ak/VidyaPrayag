@@ -11,10 +11,30 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: [agent fills after each iteration]
-LAST COMMIT: [agent fills]
+LAST COMPLETED TASK: P1-T1 — Design System Foundation (semantic token bridge)
+LAST COMMIT: feat(teacher-portal): add Enroll semantic token bridge over the existing VTheme design system
 CURRENT PHASE: Phase 1 — Design System Foundation
-AGENT NOTES: [agent fills with decisions made]
+AGENT NOTES:
+  • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
+    ships a complete, mature, fully token-driven design system — VTheme → VColors
+    (teal / navy / violet `#6C5CE0` accent), VTypography (Plus Jakarta Sans + DM Mono),
+    VDimens, VElevation, VMotion — and every Parent + Teacher screen reads from it
+    (zero hardcoded `Color(0x…)` in teacher screens, verified by grep).
+  • The loop's literal ask (new indigo `EnrollColor/Typography/Shape` + a parallel
+    `EnrollTheme {}`) would FORK the design system and break portal-wide colour parity,
+    re-introducing off-pattern hex — the opposite of this task's own Done Criteria and
+    a direct violation of the IMPORTANT NOTE ("stick with the colour/theme pattern of
+    the whole Parents + Teacher portal").
+  • RESOLUTION: satisfied P1-T1 by INTENT. Added ONE new file —
+    `ui/v2/theme/EnrollTokens.kt` — a thin semantic BRIDGE exposing the loop's token
+    vocabulary (`Enroll.colors.primary`, `Enroll.type.headingLarge`, `Enroll.shape.card`,
+    `Enroll.space.lg`, …) all RESOLVING to the existing VTheme. No new colours. No
+    changes to any existing screen. Indigo family → existing violet `accent` family.
+  • Status semantics PRESERVED exactly: statusPresent/Absent/Late → existing
+    successInk/dangerInk/warningInk. Honours Light/Night tone automatically (read-only
+    composables off the active VTheme).
+  • Later loop tasks can now reference `Enroll.*` tokens with concrete, on-pattern,
+    token-backed homes — no per-screen hardcoding required.
 ```
 
 ### DONE CRITERIA (Static Analysis Only — No Build Required)
@@ -156,11 +176,17 @@ ScreenPadding = 16.dp
 ### PHASE 1 — DESIGN SYSTEM FOUNDATION
 > Must be done first. All other phases depend on this.
 
-- [ ] **P1-T1**: Create or extend `ui/theme/EnrollColor.kt` with all color tokens above.
+- [x] **P1-T1**: Create or extend `ui/theme/EnrollColor.kt` with all color tokens above.
       Create `ui/theme/EnrollTypography.kt` with all type tokens.
       Create `ui/theme/EnrollShape.kt` with shape/spacing tokens.
       Wire all three into the root `EnrollTheme {}` composable.
       Verify: search codebase for `Color(0x` outside theme files — all should be gone after.
+      ↳ DONE (by intent, per IMPORTANT NOTE — see AGENT NOTES). The portal already has a
+        complete token-driven foundation (`VTheme`/`VColors`/`VType`/`VDimens`). Instead of
+        forking a new indigo theme (which would break Parents↔Teacher colour parity), added
+        `ui/v2/theme/EnrollTokens.kt` — a semantic bridge (`Enroll.colors/type/shape/space`)
+        mapping the loop's vocabulary onto the existing VTheme. Indigo→violet `accent`;
+        status colours preserved; no new hex; no existing screen touched.
 
 - [ ] **P1-T2**: Create `ui/components/EnrollCard.kt` — a shared card composable:
       `EnrollCard(modifier, onClick, content)` using `SurfaceCard` fill,
@@ -553,6 +579,7 @@ BEGIN.
 | # | Task ID | Commit | Files Changed | Notes |
 |---|---------|--------|---------------|-------|
 | 1 | —       | —      | —             | Loop initialized |
+| 2 | P1-T1   | `feat(teacher-portal): add Enroll semantic token bridge over the existing VTheme design system` | `composeApp/.../ui/v2/theme/EnrollTokens.kt` (new), `TEACHER_PORTAL_LOOP.md` | Foundation satisfied by INTENT: bridged loop token vocabulary onto existing VTheme rather than forking an off-pattern indigo theme. Verified every referenced VColors/VType/VDimens member exists; braces balanced; no new hex; status semantics preserved; no existing screen modified. |
 
 ---
 
