@@ -11,8 +11,8 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P2-T1 — TeacherHomeHeader (signature gradient Home header)
-LAST COMMIT: feat(teacher-portal): add gradient TeacherHomeHeader for the Home tab (loop P2-T1)
+LAST COMPLETED TASK: P2-T2 — TodayClassStrip (signature period timeline + inline expansion)
+LAST COMMIT: feat(teacher-portal): add signature TodayClassStrip period timeline (loop P2-T2)
 CURRENT PHASE: Phase 2 — Home Tab Premium Redesign (in progress)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
@@ -300,7 +300,7 @@ ScreenPadding = 16.dp
         canonical `TeacherHeader` on operational tabs). All tokens via `Enroll.*`; util date
         symbols + bridge members verified; braces balanced.
 
-- [ ] **P2-T2 — Today Strip**:
+- [x] **P2-T2 — Today Strip**:
       Implement `TodayClassStrip` composable.
       Horizontal `LazyRow` of `PeriodPill` composables.
       Each `PeriodPill(period: SchedulePeriod)` displays:
@@ -315,6 +315,13 @@ ScreenPadding = 16.dp
       Tap on any period → expand an `AnimatedContent` block below the strip
       showing: Full class name, Room number, Attendance status (taken/not taken), quick "Take Attendance" button.
       Section header above strip: `SectionHeader(title = "TODAY'S SCHEDULE")`
+      ↳ DONE. Added `ui/v2/screens/teacher/TodayClassStrip.kt`. LazyRow of PeriodPill
+        (keyed by periodId), past/active/future aesthetics (surfaceSubtle / primary+glow
+        via drawBehind / surfaceCard+border), tap → AnimatedVisibility inline detail
+        (class+subject, room, attendance status dot, pre-scoped "Take attendance" CTA →
+        P7-T2). Driven by the real server `ResolvedDayUi` (authoritative `nowIndex`, not
+        the device clock). Reuses shared `parseHourMinute`/`formatClock12h`. Status
+        colours preserved; all tokens via `Enroll.*`; braces 34/34; imports clean.
 
 - [ ] **P2-T3 — Quick Action Row**:
       Three action pills in a `Row` with `SpaceMD` gap, horizontally centered.
@@ -659,6 +666,7 @@ BEGIN.
 | 4 | P1-T3   | `feat(teacher-portal): add shared SectionHeader composable (loop P1-T3)` | `composeApp/.../ui/v2/components/SectionHeader.kt` (new), `TEACHER_PORTAL_LOOP.md` | Ergonomic string-action header (title/action/onAction). `labelCaps`+`textSecondary` title, `primaryMid` ripple-free text-button action. Terser sibling of `VSectionHeader`. Unused import removed on review; tokens via `Enroll.*`; braces 5/5. |
 | 5 | P1-T4   | `feat(teacher-portal): add EnrollBottomNav over the premium TeacherDock (loop P1-T4)` | `composeApp/.../ui/v2/screens/teacher/EnrollBottomNav.kt` (new), `TEACHER_PORTAL_LOOP.md` | Canonical nav entry point: `EnrollBottomNav` + `EnrollTab` ids + `loopTabs()`. Delegates to premium `TeacherDock` instead of a regressive pill bar (preserves spring lozenge/haptics/badges/ParentDock parity). Chat badge via `VNavItem.badge`. Placed in teacher pkg for clean layering. **PHASE 1 COMPLETE.** |
 | 6 | P2-T1   | `feat(teacher-portal): add gradient TeacherHomeHeader for the Home tab (loop P2-T1)` | `composeApp/.../ui/v2/screens/teacher/TeacherHomeHeader.kt` (new), `TEACHER_PORTAL_LOOP.md` | Signature 120dp violet-gradient Home header: time-aware greeting + first name (headingLarge) + date (bodyMedium 70%); 40dp avatar ring → Profile; glassy bell + unread badge → NotificationSheet. Additive (keeps TeacherHeader on other tabs). Reuses `teacherGreeting`; util date + Enroll members verified; braces 22/22. |
+| 7 | P2-T2   | `feat(teacher-portal): add signature TodayClassStrip period timeline (loop P2-T2)` | `composeApp/.../ui/v2/screens/teacher/TodayClassStrip.kt` (new), `TEACHER_PORTAL_LOOP.md` | Horizontal period-pill day timeline (keyed LazyRow), past/active/future states with active accent glow, tap → inline AnimatedVisibility detail (room, attendance dot, pre-scoped Take-attendance CTA). Server `ResolvedDayUi.nowIndex`-driven. Reuses shared clock utils; status colours preserved; braces 34/34. |
 
 ---
 
