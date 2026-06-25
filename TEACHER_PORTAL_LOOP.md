@@ -734,7 +734,7 @@ and track if students submitted homework — all in one place.
         hex. Tap row → `onOpenThread(threadId)` (→ P5-T2). Tokens via `Enroll.*`; braces
         27/27, parens 103/103; unused `size` import trimmed.
 
-- [ ] **P5-T2 — Chat Thread Screen**:
+- [x] **P5-T2 — Chat Thread Screen**:
       File: `ui/screens/teacher/ChatThreadScreen.kt`
       Top: `TopAppBar` — back arrow + student name + parent name subtitle + video call icon stub.
       Messages: `LazyColumn` (reversed) of `MessageBubble`.
@@ -752,6 +752,22 @@ and track if students submitted homework — all in one place.
         - "Your child's performance has improved."
         - "Please schedule a meeting with me."
         - [+ Add custom template]
+      ↳ DONE. Added `ui/v2/screens/teacher/ChatThreadScreen.kt`. Defined `ChatMessage(id,
+        text, timeLabel, fromTeacher, read)`. `ChatThreadScreen(studentName, parentName,
+        messages, onBack, onVideoCall, onSend)` = a custom `ChatTopBar` (no Material3
+        TopAppBar — quality bar: back `ThreadIconButton` + student labelBold + parent
+        bodySmall subtitle + Phone "video call" stub), a `reverseLayout` keyed `LazyColumn`
+        of `MessageBubble` (host passes newest-LAST; `asReversed()` for chat order), and a
+        `ReplyBar`. `MessageBubble`: teacher = End-aligned `primarySoft` bubble + textPrimary;
+        parent = Start-aligned `surfaceSubtle` bubble + textSecondary; each has bodyMedium
+        text + bodySmall timeLabel, and teacher bubbles add a Check read-receipt (primary
+        when read, textTertiary when only sent). `ReplyBar`: FileText template button →
+        `QuickReplySheet`, a surfaceSubtle pill `BasicTextField` ("Write a message…", primary
+        cursor), and a Send button (primary fill + onPrimary when text non-blank, else
+        surfaceSubtle + disabled). `QuickReplySheet` = `Dialog` sheet (`SectionHeader("QUICK
+        REPLIES")`) listing the 4 spec templates as tappable `EnrollCard`s + a "+ Add custom
+        template" affordance. Honours IMPORTANT NOTE (primarySoft for PrimaryIndigoSoft, no
+        new hex). Tokens via `Enroll.*`; braces 38/38, parens 156/156; every import used.
 
 - [ ] **P5-T3 — Unread Count Badge on BottomNav**:
       Chat tab in `EnrollBottomNav` shows live unread count from `ChatViewModel.unreadCount`.
