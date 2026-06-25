@@ -11,9 +11,9 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P2-T7 — NotificationSheet (bell sheet, grouped + swipe-dismiss)
-LAST COMMIT: feat(teacher-portal): add NotificationSheet with grouped swipe rows (loop P2-T7)
-CURRENT PHASE: Phase 2 COMPLETE → Phase 3 — Gradebook Tab (next)
+LAST COMPLETED TASK: P3-T1 — GradebookSelector (two-row class + subject chips)
+LAST COMMIT: feat(teacher-portal): add GradebookSelector class + subject chip rows (loop P3-T1)
+CURRENT PHASE: Phase 3 — Gradebook Tab (in progress)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
     ships a complete, mature, fully token-driven design system — VTheme → VColors
@@ -453,7 +453,7 @@ ScreenPadding = 16.dp
 **Teacher mental model:** I want to open my class, see my students, and enter marks fast.
 No extra taps. No loading spinners after every entry. Auto-save silently.
 
-- [ ] **P3-T1 — Class + Subject Selector**:
+- [x] **P3-T1 — Class + Subject Selector**:
       Sticky `TopAppBar`-level selector (not inside scroll content).
       Two horizontally scrollable chip rows:
         Row 1: Class chips (Class 7A, 8A, 9B…) — `FilterChip` style, `PrimaryIndigoSoft` selected
@@ -461,6 +461,19 @@ No extra taps. No loading spinners after every entry. Auto-save silently.
       Selected state: `PrimaryIndigo` background, white text.
       Unselected: `SurfaceSubtle` background, `TextSecondary` text.
       This replaces any current dropdown/dialog-based class selection.
+      ↳ DONE. Added `ui/v2/screens/teacher/GradebookSelector.kt`. The portal had no
+        reusable chip primitive (grep), so built `SelectorChip` here. Defined UI models
+        `GradebookClassOption(id, label)` / `GradebookSubjectOption(id, label)` so the
+        component is VM-agnostic (host maps TeacherClassSummaryDto → options; row 2
+        reloads on class pick — TODO wiring lives in the host screen). `GradebookSelector`
+        renders Row 1 (classes) always + Row 2 (subjects) only when the selected class
+        has subjects, each a `horizontalScroll` Row with SpaceSM gaps and SpaceLG edge
+        insets, designed to be PINNED in the header zone (not inside the marks
+        LazyColumn). `SelectorChip`: animated `animateColorAsState` bg/fg — selected =
+        `primary` fill + `onPrimary` white text, unselected = `surfaceSubtle` +
+        `textSecondary`; pill shape, labelBold, pressScale give. Honours IMPORTANT NOTE
+        (violet primary stands in for PrimaryIndigo — no new hex). Tokens via `Enroll.*`;
+        unused `dp` import trimmed; braces 11/11.
 
 - [ ] **P3-T2 — Grade Distribution Bar**:
       Below selector, above student list.
@@ -737,6 +750,7 @@ BEGIN.
 | 10 | P2-T5  | `feat(teacher-portal): add SmartNudgeSection with TeacherNudge sealed class (loop P2-T5)` | `composeApp/.../ui/v2/screens/teacher/SmartNudgeSection.kt` (new), `TEACHER_PORTAL_LOOP.md` | "NEEDS ATTENTION" nudge stack. Defined `TeacherNudge` sealed class (MarksNotEntered/AttendanceNotTaken/ParentUnread/HomeworkUngraded) + message/actionLabel/icon/tone extensions. `SmartNudgeSection` returns early when empty; each `NudgeCard` = tinted EnrollCard (pending→accentSoft amber, info→primarySoft violet, honouring IMPORTANT NOTE) + 36dp icon disc + bodyMedium message + pill action chip + optional Close dismiss. Pure UI (no API). Tokens via `Enroll.*`; braces 27/27. |
 | 11 | P2-T6  | `feat(teacher-portal): add PendingTasksCard with tap-to-tick tasks (loop P2-T6)` | `composeApp/.../ui/v2/screens/teacher/PendingTasksCard.kt` (new), `TEACHER_PORTAL_LOOP.md` | Home "PENDING" to-do card. Defined `TeacherTask(id, description, dueLabel, done)`. EnrollCard + `SectionHeader("PENDING", action="See All")` (See-All shows only when >3); max-3 collapsed. Each `TaskRow` = whole-row toggle with a custom `TaskCheckbox` (hairline square → statusPresent tick), bodyMedium description (strikethrough + textTertiary when done), bodySmall due-date that animates away when ticked. Custom checkbox (no Material3 default). Tokens via `Enroll.*`; braces 14/14. |
 | 12 | P2-T7  | `feat(teacher-portal): add NotificationSheet with grouped swipe rows (loop P2-T7)` | `composeApp/.../ui/v2/screens/teacher/NotificationSheet.kt` (new), `TEACHER_PORTAL_LOOP.md` | Bell-icon bottom sheet (custom, built on `Dialog` since portal has no Material3 ModalBottomSheet). ShapeSheet corners + 32×4 handle bar + `SectionHeader("NOTIFICATIONS", action="Mark all read")`. Defined `NotificationType`/`NotificationGroup`/`TeacherNotification`. Grouped LazyColumn (TODAY/YESTERDAY/EARLIER), each `NotificationRow` = 8dp primary unread dot + 36dp type-icon disc + labelBold title + bodyMedium message + bodySmall timeLabel, swipe-right-220px to dismiss (draggable + graphicsLayer), tap → onOpen (P7). Empty state included. Tokens via `Enroll.*`; braces 31/31. **PHASE 2 COMPLETE.** |
+| 13 | P3-T1  | `feat(teacher-portal): add GradebookSelector class + subject chip rows (loop P3-T1)` | `composeApp/.../ui/v2/screens/teacher/GradebookSelector.kt` (new), `TEACHER_PORTAL_LOOP.md` | Sticky two-row scope picker for the gradebook. Defined VM-agnostic options `GradebookClassOption`/`GradebookSubjectOption`. Row 1 classes always; Row 2 subjects only when present; both `horizontalScroll`. `SelectorChip` with animated bg/fg: selected → primary + white, unselected → surfaceSubtle + textSecondary; pill, labelBold, pressScale. Built a custom chip (no portal chip existed). Tokens via `Enroll.*`; braces 11/11. |
 
 ---
 
