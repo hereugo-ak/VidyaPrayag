@@ -11,8 +11,8 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P3-T2 — GradeDistributionBar (segmented A–F bar + legend)
-LAST COMMIT: feat(teacher-portal): add GradeDistributionBar segmented bar (loop P3-T2)
+LAST COMPLETED TASK: P3-T3 — ExamSelector + AddExamSheet (exam chip row + create form)
+LAST COMMIT: feat(teacher-portal): add ExamSelector with AddExamSheet (loop P3-T3)
 CURRENT PHASE: Phase 3 — Gradebook Tab (in progress)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
@@ -493,12 +493,26 @@ No extra taps. No loading spinners after every entry. Auto-save silently.
         textSecondary. Tokens via `Enroll.*`; only literals are bar geometry (8dp); braces
         11/11.
 
-- [ ] **P3-T3 — Exam Selector**:
+- [x] **P3-T3 — Exam Selector**:
       A horizontal `LazyRow` of `ExamChip(exam)` above the student list.
       "All" chip at start. Each chip: exam name + date.
       Selected exam: `PrimaryIndigo`. Tap changes the marks column displayed.
       "+ Add Exam" chip at end (outlined, `PrimaryIndigoMid` border) → opens `AddExamSheet`.
       `AddExamSheet`: exam name, date, max marks, exam type (Unit Test / Term / Assignment) — save button.
+      ↳ DONE. Added `ui/v2/screens/teacher/ExamSelector.kt`. `ExamSelector(exams,
+        selectedExamId, onSelectAll, onSelectExam, onAddExam, modifier)` consumes the real
+        `AssessmentDto` directly: a `LazyRow` with an "All" chip first (selected when
+        selectedExamId == null), keyed `ExamChip`s (name in labelBold + examDate in
+        bodySmall), and a trailing outlined `AddExamChip` ("+ Add Exam", 1dp primaryMid
+        border) → onAddExam. Selected chip = `primary` fill + onPrimary text (animated).
+        `AddExamSheet(visible, onDismiss, onSave)` = `Dialog`-based sheet (shape.sheet,
+        SectionHeader("ADD EXAM")) reusing the portal's `VInput` (name / date / max-marks
+        digit-filtered Number keyboard) + three `ExamTypeChip`s mapped to AssessmentType
+        (SCHEDULED→"Unit Test", EXAM→"Term", ASSIGNMENT→"Assignment") + a full-width
+        `VButton` enabled only when name non-blank & maxMarks>0. Emits a typed
+        `NewExamDraft(name, date, maxMarks, type)` for the host VM to validate+persist
+        (TODO wiring in host). Tokens via `Enroll.*`; Alignment import trimmed; braces
+        30/30.
 
 - [ ] **P3-T4 — Student Marks List**:
       `LazyColumn` with `key = { student.id }`.
@@ -763,6 +777,7 @@ BEGIN.
 | 12 | P2-T7  | `feat(teacher-portal): add NotificationSheet with grouped swipe rows (loop P2-T7)` | `composeApp/.../ui/v2/screens/teacher/NotificationSheet.kt` (new), `TEACHER_PORTAL_LOOP.md` | Bell-icon bottom sheet (custom, built on `Dialog` since portal has no Material3 ModalBottomSheet). ShapeSheet corners + 32×4 handle bar + `SectionHeader("NOTIFICATIONS", action="Mark all read")`. Defined `NotificationType`/`NotificationGroup`/`TeacherNotification`. Grouped LazyColumn (TODAY/YESTERDAY/EARLIER), each `NotificationRow` = 8dp primary unread dot + 36dp type-icon disc + labelBold title + bodyMedium message + bodySmall timeLabel, swipe-right-220px to dismiss (draggable + graphicsLayer), tap → onOpen (P7). Empty state included. Tokens via `Enroll.*`; braces 31/31. **PHASE 2 COMPLETE.** |
 | 13 | P3-T1  | `feat(teacher-portal): add GradebookSelector class + subject chip rows (loop P3-T1)` | `composeApp/.../ui/v2/screens/teacher/GradebookSelector.kt` (new), `TEACHER_PORTAL_LOOP.md` | Sticky two-row scope picker for the gradebook. Defined VM-agnostic options `GradebookClassOption`/`GradebookSubjectOption`. Row 1 classes always; Row 2 subjects only when present; both `horizontalScroll`. `SelectorChip` with animated bg/fg: selected → primary + white, unselected → surfaceSubtle + textSecondary; pill, labelBold, pressScale. Built a custom chip (no portal chip existed). Tokens via `Enroll.*`; braces 11/11. |
 | 14 | P3-T2  | `feat(teacher-portal): add GradeDistributionBar segmented bar (loop P3-T2)` | `composeApp/.../ui/v2/screens/teacher/GradeDistributionBar.kt` (new), `TEACHER_PORTAL_LOOP.md` | Segmented A–F distribution bar. Defined `GradeBand` + `defaultGradeBands(a,b,c,d,f)` mapping grades onto the status palette (no new hex). `GradeDistributionBar` = single Canvas (surfaceSubtle base + gapless count-share segments, animated 700ms, clipped shape.card, 8dp) + a per-band dot/count legend in bodySmall. Returns early when empty (host hides in All-Exams). Tokens via `Enroll.*`; braces 11/11. |
+| 15 | P3-T3  | `feat(teacher-portal): add ExamSelector with AddExamSheet (loop P3-T3)` | `composeApp/.../ui/v2/screens/teacher/ExamSelector.kt` (new), `TEACHER_PORTAL_LOOP.md` | Exam chip row over the marks list. `ExamSelector` = LazyRow with "All" chip + keyed `ExamChip`s (name labelBold + date bodySmall, selected→primary) + outlined "+ Add Exam" chip (primaryMid border). `AddExamSheet` = Dialog form reusing `VInput` (name/date/Number max-marks) + 3 `ExamTypeChip`s (Unit Test/Term/Assignment → AssessmentType) + full-width `VButton` (enabled when valid), emits `NewExamDraft`. Consumes real `AssessmentDto`. Tokens via `Enroll.*`; braces 30/30. |
 
 ---
 
