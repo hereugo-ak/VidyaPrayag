@@ -70,7 +70,9 @@ import com.littlebridge.vidyaprayag.util.nowMinutesOfDay
 // Palette — harmonious per-subject accent rotation (mirrors ParentPalette).
 // ─────────────────────────────────────────────────────────────────────────────
 
-@Composable
+// Pure (non-@Composable) helpers: they only read colors off the passed-in
+// [VColors] and do plain arithmetic, so they can be called from any context —
+// including non-composable lambdas (e.g. the `tint` callback in ChipFlow).
 fun teacherSubjectPalette(c: VColors): List<Color> = listOf(
     c.accent,          // violet (brand)
     c.teal,            // teal
@@ -80,7 +82,6 @@ fun teacherSubjectPalette(c: VColors): List<Color> = listOf(
 )
 
 /** Deterministic, stable per-key accent so a given subject keeps its hue everywhere. */
-@Composable
 fun teacherSubjectColor(c: VColors, key: String): Color {
     val palette = teacherSubjectPalette(c)
     if (key.isBlank()) return palette.first()
