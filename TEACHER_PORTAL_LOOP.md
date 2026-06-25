@@ -11,9 +11,9 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P2-T6 — PendingTasksCard (collapsed to-do list, tap-to-tick)
-LAST COMMIT: feat(teacher-portal): add PendingTasksCard with tap-to-tick tasks (loop P2-T6)
-CURRENT PHASE: Phase 2 — Home Tab Premium Redesign (in progress)
+LAST COMPLETED TASK: P2-T7 — NotificationSheet (bell sheet, grouped + swipe-dismiss)
+LAST COMMIT: feat(teacher-portal): add NotificationSheet with grouped swipe rows (loop P2-T7)
+CURRENT PHASE: Phase 2 COMPLETE → Phase 3 — Gradebook Tab (next)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
     ships a complete, mature, fully token-driven design system — VTheme → VColors
@@ -414,7 +414,7 @@ ScreenPadding = 16.dp
         checkbox rather than Material3 `Checkbox` (quality bar: no default components).
         Tokens via `Enroll.*`; padding import trimmed; braces 14/14.
 
-- [ ] **P2-T7 — Notification Bottom Sheet**:
+- [x] **P2-T7 — Notification Bottom Sheet**:
       `NotificationSheet` — a `ModalBottomSheetLayout` triggered from the bell icon.
       `ShapeSheet` top corners.
       Handle bar at top (32dp wide, 4dp tall, `SurfaceSubtle` color, centered).
@@ -427,6 +427,23 @@ ScreenPadding = 16.dp
         - `SwipeToDismiss` wrapper — swipe right to dismiss
         - Tap → close sheet + navigate to relevant screen (grade, attendance, chat thread)
       Group by: TODAY / YESTERDAY / EARLIER
+      ↳ DONE. Added `ui/v2/screens/teacher/NotificationSheet.kt`. The portal ships no
+        Material3 ModalBottomSheet (verified by grep) — to honour the spec AND the
+        no-default-components bar, built a custom bottom sheet on the SAME
+        `androidx.compose.ui.window.Dialog` primitive the portal already uses (cf.
+        VConfirmDialog), with `DialogProperties(usePlatformDefaultWidth = false)` for a
+        full-width panel, `Enroll.shape.sheet` top corners, and a 32×4 surfaceSubtle
+        handle bar. `SectionHeader("NOTIFICATIONS", action = "Mark all read")`. Defined
+        UI models: `NotificationType` (Grade/Attendance/Message/Announcement/Homework/
+        General → icon), `NotificationGroup` (Today/Yesterday/Earlier with caps labels),
+        `TeacherNotification(id, type, title, message, timeLabel, group, unread)`. The
+        `LazyColumn` is grouped (group caps header + keyed rows; empty groups skipped) and
+        capped at 480dp. Each `NotificationRow`: 8dp `primary` unread dot on the left
+        edge, 36dp type-icon disc, title labelBold + message bodyMedium + timeLabel
+        bodySmall textTertiary, swipe-RIGHT-past-220px to dismiss (via `draggable` +
+        `graphicsLayer` translationX, animated back if released short), tap → onOpen
+        (close + P7 deep-link). `NotificationEmpty` "You're all caught up" state. All
+        tokens via `Enroll.*`; lazy `items` import added; braces 31/31. **PHASE 2 DONE.**
 
 ---
 
@@ -719,6 +736,7 @@ BEGIN.
 | 9 | P2-T4   | `feat(teacher-portal): add AttendanceSummaryCard with donut (loop P2-T4)` | `composeApp/.../ui/v2/screens/teacher/AttendanceSummaryCard.kt` (new), `TEACHER_PORTAL_LOOP.md` | EnrollCard summary of today's roll-call: left 60% = `SectionHeader("ATTENDANCE TODAY")` + per-class rows (name → present/total → ≥90% green PercentPill); right 40% = custom Canvas donut (surfaceSubtle track + statusPresent round-cap arc, animated, dataLarge % centre). Defined missing UI models `ClassAttendanceStat`/`AttendanceDaySummary` (server-aggregated, no client recompute). Tap → onOpenAttendance (P7). Drew custom donut vs VDonut (its track is hardcoded cream). Tokens via `Enroll.*`; imports trimmed; braces 19/19. |
 | 10 | P2-T5  | `feat(teacher-portal): add SmartNudgeSection with TeacherNudge sealed class (loop P2-T5)` | `composeApp/.../ui/v2/screens/teacher/SmartNudgeSection.kt` (new), `TEACHER_PORTAL_LOOP.md` | "NEEDS ATTENTION" nudge stack. Defined `TeacherNudge` sealed class (MarksNotEntered/AttendanceNotTaken/ParentUnread/HomeworkUngraded) + message/actionLabel/icon/tone extensions. `SmartNudgeSection` returns early when empty; each `NudgeCard` = tinted EnrollCard (pending→accentSoft amber, info→primarySoft violet, honouring IMPORTANT NOTE) + 36dp icon disc + bodyMedium message + pill action chip + optional Close dismiss. Pure UI (no API). Tokens via `Enroll.*`; braces 27/27. |
 | 11 | P2-T6  | `feat(teacher-portal): add PendingTasksCard with tap-to-tick tasks (loop P2-T6)` | `composeApp/.../ui/v2/screens/teacher/PendingTasksCard.kt` (new), `TEACHER_PORTAL_LOOP.md` | Home "PENDING" to-do card. Defined `TeacherTask(id, description, dueLabel, done)`. EnrollCard + `SectionHeader("PENDING", action="See All")` (See-All shows only when >3); max-3 collapsed. Each `TaskRow` = whole-row toggle with a custom `TaskCheckbox` (hairline square → statusPresent tick), bodyMedium description (strikethrough + textTertiary when done), bodySmall due-date that animates away when ticked. Custom checkbox (no Material3 default). Tokens via `Enroll.*`; braces 14/14. |
+| 12 | P2-T7  | `feat(teacher-portal): add NotificationSheet with grouped swipe rows (loop P2-T7)` | `composeApp/.../ui/v2/screens/teacher/NotificationSheet.kt` (new), `TEACHER_PORTAL_LOOP.md` | Bell-icon bottom sheet (custom, built on `Dialog` since portal has no Material3 ModalBottomSheet). ShapeSheet corners + 32×4 handle bar + `SectionHeader("NOTIFICATIONS", action="Mark all read")`. Defined `NotificationType`/`NotificationGroup`/`TeacherNotification`. Grouped LazyColumn (TODAY/YESTERDAY/EARLIER), each `NotificationRow` = 8dp primary unread dot + 36dp type-icon disc + labelBold title + bodyMedium message + bodySmall timeLabel, swipe-right-220px to dismiss (draggable + graphicsLayer), tap → onOpen (P7). Empty state included. Tokens via `Enroll.*`; braces 31/31. **PHASE 2 COMPLETE.** |
 
 ---
 
