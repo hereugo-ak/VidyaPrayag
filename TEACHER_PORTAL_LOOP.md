@@ -11,8 +11,8 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P2-T3 — QuickActionRow (three core-action pills)
-LAST COMMIT: feat(teacher-portal): add QuickActionRow three-up action pills (loop P2-T3)
+LAST COMPLETED TASK: P2-T4 — AttendanceSummaryCard (per-class rows + overall donut)
+LAST COMMIT: feat(teacher-portal): add AttendanceSummaryCard with donut (loop P2-T4)
 CURRENT PHASE: Phase 2 — Home Tab Premium Redesign (in progress)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
@@ -336,7 +336,7 @@ ScreenPadding = 16.dp
         icon+text, shape.card, SpaceMD/SpaceLG padding, pressScale give. Callbacks
         onTakeAttendance/onAddMarks/onMessageParent wired for P7. All tokens via Enroll.*.
 
-- [ ] **P2-T4 — Attendance Summary Card**:
+- [x] **P2-T4 — Attendance Summary Card**:
       `AttendanceSummaryCard(todayStats: AttendanceDaySummary)` composable.
       `EnrollCard` container.
       Left 60%: section header "ATTENDANCE TODAY",
@@ -345,6 +345,23 @@ ScreenPadding = 16.dp
       Center of donut: `DataLarge` percentage, `TextPrimary`.
       Colors: `StatusPresent` fill, `SurfaceSubtle` track.
       Tap card → navigates to full AttendanceScreen.
+      ↳ DONE. Added `ui/v2/screens/teacher/AttendanceSummaryCard.kt` —
+        `AttendanceSummaryCard(summary, onOpenAttendance, modifier)` in an `EnrollCard`
+        (taps → onOpenAttendance, the P7 deep-link target). Defined the UI models the
+        spec referenced but that didn't exist yet: `ClassAttendanceStat(className,
+        present, total)` with a clamped `percent`, and `AttendanceDaySummary(classes)`
+        with server-aggregated `totalPresent/totalStudents/overallPercent` (NO client
+        recomputation — fed straight from the VM; mirrors TeacherAttendanceState's own
+        present/total getters). Left 60% = `SectionHeader("ATTENDANCE TODAY")` + keyed
+        `ClassStatRow`s (name → `present/total` in dataSmall → `PercentPill`); pill goes
+        `statusPresentSoft`/`statusPresent` when ≥90%, else `surfaceSubtle`/textSecondary.
+        Right 40% = custom `AttendanceDonut`: surfaceSubtle full track + statusPresent
+        round-cap arc swept to % (animated 800ms), dataLarge % centre in textPrimary —
+        matches spec exactly (drew custom rather than reuse VDonut because VDonut's track
+        is hardcoded `cream`, not the spec's SurfaceSubtle). Empty summary → renders
+        nothing (no empty card). All colour/type/shape/space via `Enroll.*`; only literals
+        are donut geometry (96dp/12dp). Imports trimmed (RoundedCornerShape, Arrangement
+        removed on review); braces/parens balanced; every Enroll + VM member verified.
 
 - [ ] **P2-T5 — Smart Nudge Cards**:
       `SmartNudgeSection(nudges: List<TeacherNudge>)` composable.
@@ -672,6 +689,7 @@ BEGIN.
 | 6 | P2-T1   | `feat(teacher-portal): add gradient TeacherHomeHeader for the Home tab (loop P2-T1)` | `composeApp/.../ui/v2/screens/teacher/TeacherHomeHeader.kt` (new), `TEACHER_PORTAL_LOOP.md` | Signature 120dp violet-gradient Home header: time-aware greeting + first name (headingLarge) + date (bodyMedium 70%); 40dp avatar ring → Profile; glassy bell + unread badge → NotificationSheet. Additive (keeps TeacherHeader on other tabs). Reuses `teacherGreeting`; util date + Enroll members verified; braces 22/22. |
 | 7 | P2-T2   | `feat(teacher-portal): add signature TodayClassStrip period timeline (loop P2-T2)` | `composeApp/.../ui/v2/screens/teacher/TodayClassStrip.kt` (new), `TEACHER_PORTAL_LOOP.md` | Horizontal period-pill day timeline (keyed LazyRow), past/active/future states with active accent glow, tap → inline AnimatedVisibility detail (room, attendance dot, pre-scoped Take-attendance CTA). Server `ResolvedDayUi.nowIndex`-driven. Reuses shared clock utils; status colours preserved; braces 34/34. |
 | 8 | P2-T3   | `feat(teacher-portal): add QuickActionRow three-up action pills (loop P2-T3)` | `composeApp/.../ui/v2/screens/teacher/QuickActionRow.kt` (new), `TEACHER_PORTAL_LOOP.md` | Three centered action pills (Take Attendance / Add Marks / Message Parent): primarySoft bg, primaryMid icon+text, shape.card, SpaceMD gap + padding, pressScale. Callbacks set up for P7 deep links. Tokens via `Enroll.*`; braces 5/5. |
+| 9 | P2-T4   | `feat(teacher-portal): add AttendanceSummaryCard with donut (loop P2-T4)` | `composeApp/.../ui/v2/screens/teacher/AttendanceSummaryCard.kt` (new), `TEACHER_PORTAL_LOOP.md` | EnrollCard summary of today's roll-call: left 60% = `SectionHeader("ATTENDANCE TODAY")` + per-class rows (name → present/total → ≥90% green PercentPill); right 40% = custom Canvas donut (surfaceSubtle track + statusPresent round-cap arc, animated, dataLarge % centre). Defined missing UI models `ClassAttendanceStat`/`AttendanceDaySummary` (server-aggregated, no client recompute). Tap → onOpenAttendance (P7). Drew custom donut vs VDonut (its track is hardcoded cream). Tokens via `Enroll.*`; imports trimmed; braces 19/19. |
 
 ---
 
