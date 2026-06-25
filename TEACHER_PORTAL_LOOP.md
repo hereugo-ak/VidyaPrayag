@@ -11,8 +11,8 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P2-T4 — AttendanceSummaryCard (per-class rows + overall donut)
-LAST COMMIT: feat(teacher-portal): add AttendanceSummaryCard with donut (loop P2-T4)
+LAST COMPLETED TASK: P2-T5 — SmartNudgeSection (NEEDS ATTENTION nudge stack)
+LAST COMMIT: feat(teacher-portal): add SmartNudgeSection with TeacherNudge sealed class (loop P2-T5)
 CURRENT PHASE: Phase 2 — Home Tab Premium Redesign (in progress)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
@@ -363,7 +363,7 @@ ScreenPadding = 16.dp
         are donut geometry (96dp/12dp). Imports trimmed (RoundedCornerShape, Arrangement
         removed on review); braces/parens balanced; every Enroll + VM member verified.
 
-- [ ] **P2-T5 — Smart Nudge Cards**:
+- [x] **P2-T5 — Smart Nudge Cards**:
       `SmartNudgeSection(nudges: List<TeacherNudge>)` composable.
       Only rendered if `nudges.isNotEmpty()`.
       Section header: `SectionHeader(title = "NEEDS ATTENTION")`.
@@ -378,6 +378,21 @@ ScreenPadding = 16.dp
         - `ParentUnread(parentName, studentName)` → action: "Reply"
         - `HomeworkUngraded(className, count)` → action: "Grade"
       Nudges are sourced from ViewModel, which reads from local cache — no additional API call.
+      ↳ DONE. Added `ui/v2/screens/teacher/SmartNudgeSection.kt`. Defined the
+        `TeacherNudge` sealed class verbatim (MarksNotEntered / AttendanceNotTaken /
+        ParentUnread / HomeworkUngraded) with typed payloads so the P7 router can address
+        the exact class/parent/homework. Per-type extensions: `message()` (real EdTech
+        copy, e.g. "Mid-Term marks for Class 7A Science aren't entered yet"),
+        `actionLabel()` (Add Now / Take Now / Reply / Grade), `icon()` (GraduationCap /
+        Check / Chat / ClipboardList), `tone()`. `SmartNudgeSection(nudges, onAction,
+        modifier, onDismiss?)` returns early when empty (clean Home = feature), renders
+        `SectionHeader("NEEDS ATTENTION")` + a `NudgeCard` stack. Each NudgeCard: 36dp
+        CircleShape icon disc (Pending→accent / Info→primaryMid), message in bodyMedium
+        textPrimary, right-edge pill action chip (surfaceCard bg, tone-coloured label) +
+        optional Close dismiss. Card tint honours the IMPORTANT NOTE — pending = amber
+        `accentSoft`, info = violet `primarySoft` (NOT a new "AccentAmber" hex; uses the
+        existing bridge family). Pure UI, no API. Tokens via `Enroll.*`; Arrangement
+        import trimmed; braces 27/27.
 
 - [ ] **P2-T6 — Pending Tasks Card**:
       `PendingTasksCard(tasks: List<TeacherTask>)` composable.
@@ -690,6 +705,7 @@ BEGIN.
 | 7 | P2-T2   | `feat(teacher-portal): add signature TodayClassStrip period timeline (loop P2-T2)` | `composeApp/.../ui/v2/screens/teacher/TodayClassStrip.kt` (new), `TEACHER_PORTAL_LOOP.md` | Horizontal period-pill day timeline (keyed LazyRow), past/active/future states with active accent glow, tap → inline AnimatedVisibility detail (room, attendance dot, pre-scoped Take-attendance CTA). Server `ResolvedDayUi.nowIndex`-driven. Reuses shared clock utils; status colours preserved; braces 34/34. |
 | 8 | P2-T3   | `feat(teacher-portal): add QuickActionRow three-up action pills (loop P2-T3)` | `composeApp/.../ui/v2/screens/teacher/QuickActionRow.kt` (new), `TEACHER_PORTAL_LOOP.md` | Three centered action pills (Take Attendance / Add Marks / Message Parent): primarySoft bg, primaryMid icon+text, shape.card, SpaceMD gap + padding, pressScale. Callbacks set up for P7 deep links. Tokens via `Enroll.*`; braces 5/5. |
 | 9 | P2-T4   | `feat(teacher-portal): add AttendanceSummaryCard with donut (loop P2-T4)` | `composeApp/.../ui/v2/screens/teacher/AttendanceSummaryCard.kt` (new), `TEACHER_PORTAL_LOOP.md` | EnrollCard summary of today's roll-call: left 60% = `SectionHeader("ATTENDANCE TODAY")` + per-class rows (name → present/total → ≥90% green PercentPill); right 40% = custom Canvas donut (surfaceSubtle track + statusPresent round-cap arc, animated, dataLarge % centre). Defined missing UI models `ClassAttendanceStat`/`AttendanceDaySummary` (server-aggregated, no client recompute). Tap → onOpenAttendance (P7). Drew custom donut vs VDonut (its track is hardcoded cream). Tokens via `Enroll.*`; imports trimmed; braces 19/19. |
+| 10 | P2-T5  | `feat(teacher-portal): add SmartNudgeSection with TeacherNudge sealed class (loop P2-T5)` | `composeApp/.../ui/v2/screens/teacher/SmartNudgeSection.kt` (new), `TEACHER_PORTAL_LOOP.md` | "NEEDS ATTENTION" nudge stack. Defined `TeacherNudge` sealed class (MarksNotEntered/AttendanceNotTaken/ParentUnread/HomeworkUngraded) + message/actionLabel/icon/tone extensions. `SmartNudgeSection` returns early when empty; each `NudgeCard` = tinted EnrollCard (pending→accentSoft amber, info→primarySoft violet, honouring IMPORTANT NOTE) + 36dp icon disc + bodyMedium message + pill action chip + optional Close dismiss. Pure UI (no API). Tokens via `Enroll.*`; braces 27/27. |
 
 ---
 
