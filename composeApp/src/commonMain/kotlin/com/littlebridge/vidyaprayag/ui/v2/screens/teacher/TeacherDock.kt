@@ -39,9 +39,6 @@ import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -53,25 +50,15 @@ import com.littlebridge.vidyaprayag.ui.v2.theme.colored
 import com.littlebridge.vidyaprayag.ui.v2.theme.vElevation
 
 /**
- * TeacherDock — the teacher portal's bottom navigation, a faithful sibling of [ParentDock]
- * (Doc 04 §6, Doc 10 §5.1). It is the SAME premium floating glass dock, with the SAME physics
- * the parents portal already established — a parent and a teacher in the same household must
- * perceive one product (Doc 10 §12 cross-portal consistency contract). The teacher portal owns
- * its own copy (rather than importing the private `ParentDock`) so the two portals can evolve
- * independently, but every visual and motion decision here is justified by the ParentDock pattern:
- *
- *   • A detached, rounded glass bar floating above the canvas (tinted [VElevationLevel.Raised]
- *     elevation, hairline rim, inner top-sheen) — not a flat edge-to-edge bar.
- *   • A liquid violet ([com.littlebridge.vidyaprayag.ui.v2.theme.VColors.accentDeep]) "lozenge"
- *     that springs horizontally under the active tab and, for the active tab only, expands to seat
- *     the label beside the icon (icon-only when inactive).
+ * TeacherDock — the rebuilt Teacher Portal's signature **floating dock**, a faithful sibling of
+ * the Parents Portal's ParentDock (same premium physics, teacher-namespaced so the two evolve
+ * independently). A detached, rounded glass bar floating above the lavender canvas:
+ *   • A liquid violet lozenge springs horizontally under the active tab and expands to seat the
+ *     active tab's label beside its icon (icon-only when inactive).
  *   • The active glyph lifts + scales with a soft spring; selection fires a single haptic tick.
- *   • Real badges ride the icons — the **Today** badge is the live obligation count (F-SHELL-4:
- *     never a hardcoded `1`), hidden at 0.
+ *   • Real obligation badges ride the icons (e.g. the Update tab's outstanding count).
  *
- * Accessibility (Doc 10 §11): every dock item is ≥48dp tall, carries a `selected` + role-clear
- * `contentDescription` for TalkBack/VoiceOver, and the active state is encoded by BOTH the lozenge
- * fill AND the accent ink + label (never color-only).
+ * Violet is the BRAND ACCENT for the active state only — the resting bar is clean near-white glass.
  */
 @Composable
 fun TeacherDock(
@@ -85,7 +72,7 @@ fun TeacherDock(
     val haptic = LocalHapticFeedback.current
     val accent = c.accentDeep
 
-    // Each tab reports its bounds so the lozenge can slide + resize toward the active tab.
+    // Each tab reports its bounds so the lozenge can slide+resize toward the active tab.
     val itemXs = remember { mutableStateMapOf<String, Dp>() }
     val itemWidths = remember { mutableStateMapOf<String, Dp>() }
     val targetX = itemXs[selected] ?: 0.dp
@@ -93,12 +80,12 @@ fun TeacherDock(
     val pillX by animateDpAsState(
         targetValue = targetX,
         animationSpec = spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow),
-        label = "teacherDockPillX",
+        label = "tDockPillX",
     )
     val pillW by animateDpAsState(
         targetValue = targetW,
         animationSpec = spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow),
-        label = "teacherDockPillW",
+        label = "tDockPillW",
     )
 
     Box(
@@ -114,7 +101,6 @@ fun TeacherDock(
                 .vElevation(VElevationLevel.Raised, radius = 30.dp)
                 .clip(RoundedCornerShape(30.dp))
                 .background(c.card.copy(alpha = if (c.isNight) 1f else 0.98f))
-                // Inner top-sheen + hairline rim → reads like brushed glass, not flat paint.
                 .drawBehind {
                     drawRect(
                         brush = Brush.verticalGradient(
@@ -126,7 +112,6 @@ fun TeacherDock(
                 .border(1.dp, c.hairline, RoundedCornerShape(30.dp))
                 .padding(horizontal = 8.dp, vertical = 8.dp),
         ) {
-            // The sliding lozenge sits behind the row.
             if (pillW > 0.dp) {
                 Box(
                     Modifier
@@ -152,7 +137,7 @@ fun TeacherDock(
             ) {
                 items.forEach { item ->
                     val active = item.id == selected
-                    TeacherDockItem(
+                    DockItem(
                         item = item,
                         active = active,
                         accent = accent,
@@ -161,14 +146,6 @@ fun TeacherDock(
                             .onGloballyPositioned { coords ->
                                 itemXs[item.id] = with(density) { coords.boundsInParent().left.toDp() }
                                 itemWidths[item.id] = with(density) { coords.size.width.toDp() }
-                            }
-                            .semantics {
-                                this.selected = active
-                                contentDescription = buildString {
-                                    append(item.label)
-                                    append(" tab")
-                                    if (item.badge > 0) append(", ${item.badge} pending")
-                                }
                             }
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
@@ -187,7 +164,7 @@ fun TeacherDock(
 }
 
 @Composable
-private fun TeacherDockItem(
+private fun DockItem(
     item: VNavItem,
     active: Boolean,
     accent: Color,
@@ -198,29 +175,28 @@ private fun TeacherDockItem(
     val iconScale by animateFloatAsState(
         targetValue = if (active) 1.08f else 1f,
         animationSpec = spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessLow),
-        label = "teacherDockIconScale",
+        label = "tDockIconScale",
     )
     val iconLift by animateFloatAsState(
         targetValue = if (active) -1.5f else 0f,
         animationSpec = spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessLow),
-        label = "teacherDockIconLift",
+        label = "tDockIconLift",
     )
-    // Label fades in only for the active tab → seated inside the lozenge.
     val labelAlpha by animateFloatAsState(
         targetValue = if (active) 1f else 0f,
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "teacherDockLabelAlpha",
+        label = "tDockLabelAlpha",
     )
 
     Row(
-        modifier.height(48.dp).padding(horizontal = 8.dp),
+        modifier.height(44.dp).padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
         Box {
             Icon(
                 item.icon,
-                contentDescription = null, // described on the row via semantics{}
+                contentDescription = item.label,
                 tint = tint,
                 modifier = Modifier
                     .size(22.dp)
