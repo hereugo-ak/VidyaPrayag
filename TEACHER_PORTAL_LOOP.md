@@ -11,8 +11,8 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P2-T5 — SmartNudgeSection (NEEDS ATTENTION nudge stack)
-LAST COMMIT: feat(teacher-portal): add SmartNudgeSection with TeacherNudge sealed class (loop P2-T5)
+LAST COMPLETED TASK: P2-T6 — PendingTasksCard (collapsed to-do list, tap-to-tick)
+LAST COMMIT: feat(teacher-portal): add PendingTasksCard with tap-to-tick tasks (loop P2-T6)
 CURRENT PHASE: Phase 2 — Home Tab Premium Redesign (in progress)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
@@ -394,13 +394,25 @@ ScreenPadding = 16.dp
         existing bridge family). Pure UI, no API. Tokens via `Enroll.*`; Arrangement
         import trimmed; braces 27/27.
 
-- [ ] **P2-T6 — Pending Tasks Card**:
+- [x] **P2-T6 — Pending Tasks Card**:
       `PendingTasksCard(tasks: List<TeacherTask>)` composable.
       `EnrollCard` with `SectionHeader("PENDING")` and "See All" action.
       Show max 3 tasks in collapsed view.
       Each `TaskRow(task)`: checkbox (tap marks done), task description `BodyMedium`,
       due date `BodySmall TextTertiary`.
       Completed task: strikethrough text, `StatusPresent` checkbox.
+      ↳ DONE. Added `ui/v2/screens/teacher/PendingTasksCard.kt`. Defined `TeacherTask(id,
+        description, dueLabel, done)`. `PendingTasksCard(tasks, onToggle, onSeeAll,
+        modifier)` returns early when empty; `EnrollCard` + `SectionHeader("PENDING",
+        action = "See All")` — the See-All action only appears when tasks > 3
+        (COLLAPSED_LIMIT), and only the first 3 render in the collapsed view. Each
+        `TaskRow` is a ripple-free clickable row (whole row toggles): a custom
+        `TaskCheckbox` (1.5dp `border` hairline square when open → `statusPresent` fill
+        with white Check tick when done, pressScale give), description in bodyMedium
+        (textPrimary→textTertiary + `TextDecoration.LineThrough` when done), and the
+        due-date in bodySmall textTertiary that animates away once ticked. Built a custom
+        checkbox rather than Material3 `Checkbox` (quality bar: no default components).
+        Tokens via `Enroll.*`; padding import trimmed; braces 14/14.
 
 - [ ] **P2-T7 — Notification Bottom Sheet**:
       `NotificationSheet` — a `ModalBottomSheetLayout` triggered from the bell icon.
@@ -706,6 +718,7 @@ BEGIN.
 | 8 | P2-T3   | `feat(teacher-portal): add QuickActionRow three-up action pills (loop P2-T3)` | `composeApp/.../ui/v2/screens/teacher/QuickActionRow.kt` (new), `TEACHER_PORTAL_LOOP.md` | Three centered action pills (Take Attendance / Add Marks / Message Parent): primarySoft bg, primaryMid icon+text, shape.card, SpaceMD gap + padding, pressScale. Callbacks set up for P7 deep links. Tokens via `Enroll.*`; braces 5/5. |
 | 9 | P2-T4   | `feat(teacher-portal): add AttendanceSummaryCard with donut (loop P2-T4)` | `composeApp/.../ui/v2/screens/teacher/AttendanceSummaryCard.kt` (new), `TEACHER_PORTAL_LOOP.md` | EnrollCard summary of today's roll-call: left 60% = `SectionHeader("ATTENDANCE TODAY")` + per-class rows (name → present/total → ≥90% green PercentPill); right 40% = custom Canvas donut (surfaceSubtle track + statusPresent round-cap arc, animated, dataLarge % centre). Defined missing UI models `ClassAttendanceStat`/`AttendanceDaySummary` (server-aggregated, no client recompute). Tap → onOpenAttendance (P7). Drew custom donut vs VDonut (its track is hardcoded cream). Tokens via `Enroll.*`; imports trimmed; braces 19/19. |
 | 10 | P2-T5  | `feat(teacher-portal): add SmartNudgeSection with TeacherNudge sealed class (loop P2-T5)` | `composeApp/.../ui/v2/screens/teacher/SmartNudgeSection.kt` (new), `TEACHER_PORTAL_LOOP.md` | "NEEDS ATTENTION" nudge stack. Defined `TeacherNudge` sealed class (MarksNotEntered/AttendanceNotTaken/ParentUnread/HomeworkUngraded) + message/actionLabel/icon/tone extensions. `SmartNudgeSection` returns early when empty; each `NudgeCard` = tinted EnrollCard (pending→accentSoft amber, info→primarySoft violet, honouring IMPORTANT NOTE) + 36dp icon disc + bodyMedium message + pill action chip + optional Close dismiss. Pure UI (no API). Tokens via `Enroll.*`; braces 27/27. |
+| 11 | P2-T6  | `feat(teacher-portal): add PendingTasksCard with tap-to-tick tasks (loop P2-T6)` | `composeApp/.../ui/v2/screens/teacher/PendingTasksCard.kt` (new), `TEACHER_PORTAL_LOOP.md` | Home "PENDING" to-do card. Defined `TeacherTask(id, description, dueLabel, done)`. EnrollCard + `SectionHeader("PENDING", action="See All")` (See-All shows only when >3); max-3 collapsed. Each `TaskRow` = whole-row toggle with a custom `TaskCheckbox` (hairline square → statusPresent tick), bodyMedium description (strikethrough + textTertiary when done), bodySmall due-date that animates away when ticked. Custom checkbox (no Material3 default). Tokens via `Enroll.*`; braces 14/14. |
 
 ---
 
