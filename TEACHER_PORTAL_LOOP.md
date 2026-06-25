@@ -11,9 +11,9 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P6-T3 — TeacherAssignmentCard "MY CLASSES" roster (Phase 6 in progress)
-LAST COMMIT: feat(teacher-portal): add MY CLASSES TeacherAssignmentCard (loop P6-T3)
-CURRENT PHASE: Phase 6 — Profile Tab (P6-T3 done → P6-T4 next)
+LAST COMPLETED TASK: P6-T4 — TeacherSettingsSection + VToggle + logout confirm (Phase 6 COMPLETE)
+LAST COMMIT: feat(teacher-portal): add PREFERENCES TeacherSettingsSection with VToggle + logout dialog (loop P6-T4)
+CURRENT PHASE: Phase 6 COMPLETE → Phase 7 — Cross-Tab Connectivity (P7-T1 next)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
     ships a complete, mature, fully token-driven design system — VTheme → VColors
@@ -841,7 +841,7 @@ and track if students submitted homework — all in one place.
         hairline divider between rows. Tap → `onOpenClass(classId)` deep-links Gradebook filtered
         to that class (host wires nav arg). No new hex; braces 20/20, parens 67/67.
 
-- [ ] **P6-T4 — Settings Section**:
+- [x] **P6-T4 — Settings Section**:
       `SectionHeader("PREFERENCES")`
       `SettingsRow` composable (icon | label | trailing widget):
         - Notification Preferences → `Switch` (toggle)
@@ -850,6 +850,18 @@ and track if students submitted homework — all in one place.
         - Dark Mode → `Switch`
         - Help & Support → chevron (stub navigation)
         - Log Out → `TextButton` in `StatusAbsent` color, confirmation dialog
+      ↳ DONE — `TeacherSettingsSection.kt`. `TeacherSettingsSection(notificationsEnabled,
+        onNotificationsChanged, smartNudgesEnabled, onSmartNudgesChanged, darkModeEnabled,
+        onDarkModeChanged, languageLabel, onOpenLanguage, onOpenHelp, onLogOut, modifier)` — all
+        state HOISTED to the host (settings DataStore / VM), only the logout-dialog visibility is
+        local. `SectionHeader("PREFERENCES")` over one EnrollCard of `SettingsRow`s (icon|label|
+        trailing, hairline between). Built a bespoke `VToggle(checked, onCheckedChange)` — 44×26
+        track animating surfaceSubtle→primary with a sliding 20dp white thumb (custom, not
+        Material3 Switch, per quality bar) — for Notification Preferences, Smart Nudges (the gate
+        for P4-T4 planner nudges), Dark Mode. Language row = value + ChevronRight → onOpenLanguage;
+        Help & Support = chevron → onOpenHelp (stub). Log Out row tinted `statusAbsent`, raises a
+        custom Dialog confirm with Secondary Cancel + Destructive/Rose `VButton` Log Out → onLogOut.
+        No new hex; braces 32/32, parens 128/128. **PHASE 6 COMPLETE.**
 
 ---
 
@@ -967,6 +979,7 @@ BEGIN.
 | 26 | P6-T1  | `feat(teacher-portal): add gradient TeacherProfileHeader (loop P6-T1)` | `composeApp/.../ui/v2/screens/teacher/TeacherProfileHeader.kt` (new), `TEACHER_PORTAL_LOOP.md` | Profile hero. `TeacherProfileHeader(teacherName, photoUrl, designation, schoolName, onPickAvatar, onEdit, modifier)`: 200dp full-width `Enroll.colors.headerGradient` banner clipped to `shape.sheet`, `statusBarsPadding`. Centre col: 72dp `VAvatar(ring=true)` (white 3dp ring) clickable→`onPickAvatar` (commonMain picker stub — no Android launcher in shared code), name `headingLarge` white, designation·school middot-joined `bodyMedium` white 80%. Glassy 36dp `Edit3` pencil top-end→`onEdit` (EditProfileScreen host stub). Mirrors TeacherHomeHeader gradient/ring/glass for hero parity. No new hex; braces 15/15, parens 65/65. |
 | 27 | P6-T2  | `feat(teacher-portal): add 4-up TeacherStatsRow profile stats card (loop P6-T2)` | `composeApp/.../ui/v2/screens/teacher/TeacherStatsRow.kt` (new), `TEACHER_PORTAL_LOOP.md` | Profile stats. `data class TeacherProfileStat(value, label, onClick?)` + `TeacherStatsRow(stats, modifier)`: one `EnrollCard` wrapping a SpaceBetween Row of weight(1f) `StatColumn`s u2014 `dataLarge` value (textPrimary) over `labelCaps` label (textSecondary), centred. 1dp `StatDivider` (h32, surfaceSubtle) between columns, never trailing. Columns tappable only when stat has onClick (Classes Taught / Total Students deep links reserved for P7-T5). No new hex; braces 15/15, parens 42/42. |
 | 28 | P6-T3  | `feat(teacher-portal): add MY CLASSES TeacherAssignmentCard (loop P6-T3)` | `composeApp/.../ui/v2/screens/teacher/TeacherAssignmentCard.kt` (new), `TEACHER_PORTAL_LOOP.md` | Teaching roster. `data class TeacherClassAssignment(classId, className, section, subjects, studentCount)` + `TeacherAssignmentCard(assignments, onOpenClass, modifier)`: `SectionHeader(MY CLASSES)` over one EnrollCard of `ClassAssignmentRow`s built with a plain Column.forEach (CMP-safe "non-scrolling list"; a nested userScrollEnabled=false LazyColumn would crash on infinite height). Each row: classu00b7section labelBold, subjects as wrapping FlowRow SubjectChips (primarySoft/primaryDeep), GraduationCap + pluralised count, trailing ChevronRight, hairline between rows. Tap u2192 onOpenClass(classId) Gradebook deep link. No new hex; braces 20/20, parens 67/67. |
+| 29 | P6-T4  | `feat(teacher-portal): add PREFERENCES TeacherSettingsSection with VToggle + logout dialog (loop P6-T4)` | `composeApp/.../ui/v2/screens/teacher/TeacherSettingsSection.kt` (new), `TEACHER_PORTAL_LOOP.md` | Settings block. `TeacherSettingsSection(...)` fully-hoisted: SectionHeader(PREFERENCES) over an EnrollCard of `SettingsRow`s (icon|label|trailing, hairline between). Bespoke `VToggle` (44u00d726 track surfaceSubtleu2192primary, sliding 20dp white thumb u2014 not Material3 Switch) for Notification Preferences, Smart Nudges (gate for P4-T4 nudges), Dark Mode. Language = value+ChevronRightu2192onOpenLanguage; Help & Support = chevronu2192onOpenHelp. Log Out row statusAbsent-tinted u2192 custom confirm Dialog (Secondary Cancel + Destructive/Rose Log Out u2192 onLogOut). No new hex; braces 32/32, parens 128/128. **PHASE 6 COMPLETE.** |
 
 ---
 
