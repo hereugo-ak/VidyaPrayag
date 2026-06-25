@@ -11,9 +11,9 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P5-T3 — EnrollBottomNav live Chat unread badge (Phase 5 COMPLETE)
-LAST COMMIT: feat(teacher-portal): add live Chat unread badge overload to EnrollBottomNav (loop P5-T3)
-CURRENT PHASE: Phase 5 COMPLETE → Phase 6 — Profile Tab (next)
+LAST COMPLETED TASK: P6-T1 — TeacherProfileHeader gradient hero (Phase 6 in progress)
+LAST COMMIT: feat(teacher-portal): add gradient TeacherProfileHeader (loop P6-T1)
+CURRENT PHASE: Phase 6 — Profile Tab (P6-T1 done → P6-T2 next)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
     ships a complete, mature, fully token-driven design system — VTheme → VColors
@@ -786,13 +786,23 @@ and track if students submitted homework — all in one place.
 ### PHASE 6 — PROFILE TAB FULL REDESIGN
 > File: `ui/screens/teacher/TeacherProfileScreen.kt`
 
-- [ ] **P6-T1 — Profile Header**:
+- [x] **P6-T1 — Profile Header**:
       Full-width gradient header (same `GradientStart → GradientEnd`), 200dp tall.
       Teacher avatar: 72dp circle, centered, white 3dp border ring.
       Tap avatar → image picker (stub: `rememberLauncherForActivityResult`).
       Name: `HeadingLarge`, white, below avatar.
       Designation + school name: `BodyMedium`, white 80% alpha.
       Edit icon (pencil) top-right → navigates to `EditProfileScreen` (stub).
+      ↳ DONE — `TeacherProfileHeader.kt`. `TeacherProfileHeader(teacherName, photoUrl,
+        designation, schoolName, onPickAvatar, onEdit, modifier)`: full-width `Enroll.colors
+        .headerGradient` Box clipped to `Enroll.shape.sheet`, `heightIn(min=200.dp)`,
+        `statusBarsPadding`. Centre Column → `VAvatar(size=72.dp, ring=true)` (white 3dp ring
+        from VAvatar) wrapped in a clickable→`onPickAvatar` (commonMain stub for the platform
+        picker — no Android `rememberLauncherForActivityResult` in shared code; host wires it),
+        name in `headingLarge` white, designation·school joined with a middot only when both
+        present in `bodyMedium` white 80%. Top-end glassy 36dp `Edit3` pencil → `onEdit`
+        (EditProfileScreen host stub). Mirrors TeacherHomeHeader's gradient/ring/glass language
+        for hero parity. No new hex; braces 15/15, parens 65/65.
 
 - [ ] **P6-T2 — Stats Row**:
       Below header: a `Row` of 4 `StatColumn` composables.
@@ -934,6 +944,7 @@ BEGIN.
 | 23 | P5-T1  | `feat(teacher-portal): add class-grouped TeacherChatScreen list (loop P5-T1)` | `composeApp/.../ui/v2/screens/teacher/TeacherChatScreen.kt` (new), `TEACHER_PORTAL_LOOP.md` | Thread-first chat list. `ChatCategory` enum + `ParentChatThread` model. `TeacherChatScreen(threads, onOpenThread)` = a VInput search bar (surfaceSubtle, "Search parent or student…", filters by name) + a LazyColumn grouped by `className` (keyed SectionHeader + keyed `ParentThreadRow`s; NO flat recency feed). `ParentThreadRow` = EnrollCard with 40dp VAvatar (initials fallback), studentName labelBold + `CategoryBadge`, parentName bodySmall, 1-line preview, right rail timeLabel + `UnreadPill` (primary, "99+" cap). Empty/no-match states. CategoryBadge soft-tints per type (no new hex). Tap → onOpenThread (P5-T2). Tokens via `Enroll.*`; braces 27/27; unused `size` import trimmed. |
 | 24 | P5-T2  | `feat(teacher-portal): add ChatThreadScreen with bubbles + QuickReplySheet (loop P5-T2)` | `composeApp/.../ui/v2/screens/teacher/ChatThreadScreen.kt` (new), `TEACHER_PORTAL_LOOP.md` | Parent conversation. `ChatMessage` model. `ChatThreadScreen(studentName, parentName, messages, onBack, onVideoCall, onSend)` = custom `ChatTopBar` (back + student + parent subtitle + Phone stub), a reverseLayout keyed LazyColumn of `MessageBubble` (teacher = End primarySoft + textPrimary, parent = Start surfaceSubtle + textSecondary; bodyMedium text + bodySmall time; teacher Check read-receipt primary/tertiary), and a `ReplyBar` (FileText templates → QuickReplySheet, surfaceSubtle pill BasicTextField, Send enabled only when non-blank). `QuickReplySheet` = Dialog with the 4 spec templates as EnrollCards + "+ Add custom template". No new hex; tokens via `Enroll.*`; braces 38/38, parens 156/156; all imports used. |
 | 25 | P5-T3  | `feat(teacher-portal): add live Chat unread badge overload to EnrollBottomNav (loop P5-T3)` | `composeApp/.../ui/v2/screens/teacher/EnrollBottomNav.kt` (edit), `TEACHER_PORTAL_LOOP.md` | Reactive nav badge. Added `EnrollBottomNav(items, selectedId, onSelect, chatUnread, modifier)` that overlays the live `chatUnread` onto the `EnrollTab.Chat` item (`copy(badge=…)`) before rendering, so the badge tracks `ChatViewModel.unreadCount` without rebuilding the tab list. The dock's `VNavItem.badge` count badge is the spec's `BadgedBox`. No new hex; braces 4/4, parens 40/40. **PHASE 5 COMPLETE.** |
+| 26 | P6-T1  | `feat(teacher-portal): add gradient TeacherProfileHeader (loop P6-T1)` | `composeApp/.../ui/v2/screens/teacher/TeacherProfileHeader.kt` (new), `TEACHER_PORTAL_LOOP.md` | Profile hero. `TeacherProfileHeader(teacherName, photoUrl, designation, schoolName, onPickAvatar, onEdit, modifier)`: 200dp full-width `Enroll.colors.headerGradient` banner clipped to `shape.sheet`, `statusBarsPadding`. Centre col: 72dp `VAvatar(ring=true)` (white 3dp ring) clickable→`onPickAvatar` (commonMain picker stub — no Android launcher in shared code), name `headingLarge` white, designation·school middot-joined `bodyMedium` white 80%. Glassy 36dp `Edit3` pencil top-end→`onEdit` (EditProfileScreen host stub). Mirrors TeacherHomeHeader gradient/ring/glass for hero parity. No new hex; braces 15/15, parens 65/65. |
 
 ---
 
