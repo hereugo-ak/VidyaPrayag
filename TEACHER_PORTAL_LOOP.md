@@ -11,9 +11,9 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P3-T5 — BulkActionsBar (slide-up multi-select bar)
-LAST COMMIT: feat(teacher-portal): add BulkActionsBar slide-up selection bar (loop P3-T5)
-CURRENT PHASE: Phase 3 — Gradebook Tab (in progress)
+LAST COMPLETED TASK: P3-T6 — GradebookExportFab + ExportSheet (PDF / WhatsApp)
+LAST COMMIT: feat(teacher-portal): add GradebookExportFab + ExportSheet (loop P3-T6)
+CURRENT PHASE: Phase 3 COMPLETE → Phase 4 — Planner Tab (next)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
     ships a complete, mature, fully token-driven design system — VTheme → VColors
@@ -565,11 +565,22 @@ No extra taps. No loading spinners after every entry. Auto-save silently.
         pressScale give. Host long-press flips selectedCount. Tokens via `Enroll.*`; only
         literal is the 20dp icon size; Arrangement import trimmed; braces 8/8.
 
-- [ ] **P3-T6 — Export / Share**:
+- [x] **P3-T6 — Export / Share**:
       FAB at bottom right: export icon.
       Tap → `ExportSheet` with two options:
         - "Share as PDF" (generates class marks PDF — calls existing PDF util or stubs one)
         - "Share via WhatsApp" (opens intent with pre-filled class performance summary text)
+      ↳ DONE. Added `ui/v2/screens/teacher/GradebookExport.kt`. `GradebookExportFab(
+        onClick, modifier)` = 56dp circular `primary`-fill FAB (shape.fab, white Share
+        icon, pressScale) the host pins bottom-right. `ExportSheet(visible, onDismiss,
+        onSharePdf, onShareWhatsApp)` = Dialog sheet (shape.sheet, SectionHeader("EXPORT"))
+        with two `ExportOption` EnrollCard rows — FileText "Share as PDF" + Send "Share via
+        WhatsApp" — each a primarySoft icon disc + title/subtitle + ChevronRight. Added a
+        `whatsAppSummaryText(className, examName, classAverage, topScorer)` builder so the
+        pre-filled copy lives with the UI; the host wires onSharePdf/onShareWhatsApp to the
+        platform PDF util + OS share intent (TODO(host) note left in-file — no expect/actual
+        added this task to avoid touching per-platform source sets out of scope). Tokens
+        via `Enroll.*`; braces 15/15. **PHASE 3 DONE.**
 
 ---
 
@@ -806,6 +817,7 @@ BEGIN.
 | 15 | P3-T3  | `feat(teacher-portal): add ExamSelector with AddExamSheet (loop P3-T3)` | `composeApp/.../ui/v2/screens/teacher/ExamSelector.kt` (new), `TEACHER_PORTAL_LOOP.md` | Exam chip row over the marks list. `ExamSelector` = LazyRow with "All" chip + keyed `ExamChip`s (name labelBold + date bodySmall, selected→primary) + outlined "+ Add Exam" chip (primaryMid border). `AddExamSheet` = Dialog form reusing `VInput` (name/date/Number max-marks) + 3 `ExamTypeChip`s (Unit Test/Term/Assignment → AssessmentType) + full-width `VButton` (enabled when valid), emits `NewExamDraft`. Consumes real `AssessmentDto`. Tokens via `Enroll.*`; braces 30/30. |
 | 16 | P3-T4  | `feat(teacher-portal): add StudentMarkRow + detail sheet (loop P3-T4)` | `composeApp/.../ui/v2/screens/teacher/StudentMarksList.kt` (new), `TEACHER_PORTAL_LOOP.md` | Premium fast-entry marks row over real `GradebookStudentMark`. Roll# + name + `AutoSaveHint` (saving→✓), auto `GradeChip` (A/B green, C/D amber, F red), `TrendArrow`, and a `MarkField` `BasicTextField` pill (surfaceSubtle, focus border primary 2dp) with **800ms debounce auto-save** (LaunchedEffect+delay, no button). Tap row → `StudentMarkDetailSheet` (VAvatar header, Canvas score-history line chart over `ExamScorePoint`, remark VInput, Message-Parent VButton → P7). Enums `MarkSaveState`/`MarkTrend` + `gradeForPercent`. Tokens via `Enroll.*`; braces 37/37. |
 | 17 | P3-T5  | `feat(teacher-portal): add BulkActionsBar slide-up selection bar (loop P3-T5)` | `composeApp/.../ui/v2/screens/teacher/BulkActionsBar.kt` (new), `TEACHER_PORTAL_LOOP.md` | Contextual multi-select bar. `AnimatedVisibility(selectedCount > 0)` + slideInVertically/fade rises from bottom; primary-fill card with "$n selected" (labelBold onPrimary) + three white `BulkAction`s (Edit3 Set Mark / ClipboardList Remark / Close Cancel), each pressScale. Tokens via `Enroll.*`; braces 8/8. |
+| 18 | P3-T6  | `feat(teacher-portal): add GradebookExportFab + ExportSheet (loop P3-T6)` | `composeApp/.../ui/v2/screens/teacher/GradebookExport.kt` (new), `TEACHER_PORTAL_LOOP.md` | Export FAB + sheet. `GradebookExportFab` = 56dp primary circular FAB (shape.fab, white Share icon, pressScale). `ExportSheet` = Dialog with two `ExportOption` EnrollCards (FileText "Share as PDF" / Send "Share via WhatsApp") + a `whatsAppSummaryText(...)` copy builder. Host wires PDF util + OS share intent (TODO(host) left in-file). Tokens via `Enroll.*`; braces 15/15. **PHASE 3 COMPLETE.** |
 
 ---
 
