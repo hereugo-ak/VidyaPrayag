@@ -2,7 +2,6 @@ package com.littlebridge.vidyaprayag.ui.v2.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -52,17 +51,22 @@ import androidx.compose.ui.unit.dp
  * rest of the system. Nothing here is a literal hex.
  */
 object Enroll {
+    // NOTE: these accessors are plain @Composable (NOT @ReadOnlyComposable) on
+    // purpose — they read from [VTheme.colors] / [VTheme.type] / [VTheme.dimens],
+    // whose own getters are @Composable only. A @ReadOnlyComposable getter may
+    // only call other @ReadOnlyComposable composables, so marking these as
+    // @ReadOnlyComposable would not compile. They mirror VTheme's own contract.
     val colors: EnrollColors
-        @Composable @ReadOnlyComposable get() = EnrollColors(VTheme.colors)
+        @Composable get() = EnrollColors(VTheme.colors)
 
     val type: EnrollType
-        @Composable @ReadOnlyComposable get() = EnrollType(VTheme.type)
+        @Composable get() = EnrollType(VTheme.type)
 
     val shape: EnrollShape
-        @Composable @ReadOnlyComposable get() = EnrollShape(VTheme.dimens)
+        @Composable get() = EnrollShape(VTheme.dimens)
 
     val space: EnrollSpace
-        @Composable @ReadOnlyComposable get() = EnrollSpace(VTheme.dimens)
+        @Composable get() = EnrollSpace(VTheme.dimens)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
