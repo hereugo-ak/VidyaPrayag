@@ -11,9 +11,9 @@
 
 ```
 LOOP VERSION: 1.0
-LAST COMPLETED TASK: P1-T4 — canonical EnrollBottomNav (delegates to the premium TeacherDock) — PHASE 1 COMPLETE
-LAST COMMIT: feat(teacher-portal): add EnrollBottomNav over the premium TeacherDock (loop P1-T4)
-CURRENT PHASE: Phase 1 — Design System Foundation (COMPLETE) → next: Phase 2 (Home Tab)
+LAST COMPLETED TASK: P2-T1 — TeacherHomeHeader (signature gradient Home header)
+LAST COMMIT: feat(teacher-portal): add gradient TeacherHomeHeader for the Home tab (loop P2-T1)
+CURRENT PHASE: Phase 2 — Home Tab Premium Redesign (in progress)
 AGENT NOTES:
   • CRITICAL DECISION (honours the iteration's IMPORTANT NOTE): the portal already
     ships a complete, mature, fully token-driven design system — VTheme → VColors
@@ -285,7 +285,7 @@ ScreenPadding = 16.dp
 - Know if anything needs their attention
 - Take action without navigating deep
 
-- [ ] **P2-T1 — Header Block**:
+- [x] **P2-T1 — Header Block**:
       Replace current header with a gradient header composable `TeacherHomeHeader`.
       Full-width, 120dp height, `GradientStart` → `GradientEnd` horizontal gradient background.
       Left: time-aware greeting ("Good Morning" / "Good Afternoon" / "Good Evening"),
@@ -293,6 +293,12 @@ ScreenPadding = 16.dp
       Below: today's date + day in `BodyMedium`, white 70% alpha.
       Right: teacher avatar (40dp circle, `ShapeAvatar`) — tappable → navigates to Profile tab.
       Below avatar: a small bell icon with unread notification badge — tappable → opens NotificationSheet.
+      ↳ DONE. Added `ui/v2/screens/teacher/TeacherHomeHeader.kt`. 120dp+ banner with the
+        sanctioned violet `headerGradient`, time-aware greeting (existing `teacherGreeting`),
+        first name (`headingLarge` white), date line (`bodyMedium` white 70%), 40dp avatar
+        ring → Profile, glassy bell + unread badge → NotificationSheet. Additive (keeps the
+        canonical `TeacherHeader` on operational tabs). All tokens via `Enroll.*`; util date
+        symbols + bridge members verified; braces balanced.
 
 - [ ] **P2-T2 — Today Strip**:
       Implement `TodayClassStrip` composable.
@@ -652,6 +658,7 @@ BEGIN.
 | 3 | P1-T2   | `feat(teacher-portal): add shared flat EnrollCard composable (loop P1-T2)` | `composeApp/.../ui/v2/components/EnrollCard.kt` (new), `TEACHER_PORTAL_LOOP.md` | Flat border-defined card, no shadow, 0.98f press via existing `pressScale`; optional `tint` for nudges. Separate from elevated `VCard`. Raw-Card replacement verified vacuous. All tokens via `Enroll.*`; imports clean; braces balanced. |
 | 4 | P1-T3   | `feat(teacher-portal): add shared SectionHeader composable (loop P1-T3)` | `composeApp/.../ui/v2/components/SectionHeader.kt` (new), `TEACHER_PORTAL_LOOP.md` | Ergonomic string-action header (title/action/onAction). `labelCaps`+`textSecondary` title, `primaryMid` ripple-free text-button action. Terser sibling of `VSectionHeader`. Unused import removed on review; tokens via `Enroll.*`; braces 5/5. |
 | 5 | P1-T4   | `feat(teacher-portal): add EnrollBottomNav over the premium TeacherDock (loop P1-T4)` | `composeApp/.../ui/v2/screens/teacher/EnrollBottomNav.kt` (new), `TEACHER_PORTAL_LOOP.md` | Canonical nav entry point: `EnrollBottomNav` + `EnrollTab` ids + `loopTabs()`. Delegates to premium `TeacherDock` instead of a regressive pill bar (preserves spring lozenge/haptics/badges/ParentDock parity). Chat badge via `VNavItem.badge`. Placed in teacher pkg for clean layering. **PHASE 1 COMPLETE.** |
+| 6 | P2-T1   | `feat(teacher-portal): add gradient TeacherHomeHeader for the Home tab (loop P2-T1)` | `composeApp/.../ui/v2/screens/teacher/TeacherHomeHeader.kt` (new), `TEACHER_PORTAL_LOOP.md` | Signature 120dp violet-gradient Home header: time-aware greeting + first name (headingLarge) + date (bodyMedium 70%); 40dp avatar ring → Profile; glassy bell + unread badge → NotificationSheet. Additive (keeps TeacherHeader on other tabs). Reuses `teacherGreeting`; util date + Enroll members verified; braces 22/22. |
 
 ---
 
