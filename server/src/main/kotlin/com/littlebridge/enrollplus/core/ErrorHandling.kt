@@ -112,7 +112,9 @@ fun StatusPagesConfig.configureErrorHandling() {
         if (call.attributes.contains(RouteHandledResponseKey)) return@status
         val uri = call.request.uri
         val hasBearer = call.request.header(HttpHeaders.Authorization)?.startsWith("Bearer ") == true
-        if (uri.startsWith("/api/v1/") && !hasBearer) {
+        val isGateway = uri.startsWith("/api/v1/gateway")
+
+        if (uri.startsWith("/api/v1/") && !hasBearer && !isGateway)  {
             call.respond(
                 HttpStatusCode.Unauthorized,
                 ApiError(
