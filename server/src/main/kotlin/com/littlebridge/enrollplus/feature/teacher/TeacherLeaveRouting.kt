@@ -18,19 +18,19 @@
  * requireTeacherContext) and a teacher can only act on requests inside the set
  * of classes they own — never another teacher's or another school's.
  */
-package com.littlebridge.vidyaprayag.feature.teacher
+package com.littlebridge.enrollplus.feature.teacher
 
-import com.littlebridge.vidyaprayag.core.fail
-import com.littlebridge.vidyaprayag.core.ok
-import com.littlebridge.vidyaprayag.core.okMessage
-import com.littlebridge.vidyaprayag.core.requireTeacherContext
-import com.littlebridge.vidyaprayag.core.teacherAssignmentsFor
-import com.littlebridge.vidyaprayag.db.AttendanceRecordsTable
-import com.littlebridge.vidyaprayag.db.ChildrenTable
-import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
-import com.littlebridge.vidyaprayag.db.LeaveRequestsTable
-import com.littlebridge.vidyaprayag.db.StudentsTable
-import com.littlebridge.vidyaprayag.feature.notifications.Notify
+import com.littlebridge.enrollplus.core.fail
+import com.littlebridge.enrollplus.core.ok
+import com.littlebridge.enrollplus.core.okMessage
+import com.littlebridge.enrollplus.core.requireTeacherContext
+import com.littlebridge.enrollplus.core.teacherAssignmentsFor
+import com.littlebridge.enrollplus.db.AttendanceRecordsTable
+import com.littlebridge.enrollplus.db.ChildrenTable
+import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
+import com.littlebridge.enrollplus.db.LeaveRequestsTable
+import com.littlebridge.enrollplus.db.StudentsTable
+import com.littlebridge.enrollplus.feature.notifications.Notify
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*

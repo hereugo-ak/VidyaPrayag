@@ -1,4 +1,4 @@
-package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
+package com.littlebridge.enrollplus.ui.v2.screens.teacher
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,17 +12,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
-import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
-import com.littlebridge.vidyaprayag.feature.parent.presentation.NotificationsViewModel
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherObligationsViewModel
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherProfileViewModel
-import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.components.VNavItem
-import com.littlebridge.vidyaprayag.ui.v2.components.VScreenScaffold
-import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
-import com.littlebridge.vidyaprayag.ui.v2.screens.notifications.NotificationsScreenV2
-import com.littlebridge.vidyaprayag.ui.v2.theme.VPortalTone
-import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
+import com.littlebridge.enrollplus.core.prefs.PreferenceRepository
+import com.littlebridge.enrollplus.feature.parent.presentation.NotificationsViewModel
+import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherObligationsViewModel
+import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherProfileViewModel
+import com.littlebridge.enrollplus.ui.v2.components.VIcons
+import com.littlebridge.enrollplus.ui.v2.components.VNavItem
+import com.littlebridge.enrollplus.ui.v2.components.VScreenScaffold
+import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
+import com.littlebridge.enrollplus.ui.v2.screens.notifications.NotificationsScreenV2
+import com.littlebridge.enrollplus.ui.v2.theme.VPortalTone
+import com.littlebridge.enrollplus.ui.v2.theme.VTheme
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 

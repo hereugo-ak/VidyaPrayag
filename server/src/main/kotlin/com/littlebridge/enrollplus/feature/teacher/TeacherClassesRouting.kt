@@ -50,23 +50,23 @@
  *   Dropping         : latest mark down >20% vs prior    → warning
  *   No data          : insufficient data (new student)   → neutral
  */
-package com.littlebridge.vidyaprayag.feature.teacher
+package com.littlebridge.enrollplus.feature.teacher
 
-import com.littlebridge.vidyaprayag.core.EnrolledStudent
-import com.littlebridge.vidyaprayag.core.OwnedAssignment
-import com.littlebridge.vidyaprayag.core.TeacherContext
-import com.littlebridge.vidyaprayag.core.ok
-import com.littlebridge.vidyaprayag.core.requireOwnedAssignment
-import com.littlebridge.vidyaprayag.core.requireTeacherContext
-import com.littlebridge.vidyaprayag.core.teacherAssignmentsFor
-import com.littlebridge.vidyaprayag.db.AssessmentMarksTable
-import com.littlebridge.vidyaprayag.db.AssessmentsTable
-import com.littlebridge.vidyaprayag.db.AttendanceRecordsTable
-import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
-import com.littlebridge.vidyaprayag.db.HomeworkSubmissionsTable
-import com.littlebridge.vidyaprayag.db.HomeworkTable
-import com.littlebridge.vidyaprayag.db.StudentsTable
-import com.littlebridge.vidyaprayag.db.TeacherPeriodsTable
+import com.littlebridge.enrollplus.core.EnrolledStudent
+import com.littlebridge.enrollplus.core.OwnedAssignment
+import com.littlebridge.enrollplus.core.TeacherContext
+import com.littlebridge.enrollplus.core.ok
+import com.littlebridge.enrollplus.core.requireOwnedAssignment
+import com.littlebridge.enrollplus.core.requireTeacherContext
+import com.littlebridge.enrollplus.core.teacherAssignmentsFor
+import com.littlebridge.enrollplus.db.AssessmentMarksTable
+import com.littlebridge.enrollplus.db.AssessmentsTable
+import com.littlebridge.enrollplus.db.AttendanceRecordsTable
+import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
+import com.littlebridge.enrollplus.db.HomeworkSubmissionsTable
+import com.littlebridge.enrollplus.db.HomeworkTable
+import com.littlebridge.enrollplus.db.StudentsTable
+import com.littlebridge.enrollplus.db.TeacherPeriodsTable
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
@@ -448,27 +448,27 @@ private fun buildClassSummaryInTxn(
 /** Typed roster (active enrollments) for an owned assignment, roll-ordered. */
 internal fun rosterForInTxn(a: OwnedAssignment): List<EnrolledStudent> {
     val classId = a.classId ?: return emptyList()
-    val enrollments = com.littlebridge.vidyaprayag.db.EnrollmentsTable.selectAll().where {
-        (com.littlebridge.vidyaprayag.db.EnrollmentsTable.classId eq classId) and
-            (com.littlebridge.vidyaprayag.db.EnrollmentsTable.section eq a.section) and
-            (com.littlebridge.vidyaprayag.db.EnrollmentsTable.status eq "active")
+    val enrollments = com.littlebridge.enrollplus.db.EnrollmentsTable.selectAll().where {
+        (com.littlebridge.enrollplus.db.EnrollmentsTable.classId eq classId) and
+            (com.littlebridge.enrollplus.db.EnrollmentsTable.section eq a.section) and
+            (com.littlebridge.enrollplus.db.EnrollmentsTable.status eq "active")
     }.toList()
     if (enrollments.isEmpty()) return emptyList()
-    val sids = enrollments.map { it[com.littlebridge.vidyaprayag.db.EnrollmentsTable.studentId] }.distinct()
-    val studentsById = com.littlebridge.vidyaprayag.db.StudentsTable.selectAll().where {
-        com.littlebridge.vidyaprayag.db.StudentsTable.id inList
-            sids.map { EntityID(it, com.littlebridge.vidyaprayag.db.StudentsTable) }
-    }.associateBy { it[com.littlebridge.vidyaprayag.db.StudentsTable.id].value }
+    val sids = enrollments.map { it[com.littlebridge.enrollplus.db.EnrollmentsTable.studentId] }.distinct()
+    val studentsById = com.littlebridge.enrollplus.db.StudentsTable.selectAll().where {
+        com.littlebridge.enrollplus.db.StudentsTable.id inList
+            sids.map { EntityID(it, com.littlebridge.enrollplus.db.StudentsTable) }
+    }.associateBy { it[com.littlebridge.enrollplus.db.StudentsTable.id].value }
     return enrollments.mapNotNull { e ->
-        val sid = e[com.littlebridge.vidyaprayag.db.EnrollmentsTable.studentId]
+        val sid = e[com.littlebridge.enrollplus.db.EnrollmentsTable.studentId]
         val s = studentsById[sid] ?: return@mapNotNull null
         EnrolledStudent(
             studentId = sid,
-            studentCode = s[com.littlebridge.vidyaprayag.db.StudentsTable.studentCode],
-            fullName = s[com.littlebridge.vidyaprayag.db.StudentsTable.fullName],
-            rollNumber = e[com.littlebridge.vidyaprayag.db.EnrollmentsTable.rollNumber],
-            section = e[com.littlebridge.vidyaprayag.db.EnrollmentsTable.section],
-            enrollmentId = e[com.littlebridge.vidyaprayag.db.EnrollmentsTable.id].value,
+            studentCode = s[com.littlebridge.enrollplus.db.StudentsTable.studentCode],
+            fullName = s[com.littlebridge.enrollplus.db.StudentsTable.fullName],
+            rollNumber = e[com.littlebridge.enrollplus.db.EnrollmentsTable.rollNumber],
+            section = e[com.littlebridge.enrollplus.db.EnrollmentsTable.section],
+            enrollmentId = e[com.littlebridge.enrollplus.db.EnrollmentsTable.id].value,
         )
     }.sortedWith(compareBy({ it.rollNumber ?: Int.MAX_VALUE }, { it.fullName }))
 }

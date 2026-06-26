@@ -21,16 +21,16 @@
  * MULTI-TENANCY: school_id is taken from the JWT-derived TeacherContext, never
  * from the body; a teacher can only ever list / create their OWN requests.
  */
-package com.littlebridge.vidyaprayag.feature.teacher
+package com.littlebridge.enrollplus.feature.teacher
 
-import com.littlebridge.vidyaprayag.core.created
-import com.littlebridge.vidyaprayag.core.fail
-import com.littlebridge.vidyaprayag.core.ok
-import com.littlebridge.vidyaprayag.core.requireTeacherContext
-import com.littlebridge.vidyaprayag.db.AppUsersTable
-import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
-import com.littlebridge.vidyaprayag.db.LeaveRequestsTable
-import com.littlebridge.vidyaprayag.feature.notifications.Notify
+import com.littlebridge.enrollplus.core.created
+import com.littlebridge.enrollplus.core.fail
+import com.littlebridge.enrollplus.core.ok
+import com.littlebridge.enrollplus.core.requireTeacherContext
+import com.littlebridge.enrollplus.db.AppUsersTable
+import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
+import com.littlebridge.enrollplus.db.LeaveRequestsTable
+import com.littlebridge.enrollplus.feature.notifications.Notify
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*

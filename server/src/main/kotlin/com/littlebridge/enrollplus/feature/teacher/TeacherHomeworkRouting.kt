@@ -49,23 +49,23 @@
  * DTOs are defined server-side (the :server module does NOT depend on :shared)
  * and mirror shared/.../teacher/domain/model/TeacherModels.kt field-for-field.
  */
-package com.littlebridge.vidyaprayag.feature.teacher
+package com.littlebridge.enrollplus.feature.teacher
 
-import com.littlebridge.vidyaprayag.core.OwnedAssignment
-import com.littlebridge.vidyaprayag.core.TeacherContext
-import com.littlebridge.vidyaprayag.core.created
-import com.littlebridge.vidyaprayag.core.enrollmentsFor
-import com.littlebridge.vidyaprayag.core.fail
-import com.littlebridge.vidyaprayag.core.ok
-import com.littlebridge.vidyaprayag.core.requireOwnedAssignment
-import com.littlebridge.vidyaprayag.core.requireTeacherContext
-import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
-import com.littlebridge.vidyaprayag.db.HomeworkAttachmentsTable
-import com.littlebridge.vidyaprayag.db.HomeworkExtensionsTable
-import com.littlebridge.vidyaprayag.db.HomeworkSubmissionsTable
-import com.littlebridge.vidyaprayag.db.HomeworkTable
-import com.littlebridge.vidyaprayag.feature.notifications.Notify
-import com.littlebridge.vidyaprayag.feature.notifications.NotifyRecipients
+import com.littlebridge.enrollplus.core.OwnedAssignment
+import com.littlebridge.enrollplus.core.TeacherContext
+import com.littlebridge.enrollplus.core.created
+import com.littlebridge.enrollplus.core.enrollmentsFor
+import com.littlebridge.enrollplus.core.fail
+import com.littlebridge.enrollplus.core.ok
+import com.littlebridge.enrollplus.core.requireOwnedAssignment
+import com.littlebridge.enrollplus.core.requireTeacherContext
+import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
+import com.littlebridge.enrollplus.db.HomeworkAttachmentsTable
+import com.littlebridge.enrollplus.db.HomeworkExtensionsTable
+import com.littlebridge.enrollplus.db.HomeworkSubmissionsTable
+import com.littlebridge.enrollplus.db.HomeworkTable
+import com.littlebridge.enrollplus.feature.notifications.Notify
+import com.littlebridge.enrollplus.feature.notifications.NotifyRecipients
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
 import io.ktor.server.auth.*

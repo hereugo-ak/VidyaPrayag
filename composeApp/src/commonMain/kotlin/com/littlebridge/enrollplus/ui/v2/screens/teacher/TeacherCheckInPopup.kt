@@ -1,4 +1,4 @@
-package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
+package com.littlebridge.enrollplus.ui.v2.screens.teacher
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -38,18 +38,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherCheckInState
-import com.littlebridge.vidyaprayag.platform.BiometricCapability
-import com.littlebridge.vidyaprayag.platform.BiometricMethod
-import com.littlebridge.vidyaprayag.platform.BiometricResult
-import com.littlebridge.vidyaprayag.platform.rememberBiometricAuthenticator
-import com.littlebridge.vidyaprayag.ui.v2.components.VButton
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
-import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
-import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherCheckInState
+import com.littlebridge.enrollplus.platform.BiometricCapability
+import com.littlebridge.enrollplus.platform.BiometricMethod
+import com.littlebridge.enrollplus.platform.BiometricResult
+import com.littlebridge.enrollplus.platform.rememberBiometricAuthenticator
+import com.littlebridge.enrollplus.ui.v2.components.VButton
+import com.littlebridge.enrollplus.ui.v2.components.VButtonSize
+import com.littlebridge.enrollplus.ui.v2.components.VButtonTone
+import com.littlebridge.enrollplus.ui.v2.components.VButtonVariant
+import com.littlebridge.enrollplus.ui.v2.components.VIcons
+import com.littlebridge.enrollplus.ui.v2.theme.VTheme
+import com.littlebridge.enrollplus.ui.v2.theme.colored
 import kotlinx.coroutines.launch
 
 /**

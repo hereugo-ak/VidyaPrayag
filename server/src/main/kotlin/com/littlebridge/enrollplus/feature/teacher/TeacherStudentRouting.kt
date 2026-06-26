@@ -30,21 +30,21 @@
  *
  * DTOs mirror shared/.../teacher/domain/model/TeacherModels.kt field-for-field.
  */
-package com.littlebridge.vidyaprayag.feature.teacher
+package com.littlebridge.enrollplus.feature.teacher
 
-import com.littlebridge.vidyaprayag.core.TeacherContext
-import com.littlebridge.vidyaprayag.core.fail
-import com.littlebridge.vidyaprayag.core.ok
-import com.littlebridge.vidyaprayag.core.teacherAssignmentsFor
-import com.littlebridge.vidyaprayag.db.AppUsersTable
-import com.littlebridge.vidyaprayag.db.AssessmentMarksTable
-import com.littlebridge.vidyaprayag.db.AssessmentsTable
-import com.littlebridge.vidyaprayag.db.AttendanceRecordsTable
-import com.littlebridge.vidyaprayag.db.ChildrenTable
-import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
-import com.littlebridge.vidyaprayag.db.EnrollmentsTable
-import com.littlebridge.vidyaprayag.db.StudentsTable
-import com.littlebridge.vidyaprayag.core.requireTeacherContext
+import com.littlebridge.enrollplus.core.TeacherContext
+import com.littlebridge.enrollplus.core.fail
+import com.littlebridge.enrollplus.core.ok
+import com.littlebridge.enrollplus.core.teacherAssignmentsFor
+import com.littlebridge.enrollplus.db.AppUsersTable
+import com.littlebridge.enrollplus.db.AssessmentMarksTable
+import com.littlebridge.enrollplus.db.AssessmentsTable
+import com.littlebridge.enrollplus.db.AttendanceRecordsTable
+import com.littlebridge.enrollplus.db.ChildrenTable
+import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
+import com.littlebridge.enrollplus.db.EnrollmentsTable
+import com.littlebridge.enrollplus.db.StudentsTable
+import com.littlebridge.enrollplus.core.requireTeacherContext
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
 import io.ktor.server.auth.*

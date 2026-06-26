@@ -1,4 +1,4 @@
-package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
+package com.littlebridge.enrollplus.ui.v2.screens.teacher
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -29,10 +29,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.TeacherClassSummaryDto
-import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
-import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import com.littlebridge.enrollplus.feature.teacher.domain.model.TeacherClassSummaryDto
+import com.littlebridge.enrollplus.ui.v2.components.VIcons
+import com.littlebridge.enrollplus.ui.v2.theme.VTheme
+import com.littlebridge.enrollplus.ui.v2.theme.colored
 
 /**
  * TeacherScopeSelector — the scope gate that fronts every UPDATE sub-screen (Attendance, Marks,

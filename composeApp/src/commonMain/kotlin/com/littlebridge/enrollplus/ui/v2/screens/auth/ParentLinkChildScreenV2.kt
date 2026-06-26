@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.littlebridge.enrollplus.feature.parent.presentation.LinkChildState
 import com.littlebridge.enrollplus.feature.parent.presentation.LinkChildViewModel
+import com.littlebridge.enrollplus.feature.parent.presentation.SchoolMatch
 import com.littlebridge.enrollplus.ui.v2.components.VAvatar
 import com.littlebridge.enrollplus.ui.v2.components.VBadge
 import com.littlebridge.enrollplus.ui.v2.components.VBadgeTone

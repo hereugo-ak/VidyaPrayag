@@ -1,4 +1,4 @@
-package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
+package com.littlebridge.enrollplus.ui.v2.screens.teacher
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -28,16 +28,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.StudentPerformanceDto
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.StudentProfileData
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherStudentProfileViewModel
-import com.littlebridge.vidyaprayag.ui.v2.components.VButton
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
-import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
-import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
-import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import com.littlebridge.enrollplus.feature.teacher.domain.model.StudentPerformanceDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.StudentProfileData
+import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherStudentProfileViewModel
+import com.littlebridge.enrollplus.ui.v2.components.VButton
+import com.littlebridge.enrollplus.ui.v2.components.VButtonSize
+import com.littlebridge.enrollplus.ui.v2.components.VButtonTone
+import com.littlebridge.enrollplus.ui.v2.components.VIcons
+import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
+import com.littlebridge.enrollplus.ui.v2.theme.VTheme
+import com.littlebridge.enrollplus.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -201,14 +201,14 @@ private fun TrendPill(trend: String) {
     TPill(label, bg, fg)
 }
 
-private fun attendanceColor(c: com.littlebridge.vidyaprayag.ui.v2.theme.VColors, pct: Int?): Color = when {
+private fun attendanceColor(c: com.littlebridge.enrollplus.ui.v2.theme.VColors, pct: Int?): Color = when {
     pct == null -> c.ink3
     pct >= 85 -> c.success
     pct >= 70 -> c.warning
     else -> c.danger
 }
 
-private fun attendanceDayColor(c: com.littlebridge.vidyaprayag.ui.v2.theme.VColors, status: String): Color = when (status.lowercase()) {
+private fun attendanceDayColor(c: com.littlebridge.enrollplus.ui.v2.theme.VColors, status: String): Color = when (status.lowercase()) {
     "present" -> c.success
     "late" -> c.warning
     "leave" -> c.accent
@@ -282,7 +282,7 @@ private fun FlagsCard(flags: List<String>) {
     }
 }
 
-private fun flagMeta(c: com.littlebridge.vidyaprayag.ui.v2.theme.VColors, code: String): Triple<Color, Color, String> = when (code) {
+private fun flagMeta(c: com.littlebridge.enrollplus.ui.v2.theme.VColors, code: String): Triple<Color, Color, String> = when (code) {
     "low_attendance" -> Triple(c.dangerInk, c.danger.copy(alpha = 0.10f), "Low attendance")
     "recent_absences" -> Triple(c.dangerInk, c.danger.copy(alpha = 0.10f), "Recent absences")
     "failing_trend" -> Triple(c.dangerInk, c.danger.copy(alpha = 0.10f), "Failing trend")

@@ -1,4 +1,4 @@
-package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
+package com.littlebridge.enrollplus.ui.v2.screens.teacher
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,12 +25,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.littlebridge.vidyaprayag.ui.v2.components.VAvatar
-import com.littlebridge.vidyaprayag.ui.v2.components.VDivider
-import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.components.VStatusDot
-import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
-import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import com.littlebridge.enrollplus.ui.v2.components.VAvatar
+import com.littlebridge.enrollplus.ui.v2.components.VDivider
+import com.littlebridge.enrollplus.ui.v2.components.VIcons
+import com.littlebridge.enrollplus.ui.v2.components.VStatusDot
+import com.littlebridge.enrollplus.ui.v2.theme.VTheme
+import com.littlebridge.enrollplus.ui.v2.theme.colored
 
 /**
  * TeacherHeader — THE single canonical header for the whole rebuilt Teacher Portal, rendered

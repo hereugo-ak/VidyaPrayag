@@ -32,23 +32,23 @@
  * deleted — see T-601 / T-504 notes inside). Attendance, marks, syllabus and
  * homework live in TeacherRoutingTasks.kt.
  */
-package com.littlebridge.vidyaprayag.feature.teacher
+package com.littlebridge.enrollplus.feature.teacher
 
-import com.littlebridge.vidyaprayag.core.ClassNaming
-import com.littlebridge.vidyaprayag.core.TeacherContext
-import com.littlebridge.vidyaprayag.core.ok
-import com.littlebridge.vidyaprayag.core.requireTeacherContext
-import com.littlebridge.vidyaprayag.core.teacherAssignmentsFor
-import com.littlebridge.vidyaprayag.db.AppUsersTable
-import com.littlebridge.vidyaprayag.db.AssessmentMarksTable
-import com.littlebridge.vidyaprayag.db.AssessmentsTable
-import com.littlebridge.vidyaprayag.db.AttendanceRecordsTable
-import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
-import com.littlebridge.vidyaprayag.db.HomeworkTable
-import com.littlebridge.vidyaprayag.db.SchoolsTable
-import com.littlebridge.vidyaprayag.db.StudentsTable
-import com.littlebridge.vidyaprayag.db.SyllabusUnitsTable
-import com.littlebridge.vidyaprayag.db.TeacherPeriodsTable
+import com.littlebridge.enrollplus.core.ClassNaming
+import com.littlebridge.enrollplus.core.TeacherContext
+import com.littlebridge.enrollplus.core.ok
+import com.littlebridge.enrollplus.core.requireTeacherContext
+import com.littlebridge.enrollplus.core.teacherAssignmentsFor
+import com.littlebridge.enrollplus.db.AppUsersTable
+import com.littlebridge.enrollplus.db.AssessmentMarksTable
+import com.littlebridge.enrollplus.db.AssessmentsTable
+import com.littlebridge.enrollplus.db.AttendanceRecordsTable
+import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
+import com.littlebridge.enrollplus.db.HomeworkTable
+import com.littlebridge.enrollplus.db.SchoolsTable
+import com.littlebridge.enrollplus.db.StudentsTable
+import com.littlebridge.enrollplus.db.SyllabusUnitsTable
+import com.littlebridge.enrollplus.db.TeacherPeriodsTable
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*

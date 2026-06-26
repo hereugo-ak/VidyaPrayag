@@ -1,4 +1,4 @@
-package com.littlebridge.vidyaprayag.platform
+package com.littlebridge.enrollplus.platform
 
 import android.content.Context
 import android.content.ContextWrapper

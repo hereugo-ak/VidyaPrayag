@@ -39,6 +39,9 @@
  */
 package com.littlebridge.enrollplus.feature.onboarding
 
+import com.littlebridge.enrollplus.core.ClassNaming
+import com.littlebridge.enrollplus.core.ClassResolution
+import com.littlebridge.enrollplus.core.StudentCode
 import com.littlebridge.enrollplus.core.fail
 import com.littlebridge.enrollplus.core.ok
 import com.littlebridge.enrollplus.core.principalUserId

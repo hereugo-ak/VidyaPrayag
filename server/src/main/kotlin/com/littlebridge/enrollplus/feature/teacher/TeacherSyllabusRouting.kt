@@ -46,18 +46,18 @@
  * (SyllabusLoadResponse/SyllabusLoadDto/SyllabusNodeDto/CreateSyllabusUnitRequest/
  *  UpdateSyllabusUnitRequest/ToggleSyllabusProgressRequest/SyllabusUnitMutationResponse).
  */
-package com.littlebridge.vidyaprayag.feature.teacher
+package com.littlebridge.enrollplus.feature.teacher
 
-import com.littlebridge.vidyaprayag.core.OwnedAssignment
-import com.littlebridge.vidyaprayag.core.TeacherContext
-import com.littlebridge.vidyaprayag.core.created
-import com.littlebridge.vidyaprayag.core.fail
-import com.littlebridge.vidyaprayag.core.ok
-import com.littlebridge.vidyaprayag.core.requireOwnedAssignment
-import com.littlebridge.vidyaprayag.core.requireTeacherContext
-import com.littlebridge.vidyaprayag.db.CurriculumUnitsTable
-import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
-import com.littlebridge.vidyaprayag.db.SyllabusProgressTable
+import com.littlebridge.enrollplus.core.OwnedAssignment
+import com.littlebridge.enrollplus.core.TeacherContext
+import com.littlebridge.enrollplus.core.created
+import com.littlebridge.enrollplus.core.fail
+import com.littlebridge.enrollplus.core.ok
+import com.littlebridge.enrollplus.core.requireOwnedAssignment
+import com.littlebridge.enrollplus.core.requireTeacherContext
+import com.littlebridge.enrollplus.db.CurriculumUnitsTable
+import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
+import com.littlebridge.enrollplus.db.SyllabusProgressTable
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
 import io.ktor.server.auth.*

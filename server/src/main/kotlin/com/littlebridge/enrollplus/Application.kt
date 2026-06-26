@@ -92,9 +92,17 @@ import com.littlebridge.enrollplus.feature.school.nonTeachingStaffRouting
 import com.littlebridge.enrollplus.feature.school.schoolRouting
 import com.littlebridge.enrollplus.feature.school.teacherAssignmentRouting
 import com.littlebridge.enrollplus.feature.school.teacherProvisioningRouting
+import com.littlebridge.enrollplus.feature.teacher.teacherAttendanceRouting
+import com.littlebridge.enrollplus.feature.teacher.teacherClassesRouting
+import com.littlebridge.enrollplus.feature.teacher.teacherDayRouting
+import com.littlebridge.enrollplus.feature.teacher.teacherGradebookRouting
+import com.littlebridge.enrollplus.feature.teacher.teacherHomeworkRouting
 import com.littlebridge.enrollplus.feature.teacher.teacherLeaveRouting
 import com.littlebridge.enrollplus.feature.teacher.teacherMessagesRouting
 import com.littlebridge.enrollplus.feature.teacher.teacherRouting
+import com.littlebridge.enrollplus.feature.teacher.teacherSelfLeaveRouting
+import com.littlebridge.enrollplus.feature.teacher.teacherStudentRouting
+import com.littlebridge.enrollplus.feature.teacher.teacherSyllabusRouting
 import com.littlebridge.enrollplus.feature.user.parentRouting
 import com.littlebridge.enrollplus.feature.user.parentMessagesRouting
 import com.littlebridge.enrollplus.feature.user.userDetailsRouting

@@ -29,6 +29,7 @@
  */
 package com.littlebridge.enrollplus.feature.school
 
+import com.littlebridge.enrollplus.core.ClassNaming
 import com.littlebridge.enrollplus.db.AppUsersTable
 import com.littlebridge.enrollplus.db.AssessmentMarksTable
 import com.littlebridge.enrollplus.db.AssessmentsTable

@@ -1,4 +1,4 @@
-package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
+package com.littlebridge.enrollplus.ui.v2.screens.teacher
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,23 +37,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentDto
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentStatus
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentType
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.GradebookMode
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.GradebookStudentMark
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherGradebookViewModel
-import com.littlebridge.vidyaprayag.ui.v2.components.VButton
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
-import com.littlebridge.vidyaprayag.ui.v2.components.VDatePicker
-import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.components.VInput
-import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
-import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
-import com.littlebridge.vidyaprayag.ui.v2.theme.colored
-import com.littlebridge.vidyaprayag.util.todayIso
+import com.littlebridge.enrollplus.feature.teacher.domain.model.AssessmentDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.AssessmentStatus
+import com.littlebridge.enrollplus.feature.teacher.domain.model.AssessmentType
+import com.littlebridge.enrollplus.feature.teacher.presentation.GradebookMode
+import com.littlebridge.enrollplus.feature.teacher.presentation.GradebookStudentMark
+import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherGradebookViewModel
+import com.littlebridge.enrollplus.ui.v2.components.VButton
+import com.littlebridge.enrollplus.ui.v2.components.VButtonSize
+import com.littlebridge.enrollplus.ui.v2.components.VButtonTone
+import com.littlebridge.enrollplus.ui.v2.components.VButtonVariant
+import com.littlebridge.enrollplus.ui.v2.components.VDatePicker
+import com.littlebridge.enrollplus.ui.v2.components.VIcons
+import com.littlebridge.enrollplus.ui.v2.components.VInput
+import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
+import com.littlebridge.enrollplus.ui.v2.theme.VTheme
+import com.littlebridge.enrollplus.ui.v2.theme.colored
+import com.littlebridge.enrollplus.util.todayIso
 import org.koin.compose.viewmodel.koinViewModel
 
 /**

@@ -1,4 +1,4 @@
-package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
+package com.littlebridge.enrollplus.ui.v2.screens.teacher
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -38,22 +38,22 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.ClassAssessmentDto
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.ClassDetailData
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.ClassHomeworkDto
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.RosterStudentDto
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.TeacherClassSummaryDto
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.WeeklyPeriodDto
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClassesViewModel
-import com.littlebridge.vidyaprayag.ui.v2.components.VButton
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonSize
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonTone
-import com.littlebridge.vidyaprayag.ui.v2.components.VButtonVariant
-import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.components.VInput
-import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
-import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
-import com.littlebridge.vidyaprayag.ui.v2.theme.colored
+import com.littlebridge.enrollplus.feature.teacher.domain.model.ClassAssessmentDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.ClassDetailData
+import com.littlebridge.enrollplus.feature.teacher.domain.model.ClassHomeworkDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.RosterStudentDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.TeacherClassSummaryDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.WeeklyPeriodDto
+import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherClassesViewModel
+import com.littlebridge.enrollplus.ui.v2.components.VButton
+import com.littlebridge.enrollplus.ui.v2.components.VButtonSize
+import com.littlebridge.enrollplus.ui.v2.components.VButtonTone
+import com.littlebridge.enrollplus.ui.v2.components.VButtonVariant
+import com.littlebridge.enrollplus.ui.v2.components.VIcons
+import com.littlebridge.enrollplus.ui.v2.components.VInput
+import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
+import com.littlebridge.enrollplus.ui.v2.theme.VTheme
+import com.littlebridge.enrollplus.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -115,7 +115,7 @@ fun TeacherClassesScreenV2(
 
 @Composable
 private fun ClassListPane(
-    state: com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClassesState,
+    state: com.littlebridge.enrollplus.feature.teacher.presentation.TeacherClassesState,
     onSearch: (String) -> Unit,
     onCycleFilter: () -> Unit,
     onOpenClass: (String) -> Unit,
@@ -289,7 +289,7 @@ private fun nextPeriodLabel(day: String, start: String, end: String, room: Strin
 
 @Composable
 private fun ClassDetailPane(
-    state: com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClassesState,
+    state: com.littlebridge.enrollplus.feature.teacher.presentation.TeacherClassesState,
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onOpenStudent: (String) -> Unit,

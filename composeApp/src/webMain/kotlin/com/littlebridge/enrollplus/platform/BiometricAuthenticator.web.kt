@@ -1,4 +1,4 @@
-package com.littlebridge.vidyaprayag.platform
+package com.littlebridge.enrollplus.platform
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember

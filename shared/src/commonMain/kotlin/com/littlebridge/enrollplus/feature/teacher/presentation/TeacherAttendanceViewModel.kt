@@ -4,9 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.littlebridge.enrollplus.core.network.NetworkResult
 import com.littlebridge.enrollplus.core.prefs.PreferenceRepository
-import com.littlebridge.enrollplus.feature.teacher.domain.model.AttendanceEntryDto
-import com.littlebridge.enrollplus.feature.teacher.domain.model.AttendanceMarkDto
-import com.littlebridge.enrollplus.feature.teacher.domain.model.SubmitAttendanceRequest
+import com.littlebridge.enrollplus.feature.teacher.domain.model.AttendanceSaveMarkDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.AttendanceSaveRequest
 import com.littlebridge.enrollplus.feature.teacher.domain.repository.TeacherRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

@@ -40,6 +40,8 @@ package com.littlebridge.enrollplus.core
 
 import com.littlebridge.enrollplus.db.AppUsersTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
+import com.littlebridge.enrollplus.db.EnrollmentsTable
+import com.littlebridge.enrollplus.db.StudentsTable
 import com.littlebridge.enrollplus.db.TeacherSubjectAssignmentsTable
 import io.ktor.http.*
 import io.ktor.server.application.*

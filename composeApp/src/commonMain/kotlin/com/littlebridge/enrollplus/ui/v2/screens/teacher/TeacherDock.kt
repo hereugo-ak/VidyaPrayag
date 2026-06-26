@@ -1,4 +1,4 @@
-package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
+package com.littlebridge.enrollplus.ui.v2.screens.teacher
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -43,11 +43,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.littlebridge.vidyaprayag.ui.v2.components.VNavItem
-import com.littlebridge.vidyaprayag.ui.v2.theme.VElevationLevel
-import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
-import com.littlebridge.vidyaprayag.ui.v2.theme.colored
-import com.littlebridge.vidyaprayag.ui.v2.theme.vElevation
+import com.littlebridge.enrollplus.ui.v2.components.VNavItem
+import com.littlebridge.enrollplus.ui.v2.theme.VElevationLevel
+import com.littlebridge.enrollplus.ui.v2.theme.VTheme
+import com.littlebridge.enrollplus.ui.v2.theme.colored
+import com.littlebridge.enrollplus.ui.v2.theme.vElevation
 
 /**
  * TeacherDock — the rebuilt Teacher Portal's signature **floating dock**, a faithful sibling of

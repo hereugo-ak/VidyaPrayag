@@ -1,4 +1,4 @@
-package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
+package com.littlebridge.enrollplus.ui.v2.screens.teacher
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,21 +33,21 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.ObligationItemDto
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.ResolvedDayUi
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.ResolvedPeriodUi
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherCheckInState
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherCheckInViewModel
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherObligationsState
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherObligationsViewModel
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherTodayState
-import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherTodayViewModel
-import com.littlebridge.vidyaprayag.platform.BiometricMethod
-import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
-import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
-import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
-import com.littlebridge.vidyaprayag.ui.v2.theme.colored
-import com.littlebridge.vidyaprayag.util.todayIso
+import com.littlebridge.enrollplus.feature.teacher.domain.model.ObligationItemDto
+import com.littlebridge.enrollplus.feature.teacher.presentation.ResolvedDayUi
+import com.littlebridge.enrollplus.feature.teacher.presentation.ResolvedPeriodUi
+import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherCheckInState
+import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherCheckInViewModel
+import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherObligationsState
+import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherObligationsViewModel
+import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherTodayState
+import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherTodayViewModel
+import com.littlebridge.enrollplus.platform.BiometricMethod
+import com.littlebridge.enrollplus.ui.v2.components.VIcons
+import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
+import com.littlebridge.enrollplus.ui.v2.theme.VTheme
+import com.littlebridge.enrollplus.ui.v2.theme.colored
+import com.littlebridge.enrollplus.util.todayIso
 import org.koin.compose.viewmodel.koinViewModel
 
 /**

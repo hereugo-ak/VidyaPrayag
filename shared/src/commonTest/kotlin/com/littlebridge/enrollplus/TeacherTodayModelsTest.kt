@@ -1,17 +1,17 @@
-package com.littlebridge.vidyaprayag
+package com.littlebridge.enrollplus
 
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AttendanceLoadDto
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AttendanceSaveMarkDto
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AttendanceSaveRequest
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AttendanceSaveResultDto
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.AttendanceStudentDto
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.CalendarOverlayDto
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.CheckInStatusDto
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.ObligationItemDto
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.ResolvedDayDto
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.ResolvedPeriodDto
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.ResolvedWeekDto
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.TeacherObligationsDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.AttendanceLoadDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.AttendanceSaveMarkDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.AttendanceSaveRequest
+import com.littlebridge.enrollplus.feature.teacher.domain.model.AttendanceSaveResultDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.AttendanceStudentDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.CalendarOverlayDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.CheckInStatusDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.ObligationItemDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.ResolvedDayDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.ResolvedPeriodDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.ResolvedWeekDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.TeacherObligationsDto
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -181,7 +181,7 @@ class TeacherTodayModelsTest {
                      "already_marked":false,"leave_defaults":[]}}
         """.trimIndent()
         val decoded = json.decodeFromString(
-            com.littlebridge.vidyaprayag.feature.teacher.domain.model.AttendanceLoadResponse.serializer(),
+            com.littlebridge.enrollplus.feature.teacher.domain.model.AttendanceLoadResponse.serializer(),
             wire,
         )
         assertTrue(decoded.success)
@@ -214,7 +214,7 @@ class TeacherTodayModelsTest {
 
     @Test
     fun assessment_roundTrips_withScopeAndStatus() {
-        val original = com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentDto(
+        val original = com.littlebridge.enrollplus.feature.teacher.domain.model.AssessmentDto(
             id = "as1",
             assignmentId = "a1",
             classId = "c1",
@@ -223,16 +223,16 @@ class TeacherTodayModelsTest {
             section = "B",
             subject = "Mathematics",
             name = "Unit Test I",
-            type = com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentType.SCHEDULED,
+            type = com.littlebridge.enrollplus.feature.teacher.domain.model.AssessmentType.SCHEDULED,
             maxMarks = 25,
             passMarks = 10,
             examDate = "2026-06-25",
-            status = com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentStatus.MARKS_PENDING,
+            status = com.littlebridge.enrollplus.feature.teacher.domain.model.AssessmentStatus.MARKS_PENDING,
             enteredCount = 31,
             rosterCount = 38,
         )
         val encoded = json.encodeToString(
-            com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentDto.serializer(),
+            com.littlebridge.enrollplus.feature.teacher.domain.model.AssessmentDto.serializer(),
             original,
         )
         assertTrue(encoded.contains("\"assignment_id\""))
@@ -240,7 +240,7 @@ class TeacherTodayModelsTest {
         assertTrue(encoded.contains("\"pass_marks\""))
         assertTrue(encoded.contains("\"entered_count\""))
         val decoded = json.decodeFromString(
-            com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentDto.serializer(),
+            com.littlebridge.enrollplus.feature.teacher.domain.model.AssessmentDto.serializer(),
             encoded,
         )
         assertEquals(original, decoded)
@@ -251,17 +251,17 @@ class TeacherTodayModelsTest {
 
     @Test
     fun marksLoad_restoresEnteredValues_andAbsent() {
-        val original = com.littlebridge.vidyaprayag.feature.teacher.domain.model.MarksLoadDto(
-            assessment = com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentDto(
+        val original = com.littlebridge.enrollplus.feature.teacher.domain.model.MarksLoadDto(
+            assessment = com.littlebridge.enrollplus.feature.teacher.domain.model.AssessmentDto(
                 id = "as1", name = "Unit Test I", maxMarks = 25, passMarks = 10,
-                status = com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentStatus.MARKS_PENDING,
+                status = com.littlebridge.enrollplus.feature.teacher.domain.model.AssessmentStatus.MARKS_PENDING,
             ),
             students = listOf(
-                com.littlebridge.vidyaprayag.feature.teacher.domain.model.MarkEntryDto(
+                com.littlebridge.enrollplus.feature.teacher.domain.model.MarkEntryDto(
                     studentId = "s1", name = "Asha", rollNo = "1", marks = 22f,
                 ),
                 // AB is a distinct state, not a 0 (§5.2)
-                com.littlebridge.vidyaprayag.feature.teacher.domain.model.MarkEntryDto(
+                com.littlebridge.enrollplus.feature.teacher.domain.model.MarkEntryDto(
                     studentId = "s2", name = "Bilal", rollNo = "2", marks = null, isAbsent = true,
                     remark = "Sick",
                 ),
@@ -270,13 +270,13 @@ class TeacherTodayModelsTest {
             rosterCount = 2,
         )
         val encoded = json.encodeToString(
-            com.littlebridge.vidyaprayag.feature.teacher.domain.model.MarksLoadDto.serializer(),
+            com.littlebridge.enrollplus.feature.teacher.domain.model.MarksLoadDto.serializer(),
             original,
         )
         assertTrue(encoded.contains("\"is_absent\""))
         assertTrue(encoded.contains("\"roll_no\""))
         val decoded = json.decodeFromString(
-            com.littlebridge.vidyaprayag.feature.teacher.domain.model.MarksLoadDto.serializer(),
+            com.littlebridge.enrollplus.feature.teacher.domain.model.MarksLoadDto.serializer(),
             encoded,
         )
         assertEquals(original, decoded)
@@ -284,67 +284,67 @@ class TeacherTodayModelsTest {
 
     @Test
     fun marksSave_carriesNoPublishFlag_andEchoesUnpublishedStatus() {
-        val req = com.littlebridge.vidyaprayag.feature.teacher.domain.model.MarksSaveRequest(
+        val req = com.littlebridge.enrollplus.feature.teacher.domain.model.MarksSaveRequest(
             entries = listOf(
-                com.littlebridge.vidyaprayag.feature.teacher.domain.model.MarkSaveEntryDto(
+                com.littlebridge.enrollplus.feature.teacher.domain.model.MarkSaveEntryDto(
                     studentId = "s1", marks = 22f,
                 ),
-                com.littlebridge.vidyaprayag.feature.teacher.domain.model.MarkSaveEntryDto(
+                com.littlebridge.enrollplus.feature.teacher.domain.model.MarkSaveEntryDto(
                     studentId = "s2", marks = null, isAbsent = true,
                 ),
             ),
         )
         val encoded = json.encodeToString(
-            com.littlebridge.vidyaprayag.feature.teacher.domain.model.MarksSaveRequest.serializer(),
+            com.littlebridge.enrollplus.feature.teacher.domain.model.MarksSaveRequest.serializer(),
             req,
         )
         // The B-MK-1 fix is structural: a SAVE payload has no publish concept at all.
         assertFalse(encoded.contains("publish"))
         assertTrue(encoded.contains("\"student_id\""))
         val decoded = json.decodeFromString(
-            com.littlebridge.vidyaprayag.feature.teacher.domain.model.MarksSaveRequest.serializer(),
+            com.littlebridge.enrollplus.feature.teacher.domain.model.MarksSaveRequest.serializer(),
             encoded,
         )
         assertEquals(req, decoded)
 
         // SAVE result echoes the still-unpublished status so the UI can prove it.
-        val result = com.littlebridge.vidyaprayag.feature.teacher.domain.model.MarksSaveResultDto(
+        val result = com.littlebridge.enrollplus.feature.teacher.domain.model.MarksSaveResultDto(
             saved = 2, enteredCount = 2, rosterCount = 38,
         )
         assertEquals(
-            com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentStatus.MARKS_PENDING,
+            com.littlebridge.enrollplus.feature.teacher.domain.model.AssessmentStatus.MARKS_PENDING,
             result.status,
         )
     }
 
     @Test
     fun assessmentHistory_roundTrips_andHonestEmpty() {
-        val empty = com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentHistoryDto()
+        val empty = com.littlebridge.enrollplus.feature.teacher.domain.model.AssessmentHistoryDto()
         assertFalse(empty.hasData)
 
-        val original = com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentHistoryDto(
+        val original = com.littlebridge.enrollplus.feature.teacher.domain.model.AssessmentHistoryDto(
             assignmentId = "a1",
             className = "Grade 7",
             subject = "Mathematics",
             timeline = listOf(
-                com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentTrendPointDto(
+                com.littlebridge.enrollplus.feature.teacher.domain.model.AssessmentTrendPointDto(
                     assessmentId = "as1", name = "Unit Test I", examDate = "2026-05-01",
                     maxMarks = 25, average = 18.4f, passRate = 0.86f, enteredCount = 38, rosterCount = 38,
                 ),
             ),
             distribution = listOf(
-                com.littlebridge.vidyaprayag.feature.teacher.domain.model.MarkBucketDto(label = "0–24%", count = 2),
-                com.littlebridge.vidyaprayag.feature.teacher.domain.model.MarkBucketDto(label = "75–100%", count = 9),
+                com.littlebridge.enrollplus.feature.teacher.domain.model.MarkBucketDto(label = "0–24%", count = 2),
+                com.littlebridge.enrollplus.feature.teacher.domain.model.MarkBucketDto(label = "75–100%", count = 9),
             ),
         )
         val encoded = json.encodeToString(
-            com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentHistoryDto.serializer(),
+            com.littlebridge.enrollplus.feature.teacher.domain.model.AssessmentHistoryDto.serializer(),
             original,
         )
         assertTrue(encoded.contains("\"assignment_id\""))
         assertTrue(encoded.contains("\"pass_rate\""))
         val decoded = json.decodeFromString(
-            com.littlebridge.vidyaprayag.feature.teacher.domain.model.AssessmentHistoryDto.serializer(),
+            com.littlebridge.enrollplus.feature.teacher.domain.model.AssessmentHistoryDto.serializer(),
             encoded,
         )
         assertEquals(original, decoded)

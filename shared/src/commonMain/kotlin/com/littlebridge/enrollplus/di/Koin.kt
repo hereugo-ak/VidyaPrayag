@@ -442,15 +442,27 @@ val viewModelModule = module {
     factory { ResultsViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.content.presentation.LandingViewModel(get()) }
     factory { com.littlebridge.enrollplus.feature.auth.presentation.AuthViewModel(get()) }
-    // Teacher vertical (master doc G1) — 7 VMs, all (TeacherRepository, PreferenceRepository)
-    factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherHomeViewModel(get(), get()) }
+    // Teacher vertical (master doc G1) — all (TeacherRepository, PreferenceRepository)
+    // T-601 (DELETE-don't-patch): TeacherHomeViewModel factory removed — the legacy
+    // Home tab is replaced by the Today tab (Doc 04 §4). See TeacherTodayViewModel below.
+    // T-105: the new Today tab (server-resolved schedule).
+    factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherTodayViewModel(get(), get()) }
+    // T-106c: teacher self check-in (Doc 06 §2) — backs the Today greeting band pill.
+    factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherCheckInViewModel(get(), get()) }
+    // T-107: real obligations strip (Doc 04 §5.5) — backs the Today "what needs me" strip.
+    factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherObligationsViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherClassesViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherStudentProfileViewModel(get(), get()) } // T-505
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherAttendanceViewModel(get(), get()) }
-    factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherMarksViewModel(get(), get()) }
-    factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherAssessmentsViewModel(get(), get()) }
+    // T-305: the rebuilt gradebook state holder (replaces the legacy split of
+    // TeacherMarksViewModel + TeacherAssessmentsViewModel, both deleted in T-305).
+    factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherGradebookViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherSyllabusViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherHomeworkViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherProfileViewModel(get(), get()) }
+    // T-602b: the actionable Profile VM (own-leave list/apply, password change via
+    // AuthRepository, theme pref) — (TeacherRepository, PreferenceRepository, AuthRepository).
+    factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherProfileActionsViewModel(get(), get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherLeaveViewModel(get(), get()) }
 }
 

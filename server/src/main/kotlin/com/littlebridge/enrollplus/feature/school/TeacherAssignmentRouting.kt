@@ -21,6 +21,8 @@
  */
 package com.littlebridge.enrollplus.feature.school
 
+import com.littlebridge.enrollplus.core.ClassNaming
+import com.littlebridge.enrollplus.core.ClassResolution
 import com.littlebridge.enrollplus.core.created
 import com.littlebridge.enrollplus.core.fail
 import com.littlebridge.enrollplus.core.ok

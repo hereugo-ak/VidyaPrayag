@@ -17,7 +17,7 @@
  * What remains here is the (now empty) teacherTaskRoutes() mount point plus the
  * migration ledger below, kept as the documented landing zone for the rebuild story.
  */
-package com.littlebridge.vidyaprayag.feature.teacher
+package com.littlebridge.enrollplus.feature.teacher
 
 import io.ktor.server.routing.*
 

@@ -1,11 +1,11 @@
-package com.littlebridge.vidyaprayag.feature.teacher.presentation
+package com.littlebridge.enrollplus.feature.teacher.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.littlebridge.vidyaprayag.core.network.NetworkResult
-import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
-import com.littlebridge.vidyaprayag.feature.teacher.domain.model.ObligationItemDto
-import com.littlebridge.vidyaprayag.feature.teacher.domain.repository.TeacherRepository
+import com.littlebridge.enrollplus.core.network.NetworkResult
+import com.littlebridge.enrollplus.core.prefs.PreferenceRepository
+import com.littlebridge.enrollplus.feature.teacher.domain.model.ObligationItemDto
+import com.littlebridge.enrollplus.feature.teacher.domain.repository.TeacherRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
