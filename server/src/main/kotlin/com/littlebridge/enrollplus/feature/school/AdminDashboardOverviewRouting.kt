@@ -385,7 +385,9 @@ fun Route.adminDashboardOverviewRouting() {
                         .toList()
                         .map {
                             Triple(
-                                it[AttendanceRecordsTable.date],
+                                // T-004: date is now LocalDate; keep ISO String for the
+                                // String-typed ovParseDate / ovPresentRate helpers.
+                                it[AttendanceRecordsTable.date].toString(),
                                 it[AttendanceRecordsTable.status],
                                 it[AttendanceRecordsTable.grade]
                             )

@@ -71,9 +71,25 @@ class StudentRosterViewModel(
         }
     }
 
-    fun addStudent(fullName: String, className: String, section: String, rollNumber: String) {
+    fun addStudent(
+        fullName: String,
+        className: String,
+        section: String,
+        rollNumber: String,
+        parentPhone: String,
+    ) {
         if (fullName.isBlank() || className.isBlank() || rollNumber.isBlank()) {
             _state.value = _state.value.copy(addError = "Name, class and roll number are required.")
+            return
+        }
+        // ISSUE 2b: parent phone is optional — validate only when the admin entered something.
+        // A school may not capture parent phone at enrollment time; students without a phone
+        // on record can still be matched by name+class+roll during the parent link flow.
+        val phoneDigits = parentPhone.filter { it.isDigit() }
+        if (parentPhone.isNotBlank() && phoneDigits.length < 10) {
+            _state.value = _state.value.copy(
+                addError = "That phone number doesn't look right. Enter at least 10 digits, or leave it blank."
+            )
             return
         }
         viewModelScope.launch {
@@ -87,7 +103,8 @@ class StudentRosterViewModel(
                 fullName = fullName.trim(),
                 className = className.trim(),
                 section = section.trim().ifBlank { null },
-                rollNumber = rollNumber.trim()
+                rollNumber = rollNumber.trim(),
+                parentPhone = parentPhone.trim().ifBlank { null }
             )
             when (val r = repository.createStudent(token, req)) {
                 is NetworkResult.Success -> {

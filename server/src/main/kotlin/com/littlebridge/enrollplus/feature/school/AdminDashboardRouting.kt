@@ -405,7 +405,7 @@ fun Route.adminDashboardRouting() {
                                 (AttendanceRecordsTable.type eq "student")
                         }
                         .toList()
-                        .map { (it[AttendanceRecordsTable.date]) to it[AttendanceRecordsTable.status] }
+                        .map { (it[AttendanceRecordsTable.date].toString()) to it[AttendanceRecordsTable.status] }
 
                     // Most recent attendance day + the day before it (for trend).
                     val byDate = attRows.groupBy { it.first }
@@ -563,7 +563,7 @@ fun Route.adminDashboardRouting() {
                         }
                         .toList()
                     val attByMonth = attRows.groupBy {
-                        parseDate(it[AttendanceRecordsTable.date])?.let { d -> d.year to d.monthValue }
+                        parseDate(it[AttendanceRecordsTable.date].toString())?.let { d -> d.year to d.monthValue }
                     }
                     val trendLabels = ArrayList<String>(7)
                     val trendValues = ArrayList<Int>(7)
@@ -571,7 +571,7 @@ fun Route.adminDashboardRouting() {
                         val d = today.minusMonths(back.toLong())
                         trendLabels += MONTH_NAMES[d.monthValue - 1]
                         val pool = attByMonth[d.year to d.monthValue].orEmpty()
-                        val rate = presentRate(pool.map { it[AttendanceRecordsTable.date] to it[AttendanceRecordsTable.status] }) ?: 0
+                        val rate = presentRate(pool.map { it[AttendanceRecordsTable.date].toString() to it[AttendanceRecordsTable.status] }) ?: 0
                         trendValues += rate
                     }
 
@@ -605,9 +605,11 @@ fun Route.adminDashboardRouting() {
                         .map { DashTopClassDto(it.first, kotlin.math.round(it.second).toInt()) }
 
                     // ---- attendance breakdown (latest day) ----
-                    val latestDay = attRows.maxByOrNull { it[AttendanceRecordsTable.date] }?.get(AttendanceRecordsTable.date)
+                    // T-004: date is now LocalDate; compare by ISO String to keep
+                    // parity with the String-keyed byDate map above.
+                    val latestDay = attRows.maxByOrNull { it[AttendanceRecordsTable.date] }?.get(AttendanceRecordsTable.date)?.toString()
                     val latestRows = if (latestDay == null) emptyList()
-                    else attRows.filter { it[AttendanceRecordsTable.date] == latestDay }
+                    else attRows.filter { it[AttendanceRecordsTable.date].toString() == latestDay }
                     val totalDay = latestRows.size
                     val presentCount = latestRows.count { it[AttendanceRecordsTable.status].equals("PRESENT", true) }
                     val lateCount = latestRows.count { it[AttendanceRecordsTable.status].equals("LATE", true) }

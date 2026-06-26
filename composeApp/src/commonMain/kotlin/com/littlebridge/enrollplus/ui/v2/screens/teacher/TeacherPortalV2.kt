@@ -1,166 +1,183 @@
-package com.littlebridge.enrollplus.ui.v2.screens.teacher
+package com.littlebridge.vidyaprayag.ui.v2.screens.teacher
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
-import androidx.compose.ui.unit.dp
-import com.littlebridge.enrollplus.ui.v2.components.VBottomNav
-import com.littlebridge.enrollplus.ui.v2.components.VIcons
-import com.littlebridge.enrollplus.ui.v2.components.VNavItem
-import com.littlebridge.enrollplus.ui.v2.components.VScreenScaffold
-import com.littlebridge.enrollplus.ui.v2.components.VTopTabs
-import com.littlebridge.enrollplus.ui.v2.screens.discovery.AcademicCalendarScreenV2
-import com.littlebridge.enrollplus.ui.v2.screens.notifications.NotificationsScreenV2
-import com.littlebridge.enrollplus.ui.v2.theme.VPortalTone
-import com.littlebridge.enrollplus.ui.v2.theme.VTheme
+import com.littlebridge.vidyaprayag.core.prefs.PreferenceRepository
+import com.littlebridge.vidyaprayag.feature.parent.presentation.NotificationsViewModel
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherObligationsViewModel
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherProfileViewModel
+import com.littlebridge.vidyaprayag.ui.v2.components.VIcons
+import com.littlebridge.vidyaprayag.ui.v2.components.VNavItem
+import com.littlebridge.vidyaprayag.ui.v2.components.VScreenScaffold
+import com.littlebridge.vidyaprayag.ui.v2.screens.collectAsStateV2
+import com.littlebridge.vidyaprayag.ui.v2.screens.notifications.NotificationsScreenV2
+import com.littlebridge.vidyaprayag.ui.v2.theme.VPortalTone
+import com.littlebridge.vidyaprayag.ui.v2.theme.VTheme
+import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays the teacher portal can push above its tab content. */
-private enum class TeacherOverlay { None, Notifications, Calendar, Leave }
+private enum class TeacherOverlay { None, Notifications }
 
 /**
- * TeacherPortalV2 — the 4-tab teacher shell, translated from Teacher.tsx.
+ * TeacherPortalV2 — the teacher shell, rebuilt FROM SCRATCH on the Parents-Portal
+ * design language (lavender canvas, white rounded cards, Canvas rings, floating
+ * dock, brand violet reserved for active/brand moments).
  *
- * Bottom nav: Home · Update · Classes · Profile. The "Update" tab carries an inner [VTopTabs]
- * row for the four data-entry screens (Attendance / Marks / Syllabus / Homework). Each leaf is the
- * corresponding `*ScreenV2`, which `koinViewModel()`s its own VM. The portal is `tone = Warm`
- * (set by the host `VTheme`).
+ * New 4-tab IA (replacing the old Today/Classes/Gradebook/Planner/Profile):
  *
- * Notifications and AcademicCalendar (from the `App.tsx` graph) are pushed as full-screen overlays.
- * RA-40: the Update plane now sources real class/subject/exam ids from [TeacherClassPicker] /
- * [TeacherExamPicker] (backed by `GET /teacher/classes` and `GET /teacher/assessments`) instead
- * of the previously hardcoded blank ids, which made the teacher write plane unreachable.
+ *   HOME · UPDATE · CLASSES · PROFILE
+ *
+ *   • HOME    — time-sensitive greeting, first-login fingerprint check-in popup,
+ *               attendance clubbed into DB-backed summary cards, today's schedule,
+ *               assignments/tests/reminders. Swipe cards expand in place.
+ *   • UPDATE  — the write plane (Attendance · Marks · Syllabus · Homework) with a
+ *               class/section/subject scope gate. Reached pre-scoped from HOME CTAs
+ *               or picked fresh from the gate.
+ *   • CLASSES — rich roster plane: class list → composite class detail → scoped
+ *               student-profile drill-down (all self-contained in the tab).
+ *   • PROFILE — identity, leave apply/status, password, theme switch, logout.
+ *
+ * The signature `TeacherPortalV2(onLogout, modifier)` is PRESERVED — it is the only
+ * external reference (NavGraphV2 line 309).
+ *
+ * Live theme: the Profile → Appearance switch writes the global theme pref; this
+ * shell reads `getThemeName()` and wraps content in a nested [VTheme] so the tone
+ * (Warm / Light / Night) flips immediately without a relaunch. Default is Warm —
+ * the teacher portal's canonical lavender look.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun TeacherPortalV2(
     onLogout: () -> Unit = {},
     modifier: Modifier = Modifier,
+    profileViewModel: TeacherProfileViewModel = koinViewModel(),
+    obligationsViewModel: TeacherObligationsViewModel = koinViewModel(),
+    notificationsViewModel: NotificationsViewModel = koinViewModel(),
+    preferenceRepository: PreferenceRepository = koinInject(),
 ) {
-    // UI_FIDELITY_AUDIT §0.5: Teacher.tsx renders under `PhoneFrame dark`, but legacy `dark` == the
-    // `.warm` scope, which is a WARM-LIGHT theme (lavender bg, dark ink, white cards) — NOT black.
-    // So the teacher portal must be Warm, never Night.
-    VTheme(tone = VPortalTone.Warm) {
+    // Live tone from the saved preference (defaults Warm — the canonical teacher look).
+    val themeName by preferenceRepository.getThemeName().collectAsState(initial = "WARM")
+    val tone = when (themeName.uppercase()) {
+        "LIGHT" -> VPortalTone.Light
+        "NIGHT" -> VPortalTone.Night
+        else -> VPortalTone.Warm
+    }
+
+    VTheme(tone = tone) {
         var tab by remember { mutableStateOf("home") }
-        var updateSub by remember { mutableStateOf("Attendance") }
         var overlay by remember { mutableStateOf(TeacherOverlay.None) }
 
-        // RA-40: the Update plane (Attendance/Marks/Syllabus) needs real ids. These
-        // hold the teacher's current class/subject/exam selection (sourced from the
-        // class + exam pickers below) and replace the previously hardcoded blanks.
-        var selectedClassId by remember { mutableStateOf("") }
-        var selectedSubject by remember { mutableStateOf("") }
-        var selectedExamId by remember { mutableStateOf("") }
+        // The UPDATE tab can be entered pre-scoped from a HOME CTA. These hold the
+        // pre-authorized scope; a bump on [updateScopeNonce] forces the Update screen
+        // to re-read its initial* values (so a fresh HOME tap re-seeds the gate).
+        var updateAssignmentId by remember { mutableStateOf<String?>(null) }
+        var updateScopeLabel by remember { mutableStateOf("") }
+        var updateInitialTool by remember { mutableStateOf(UpdateTool.Attendance) }
+        var updateScopeNonce by remember { mutableStateOf(0) }
 
-        // §11 cross-platform — Android predictive back / iOS edge-swipe pops
-        // the full-screen Notifications/Calendar overlay back to the teacher
-        // tabs instead of leaving the portal. Mirrors the React `onBack` wiring.
+        val profile by profileViewModel.state.collectAsStateV2()
+        val obligations by obligationsViewModel.state.collectAsStateV2()
+        val notifications by notificationsViewModel.state.collectAsStateV2()
+
         BackHandler(enabled = overlay != TeacherOverlay.None) {
             overlay = TeacherOverlay.None
         }
+        // From a non-home tab, Back returns to HOME (familiar app behaviour).
+        BackHandler(enabled = overlay == TeacherOverlay.None && tab != "home") {
+            tab = "home"
+        }
 
+        // ── Overlays sit above all tab content ──────────────────────────────────
         when (overlay) {
             TeacherOverlay.Notifications -> {
                 NotificationsScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
                 return@VTheme
             }
-            TeacherOverlay.Calendar -> {
-                AcademicCalendarScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
-                return@VTheme
-            }
-            TeacherOverlay.Leave -> {
-                // RA-44: the teacher leg of the leave workflow.
-                TeacherLeaveScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
-                return@VTheme
-            }
             TeacherOverlay.None -> Unit
         }
 
-        // §0.6 React nav glyphs (Teacher.tsx:8-13): Home, ListChecks (Update), Users (My Classes), User.
+        // ── Dock items. The Update badge rides the LIVE obligation count (hidden at 0). ──
         val items = listOf(
             VNavItem("home", "Home", VIcons.Home),
-            VNavItem("update", "Update", VIcons.ListChecks, badge = 1),
-            VNavItem("classes", "My Classes", VIcons.Users),
+            VNavItem("update", "Update", VIcons.Edit3, badge = obligations.totalOutstanding),
+            VNavItem("classes", "Classes", VIcons.Users),
             VNavItem("profile", "Profile", VIcons.User),
         )
+
+        // Canonical header identity (hidden on HOME — HOME renders its own greeting hero).
+        val teacherName = profile.profile?.name.orEmpty()
+        val schoolName = profile.profile?.schoolName.orEmpty()
+        val photoUrl = profile.profile?.photoUrl
+        val subline = when (tab) {
+            "update" -> "Mark & publish"
+            "classes" -> "Your classes & students"
+            "profile" -> schoolName.ifBlank { "Your account" }
+            else -> schoolName
+        }
 
         VScreenScaffold(
             modifier = modifier,
             topBar = {
-                if (tab == "update") {
-                    // §6.2 React Update() renders an <h1 className="mb-4">Update</h1> above the tabs
-                    // (Teacher.tsx:113-115). pt-6 (24) / px-5 (20) / mb-4 (16).
-                    Column(Modifier.fillMaxWidth().background(VTheme.colors.card)) {
-                        Text(
-                            "Update",
-                            style = VTheme.type.h1.copy(color = VTheme.colors.ink),
-                            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 16.dp),
-                        )
-                        VTopTabs(
-                            tabs = listOf("Attendance", "Marks", "Syllabus", "Homework"),
-                            selected = updateSub,
-                            onSelect = { updateSub = it },
-                        )
-                    }
+                // HOME owns its own greeting hero, so the slim canonical header only
+                // mounts on the other three tabs (no double chrome).
+                if (tab != "home") {
+                    TeacherHeader(
+                        teacherName = teacherName.ifBlank { "Teacher" },
+                        subline = subline,
+                        photoUrl = photoUrl,
+                        unreadCount = notifications.unreadCount,
+                        onOpenProfile = { tab = "profile" },
+                        onOpenNotifications = { overlay = TeacherOverlay.Notifications },
+                    )
                 }
             },
             bottomBar = {
-                VBottomNav(items = items, selected = tab, onSelect = { tab = it })
+                TeacherDock(items = items, selected = tab, onSelect = { tab = it })
             },
         ) { _ ->
             Box(Modifier.fillMaxSize()) {
                 when (tab) {
                     "home" -> TeacherHomeScreenV2(
-                        onOpenNotifications = { overlay = TeacherOverlay.Notifications },
-                        onOpenCalendar = { overlay = TeacherOverlay.Calendar },
-                        // RA-44 — open the teacher leave-requests queue.
-                        onOpenLeave = { overlay = TeacherOverlay.Leave },
-                        // §7 finding K — tapping the avatar opens the Profile tab (where logout
-                        // lives), instead of logging the teacher out outright.
-                        onExit = { tab = "profile" },
+                        onOpenAttendanceForAssignment = { assignmentId, scope ->
+                            updateAssignmentId = assignmentId
+                            updateScopeLabel = scope
+                            updateInitialTool = UpdateTool.Attendance
+                            updateScopeNonce++
+                            tab = "update"
+                        },
+                        onOpenUpdateTab = {
+                            // Fresh, unscoped entry → the Update gate picks a class.
+                            updateAssignmentId = null
+                            updateScopeLabel = ""
+                            updateInitialTool = UpdateTool.Attendance
+                            updateScopeNonce++
+                            tab = "update"
+                        },
+                        onOpenClasses = { tab = "classes" },
                     )
-                    "classes" -> TeacherClassesScreenV2()
-                    "profile" -> TeacherProfileScreenV2(onLogout = onLogout)
-                    "update" -> Column(Modifier.fillMaxSize()) {
-                        // RA-40: Homework authors its own class field, so the shared class
-                        // picker only fronts the Attendance/Marks/Syllabus planes.
-                        if (updateSub != "Homework") {
-                            TeacherClassPicker(
-                                selectedClassId = selectedClassId,
-                                onSelectClass = { cls ->
-                                    selectedClassId = cls.id
-                                    selectedSubject = cls.subject
-                                    selectedExamId = ""   // exam belongs to a class; reset on class change
-                                },
-                            )
-                        }
-                        when (updateSub) {
-                            "Attendance" -> TeacherAttendanceScreenV2(classId = selectedClassId, date = "")
-                            "Marks" -> {
-                                // Marks additionally needs a valid exam_id (RA-40 root).
-                                if (selectedClassId.isNotBlank()) {
-                                    TeacherExamPicker(
-                                        classId = selectedClassId,
-                                        onSelectExam = { selectedExamId = it },
-                                    )
-                                }
-                                TeacherMarksScreenV2(classId = selectedClassId, examId = selectedExamId)
-                            }
-                            "Syllabus" -> TeacherSyllabusScreenV2(classId = selectedClassId, subject = selectedSubject)
-                            "Homework" -> TeacherHomeworkScreenV2()
-                        }
+
+                    "update" -> key(updateScopeNonce) {
+                        TeacherUpdateScreenV2(
+                            initialAssignmentId = updateAssignmentId,
+                            initialScopeLabel = updateScopeLabel,
+                            initialTool = updateInitialTool,
+                        )
                     }
+
+                    "classes" -> TeacherClassesScreenV2()
+
+                    "profile" -> TeacherProfileScreenV2(onLogout = onLogout)
                 }
             }
         }

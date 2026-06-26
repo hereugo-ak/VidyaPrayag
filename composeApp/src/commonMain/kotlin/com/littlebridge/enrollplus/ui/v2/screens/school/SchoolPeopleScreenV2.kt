@@ -149,7 +149,7 @@ private fun SchoolPeopleContent(
     studentsState: StudentRosterState,
     onStudentsRetry: () -> Unit,
     onStudentSearch: (String) -> Unit,
-    onAddStudent: (name: String, className: String, section: String, rollNumber: String) -> Unit,
+    onAddStudent: (name: String, className: String, section: String, rollNumber: String, parentPhone: String) -> Unit,
     onImportStudentsCsv: (String) -> Unit,
     onClearStudentMessages: () -> Unit,
     staffState: StaffRosterState,
@@ -273,7 +273,7 @@ private fun SchoolPeopleContent(
             isSubmitting = studentsState.isSaving,
             error = studentsState.addError,
             onDismiss = { showAddStudent = false; onClearStudentMessages() },
-            onSubmit = { name, cls, sec, roll -> onAddStudent(name, cls, sec, roll) },
+            onSubmit = { name, cls, sec, roll, phone -> onAddStudent(name, cls, sec, roll, phone) },
         )
     }
 
@@ -1058,15 +1058,20 @@ private fun AddStudentPeopleDialog(
     isSubmitting: Boolean,
     error: String?,
     onDismiss: () -> Unit,
-    onSubmit: (name: String, className: String, section: String, rollNumber: String) -> Unit,
+    onSubmit: (name: String, className: String, section: String, rollNumber: String, parentPhone: String) -> Unit,
 ) {
     val c = VTheme.colors
     var name by remember { mutableStateOf("") }
     var className by remember { mutableStateOf("") }
     var section by remember { mutableStateOf("") }
     var roll by remember { mutableStateOf("") }
+    var parentPhone by remember { mutableStateOf("") }
 
-    val canSubmit = name.isNotBlank() && className.isNotBlank() && roll.isNotBlank() && !isSubmitting
+    val phoneDigits = parentPhone.count { it.isDigit() }
+    // Parent phone is optional — only validate when the admin has entered something.
+    val phoneOk = parentPhone.isBlank() || phoneDigits >= 10
+    val canSubmit = name.isNotBlank() && className.isNotBlank() && roll.isNotBlank() &&
+        phoneOk && !isSubmitting
 
     Dialog(onDismissRequest = onDismiss) {
         VCard(modifier = Modifier.fillMaxWidth()) {
@@ -1076,13 +1081,20 @@ private fun AddStudentPeopleDialog(
                 VInput(className, { className = it }, label = "Class", placeholder = "e.g. Grade 4")
                 VInput(section, { section = it }, label = "Section", placeholder = "A")
                 VInput(roll, { roll = it }, label = "Roll number", placeholder = "e.g. 12", keyboardType = KeyboardType.Number)
+                VInput(
+                    parentPhone,
+                    { parentPhone = it },
+                    label = "Parent/guardian phone (optional)",
+                    placeholder = "e.g. 9876543210",
+                    keyboardType = KeyboardType.Phone,
+                )
                 if (error != null) {
                     Text(error, style = VTheme.type.body.colored(c.dangerInk))
                 }
                 Spacer(Modifier.height(2.dp))
                 VButton(
                     text = "Add student",
-                    onClick = { onSubmit(name, className, section, roll) },
+                    onClick = { onSubmit(name, className, section, roll, parentPhone) },
                     variant = VButtonVariant.Primary,
                     full = true,
                     enabled = canSubmit,

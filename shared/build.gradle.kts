@@ -47,7 +47,18 @@ kotlin {
     iosArm64()
     iosSimulatorArm64()
     
-    jvm()
+    jvm {
+        // Pin the Kotlin JVM target so it stays consistent with the Java
+        // compile tasks (compileJvmMainJava). Without this, when Gradle runs
+        // on a very new JDK (e.g. 26) that Kotlin does not support yet, Kotlin
+        // silently falls back to JVM 24 while javac defaults to 26 — which
+        // makes Gradle abort with "Inconsistent JVM-target compatibility
+        // between Java and Kotlin tasks". JVM 21 matches the rest of the
+        // project (androidTarget + android.compileOptions).
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_21)
+        }
+    }
     
     js {
         browser()
@@ -154,6 +165,17 @@ dependencies {
     add("kspIosArm64", libs.androidx.room.compiler)
 }
 
+
+// Pin every Java compile task (including the Kotlin/JVM target's
+// `compileJvmMainJava`) to Java 21. This guarantees javac and the Kotlin
+// compiler/KSP agree on the JVM target even when Gradle itself runs on a much
+// newer JDK (e.g. 26) that Kotlin has not added support for yet. Without this,
+// the build fails with "Inconsistent JVM-target compatibility between Java and
+// Kotlin tasks (compileJvmMainJava=26, kspKotlinJvm=24)".
+tasks.withType<JavaCompile>().configureEach {
+    sourceCompatibility = JavaVersion.VERSION_21.toString()
+    targetCompatibility = JavaVersion.VERSION_21.toString()
+}
 
 // room {
 //     schemaDirectory("/tmp/schemas")

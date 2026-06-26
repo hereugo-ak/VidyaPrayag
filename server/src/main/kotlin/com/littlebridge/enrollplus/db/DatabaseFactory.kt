@@ -143,9 +143,20 @@ object DatabaseFactory {
         AssessmentsTable,
         AssessmentMarksTable,
         SyllabusUnitsTable,
+        // Teacher Portal Rebuild — Doc 11 T-401 (Doc 08 §1.2): syllabus template/
+        // progress split. Applied by docs/db/migration_016_syllabus.sql (must run
+        // before deploy; AUTO_CREATE_TABLES is OFF in prod). Closes D-SYL-1..4.
+        CurriculumUnitsTable,
+        SyllabusProgressTable,
         HomeworkTable,
         HomeworkSubmissionsTable,
+        // T-404 (Doc 08 §5.3): typed homework attachments + teacher cutoff
+        // extensions (migration_017_homework.sql applies these in Supabase
+        // before deploy; AUTO_CREATE_TABLES is OFF in prod). Closes D-HW-1..5.
+        HomeworkAttachmentsTable,
+        HomeworkExtensionsTable,
         TeacherPeriodsTable,
+        PeriodExceptionsTable,   // T-101: one-off overrides to the weekly pattern (Doc 05 §2.2)
         // Parent scholarships (audit §4.2/§5.2 — DB-backed, replaces hardcoded list)
         ScholarshipsTable,
         ScholarshipApplicationsTable,
@@ -164,7 +175,16 @@ object DatabaseFactory {
         ParentAchievementsTable,
         // Academic Calendar platform (VP-CAL — centralized planning & scheduling)
         CalendarEventsTable,
-        AcademicYearsTable
+        AcademicYearsTable,
+        // Teacher Portal Rebuild — Doc 11 T-001: typed class membership (enrollments).
+        // Applied by docs/db/migration_008_enrollments.sql (must run before deploy;
+        // AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates boot on it).
+        EnrollmentsTable,
+        // Teacher Portal Rebuild — Doc 11 T-106a: teacher self check-in (teacher_check_ins).
+        // Applied by docs/db/migration_013_teacher_checkins.sql (must run before deploy;
+        // AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates boot on it).
+        // Closes B-ATT-5 (teacher self check-in) at the schema layer.
+        TeacherCheckInsTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

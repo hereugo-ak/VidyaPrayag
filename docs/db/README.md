@@ -13,6 +13,11 @@ root `supabase_schema`, the uploaded `Vidyasetu schema.txt`, and `Tables.kt`).
 | `migration_001_faculty_and_holiday_list.sql` | **Supplementary** tables the backend's `Tables.kt` maps but the base schema was missing: `faculty`, `holiday_list`. |
 | `migration_002_segmentation_geo_assignments.sql` | Broadcast segmentation columns on `announcements`; `latitude`/`longitude` on `schools`; new `teacher_subject_assignments` table; `student_code` link on `children`. (P1/P2 — report §4.4, §5.5, §5.6, §5.7.) |
 | `migration_003_leave_workflow_and_two_party_messaging.sql` | Cross-role leave routing columns on `leave_requests` (`class_id`, `class_name`, `section`, `teacher_id`, `child_id`, `parent_id` — RA-44); two-party conversation columns on `message_threads` (`conversation_id`, `peer_user_id`) and `messages` (`conversation_id` — RA-51). |
+| `migration_005_class_normalization_and_student_code_standard.sql` | **ISSUE 1 + 2a/2b.** Adds `students.parent_phone`; canonicalises existing `class_name`/`section` on `students` and `teacher_subject_assignments` so the derived teacher⇄student join holds; regenerates every `student_code` into the standard `<CLASS_TOKEN><SECTION>-<ROLL3>` and cascades it to all referencing tables. Idempotent + guarded. |
+| `migration_006_parent_link_review_fields.sql` | **ISSUE 2c/2d.** Adds `class_name`/`section`/`parent_phone`/`review_reason` to `parent_child_links` and widens `status` for `needs_review`. Idempotent + guarded. |
+
+> 📘 For the step-by-step run order, safety notes and verification queries for
+> the ISSUE 1 / ISSUE 2 work, see **`README-issue1-2-migrations.md`**.
 
 ## How to provision a fresh Supabase / Postgres database
 

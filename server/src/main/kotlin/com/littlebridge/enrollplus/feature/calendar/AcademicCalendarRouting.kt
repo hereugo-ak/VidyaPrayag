@@ -151,11 +151,10 @@ private fun today(): LocalDate = LocalDate.now()
 
 /** Map a row to a DTO and attach freshly-computed conflict warnings. */
 private fun org.jetbrains.exposed.sql.ResultRow.toDtoWithConflicts(schoolId: UUID): AcademicCalendarEventDto {
-    val start = parseIso(this[CalendarEventsTable.startDate])
-    val end = parseIso(this[CalendarEventsTable.endDate]) ?: start
-    val warnings = if (start != null && end != null)
-        detectConflicts(schoolId, start, end, excludeCode = this[CalendarEventsTable.eventCode])
-    else emptyList()
+    // T-004: columns are now typed `date` (no parse needed).
+    val start = this[CalendarEventsTable.startDate]
+    val end = this[CalendarEventsTable.endDate]
+    val warnings = detectConflicts(schoolId, start, end, excludeCode = this[CalendarEventsTable.eventCode])
     return toCalendarEventDto(warnings)
 }
 
@@ -389,8 +388,9 @@ fun Route.academicCalendarRouting() {
                         req.description?.let { v -> it[description] = v.trim() }
                         req.type?.let { v -> it[type] = v.uppercase() }
                         req.status?.let { v -> it[status] = v.uppercase() }
-                        req.startDate?.let { v -> it[startDate] = v }
-                        req.endDate?.let { v -> it[endDate] = v }
+                        // T-004: typed `date` columns — parse validated String at boundary.
+                        req.startDate?.let { v -> it[startDate] = LocalDate.parse(v) }
+                        req.endDate?.let { v -> it[endDate] = LocalDate.parse(v) }
                         req.allDay?.let { v -> it[allDay] = v }
                         req.bannerUrl?.let { v -> it[bannerUrl] = v }
                         req.icon?.let { v -> it[icon] = v }

@@ -19,8 +19,25 @@ import kotlinx.coroutines.launch
  * the real GET /api/v1/school/link-requests + approve/reject endpoints. Every
  * request shown is scoped server-side to the admin's own school.
  */
+/**
+ * ISSUE 2d: the admin link queue is split into two tabs:
+ *  • [PENDING] — clean full matches (name + class/section/roll + phone) waiting
+ *    for a routine approve/reject.
+ *  • [NEEDS_REVIEW] — partial matches where only the phone number mismatched.
+ *    These are flagged (never silently dropped) so an admin can manually verify.
+ */
+enum class LinkRequestTab(val status: String) {
+    PENDING("pending"),
+    NEEDS_REVIEW("needs_review"),
+}
+
 data class LinkRequestsState(
+    // The currently selected tab's requests.
     val requests: List<LinkRequestDto> = emptyList(),
+    val tab: LinkRequestTab = LinkRequestTab.PENDING,
+    // How many requests sit in the "needs review" bucket (drives the tab badge),
+    // refreshed whenever that tab is loaded.
+    val needsReviewCount: Int = 0,
     val isLoading: Boolean = false,
     val error: String? = null,
     // ids currently being approved/rejected (per-row spinner / disable).
@@ -39,20 +56,34 @@ class LinkRequestsViewModel(
         load()
     }
 
+    /** Switch tabs and (re)load that tab's queue. */
+    fun selectTab(tab: LinkRequestTab) {
+        if (_state.value.tab == tab) return
+        _state.value = _state.value.copy(tab = tab, requests = emptyList())
+        load()
+    }
+
     fun load() {
         viewModelScope.launch {
+            val tab = _state.value.tab
             _state.value = _state.value.copy(isLoading = true, error = null)
             val token = preferenceRepository.getUserToken().first()
             if (token.isNullOrBlank()) {
                 _state.value = _state.value.copy(isLoading = false, error = "Not signed in")
                 return@launch
             }
-            when (val result = repository.getLinkRequests(token, "pending")) {
+            when (val result = repository.getLinkRequests(token, tab.status)) {
                 is NetworkResult.Success -> {
+                    val list = result.data.data?.requests ?: emptyList()
                     _state.value = _state.value.copy(
                         isLoading = false,
-                        requests = result.data.data?.requests ?: emptyList(),
+                        requests = list,
+                        // Keep the needs-review badge in sync when we're on that tab.
+                        needsReviewCount = if (tab == LinkRequestTab.NEEDS_REVIEW) list.size else _state.value.needsReviewCount,
                     )
+                    // If we're on the pending tab, opportunistically refresh the
+                    // needs-review count so the badge is accurate without a switch.
+                    if (tab == LinkRequestTab.PENDING) refreshNeedsReviewCount(token)
                 }
                 is NetworkResult.Error -> {
                     AppLogger.e("LinkRequestsVM", "getLinkRequests error: ${result.message}")
@@ -62,6 +93,15 @@ class LinkRequestsViewModel(
                     _state.value = _state.value.copy(isLoading = false, error = "Connection error. Check your internet.")
                 }
             }
+        }
+    }
+
+    /** Fetch just the count of needs-review requests to drive the tab badge. */
+    private suspend fun refreshNeedsReviewCount(token: String) {
+        when (val result = repository.getLinkRequests(token, LinkRequestTab.NEEDS_REVIEW.status)) {
+            is NetworkResult.Success ->
+                _state.value = _state.value.copy(needsReviewCount = result.data.data?.requests?.size ?: 0)
+            else -> { /* leave the previous count on a transient failure */ }
         }
     }
 
@@ -76,9 +116,13 @@ class LinkRequestsViewModel(
             _state.value = _state.value.copy(actingIds = _state.value.actingIds - id)
             when (result) {
                 is NetworkResult.Success -> {
-                    // Optimistically drop the decided row; it leaves the pending list.
+                    // Optimistically drop the decided row; it leaves the current queue.
+                    val onNeedsReview = _state.value.tab == LinkRequestTab.NEEDS_REVIEW
                     _state.value = _state.value.copy(
-                        requests = _state.value.requests.filterNot { it.id == id }
+                        requests = _state.value.requests.filterNot { it.id == id },
+                        needsReviewCount = if (onNeedsReview)
+                            (_state.value.needsReviewCount - 1).coerceAtLeast(0)
+                        else _state.value.needsReviewCount,
                     )
                 }
                 is NetworkResult.Error ->

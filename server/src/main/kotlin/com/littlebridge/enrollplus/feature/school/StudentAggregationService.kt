@@ -66,12 +66,11 @@ object StudentAggregationService {
         className: String,
         section: String
     ): List<StudentTeacherDto> {
-        val rows = TeacherSubjectAssignmentsTable.selectAll().where {
-            (TeacherSubjectAssignmentsTable.schoolId eq schoolId) and
-                (TeacherSubjectAssignmentsTable.isActive eq true) and
-                (TeacherSubjectAssignmentsTable.className eq className) and
-                (TeacherSubjectAssignmentsTable.section eq section)
-        }.toList()
+        // ROOT FIX (ISSUE 1): match the assignment graph to the student's
+        // (class, section) through the [ClassNaming] key, NOT a raw SQL `eq`.
+        // Fetch the school's active assignments and filter in memory so
+        // "Grade 4"/"grade 4"/"4"/"Class IV" + "A"/"a"/"" all connect.
+        val rows = activeAssignmentsMatching(schoolId, className, section)
 
         // How many subjects each teacher covers in THIS class+section — used to
         // derive a "Class Teacher" designation (covers the whole class) vs a
@@ -99,25 +98,39 @@ object StudentAggregationService {
 
     /** Distinct teacher headcount for a student (for the listing `teacher_count`). */
     fun teacherCountForStudent(schoolId: UUID, className: String, section: String): Int =
-        TeacherSubjectAssignmentsTable.selectAll().where {
-            (TeacherSubjectAssignmentsTable.schoolId eq schoolId) and
-                (TeacherSubjectAssignmentsTable.isActive eq true) and
-                (TeacherSubjectAssignmentsTable.className eq className) and
-                (TeacherSubjectAssignmentsTable.section eq section)
-        }.map { teacherKey(it) }.distinct().size
+        activeAssignmentsMatching(schoolId, className, section)
+            .map { teacherKey(it) }.distinct().size
 
     /** Distinct subject count taught to a student's class+section. */
     fun subjectCountForStudent(schoolId: UUID, className: String, section: String): Int =
-        TeacherSubjectAssignmentsTable.selectAll().where {
-            (TeacherSubjectAssignmentsTable.schoolId eq schoolId) and
-                (TeacherSubjectAssignmentsTable.isActive eq true) and
-                (TeacherSubjectAssignmentsTable.className eq className) and
-                (TeacherSubjectAssignmentsTable.section eq section)
-        }.map { it[TeacherSubjectAssignmentsTable.subject] }.distinct().size
+        activeAssignmentsMatching(schoolId, className, section)
+            .map { it[TeacherSubjectAssignmentsTable.subject] }.distinct().size
 
     private fun teacherKey(r: org.jetbrains.exposed.sql.ResultRow): String =
         r[TeacherSubjectAssignmentsTable.teacherId]?.toString()
             ?: ("name:" + (r[TeacherSubjectAssignmentsTable.teacherName] ?: "?"))
+
+    /**
+     * ROOT FIX (ISSUE 1): the shared teacher⇄student matcher. Returns the active
+     * teacher_subject_assignments rows for [schoolId] whose (class, section)
+     * matches the given pair under [ClassNaming.sameClassSection] — the
+     * normalised, format-tolerant comparison that replaces the brittle raw `eq`.
+     * Every read path funnels through here so the join can never drift again.
+     */
+    private fun activeAssignmentsMatching(
+        schoolId: UUID,
+        className: String,
+        section: String
+    ): List<org.jetbrains.exposed.sql.ResultRow> =
+        TeacherSubjectAssignmentsTable.selectAll().where {
+            (TeacherSubjectAssignmentsTable.schoolId eq schoolId) and
+                (TeacherSubjectAssignmentsTable.isActive eq true)
+        }.filter {
+            ClassNaming.sameClassSection(
+                it[TeacherSubjectAssignmentsTable.className], it[TeacherSubjectAssignmentsTable.section],
+                className, section
+            )
+        }
 
     private fun resolveTeacherName(schoolId: UUID, teacherId: UUID): String? =
         AppUsersTable.selectAll().where {
@@ -255,13 +268,9 @@ object StudentAggregationService {
         className: String,
         section: String
     ): Map<String, Int> {
-        // Teachers touching this class+section.
-        val teacherKeys = TeacherSubjectAssignmentsTable.selectAll().where {
-            (TeacherSubjectAssignmentsTable.schoolId eq schoolId) and
-                (TeacherSubjectAssignmentsTable.isActive eq true) and
-                (TeacherSubjectAssignmentsTable.className eq className) and
-                (TeacherSubjectAssignmentsTable.section eq section)
-        }.map { teacherKey(it) }.distinct()
+        // Teachers touching this class+section (normalised match — ISSUE 1 fix).
+        val teacherKeys = activeAssignmentsMatching(schoolId, className, section)
+            .map { teacherKey(it) }.distinct()
 
         return teacherKeys.associateWith { key ->
             // All class+section pairs this teacher is assigned to.
@@ -271,15 +280,30 @@ object StudentAggregationService {
             }.filter { teacherKey(it) == key }
                 .map { it[TeacherSubjectAssignmentsTable.className] to it[TeacherSubjectAssignmentsTable.section] }
                 .distinct()
-            // Distinct student headcount across those pairs.
-            pairs.sumOf { (cls, sec) ->
-                StudentsTable.selectAll().where {
-                    (StudentsTable.schoolId eq schoolId) and
-                        (StudentsTable.isActive eq true) and
-                        (StudentsTable.className eq cls) and
-                        (StudentsTable.section eq sec)
-                }.count().toInt()
-            }
+            // Distinct student headcount across those pairs (normalised match).
+            countDistinctStudentsForPairs(schoolId, pairs)
+        }
+    }
+
+    /**
+     * ROOT FIX (ISSUE 1): count DISTINCT active students whose (class, section)
+     * matches any of [pairs] under [ClassNaming]. Fetches the school roster once
+     * and matches in memory so two differently-formatted-but-equal class labels
+     * are never double counted and never missed.
+     */
+    private fun countDistinctStudentsForPairs(
+        schoolId: UUID,
+        pairs: List<Pair<String, String>>
+    ): Int {
+        if (pairs.isEmpty()) return 0
+        val wantKeys = pairs.map { ClassNaming.key(it.first, it.second).composite }.toSet()
+        return StudentsTable.selectAll().where {
+            (StudentsTable.schoolId eq schoolId) and (StudentsTable.isActive eq true)
+        }.count { row ->
+            val k = ClassNaming.key(
+                row[StudentsTable.className], row[StudentsTable.section]
+            ).composite
+            k in wantKeys
         }
     }
 
@@ -328,14 +352,8 @@ object StudentAggregationService {
                 (TeacherSubjectAssignmentsTable.teacherId eq teacherId)
         }.map { it[TeacherSubjectAssignmentsTable.className] to it[TeacherSubjectAssignmentsTable.section] }
             .distinct()
-        return pairs.sumOf { (cls, sec) ->
-            StudentsTable.selectAll().where {
-                (StudentsTable.schoolId eq schoolId) and
-                    (StudentsTable.isActive eq true) and
-                    (StudentsTable.className eq cls) and
-                    (StudentsTable.section eq sec)
-            }.count().toInt()
-        }
+        // Normalised, de-duplicated headcount across this teacher's pairs (ISSUE 1).
+        return countDistinctStudentsForPairs(schoolId, pairs)
     }
 
     /**

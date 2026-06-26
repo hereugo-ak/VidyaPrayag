@@ -149,8 +149,10 @@ fun org.jetbrains.exposed.sql.ResultRow.toCalendarEventDto(
     source = this[CalendarEventsTable.eventSource],
     sourceRef = this[CalendarEventsTable.sourceRef],
     academicYearId = this[CalendarEventsTable.academicYearId]?.toString(),
-    startDate = this[CalendarEventsTable.startDate],
-    endDate = this[CalendarEventsTable.endDate],
+    // T-004: columns are now typed `date`; wire DTO stays ISO String
+    // (LocalDate.toString() == "YYYY-MM-DD").
+    startDate = this[CalendarEventsTable.startDate].toString(),
+    endDate = this[CalendarEventsTable.endDate].toString(),
     allDay = this[CalendarEventsTable.allDay],
     bannerUrl = this[CalendarEventsTable.bannerUrl],
     icon = this[CalendarEventsTable.icon],
@@ -201,8 +203,9 @@ fun detectConflicts(
         if (excludeCode != null && code == excludeCode) return@forEach
         val status = row[CalendarEventsTable.status]
         if (status == EventStatus.CANCELLED) return@forEach
-        val s = parseIso(row[CalendarEventsTable.startDate]) ?: return@forEach
-        val e = parseIso(row[CalendarEventsTable.endDate]) ?: s
+        // T-004: columns are now typed `date` (no parse needed).
+        val s = row[CalendarEventsTable.startDate]
+        val e = row[CalendarEventsTable.endDate]
         // Overlap test: !(end < s || start > e)
         val overlaps = !(end.isBefore(s) || start.isAfter(e))
         if (overlaps) {
@@ -272,8 +275,9 @@ suspend fun createCalendarEvent(
         it[CalendarEventsTable.status] = status
         it[CalendarEventsTable.eventSource] = source
         it[CalendarEventsTable.sourceRef] = sourceRef
-        it[CalendarEventsTable.startDate] = startDate
-        it[CalendarEventsTable.endDate] = endDate ?: startDate
+        // T-004: typed `date` columns — parse the String inputs at the boundary.
+        it[CalendarEventsTable.startDate] = LocalDate.parse(startDate)
+        it[CalendarEventsTable.endDate] = LocalDate.parse(endDate ?: startDate)
         it[CalendarEventsTable.allDay] = allDay
         it[CalendarEventsTable.bannerUrl] = bannerUrl
         it[CalendarEventsTable.icon] = icon

@@ -8,7 +8,6 @@
  *   shared/.../feature/teacher/domain/model/TeacherModels.kt
  *
  * Routes (all JWT-guarded + scoped via core/TeacherAccess):
- *   GET   /api/v1/teacher/home
  *   GET   /api/v1/teacher/classes
  *   GET   /api/v1/teacher/profile
  *   GET   /api/v1/teacher/attendance?class_id=&date=
@@ -29,25 +28,27 @@
  * timetable, no syllabus units) we return honest empty lists — never fabricated
  * rows.
  *
- * This file holds the READ surface (home / classes / profile). Attendance,
- * marks, syllabus and homework live in TeacherRoutingTasks.kt.
+ * This file holds the READ surface (profile; legacy /home + /classes list
+ * deleted — see T-601 / T-504 notes inside). Attendance, marks, syllabus and
+ * homework live in TeacherRoutingTasks.kt.
  */
-package com.littlebridge.enrollplus.feature.teacher
+package com.littlebridge.vidyaprayag.feature.teacher
 
-import com.littlebridge.enrollplus.core.TeacherContext
-import com.littlebridge.enrollplus.core.ok
-import com.littlebridge.enrollplus.core.requireTeacherContext
-import com.littlebridge.enrollplus.core.teacherAssignmentsFor
-import com.littlebridge.enrollplus.db.AppUsersTable
-import com.littlebridge.enrollplus.db.AssessmentMarksTable
-import com.littlebridge.enrollplus.db.AssessmentsTable
-import com.littlebridge.enrollplus.db.AttendanceRecordsTable
-import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
-import com.littlebridge.enrollplus.db.HomeworkTable
-import com.littlebridge.enrollplus.db.SchoolsTable
-import com.littlebridge.enrollplus.db.StudentsTable
-import com.littlebridge.enrollplus.db.SyllabusUnitsTable
-import com.littlebridge.enrollplus.db.TeacherPeriodsTable
+import com.littlebridge.vidyaprayag.core.ClassNaming
+import com.littlebridge.vidyaprayag.core.TeacherContext
+import com.littlebridge.vidyaprayag.core.ok
+import com.littlebridge.vidyaprayag.core.requireTeacherContext
+import com.littlebridge.vidyaprayag.core.teacherAssignmentsFor
+import com.littlebridge.vidyaprayag.db.AppUsersTable
+import com.littlebridge.vidyaprayag.db.AssessmentMarksTable
+import com.littlebridge.vidyaprayag.db.AssessmentsTable
+import com.littlebridge.vidyaprayag.db.AttendanceRecordsTable
+import com.littlebridge.vidyaprayag.db.DatabaseFactory.dbQuery
+import com.littlebridge.vidyaprayag.db.HomeworkTable
+import com.littlebridge.vidyaprayag.db.SchoolsTable
+import com.littlebridge.vidyaprayag.db.StudentsTable
+import com.littlebridge.vidyaprayag.db.SyllabusUnitsTable
+import com.littlebridge.vidyaprayag.db.TeacherPeriodsTable
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
@@ -62,56 +63,16 @@ import java.time.format.DateTimeFormatter
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Server-side DTOs — field names mirror the client (TeacherModels.kt) exactly.
+//
+// T-601 (DELETE-don't-patch): TeacherPeriodDto / TeacherTaskDto / TeacherHomeData
+// (the legacy /home dashboard shapes) were DELETED with the GET /home handler.
+// The Today tab (GET /day, GET /week in TeacherTodayRouting) is the canonical
+// day surface now (Doc 04 §4).
 // ─────────────────────────────────────────────────────────────────────────────
 
-@Serializable
-data class TeacherPeriodDto(
-    val id: String,
-    val time: String,
-    @SerialName("class_name") val className: String,
-    val subject: String,
-    val room: String = "",
-    @SerialName("is_current") val isCurrent: Boolean = false,
-    val status: String = "upcoming",
-)
-
-@Serializable
-data class TeacherTaskDto(
-    val id: String,
-    val title: String,
-    val subtitle: String = "",
-    val type: String,
-    @SerialName("class_name") val className: String = "",
-    @SerialName("is_done") val isDone: Boolean = false,
-)
-
-@Serializable
-data class TeacherHomeData(
-    @SerialName("teacher_name") val teacherName: String,
-    @SerialName("school_name") val schoolName: String,
-    @SerialName("classes_today") val classesToday: Int,
-    @SerialName("pending_attendance") val pendingAttendance: Int,
-    @SerialName("pending_marks") val pendingMarks: Int,
-    @SerialName("homework_due") val homeworkDue: Int,
-    @SerialName("today_periods") val todayPeriods: List<TeacherPeriodDto> = emptyList(),
-    val tasks: List<TeacherTaskDto> = emptyList(),
-)
-
-@Serializable
-data class TeacherClassDto(
-    val id: String,
-    @SerialName("class_name") val className: String,
-    val subject: String,
-    @SerialName("student_count") val studentCount: Int,
-    @SerialName("is_class_teacher") val isClassTeacher: Boolean = false,
-    @SerialName("syllabus_progress") val syllabusProgress: Float = 0f,
-    @SerialName("avg_attendance") val avgAttendance: Float = 0f,
-)
-
-@Serializable
-data class TeacherClassesData(
-    val classes: List<TeacherClassDto> = emptyList(),
-)
+// T-504: TeacherClassDto / TeacherClassesData (the legacy /classes list shape) were
+// DELETED with the legacy handler. The canonical class list is now served by
+// TeacherClassSummaryDto / TeacherClassesV2Data in TeacherClassesRouting.
 
 @Serializable
 data class TeacherProfileData(
@@ -136,165 +97,65 @@ internal fun todayIso(): String = LocalDate.now().toString()
  * homework totalCount / marks rosters. Reads the read-only students mirror.
  */
 internal suspend fun studentCountFor(schoolId: java.util.UUID, className: String, section: String): Int = dbQuery {
+    // ROOT FIX (ISSUE 1): match the roster to the teacher's assignment via the
+    // ClassNaming key, not raw eq, so "Grade 4"/"4"/"Class IV" + "A"/"a"/"" all
+    // resolve to the same class+section.
     StudentsTable.selectAll().where {
-        (StudentsTable.schoolId eq schoolId) and
-            (StudentsTable.className eq className) and
-            (StudentsTable.section eq section) and
-            (StudentsTable.isActive eq true)
-    }.count().toInt()
+        (StudentsTable.schoolId eq schoolId) and (StudentsTable.isActive eq true)
+    }.count {
+        ClassNaming.sameClassSection(
+            it[StudentsTable.className], it[StudentsTable.section], className, section
+        )
+    }
 }
 
-/** Overall syllabus progress (covered / total) for a class+section+subject; 0f if none. */
-internal suspend fun syllabusProgressFor(
-    schoolId: java.util.UUID, className: String, section: String, subject: String,
-): Float = dbQuery {
-    val units = SyllabusUnitsTable.selectAll().where {
-        (SyllabusUnitsTable.schoolId eq schoolId) and
-            (SyllabusUnitsTable.className eq className) and
-            (SyllabusUnitsTable.section eq section) and
-            (SyllabusUnitsTable.subject eq subject)
-    }.toList()
-    if (units.isEmpty()) 0f
-    else units.count { it[SyllabusUnitsTable.isCovered] }.toFloat() / units.size.toFloat()
-}
+/**
+ * ROOT FIX (ISSUE 1): the shared, normalised student-roster query for teacher
+ * task screens (attendance, marks). Returns active students in [schoolId] whose
+ * (class, section) matches [className]/[section] under [ClassNaming], sorted by
+ * roll number. Replaces the per-screen raw `eq` filters that silently produced
+ * empty rosters when the stored class label differed only by case/format.
+ *
+ * Runs inside the caller's transaction — call from `dbQuery { ... }`.
+ */
+internal fun studentsForAssignment(
+    schoolId: java.util.UUID,
+    className: String,
+    section: String,
+    includeInactive: Boolean = false,
+): List<org.jetbrains.exposed.sql.ResultRow> =
+    StudentsTable.selectAll().where {
+        if (includeInactive) StudentsTable.schoolId eq schoolId
+        else (StudentsTable.schoolId eq schoolId) and (StudentsTable.isActive eq true)
+    }.filter {
+        ClassNaming.sameClassSection(
+            it[StudentsTable.className], it[StudentsTable.section], className, section
+        )
+    }.sortedBy { it[StudentsTable.rollNumber] }
+
+// T-504: syllabusProgressFor / avgAttendanceFor were DELETED with the legacy
+// /classes handler (their only caller). The rebuilt class plane computes
+// attendance rates from typed enrollments + typed date in TeacherClassesRouting,
+// not by parsing grade strings or ClassNaming heuristics (B-CLS-2 fix).
 
 fun Route.teacherRouting() {
     authenticate("jwt") {
         route("/api/v1/teacher") {
 
-            // ── GET /home ───────────────────────────────────────────────────
-            get("/home") {
-                val ctx = call.requireTeacherContext() ?: return@get
-                val assignments = teacherAssignmentsFor(ctx)
+            // ── GET /home — DELETED (T-601, DELETE-don't-patch) ───────────────
+            // The legacy Home dashboard (counts + today periods + task cards) is
+            // replaced by the Today tab (GET /day, GET /week in TeacherTodayRouting),
+            // which resolves the real day from timetable + exceptions + calendar and
+            // joins per-period attendance state (Doc 04 §4, Doc 05 §4). The matching
+            // client getHome/TeacherHomeViewModel/TeacherHomeScreenV2 were deleted too.
 
-                val schoolName = dbQuery {
-                    SchoolsTable.selectAll().where { SchoolsTable.id eq ctx.schoolId }
-                        .singleOrNull()?.get(SchoolsTable.name)
-                } ?: ""
-
-                val today = todayIso()
-                val weekday = LocalDate.now().dayOfWeek.value // 1..7
-
-                // Today's periods from the (optional) timetable. Honest empty if none.
-                val periods = dbQuery {
-                    TeacherPeriodsTable.selectAll().where {
-                        (TeacherPeriodsTable.schoolId eq ctx.schoolId) and
-                            (TeacherPeriodsTable.teacherId eq ctx.userId) and
-                            (TeacherPeriodsTable.weekday eq weekday)
-                    }.toList()
-                }.sortedBy { it[TeacherPeriodsTable.startTime] }
-
-                val now = java.time.LocalTime.now()
-                val periodDtos = periods.map { r ->
-                    val start = runCatching { java.time.LocalTime.parse(r[TeacherPeriodsTable.startTime], HHMM) }.getOrNull()
-                    val end = runCatching { java.time.LocalTime.parse(r[TeacherPeriodsTable.endTime], HHMM) }.getOrNull()
-                    val status = when {
-                        start != null && end != null && !now.isBefore(start) && now.isBefore(end) -> "current"
-                        end != null && !now.isBefore(end) -> "done"
-                        else -> "upcoming"
-                    }
-                    TeacherPeriodDto(
-                        id = r[TeacherPeriodsTable.id].value.toString(),
-                        time = "${r[TeacherPeriodsTable.startTime]} - ${r[TeacherPeriodsTable.endTime]}",
-                        className = "${r[TeacherPeriodsTable.className]}-${r[TeacherPeriodsTable.section]}",
-                        subject = r[TeacherPeriodsTable.subject],
-                        room = r[TeacherPeriodsTable.room],
-                        isCurrent = status == "current",
-                        status = status,
-                    )
-                }
-
-                // Pending attendance: classes the teacher handles that have NO
-                // student attendance row for today.
-                var pendingAttendance = 0
-                for (a in assignments) {
-                    val grade = "${a.className}-${a.section}"
-                    val marked = dbQuery {
-                        AttendanceRecordsTable.selectAll().where {
-                            (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
-                                (AttendanceRecordsTable.date eq today) and
-                                (AttendanceRecordsTable.type eq "student") and
-                                (AttendanceRecordsTable.grade eq grade)
-                        }.limit(1).firstOrNull() != null
-                    }
-                    if (!marked) pendingAttendance++
-                }
-
-                // Pending marks: active assessments owned by this teacher that
-                // still have at least one student without a score.
-                val pendingMarks = dbQuery {
-                    val mine = AssessmentsTable.selectAll().where {
-                        (AssessmentsTable.schoolId eq ctx.schoolId) and
-                            (AssessmentsTable.teacherId eq ctx.userId) and
-                            (AssessmentsTable.isActive eq true)
-                    }.toList()
-                    mine.count { asg ->
-                        AssessmentMarksTable.selectAll().where {
-                            (AssessmentMarksTable.assessmentId eq asg[AssessmentsTable.id].value) and
-                                (AssessmentMarksTable.marks eq null)
-                        }.limit(1).firstOrNull() != null
-                    }
-                }
-
-                // Homework due today or later, authored by this teacher.
-                val homeworkDue = dbQuery {
-                    HomeworkTable.selectAll().where {
-                        (HomeworkTable.schoolId eq ctx.schoolId) and
-                            (HomeworkTable.teacherId eq ctx.userId) and
-                            (HomeworkTable.isActive eq true) and
-                            (HomeworkTable.dueDate greaterEq today)
-                    }.count().toInt()
-                }
-
-                // Actionable task cards — one per class still needing attendance.
-                val tasks = assignments
-                    .map { a ->
-                        TeacherTaskDto(
-                            id = "att-${a.assignmentId}",
-                            title = "Mark attendance",
-                            subtitle = "${a.className}-${a.section} · ${a.subject}",
-                            type = "attendance",
-                            className = "${a.className}-${a.section}",
-                            isDone = false,
-                        )
-                    }
-
-                call.ok(
-                    TeacherHomeData(
-                        teacherName = ctx.fullName,
-                        schoolName = schoolName,
-                        classesToday = periodDtos.size.takeIf { it > 0 } ?: assignments.map { "${it.className}-${it.section}" }.distinct().size,
-                        pendingAttendance = pendingAttendance,
-                        pendingMarks = pendingMarks,
-                        homeworkDue = homeworkDue,
-                        todayPeriods = periodDtos,
-                        tasks = tasks,
-                    ),
-                    message = "Teacher home loaded",
-                )
-            }
-
-            // ── GET /classes ──────────────────────────────────────────────────
-            get("/classes") {
-                val ctx = call.requireTeacherContext() ?: return@get
-                val assignments = teacherAssignmentsFor(ctx)
-
-                val classes = assignments.map { a ->
-                    val count = studentCountFor(ctx.schoolId, a.className, a.section)
-                    val progress = syllabusProgressFor(ctx.schoolId, a.className, a.section, a.subject)
-                    val avgAtt = avgAttendanceFor(ctx.schoolId, a.className, a.section)
-                    TeacherClassDto(
-                        id = a.assignmentId.toString(),
-                        className = "${a.className}-${a.section}",
-                        subject = a.subject,
-                        studentCount = count,
-                        isClassTeacher = false,
-                        syllabusProgress = progress,
-                        avgAttendance = avgAtt,
-                    )
-                }
-                call.ok(TeacherClassesData(classes), message = "Classes loaded")
-            }
+            // ── GET /classes — DELETED (T-504) ────────────────────────────────
+            // The legacy looping list (N+1 per class via studentCountFor /
+            // syllabusProgressFor / avgAttendanceFor, hardcoded isClassTeacher=false,
+            // grade-string attendance parsing) is GONE. The canonical
+            // GET /api/v1/teacher/classes[/{id}] now resolves via the single
+            // aggregated query set in TeacherClassesRouting (converged from the
+            // staged /classes-v2 paths). Closes B-CLS-1/2/3 + F-CLS-5.
 
             // ── GET /profile ──────────────────────────────────────────────────
             get("/profile") {
@@ -336,15 +197,4 @@ fun Route.teacherRouting() {
     }
 }
 
-/** Average attendance ratio (present / total marked) for a class over its history; 0f if none. */
-internal suspend fun avgAttendanceFor(schoolId: java.util.UUID, className: String, section: String): Float = dbQuery {
-    val grade = "$className-$section"
-    val rows = AttendanceRecordsTable.selectAll().where {
-        (AttendanceRecordsTable.schoolId eq schoolId) and
-            (AttendanceRecordsTable.type eq "student") and
-            (AttendanceRecordsTable.grade eq grade)
-    }.toList()
-    if (rows.isEmpty()) 0f
-    else rows.count { it[AttendanceRecordsTable.status].equals("present", ignoreCase = true) }
-        .toFloat() / rows.size.toFloat()
-}
+// avgAttendanceFor — DELETED (T-504). See note above teacherRouting().

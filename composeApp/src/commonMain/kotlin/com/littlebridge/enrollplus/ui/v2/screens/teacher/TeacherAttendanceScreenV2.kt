@@ -1,6 +1,7 @@
 package com.littlebridge.enrollplus.ui.v2.screens.teacher
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -12,9 +13,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,144 +48,198 @@ import com.littlebridge.enrollplus.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * TeacherAttendanceScreenV2 — `Teacher.tsx → AttendanceFlow`, wired to the real
- * [TeacherAttendanceViewModel] (`TeacherRepository.getAttendance` / `submitAttendance`).
- *
- * Class/date selectors, "Mark all present", per-student P/A/L pill row (live edits via the VM),
- * and a sticky submit summary. No MockV2 in production; the three UI states come from [VStateHost].
- * When [classId] is blank the screen shows an empty prompt (selection lands with Phase 3E nav).
+ * TeacherAttendanceScreenV2 — the scoped attendance plane (Doc 06 §3). Reached PRE-SCOPED with a
+ * pre-authorized [assignmentId] from the Update scope gate or a Home/Classes CTA. It loads the typed
+ * roster, defaults the date to today (correctable), pre-sets approved-leave students to "leave"
+ * (locked), supports the 4-state space (present · absent · late · leave), a bulk "mark all present",
+ * a live running counter, and a result-driven Save that NEVER auto-publishes.
  */
 @Composable
 fun TeacherAttendanceScreenV2(
-    classId: String = "",
-    date: String = "",
+    assignmentId: String,
+    scopeLabel: String,
     modifier: Modifier = Modifier,
     viewModel: TeacherAttendanceViewModel = koinViewModel(),
 ) {
+    val c = VTheme.colors
     val state by viewModel.state.collectAsStateV2()
 
-    // The portal supplies class/date; load whenever they change and are present.
-    LaunchedEffect(classId, date) {
-        if (classId.isNotBlank()) viewModel.load(classId, date)
+    LaunchedEffect(assignmentId) {
+        if (assignmentId.isNotBlank() && state.assignmentId != assignmentId) viewModel.load(assignmentId)
     }
 
-    TeacherAttendanceContent(
-        state = state,
-        hasSelection = classId.isNotBlank(),
-        onMarkAll = { viewModel.markAll(AttendanceStatus.PRESENT) },
-        onSetStatus = viewModel::setStatus,
-        onSubmit = viewModel::submit,
-        onRetry = { if (classId.isNotBlank()) viewModel.load(classId, date) },
-        modifier = modifier,
-    )
+    Box(modifier.fillMaxSize().background(c.background)) {
+        when {
+            state.isLoading && state.students.isEmpty() -> TeacherCenterState { TeacherSpinner() }
+            state.error != null && state.students.isEmpty() -> TeacherCenterState {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Couldn't load attendance", style = VTheme.type.h3.colored(c.ink))
+                    Spacer(Modifier.height(6.dp))
+                    Text(state.error ?: "", style = VTheme.type.body.colored(c.ink2), maxLines = 3)
+                    Spacer(Modifier.height(14.dp))
+                    VButton("Retry", onClick = { viewModel.retry() }, tone = VButtonTone.Lavender)
+                }
+            }
+            else -> AttendanceBody(state.students, viewModel, scopeLabel)
+        }
+    }
 }
 
 @Composable
-private fun TeacherAttendanceContent(
-    state: TeacherAttendanceState,
-    hasSelection: Boolean,
-    onMarkAll: () -> Unit,
-    onSetStatus: (String, String) -> Unit,
-    onSubmit: () -> Unit,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier,
+private fun AttendanceBody(
+    students: List<StudentAttendance>,
+    viewModel: TeacherAttendanceViewModel,
+    scopeLabel: String,
 ) {
     val c = VTheme.colors
-    Column(
-        modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
-            .padding(top = 16.dp, bottom = 24.dp),
+    val state by viewModel.state.collectAsStateV2()
+
+    LazyColumn(
+        Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 14.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            VInput(value = state.className.ifBlank { "Select class" }, onValueChange = {}, modifier = Modifier.weight(1f), enabled = false)
-            VInput(value = state.date.ifBlank { "Today" }, onValueChange = {}, modifier = Modifier.weight(1f), enabled = false)
-        }
-
-        VStateHost(
-            loading = state.isLoading,
-            error = state.error,
-            isEmpty = !hasSelection || state.students.isEmpty(),
-            emptyTitle = if (hasSelection) "No students" else "Choose a class",
-            emptyBody = if (hasSelection) "This class has no students to mark yet."
-            else "Pick a class to start marking attendance.",
-            emptyIcon = VIcons.Users,
-            onRetry = onRetry,
-        ) {
-            VButton(text = "Mark all present", onClick = onMarkAll, full = true, variant = VButtonVariant.Secondary)
-            VCard {
-                state.students.forEachIndexed { i, s ->
-                    if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(c.border1))
-                    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        VAvatar(name = s.name, size = 32.dp)
-                        Column(Modifier.weight(1f)) {
-                            Text(s.name, style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 13.sp))
-                            Text("Roll ${s.rollNo}", style = VTheme.type.dataSm.colored(c.ink3).copy(fontSize = 11.sp))
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            PalPill("P", s.status == AttendanceStatus.PRESENT, c.success) { onSetStatus(s.studentId, AttendanceStatus.PRESENT) }
-                            PalPill("A", s.status == AttendanceStatus.ABSENT, c.danger) { onSetStatus(s.studentId, AttendanceStatus.ABSENT) }
-                            PalPill("L", s.status == AttendanceStatus.LATE, c.warning) { onSetStatus(s.studentId, AttendanceStatus.LATE) }
-                        }
+        // ── Scope + date + running counter header ──
+        item {
+            TCard(padding = 16.dp) {
+                Column {
+                    TEyebrow("MARKING ATTENDANCE", dot = c.accent)
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        scopeLabel.ifBlank { "${state.className}-${state.section} · ${state.subject}" },
+                        style = VTheme.type.h3.colored(c.navyDeep).copy(fontWeight = FontWeight.ExtraBold),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    VDatePicker(
+                        value = state.date,
+                        onValueChange = { viewModel.changeDate(it) },
+                        label = "Date",
+                    )
+                    if (state.isHoliday || state.isCancelled) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            if (state.isHoliday) "This is a holiday${state.holidayName?.let { " — $it" } ?: ""}." else "This class is cancelled on this date.",
+                            style = VTheme.type.caption.colored(c.warningInk).copy(fontSize = 12.sp),
+                        )
                     }
-                }
-            }
-            VCard {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    val marked = state.presentCount + state.absentCount + state.lateCount
-                    val total = state.students.size
-                    val remaining = (total - marked).coerceAtLeast(0)
-                    val pct = if (total == 0) 0f else marked.toFloat() / total * 100f
-                    Column(Modifier.weight(1f)) {
-                        Text("$marked marked • $remaining remaining", style = VTheme.type.caption.colored(c.ink2))
-                        Spacer(Modifier.height(4.dp))
-                        VProgressBar(value = pct)
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TMetricTile(state.presentCount.toString(), "Present", c.successInk, Modifier.weight(1f))
+                        TMetricTile(state.absentCount.toString(), "Absent", c.dangerInk, Modifier.weight(1f))
+                        TMetricTile(state.lateCount.toString(), "Late", c.warningInk, Modifier.weight(1f))
+                        TMetricTile(state.leaveCount.toString(), "Leave", c.navy, Modifier.weight(1f))
                     }
-                    Spacer(Modifier.height(0.dp))
-                    // RA-S18: result-driven Submit. No fake `stateful` timer — the spinner shows
-                    // only while the request is in flight (`isSubmitting`) and the "Submitted" check
-                    // shows only after the VM confirms the write (`submitSuccess`). Disabled while
-                    // submitting or after a confirmed save (re-enables when the roster is edited).
+                    if (state.alreadyMarked && state.lastMarkedBy != null) {
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            "Last marked by ${state.lastMarkedBy ?: ""}${state.lastMarkedAt?.let { " · ${prettyDate(it.take(10))}" } ?: ""}",
+                            style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
                     VButton(
-                        text = if (state.submitSuccess) "Submitted" else "Submit",
-                        onClick = onSubmit,
-                        size = VButtonSize.Lg,
-                        tone = VButtonTone.Lavender,
-                        loading = state.isSubmitting,
-                        success = state.submitSuccess,
-                        enabled = !state.isSubmitting && !state.submitSuccess,
-                        successLabel = "Submitted",
+                        text = "Mark all present",
+                        onClick = { viewModel.markAllPresent() },
+                        full = true,
+                        variant = VButtonVariant.Secondary,
+                        tone = VButtonTone.Mint,
+                        size = VButtonSize.Md,
+                        leading = { Icon(VIcons.Check, contentDescription = null, modifier = Modifier.size(15.dp)) },
                     )
                 }
             }
-            // RA-S18: surface a submit error inline (the VStateHost error channel covers the
-            // load path; a failed submit must not silently look like nothing happened, nor wipe
-            // the marked roster the teacher is mid-way through).
-            state.submitError?.let { err ->
-                Text(
-                    err,
-                    style = VTheme.type.caption.colored(c.danger),
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                )
+        }
+
+        items(students, key = { it.studentId }) { s ->
+            AttendanceStudentRow(s, onSetStatus = { status -> viewModel.setStatus(s.studentId, status) })
+        }
+
+        // ── Save footer ──
+        item {
+            Spacer(Modifier.height(4.dp))
+            if (state.saveError != null) {
+                Text(state.saveError ?: "", style = VTheme.type.caption.colored(c.dangerInk).copy(fontSize = 12.sp))
+                Spacer(Modifier.height(8.dp))
             }
+            VButton(
+                text = if (state.alreadyMarked) "Update attendance" else "Save attendance",
+                onClick = { viewModel.save() },
+                full = true,
+                tone = VButtonTone.Lavender,
+                size = VButtonSize.Lg,
+                loading = state.isSaving,
+                success = state.saveSuccess,
+                successLabel = "Saved",
+                stateful = true,
+                enabled = students.isNotEmpty() && !state.isHoliday,
+            )
         }
     }
 }
 
 @Composable
-private fun PalPill(letter: String, active: Boolean, tone: Color, onClick: () -> Unit) {
+private fun AttendanceStudentRow(s: StudentAttendance, onSetStatus: (String) -> Unit) {
     val c = VTheme.colors
-    val interaction = remember { MutableInteractionSource() }
-    Box(
+    val locked = s.isOnApprovedLeave
+    Column(
         Modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(if (active) tone else c.ink.copy(alpha = 0.06f))
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(c.card)
+            .border(1.dp, c.hairline, RoundedCornerShape(18.dp))
+            .padding(12.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            VAvatar(name = s.name, size = 38.dp)
+            Column(Modifier.weight(1f)) {
+                Text(s.name, style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 14.sp, fontWeight = FontWeight.Bold), maxLines = 1)
+                Text(
+                    if (locked) "Roll ${s.rollNo} · On approved leave" else "Roll ${s.rollNo}",
+                    style = VTheme.type.caption.colored(if (locked) c.navy else c.ink3).copy(fontSize = 11.sp),
+                )
+            }
+        }
+        // The 4-state segmented control sits on its own line under the identity for tap comfort.
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            StatusChip("P", AttendanceStatus.PRESENT, s.status, c.successInk, locked, onSetStatus, Modifier.weight(1f))
+            StatusChip("A", AttendanceStatus.ABSENT, s.status, c.dangerInk, locked, onSetStatus, Modifier.weight(1f))
+            StatusChip("Late", AttendanceStatus.LATE, s.status, c.warningInk, locked, onSetStatus, Modifier.weight(1f))
+            StatusChip("Leave", AttendanceStatus.LEAVE, s.status, c.navy, locked, onSetStatus, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun StatusChip(
+    label: String,
+    status: String,
+    current: String,
+    tint: androidx.compose.ui.graphics.Color,
+    locked: Boolean,
+    onSet: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+    val active = current == status
+    val ix = remember { MutableInteractionSource() }
+    Box(
+        modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (active) tint.copy(alpha = 0.16f) else c.cream)
+            .border(1.dp, if (active) tint.copy(alpha = 0.5f) else c.hairline, RoundedCornerShape(12.dp))
+            .clickable(interactionSource = ix, indication = null, enabled = !locked) { onSet(status) }
+            .padding(vertical = 9.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(letter, style = VTheme.type.label.colored(if (active) c.background else c.ink3).copy(letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified, fontWeight = FontWeight.SemiBold))
+        Text(
+            label,
+            style = VTheme.type.bodyStrong.colored(if (active) tint else c.ink2)
+                .copy(fontSize = 12.5.sp, fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Medium),
+        )
     }
 }

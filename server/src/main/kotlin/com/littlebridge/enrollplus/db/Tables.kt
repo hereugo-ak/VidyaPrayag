@@ -14,11 +14,18 @@
  *      schools lat/long now live in the BASE schema per §1.3, so this only re-asserts them
  *      via ADD COLUMN IF NOT EXISTS — a harmless no-op)
  *   4. docs/backend/sql/02_teacher_schema.sql
+ *   5. docs/db/migration_005_class_normalization_and_student_code_standard.sql
+ *   6. docs/db/migration_006_parent_link_review_fields.sql
+ *   7. docs/db/migration_007_child_link_robustness.sql
+ *   8. docs/db/migration_008_enrollments.sql   (Teacher Portal Rebuild T-001:
+ *      typed class membership — EnrollmentsTable)
+ *   9. docs/db/migration_009_tsa_fks.sql        (Teacher Portal Rebuild T-002:
+ *      TSA class_id/subject_id FKs + is_class_teacher)
  *
- * Run all four in Supabase → SQL Editor before pointing the backend at
+ * Run all in Supabase → SQL Editor before pointing the backend at
  * production. For local-dev SQLite fallback, Exposed auto-creates the tables
  * in the order declared in DatabaseFactory.allTables. In Postgres, boot-time
- * validation (DatabaseFactory.validateSchema) logs any of the 38 tables that
+ * validation (DatabaseFactory.validateSchema) logs any of the registered tables that
  * are missing and refuses to start when AUTO_CREATE_TABLES is not enabled.
  *
  * IMPORTANT DESIGN CHOICES
@@ -38,6 +45,8 @@ package com.littlebridge.enrollplus.db
 
 import org.jetbrains.exposed.dao.id.UUIDTable
 import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.sql.javatime.date
+import org.jetbrains.exposed.sql.javatime.time
 import org.jetbrains.exposed.sql.javatime.timestamp
 
 // =====================================================================
@@ -281,14 +290,20 @@ object SchoolSubjectsTable : UUIDTable("school_subjects", "id") {
 // =====================================================================
 object TeacherSubjectAssignmentsTable : UUIDTable("teacher_subject_assignments", "id") {
     val schoolId  = uuid("school_id")
-    val classId   = uuid("class_id").nullable()          // FK school_classes.id (optional pre-migration)
-    val className = text("class_name")                   // denormalised for fast reads / display
+    // T-002: class_id / subject_id are now FK-backed and backfilled
+    // (migration_009_tsa_fks.sql) — the AUTHORITATIVE typed scope. className /
+    // section / subject below are DISPLAY-only denormalised columns; the scoping
+    // core (TeacherAccess, T-003) is id-first and treats ClassNaming as fallback.
+    val classId   = uuid("class_id").nullable()          // FK school_classes.id (fk_tsa_class)
+    val className = text("class_name")                   // DISPLAY only (denormalised)
     val section   = varchar("section", 8).default("A")
-    val subjectId = uuid("subject_id").nullable()        // FK school_subjects.id (optional)
-    val subject   = text("subject")                      // denormalised subject name
+    val subjectId = uuid("subject_id").nullable()        // FK school_subjects.id (fk_tsa_subject)
+    val subject   = text("subject")                      // DISPLAY only (denormalised)
     val teacherId = uuid("teacher_id").nullable()        // FK faculty.id / app_users.id
     val teacherName = text("teacher_name").nullable()    // display fallback when no FK
     val isActive  = bool("is_active").default(true)
+    // T-002: real "class teacher of this class+section" signal (B-CLS-3/F-CLS-3).
+    val isClassTeacher = bool("is_class_teacher").default(false)
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
     init {
@@ -406,6 +421,22 @@ object AcademicCalendarTable : UUIDTable("academic_calendar", "id") {
     val createdAt        = timestamp("created_at")
 }
 
+/**
+ * LEGACY holiday source. DEPRECATED by Teacher Portal Rebuild T-102 (Doc 05
+ * §2.3, closes D-TT-5): `calendar_events(type=HOLIDAY, status=PUBLISHED)` is now
+ * the SINGLE source of holiday truth, and the resolved-day computation (T-104)
+ * reads holidays ONLY from there. migration_012_holidays_merge.sql forward-fills
+ * every holiday_list row into calendar_events (idempotent via source_ref
+ * 'HL:<id>').
+ *
+ * The table + this mapping are KEPT (not dropped) only so the two surviving
+ * legacy readers compile+work in this release:
+ *   - feature/parent/ParentAcademicsRouting.kt (parent academics holidays)
+ *   - feature/school/SchoolRouting.kt          (school holidays screen)
+ * A later phase repoints those readers at calendar_events and then drops this
+ * table + mapping. Do NOT add new readers of this table — read calendar_events.
+ */
+@Deprecated("D-TT-5 / T-102: holidays now live in calendar_events(HOLIDAY,PUBLISHED). Read CalendarEventsTable instead; holiday_list is migrated by migration_012 and will be dropped once the two legacy readers are repointed.")
 object HolidayListTable : UUIDTable("holiday_list", "id") {
     val schoolId  = uuid("school_id")
     val date      = varchar("date", 12)
@@ -426,17 +457,67 @@ object FacultyTable : UUIDTable("faculty", "id") {
     val createdAt  = timestamp("created_at")
 }
 
+// =====================================================================
+// attendance_records  (Teacher Portal Rebuild — Doc 11 T-201 / Doc 06 §1.2)
+//   The TYPED student/faculty attendance record. T-201 migrates the legacy
+//   shape (packed `grade` "<class>-<section>" + free `person_id`, status
+//   present|absent|late) to a provably-scoped one:
+//     • student_id / enrollment_id   — typed FK identity of WHO + which exact
+//       class membership (kills D-ATT-2 / X-1 / D-STU for attendance).
+//     • faculty_id                   — the app_users id when type='faculty'.
+//     • assignment_id                — the authorizing TSA (Doc 05 binding) so
+//       the mark's class/section/subject scope is provable, not parsed from a
+//       string (kills D-ATT-4 / X-1).
+//     • status now includes `leave`  — an approved leave can be reflected
+//       (D-ATT-1); leave approval auto-writes it (B-LV-2, T-204).
+//     • source                       — manual | leave_auto | bulk | biometric.
+//     • marked_at                    — when the mark was last written.
+//   The packed `grade` column is DROPPED (class/section derive via
+//   assignment_id → TSA). `person_id` is retained NULLABLE only so the T-201
+//   migration can quarantine un-resolvable legacy rows without data loss; new
+//   writes use the typed FKs. Applied by docs/db/migration_014_attendance.sql.
+//   UNIQUE moves to (school, date, type, student_id, assignment_id): one mark
+//   per student per class per day (Doc 06 §1.2).
+// =====================================================================
 object AttendanceRecordsTable : UUIDTable("attendance_records", "id") {
-    val schoolId   = uuid("school_id")
-    val date       = varchar("date", 12)
-    val type       = varchar("type", 16) // student | faculty
-    val personId   = text("person_id")
-    val grade      = text("grade").nullable()
-    val status     = varchar("status", 16)
-    val markedBy   = uuid("marked_by").nullable()
-    val createdAt  = timestamp("created_at")
+    val schoolId     = uuid("school_id")
+    val date         = date("date")        // T-004: typed `date` (was varchar12)
+    val type         = varchar("type", 16) // student | faculty
+    // Legacy free identifier — retained NULLABLE for migration/quarantine only.
+    val personId     = text("person_id").nullable()
+    // DEPRECATED (T-201): the packed "<class>-<section>" grade string. Doc 06 §1.2
+    // calls for it to be DROPPED (class/section derive via assignment_id → TSA).
+    // It is kept here as a NULLABLE deprecated column ONLY so the pre-rebuild
+    // readers (admin dashboards, parent academics, the legacy TeacherRouting
+    // attendance path, and the T-104 resolver's attendanceMarked join) keep
+    // compiling and working until they are migrated to the typed columns in
+    // T-203/T-205. The migration (014) ADDS the typed columns + new UNIQUE but
+    // does NOT physically drop `grade` yet — the DROP is deferred to a follow-up
+    // once every reader is off it (flagged deviation, see migration_014 header).
+    val grade        = text("grade").nullable()
+    // T-201 typed identity (Doc 06 §1.2). All nullable: a student row fills
+    // student_id/enrollment_id/assignment_id; a faculty row fills faculty_id.
+    val studentId    = uuid("student_id").nullable()      // FK students.id (type=student)
+    val enrollmentId = uuid("enrollment_id").nullable()   // FK enrollments.id (exact membership)
+    val facultyId    = uuid("faculty_id").nullable()      // FK app_users.id (type=faculty)
+    val assignmentId = uuid("assignment_id").nullable()   // FK teacher_subject_assignments.id
+    val status       = varchar("status", 16)              // present | absent | late | leave
+    // NOTE: property named `attSource` (not `source`) because Exposed's ColumnSet
+    // now declares a `source` member; a column property of the same name would
+    // hide it and fail to compile. DB column name stays "source".
+    val attSource    = varchar("source", 16).default("manual") // manual|leave_auto|bulk|biometric
+    val markedBy     = uuid("marked_by").nullable()
+    val markedAt     = timestamp("marked_at").nullable()  // when last written (Doc 06 §1.2)
+    val createdAt    = timestamp("created_at")
     init {
-        uniqueIndex("ux_att_records_unique", schoolId, date, type, personId)
+        // Doc 06 §1.2: one mark per student per class (assignment) per day. NULLs
+        // in student_id/assignment_id are treated distinct by Postgres; the legacy
+        // ux_att_records_unique (school,date,type,person_id) is replaced by the
+        // migration. New student writes always carry both, so the key is real.
+        uniqueIndex(
+            "ux_att_records_typed_unique",
+            schoolId, date, type, studentId, assignmentId
+        )
     }
 }
 
@@ -450,9 +531,54 @@ object StudentsTable : UUIDTable("students", "id") {
     val className  = text("class_name")
     val section    = text("section").default("A")
     val rollNumber = text("roll_number")
+    // ISSUE 2b: parent/guardian phone captured at admin student creation. Used by
+    // the parent→child link matching logic (full match vs phone-mismatch review).
+    // Nullable so pre-existing rows remain valid until backfilled.
+    val parentPhone = text("parent_phone").nullable()
     val profilePhotoUrl = text("profile_photo_url").nullable()
     val isActive   = bool("is_active").default(true)
     val createdAt  = timestamp("created_at")
+}
+
+// =====================================================================
+// enrollments  (Teacher Portal Rebuild — Doc 11 T-001 / Doc 09 §1)
+//   The TYPED class-membership bridge: a student is enrolled in a
+//   class+section for a period. This replaces the in-memory
+//   ClassNaming.sameClassSection() heuristic (X-1/X-2) and the packed
+//   attendance_records.grade "<class>-<section>" string (D-STU) as the
+//   source of truth for "who is in class 7B".
+//
+//   FK: student_id -> students.id, class_id -> school_classes.id.
+//   Uniqueness: (student_id, class_id, section, start_date) so re-running
+//   the backfill is idempotent and historical/transfer rows coexist.
+//
+//   Created/applied by docs/db/migration_008_enrollments.sql. Registered in
+//   DatabaseFactory.allTables — AUTO_CREATE_TABLES is OFF in production, so
+//   that migration MUST be applied in Supabase before the matching deploy or
+//   validateSchema() refuses to boot.
+//
+//   NOTE (per LAWS): Doc 01 §11.2 sketched (from_date/to_date/is_active) but
+//   Doc 11 T-001 "Details" cites Doc 09 §1, whose shape (school_id, section,
+//   roll_number, status, start_date, end_date) is authoritative and modelled
+//   here. start_date/end_date are real DATE columns (not the varchar(12) date
+//   convention used by pre-T-004 tables).
+// =====================================================================
+object EnrollmentsTable : UUIDTable("enrollments", "id") {
+    val schoolId   = uuid("school_id")
+    val studentId  = uuid("student_id")                 // FK students.id
+    val classId    = uuid("class_id")                   // FK school_classes.id
+    val section    = varchar("section", 8).default("A")
+    val rollNumber = integer("roll_number").nullable()
+    val status     = varchar("status", 16).default("active") // active|transferred|withdrawn
+    val startDate  = date("start_date")
+    val endDate    = date("end_date").nullable()        // transfers/withdrawals (Doc 06 E4/E5)
+    val createdAt  = timestamp("created_at")
+    init {
+        uniqueIndex(
+            "ux_enrollments_unique",
+            studentId, classId, section, startDate
+        )
+    }
 }
 
 // =====================================================================
@@ -643,6 +769,25 @@ object MessagesTable : UUIDTable("messages", "id") {
  *
  * Spec ref: school_api_spec.artifact.md §Module: Results
  */
+/**
+ * LEGACY, school-admin string-scored marks model. T-301 / X-6 / D-ASMT-1
+ * designate [AssessmentsTable] + [AssessmentMarksTable] as the SINGLE
+ * canonical marks model; this parallel table is DEPRECATED as a source of
+ * truth.
+ *
+ * It is NOT dropped: 5 school-admin routing files (ResultsRouting,
+ * SchoolAnalyticsRouting, SchoolStudentsRouting, AdminDashboard*Routing) still
+ * read it (78 references). Per the constitution's "schema migrations are
+ * non-destructive; don't break out-of-scope readers" rule (same pattern as the
+ * T-201 attendance `grade`/`person_id` retention), migration_015 MIRRORS the
+ * numeric-scored exam_results rows into `assessments`/`assessment_marks`
+ * (idempotently, marked `type='exam'`, `created_by=NULL`) so the teacher
+ * Gradebook history (T-304/T-306) is complete, while leaving exam_results
+ * itself intact for the admin side. The admin readers will migrate onto the
+ * canonical model in a future admin-portal pass; until then exam_results is
+ * read-only legacy.
+ */
+@Deprecated("T-301 / X-6: superseded by AssessmentsTable + AssessmentMarksTable (the single canonical marks model). Retained read-only for the 5 school-admin readers; migration_015 mirrors numeric rows into assessments. Do NOT write new teacher marks here.")
 object ExamResultsTable : UUIDTable("exam_results", "id") {
     val schoolId   = uuid("school_id")
     val test       = text("test")
@@ -694,7 +839,7 @@ object AssessmentsTable : UUIDTable("assessments", "id") {
     val subject   = text("subject")
     val name       = text("name")                        // "Unit Test I", "Mid Term", …
     val maxMarks  = integer("max_marks").default(100)
-    val examDate  = varchar("exam_date", 12).nullable()  // YYYY-MM-DD
+    val examDate  = date("exam_date").nullable()         // T-004: typed `date` (was varchar12)
     val isActive  = bool("is_active").default(true)
     // RA-43: marks become parent-visible only once published. The teacher
     // marks-submit can publish; parent reads filter on isPublished = true.
@@ -702,6 +847,34 @@ object AssessmentsTable : UUIDTable("assessments", "id") {
     val publishedAt = timestamp("published_at").nullable()
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
+
+    // ---------------------------------------------------------------------
+    // T-301 (Doc 07 §1.3) — canonical, typed, scope-bound assessment model.
+    // These columns make `assessments` the SINGLE marks model (closes X-6,
+    // D-ASMT-1..6). All nullable/defaulted so the migration (migration_015)
+    // is non-destructive and the legacy columns above remain valid readers
+    // (ParentAcademicsRouting, the legacy teacher /marks handler) until those
+    // readers are repointed (T-303 / parent rebuild). Same additive pattern
+    // as the T-201 attendance migration.
+    // ---------------------------------------------------------------------
+    val academicYearId  = uuid("academic_year_id").nullable()   // FK academic_years.id
+    // X-1/D-ASMT-6: provable scope binding instead of free-text class/section/subject.
+    val assignmentId    = uuid("assignment_id").nullable()      // FK teacher_subject_assignments.id
+    val classId         = uuid("class_id").nullable()           // FK school_classes.id (canonical scope)
+    val subjectId       = uuid("subject_id").nullable()         // FK school_subjects.id
+    // D-ASMT-4: assessment type — scheduled|surprise|assignment|project|exam.
+    val type            = varchar("type", 16).default("scheduled")
+    // D-ASMT-4: pass mark (nullable; 0 <= pass_marks <= max_marks enforced by CHECK).
+    val passMarks       = integer("pass_marks").nullable()
+    // D-ASMT-5: calendar tie (an assessment can surface on the school calendar).
+    val calendarEventId = uuid("calendar_event_id").nullable()  // FK calendar_events.id
+    // The publish-discipline state machine (Doc 07 §2 / the B-MK-1 fix lives in T-303):
+    //   draft → scheduled → marks_pending → published → archived.
+    // `isPublished`/`publishedAt` above remain the legacy parent-visibility gate
+    // until parent reads move onto `status='published'`; the migration keeps the
+    // two in sync (status='published' ⇔ is_published=true).
+    val status          = varchar("status", 16).default("draft")
+    val createdBy       = uuid("created_by").nullable()         // FK app_users.id (author audit)
 }
 
 /**
@@ -711,12 +884,32 @@ object AssessmentsTable : UUIDTable("assessments", "id") {
  */
 object AssessmentMarksTable : UUIDTable("assessment_marks", "id") {
     val assessmentId = uuid("assessment_id")             // FK assessments.id
-    val studentId    = text("student_id")                // students.student_code
+    @Deprecated("T-301 / D-ASMT-3: identity moves to studentRef (FK students.id). " +
+        "This student_code text column is retained for the legacy /marks reader + " +
+        "ParentAcademicsRouting until they are repointed (T-303 / parent rebuild).")
+    val studentId    = text("student_id")                // students.student_code (legacy identity)
+    @Deprecated("T-301 / X-4: name is joined from students for display, not stored as truth. " +
+        "Retained nullable until legacy readers stop selecting it.")
     val studentName  = text("student_name")
     val marks        = double("marks").nullable()        // null = not yet entered
     val enteredBy    = uuid("entered_by").nullable()     // FK app_users.id (teacher)
     val createdAt    = timestamp("created_at")
     val updatedAt    = timestamp("updated_at")
+
+    // ---------------------------------------------------------------------
+    // T-301 (Doc 07 §1.3) — typed per-student score.
+    //   • studentRef : FK students.id (D-ASMT-3) — the canonical WHO; the
+    //     student_code text above is kept only for legacy readers.
+    //   • isAbsent   : "AB" distinct from a real 0 (Doc 07 §1.3).
+    //   • remark     : optional per-student note.
+    //   • enteredAt  : when the score was last entered/edited (audit).
+    // Backfilled best-effort from student_code; nullable so the ADD is
+    // non-destructive.
+    // ---------------------------------------------------------------------
+    val studentRef   = uuid("student_ref").nullable()    // FK students.id (typed identity, D-ASMT-3)
+    val isAbsent     = bool("is_absent").default(false)  // AB ≠ 0
+    val remark       = text("remark").nullable()
+    val enteredAt    = timestamp("entered_at").nullable()
     init {
         uniqueIndex("ux_assessment_marks_unique", assessmentId, studentId)
     }
@@ -724,8 +917,15 @@ object AssessmentMarksTable : UUIDTable("assessment_marks", "id") {
 
 /**
  * Syllabus unit (chapter/topic) for a class+section+subject, with a covered
- * flag + the date it was marked covered. Backs TeacherSyllabusData / the
- * PATCH /teacher/syllabus toggle. `position` orders units within a subject.
+ * flag + the date it was marked covered. `position` orders units within a subject.
+ *
+ * T-403: this LEGACY flat table no longer backs the teacher syllabus surface —
+ * the teacher plane moved to the typed [CurriculumUnitsTable] template +
+ * [SyllabusProgressTable] per-section progress (see TeacherSyllabusRouting.kt).
+ * It is RETAINED (not dropped) because it still backs read-only consumers:
+ * ParentAcademicsRouting (parent syllabus view), SchoolIntelligenceRouting
+ * (school-wide coverage), and the TeacherRouting dashboard progress rollup.
+ * A future migration can backfill those onto the typed tables and drop this.
  */
 object SyllabusUnitsTable : UUIDTable("syllabus_units", "id") {
     val schoolId   = uuid("school_id")
@@ -735,45 +935,156 @@ object SyllabusUnitsTable : UUIDTable("syllabus_units", "id") {
     val title      = text("title")
     val position   = integer("position").default(0)
     val isCovered  = bool("is_covered").default(false)
-    val coveredOn  = varchar("covered_on", 12).nullable()  // YYYY-MM-DD
+    val coveredOn  = date("covered_on").nullable()         // T-004: typed `date` (was varchar12)
     val coveredBy  = uuid("covered_by").nullable()          // FK app_users.id (teacher)
     val createdAt  = timestamp("created_at")
     val updatedAt  = timestamp("updated_at")
 }
 
 /**
+ * T-401 (Doc 08 §1.2) — the syllabus **template** (split from per-section
+ * progress). A curriculum unit is a chapter or topic for a class+subject; a
+ * NULL [parentId] is a top-level chapter, a non-null parent is a topic under it
+ * (the chapter ▸ topic hierarchy that fixes D-SYL-4). The template is authored
+ * once (per class+subject) and shared by every section, so two sections of the
+ * same class track coverage independently in [SyllabusProgressTable]. This
+ * resolves the free-text scope defect (D-SYL-3 / X-1) by binding to typed
+ * class_id/subject_id.
+ *
+ * T-403 repointed the TEACHER readers/writers onto this typed pair and deleted
+ * the legacy `/syllabus` handler. The legacy [SyllabusUnitsTable] is still
+ * RETAINED (not dropped) because parent/school read-only consumers remain on it;
+ * a future migration can backfill + drop it.
+ */
+object CurriculumUnitsTable : UUIDTable("curriculum_units", "id") {
+    val schoolId  = uuid("school_id")
+    val classId   = uuid("class_id")                     // FK school_classes.id (typed scope, X-1)
+    val subjectId = uuid("subject_id")                   // FK school_subjects.id
+    val parentId  = uuid("parent_id").nullable()         // FK curriculum_units.id — chapter ▸ topic (D-SYL-4)
+    val title     = text("title")
+    val position  = integer("position").default(0)
+    val isActive  = bool("is_active").default(true)
+    val createdAt = timestamp("created_at")
+    val updatedAt = timestamp("updated_at")
+}
+
+/**
+ * T-401 (Doc 08 §1.2) — per-section coverage **state** for a curriculum unit.
+ * Keyed UNIQUE on (unit, section, assignment) so the same template unit can be
+ * "covered" independently for each section a teacher owns. [coveredOn] is typed
+ * `date` (D-SYL-2 / X-3). The one-tap toggle (T-402 PATCH /syllabus/progress)
+ * upserts a row here; [assignmentId] binds the write to a TSA the teacher owns
+ * (X-1, enforced via requireOwnedAssignment).
+ */
+object SyllabusProgressTable : UUIDTable("syllabus_progress", "id") {
+    val unitId       = uuid("unit_id")                   // FK curriculum_units.id
+    val section      = varchar("section", 8).default("A")
+    val assignmentId = uuid("assignment_id")             // FK teacher_subject_assignments.id (scope, X-1)
+    val isCovered    = bool("is_covered").default(false)
+    val coveredOn    = date("covered_on").nullable()     // TYPED (D-SYL-2)
+    val coveredBy    = uuid("covered_by").nullable()     // FK app_users.id (teacher who toggled)
+    val note         = text("note").nullable()
+    val createdAt    = timestamp("created_at")
+    val updatedAt    = timestamp("updated_at")
+    init {
+        uniqueIndex("ux_syllabus_progress_unique", unitId, section, assignmentId)
+    }
+}
+
+/**
  * A homework/assignment authored by a teacher for one class+section+subject.
  * `submittedCount` is derived live from [HomeworkSubmissionsTable] at read
  * time; `totalCount` is the headcount of the target class (computed from
- * `students`). Backs TeacherHomeworkData / CreateHomeworkRequest.
+ * enrollments).
+ *
+ * T-404 (Doc 08 §5.3) — added the TYPED SCOPE spine ([assignmentId]/[classId]/
+ * [subjectId], X-1) so the T-405 backend can enforce allocation via
+ * requireOwnedAssignment instead of free-text class/section/subject (D-HW-1);
+ * an optional [dueTime] so "is it past due?" is real date+time math (D-HW-2);
+ * and the [allowLate] teacher policy that drives the no-submit-past-due rule
+ * (D-HW-4). The legacy display columns ([className]/[section]/[subject]) are
+ * RETAINED (not dropped) so the existing /homework GET+POST handler/screen keep
+ * compiling green until T-405/T-406 repoint them (DELETE-don't-patch); the typed
+ * ids are nullable + best-effort backfilled in migration_017_homework.sql.
  */
 object HomeworkTable : UUIDTable("homework", "id") {
     val schoolId    = uuid("school_id")
     val teacherId   = uuid("teacher_id").nullable()     // FK app_users.id (author)
+    // T-404: typed scope (X-1) — authoritative once backfilled; nullable for
+    // back-compat with rows written before the binding existed.
+    val assignmentId = uuid("assignment_id").nullable() // FK teacher_subject_assignments.id
+    val classId      = uuid("class_id").nullable()      // FK school_classes.id
+    val subjectId    = uuid("subject_id").nullable()    // FK school_subjects.id
+    // Legacy DISPLAY columns (demoted; retained until T-405/T-406 — Rule 4).
     val className   = text("class_name")
     val section     = varchar("section", 8).default("A")
     val subject     = text("subject")
     val title       = text("title")
     val description = text("description").default("")
-    val dueDate     = varchar("due_date", 12)           // YYYY-MM-DD
+    val dueDate     = date("due_date")                  // T-004: typed `date` (was varchar12)
+    val dueTime     = time("due_time").nullable()       // T-404: optional cutoff time (D-HW-2)
+    val allowLate   = bool("allow_late").default(false) // T-404: teacher policy (D-HW-4)
     val isActive    = bool("is_active").default(true)
     val createdAt   = timestamp("created_at")
     val updatedAt   = timestamp("updated_at")
 }
 
 /**
+ * T-404 (Doc 08 §5.3) — a file/image attached to a homework (D-HW-3 / B-HW-5).
+ * One homework can carry several. [uploadedBy] is the author (app_users.id).
+ */
+object HomeworkAttachmentsTable : UUIDTable("homework_attachments", "id") {
+    val homeworkId  = uuid("homework_id")               // FK homework.id (CASCADE)
+    val url         = text("url")
+    val filename    = text("filename").default("")
+    val mime        = text("mime").default("")
+    val sizeBytes   = long("size_bytes").default(0)
+    val uploadedBy  = uuid("uploaded_by").nullable()    // FK app_users.id
+    val createdAt   = timestamp("created_at")
+}
+
+/**
  * One student's submission against a [HomeworkTable] row. Used to compute the
- * submitted/total ratio shown on the teacher's homework cards. Unique on
+ * submitted/total ratio AND the submissions board (T-405). Unique on
  * (homework, student).
+ *
+ * T-404 (Doc 08 §5.3) — added a TYPED [studentUuid] FK to students (B-HW-6;
+ * the legacy text [studentId] = student_code is retained for back-compat until
+ * T-405 repoints readers), plus the lifecycle columns the board reads/writes:
+ * [grade], [reviewedBy], [reviewedAt]. `status` now includes 'not_submitted'
+ * (the board mostly derives that set by roster LEFT JOIN at read time, but the
+ * column tolerates a materialised value). [submittedAt] is nullable (a
+ * not-submitted/late-pending row has no submission time).
  */
 object HomeworkSubmissionsTable : UUIDTable("homework_submissions", "id") {
-    val homeworkId  = uuid("homework_id")               // FK homework.id
-    val studentId   = text("student_id")                // students.student_code
-    val status      = varchar("status", 16).default("submitted") // submitted | graded | late
-    val submittedAt = timestamp("submitted_at")
+    val homeworkId  = uuid("homework_id")               // FK homework.id (CASCADE)
+    val studentId   = text("student_id")                // legacy: students.student_code
+    val studentUuid = uuid("student_uuid").nullable()   // T-404: typed FK students.id (B-HW-6)
+    // submitted | late | graded | not_submitted  (T-404 widened to text + check).
+    val status      = text("status").default("submitted")
+    val submittedAt = timestamp("submitted_at").nullable()
+    val grade       = text("grade").nullable()          // T-404: optional grade/feedback
+    val reviewedBy  = uuid("reviewed_by").nullable()    // T-404: FK app_users.id
+    val reviewedAt  = timestamp("reviewed_at").nullable()
     init {
         uniqueIndex("ux_homework_submissions_unique", homeworkId, studentId)
     }
+}
+
+/**
+ * T-404 (Doc 08 §5.3 / §7) — a teacher override of a homework's cutoff (D-HW-5).
+ * [studentId] NULL = a whole-class extension (moves the cutoff for everyone);
+ * non-null = reopen submission for that one student (the "she was sick" case).
+ * Logged with [grantedBy]/[createdAt]/[reason] and reflected on the board.
+ */
+object HomeworkExtensionsTable : UUIDTable("homework_extensions", "id") {
+    val homeworkId  = uuid("homework_id")               // FK homework.id (CASCADE)
+    val studentId   = uuid("student_id").nullable()     // NULL = whole class; else FK students.id
+    val newDueDate  = date("new_due_date")
+    val newDueTime  = time("new_due_time").nullable()
+    val grantedBy   = uuid("granted_by").nullable()     // FK app_users.id
+    val reason      = text("reason").nullable()
+    val createdAt   = timestamp("created_at")
 }
 
 /**
@@ -785,15 +1096,66 @@ object HomeworkSubmissionsTable : UUIDTable("homework_submissions", "id") {
 object TeacherPeriodsTable : UUIDTable("teacher_periods", "id") {
     val schoolId   = uuid("school_id")
     val teacherId  = uuid("teacher_id")                 // FK app_users.id
-    val weekday    = integer("weekday")                 // 1=Mon … 7=Sun
-    val startTime  = varchar("start_time", 8)           // "HH:mm"
-    val endTime    = varchar("end_time", 8)             // "HH:mm"
-    val className  = text("class_name")
-    val section    = varchar("section", 8).default("A")
-    val subject    = text("subject")
+    val weekday    = integer("weekday")                 // 1=Mon … 7=Sun (ISO, documented — D-TT-1)
+    // T-101 (Doc 05 §2.1): start_time/end_time promoted varchar("HH:mm") → typed
+    // `time` (LocalTime) so the resolved-day computation can compare without
+    // string parsing (D-TT-2). The wire contract is preserved: every consumer
+    // formats LocalTime back to "HH:mm" at the DTO boundary.
+    val startTime  = time("start_time")                 // TYPED (was varchar8 "HH:mm")
+    val endTime    = time("end_time")                   // TYPED (was varchar8 "HH:mm")
+    // T-101 NEW (Doc 05 §2.1): term validity + the TSA this period implements.
+    // academic_year_id / assignment_id are nullable for back-compat with rows
+    // written before the binding existed; backfill is best-effort in the
+    // migration. assignment_id is the linchpin (D-TT-4): "current period" →
+    // assignment_id → requireOwnedAssignment → authorized attendance/marks scope.
+    val academicYearId = uuid("academic_year_id").nullable()  // FK academic_years.id
+    val assignmentId   = uuid("assignment_id").nullable()     // FK teacher_subject_assignments.id
+    // DEVIATION (Doc 05 §2.1 says "DROP className/section/subject as truth"):
+    // the columns are KEPT as display-only/legacy here (NOT dropped) so the
+    // existing timetable readers (Parent/School/Teacher routing) keep compiling
+    // green in this commit (Rule 4). assignment_id is now the source of truth;
+    // the legacy columns are demoted to a denormalised display fallback and a
+    // later phase drops them once all readers derive class/subject via the FK.
+    val className  = text("class_name")                 // DISPLAY/legacy (demoted)
+    val section    = varchar("section", 8).default("A") // DISPLAY/legacy (demoted)
+    val subject    = text("subject")                    // DISPLAY/legacy (demoted)
     val room       = text("room").default("")
     val position   = integer("position").default(0)
+    val validFrom  = date("valid_from").nullable()      // T-101: term-revision window
+    val validTo    = date("valid_to").nullable()
+    val isActive   = bool("is_active").default(true)    // T-101: soft-disable a period
     val createdAt  = timestamp("created_at")
+    init {
+        // Doc 05 §2.1: no double-booking a teacher in the same weekday slot.
+        uniqueIndex("ux_periods_no_double_book", schoolId, teacherId, weekday, startTime)
+    }
+}
+
+/**
+ * T-101 (Doc 05 §2.2) — one-off overrides to the recurring weekly pattern, so
+ * the resolved-day computation for a SPECIFIC date is correct: a normally
+ * scheduled period can be CANCELLED (attendance not expected — Doc 06 edge
+ * case), RESCHEDULED, have a ROOM_CHANGE, a SUBSTITUTION inserted, or an EXTRA
+ * period added for one date only.
+ */
+object PeriodExceptionsTable : UUIDTable("period_exceptions", "id") {
+    val schoolId            = uuid("school_id")
+    val periodId            = uuid("period_id").nullable()   // FK teacher_periods.id (null for EXTRA)
+    val date                = date("date")                   // the specific date this applies to
+    val kind                = varchar("kind", 16)            // CANCELLED|RESCHEDULED|ROOM_CHANGE|SUBSTITUTION|EXTRA
+    val newStart            = time("new_start").nullable()
+    val newEnd              = time("new_end").nullable()
+    val newRoom             = text("new_room").nullable()
+    val substituteTeacherId = uuid("substitute_teacher_id").nullable()  // FK app_users.id
+    // EXTRA periods aren't tied to a recurring row, so they carry their own
+    // assignment binding + display fallback (same demotion rule as periods).
+    val assignmentId        = uuid("assignment_id").nullable()          // FK teacher_subject_assignments.id
+    val note                = text("note").default("")
+    val createdAt           = timestamp("created_at")
+    val updatedAt           = timestamp("updated_at")
+    init {
+        uniqueIndex("ux_period_exceptions_unique", schoolId, periodId, date, kind)
+    }
 }
 
 // =====================================================================
@@ -1004,8 +1366,18 @@ object ParentChildLinksTable : UUIDTable("parent_child_links", "id") {
     val studentCode = varchar("student_code", 64).nullable()
     val rollNumber  = varchar("roll_number", 64).nullable()
     val childName   = text("child_name").nullable()
+    // ISSUE 2c: the class+section the parent provided for the matched student,
+    // captured so the admin queue can show the full claim and the matcher can
+    // compare against the roster. Nullable so existing rows parse unchanged.
+    val className   = text("class_name").nullable()
+    val section     = varchar("section", 16).nullable()
+    // ISSUE 2d: the parent phone that was on the request, and a flag for the
+    // "needs review" (phone-mismatch) bucket so it is never silently dropped.
+    val parentPhone = varchar("parent_phone", 32).nullable()
+    val reviewReason = text("review_reason").nullable()
     val childId     = uuid("child_id").nullable()       // children.id once approved
-    val status      = varchar("status", 16).default("pending") // pending | approved | rejected
+    // status: pending | approved | rejected | needs_review (ISSUE 2d)
+    val status      = varchar("status", 24).default("pending")
     // RA-SP: first-class parent relationship metadata. `relation` describes the
     // guardian role (Father | Mother | Guardian | …) and `isPrimaryGuardian`
     // marks the single primary point-of-contact for a student. The aggregation
@@ -1128,8 +1500,8 @@ object CalendarEventsTable : UUIDTable("calendar_events", "id") {
     // When source = ANNOUNCEMENT, the originating announcement's event_id so we
     // can keep the two in sync and avoid duplicate workflows.
     val sourceRef       = text("source_ref").nullable()
-    val startDate       = varchar("start_date", 12)             // YYYY-MM-DD
-    val endDate         = varchar("end_date", 12)               // YYYY-MM-DD (== startDate for single-day)
+    val startDate       = date("start_date")                    // T-004: typed `date` (was varchar12)
+    val endDate         = date("end_date")                      // T-004: typed `date` (== startDate for single-day)
     val allDay          = bool("all_day").default(true)
     val bannerUrl       = text("banner_url").nullable()
     val icon            = text("icon").nullable()
@@ -1170,4 +1542,47 @@ object AcademicYearsTable : UUIDTable("academic_years", "id") {
     val holidayDays   = integer("holiday_days").nullable()
     val createdAt     = timestamp("created_at")
     val updatedAt     = timestamp("updated_at")
+}
+
+// =====================================================================
+// teacher_check_ins  (Teacher Portal Rebuild — Doc 11 T-106a / Doc 06 §1.3)
+//   The authoritative one-row-per-teacher-per-day self check-in record that
+//   powers the Today-tab check-in band (Doc 04 §5.1) and the biometric ladder
+//   (Doc 06 §2: biometric -> PIN -> manual, always-available fallback, never a
+//   hard gate). Closes B-ATT-5 (teacher self check-in).
+//
+//   `checked_in_at` is SERVER-STAMPED by POST /api/v1/teacher/checkin (T-106b)
+//   with the server clock — NOT the device clock (Doc 06 §2.4 clock-skew edge).
+//   `method` records which rung of the ladder succeeded.
+//   UNIQUE (school_id, teacher_id, date) is the idempotency key: a second POST
+//   for the same (school, teacher, date) returns the existing row, it does not
+//   duplicate.
+//
+//   FK: teacher_id -> app_users.id. `device_id` is optional (the DTO makes it
+//   nullable and the prefs layer has no device-id accessor, so callers pass
+//   null for now).
+//
+//   Created/applied by docs/db/migration_013_teacher_checkins.sql. Registered in
+//   DatabaseFactory.allTables — AUTO_CREATE_TABLES is OFF in production, so
+//   that migration MUST be applied in Supabase before the matching deploy or
+//   validateSchema() refuses to boot.
+//
+//   NOTE (per LAWS): Doc 06 §1.3 specifies exactly the columns below — no
+//   separate `created_at` audit column (the row IS the check-in event, its
+//   authoritative timestamp is `checked_in_at`). This mapping is faithful to
+//   the authority.
+// =====================================================================
+object TeacherCheckInsTable : UUIDTable("teacher_check_ins", "id") {
+    val schoolId    = uuid("school_id")
+    val teacherId   = uuid("teacher_id")                 // FK app_users.id
+    val date        = date("date")
+    val checkedInAt = timestamp("checked_in_at")         // server-stamped (authoritative clock)
+    val method      = varchar("method", 16)              // biometric | pin | manual
+    val deviceId    = text("device_id").nullable()
+    init {
+        uniqueIndex(
+            "ux_teacher_checkins_unique",
+            schoolId, teacherId, date
+        )
+    }
 }
