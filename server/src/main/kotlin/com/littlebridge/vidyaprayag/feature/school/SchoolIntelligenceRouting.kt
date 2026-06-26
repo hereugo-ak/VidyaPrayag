@@ -196,7 +196,9 @@ fun Route.schoolIntelligenceRouting() {
                     (AttendanceRecordsTable.schoolId eq schoolId) and
                         (AttendanceRecordsTable.type eq "student")
                 }.map {
-                    it[AttendanceRecordsTable.date] to it[AttendanceRecordsTable.status].lowercase()
+                    // T-004: date is now a typed `date` (LocalDate); keep ISO String
+                    // for the downstream map keys / parse via toString().
+                    it[AttendanceRecordsTable.date].toString() to it[AttendanceRecordsTable.status].lowercase()
                 }.filter { (d, _) ->
                     runCatching { LocalDate.parse(d, ISO_DATE) >= sinceDate }.getOrDefault(false)
                 }
@@ -207,7 +209,8 @@ fun Route.schoolIntelligenceRouting() {
                     .where { (AssessmentsTable.schoolId eq schoolId) and (AssessmentsTable.isActive eq true) }
                     .forEach { row ->
                         row[AssessmentsTable.examDate]?.let { d ->
-                            examByDate.putIfAbsent(d, "${row[AssessmentsTable.subject]} — ${row[AssessmentsTable.name]}")
+                            // T-004: examDate is now LocalDate; key the String map by ISO text.
+                            examByDate.putIfAbsent(d.toString(), "${row[AssessmentsTable.subject]} — ${row[AssessmentsTable.name]}")
                         }
                     }
                 AcademicCalendarTable.selectAll()
@@ -264,7 +267,9 @@ fun Route.schoolIntelligenceRouting() {
                     (AttendanceRecordsTable.schoolId eq schoolId) and
                         (AttendanceRecordsTable.type eq "student")
                 }.forEach { row ->
-                    val code = row[AttendanceRecordsTable.personId]
+                    // person_id is nullable (Tables.kt); rows without a code can't be
+                    // attributed to a student, so skip them.
+                    val code = row[AttendanceRecordsTable.personId] ?: return@forEach
                     val s = row[AttendanceRecordsTable.status].lowercase()
                     val arr = attByStudent.getOrPut(code) { intArrayOf(0, 0) }
                     if (s == "present" || s == "late") arr[0]++

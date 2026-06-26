@@ -186,6 +186,14 @@ data class SchoolMatchDto(
 data class LinkChildRequest(
     @SerialName("school_id") val schoolId: String,
     @SerialName("roll_number") val rollNumber: String,
+    // ISSUE 2c: the guided final step now also sends the child's class+section
+    // and name (school already chosen) so the server can match precisely.
+    @SerialName("class_name") val className: String? = null,
+    val section: String? = null,
+    @SerialName("child_name") val childName: String? = null,
+    // ISSUE 2d: the parent's contact phone for this child, matched against the
+    // student's parent_phone on record.
+    @SerialName("parent_phone") val parentPhone: String? = null,
     @SerialName("parent_name") val parentName: String? = null
 )
 

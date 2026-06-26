@@ -21,6 +21,8 @@
  */
 package com.littlebridge.vidyaprayag.feature.school
 
+import com.littlebridge.vidyaprayag.core.ClassNaming
+import com.littlebridge.vidyaprayag.core.ClassResolution
 import com.littlebridge.vidyaprayag.core.created
 import com.littlebridge.vidyaprayag.core.fail
 import com.littlebridge.vidyaprayag.core.ok
@@ -204,12 +206,15 @@ private fun kotlinx.serialization.json.JsonPrimitive.contentOrNull(): String? =
  * Exposed transaction.
  */
 private fun studentCountFor(schoolId: UUID, className: String, section: String): Int =
+    // ROOT FIX (ISSUE 1): match roster to assignment via the ClassNaming key
+    // (case/whitespace/Grade-prefix tolerant) instead of brittle raw eq.
     StudentsTable.selectAll().where {
-        (StudentsTable.schoolId eq schoolId) and
-            (StudentsTable.isActive eq true) and
-            (StudentsTable.className eq className) and
-            (StudentsTable.section eq section)
-    }.count().toInt()
+        (StudentsTable.schoolId eq schoolId) and (StudentsTable.isActive eq true)
+    }.count {
+        ClassNaming.sameClassSection(
+            it[StudentsTable.className], it[StudentsTable.section], className, section
+        )
+    }
 
 /** RA-TAM: load this teacher's active assignment rows as DTOs (with live counts). */
 private fun loadTeacherAssignments(schoolId: UUID, teacherId: UUID): List<TeacherAssignmentDto> {
@@ -328,6 +333,12 @@ fun Route.teacherAssignmentRouting() {
                 val teacherUuid = parseUuid(req.teacherId)
 
                 val result = dbQuery {
+                    // ROOT FIX (ISSUE 1): store the CANONICAL class name + section so
+                    // this assignment's (class, section) is byte-identical to what
+                    // students store, keeping the derived teacher⇄student join intact.
+                    val canonClass = ClassResolution.canonicalClassName(ctx.schoolId, req.className)
+                    val canonSection = ClassNaming.canonicalSection(section)
+
                     // When linking by id, the teacher MUST be a real teacher in the
                     // caller's school (IDOR-safe) — and we adopt its name.
                     var resolvedName = req.teacherName
@@ -342,20 +353,29 @@ fun Route.teacherAssignmentRouting() {
                         resolvedName = teacherRow[AppUsersTable.fullName]
                     }
 
-                    // Upsert on (school, class, section, subject).
+                    // Upsert on (school, class, section, subject). Class+section are
+                    // compared via the ClassNaming key so a legacy row stored under a
+                    // differently-formatted label is reused, not duplicated.
                     val existing = TeacherSubjectAssignmentsTable.selectAll()
                         .where {
                             (TeacherSubjectAssignmentsTable.schoolId eq ctx.schoolId) and
-                                (TeacherSubjectAssignmentsTable.className eq req.className) and
-                                (TeacherSubjectAssignmentsTable.section eq section) and
                                 (TeacherSubjectAssignmentsTable.subject eq req.subject)
                         }
-                        .firstOrNull()
+                        .firstOrNull {
+                            ClassNaming.sameClassSection(
+                                it[TeacherSubjectAssignmentsTable.className],
+                                it[TeacherSubjectAssignmentsTable.section],
+                                canonClass, canonSection
+                            )
+                        }
 
                     val rowId: UUID = if (existing != null) {
                         val rid = existing[TeacherSubjectAssignmentsTable.id].value
                         TeacherSubjectAssignmentsTable.update({ TeacherSubjectAssignmentsTable.id eq rid }) {
                             it[classId] = parseUuid(req.classId)
+                            // Normalise stored class+section to canonical on every write.
+                            it[className] = canonClass
+                            it[TeacherSubjectAssignmentsTable.section] = canonSection
                             it[subjectId] = parseUuid(req.subjectId)
                             it[teacherId] = teacherUuid
                             it[teacherName] = resolvedName
@@ -369,8 +389,8 @@ fun Route.teacherAssignmentRouting() {
                             it[id] = newId
                             it[schoolId] = ctx.schoolId
                             it[classId] = parseUuid(req.classId)
-                            it[className] = req.className
-                            it[TeacherSubjectAssignmentsTable.section] = section
+                            it[className] = canonClass
+                            it[TeacherSubjectAssignmentsTable.section] = canonSection
                             it[subjectId] = parseUuid(req.subjectId)
                             it[subject] = req.subject
                             it[teacherId] = teacherUuid
@@ -387,7 +407,7 @@ fun Route.teacherAssignmentRouting() {
                     // every student of (class, section) is now linked to this teacher
                     // and the teacher's workload reflects the change. No manual link.
                     StudentAggregationService.recalcForAssignmentChange(
-                        ctx.schoolId, req.className, section, teacherUuid
+                        ctx.schoolId, canonClass, canonSection, teacherUuid
                     )
 
                     TeacherSubjectAssignmentsTable.selectAll()
@@ -609,14 +629,26 @@ fun Route.teacherAssignmentRouting() {
                             return@forEach
                         }
 
+                        // ROOT FIX (ISSUE 1): store the CANONICAL class name + section
+                        // so this assignment's (class, section) is byte-identical to
+                        // what students store, keeping the derived join intact.
+                        val canonClass = ClassResolution.canonicalClassName(ctx.schoolId, className)
+                        val canonSection = ClassNaming.canonicalSection(section)
+
                         // Conflict detection: duplicate active assignment for the
-                        // same teacher+class+section+subject.
+                        // same teacher+class+section+subject. Class+section compared
+                        // via the ClassNaming key so a legacy differently-formatted
+                        // row is reused, not duplicated.
                         val existing = TeacherSubjectAssignmentsTable.selectAll().where {
                             (TeacherSubjectAssignmentsTable.schoolId eq ctx.schoolId) and
-                                (TeacherSubjectAssignmentsTable.className eq className) and
-                                (TeacherSubjectAssignmentsTable.section eq section) and
                                 (TeacherSubjectAssignmentsTable.subject eq resolvedSubjectName)
-                        }.firstOrNull()
+                        }.firstOrNull {
+                            ClassNaming.sameClassSection(
+                                it[TeacherSubjectAssignmentsTable.className],
+                                it[TeacherSubjectAssignmentsTable.section],
+                                canonClass, canonSection
+                            )
+                        }
 
                         if (existing != null) {
                             val existingTeacher = existing[TeacherSubjectAssignmentsTable.teacherId]
@@ -634,6 +666,9 @@ fun Route.teacherAssignmentRouting() {
                             val rid = existing[TeacherSubjectAssignmentsTable.id].value
                             TeacherSubjectAssignmentsTable.update({ TeacherSubjectAssignmentsTable.id eq rid }) {
                                 it[classId] = parseUuid(target.classId)
+                                // Normalise stored class+section to canonical on write.
+                                it[TeacherSubjectAssignmentsTable.className] = canonClass
+                                it[TeacherSubjectAssignmentsTable.section] = canonSection
                                 it[subjectId] = subjectUuid
                                 it[TeacherSubjectAssignmentsTable.teacherId] = teacherId
                                 it[TeacherSubjectAssignmentsTable.teacherName] = teacherName
@@ -643,10 +678,10 @@ fun Route.teacherAssignmentRouting() {
                             val dto = TeacherSubjectAssignmentsTable.selectAll()
                                 .where { TeacherSubjectAssignmentsTable.id eq rid }
                                 .first().toAssignmentDto()
-                                .copy(studentCount = studentCountFor(ctx.schoolId, className, section))
+                                .copy(studentCount = studentCountFor(ctx.schoolId, canonClass, canonSection))
                             created += dto
-                            touchedClasses += className to section
-                            results += BulkAssignResultItemDto(className, section, "created", assignment = dto)
+                            touchedClasses += canonClass to canonSection
+                            results += BulkAssignResultItemDto(canonClass, canonSection, "created", assignment = dto)
                             return@forEach
                         }
 
@@ -656,8 +691,8 @@ fun Route.teacherAssignmentRouting() {
                             it[id] = newId
                             it[schoolId] = ctx.schoolId
                             it[classId] = parseUuid(target.classId)
-                            it[TeacherSubjectAssignmentsTable.className] = className
-                            it[TeacherSubjectAssignmentsTable.section] = section
+                            it[TeacherSubjectAssignmentsTable.className] = canonClass
+                            it[TeacherSubjectAssignmentsTable.section] = canonSection
                             it[subjectId] = subjectUuid
                             it[subject] = resolvedSubjectName
                             it[TeacherSubjectAssignmentsTable.teacherId] = teacherId
@@ -669,10 +704,10 @@ fun Route.teacherAssignmentRouting() {
                         val dto = TeacherSubjectAssignmentsTable.selectAll()
                             .where { TeacherSubjectAssignmentsTable.id eq newId }
                             .first().toAssignmentDto()
-                            .copy(studentCount = studentCountFor(ctx.schoolId, className, section))
+                            .copy(studentCount = studentCountFor(ctx.schoolId, canonClass, canonSection))
                         created += dto
-                        touchedClasses += className to section
-                        results += BulkAssignResultItemDto(className, section, "created", assignment = dto)
+                        touchedClasses += canonClass to canonSection
+                        results += BulkAssignResultItemDto(canonClass, canonSection, "created", assignment = dto)
                     }
 
                     // RA-LINK: reconcile every affected (class, section) once so all

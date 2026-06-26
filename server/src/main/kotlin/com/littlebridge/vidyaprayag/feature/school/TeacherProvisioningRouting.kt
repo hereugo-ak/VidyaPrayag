@@ -403,12 +403,16 @@ fun Route.teacherProvisioningRouting() {
                                 }
                                 .toList()
                                 .filter {
-                                    runCatching {
-                                        LocalDate.parse(it[AttendanceRecordsTable.date]).isAfter(cutoff)
-                                    }.getOrDefault(false)
+                                    // person_id is nullable (Tables.kt); drop rows that
+                                    // can't be attributed before grouping by a String key.
+                                    it[AttendanceRecordsTable.personId] != null &&
+                                        runCatching {
+                                            // T-004: date is now a typed `date` (LocalDate) — no parse.
+                                            it[AttendanceRecordsTable.date].isAfter(cutoff)
+                                        }.getOrDefault(false)
                                 }
                                 .groupBy(
-                                    { it[AttendanceRecordsTable.personId] },
+                                    { it[AttendanceRecordsTable.personId]!! },
                                     { it[AttendanceRecordsTable.status] }
                                 )
                         }

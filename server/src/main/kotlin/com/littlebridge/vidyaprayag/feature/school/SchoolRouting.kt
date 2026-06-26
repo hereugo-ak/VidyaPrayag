@@ -215,6 +215,8 @@ fun Route.schoolRouting() {
                 val type  = call.request.queryParameters["type"]?.lowercase() ?: "student"
                 val grade = call.request.queryParameters["grade"]
                 val date  = call.request.queryParameters["date"] ?: LocalDate.now().toString()
+                // T-004: attendance_records.date is now a typed `date` column.
+                val dateValue = LocalDate.parse(date)
 
                 if (type !in setOf("student", "faculty")) {
                     call.fail("type must be 'student' or 'faculty'"); return@get
@@ -239,7 +241,7 @@ fun Route.schoolRouting() {
                     val records = AttendanceRecordsTable.selectAll()
                         .where {
                             (AttendanceRecordsTable.schoolId eq schoolId) and
-                                (AttendanceRecordsTable.date eq date) and
+                                (AttendanceRecordsTable.date eq dateValue) and
                                 (AttendanceRecordsTable.type eq type)
                         }
                         .associate { it[AttendanceRecordsTable.personId] to it[AttendanceRecordsTable.status] }

@@ -40,7 +40,12 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
+import java.time.format.DateTimeFormatter
 import java.util.UUID
+
+// T-101: teacher_periods.start_time/end_time are now typed `time` (LocalTime).
+// Format back to the "HH:mm" wire contract this screen's DTOs expect.
+private val PARENT_HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
 // ── DTOs ─────────────────────────────────────────────────────────────────────
 
@@ -219,7 +224,7 @@ fun Route.parentAcademicsRouting() {
                             (AttendanceRecordsTable.personId eq child.studentCode)
                     }.orderBy(AttendanceRecordsTable.date, SortOrder.DESC).map {
                         ParentAttendanceDayDto(
-                            date = it[AttendanceRecordsTable.date],
+                            date = it[AttendanceRecordsTable.date].toString(),
                             status = it[AttendanceRecordsTable.status].lowercase(),
                         )
                     }
@@ -294,7 +299,7 @@ fun Route.parentAcademicsRouting() {
                             subject = a[AssessmentsTable.subject],
                             marks = mark,
                             maxMarks = a[AssessmentsTable.maxMarks],
-                            examDate = a[AssessmentsTable.examDate],
+                            examDate = a[AssessmentsTable.examDate]?.toString(),
                         )
                     }
                 }
@@ -330,7 +335,7 @@ fun Route.parentAcademicsRouting() {
                                 ParentSyllabusUnitDto(
                                     title = it[SyllabusUnitsTable.title],
                                     isCovered = it[SyllabusUnitsTable.isCovered],
-                                    coveredOn = it[SyllabusUnitsTable.coveredOn],
+                                    coveredOn = it[SyllabusUnitsTable.coveredOn]?.toString(),
                                 )
                             },
                         )
@@ -378,8 +383,8 @@ fun Route.parentAcademicsRouting() {
                             r[TeacherPeriodsTable.weekday],
                             r[TeacherPeriodsTable.startTime],
                             ParentPeriodDto(
-                                startTime = r[TeacherPeriodsTable.startTime],
-                                endTime = r[TeacherPeriodsTable.endTime],
+                                startTime = r[TeacherPeriodsTable.startTime].format(PARENT_HHMM),
+                                endTime = r[TeacherPeriodsTable.endTime].format(PARENT_HHMM),
                                 subject = r[TeacherPeriodsTable.subject],
                                 room = r[TeacherPeriodsTable.room],
                                 teacherName = teacherNames[tId] ?: "",

@@ -39,7 +39,8 @@
  *   - resultsRouting()                    — /api/v1/school/results
  *   - teacherAssignmentRouting()          — /api/v1/school/teacher-assignments[…]
  *   - mediaRouting()                      — /api/v1/school/media/upload[…] (binary → Supabase Storage)
- *   - teacherRouting()                    — /api/v1/teacher/{home,classes,profile,attendance,marks,syllabus,homework}
+ *   - teacherRouting()                    — /api/v1/teacher/{home,classes,profile,syllabus,homework}
+ *   - teacherDayRouting()                 — /api/v1/teacher/{day,week} (T-104 resolved schedule)
  *
  * On boot:
  *   DatabaseFactory.init() creates/migrates all tables and seeds CMS + demo data.
@@ -89,9 +90,17 @@ import com.littlebridge.vidyaprayag.feature.school.nonTeachingStaffRouting
 import com.littlebridge.vidyaprayag.feature.school.schoolRouting
 import com.littlebridge.vidyaprayag.feature.school.teacherAssignmentRouting
 import com.littlebridge.vidyaprayag.feature.school.teacherProvisioningRouting
+import com.littlebridge.vidyaprayag.feature.teacher.teacherAttendanceRouting
+import com.littlebridge.vidyaprayag.feature.teacher.teacherClassesRouting
+import com.littlebridge.vidyaprayag.feature.teacher.teacherStudentRouting
+import com.littlebridge.vidyaprayag.feature.teacher.teacherDayRouting
+import com.littlebridge.vidyaprayag.feature.teacher.teacherGradebookRouting
+import com.littlebridge.vidyaprayag.feature.teacher.teacherHomeworkRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherLeaveRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherMessagesRouting
 import com.littlebridge.vidyaprayag.feature.teacher.teacherRouting
+import com.littlebridge.vidyaprayag.feature.teacher.teacherSelfLeaveRouting
+import com.littlebridge.vidyaprayag.feature.teacher.teacherSyllabusRouting
 import com.littlebridge.vidyaprayag.feature.user.parentRouting
 import com.littlebridge.vidyaprayag.feature.user.parentMessagesRouting
 import com.littlebridge.vidyaprayag.feature.user.userDetailsRouting
@@ -289,8 +298,16 @@ fun Application.module() {
         academicYearRouting()        // /api/admin/academic-years[…] — real Academic Year management (replaces "Coming Soon")
 
         // Teacher vertical (master rebuild doc Step 7 / gap G1)
-        teacherRouting()             // /api/v1/teacher/{home,classes,profile,attendance,marks,syllabus,homework}
-        teacherLeaveRouting()        // /api/v1/teacher/leave-requests[…] — RA-44 teacher lists/decides leave for their classes
+        teacherRouting()             // /api/v1/teacher/{home,classes,profile,syllabus,homework}
+        teacherDayRouting()          // T-104 /api/v1/teacher/{day,week} — resolved schedule (periods+exceptions+holidays+calendar, server now/next)
+        teacherAttendanceRouting()   // T-203/T-205 /api/v1/teacher/attendance — typed, assignment-scoped attendance load/save (Doc 06 §3.8); legacy packed-grade handler deleted
+        teacherGradebookRouting()    // T-303/T-304/T-305 /api/v1/teacher/assessments — typed assessment lifecycle: list/create, marks load/SAVE (no publish, the B-MK-1 fix), publish/unpublish, history (Doc 07 §2/§5/§6); converged from /gradebook to canonical /assessments in T-305 (legacy /marks + /assessments handlers deleted)
+        teacherSyllabusRouting()     // T-402/T-403 /api/v1/teacher/syllabus — typed, assignment-scoped syllabus: hierarchical load, create unit (B-SYL-1 fix), rename/reorder, one-tap covered toggle w/ typed covered_on (Doc 08 §1.2/§3); converged from staged /syllabus-typed to canonical /syllabus in T-403 (legacy /syllabus GET+PATCH handler in teacherTaskRoutes deleted)
+        teacherClassesRouting()      // T-501/T-502/T-504 /api/v1/teacher/classes[/{id}] — single-aggregated-query class list (kills B-CLS-1 N+1), real is_class_teacher (B-CLS-3), composite class detail w/ real roster (F-CLS-5); CONVERGED from staged /classes-v2 to canonical /classes[/{id}] in T-504 (legacy looping /classes handler in teacherRouting DELETED)
+        teacherStudentRouting()      // T-503/T-504 /api/v1/teacher/students/{id} — scoped student profile (403 if teacher doesn't teach the student; B-PROF-1/2/F-PROF-3); CONVERGED from staged /students-v2 to canonical /students/{id} in T-504
+        teacherHomeworkRouting()     // T-405/T-406 /api/v1/teacher/homework — typed homework lifecycle: assign (fixes dead button F-HW-1/B-HW-1), roster-joined submissions board (B-HW-3), extend (whole-class/single-student), review/grade, close (Doc 08 Part B); CONVERGED from staged /homework-v2 to canonical /homework in T-406 (legacy /homework GET+POST handler in teacherTaskRoutes DELETED)
+        teacherLeaveRouting()        // /api/v1/teacher/leave-requests[…] — RA-44 teacher lists/decides STUDENT leave routed to their classes
+        teacherSelfLeaveRouting()    // T-602a /api/v1/teacher/leave[…] — the teacher's OWN leave: apply (requester_role=teacher, routed to school admins) + list-own-status (Doc 04 §5.14)
         teacherMessagesRouting()     // /api/v1/teacher/messages[…] — RA-51 teacher↔parent messaging + class broadcast
 
         // Cross-user notification spine (audit part-2 RA-41/42/46/50) — role-aware
