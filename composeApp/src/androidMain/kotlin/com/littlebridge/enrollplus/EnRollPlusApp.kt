@@ -16,7 +16,7 @@ class EnRollPlusApp : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
-        NotificationManagerHelper.createDefaultChannel(this)
+        NotificationManagerHelper.createAllChannels(this)
 
         // Surface the resolved backend at boot so you can confirm in Logcat
         // exactly which server the phone is calling (filter tag: VidyaPrayagApp).

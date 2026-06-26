@@ -66,6 +66,10 @@ fun App(
     // can dismiss the native SplashScreen with zero white flash. No-op default keeps
     // iOS / desktop / @Preview callers unchanged (RULE-5: commonMain-safe).
     onContentRendered: () -> Unit = {},
+    // Deep-link path from a notification tap (Android only). When non-null,
+    // NavGraphV2 parses it and routes to the correct portal/screen.
+    deepLink: String? = null,
+    onDeepLinkConsumed: () -> Unit = {},
 ) {
     KoinContext {
         // Signal the platform host after the first composition lands. SideEffect runs
@@ -167,6 +171,8 @@ fun App(
                             // disposes this scope's store so no session-scoped VM
                             // survives into the next login.
                             onLogout = { viewModel.logout() },
+                            deepLink = deepLink,
+                            onDeepLinkConsumed = onDeepLinkConsumed,
                             modifier = Modifier.fillMaxSize(),
                         )
                     }

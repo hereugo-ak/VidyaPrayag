@@ -90,6 +90,7 @@ import com.littlebridge.enrollplus.feature.admin.presentation.AcademicCalendarPl
 import com.littlebridge.enrollplus.feature.admin.presentation.SchoolDashboardViewModel
 import com.littlebridge.enrollplus.feature.parent.presentation.NotificationsViewModel
 import com.littlebridge.enrollplus.presentation.PermissionViewModel
+import com.littlebridge.enrollplus.platform.rememberNotificationPermissionLauncher
 import com.littlebridge.enrollplus.ui.v2.components.*
 import com.littlebridge.enrollplus.ui.v2.screens.SkeletonDashboard
 import com.littlebridge.enrollplus.ui.v2.screens.VStateHost
@@ -128,6 +129,19 @@ fun SchoolHomeScreenV2(
     val calendarState by calendarViewModel.state.collectAsStateV2()
 
     val showRationale by permissionVm.showNotificationRationale.collectAsStateV2()
+    val launchPermission by permissionVm.launchPermissionRequest.collectAsStateV2()
+
+    val permissionLauncher = rememberNotificationPermissionLauncher { granted ->
+        permissionVm.onPermissionResult(granted)
+    }
+
+    // When the ViewModel signals we should launch the system dialog, do so.
+    androidx.compose.runtime.LaunchedEffect(launchPermission) {
+        if (launchPermission) {
+            permissionVm.consumeLaunchPermissionRequest()
+            permissionLauncher.launch()
+        }
+    }
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
         permissionVm.checkNotificationPermission()

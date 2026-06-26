@@ -101,5 +101,6 @@ data class RefreshRequest(
 
 @Serializable
 data class LogoutRequest(
-    @SerialName("refresh_token") val refreshToken: String? = null
+    @SerialName("refresh_token") val refreshToken: String? = null,
+    @SerialName("fcm_token") val fcmToken: String? = null
 )

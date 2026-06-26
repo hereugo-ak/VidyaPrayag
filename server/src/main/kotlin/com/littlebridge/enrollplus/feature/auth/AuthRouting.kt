@@ -45,6 +45,7 @@ import com.littlebridge.enrollplus.db.AuthOtpsTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.db.SchoolsTable
 import com.littlebridge.enrollplus.db.UserSessionsTable
+import com.littlebridge.enrollplus.feature.notification.repository.DeviceTokenRepository
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.plugins.origin
@@ -62,6 +63,8 @@ import java.security.MessageDigest
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
+
+private val logoutDeviceTokenRepo = DeviceTokenRepository()
 
 // ============================================================
 // DTOs
@@ -187,7 +190,10 @@ data class SchoolRegisterDto(
 )
 
 @Serializable
-data class LogoutDto(@SerialName("refresh_token") val refreshToken: String? = null)
+data class LogoutDto(
+    @SerialName("refresh_token") val refreshToken: String? = null,
+    @SerialName("fcm_token") val fcmToken: String? = null
+)
 
 // ============================================================
 // Helpers
@@ -838,6 +844,12 @@ fun Route.authRouting() {
                             UserSessionsTable.userId eq uid
                         }) { it[revokedAt] = now }
                     }
+                }
+                // Deactivate the device token so the user stops receiving push
+                // notifications on this device after logout. Only the token in
+                // the request is deactivated (multi-device safe).
+                body?.fcmToken?.takeIf { it.isNotBlank() }?.let { token ->
+                    runCatching { logoutDeviceTokenRepo.deactivateToken(token) }
                 }
                 call.okMessage("Logged out")
             }

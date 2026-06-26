@@ -1,6 +1,7 @@
 package com.littlebridge.enrollplus
 
 import android.animation.ObjectAnimator
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.view.animation.AnticipateInterpolator
@@ -14,9 +15,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.animation.doOnEnd
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.littlebridge.enrollplus.notification.NotificationManagerHelper
 
 class MainActivity : ComponentActivity() {
     private val contentReady = mutableStateOf(false)
+    private val deepLink = mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,8 +74,25 @@ class MainActivity : ComponentActivity() {
             scaleY.start()
         }
 
+        // Read deep link from notification intent (if launched from a push tap).
+        deepLink.value = extractDeepLink(intent)
+
         setContent {
-            App(onContentRendered = { contentReady.value = true })
+            App(
+                onContentRendered = { contentReady.value = true },
+                deepLink = deepLink.value,
+                onDeepLinkConsumed = { deepLink.value = null },
+            )
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        deepLink.value = extractDeepLink(intent)
+    }
+
+    private fun extractDeepLink(intent: Intent): String? {
+        if (!intent.getBooleanExtra(NotificationManagerHelper.EXTRA_FROM_PUSH, false)) return null
+        return intent.getStringExtra(NotificationManagerHelper.EXTRA_DEEP_LINK)
     }
 }

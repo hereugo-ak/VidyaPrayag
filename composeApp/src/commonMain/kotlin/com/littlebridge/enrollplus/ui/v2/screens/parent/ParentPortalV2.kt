@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +41,7 @@ import com.littlebridge.enrollplus.ui.v2.components.VIcons
 import com.littlebridge.enrollplus.ui.v2.components.VNavItem
 import com.littlebridge.enrollplus.ui.v2.components.VScreenScaffold
 import com.littlebridge.enrollplus.ui.v2.components.VStatusDot
+import com.littlebridge.enrollplus.ui.v2.navigation.DeepLinkTarget
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.screens.auth.ParentLinkChildScreenV2
 import com.littlebridge.enrollplus.ui.v2.screens.discovery.AcademicCalendarScreenV2
@@ -65,6 +67,7 @@ private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, 
 fun ParentPortalV2(
     onLogout: () -> Unit = {},
     modifier: Modifier = Modifier,
+    deepLinkTarget: DeepLinkTarget? = null,
     // RA-PP-FIX: child identity in the shared header now comes from the real
     // /parent/dashboard child_summary (the single source of truth the rest of the
     // dashboard already uses), NOT from /track-progress — which never returned a
@@ -77,6 +80,23 @@ fun ParentPortalV2(
 ) {
     var tab by remember { mutableStateOf("home") }
     var overlay by remember { mutableStateOf(ParentOverlay.None) }
+
+    // Apply deep-link routing: set tab + overlay from the typed target.
+    LaunchedEffect(deepLinkTarget) {
+        when (deepLinkTarget) {
+            is DeepLinkTarget.ParentTab -> {
+                tab = deepLinkTarget.tab
+                when (deepLinkTarget.overlay) {
+                    "leave" -> overlay = ParentOverlay.Leave
+                    "messages" -> overlay = ParentOverlay.Messages
+                    "notifications" -> overlay = ParentOverlay.Notifications
+                    "calendar" -> overlay = ParentOverlay.Calendar
+                    else -> overlay = ParentOverlay.None
+                }
+            }
+            else -> Unit
+        }
+    }
     val dashboard by dashboardViewModel.state.collectAsStateV2()
     val progress by headerViewModel.state.collectAsStateV2()
     val notifications by notificationsViewModel.state.collectAsStateV2()

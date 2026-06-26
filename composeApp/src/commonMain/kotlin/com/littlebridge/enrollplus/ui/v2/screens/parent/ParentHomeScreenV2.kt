@@ -56,6 +56,7 @@ import com.littlebridge.enrollplus.ui.v2.components.VIcons
 import com.littlebridge.enrollplus.ui.v2.screens.VErrorState
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.presentation.PermissionViewModel
+import com.littlebridge.enrollplus.platform.rememberNotificationPermissionLauncher
 import com.littlebridge.enrollplus.ui.v2.components.*
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
@@ -94,6 +95,19 @@ fun ParentHomeScreenV2(
 ) {
     val state by viewModel.state.collectAsStateV2()
     val showRationale by permissionVm.showNotificationRationale.collectAsStateV2()
+    val launchPermission by permissionVm.launchPermissionRequest.collectAsStateV2()
+
+    val permissionLauncher = rememberNotificationPermissionLauncher { granted ->
+        permissionVm.onPermissionResult(granted)
+    }
+
+    // When the ViewModel signals we should launch the system dialog, do so.
+    LaunchedEffect(launchPermission) {
+        if (launchPermission) {
+            permissionVm.consumeLaunchPermissionRequest()
+            permissionLauncher.launch()
+        }
+    }
 
     // Live clock — re-derive the time-aware greeting + period/end-of-day fields each minute.
     LaunchedEffect(Unit) {

@@ -640,6 +640,8 @@ object FeeRecordsTable : UUIDTable("fee_records", "id") {
     val category    = varchar("category", 32).default("Tuition")        // Tuition | Transport | ...
     val createdAt   = timestamp("created_at")
     val updatedAt   = timestamp("updated_at")
+    // Notification scheduler: throttle fee reminders to at most once per 24h.
+    val lastRemindedAt = timestamp("last_reminded_at").nullable()
 }
 
 // =====================================================================
@@ -1224,6 +1226,19 @@ object NotificationsTable : UUIDTable("notifications", "id") {
     val isRead     = bool("is_read").default(false)
     val createdAt  = timestamp("created_at")
     val readAt     = timestamp("read_at").nullable()
+    // Idempotency key to prevent duplicate notifications for the same event.
+    val idempotencyKey = varchar("idempotency_key", 128).nullable()
+    // Soft-archive timestamp (null = active, non-null = archived).
+    val archivedAt = timestamp("archived_at").nullable()
+
+    init {
+        // Fast lookup of a user's unread notifications (bell summary).
+        index("ix_notifications_user_unread", isUnique = false, userId, isRead)
+        // Fast lookup by category for rate-limiting checks.
+        index("ix_notifications_user_category", isUnique = false, userId, category)
+        // Idempotency dedup lookup.
+        index("ix_notifications_idempotency", isUnique = false, idempotencyKey)
+    }
 }
 
 // =====================================================================
@@ -1519,6 +1534,8 @@ object CalendarEventsTable : UUIDTable("calendar_events", "id") {
     val updatedBy       = uuid("updated_by").nullable()
     val createdAt       = timestamp("created_at")
     val updatedAt       = timestamp("updated_at")
+    // Notification scheduler: marks whether a reminder has been sent for this event.
+    val reminderSent    = bool("reminder_sent").default(false)
 }
 
 /**
@@ -1584,5 +1601,27 @@ object TeacherCheckInsTable : UUIDTable("teacher_check_ins", "id") {
             "ux_teacher_checkins_unique",
             schoolId, teacherId, date
         )
+    }
+}
+
+// =====================================================================
+// notification_preferences  (per-user, per-category notification prefs)
+// =====================================================================
+//
+// Allows each user to enable/disable notifications per category and select
+// a custom sound. When a row does not exist for a (user_id, category) pair,
+// the default is enabled=true. Notify.toUsers() checks this table before
+// inserting a notification row and dispatching push.
+object NotificationPreferencesTable : UUIDTable("notification_preferences", "id") {
+    val userId     = uuid("user_id")
+    val category   = varchar("category", 32)               // attendance|marks|announcement|leave|fees|...
+    val enabled    = bool("enabled").default(true)
+    val sound      = varchar("sound", 64).nullable()       // sound resource name or null for default
+    val createdAt  = timestamp("created_at")
+    val updatedAt  = timestamp("updated_at")
+
+    init {
+        // One preference row per user per category.
+        uniqueIndex("ux_notif_prefs_user_category", userId, category)
     }
 }

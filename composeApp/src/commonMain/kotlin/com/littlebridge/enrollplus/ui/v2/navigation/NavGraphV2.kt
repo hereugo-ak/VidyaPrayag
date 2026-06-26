@@ -14,7 +14,7 @@ import com.littlebridge.enrollplus.feature.admin.presentation.OnboardingGate
 import com.littlebridge.enrollplus.feature.admin.presentation.OnboardingGateViewModel
 import com.littlebridge.enrollplus.feature.auth.domain.repository.AuthRepository
 import com.littlebridge.enrollplus.ui.v2.screens.auth.AdminAuthScreenV2
-import com.littlebridge.enrollplus.ui.v2.screens.auth.CommonLandingScreenV2
+import com.littlebridge.enrollplus.ui.v2.screens.auth.CommonLandingScreenV3
 import com.littlebridge.enrollplus.ui.v2.screens.auth.LegalDoc
 import com.littlebridge.enrollplus.ui.v2.screens.auth.LegalInfoScreenV2
 import com.littlebridge.enrollplus.ui.v2.screens.auth.ParentAuthScreenV2
@@ -52,17 +52,72 @@ fun NavGraphV2(
     role: String?,
     isAuthenticated: Boolean,
     onLogout: () -> Unit,
+    deepLink: String? = null,
+    onDeepLinkConsumed: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val entryRole = EntryRole.from(role)
     val tone = entryRole.tone(isAuthenticated)
 
+    // Parse the deep link once when it arrives.
+    var pendingNavigation by remember { mutableStateOf<DeepLinkTarget?>(null) }
+    LaunchedEffect(deepLink) {
+        if (deepLink != null) {
+            pendingNavigation = parseDeepLink(deepLink, entryRole)
+            onDeepLinkConsumed()
+        }
+    }
+
     VTheme(tone = tone) {
         if (isAuthenticated) {
-            AuthedFlow(role = entryRole, onLogout = onLogout, modifier = modifier)
+            AuthedFlow(
+                role = entryRole,
+                onLogout = onLogout,
+                deepLinkTarget = pendingNavigation,
+                onDeepLinkNavigated = { pendingNavigation = null },
+                modifier = modifier,
+            )
         } else {
             UnauthFlow(modifier = modifier)
         }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Deep-link routing — parse notification deep-link paths into typed targets.
+// ─────────────────────────────────────────────────────────────────────────────
+
+sealed class DeepLinkTarget {
+    abstract val role: EntryRole
+
+    data class ParentTab(override val role: EntryRole, val tab: String, val overlay: String? = null) : DeepLinkTarget()
+    data class TeacherScreen(override val role: EntryRole, val screen: String) : DeepLinkTarget()
+    data class SchoolScreen(override val role: EntryRole, val screen: String) : DeepLinkTarget()
+    data class Generic(override val role: EntryRole, val path: String) : DeepLinkTarget()
+}
+
+fun parseDeepLink(path: String, currentRole: EntryRole): DeepLinkTarget {
+    val normalized = path.trim().removePrefix("/")
+    val segments = normalized.split("/").filter { it.isNotBlank() }
+    if (segments.isEmpty()) return DeepLinkTarget.Generic(currentRole, path)
+
+    return when (segments.first()) {
+        "parent" -> {
+            val tab = segments.getOrNull(1) ?: "home"
+            val overlay = when (segments.getOrNull(2)) {
+                "leave" -> "leave"
+                "messages" -> "messages"
+                "notifications" -> "notifications"
+                "calendar" -> "calendar"
+                else -> null
+            }
+            DeepLinkTarget.ParentTab(EntryRole.Parent, tab, overlay)
+        }
+        "teacher" -> DeepLinkTarget.TeacherScreen(EntryRole.Teacher, segments.getOrNull(1) ?: "home")
+        "school", "admin" -> DeepLinkTarget.SchoolScreen(EntryRole.SchoolAdmin, segments.getOrNull(1) ?: "home")
+        "announcements" -> DeepLinkTarget.Generic(currentRole, path)
+        "calendar" -> DeepLinkTarget.Generic(currentRole, path)
+        else -> DeepLinkTarget.Generic(currentRole, path)
     }
 }
 
@@ -136,7 +191,7 @@ private fun UnauthFlow(modifier: Modifier = Modifier) {
             // featured schools, offerings, portals) is CMS-driven inside the screen itself via
             // LandingViewModel + MainViewModel — both fetch in `init`, so no extra wiring is needed
             // here; this site only supplies the navigation callbacks.
-            UnauthRoute.Landing -> CommonLandingScreenV2(
+            UnauthRoute.Landing -> CommonLandingScreenV3(
                 onParent = { route = UnauthRoute.ParentAuth },
                 onAdmin = { route = UnauthRoute.AdminAuth },
                 // Footer "Privacy Policy / Terms of Service / Help Desk" + the continue-footnote
@@ -208,6 +263,8 @@ private enum class AuthedRoute { Resolving, ParentLinkChild, SchoolOnboarding, T
 private fun AuthedFlow(
     role: EntryRole,
     onLogout: () -> Unit,
+    deepLinkTarget: DeepLinkTarget? = null,
+    onDeepLinkNavigated: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val authRepository = koinInject<AuthRepository>()
@@ -294,22 +351,55 @@ private fun AuthedFlow(
             AuthedRoute.TeacherFirstLogin -> TeacherFirstLoginScreenV2(
                 onDone = { route = AuthedRoute.Portal },
             )
-            AuthedRoute.Portal -> RolePortal(role = role, onLogout = onLogout)
+            AuthedRoute.Portal -> RolePortal(
+                role = role,
+                onLogout = onLogout,
+                deepLinkTarget = deepLinkTarget,
+                onDeepLinkNavigated = onDeepLinkNavigated,
+                modifier = modifier,
+            )
         }
     }
 }
 
 /** Maps the typed role to its self-contained, tabbed portal (the role's "dashboard"). */
 @Composable
-private fun RolePortal(role: EntryRole, onLogout: () -> Unit, modifier: Modifier = Modifier) {
+private fun RolePortal(
+    role: EntryRole,
+    onLogout: () -> Unit,
+    deepLinkTarget: DeepLinkTarget? = null,
+    onDeepLinkNavigated: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
     when (role) {
         // super_admin currently shares the school-admin operator surface (no
         // dedicated super-admin portal exists yet) — but it is no longer
         // silently dropped into the parent UI (audit §3.5).
-        EntryRole.SchoolAdmin, EntryRole.SuperAdmin -> SchoolPortalV2(onLogout = onLogout, modifier = modifier)
-        EntryRole.Teacher -> TeacherPortalV2(onLogout = onLogout, modifier = modifier)
-        EntryRole.Parent -> ParentPortalV2(onLogout = onLogout, modifier = modifier)
+        EntryRole.SchoolAdmin, EntryRole.SuperAdmin -> SchoolPortalV2(
+            onLogout = onLogout,
+            modifier = modifier,
+            deepLinkTarget = deepLinkTarget,
+        )
+        EntryRole.Teacher -> TeacherPortalV2(
+            onLogout = onLogout,
+            modifier = modifier,
+            deepLinkTarget = deepLinkTarget,
+        )
+        EntryRole.Parent -> ParentPortalV2(
+            onLogout = onLogout,
+            modifier = modifier,
+            deepLinkTarget = deepLinkTarget,
+        )
         // Authenticated but role unknown → safest default is the parent surface.
-        EntryRole.Unknown -> ParentPortalV2(onLogout = onLogout, modifier = modifier)
+        EntryRole.Unknown -> ParentPortalV2(
+            onLogout = onLogout,
+            modifier = modifier,
+            deepLinkTarget = deepLinkTarget,
+        )
+    }
+
+    // Consume the deep link once the portal is composed.
+    LaunchedEffect(deepLinkTarget) {
+        if (deepLinkTarget != null) onDeepLinkNavigated()
     }
 }

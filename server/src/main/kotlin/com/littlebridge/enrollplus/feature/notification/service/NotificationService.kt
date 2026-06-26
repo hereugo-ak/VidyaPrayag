@@ -41,6 +41,9 @@ import com.google.firebase.messaging.FirebaseMessagingException
 import com.google.firebase.messaging.Message
 import com.google.firebase.messaging.MulticastMessage
 import com.google.firebase.messaging.Notification
+import com.google.firebase.messaging.AndroidConfig
+import com.google.firebase.messaging.ApnsConfig
+import com.google.firebase.messaging.Aps
 import com.littlebridge.enrollplus.feature.notification.dto.SendNotificationRequest
 import com.littlebridge.enrollplus.feature.notification.dto.SendNotificationResponse
 import com.littlebridge.enrollplus.feature.notification.firebase.FirebaseAdminInitializer
@@ -93,6 +96,21 @@ class NotificationService(
             .setBody(request.body)
             .build()
 
+        // TTL + collapse key (§6.10): high-priority Android TTL for timely
+        // delivery, collapse key per category so stacked notifications replace
+        // each other in the system tray instead of piling up.
+        val androidConfig = AndroidConfig.builder()
+            .setTtl(ANDROID_TTL_SECONDS)
+            .setPriority(AndroidConfig.Priority.HIGH)
+            .apply {
+                request.data["type"]?.let { setCollapseKey(it) }
+            }
+            .build()
+
+        val apnsConfig = ApnsConfig.builder()
+            .setAps(Aps.builder().setContentAvailable(true).build())
+            .build()
+
         var sent = 0
         var failed = 0
 
@@ -104,6 +122,8 @@ class NotificationService(
                 .addAllTokens(chunk)
                 .setNotification(notification)
                 .putAllData(dataPayload)
+                .setAndroidConfig(androidConfig)
+                .setApnsConfig(apnsConfig)
                 .build()
 
             val batchResponse = runCatching { messaging.sendEachForMulticast(multicast) }
@@ -182,6 +202,9 @@ class NotificationService(
     companion object {
         /** FCM caps a multicast at 500 tokens; chunk to stay under. */
         private const val MULTICAST_CHUNK_SIZE = 500
+
+        /** Android TTL: 4 weeks in seconds (§6.10). */
+        private const val ANDROID_TTL_SECONDS = 2419200L
 
         /**
          * Firebase Admin SDK error codes that signal the token is no longer
