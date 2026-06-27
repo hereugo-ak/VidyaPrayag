@@ -606,10 +606,11 @@ private fun SchoolPulseCard(pulse: OverviewSchoolPulse) {
 
 @Composable
 private fun StatusPill(status: String) {
+    val c = VTheme.colors
     val tint = when (status.uppercase()) {
-        "EXCELLENT", "HEALTHY" -> Color(0xFF5FD6A4)
-        "WATCH" -> Color(0xFFFFC275)
-        else -> Color(0xFFFF8A82)
+        "EXCELLENT", "HEALTHY" -> c.successInk
+        "WATCH" -> c.warningInk
+        else -> c.dangerInk
     }
     Box(
         modifier = Modifier
@@ -625,8 +626,9 @@ private fun StatusPill(status: String) {
 
 @Composable
 private fun PulseGauge(progress: Float, score: Int) {
+    val c = VTheme.colors
     val track = Color.White.copy(alpha = .18f)
-    val arc = Color(0xFF3CD1BE)
+    val arc = c.teal
     Box(modifier = Modifier.size(112.dp), contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.size(112.dp)) {
             val stroke = 12.dp.toPx()
@@ -668,6 +670,7 @@ private fun PulseGauge(progress: Float, score: Int) {
 
 @Composable
 private fun PulseCategoryRow(label: String, score: Int) {
+    val c = VTheme.colors
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -693,7 +696,7 @@ private fun PulseCategoryRow(label: String, score: Int) {
                     .fillMaxWidth(frac)
                     .height(5.dp)
                     .clip(RoundedCornerShape(50))
-                    .background(Color(0xFF3CD1BE)),
+                    .background(c.teal),
             )
         }
     }

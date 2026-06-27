@@ -37,8 +37,8 @@ import com.littlebridge.enrollplus.ui.v2.components.VCard
 import com.littlebridge.enrollplus.ui.v2.components.VIcons
 import com.littlebridge.enrollplus.ui.v2.components.VLabel
 import com.littlebridge.enrollplus.ui.v2.components.VTopTabs
-import com.littlebridge.enrollplus.ui.v2.theme.VPortalTone
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
+import com.littlebridge.enrollplus.ui.v2.theme.VThemeRegistry
 import com.littlebridge.enrollplus.ui.v2.theme.colored
 
 /**
@@ -68,7 +68,7 @@ fun LegalInfoScreenV2(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     initial: LegalDoc = LegalDoc.Privacy,
-) = VTheme(tone = VPortalTone.Light) {
+) = VTheme(themeDef = VThemeRegistry.resolve("light")) {
     val c = VTheme.colors
     val d = VTheme.dimens
 

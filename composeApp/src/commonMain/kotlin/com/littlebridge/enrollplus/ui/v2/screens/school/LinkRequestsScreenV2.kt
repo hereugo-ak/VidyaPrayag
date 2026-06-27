@@ -200,7 +200,7 @@ private fun LinkRequestCard(
                     Spacer(Modifier.height(6.dp))
                     Text(
                         "⚠ $reason",
-                        style = VTheme.type.caption.colored(Color(0xFFB7791F)),
+                        style = VTheme.type.caption.colored(c.warningInk),
                     )
                 }
             }

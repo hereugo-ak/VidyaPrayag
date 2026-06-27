@@ -61,9 +61,13 @@ class MainViewModelTest {
         override fun getUserToken(): Flow<String?> = userTokenFlow
         override fun getUserRole(): Flow<String> = flowOf("GUEST")
         override fun getThemeName(): Flow<String> = flowOf("LIGHT")
+        override suspend fun setThemeName(name: String) {}
+        override fun getThemeMode(): Flow<String> = flowOf("system")
+        override suspend fun setThemeMode(mode: String) {}
+        override fun getCustomThemeId(): Flow<String?> = flowOf(null)
+        override suspend fun setCustomThemeId(id: String?) {}
         override suspend fun setUserToken(token: String?) { userTokenFlow.value = token }
         override suspend fun setUserRole(role: String) {}
-        override suspend fun setThemeName(name: String) {}
         override fun getFcmToken(): Flow<String?> = flowOf(null)
         override suspend fun setFcmToken(token: String?) {}
         override fun getNotificationsDeclined(): Flow<Boolean> = flowOf(false)
@@ -111,5 +115,6 @@ class MainViewModelTest {
         override suspend fun changePassword(oldPassword: String?, newPassword: String): NetworkResult<Unit> = TODO()
         override suspend fun logout() {}
         override suspend fun getUserDetails(token: String): NetworkResult<com.littlebridge.enrollplus.feature.auth.domain.model.UserDetailsResponse> = TODO()
+        override suspend fun syncThemePref(themePref: String): NetworkResult<Unit> = TODO()
     }
 }

@@ -43,6 +43,7 @@ import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherObligatio
 import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherTodayState
 import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherTodayViewModel
 import com.littlebridge.enrollplus.platform.BiometricMethod
+import com.littlebridge.enrollplus.ui.v2.components.VActionCard
 import com.littlebridge.enrollplus.ui.v2.components.VIcons
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
@@ -67,6 +68,7 @@ fun TeacherHomeScreenV2(
     onOpenUpdateTab: () -> Unit,
     onOpenClasses: () -> Unit,
     onOpenLessonPlanForAssignment: (assignmentId: String, scope: String) -> Unit = { _, _ -> },
+    onOpenHealthAlerts: () -> Unit = {},
     modifier: Modifier = Modifier,
     todayViewModel: TeacherTodayViewModel = koinViewModel(),
     checkInViewModel: TeacherCheckInViewModel = koinViewModel(),
@@ -115,6 +117,13 @@ fun TeacherHomeScreenV2(
                 obligations = obligations,
                 onOpenUpdate = onOpenUpdateTab,
                 onOpenClasses = onOpenClasses,
+            )
+
+            VActionCard(
+                title = "Health Alerts",
+                subtitle = "Allergies & conditions for students in your classes",
+                icon = VIcons.Heart,
+                onClick = onOpenHealthAlerts,
             )
         }
 

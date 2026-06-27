@@ -46,6 +46,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -69,31 +70,102 @@ private data class TonePal(
     val soft: Color, val softFg: Color, val softBorder: Color, val softShadow: Color,
 )
 
-private fun tonePalette(tone: VButtonTone): TonePal = when (tone) {
-    VButtonTone.Navy -> TonePal(
-        bg = Color(0xFF26234D), fg = Color.White, shadow = Color(0x4D26234D),
-        soft = Color(0xFFD8D2F1), softFg = Color(0xFF26234D), softBorder = Color(0x3826234D), softShadow = Color(0x2926234D))
-    VButtonTone.Teal -> TonePal(
-        bg = Color(0xFF006A60), fg = Color.White, shadow = Color(0x47006A60),
-        soft = Color(0xFFB9E6DF), softFg = Color(0xFF005048), softBorder = Color(0x4D006A60), softShadow = Color(0x2E006A60))
-    VButtonTone.Sky -> TonePal(
-        bg = Color(0xFF3B78E7), fg = Color.White, shadow = Color(0x4D3B78E7),
-        soft = Color(0xFFCDDCFF), softFg = Color(0xFF1A3F99), softBorder = Color(0x471F4FB5), softShadow = Color(0x2E1F4FB5))
-    VButtonTone.Peach -> TonePal(
-        bg = Color(0xFFE08A3C), fg = Color.White, shadow = Color(0x4DE08A3C),
-        soft = Color(0xFFFAD0A8), softFg = Color(0xFF7A3F0A), softBorder = Color(0x478A4A10), softShadow = Color(0x2E8A4A10))
-    VButtonTone.Lavender -> TonePal(
-        bg = Color(0xFF7A6CF0), fg = Color.White, shadow = Color(0x4D7A6CF0),
-        soft = Color(0xFFD6CDFF), softFg = Color(0xFF3527A8), softBorder = Color(0x473D2DB5), softShadow = Color(0x2E3D2DB5))
-    VButtonTone.Sand -> TonePal(
-        bg = Color(0xFFA88B5C), fg = Color.White, shadow = Color(0x47A88B5C),
-        soft = Color(0xFFE8D8B6), softFg = Color(0xFF5A4626), softBorder = Color(0x4D6B5230), softShadow = Color(0x2E6B5230))
-    VButtonTone.Rose -> TonePal(
-        bg = Color(0xFFC14A6A), fg = Color.White, shadow = Color(0x47C14A6A),
-        soft = Color(0xFFF6CAD6), softFg = Color(0xFF6E1730), softBorder = Color(0x477E1F3A), softShadow = Color(0x2E7E1F3A))
-    VButtonTone.Mint -> TonePal(
-        bg = Color(0xFF2F9B7A), fg = Color.White, shadow = Color(0x472F9B7A),
-        soft = Color(0xFFBCE5D2), softFg = Color(0xFF0E4D36), softBorder = Color(0x4713573F), softShadow = Color(0x2E13573F))
+/**
+ * Theme-aware tone palette. Brand tones (Navy, Teal, Lavender) read directly
+ * from [VTheme.colors] so they adapt to dark mode. Decorative tones keep their
+ * filled hex for brand consistency, but their soft variants are computed from
+ * the theme's card surface so they look correct in both light and dark.
+ */
+@Composable
+private fun tonePalette(tone: VButtonTone): TonePal {
+    val c = VTheme.colors
+    val isDark = c.isNight
+
+    fun softVariant(base: Color): Color =
+        if (isDark) base.copy(alpha = 0.18f).compositeOver(c.card)
+        else base.copy(alpha = 0.85f).compositeOver(Color.White)
+
+    fun softFgVariant(base: Color): Color =
+        if (isDark) base.copy(alpha = 0.90f).compositeOver(c.card)
+        else base
+
+    fun softBorderVariant(base: Color): Color =
+        if (isDark) base.copy(alpha = 0.30f)
+        else base.copy(alpha = 0.30f)
+
+    fun softShadowVariant(base: Color): Color =
+        if (isDark) Color.Black.copy(alpha = 0.20f)
+        else base.copy(alpha = 0.18f)
+
+    return when (tone) {
+        VButtonTone.Navy -> {
+            val bg = c.navy
+            TonePal(
+                bg = bg, fg = if (isDark) c.navyDeep else Color.White, shadow = bg.copy(alpha = 0.30f),
+                soft = if (isDark) c.navy.copy(alpha = 0.12f).compositeOver(c.card) else Color(0xFFD8D2F1),
+                softFg = if (isDark) c.navy else c.navy,
+                softBorder = bg.copy(alpha = 0.22f), softShadow = softShadowVariant(bg),
+            )
+        }
+        VButtonTone.Teal -> {
+            val bg = c.tealDeep
+            TonePal(
+                bg = bg, fg = Color.White, shadow = bg.copy(alpha = 0.28f),
+                soft = if (isDark) bg.copy(alpha = 0.15f).compositeOver(c.card) else Color(0xFFB9E6DF),
+                softFg = if (isDark) c.teal else Color(0xFF005048),
+                softBorder = bg.copy(alpha = 0.30f), softShadow = softShadowVariant(bg),
+            )
+        }
+        VButtonTone.Lavender -> {
+            val bg = c.accent
+            TonePal(
+                bg = bg, fg = Color.White, shadow = bg.copy(alpha = 0.30f),
+                soft = c.accentTint,
+                softFg = c.accentDeep,
+                softBorder = c.accent.copy(alpha = 0.28f), softShadow = softShadowVariant(bg),
+            )
+        }
+        VButtonTone.Sky -> {
+            val base = Color(0xFF3B78E7)
+            TonePal(
+                bg = base, fg = Color.White, shadow = base.copy(alpha = 0.30f),
+                soft = softVariant(base), softFg = softFgVariant(Color(0xFF1A3F99)),
+                softBorder = softBorderVariant(base), softShadow = softShadowVariant(base),
+            )
+        }
+        VButtonTone.Peach -> {
+            val base = Color(0xFFE08A3C)
+            TonePal(
+                bg = base, fg = Color.White, shadow = base.copy(alpha = 0.30f),
+                soft = softVariant(base), softFg = softFgVariant(Color(0xFF7A3F0A)),
+                softBorder = softBorderVariant(base), softShadow = softShadowVariant(base),
+            )
+        }
+        VButtonTone.Sand -> {
+            val base = Color(0xFFA88B5C)
+            TonePal(
+                bg = base, fg = Color.White, shadow = base.copy(alpha = 0.28f),
+                soft = softVariant(base), softFg = softFgVariant(Color(0xFF5A4626)),
+                softBorder = softBorderVariant(base), softShadow = softShadowVariant(base),
+            )
+        }
+        VButtonTone.Rose -> {
+            val base = Color(0xFFC14A6A)
+            TonePal(
+                bg = base, fg = Color.White, shadow = base.copy(alpha = 0.28f),
+                soft = softVariant(base), softFg = softFgVariant(Color(0xFF6E1730)),
+                softBorder = softBorderVariant(base), softShadow = softShadowVariant(base),
+            )
+        }
+        VButtonTone.Mint -> {
+            val base = Color(0xFF2F9B7A)
+            TonePal(
+                bg = base, fg = Color.White, shadow = base.copy(alpha = 0.28f),
+                soft = softVariant(base), softFg = softFgVariant(Color(0xFF0E4D36)),
+                softBorder = softBorderVariant(base), softShadow = softShadowVariant(base),
+            )
+        }
+    }
 }
 
 /**

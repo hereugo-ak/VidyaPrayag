@@ -77,8 +77,8 @@ import com.littlebridge.enrollplus.ui.v2.components.VDatePicker
 import com.littlebridge.enrollplus.ui.v2.components.VInput
 import com.littlebridge.enrollplus.ui.v2.components.VProgressBar
 import com.littlebridge.enrollplus.ui.v2.components.VTag
-import com.littlebridge.enrollplus.ui.v2.theme.VPortalTone
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
+import com.littlebridge.enrollplus.ui.v2.theme.VThemeRegistry
 import com.littlebridge.enrollplus.ui.v2.theme.colored
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.feature.admin.presentation.AcademicInfoOBViewModel
@@ -119,7 +119,7 @@ fun SchoolOnboardingScreenV2(
     launchVm: LaunchInfoOBViewModel = koinViewModel(),
     teacherProvisionVm: TeacherProvisioningOBViewModel = koinViewModel(),
 ) {
-    VTheme(tone = VPortalTone.Warm) {
+    VTheme(themeDef = VThemeRegistry.resolve("warm")) {
         val c = VTheme.colors
         val d = VTheme.dimens
         val titles = listOf("School identity", "Academic year", "Classes & sections", "Subjects", "Teachers", "Students")

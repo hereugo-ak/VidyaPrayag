@@ -65,16 +65,16 @@ fun PewsPreview(modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                RiskBandTile("Low", Color(0xFFA8E6CF), Color(0xFF155E3A), Modifier.weight(1f))
-                RiskBandTile("Watch", Color(0xFFFFD4A3), Color(0xFF7A3F00), Modifier.weight(1f))
-                RiskBandTile("High", Color(0xFFFFADA8), Color(0xFF7A1C18), Modifier.weight(1f))
+                RiskBandTile("Low", c.success, c.successInk, Modifier.weight(1f))
+                RiskBandTile("Watch", c.warning, c.warningInk, Modifier.weight(1f))
+                RiskBandTile("High", c.danger, c.dangerInk, Modifier.weight(1f))
             }
         }
 
         // ── Highest-priority placeholder rows (no names, no scores) ──────────────
         Column {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(VIcons.AlertTriangle, contentDescription = null, tint = Color(0xFF7A1C18), modifier = Modifier.size(13.dp))
+                Icon(VIcons.AlertTriangle, contentDescription = null, tint = c.dangerInk, modifier = Modifier.size(13.dp))
                 Text(
                     "HIGHEST PRIORITY",
                     style = VTheme.type.label.colored(c.ink2).copy(fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 0.04.em),

@@ -46,6 +46,7 @@ import com.littlebridge.enrollplus.ui.v2.components.VBadge
 import com.littlebridge.enrollplus.ui.v2.components.VBadgeTone
 import com.littlebridge.enrollplus.ui.v2.components.VButton
 import com.littlebridge.enrollplus.ui.v2.components.VButtonVariant
+import com.littlebridge.enrollplus.ui.v2.components.VActionCard
 import com.littlebridge.enrollplus.ui.v2.components.VCard
 import com.littlebridge.enrollplus.ui.v2.components.VConfirmDialog
 import com.littlebridge.enrollplus.ui.v2.components.VIcons
@@ -76,6 +77,7 @@ fun StudentProfileScreenV2(
     studentId: String,
     onBack: () -> Unit = {},
     onRemoved: () -> Unit = onBack,
+    onOpenHealth: ((String, String) -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: StudentProfileViewModel = koinViewModel(),
 ) {
@@ -95,6 +97,7 @@ fun StudentProfileScreenV2(
             state = state,
             onRetry = viewModel::retry,
             onRemove = { viewModel.remove(studentId) },
+            onOpenHealth = onOpenHealth,
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -105,6 +108,7 @@ private fun StudentProfileContent(
     state: StudentProfileUiState,
     onRetry: () -> Unit,
     onRemove: () -> Unit,
+    onOpenHealth: ((String, String) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var confirmRemove by remember { mutableStateOf(false) }
@@ -126,6 +130,16 @@ private fun StudentProfileContent(
         ) {
             val p = state.profile ?: return@VStateHost
             StudentProfileBody(p)
+
+            if (onOpenHealth != null) {
+                Spacer(Modifier.height(8.dp))
+                VActionCard(
+                    title = "Health Records",
+                    subtitle = "View and manage health profile, immunizations, and incidents",
+                    icon = VIcons.Heart,
+                    onClick = { onOpenHealth(p.student.id, p.student.fullName) },
+                )
+            }
 
             Spacer(Modifier.height(8.dp))
             DangerZone(

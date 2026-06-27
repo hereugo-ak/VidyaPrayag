@@ -44,8 +44,8 @@ import androidx.compose.ui.unit.sp
 import com.littlebridge.enrollplus.ui.v2.components.VBrandLogo
 import com.littlebridge.enrollplus.ui.v2.components.VIcons
 import com.littlebridge.enrollplus.ui.v2.theme.VMotion
-import com.littlebridge.enrollplus.ui.v2.theme.VPortalTone
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
+import com.littlebridge.enrollplus.ui.v2.theme.VThemeRegistry
 import com.littlebridge.enrollplus.ui.v2.theme.colored
 import kotlinx.coroutines.launch
 
@@ -65,7 +65,7 @@ fun AuthScaffoldV2(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
-) = VTheme(tone = VPortalTone.Light) {
+) = VTheme(themeDef = VThemeRegistry.resolve("light")) {
     val c = VTheme.colors
 
     val logoScale = remember { Animatable(0.85f) }

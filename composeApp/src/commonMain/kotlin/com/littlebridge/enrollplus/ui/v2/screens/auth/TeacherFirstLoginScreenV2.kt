@@ -33,8 +33,8 @@ import com.littlebridge.enrollplus.ui.v2.components.VButtonTone
 import com.littlebridge.enrollplus.ui.v2.components.VButtonVariant
 import com.littlebridge.enrollplus.ui.v2.components.VIcons
 import com.littlebridge.enrollplus.ui.v2.components.VInput
-import com.littlebridge.enrollplus.ui.v2.theme.VPortalTone
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
+import com.littlebridge.enrollplus.ui.v2.theme.VThemeRegistry
 import com.littlebridge.enrollplus.ui.v2.theme.colored
 
 /**
@@ -54,7 +54,7 @@ fun TeacherFirstLoginScreenV2(
     modifier: Modifier = Modifier,
     teacherName: String? = "Mr. Vikram",
     authRepository: AuthRepository = koinInject(),
-) = VTheme(tone = VPortalTone.Night) {
+) = VTheme(themeDef = VThemeRegistry.resolve("dark")) {
     val scope = rememberCoroutineScope()
     var current by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }

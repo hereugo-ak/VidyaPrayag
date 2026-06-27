@@ -28,6 +28,12 @@ class MainViewModel(
     val themeName: StateFlow<String> = preferenceRepository.getThemeName()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "LIGHT")
 
+    val themeMode: StateFlow<String> = preferenceRepository.getThemeMode()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "system")
+
+    val customThemeId: StateFlow<String?> = preferenceRepository.getCustomThemeId()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     val authState: StateFlow<AuthState> = combine(
         preferenceRepository.getUserRole(),
         preferenceRepository.getUserToken()
@@ -70,6 +76,18 @@ class MainViewModel(
     fun setTheme(name: String) {
         viewModelScope.launch {
             preferenceRepository.setThemeName(name)
+        }
+    }
+
+    fun setThemeMode(mode: String) {
+        viewModelScope.launch {
+            preferenceRepository.setThemeMode(mode)
+        }
+    }
+
+    fun setCustomThemeId(id: String?) {
+        viewModelScope.launch {
+            preferenceRepository.setCustomThemeId(id)
         }
     }
 

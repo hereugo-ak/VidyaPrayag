@@ -7,9 +7,11 @@ import com.littlebridge.enrollplus.core.prefs.PreferenceRepository
 import com.littlebridge.enrollplus.feature.auth.domain.model.PersonalDetails
 import com.littlebridge.enrollplus.feature.auth.domain.repository.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -45,6 +47,20 @@ class ParentProfileViewModel(
 ) : ViewModel() {
     private val _state = MutableStateFlow(ParentProfileState())
     val state: StateFlow<ParentProfileState> = _state.asStateFlow()
+
+    val themeMode: StateFlow<String> = preferenceRepository.getThemeMode()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "system")
+
+    val customThemeId: StateFlow<String?> = preferenceRepository.getCustomThemeId()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun setThemeMode(mode: String) {
+        viewModelScope.launch { preferenceRepository.setThemeMode(mode) }
+    }
+
+    fun setCustomThemeId(id: String?) {
+        viewModelScope.launch { preferenceRepository.setCustomThemeId(id) }
+    }
 
     init {
         load()

@@ -65,6 +65,7 @@ import com.littlebridge.enrollplus.feature.config.versionRouting
 import com.littlebridge.enrollplus.feature.content.landingRouting
 import com.littlebridge.enrollplus.feature.content.supportRouting
 import com.littlebridge.enrollplus.feature.gateway.api.gatewayRouting
+import com.littlebridge.enrollplus.feature.health.healthRouting
 import com.littlebridge.enrollplus.feature.media.mediaRouting
 import com.littlebridge.enrollplus.feature.notification.api.notificationRouting
 import com.littlebridge.enrollplus.feature.notifications.notificationsRouting
@@ -341,5 +342,11 @@ fun Application.module() {
         //   /api/device-tokens            — register/refresh FCM token (any role)
         //   /api/admin/notifications/send — school-admin broadcast via Firebase Admin SDK
         notificationRouting()
+
+        // Student Health Records (HEALTH_RECORDS_SPEC.md — P1-12)
+        //   /api/v1/school/health/{profiles,immunizations,incidents}  — admin/nurse
+        //   /api/v1/teacher/health/alerts                              — teacher allergy alerts
+        //   /api/v1/parent/health/{childId}                            — parent view
+        healthRouting()
     }
 }

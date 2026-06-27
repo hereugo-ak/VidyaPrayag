@@ -58,14 +58,14 @@ fun SriPreview(score: Float, modifier: Modifier = Modifier) {
                 )
                 Text("Above Lucknow median (7.4)", style = VTheme.type.label.colored(c.ink3).copy(fontSize = 11.sp, fontWeight = FontWeight.Normal, letterSpacing = 0.sp), modifier = Modifier.padding(top = 2.dp))
             }
-            // "+0.3 YoY" chip — pastel mint bg #A8E6CF@40%, dark-green ink #155E3A.
+            // "+0.3 YoY" chip — success tint bg, success ink.
             Row(
-                Modifier.clip(RoundedCornerShape(999.dp)).background(Color(0xFFA8E6CF).copy(alpha = 0.4f)).padding(horizontal = 8.dp, vertical = 4.dp),
+                Modifier.clip(RoundedCornerShape(999.dp)).background(c.success.copy(alpha = 0.4f)).padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Icon(VIcons.TrendingUp, contentDescription = null, tint = Color(0xFF155E3A), modifier = Modifier.size(11.dp))
-                Text("+0.3 YoY", style = VTheme.type.label.colored(Color(0xFF155E3A)).copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold))
+                Icon(VIcons.TrendingUp, contentDescription = null, tint = c.successInk, modifier = Modifier.size(11.dp))
+                Text("+0.3 YoY", style = VTheme.type.label.colored(c.successInk).copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold))
             }
         }
         Spacer(Modifier.height(12.dp))

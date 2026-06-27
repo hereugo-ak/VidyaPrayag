@@ -194,7 +194,14 @@ object DatabaseFactory {
         // AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates boot on it).
         LessonPlansTable,
         LessonPlanTemplatesTable,
-        LessonPlanAttachmentsTable
+        LessonPlanAttachmentsTable,
+        // Student Health Records (HEALTH_RECORDS_SPEC.md — P1-12)
+        // Applied by docs/db/migration_050_health_records.sql (must run before
+        // deploy; AUTO_CREATE_TABLES is OFF in prod). Closes the health records
+        // feature at the schema layer.
+        StudentHealthProfilesTable,
+        StudentImmunizationsTable,
+        StudentHealthIncidentsTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

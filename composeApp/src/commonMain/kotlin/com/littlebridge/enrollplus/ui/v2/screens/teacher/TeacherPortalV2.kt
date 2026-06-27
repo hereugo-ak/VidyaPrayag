@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -24,13 +23,11 @@ import com.littlebridge.enrollplus.ui.v2.components.VScreenScaffold
 import com.littlebridge.enrollplus.ui.v2.navigation.DeepLinkTarget
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.screens.notifications.NotificationsScreenV2
-import com.littlebridge.enrollplus.ui.v2.theme.VPortalTone
-import com.littlebridge.enrollplus.ui.v2.theme.VTheme
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays the teacher portal can push above its tab content. */
-private enum class TeacherOverlay { None, Notifications }
+private enum class TeacherOverlay { None, Notifications, HealthAlerts }
 
 /**
  * TeacherPortalV2 — the teacher shell, rebuilt FROM SCRATCH on the Parents-Portal
@@ -70,134 +67,129 @@ fun TeacherPortalV2(
     notificationsViewModel: NotificationsViewModel = koinViewModel(),
     preferenceRepository: PreferenceRepository = koinInject(),
 ) {
-    // Live tone from the saved preference (defaults Warm — the canonical teacher look).
-    val themeName by preferenceRepository.getThemeName().collectAsState(initial = "WARM")
-    val tone = when (themeName.uppercase()) {
-        "LIGHT" -> VPortalTone.Light
-        "NIGHT" -> VPortalTone.Night
-        else -> VPortalTone.Warm
+    var tab by remember { mutableStateOf("home") }
+    var overlay by remember { mutableStateOf(TeacherOverlay.None) }
+
+    // Apply deep-link routing: set tab from the typed target.
+    LaunchedEffect(deepLinkTarget) {
+        when (deepLinkTarget) {
+            is DeepLinkTarget.TeacherScreen -> tab = deepLinkTarget.screen
+            else -> Unit
+        }
     }
 
-    VTheme(tone = tone) {
-        var tab by remember { mutableStateOf("home") }
-        var overlay by remember { mutableStateOf(TeacherOverlay.None) }
+    // The UPDATE tab can be entered pre-scoped from a HOME CTA. These hold the
+    // pre-authorized scope; a bump on [updateScopeNonce] forces the Update screen
+    // to re-read its initial* values (so a fresh HOME tap re-seeds the gate).
+    var updateAssignmentId by remember { mutableStateOf<String?>(null) }
+    var updateScopeLabel by remember { mutableStateOf("") }
+    var updateInitialTool by remember { mutableStateOf(UpdateTool.Attendance) }
+    var updateScopeNonce by remember { mutableStateOf(0) }
 
-        // Apply deep-link routing: set tab from the typed target.
-        LaunchedEffect(deepLinkTarget) {
-            when (deepLinkTarget) {
-                is DeepLinkTarget.TeacherScreen -> tab = deepLinkTarget.screen
-                else -> Unit
+    val profile by profileViewModel.state.collectAsStateV2()
+    val obligations by obligationsViewModel.state.collectAsStateV2()
+    val notifications by notificationsViewModel.state.collectAsStateV2()
+
+    BackHandler(enabled = overlay != TeacherOverlay.None) {
+        overlay = TeacherOverlay.None
+    }
+    // From a non-home tab, Back returns to HOME (familiar app behaviour).
+    BackHandler(enabled = overlay == TeacherOverlay.None && tab != "home") {
+        tab = "home"
+    }
+
+    // ── Overlays sit above all tab content ──────────────────────────────────
+    when (overlay) {
+        TeacherOverlay.Notifications -> {
+            NotificationsScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
+            return
+        }
+        TeacherOverlay.HealthAlerts -> {
+            TeacherHealthAlertsScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
+            return
+        }
+        TeacherOverlay.None -> Unit
+    }
+
+    // ── Dock items. The Update badge rides the LIVE obligation count (hidden at 0). ──
+    val items = listOf(
+        VNavItem("home", "Home", VIcons.Home),
+        VNavItem("update", "Update", VIcons.Edit3, badge = obligations.totalOutstanding),
+        VNavItem("classes", "Classes", VIcons.Users),
+        VNavItem("profile", "Profile", VIcons.User),
+    )
+
+    // Canonical header identity (hidden on HOME — HOME renders its own greeting hero).
+    val teacherName = profile.profile?.name.orEmpty()
+    val schoolName = profile.profile?.schoolName.orEmpty()
+    val photoUrl = profile.profile?.photoUrl
+    val subline = when (tab) {
+        "update" -> "Mark & publish"
+        "classes" -> "Your classes & students"
+        "profile" -> schoolName.ifBlank { "Your account" }
+        else -> schoolName
+    }
+
+    VScreenScaffold(
+        modifier = modifier,
+        topBar = {
+            // HOME owns its own greeting hero, so the slim canonical header only
+            // mounts on the other three tabs (no double chrome).
+            if (tab != "home") {
+                TeacherHeader(
+                    teacherName = teacherName.ifBlank { "Teacher" },
+                    subline = subline,
+                    photoUrl = photoUrl,
+                    unreadCount = notifications.unreadCount,
+                    onOpenProfile = { tab = "profile" },
+                    onOpenNotifications = { overlay = TeacherOverlay.Notifications },
+                )
             }
-        }
+        },
+        bottomBar = {
+            TeacherDock(items = items, selected = tab, onSelect = { tab = it })
+        },
+    ) { padding ->
+        Box(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())) {
+            when (tab) {
+                "home" -> TeacherHomeScreenV2(
+                    onOpenAttendanceForAssignment = { assignmentId, scope ->
+                        updateAssignmentId = assignmentId
+                        updateScopeLabel = scope
+                        updateInitialTool = UpdateTool.Attendance
+                        updateScopeNonce++
+                        tab = "update"
+                    },
+                    onOpenLessonPlanForAssignment = { assignmentId, scope ->
+                        updateAssignmentId = assignmentId
+                        updateScopeLabel = scope
+                        updateInitialTool = UpdateTool.LessonPlan
+                        updateScopeNonce++
+                        tab = "update"
+                    },
+                    onOpenUpdateTab = {
+                        // Fresh, unscoped entry → the Update gate picks a class.
+                        updateAssignmentId = null
+                        updateScopeLabel = ""
+                        updateInitialTool = UpdateTool.Attendance
+                        updateScopeNonce++
+                        tab = "update"
+                    },
+                    onOpenClasses = { tab = "classes" },
+                    onOpenHealthAlerts = { overlay = TeacherOverlay.HealthAlerts },
+                )
 
-        // The UPDATE tab can be entered pre-scoped from a HOME CTA. These hold the
-        // pre-authorized scope; a bump on [updateScopeNonce] forces the Update screen
-        // to re-read its initial* values (so a fresh HOME tap re-seeds the gate).
-        var updateAssignmentId by remember { mutableStateOf<String?>(null) }
-        var updateScopeLabel by remember { mutableStateOf("") }
-        var updateInitialTool by remember { mutableStateOf(UpdateTool.Attendance) }
-        var updateScopeNonce by remember { mutableStateOf(0) }
-
-        val profile by profileViewModel.state.collectAsStateV2()
-        val obligations by obligationsViewModel.state.collectAsStateV2()
-        val notifications by notificationsViewModel.state.collectAsStateV2()
-
-        BackHandler(enabled = overlay != TeacherOverlay.None) {
-            overlay = TeacherOverlay.None
-        }
-        // From a non-home tab, Back returns to HOME (familiar app behaviour).
-        BackHandler(enabled = overlay == TeacherOverlay.None && tab != "home") {
-            tab = "home"
-        }
-
-        // ── Overlays sit above all tab content ──────────────────────────────────
-        when (overlay) {
-            TeacherOverlay.Notifications -> {
-                NotificationsScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
-                return@VTheme
-            }
-            TeacherOverlay.None -> Unit
-        }
-
-        // ── Dock items. The Update badge rides the LIVE obligation count (hidden at 0). ──
-        val items = listOf(
-            VNavItem("home", "Home", VIcons.Home),
-            VNavItem("update", "Update", VIcons.Edit3, badge = obligations.totalOutstanding),
-            VNavItem("classes", "Classes", VIcons.Users),
-            VNavItem("profile", "Profile", VIcons.User),
-        )
-
-        // Canonical header identity (hidden on HOME — HOME renders its own greeting hero).
-        val teacherName = profile.profile?.name.orEmpty()
-        val schoolName = profile.profile?.schoolName.orEmpty()
-        val photoUrl = profile.profile?.photoUrl
-        val subline = when (tab) {
-            "update" -> "Mark & publish"
-            "classes" -> "Your classes & students"
-            "profile" -> schoolName.ifBlank { "Your account" }
-            else -> schoolName
-        }
-
-        VScreenScaffold(
-            modifier = modifier,
-            topBar = {
-                // HOME owns its own greeting hero, so the slim canonical header only
-                // mounts on the other three tabs (no double chrome).
-                if (tab != "home") {
-                    TeacherHeader(
-                        teacherName = teacherName.ifBlank { "Teacher" },
-                        subline = subline,
-                        photoUrl = photoUrl,
-                        unreadCount = notifications.unreadCount,
-                        onOpenProfile = { tab = "profile" },
-                        onOpenNotifications = { overlay = TeacherOverlay.Notifications },
+                "update" -> key(updateScopeNonce) {
+                    TeacherUpdateScreenV2(
+                        initialAssignmentId = updateAssignmentId,
+                        initialScopeLabel = updateScopeLabel,
+                        initialTool = updateInitialTool,
                     )
                 }
-            },
-            bottomBar = {
-                TeacherDock(items = items, selected = tab, onSelect = { tab = it })
-            },
-        ) { padding ->
-            Box(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())) {
-                when (tab) {
-                    "home" -> TeacherHomeScreenV2(
-                        onOpenAttendanceForAssignment = { assignmentId, scope ->
-                            updateAssignmentId = assignmentId
-                            updateScopeLabel = scope
-                            updateInitialTool = UpdateTool.Attendance
-                            updateScopeNonce++
-                            tab = "update"
-                        },
-                        onOpenLessonPlanForAssignment = { assignmentId, scope ->
-                            updateAssignmentId = assignmentId
-                            updateScopeLabel = scope
-                            updateInitialTool = UpdateTool.LessonPlan
-                            updateScopeNonce++
-                            tab = "update"
-                        },
-                        onOpenUpdateTab = {
-                            // Fresh, unscoped entry → the Update gate picks a class.
-                            updateAssignmentId = null
-                            updateScopeLabel = ""
-                            updateInitialTool = UpdateTool.Attendance
-                            updateScopeNonce++
-                            tab = "update"
-                        },
-                        onOpenClasses = { tab = "classes" },
-                    )
 
-                    "update" -> key(updateScopeNonce) {
-                        TeacherUpdateScreenV2(
-                            initialAssignmentId = updateAssignmentId,
-                            initialScopeLabel = updateScopeLabel,
-                            initialTool = updateInitialTool,
-                        )
-                    }
+                "classes" -> TeacherClassesScreenV2()
 
-                    "classes" -> TeacherClassesScreenV2()
-
-                    "profile" -> TeacherProfileScreenV2(onLogout = onLogout)
-                }
+                "profile" -> TeacherProfileScreenV2(onLogout = onLogout)
             }
         }
     }

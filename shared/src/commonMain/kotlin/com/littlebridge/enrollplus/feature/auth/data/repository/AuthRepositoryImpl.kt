@@ -197,7 +197,31 @@ class AuthRepositoryImpl(
             result.data.data.personalDetails.name
                 .takeIf { it.isNotBlank() }
                 ?.let { preferenceRepository.setUserName(it) }
+            // Phase 6: sync server-side theme_pref back to local preferences.
+            result.data.data.personalDetails.themePref?.let { serverPref ->
+                val mode = if (serverPref.startsWith("custom:")) {
+                    "custom"
+                } else {
+                    serverPref
+                }
+                val customId = if (serverPref.startsWith("custom:")) {
+                    serverPref.removePrefix("custom:")
+                } else {
+                    null
+                }
+                preferenceRepository.setThemeMode(mode)
+                preferenceRepository.setCustomThemeId(customId)
+            }
         }
         return result
+    }
+
+    override suspend fun syncThemePref(themePref: String): NetworkResult<Unit> {
+        val result = api.setThemePref(themePref)
+        return when (result) {
+            is NetworkResult.Success -> NetworkResult.Success(Unit)
+            is NetworkResult.Error -> NetworkResult.Error(result.message)
+            is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
+        }
     }
 }

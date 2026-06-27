@@ -36,6 +36,7 @@ import com.littlebridge.enrollplus.ui.v2.components.VCard
 import com.littlebridge.enrollplus.ui.v2.components.VBackHeader
 import com.littlebridge.enrollplus.ui.v2.components.VConfirmDialog
 import com.littlebridge.enrollplus.ui.v2.components.VIcons
+import com.littlebridge.enrollplus.ui.v2.components.VThemePicker
 import com.littlebridge.enrollplus.ui.v2.screens.VStateHost
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
@@ -64,8 +65,16 @@ fun ParentProfileScreenV2(
     viewModel: ParentProfileViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
+    val themeMode by viewModel.themeMode.collectAsStateV2()
+    val customThemeId by viewModel.customThemeId.collectAsStateV2()
     ParentProfileContent(
         state = state,
+        themeMode = themeMode,
+        customThemeId = customThemeId,
+        onThemeSelect = { mode, customId ->
+            viewModel.setThemeMode(mode)
+            viewModel.setCustomThemeId(customId)
+        },
         onBack = onBack,
         onLogout = onLogout,
         onLinkChild = onLinkChild,
@@ -80,6 +89,9 @@ fun ParentProfileScreenV2(
 @Composable
 private fun ParentProfileContent(
     state: ParentProfileState,
+    themeMode: String,
+    customThemeId: String?,
+    onThemeSelect: (String, String?) -> Unit,
     onBack: () -> Unit,
     onLogout: () -> Unit,
     onLinkChild: () -> Unit,
@@ -203,6 +215,17 @@ private fun ParentProfileContent(
                             }
                         }
                         Spacer(Modifier.height(8.dp))
+
+                        // ── Appearance / theme picker ───────────────────────────────
+                        VCard {
+                            VThemePicker(
+                                currentMode = themeMode,
+                                currentCustomId = customThemeId,
+                                onSelect = onThemeSelect,
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+
                         VButton(
                             text = "Log out",
                             onClick = { showLogoutConfirm = true },

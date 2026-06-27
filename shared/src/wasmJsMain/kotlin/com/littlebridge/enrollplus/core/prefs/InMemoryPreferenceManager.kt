@@ -5,6 +5,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 class InMemoryPreferenceManager : PreferenceRepository {
     private val themeName = MutableStateFlow("LIGHT")
+    private val themeMode = MutableStateFlow("system")
+    private val customThemeId = MutableStateFlow<String?>(null)
     private val userRole = MutableStateFlow("GUEST")
     private val userToken = MutableStateFlow<String?>(null)
     private val userId = MutableStateFlow<String?>(null)
@@ -20,6 +22,16 @@ class InMemoryPreferenceManager : PreferenceRepository {
 
     override suspend fun setThemeName(name: String) {
         themeName.value = name
+    }
+
+    override fun getThemeMode(): Flow<String> = themeMode
+    override suspend fun setThemeMode(mode: String) {
+        themeMode.value = mode
+    }
+
+    override fun getCustomThemeId(): Flow<String?> = customThemeId
+    override suspend fun setCustomThemeId(id: String?) {
+        customThemeId.value = id
     }
 
     override fun getUserRole(): Flow<String> {

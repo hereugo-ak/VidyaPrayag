@@ -276,6 +276,13 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    // Health Records (P1-12) — admin/nurse + teacher + parent health endpoints.
+    single {
+        com.littlebridge.enrollplus.feature.health.data.remote.HealthApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
 
     // Repositories
     single<SchoolRepository> { SchoolRepositoryImpl(get(), get()) }
@@ -365,6 +372,10 @@ val commonModule = module {
     // Notification FOUNDATION repository — delegates to NotificationApi.
     single<com.littlebridge.enrollplus.feature.notification.domain.repository.NotificationRepository> {
         com.littlebridge.enrollplus.feature.notification.data.repository.NotificationRepositoryImpl(get())
+    }
+    // Health Records repository (P1-12)
+    single<com.littlebridge.enrollplus.feature.health.domain.repository.HealthRepository> {
+        com.littlebridge.enrollplus.feature.health.data.repository.HealthRepositoryImpl(get())
     }
 
     // UseCases
@@ -465,6 +476,10 @@ val viewModelModule = module {
     // AuthRepository, theme pref) — (TeacherRepository, PreferenceRepository, AuthRepository).
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherProfileActionsViewModel(get(), get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherLeaveViewModel(get(), get()) }
+    // Health Records (P1-12) — admin/nurse + teacher + parent view models
+    factory { com.littlebridge.enrollplus.feature.health.presentation.AdminHealthViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.health.presentation.TeacherHealthAlertsViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.health.presentation.ParentHealthViewModel(get(), get()) }
 }
 
 fun initKoin(
