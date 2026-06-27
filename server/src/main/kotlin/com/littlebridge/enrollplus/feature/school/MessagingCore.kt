@@ -38,7 +38,6 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.max
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.forUpdate
 import org.jetbrains.exposed.sql.update
 import java.time.Instant
 import java.util.UUID
