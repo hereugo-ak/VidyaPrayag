@@ -29,12 +29,19 @@ import com.littlebridge.enrollplus.core.principalUserUuid
 import com.littlebridge.enrollplus.db.AppUsersTable
 import com.littlebridge.enrollplus.db.ChildrenTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
+import com.littlebridge.enrollplus.db.MessageAttachmentsTable
 import com.littlebridge.enrollplus.db.MessageThreadsTable
 import com.littlebridge.enrollplus.db.MessagesTable
 import com.littlebridge.enrollplus.db.TeacherPeriodsTable
+import com.littlebridge.enrollplus.feature.school.AttachmentInput
 import com.littlebridge.enrollplus.feature.school.conversationMessagesFor
-import com.littlebridge.enrollplus.feature.school.resolveMessagingUser
+import com.littlebridge.enrollplus.feature.school.deleteMessage
+import com.littlebridge.enrollplus.feature.school.editMessage
+import com.littlebridge.enrollplus.feature.school.handleAttachmentUpload
+import com.littlebridge.enrollplus.feature.school.loadAttachmentsForMessages
+import com.littlebridge.enrollplus.feature.school.loadMessageStatus
 import com.littlebridge.enrollplus.feature.school.notifyMessageRecipient
+import com.littlebridge.enrollplus.feature.school.resolveMessagingUser
 import com.littlebridge.enrollplus.feature.school.sendInConversation
 import io.ktor.http.*
 import io.ktor.server.auth.*
@@ -79,14 +86,51 @@ data class ParentMessageDto(
     @SerialName("is_mine") val isMine: Boolean,
     @SerialName("sender_id") val senderId: String? = null,
     @SerialName("created_at") val createdAt: String,
-    val time: String
+    val time: String,
+    // Phase 1: seq, status, edit/delete, attachments.
+    val seq: Int? = null,
+    val status: String? = null,
+    @SerialName("edited_at") val editedAt: String? = null,
+    @SerialName("deleted_at") val deletedAt: String? = null,
+    @SerialName("reply_to_id") val replyToId: String? = null,
+    val attachments: List<ParentAttachmentDto> = emptyList(),
+)
+
+@Serializable
+data class ParentAttachmentDto(
+    val id: String,
+    @SerialName("file_name") val fileName: String,
+    @SerialName("mime_type") val mimeType: String,
+    @SerialName("size_bytes") val sizeBytes: Long,
+    @SerialName("storage_url") val storageUrl: String,
+    @SerialName("thumbnail_url") val thumbnailUrl: String? = null,
+    @SerialName("attachment_type") val attachmentType: String,
+    val width: Int? = null,
+    val height: Int? = null,
+    @SerialName("duration_ms") val durationMs: Int? = null,
 )
 
 @Serializable
 data class ParentThreadMessagesResponse(
     @SerialName("thread_id") val threadId: String,
     @SerialName("sender_name") val senderName: String,
-    val messages: List<ParentMessageDto>
+    val messages: List<ParentMessageDto>,
+    // Phase 1 (§9.2): pagination metadata.
+    @SerialName("has_more") val hasMore: Boolean = false,
+    @SerialName("total_count") val totalCount: Long = 0,
+)
+
+@Serializable
+data class ParentAttachmentInputDto(
+    @SerialName("file_name") val fileName: String,
+    @SerialName("mime_type") val mimeType: String,
+    @SerialName("size_bytes") val sizeBytes: Long,
+    @SerialName("storage_url") val storageUrl: String,
+    @SerialName("attachment_type") val attachmentType: String = "IMAGE",
+    @SerialName("thumbnail_url") val thumbnailUrl: String? = null,
+    val width: Int? = null,
+    val height: Int? = null,
+    @SerialName("duration_ms") val durationMs: Int? = null,
 )
 
 @Serializable
@@ -97,13 +141,23 @@ data class ParentSendMessageDto(
     @SerialName("sender_image_url") val senderImageUrl: String? = null,
     @SerialName("icon_name") val iconName: String? = null,
     @SerialName("recipient_user_id") val recipientUserId: String? = null,
+    @SerialName("client_msg_id") val clientMsgId: String? = null,
+    @SerialName("reply_to_id") val replyToId: String? = null,
+    val attachments: List<ParentAttachmentInputDto> = emptyList(),
     val body: String
 )
 
 @Serializable
 data class ParentSendMessageResponse(
     @SerialName("thread_id") val threadId: String,
-    @SerialName("message_id") val messageId: String
+    @SerialName("message_id") val messageId: String,
+    val seq: Int? = null,
+    @SerialName("server_timestamp") val serverTimestamp: String? = null,
+)
+
+@Serializable
+data class ParentEditMessageDto(
+    val body: String,
 )
 
 /**
@@ -149,6 +203,20 @@ private fun org.jetbrains.exposed.sql.ResultRow.toParentThreadDto() = ParentMess
     senderImageUrl = this[MessageThreadsTable.senderImageUrl],
     iconName = this[MessageThreadsTable.iconName],
     isRead = this[MessageThreadsTable.isRead]
+)
+
+// Phase 1 (§9.2): convert an attachment row to parent DTO.
+private fun org.jetbrains.exposed.sql.ResultRow.toParentAttachmentDto() = ParentAttachmentDto(
+    id = this[MessageAttachmentsTable.id].value.toString(),
+    fileName = this[MessageAttachmentsTable.fileName],
+    mimeType = this[MessageAttachmentsTable.mimeType],
+    sizeBytes = this[MessageAttachmentsTable.sizeBytes],
+    storageUrl = this[MessageAttachmentsTable.storageUrl],
+    thumbnailUrl = this[MessageAttachmentsTable.thumbnailUrl],
+    attachmentType = this[MessageAttachmentsTable.attachmentType],
+    width = this[MessageAttachmentsTable.width],
+    height = this[MessageAttachmentsTable.height],
+    durationMs = this[MessageAttachmentsTable.durationMs],
 )
 
 /** Resolve the (first active) school the parent's child belongs to, if any. */
@@ -249,29 +317,51 @@ fun Route.parentMessagesRouting() {
                 val id = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                     ?: run { call.fail("Invalid id"); return@get }
 
+                // Phase 1 (§9.2): pagination via offset/limit query params.
+                val offset = call.parameters["offset"]?.toIntOrNull() ?: 0
+                val limit = call.parameters["limit"]?.toIntOrNull() ?: 50
+
                 val payload = dbQuery {
                     val thread = MessageThreadsTable.selectAll()
                         .where { (MessageThreadsTable.id eq id) and (MessageThreadsTable.ownerUserId eq uid) }
                         .singleOrNull() ?: return@dbQuery null
 
-                    // RA-51: read by conversation_id so the parent sees both sides.
-                    val (_, rows) = conversationMessagesFor(id, uid) ?: return@dbQuery null
-                    val msgs = rows.map { row ->
+                    // Phase 1: paginated fetch with seq ordering + pagination metadata.
+                    val paged = conversationMessagesFor(id, uid, offset = offset, limit = limit)
+                        ?: return@dbQuery null
+
+                    // Phase 1 (§9.2): load attachments for the page of messages.
+                    val msgIds = paged.messages.map { it[MessagesTable.id].value }
+                    val attachmentsMap = loadAttachmentsForMessages(msgIds)
+
+                    val msgs = paged.messages.map { row ->
                         val sid = row[MessagesTable.senderId]
                         val created = row[MessagesTable.createdAt]
+                        val msgId = row[MessagesTable.id].value
+                        val status = if (sid != uid && paged.conversationId != null) {
+                            loadMessageStatus(msgId, uid)
+                        } else null
                         ParentMessageDto(
-                            id = row[MessagesTable.id].value.toString(),
-                            body = row[MessagesTable.body],
+                            id = msgId.toString(),
+                            body = row[MessagesTable.body] ?: "",
                             isMine = sid == uid,
                             senderId = sid?.toString(),
                             createdAt = created.toString(),
-                            time = fmtParentTime(created)
+                            time = fmtParentTime(created),
+                            seq = row[MessagesTable.seq],
+                            status = status,
+                            editedAt = row[MessagesTable.editedAt]?.toString(),
+                            deletedAt = row[MessagesTable.deletedAt]?.toString(),
+                            replyToId = row[MessagesTable.replyToId]?.toString(),
+                            attachments = (attachmentsMap[msgId] ?: emptyList()).map { it.toParentAttachmentDto() },
                         )
                     }
                     ParentThreadMessagesResponse(
                         threadId = id.toString(),
                         senderName = thread[MessageThreadsTable.senderName],
-                        messages = msgs
+                        messages = msgs,
+                        hasMore = paged.hasMore,
+                        totalCount = paged.totalCount,
                     )
                 }
                 if (payload == null) call.fail("Thread not found", HttpStatusCode.NotFound)
@@ -312,6 +402,10 @@ fun Route.parentMessagesRouting() {
                 val uid = call.principalUserUuid() ?: run { call.fail("Unauthorized", HttpStatusCode.Unauthorized); return@post }
                 val req = call.receive<ParentSendMessageDto>()
                 if (req.body.isBlank()) { call.fail("body is required"); return@post }
+                if (req.body.length > 4096) {
+                    call.fail("Message body exceeds 4096 characters", HttpStatusCode.BadRequest, errorCode = "BODY_TOO_LONG")
+                    return@post
+                }
 
                 // For existing threads, verify ownership BEFORE writing.
                 if (req.threadId != null) {
@@ -346,6 +440,25 @@ fun Route.parentMessagesRouting() {
                     return@post
                 }
 
+                // Phase 1: parse client_msg_id for idempotency.
+                val clientMsgId = req.clientMsgId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                val replyTo = req.replyToId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+
+                // Phase 1: map attachment DTOs to core AttachmentInput.
+                val attachmentInputs = req.attachments.map { att ->
+                    AttachmentInput(
+                        fileName = att.fileName,
+                        mimeType = att.mimeType,
+                        sizeBytes = att.sizeBytes,
+                        storageUrl = att.storageUrl,
+                        attachmentType = att.attachmentType,
+                        thumbnailUrl = att.thumbnailUrl,
+                        width = att.width,
+                        height = att.height,
+                        durationMs = att.durationMs,
+                    )
+                }
+
                 val result = dbQuery {
                     // For a reply (threadId given) the engine ignores senderSchoolId;
                     // for a new conversation parentSchoolId is guaranteed non-null above.
@@ -360,10 +473,15 @@ fun Route.parentMessagesRouting() {
                         senderImageUrl = req.senderImageUrl,
                         iconName = req.iconName,
                         now = now,
+                        clientMsgId = clientMsgId,
+                        replyToId = replyTo,
+                        attachments = attachmentInputs,
                     )
                 }
                 if (result == null) {
                     call.fail("Thread not found", HttpStatusCode.NotFound)
+                } else if (result.isDuplicate) {
+                    call.fail("Message already sent", HttpStatusCode.Conflict, errorCode = "MSG_DUPLICATE")
                 } else {
                     // RA-S08: notify the recipient (teacher/admin) of the parent's message — parity
                     // with the admin/teacher send paths via the shared helper. Best-effort.
@@ -376,9 +494,90 @@ fun Route.parentMessagesRouting() {
                         body = req.body,
                     )
                     call.created(
-                        ParentSendMessageResponse(result.senderThreadId.toString(), result.messageId.toString()),
+                        ParentSendMessageResponse(
+                            threadId = result.senderThreadId.toString(),
+                            messageId = result.messageId.toString(),
+                            seq = result.seq,
+                            serverTimestamp = result.serverTimestamp?.toString(),
+                        ),
                         message = "Message sent"
                     )
+                }
+            }
+
+            // -------- Phase 1 (§9.4): EDIT MESSAGE --------
+            patch("/messages/{id}") {
+                val uid = call.principalUserUuid() ?: run { call.fail("Unauthorized", HttpStatusCode.Unauthorized); return@patch }
+                val msgId = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                    ?: run { call.fail("Invalid message id"); return@patch }
+                val req = call.receive<ParentEditMessageDto>()
+                if (req.body.isBlank()) { call.fail("body is required"); return@patch }
+                if (req.body.length > 4096) {
+                    call.fail("Message body exceeds 4096 characters", HttpStatusCode.BadRequest, errorCode = "BODY_TOO_LONG")
+                    return@patch
+                }
+
+                val now = Instant.now()
+                val result = dbQuery {
+                    editMessage(msgId, uid, req.body, now)
+                }
+                if (result == null) {
+                    call.fail(
+                        "Message not found, not yours, already deleted, or edit window expired",
+                        HttpStatusCode.Forbidden,
+                        errorCode = "MSG_EDIT_WINDOW_EXPIRED",
+                    )
+                } else {
+                    call.ok(
+                        mapOf(
+                            "message_id" to result.messageId.toString(),
+                            "conversation_id" to result.conversationId.toString(),
+                            "body" to result.newBody,
+                            "edited_at" to result.editedAt.toString(),
+                        ),
+                        message = "Message edited",
+                    )
+                }
+            }
+
+            // -------- Phase 1 (§9.4): DELETE MESSAGE --------
+            delete("/messages/{id}") {
+                val uid = call.principalUserUuid() ?: run { call.fail("Unauthorized", HttpStatusCode.Unauthorized); return@delete }
+                val msgId = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                    ?: run { call.fail("Invalid message id"); return@delete }
+                val scope = call.parameters["scope"] ?: "everyone"
+
+                val now = Instant.now()
+                val result = dbQuery {
+                    deleteMessage(msgId, uid, callerIsAdmin = false, scope = scope, now = now)
+                }
+                if (result == null && scope == "me") {
+                    call.okMessage("Message deleted for you")
+                } else if (result == null) {
+                    call.fail(
+                        "Message not found or already deleted",
+                        HttpStatusCode.NotFound,
+                        errorCode = "MSG_NOT_FOUND",
+                    )
+                } else {
+                    call.ok(
+                        mapOf(
+                            "message_id" to result.messageId.toString(),
+                            "conversation_id" to result.conversationId.toString(),
+                        ),
+                        message = "Message deleted",
+                    )
+                }
+            }
+
+            // -------- Phase 1 (§9.4, §12): ATTACHMENT UPLOAD --------
+            post("/attachments") {
+                val uid = call.principalUserUuid() ?: run { call.fail("Unauthorized", HttpStatusCode.Unauthorized); return@post }
+                val schoolId = dbQuery { resolveParentSchoolId(uid) ?: resolveMessagingUser(uid)?.schoolId }
+                    ?: run { call.fail("Link a child to a school before uploading", HttpStatusCode.Conflict); return@post }
+                val result = call.handleAttachmentUpload(uid, schoolId)
+                if (result != null) {
+                    call.ok(result, message = "Attachment uploaded")
                 }
             }
         }

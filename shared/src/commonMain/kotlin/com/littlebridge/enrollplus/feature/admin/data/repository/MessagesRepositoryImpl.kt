@@ -13,6 +13,7 @@ import com.littlebridge.enrollplus.feature.admin.data.remote.MessagesApi
 import com.littlebridge.enrollplus.feature.admin.domain.model.MessageThread
 import com.littlebridge.enrollplus.feature.admin.domain.model.SendMessageRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.SendMessageResponse
+import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolRecipient
 import com.littlebridge.enrollplus.feature.admin.domain.model.ThreadMessagesResponse
 import com.littlebridge.enrollplus.feature.admin.domain.repository.MessagesRepository
 
@@ -94,6 +95,48 @@ class MessagesRepositoryImpl(
                     data == null -> NetworkResult.Error("No data in response")
                     else -> NetworkResult.Success(data)
                 }
+            }
+            is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)
+            is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
+        }
+    }
+
+    override suspend fun getRecipients(token: String): NetworkResult<List<SchoolRecipient>> {
+        return when (val result = api.getRecipients(token)) {
+            is NetworkResult.Success -> {
+                val envelope = result.data
+                val data = envelope.data
+                when {
+                    !envelope.success -> NetworkResult.Error(
+                        envelope.message.ifBlank { "Failed to fetch recipients" }
+                    )
+                    data == null -> NetworkResult.Error("No data in response")
+                    else -> NetworkResult.Success(data.recipients)
+                }
+            }
+            is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)
+            is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
+        }
+    }
+
+    override suspend fun editMessage(token: String, messageId: String, body: String): NetworkResult<Map<String, String>> {
+        return when (val result = api.editMessage(token, messageId, body)) {
+            is NetworkResult.Success -> {
+                val envelope = result.data
+                if (!envelope.success) NetworkResult.Error(envelope.message.ifBlank { "Failed to edit message" })
+                else NetworkResult.Success(envelope.data ?: emptyMap())
+            }
+            is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)
+            is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
+        }
+    }
+
+    override suspend fun deleteMessage(token: String, messageId: String, scope: String): NetworkResult<Map<String, String>> {
+        return when (val result = api.deleteMessage(token, messageId, scope)) {
+            is NetworkResult.Success -> {
+                val envelope = result.data
+                if (!envelope.success) NetworkResult.Error(envelope.message.ifBlank { "Failed to delete message" })
+                else NetworkResult.Success(envelope.data ?: emptyMap())
             }
             is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)
             is NetworkResult.ConnectionError -> NetworkResult.ConnectionError

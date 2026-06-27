@@ -171,11 +171,16 @@ class AuthRepositoryImpl(
         // state, so the refresh token cannot be reused for 30 days.
         val token = preferenceRepository.getUserToken().first()
         val refreshToken = preferenceRepository.getRefreshToken().first()
+        val fcmToken = preferenceRepository.getFcmToken().first()
         if (token != null) {
-            runCatching { api.logout(token, refreshToken) }
+            runCatching { api.logout(token, refreshToken, fcmToken) }
         }
         // Clear the persisted session FIRST so loadTokens() reads null on the next request…
         preferenceRepository.clearSession()
+        // Belt-and-suspenders: explicitly clear the FCM token cache so a
+        // re-login (possibly as a different user on the same device) forces
+        // the registrar to re-register under the new user.
+        preferenceRepository.setFcmToken(null)
         // …then evict the Ktor Auth plugin's in-memory bearer cache (RA-S01). Without this the
         // singleton HttpClient keeps serving the previous user's cached token until a 401 forces
         // a refresh, leaking a stale session across a logout → re-login (esp. a role switch).

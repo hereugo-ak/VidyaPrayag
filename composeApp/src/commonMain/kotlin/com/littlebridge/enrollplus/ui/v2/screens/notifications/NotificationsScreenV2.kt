@@ -49,6 +49,7 @@ import com.littlebridge.enrollplus.ui.v2.components.VBadge
 import com.littlebridge.enrollplus.ui.v2.components.VBadgeTone
 import com.littlebridge.enrollplus.ui.v2.components.VIcons
 import com.littlebridge.enrollplus.ui.v2.components.VBackHeader
+import com.littlebridge.enrollplus.ui.v2.components.VPullRefresh
 import com.littlebridge.enrollplus.ui.v2.screens.VStateHost
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.theme.VElevationLevel
@@ -86,6 +87,8 @@ fun NotificationsScreenV2(
     val state by viewModel.state.collectAsStateV2()
     NotificationsContent(
         state = state,
+        isRefreshing = state.isLoading,
+        onRefresh = viewModel::load,
         onBack = onBack,
         onMarkAll = viewModel::markAllRead,
         onMarkRead = viewModel::markRead,
@@ -100,6 +103,8 @@ fun NotificationsScreenV2(
 @Composable
 private fun NotificationsContent(
     state: NotificationsState,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
     onBack: () -> Unit,
     onMarkAll: () -> Unit,
     onMarkRead: (String) -> Unit,
@@ -149,6 +154,11 @@ private fun NotificationsContent(
             },
         )
 
+        VPullRefresh(
+            isRefreshing = isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize(),
+        ) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -296,6 +306,7 @@ private fun NotificationsContent(
                     )
                 }
             }
+        }
         }
     }
 }

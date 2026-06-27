@@ -52,6 +52,12 @@ data class ParentMessageDto(
     @SerialName("sender_id") val senderId: String? = null,
     @SerialName("created_at") val createdAt: String,
     val time: String,
+    val seq: Int? = null,
+    val status: String? = null,
+    @SerialName("edited_at") val editedAt: String? = null,
+    @SerialName("deleted_at") val deletedAt: String? = null,
+    @SerialName("reply_to_id") val replyToId: String? = null,
+    val attachments: List<ParentMessageAttachment> = emptyList(),
 )
 
 @Serializable
@@ -59,6 +65,8 @@ data class ParentThreadMessagesData(
     @SerialName("thread_id") val threadId: String,
     @SerialName("sender_name") val senderName: String,
     val messages: List<ParentMessageDto> = emptyList(),
+    @SerialName("has_more") val hasMore: Boolean = false,
+    @SerialName("total_count") val totalCount: Long = 0,
 )
 
 @Serializable
@@ -75,6 +83,9 @@ data class ParentSendMessageRequest(
     @SerialName("sender_image_url") val senderImageUrl: String? = null,
     @SerialName("icon_name") val iconName: String? = null,
     @SerialName("recipient_user_id") val recipientUserId: String? = null,
+    @SerialName("client_msg_id") val clientMsgId: String? = null,
+    @SerialName("reply_to_id") val replyToId: String? = null,
+    val attachments: List<ParentAttachmentInput> = emptyList(),
     val body: String,
 )
 
@@ -82,6 +93,8 @@ data class ParentSendMessageRequest(
 data class ParentSendMessageData(
     @SerialName("thread_id") val threadId: String,
     @SerialName("message_id") val messageId: String,
+    val seq: Int? = null,
+    @SerialName("server_timestamp") val serverTimestamp: String? = null,
 )
 
 @Serializable
@@ -114,4 +127,33 @@ data class ParentRecipientsData(val recipients: List<ParentRecipientDto> = empty
 data class ParentRecipientsResponse(
     val success: Boolean = false,
     val data: ParentRecipientsData? = null,
+)
+
+/** Phase 1 (§12): attachment metadata for sending in a parent message. */
+@Serializable
+data class ParentAttachmentInput(
+    @SerialName("file_name") val fileName: String,
+    @SerialName("mime_type") val mimeType: String,
+    @SerialName("size_bytes") val sizeBytes: Long,
+    @SerialName("storage_url") val storageUrl: String,
+    @SerialName("attachment_type") val attachmentType: String = "IMAGE",
+    @SerialName("thumbnail_url") val thumbnailUrl: String? = null,
+    val width: Int? = null,
+    val height: Int? = null,
+    @SerialName("duration_ms") val durationMs: Int? = null,
+)
+
+/** Phase 1 (§12): attachment metadata returned by the server in parent message responses. */
+@Serializable
+data class ParentMessageAttachment(
+    val id: String,
+    @SerialName("file_name") val fileName: String,
+    @SerialName("mime_type") val mimeType: String,
+    @SerialName("size_bytes") val sizeBytes: Long,
+    @SerialName("storage_url") val storageUrl: String,
+    @SerialName("thumbnail_url") val thumbnailUrl: String? = null,
+    @SerialName("attachment_type") val attachmentType: String,
+    val width: Int? = null,
+    val height: Int? = null,
+    @SerialName("duration_ms") val durationMs: Int? = null,
 )

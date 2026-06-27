@@ -34,6 +34,7 @@ import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
+import java.util.UUID
 
 // ------------------------------------------------------------------
 // No-DI collaborators — module-level singletons (see Notify.kt pattern).
@@ -104,7 +105,6 @@ fun Route.notificationRouting() {
             // We do not need ctx for the dispatch (recipients are userIds in
             // the request body), but the guard is what enforces that only
             // school admins can trigger a server-side push.
-            @Suppress("UNUSED_VARIABLE")
             val ctx = call.requireSchoolAdmin() ?: return@post
 
             val req = runCatching { call.receive<SendNotificationRequest>() }.getOrNull()
@@ -117,7 +117,19 @@ fun Route.notificationRouting() {
                 return@post
             }
 
-            val response: SendNotificationResponse = notificationService.send(req)
+            // School-scoping: validate every requested userId belongs to the
+            // admin's school. An admin must not be able to push to users
+            // outside their tenant.
+            val schoolId = ctx.schoolId
+            val scopedUserIds = req.userIds.filter { uid ->
+                runCatching {
+                    val userSchoolId = resolveSchoolIdForUser(UUID.fromString(uid))
+                    userSchoolId == schoolId
+                }.getOrDefault(false)
+            }
+            val scopedReq = req.copy(userIds = scopedUserIds)
+
+            val response: SendNotificationResponse = notificationService.send(scopedReq)
             call.ok(response, message = "Notification dispatched")
         }
     }

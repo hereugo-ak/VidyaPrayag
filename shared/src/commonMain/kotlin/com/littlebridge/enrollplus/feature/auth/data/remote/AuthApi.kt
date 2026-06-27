@@ -108,11 +108,11 @@ class AuthApi(
     }
 
     /** Revoke the current session server-side (audit §3.6). */
-    suspend fun logout(token: String, refreshToken: String?): NetworkResult<ApiResponse<Unit>> {
+    suspend fun logout(token: String, refreshToken: String?, fcmToken: String? = null): NetworkResult<ApiResponse<Unit>> {
         return safeApiCall {
             client.post(getUrl("api/v1/auth/logout")) {
                 contentType(ContentType.Application.Json)
-                setBody(LogoutRequest(refreshToken))
+                setBody(LogoutRequest(refreshToken = refreshToken, fcmToken = fcmToken))
             }
         }
     }

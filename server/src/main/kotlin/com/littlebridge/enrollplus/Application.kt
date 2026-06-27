@@ -68,6 +68,8 @@ import com.littlebridge.enrollplus.feature.gateway.api.gatewayRouting
 import com.littlebridge.enrollplus.feature.media.mediaRouting
 import com.littlebridge.enrollplus.feature.notification.api.notificationRouting
 import com.littlebridge.enrollplus.feature.notifications.notificationsRouting
+import com.littlebridge.enrollplus.feature.notifications.NotificationScheduler
+import com.littlebridge.enrollplus.feature.notifications.notificationPreferencesRouting
 import com.littlebridge.enrollplus.feature.onboarding.onboardingRouting
 import com.littlebridge.enrollplus.feature.parent.parentDashboardRouting
 import com.littlebridge.enrollplus.feature.parent.parentFeesRouting
@@ -152,6 +154,9 @@ fun main() {
     val port = props.getProperty("SERVER_PORT")
         ?.toIntOrNull()
         ?: SERVER_PORT
+
+    // Start the notification scheduler (fee reminders, calendar reminders).
+    NotificationScheduler.start(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default))
 
     embeddedServer(
         Netty,
@@ -325,7 +330,8 @@ fun Application.module() {
 
         // Cross-user notification spine (audit part-2 RA-41/42/46/50) — role-aware
         // inbox replacing the parent-only synth; persisted read state; bell summary.
-        notificationsRouting()       // /api/v1/notifications[/summary,/{id}/read,/read-all,/device-token]
+        notificationsRouting()       // /api/v1/notifications[/summary,/{id}/read,/read-all]
+        notificationPreferencesRouting() // /api/v1/notifications/preferences
 
         // Notification FOUNDATION (push infra — distinct from the inbox spine):
         //   /api/device-tokens            — register/refresh FCM token (any role)

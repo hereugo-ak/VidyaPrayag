@@ -19,6 +19,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +49,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -191,6 +194,11 @@ fun CommonLandingScreenV2(
                         label = "landing-headline",
                     ) { t ->
                         Column {
+                            Text(
+                                if (t == 0) "SCHOOL MANAGEMENT" else "PARENT PORTAL",
+                                style = VTheme.type.label.colored(c.tealDeep),
+                            )
+                            Spacer(Modifier.height(8.dp))
                             Text(
                                 if (t == 0) "Run your whole school\nfrom one screen."
                                 else "Your child's school day,\nin your pocket.",
@@ -395,6 +403,7 @@ private fun TabSwitcher(
                     .padding(start = safeOffset)
                     .width(trackWidth / 2f)
                     .height(40.dp)
+                    .shadow(4.dp, RoundedCornerShape(999.dp))
                     .clip(RoundedCornerShape(999.dp))
                     .background(c.tealDeep),
             )
@@ -443,11 +452,14 @@ private fun TabPane(
     Column(Modifier.fillMaxWidth().padding(horizontal = d.lg)) {
         heroImage(HeroSpec(imageA, imageB, networkImage))
         Spacer(Modifier.height(10.dp))
-        Text(imageLabel, style = VTheme.type.caption.colored(c.ink3))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(Modifier.size(5.dp).clip(RoundedCornerShape(999.dp)).background(c.teal))
+            Text(imageLabel, style = VTheme.type.caption.colored(c.ink3))
+        }
         Spacer(Modifier.height(d.lg))
         features.forEachIndexed { i, f ->
             FeatureBlock(f, index = i)
-            if (i != features.lastIndex) Spacer(Modifier.height(d.lg))
+            if (i != features.lastIndex) Spacer(Modifier.height(d.sm))
         }
     }
 }
@@ -471,6 +483,7 @@ private fun ContainedHeroPhoto(spec: HeroSpec) {
         Modifier
             .fillMaxWidth()
             .aspectRatio(16f / 9f)
+            .shadow(8.dp, RoundedCornerShape(d.radiusCard))
             .clip(RoundedCornerShape(d.radiusCard))
             .background(c.cream)
             .border(1.dp, c.hairline, RoundedCornerShape(d.radiusCard)),
@@ -510,6 +523,18 @@ private fun ContainedHeroPhoto(spec: HeroSpec) {
                 }
             }
         }
+
+        // Gradient scrim for depth — sits on top of all image layers.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0.55f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = 0.22f),
+                    )
+                )
+        )
     }
 }
 
@@ -521,6 +546,17 @@ private fun ContainedHeroPhoto(spec: HeroSpec) {
 @Composable
 private fun FeatureBlock(feature: LandingFeature, index: Int) {
     val c = VTheme.colors
+    val d = VTheme.dimens
+    val interaction = remember { MutableInteractionSource() }
+    val isPressed by interaction.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium,
+        ),
+        label = "feature-press",
+    )
     val alpha = remember { Animatable(0f) }
     val ty = remember { Animatable(12f) }
     LaunchedEffect(Unit) {
@@ -535,15 +571,34 @@ private fun FeatureBlock(feature: LandingFeature, index: Int) {
             .graphicsLayer {
                 this.alpha = alpha.value
                 translationY = ty.value * density
-            },
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                scaleX = pressScale
+                scaleY = pressScale
+            }
+            .clip(RoundedCornerShape(d.radiusCard))
+            .background(c.card)
+            .border(1.dp, c.hairline, RoundedCornerShape(d.radiusCard))
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+            ) {}
+            .padding(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top,
     ) {
-        Icon(
-            feature.icon,
-            contentDescription = null,
-            tint = c.ink,
-            modifier = Modifier.size(20.dp).padding(top = 1.dp),
-        )
+        Box(
+            Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(c.teal.copy(alpha = 0.1f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                feature.icon,
+                contentDescription = null,
+                tint = c.tealDeep,
+                modifier = Modifier.size(20.dp),
+            )
+        }
         Column(Modifier.weight(1f)) {
             Text(
                 feature.title,
@@ -574,15 +629,15 @@ private fun CtaDock(
     Column(
         Modifier
             .fillMaxWidth()
-            .background(c.background)
-            .padding(top = 12.dp)
+            .shadow(12.dp, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            .background(c.card)
+            .padding(top = 16.dp)
             .padding(horizontal = d.lg)
             .navigationBarsPadding()
             .padding(bottom = 12.dp),
     ) {
-        // Hairline above the dock to seat it visually above the scrolling content.
-        Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(4.dp))
 
         AnimatedContent(
             targetState = tab,
@@ -602,7 +657,15 @@ private fun CtaDock(
                         soft = false,
                         size = VButtonSize.Lg,
                         full = true,
-                        modifier = Modifier.weight(0.7f)
+                        modifier = Modifier.weight(0.7f),
+                        leading = {
+                            Icon(
+                                VIcons.School,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        },
                     )
 
                     OutlinedCta(
@@ -620,7 +683,15 @@ private fun CtaDock(
                         soft = false,
                         size = VButtonSize.Lg,
                         full = true,
-                        modifier = Modifier.weight(0.7f)
+                        modifier = Modifier.weight(0.7f),
+                        leading = {
+                            Icon(
+                                VIcons.User,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        },
                     )
 
                     OutlinedCta(

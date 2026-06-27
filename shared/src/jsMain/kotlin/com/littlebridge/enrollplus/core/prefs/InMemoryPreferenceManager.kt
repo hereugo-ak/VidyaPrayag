@@ -11,6 +11,8 @@ class InMemoryPreferenceManager : PreferenceRepository {
     private val refreshToken = MutableStateFlow<String?>(null)
     private val profileCompleted = MutableStateFlow<Boolean?>(null)
     private val userName = MutableStateFlow<String?>(null)
+    private val fcmToken = MutableStateFlow<String?>(null)
+    private val notificationsDeclined = MutableStateFlow(false)
 
     override fun getThemeName(): Flow<String> {
         return themeName
@@ -48,6 +50,12 @@ class InMemoryPreferenceManager : PreferenceRepository {
     override fun getUserName(): Flow<String?> = userName
     override suspend fun setUserName(name: String?) { userName.value = name?.takeIf { it.isNotBlank() } }
 
+    override fun getFcmToken(): Flow<String?> = fcmToken
+    override suspend fun setFcmToken(token: String?) { fcmToken.value = token }
+
+    override fun getNotificationsDeclined(): Flow<Boolean> = notificationsDeclined
+    override suspend fun setNotificationsDeclined(declined: Boolean) { notificationsDeclined.value = declined }
+
     override suspend fun clearSession() {
         userRole.value = "GUEST"
         userToken.value = null
@@ -55,5 +63,7 @@ class InMemoryPreferenceManager : PreferenceRepository {
         refreshToken.value = null
         profileCompleted.value = null
         userName.value = null
+        fcmToken.value = null
+        notificationsDeclined.value = false
     }
 }

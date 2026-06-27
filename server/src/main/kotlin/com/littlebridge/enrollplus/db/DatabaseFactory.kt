@@ -138,6 +138,10 @@ object DatabaseFactory {
         PtmClassProgressTable,
         MessageThreadsTable,
         MessagesTable,
+        // Phase 1 (MESSAGING_SYSTEM_SPEC §7.1, §8.2): seq counter + per-message delivery status + attachments.
+        ConversationSeqTable,
+        MessageStatusTable,
+        MessageAttachmentsTable,
         ExamResultsTable,
         // Teacher vertical (master doc Step 7 / gap G1)
         AssessmentsTable,

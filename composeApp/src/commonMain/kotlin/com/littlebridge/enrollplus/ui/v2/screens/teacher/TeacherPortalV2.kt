@@ -3,6 +3,7 @@ package com.littlebridge.enrollplus.ui.v2.screens.teacher
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -19,6 +20,7 @@ import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherProfileVi
 import com.littlebridge.enrollplus.ui.v2.components.VIcons
 import com.littlebridge.enrollplus.ui.v2.components.VNavItem
 import com.littlebridge.enrollplus.ui.v2.components.VScreenScaffold
+import com.littlebridge.enrollplus.ui.v2.navigation.DeepLinkTarget
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.screens.notifications.NotificationsScreenV2
 import com.littlebridge.enrollplus.ui.v2.theme.VPortalTone
@@ -61,6 +63,7 @@ private enum class TeacherOverlay { None, Notifications }
 fun TeacherPortalV2(
     onLogout: () -> Unit = {},
     modifier: Modifier = Modifier,
+    deepLinkTarget: DeepLinkTarget? = null,
     profileViewModel: TeacherProfileViewModel = koinViewModel(),
     obligationsViewModel: TeacherObligationsViewModel = koinViewModel(),
     notificationsViewModel: NotificationsViewModel = koinViewModel(),
@@ -77,6 +80,14 @@ fun TeacherPortalV2(
     VTheme(tone = tone) {
         var tab by remember { mutableStateOf("home") }
         var overlay by remember { mutableStateOf(TeacherOverlay.None) }
+
+        // Apply deep-link routing: set tab from the typed target.
+        LaunchedEffect(deepLinkTarget) {
+            when (deepLinkTarget) {
+                is DeepLinkTarget.TeacherScreen -> tab = deepLinkTarget.screen
+                else -> Unit
+            }
+        }
 
         // The UPDATE tab can be entered pre-scoped from a HOME CTA. These hold the
         // pre-authorized scope; a bump on [updateScopeNonce] forces the Update screen

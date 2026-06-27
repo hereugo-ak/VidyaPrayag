@@ -3,6 +3,7 @@ package com.littlebridge.enrollplus.ui.v2.screens.school
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -16,6 +17,7 @@ import com.littlebridge.enrollplus.ui.v2.components.VBottomNav
 import com.littlebridge.enrollplus.ui.v2.components.VIcons
 import com.littlebridge.enrollplus.ui.v2.components.VNavItem
 import com.littlebridge.enrollplus.ui.v2.components.VScreenScaffold
+import com.littlebridge.enrollplus.ui.v2.navigation.DeepLinkTarget
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.screens.discovery.AcademicCalendarScreenV2
 import com.littlebridge.enrollplus.ui.v2.screens.notifications.NotificationsScreenV2
@@ -66,6 +68,7 @@ private enum class SchoolOverlay {
 fun SchoolPortalV2(
     onLogout: () -> Unit = {},
     modifier: Modifier = Modifier,
+    deepLinkTarget: DeepLinkTarget? = null,
     // RA-S12 — drives the Comms nav badge from the real unread-thread count.
     messagesViewModel: MessagesViewModel = koinViewModel(),
 ) {
@@ -75,6 +78,14 @@ fun SchoolPortalV2(
     VTheme(tone = VPortalTone.Warm) {
         var tab by remember { mutableStateOf("home") }
         var overlay by remember { mutableStateOf(SchoolOverlay.None) }
+
+        // Apply deep-link routing: set tab from the typed target.
+        LaunchedEffect(deepLinkTarget) {
+            when (deepLinkTarget) {
+                is DeepLinkTarget.SchoolScreen -> tab = deepLinkTarget.screen
+                else -> Unit
+            }
+        }
         // RA-45 — id carried into the student/teacher profile overlays.
         var selectedStudentId by remember { mutableStateOf<String?>(null) }
         var selectedTeacherId by remember { mutableStateOf<String?>(null) }

@@ -13,6 +13,7 @@ import com.littlebridge.enrollplus.core.network.NetworkResult
 import com.littlebridge.enrollplus.feature.admin.domain.model.MessageThread
 import com.littlebridge.enrollplus.feature.admin.domain.model.SendMessageRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.SendMessageResponse
+import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolRecipient
 import com.littlebridge.enrollplus.feature.admin.domain.model.ThreadMessagesResponse
 
 interface MessagesRepository {
@@ -54,4 +55,18 @@ interface MessagesRepository {
         token: String,
         request: SendMessageRequest
     ): NetworkResult<SendMessageResponse>
+
+    /**
+     * GET /api/v1/school/messages/recipients
+     *
+     * Returns all teachers, admins, and parents (with enrolled children)
+     * that the school admin can start a conversation with.
+     */
+    suspend fun getRecipients(token: String): NetworkResult<List<SchoolRecipient>>
+
+    /** Phase 1 (§9.4): PATCH /api/v1/school/messages/messages/{id} — edit a message. */
+    suspend fun editMessage(token: String, messageId: String, body: String): NetworkResult<Map<String, String>>
+
+    /** Phase 1 (§9.4): DELETE /api/v1/school/messages/messages/{id} — soft-delete a message. */
+    suspend fun deleteMessage(token: String, messageId: String, scope: String = "everyone"): NetworkResult<Map<String, String>>
 }

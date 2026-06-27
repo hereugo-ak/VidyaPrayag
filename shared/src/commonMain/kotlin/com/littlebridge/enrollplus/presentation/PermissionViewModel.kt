@@ -26,6 +26,10 @@ class PermissionViewModel(
     private val _showNotificationRationale = MutableStateFlow(false)
     val showNotificationRationale: StateFlow<Boolean> = _showNotificationRationale.asStateFlow()
 
+    /** One-shot event telling the screen to launch the system permission dialog. */
+    private val _launchPermissionRequest = MutableStateFlow(false)
+    val launchPermissionRequest: StateFlow<Boolean> = _launchPermissionRequest.asStateFlow()
+
     /**
      * Check the current state of notification permissions and decide if we should
      * prompt the user. Called typically from a screen's `LaunchedEffect(Unit)`.
@@ -45,13 +49,9 @@ class PermissionViewModel(
                 // User denied once — show our explanation before asking again.
                 _showNotificationRationale.value = true
             } else {
-                // First time asking or permanently denied (in which case the prompt won't show,
-                // which is correct OS behaviour).
-                notificationService.requestPermission { granted ->
-                    if (granted) {
-                        _showNotificationRationale.value = false
-                    }
-                }
+                // First time asking or permanently denied. Signal the screen
+                // to launch the system dialog via rememberLauncherForActivityResult.
+                _launchPermissionRequest.value = true
             }
         }
     }
@@ -59,9 +59,20 @@ class PermissionViewModel(
     /** Trigger the system permission prompt directly (typically from the Rationale "Enable" button). */
     fun requestNotificationPermission() {
         _showNotificationRationale.value = false
-        notificationService.requestPermission { _ ->
-            // Result is handled by OS and reflected in next checkNotificationPermission call
+        _launchPermissionRequest.value = true
+    }
+
+    /** Called by the screen when the system permission dialog returns a result. */
+    fun onPermissionResult(granted: Boolean) {
+        _launchPermissionRequest.value = false
+        if (granted) {
+            _showNotificationRationale.value = false
         }
+    }
+
+    /** Consumes the launch event (call after the screen has read it and launched the dialog). */
+    fun consumeLaunchPermissionRequest() {
+        _launchPermissionRequest.value = false
     }
 
     /** User clicked "Not Now" on our rationale — persist this so we don't pester them again. */

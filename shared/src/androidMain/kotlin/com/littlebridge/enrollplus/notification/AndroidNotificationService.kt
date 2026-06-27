@@ -36,29 +36,17 @@ class AndroidNotificationService(
     }
 
     override fun requestPermission(onResult: (Boolean) -> Unit) {
+        // The Compose layer now handles permission launching via
+        // rememberNotificationPermissionLauncher (ActivityResultContracts).
+        // This method is kept for interface compliance; the actual launch
+        // happens in the screen composable, and the result is routed through
+        // PermissionViewModel.onPermissionResult().
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             onResult(true)
-            return
+        } else {
+            // Return current state — the Compose launcher will update it.
+            onResult(hasPermission())
         }
-
-        val activity = findActivity(context)
-        if (activity == null) {
-            // Cannot request from non-Activity context
-            onResult(false)
-            return
-        }
-
-        // We use the traditional ActivityCompat.requestPermissions here as this
-        // service is a singleton and doesn't have access to an ActivityResultLauncher
-        // directly. In a real app we'd often pipe this through the MainActivity.
-        ActivityCompat.requestPermissions(
-            activity,
-            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-            PERMISSION_REQUEST_CODE
-        )
-        // Note: the actual result is handled by MainActivity.onRequestPermissionsResult
-        // which we'll need to wire up if we want the callback to work.
-        // For the "Ask on every home" requirement, we mainly need the dialog to appear.
     }
 
     override fun shouldShowRationale(): Boolean {
@@ -77,9 +65,5 @@ class AndroidNotificationService(
             c = c.baseContext
         }
         return null
-    }
-
-    companion object {
-        const val PERMISSION_REQUEST_CODE = 1001
     }
 }

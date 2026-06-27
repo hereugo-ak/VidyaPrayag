@@ -6,6 +6,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,12 +17,22 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,8 +40,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.littlebridge.enrollplus.feature.admin.domain.model.Message
 import com.littlebridge.enrollplus.feature.admin.domain.model.MessageThread
 import com.littlebridge.enrollplus.feature.admin.presentation.ComposeState
@@ -40,14 +56,7 @@ import com.littlebridge.enrollplus.feature.admin.presentation.MessagesState
 import com.littlebridge.enrollplus.feature.admin.presentation.MessagesViewModel
 import com.littlebridge.enrollplus.ui.v2.components.VAvatar
 import com.littlebridge.enrollplus.ui.v2.components.VBackHeader
-import com.littlebridge.enrollplus.ui.v2.components.VBadge
-import com.littlebridge.enrollplus.ui.v2.components.VBadgeTone
-import com.littlebridge.enrollplus.ui.v2.components.VButton
-import com.littlebridge.enrollplus.ui.v2.components.VButtonSize
-import com.littlebridge.enrollplus.ui.v2.components.VButtonTone
-import com.littlebridge.enrollplus.ui.v2.components.VCard
 import com.littlebridge.enrollplus.ui.v2.components.VIcons
-import com.littlebridge.enrollplus.ui.v2.components.VInput
 import com.littlebridge.enrollplus.ui.v2.screens.VStateHost
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
@@ -114,6 +123,7 @@ fun MessagesScreenV2(
                 conversation = conversation,
                 onSend = viewModel::sendReply,
                 onClearError = viewModel::clearConversationError,
+                onMarkRead = viewModel::markAsRead,
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
@@ -121,7 +131,10 @@ fun MessagesScreenV2(
                 state = state,
                 isLoading = isLoading,
                 error = errorMessage,
-                onOpenThread = viewModel::openConversation,
+                onOpenThread = { threadId ->
+                    viewModel.markAsRead(threadId)
+                    viewModel.openConversation(threadId)
+                },
                 onRetry = viewModel::refresh,
                 onClearError = viewModel::clearError,
                 onCompose = viewModel::openCompose,
@@ -143,29 +156,7 @@ private fun ThreadListContent(
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
-    Column(
-        modifier
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
-            .padding(top = 16.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        // RA-S07: compose-new entry point — admins can now INITIATE a conversation (with a
-        // teacher), not just reply. The recipient picker + send live in the compose sheet.
-        VButton(
-            text = "New message",
-            onClick = onCompose,
-            full = true,
-            size = VButtonSize.Md,
-            tone = VButtonTone.Teal,
-            leading = {
-                androidx.compose.material3.Icon(
-                    VIcons.Chat,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                )
-            },
-        )
+    Box(modifier) {
         VStateHost(
             loading = isLoading,
             error = error,
@@ -175,12 +166,39 @@ private fun ThreadListContent(
             emptyIcon = VIcons.Chat,
             onRetry = onRetry,
         ) {
-            VCard {
-                state.threads.forEachIndexed { i, t ->
-                    if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(c.border1))
-                    ThreadRow(thread = t, onClick = { onOpenThread(t.id) })
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = 0.dp,
+                    end = 0.dp,
+                    top = 8.dp,
+                    bottom = 80.dp,
+                ),
+            ) {
+                items(state.threads, key = { it.id }) { thread ->
+                    ThreadRow(thread = thread, onClick = { onOpenThread(thread.id) })
                 }
             }
+        }
+
+        // Floating compose-new FAB — WhatsApp-style
+        val interaction = remember { MutableInteractionSource() }
+        Box(
+            Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 20.dp, bottom = 20.dp)
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(c.accent)
+                .clickable(interactionSource = interaction, indication = null, onClick = onCompose),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                VIcons.Edit3,
+                contentDescription = "New message",
+                tint = Color.White,
+                modifier = Modifier.size(24.dp),
+            )
         }
     }
 }
@@ -193,29 +211,56 @@ private fun ThreadRow(thread: MessageThread, onClick: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(vertical = 12.dp),
+            .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        VAvatar(name = thread.senderName.ifBlank { "?" }, src = thread.senderImageUrl, size = 40.dp)
+        VAvatar(name = thread.senderName.ifBlank { "?" }, src = thread.senderImageUrl, size = 52.dp)
         Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
                 Text(
                     thread.senderName,
-                    style = VTheme.type.bodyStrong.colored(c.ink),
+                    style = VTheme.type.bodyStrong.colored(c.ink)
+                        .copy(fontWeight = if (thread.isRead) FontWeight.SemiBold else FontWeight.Bold),
+                    modifier = Modifier.weight(1f, fill = false),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    thread.time,
+                    style = VTheme.type.caption.colored(if (thread.isRead) c.ink3 else c.accent),
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    thread.lastMessage,
+                    style = VTheme.type.body.colored(if (thread.isRead) c.ink3 else c.ink2),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
-                Text(thread.time, style = VTheme.type.caption.colored(c.ink3))
+                if (thread.unreadCount > 0) {
+                    Box(
+                        Modifier
+                            .clip(CircleShape)
+                            .background(c.accent)
+                            .padding(horizontal = 7.dp, vertical = 2.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            if (thread.unreadCount > 99) "99+" else thread.unreadCount.toString(),
+                            style = VTheme.type.caption.colored(Color.White).copy(fontWeight = FontWeight.Bold),
+                        )
+                    }
+                }
             }
-            Spacer(Modifier.height(2.dp))
-            Text(
-                thread.lastMessage,
-                style = VTheme.type.caption.colored(if (thread.isRead) c.ink3 else c.ink2),
-                maxLines = 1,
-            )
-        }
-        if (thread.unreadCount > 0) {
-            VBadge(text = thread.unreadCount.toString(), tone = VBadgeTone.Arctic)
         }
     }
 }
@@ -225,14 +270,34 @@ private fun ConversationContent(
     conversation: ConversationState,
     onSend: (String) -> Unit,
     onClearError: () -> Unit,
+    onMarkRead: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
     var reply by remember { mutableStateOf("") }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val listState = rememberLazyListState()
+
+    // P1-13: Mark thread as read on open
+    LaunchedEffect(conversation.threadId) {
+        conversation.threadId?.let { onMarkRead(it) }
+    }
+
+    // P1-9: Auto-scroll to bottom when new messages arrive
+    LaunchedEffect(conversation.messages.size) {
+        if (conversation.messages.isNotEmpty()) {
+            listState.animateScrollToItem(conversation.messages.lastIndex)
+        }
+    }
 
     Column(modifier) {
-        // Body
-        Box(Modifier.weight(1f).fillMaxWidth()) {
+        // Chat surface
+        Box(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .background(c.accentTint),
+        ) {
             VStateHost(
                 loading = conversation.isLoading,
                 error = conversation.error,
@@ -242,52 +307,50 @@ private fun ConversationContent(
                 emptyIcon = VIcons.Chat,
                 onRetry = onClearError,
             ) {
-                Column(
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp)
-                        .padding(top = 16.dp, bottom = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        horizontal = 16.dp,
+                        vertical = 12.dp,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    conversation.messages.forEach { msg ->
-                        MessageBubble(msg)
+                    itemsIndexed(conversation.messages, key = { _, msg -> msg.id }) { index, msg ->
+                        // P1-7: Date header when date changes from previous message
+                        val showDateHeader = index == 0 ||
+                            !msg.time.contentEquals(conversation.messages[index - 1].time, true)
+                        // P1-8: Message grouping — tighter spacing for consecutive same-sender
+                        val isGroupStart = index == 0 ||
+                            conversation.messages[index - 1].senderId != msg.senderId
+
+                        if (showDateHeader && msg.time.isNotBlank()) {
+                            DateHeader(date = msg.time)
+                        }
+                        MessageBubble(
+                            msg = msg,
+                            isGroupStart = isGroupStart,
+                        )
                     }
                 }
             }
         }
 
-        // Reply composer
-        Box(Modifier.fillMaxWidth().background(c.card).padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Box(Modifier.weight(1f)) {
-                    VInput(
-                        value = reply,
-                        onValueChange = { reply = it },
-                        placeholder = "Type a message…",
-                        enabled = !conversation.isSending,
-                    )
+        // WhatsApp-style compose bar (P1-10: unified with parent)
+        SharedComposeBar(
+            text = reply,
+            onTextChange = { reply = it },
+            placeholder = "Type a message…",
+            enabled = !conversation.isSending,
+            sending = conversation.isSending,
+            onSend = {
+                if (reply.isNotBlank()) {
+                    onSend(reply.trim())
+                    reply = ""
+                    keyboard?.hide()
                 }
-                VButton(
-                    text = "Send",
-                    onClick = {
-                        if (reply.isNotBlank()) {
-                            val body = reply
-                            reply = ""
-                            onSend(body)
-                        }
-                    },
-                    size = VButtonSize.Md,
-                    tone = VButtonTone.Teal,
-                    loading = conversation.isSending,
-                    enabled = reply.isNotBlank() && !conversation.isSending,
-                )
-            }
-        }
+            },
+        )
     }
 }
 
@@ -306,8 +369,9 @@ private fun ComposeNewContent(
     val c = VTheme.colors
     var selected by remember { mutableStateOf<MessageRecipient?>(null) }
     var body by remember { mutableStateOf("") }
+    val keyboard = LocalSoftwareKeyboardController.current
 
-    Column(modifier) {
+    Column(modifier.statusBarsPadding().imePadding().navigationBarsPadding()) {
         VBackHeader(title = "New message", onBack = onClose)
         Box(Modifier.weight(1f).fillMaxWidth()) {
             VStateHost(
@@ -315,61 +379,49 @@ private fun ComposeNewContent(
                 error = compose.error,
                 isEmpty = compose.candidates.isEmpty(),
                 emptyTitle = "No recipients",
-                emptyBody = "Add teachers to your school to start a conversation.",
+                emptyBody = "Add teachers or enroll students with parents to start a conversation.",
                 emptyIcon = VIcons.Chat,
                 onRetry = onClose,
             ) {
-                Column(
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp)
-                        .padding(top = 16.dp, bottom = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    Text("To", style = VTheme.type.caption.colored(c.ink3))
-                    VCard {
-                        compose.candidates.forEachIndexed { i, r ->
-                            if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(c.border1))
-                            RecipientRow(
-                                recipient = r,
-                                isSelected = selected?.id == r.id,
-                                onClick = { selected = r },
-                            )
-                        }
+                    item {
+                        Text(
+                            "Select recipient",
+                            style = VTheme.type.label.colored(c.ink3),
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                    }
+                    items(compose.candidates, key = { it.id }) { recipient ->
+                        RecipientRow(
+                            recipient = recipient,
+                            isSelected = selected?.id == recipient.id,
+                            onClick = { selected = recipient },
+                        )
                     }
                 }
             }
         }
 
-        // Composer (recipient must be chosen before sending).
-        Box(Modifier.fillMaxWidth().background(c.card).padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Box(Modifier.weight(1f)) {
-                    VInput(
-                        value = body,
-                        onValueChange = { body = it },
-                        placeholder = if (selected == null) "Pick a recipient above…" else "Message ${selected!!.name}…",
-                        enabled = selected != null && !isSending,
-                    )
+        // WhatsApp-style compose bar (P1-10: unified)
+        SharedComposeBar(
+            text = body,
+            onTextChange = { body = it },
+            placeholder = if (selected == null) "Pick a recipient above…" else "Message ${selected!!.name}…",
+            enabled = selected != null && !isSending,
+            sending = isSending,
+            onSend = {
+                val r = selected
+                if (r != null && body.isNotBlank()) {
+                    onSend(r.id, body.trim())
+                    body = ""
+                    keyboard?.hide()
                 }
-                VButton(
-                    text = "Send",
-                    onClick = {
-                        val r = selected
-                        if (r != null && body.isNotBlank()) onSend(r.id, body)
-                    },
-                    size = VButtonSize.Md,
-                    tone = VButtonTone.Teal,
-                    loading = isSending,
-                    enabled = selected != null && body.isNotBlank() && !isSending,
-                )
-            }
-        }
+            },
+        )
     }
 }
 
@@ -377,54 +429,282 @@ private fun ComposeNewContent(
 private fun RecipientRow(recipient: MessageRecipient, isSelected: Boolean, onClick: () -> Unit) {
     val c = VTheme.colors
     val interaction = remember { MutableInteractionSource() }
+    val bg = if (isSelected) c.accentTint else Color.Transparent
     Row(
         Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(bg)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(vertical = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        VAvatar(name = recipient.name.ifBlank { "?" }, size = 40.dp)
+        VAvatar(name = recipient.name.ifBlank { "?" }, src = recipient.imageUrl, size = 48.dp)
         Column(Modifier.weight(1f)) {
-            Text(recipient.name, style = VTheme.type.bodyStrong.colored(c.ink))
-            Text(recipient.subtitle, style = VTheme.type.caption.colored(c.ink3))
+            Text(
+                recipient.name,
+                style = VTheme.type.bodyStrong.colored(c.ink),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                recipient.subtitle,
+                style = VTheme.type.caption.colored(c.ink3),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         if (isSelected) {
-            VBadge(text = "Selected", tone = VBadgeTone.Arctic)
+            Box(
+                Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(c.accent),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    VIcons.Check,
+                    contentDescription = "Selected",
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun MessageBubble(msg: Message) {
+private fun MessageBubble(msg: Message, isGroupStart: Boolean = true) {
     val c = VTheme.colors
     val isMine = msg.isMine
+    val isDeleted = msg.deletedAt != null
+
+    val bubbleColor = if (isMine) c.accent else c.card
+    val textColor = if (isMine) Color.White else c.ink
+    val timeColor = if (isMine) Color.White.copy(alpha = 0.7f) else c.ink3
+
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start,
     ) {
-        val bubbleShape = RoundedCornerShape(
-            topStart = 16.dp,
-            topEnd = 16.dp,
-            bottomStart = if (isMine) 16.dp else 4.dp,
-            bottomEnd = if (isMine) 4.dp else 16.dp,
-        )
+        val bubbleShape = if (isMine) {
+            RoundedCornerShape(
+                topStart = 18.dp,
+                topEnd = 18.dp,
+                bottomStart = if (isGroupStart) 18.dp else 4.dp,
+                bottomEnd = 4.dp,
+            )
+        } else {
+            RoundedCornerShape(
+                topStart = 18.dp,
+                topEnd = 18.dp,
+                bottomStart = 4.dp,
+                bottomEnd = if (isGroupStart) 18.dp else 4.dp,
+            )
+        }
+
         Column(
             Modifier
+                .widthIn(max = 280.dp)
                 .clip(bubbleShape)
-                .background(if (isMine) c.teal.copy(alpha = 0.16f) else c.cream)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .background(bubbleColor)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+        ) {
+            if (isDeleted) {
+                // P2-10: Tombstone display
+                Text(
+                    "This message was deleted",
+                    style = VTheme.type.body.colored(textColor).copy(
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                    ),
+                )
+            } else {
+                Text(
+                    msg.body,
+                    style = VTheme.type.body.colored(textColor),
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Row(
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                // P2-5: Status ticks for own messages
+                if (isMine && !isDeleted) {
+                    when (msg.status?.uppercase()) {
+                        "READ" -> {
+                            Icon(
+                                VIcons.Check,
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.9f),
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Spacer(Modifier.size(2.dp))
+                            Icon(
+                                VIcons.Check,
+                                contentDescription = "Read",
+                                tint = Color.White.copy(alpha = 0.9f),
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
+                        "DELIVERED" -> {
+                            Icon(
+                                VIcons.Check,
+                                contentDescription = "Delivered",
+                                tint = Color.White.copy(alpha = 0.7f),
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Spacer(Modifier.size(2.dp))
+                            Icon(
+                                VIcons.Check,
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.7f),
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
+                        "SENT" -> {
+                            Icon(
+                                VIcons.Check,
+                                contentDescription = "Sent",
+                                tint = Color.White.copy(alpha = 0.5f),
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.size(4.dp))
+                }
+                Text(
+                    msg.time,
+                    style = VTheme.type.caption.colored(timeColor).copy(fontSize = 10.sp),
+                )
+                // P2-10: Edited label
+                if (msg.editedAt != null && !isDeleted) {
+                    Spacer(Modifier.size(4.dp))
+                    Text(
+                        "edited",
+                        style = VTheme.type.caption.colored(timeColor).copy(fontSize = 9.sp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** P1-7: Date header for message grouping by date. */
+@Composable
+private fun DateHeader(date: String) {
+    val c = VTheme.colors
+    Box(
+        Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(c.border2)
+                .padding(horizontal = 10.dp, vertical = 4.dp),
         ) {
             Text(
-                msg.body,
-                style = VTheme.type.body.colored(c.ink).copy(fontWeight = FontWeight.Normal),
+                date,
+                style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
             )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                msg.time,
-                style = VTheme.type.caption.colored(c.ink3),
-            )
+        }
+    }
+}
+
+/**
+ * P1-10: Shared WhatsApp-style compose bar — unified between admin and parent screens.
+ * Rounded pill input with an embedded circular send button.
+ */
+@Composable
+private fun SharedComposeBar(
+    text: String,
+    onTextChange: (String) -> Unit,
+    placeholder: String,
+    enabled: Boolean,
+    sending: Boolean,
+    onSend: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = VTheme.colors
+    val canSend = text.isNotBlank() && enabled
+
+    Column(
+        modifier
+            .fillMaxWidth()
+            .background(c.card),
+    ) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))
+
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(c.cream)
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+            ) {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = onTextChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = {
+                        Text(
+                            placeholder,
+                            style = VTheme.type.body.colored(c.placeholder),
+                        )
+                    },
+                    enabled = enabled,
+                    singleLine = false,
+                    maxLines = 4,
+                    shape = RoundedCornerShape(22.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                        disabledBorderColor = Color.Transparent,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        disabledContainerColor = Color.Transparent,
+                        cursorColor = c.accent,
+                    ),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+                    keyboardActions = KeyboardActions(onSend = { if (canSend) onSend() }),
+                    textStyle = VTheme.type.body.colored(c.ink),
+                )
+            }
+
+            val sendInteraction = remember { MutableInteractionSource() }
+            Box(
+                Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(if (canSend) c.accent else c.border2)
+                    .clickable(interactionSource = sendInteraction, indication = null, enabled = canSend, onClick = onSend),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (sending) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(20.dp),
+                    )
+                } else {
+                    Icon(
+                        VIcons.Send,
+                        contentDescription = "Send",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
         }
     }
 }

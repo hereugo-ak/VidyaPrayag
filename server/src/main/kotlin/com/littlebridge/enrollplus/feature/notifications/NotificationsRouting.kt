@@ -15,7 +15,6 @@
  *   GET   /api/v1/notifications/summary  — unread count for the bell.
  *   PATCH /api/v1/notifications/{id}/read— mark one read (persisted — RA-46).
  *   POST  /api/v1/notifications/read-all — mark all read (persisted — RA-46).
- *   POST  /api/v1/notifications/device-token — register an FCM/APNs token.
  *
  * Everything is recipient-scoped (user_id = jwt.sub). Synthesised parent items
  * carry a stable id ("ann_…"/"fee_…") and are NOT persisted; only real
@@ -30,13 +29,11 @@ import com.littlebridge.enrollplus.db.AnnouncementsTable
 import com.littlebridge.enrollplus.db.AppUsersTable
 import com.littlebridge.enrollplus.db.ChildrenTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
-import com.littlebridge.enrollplus.db.DeviceTokensTable
 import com.littlebridge.enrollplus.db.FeeRecordsTable
 import com.littlebridge.enrollplus.db.NotificationsTable
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
-import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.SerialName
@@ -44,7 +41,6 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
@@ -70,12 +66,6 @@ data class NotificationsDataDto(
 @Serializable
 data class NotificationsSummaryDto(
     @SerialName("unread_count") val unreadCount: Int
-)
-
-@Serializable
-data class DeviceTokenDto(
-    val token: String,
-    val platform: String? = null
 )
 
 fun Route.notificationsRouting() {
@@ -248,38 +238,6 @@ fun Route.notificationsRouting() {
                 call.okMessage("All marked read")
             }
 
-            // -------- register a device token (RA-41 push, Phase E) --------
-            post("/device-token") {
-                val uid = call.principalUserUuid() ?: run {
-                    call.respond(HttpStatusCode.Unauthorized); return@post
-                }
-                val req = runCatching { call.receive<DeviceTokenDto>() }.getOrNull()
-                    ?: run { call.respond(HttpStatusCode.BadRequest); return@post }
-                if (req.token.isBlank()) { call.respond(HttpStatusCode.BadRequest); return@post }
-                val now = Instant.now()
-                dbQuery {
-                    val existing = DeviceTokensTable.selectAll()
-                        .where { DeviceTokensTable.token eq req.token }
-                        .singleOrNull()
-                    if (existing == null) {
-                        DeviceTokensTable.insert {
-                            it[userId] = uid
-                            it[token] = req.token
-                            it[platform] = req.platform ?: "android"
-                            it[isActive] = true
-                            it[createdAt] = now
-                            it[updatedAt] = now
-                        }
-                    } else {
-                        DeviceTokensTable.update({ DeviceTokensTable.token eq req.token }) {
-                            it[userId] = uid
-                            it[isActive] = true
-                            it[updatedAt] = now
-                        }
-                    }
-                }
-                call.okMessage("Device token registered")
-            }
         }
     }
 }

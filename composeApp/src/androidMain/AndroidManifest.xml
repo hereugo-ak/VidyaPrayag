@@ -45,6 +45,19 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!--
+          Notification action button receiver. Handles inline actions from
+          notification action buttons (e.g. Mark Read, Approve, Reject).
+          exported=false — only the system notification framework may invoke it.
+        -->
+        <receiver
+            android:name=".notification.NotificationActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.littlebridge.enrollplus.notification.MARK_READ" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

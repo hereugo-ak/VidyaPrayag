@@ -25,10 +25,13 @@ import com.littlebridge.enrollplus.feature.admin.domain.model.SendMessageRequest
 import com.littlebridge.enrollplus.feature.admin.domain.repository.MessagesRepository
 import com.littlebridge.enrollplus.feature.admin.domain.repository.TeachersRepository
 import com.littlebridge.enrollplus.util.AppLogger
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
@@ -77,6 +80,7 @@ data class MessageRecipient(
     val id: String,
     val name: String,
     val subtitle: String,
+    val imageUrl: String? = null,
 )
 
 class MessagesViewModel(
@@ -84,6 +88,10 @@ class MessagesViewModel(
     private val preferenceRepository: PreferenceRepository,
     private val teachersRepository: TeachersRepository,
 ) : ViewModel() {
+
+    private companion object {
+        const val POLL_INTERVAL_MS = 5_000L
+    }
 
     private val _state = MutableStateFlow(MessagesState())
     val state: StateFlow<MessagesState> = _state.asStateFlow()
@@ -99,6 +107,8 @@ class MessagesViewModel(
 
     private val _conversation = MutableStateFlow(ConversationState())
     val conversation: StateFlow<ConversationState> = _conversation.asStateFlow()
+
+    private var pollJob: Job? = null
 
     init {
         refresh()
@@ -204,13 +214,11 @@ class MessagesViewModel(
                 return@launch
             }
 
-            // RA-S07: pass recipient_user_id so a NULL thread starts a real 1:1 conversation
-            // (compose-new), not a self/system thread. The two-row engine + server already
-            // support this; only the UI/VM wiring was missing.
             val request = SendMessageRequest(
                 threadId = threadId,
                 recipientUserId = recipientUserId,
                 body = body,
+                clientMsgId = java.util.UUID.randomUUID().toString(),
             )
             when (val result = messagesRepository.sendMessage(token, request)) {
                 is NetworkResult.Success -> {
@@ -242,6 +250,7 @@ class MessagesViewModel(
      * local thread list to drop the badge immediately.
      */
     fun openConversation(threadId: String) {
+        stopPolling()
         val thread = _state.value.threads.firstOrNull { it.id == threadId }
         _conversation.value = ConversationState(
             threadId = threadId,
@@ -273,6 +282,7 @@ class MessagesViewModel(
                             if (it.id == threadId) it.copy(isRead = true, unreadCount = 0) else it
                         }
                     )
+                    startPolling()
                 }
                 is NetworkResult.Error -> {
                     AppLogger.e("MessagesVM", "getThreadMessages failed: ${result.message}")
@@ -292,7 +302,7 @@ class MessagesViewModel(
         }
     }
 
-    /** Reloads the currently open conversation (after sending a reply). */
+    /** Reloads the currently open conversation (after sending a reply or via polling). */
     private fun reloadConversation() {
         val threadId = _conversation.value.threadId ?: return
         viewModelScope.launch {
@@ -303,15 +313,22 @@ class MessagesViewModel(
                     _conversation.value = _conversation.value.copy(
                         senderName = result.data.senderName,
                         messages = result.data.messages,
-                        error = null
+                        error = null,
                     )
                 }
-                is NetworkResult.Error -> AppLogger.e(
-                    "MessagesVM", "reloadConversation failed: ${result.message}"
-                )
-                is NetworkResult.ConnectionError -> AppLogger.e(
-                    "MessagesVM", "reloadConversation connection error"
-                )
+                is NetworkResult.Error -> {
+                    AppLogger.e("MessagesVM", "reloadConversation failed: ${result.message}")
+                    // P1-5: Surface polling errors to the UI instead of silently swallowing.
+                    if (_conversation.value.error == null) {
+                        _conversation.value = _conversation.value.copy(error = result.message)
+                    }
+                }
+                is NetworkResult.ConnectionError -> {
+                    AppLogger.e("MessagesVM", "reloadConversation connection error")
+                    if (_conversation.value.error == null) {
+                        _conversation.value = _conversation.value.copy(error = "Connection error")
+                    }
+                }
             }
         }
     }
@@ -327,9 +344,23 @@ class MessagesViewModel(
             return
         }
 
-        viewModelScope.launch {
-            _conversation.value = _conversation.value.copy(isSending = true, error = null)
+        // P1-3: Optimistic send — insert a temp message immediately for instant UI feedback.
+        val tempId = "optimistic-${System.currentTimeMillis()}"
+        val optimisticMsg = Message(
+            id = tempId,
+            body = body,
+            isMine = true,
+            createdAt = "",
+            time = "Now",
+            status = "SENT",
+        )
+        _conversation.value = _conversation.value.copy(
+            messages = _conversation.value.messages + optimisticMsg,
+            isSending = true,
+            error = null,
+        )
 
+        viewModelScope.launch {
             val token = preferenceRepository.getUserToken().first()
             if (token.isNullOrBlank()) {
                 _conversation.value = _conversation.value.copy(
@@ -339,25 +370,34 @@ class MessagesViewModel(
                 return@launch
             }
 
-            val request = SendMessageRequest(threadId = threadId, body = body)
+            val clientMsgId = java.util.UUID.randomUUID().toString()
+            val request = SendMessageRequest(
+                threadId = threadId,
+                body = body,
+                clientMsgId = clientMsgId,
+            )
             when (val result = messagesRepository.sendMessage(token, request)) {
                 is NetworkResult.Success -> {
+                    // Replace optimistic message with real one via reload.
                     _conversation.value = _conversation.value.copy(isSending = false)
                     reloadConversation()
                     refresh()
                 }
                 is NetworkResult.Error -> {
                     AppLogger.e("MessagesVM", "sendReply failed: ${result.message}")
+                    // Remove optimistic message on failure.
                     _conversation.value = _conversation.value.copy(
+                        messages = _conversation.value.messages.filterNot { it.id == tempId },
                         isSending = false,
-                        error = result.message
+                        error = result.message,
                     )
                 }
                 is NetworkResult.ConnectionError -> {
                     AppLogger.e("MessagesVM", "sendReply connection error")
                     _conversation.value = _conversation.value.copy(
+                        messages = _conversation.value.messages.filterNot { it.id == tempId },
                         isSending = false,
-                        error = "Connection error"
+                        error = "Connection error",
                     )
                 }
             }
@@ -366,13 +406,14 @@ class MessagesViewModel(
 
     /** Closes the conversation view and resets its state. */
     fun closeConversation() {
+        stopPolling()
         _conversation.value = ConversationState()
     }
 
     /**
-     * RA-S07 — open the compose-new sheet and load recipient candidates (the school's teachers).
-     * Reuses the existing teachers roster endpoint; `TeacherAccountDto.id` is the recipient's
-     * app_users id, which is exactly what the messaging engine needs as `recipient_user_id`.
+     * RA-S07 — open the compose-new sheet and load recipient candidates.
+     * Uses the dedicated /recipients endpoint which returns both staff
+     * (teachers + admins) and parents (whose children are enrolled).
      */
     fun openCompose() {
         _compose.value = ComposeState(isOpen = true, isLoadingRecipients = true)
@@ -382,15 +423,14 @@ class MessagesViewModel(
                 _compose.value = _compose.value.copy(isLoadingRecipients = false, error = "Not signed in")
                 return@launch
             }
-            // Pull a generous first page of teacher cards as compose recipients.
-            // The card contract nests name/role under `profile`.
-            when (val result = teachersRepository.getTeachers(token, page = 1, pageSize = 100)) {
+            when (val result = messagesRepository.getRecipients(token)) {
                 is NetworkResult.Success -> {
-                    val candidates = result.data.data?.teachers.orEmpty().map {
+                    val candidates = result.data.map {
                         MessageRecipient(
                             id = it.id,
-                            name = it.profile.name,
-                            subtitle = it.profile.role.replaceFirstChar { ch -> ch.uppercase() },
+                            name = it.name,
+                            subtitle = it.subtitle,
+                            imageUrl = it.imageUrl,
                         )
                     }
                     _compose.value = _compose.value.copy(isLoadingRecipients = false, candidates = candidates, error = null)
@@ -426,5 +466,31 @@ class MessagesViewModel(
     /** Lets the screen dismiss the inline error banner. */
     fun clearError() {
         _errorMessage.value = null
+    }
+
+    /**
+     * Starts periodic polling for new messages in the open conversation.
+     * Called when a conversation is opened; stopped when it's closed.
+     */
+    private fun startPolling() {
+        stopPolling()
+        pollJob = viewModelScope.launch {
+            while (isActive) {
+                delay(POLL_INTERVAL_MS)
+                if (_conversation.value.threadId != null && !_conversation.value.isSending) {
+                    reloadConversation()
+                }
+            }
+        }
+    }
+
+    private fun stopPolling() {
+        pollJob?.cancel()
+        pollJob = null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopPolling()
     }
 }
