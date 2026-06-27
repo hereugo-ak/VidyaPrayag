@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VidyaSetu — Role Flow Diagrams</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  @page { size: A4; margin: 18mm 14mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    color: #1a1a2e;
+    background: #f5f5f7;
+    line-height: 1.5;
+  }
+  .page {
+    background: #fff;
+    max-width: 900px;
+    margin: 0 auto 40px;
+    padding: 48px 56px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    page-break-after: always;
+  }
+  .page:last-child { page-break-after: auto; }
+  h1 {
+    font-size: 28px;
+    font-weight: 800;
+    color: #0d3b66;
+    margin-bottom: 4px;
+    letter-spacing: -0.5px;
+  }
+  h1 .brand { color: #00897b; }
+  h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #0d3b66;
+    margin: 32px 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #00897b;
+  }
+  h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #333;
+    margin: 20px 0 8px;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 28px;
+  }
+  .meta-box {
+    background: #f0f7f6;
+    border: 1px solid #b2dfdb;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0 24px;
+    font-size: 13px;
+  }
+  .meta-box strong { color: #00695c; }
+  .mermaid {
+    display: flex;
+    justify-content: center;
+    margin: 12px 0 8px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 20px;
+    font-size: 12.5px;
+  }
+  th {
+    background: #0d3b66;
+    color: #fff;
+    text-align: left;
+    padding: 8px 12px;
+    font-weight: 600;
+  }
+  td {
+    border: 1px solid #e0e0e0;
+    padding: 7px 12px;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f9fbff; }
+  .legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin: 12px 0 20px;
+    font-size: 12px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot {
+    width: 14px; height: 14px; border-radius: 3px;
+  }
+  .footer-note {
+    font-size: 11px;
+    color: #999;
+    margin-top: 24px;
+    border-top: 1px solid #eee;
+    padding-top: 10px;
+  }
+  .toc {
+    list-style: none;
+    padding: 0;
+  }
+  .toc li {
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+    font-size: 14px;
+  }
+  .toc li a {
+    text-decoration: none;
+    color: #0d3b66;
+    font-weight: 600;
+  }
+  .toc li a:hover { color: #00897b; }
+  .toc li .page-num { float: right; color: #999; font-weight: 400; }
+</style>
+</head>
+<body>
+
+<!-- ───────────────── PAGE 1: Cover + TOC ───────────────── -->
+<div class="page">
+  <h1><span class="brand">VidyaSetu</span> — Role Flow Diagrams</h1>
+  <p class="subtitle">Complete navigation & screen flow for School, Teacher, and Parent roles</p>
+
+  <div class="meta-box">
+    <strong>Source files:</strong>
+    <code>NavGraphV2.kt</code>,
+    <code>SchoolPortalV2.kt</code>,
+    <code>TeacherPortalV2.kt</code>,
+    <code>ParentPortalV2.kt</code>,
+    <code>App.kt</code><br>
+    <strong>Generated:</strong> Jun 27, 2026 &nbsp;|&nbsp;
+    <strong>Framework:</strong> Kotlin Multiplatform / Jetpack Compose
+  </div>
+
+  <h2>Table of Contents</h2>
+  <ul class="toc">
+    <li><a href="#common">1. Common Entry Flow (Unauthenticated)</a><span class="page-num">Page 2</span></li>
+    <li><a href="#school">2. School / Admin Role Flow</a><span class="page-num">Page 3</span></li>
+    <li><a href="#teacher">3. Teacher Role Flow</a><span class="page-num">Page 4</span></li>
+    <li><a href="#parent">4. Parent Role Flow</a><span class="page-num">Page 5</span></li>
+    <li><a href="#summary">5. Summary & Comparison Table</a><span class="page-num">Page 6</span></li>
+  </ul>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#e3f2fd;border:1px solid #1565c0"></div> Screen / Composable</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fff9c4;border:1px solid #f9a825"></div> Gate / Decision</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#e8f5e9;border:1px solid #2e7d32"></div> Portal Tab</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fce4ec;border:1px solid #c62828"></div> Overlay Screen</div>
+  </div>
+</div>
+
+<!-- ───────────────── PAGE 2: Common Entry ───────────────── -->
+<div class="page" id="common">
+  <h2>1. Common Entry Flow (Unauthenticated)</h2>
+  <p class="subtitle">All users start here — splash screen decides auth vs portal based on persisted JWT session.</p>
+
+  <div class="mermaid">
+flowchart TD
+    SPLASH["SplashScreenV2<br><small>App.kt — session check</small>"]:::screen
+
+    SPLASH -->|"valid session"| AUTHED["AuthedFlow<br><small>NavGraphV2.kt</small>"]:::screen
+    SPLASH -->|"no session"| UNAUTH["UnauthFlow<br><small>NavGraphV2.kt</small>"]:::screen
+
+    UNAUTH --> LANDING["CommonLandingScreenV3<br><small>Schools / Parents tab</small>"]:::screen
+
+    LANDING -->|"Enter EnRoll+<br>(School/Admin)"| ADMIN_AUTH["AdminAuthScreenV2<br><small>Credentials login</small>"]:::screen
+    LANDING -->|"I'm a Parent"| PARENT_AUTH["ParentAuthScreenV2<br><small>OTP login</small>"]:::screen
+    LANDING -->|"Privacy / Terms"| LEGAL["LegalInfoScreenV2<br><small>Public legal docs</small>"]:::screen
+
+    ADMIN_AUTH -->|"onAuthSuccess"| SESSION_FLIP["Session flips<br>isAuthenticated = true"]:::gate
+    PARENT_AUTH -->|"onAuthSuccess"| SESSION_FLIP
+
+    ADMIN_AUTH -->|"onBack"| LANDING
+    PARENT_AUTH -->|"onBack"| LANDING
+    LEGAL -->|"onBack"| LANDING
+
+    PARENT_AUTH -->|"Browse schools"| DISCOVERY["DiscoveryScreenV2<br><small>Marketplace</small>"]:::screen
+    DISCOVERY -->|"Open school"| LINK_CHILD["ParentLinkChildScreenV2<br><small>Link child flow</small>"]:::screen
+    LINK_CHILD -->|"onDone"| PARENT_AUTH
+
+    SESSION_FLIP --> ROLE_GATE{"EntryRole.from(JWT)<br>role resolver"}:::gate
+
+    ROLE_GATE -->|"SCHOOL_ADMIN<br>SUPER_ADMIN"| SCHOOL_FLOW["→ School Flow<br>(Page 3)"]:::screen
+    ROLE_GATE -->|"TEACHER"| TEACHER_FLOW["→ Teacher Flow<br>(Page 4)"]:::screen
+    ROLE_GATE -->|"PARENT"| PARENT_FLOW["→ Parent Flow<br>(Page 5)"]:::screen
+    ROLE_GATE -->|"Unknown"| PARENT_FLOW
+
+    classDef screen fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#0d47a1
+    classDef gate fill:#fff9c4,stroke:#f9a825,stroke-width:1.5px,color:#e65100
+  </div>
+
+  <h3>Key Details</h3>
+  <table>
+    <tr><th>Step</th><th>Screen</th><th>File</th><th>Trigger</th></tr>
+    <tr><td>1</td><td>SplashScreenV2</td><td>App.kt</td><td>App launch — checks persisted session</td></tr>
+    <tr><td>2</td><td>CommonLandingScreenV3</td><td>CommonLandingScreenV3.kt</td><td>No valid session — dual-tab landing</td></tr>
+    <tr><td>3a</td><td>AdminAuthScreenV2</td><td>AdminAuthScreenV2.kt</td><td>"Enter EnRoll+" CTA — school/admin credentials</td></tr>
+    <tr><td>3b</td><td>ParentAuthScreenV2</td><td>ParentAuthScreenV2.kt</td><td>"I'm a Parent" CTA — OTP-based login</td></tr>
+    <tr><td>4</td><td>DiscoveryScreenV2</td><td>DiscoveryScreenV2.kt</td><td>Parent browse schools before linking</td></tr>
+    <tr><td>5</td><td>ParentLinkChildScreenV2</td><td>ParentLinkChildScreenV2.kt</td><td>Parent selects school → link child request</td></tr>
+    <tr><td>6</td><td>LegalInfoScreenV2</td><td>LegalInfoScreenV2.kt</td><td>Footer links — Privacy / Terms / Help Desk</td></tr>
+  </table>
+</div>
+
+<!-- ───────────────── PAGE 3: School Flow ───────────────── -->
+<div class="page" id="school">
+  <h2>2. School / Admin Role Flow</h2>
+  <p class="subtitle">SchoolAdmin & SuperAdmin — 5-tab portal with 21 overlay screens and server-driven onboarding gate.</p>
+
+  <div class="mermaid">
+flowchart TD
+    ADMIN_AUTH["AdminAuthScreenV2<br><small>Credentials login</small>"]:::screen
+
+    ADMIN_AUTH --> AUTHED["AuthedFlow<br>EntryRole.SchoolAdmin"]:::screen
+
+    AUTHED --> GATE_VM["OnboardingGateViewModel<br><small>GET /api/v1/onboarding/status</small>"]:::gate
+
+    GATE_VM -->|"Onboarding incomplete"| ONBOARD["SchoolOnboardingScreenV2<br><small>Resume at first incomplete step</small>"]:::screen
+    GATE_VM -->|"Onboarding complete"| PORTAL["SchoolPortalV2<br><small>tone = Warm</small>"]:::screen
+
+    ONBOARD -->|"onComplete"| PORTAL
+    ONBOARD -->|"onBack"| PORTAL
+
+    PORTAL --> TAB_HOME["Home"]:::tab
+    PORTAL --> TAB_PEOPLE["People"]:::tab
+    PORTAL --> TAB_RECORDS["Records"]:::tab
+    PORTAL --> TAB_COMMS["Comms"]:::tab
+    PORTAL --> TAB_SETTINGS["Settings"]:::tab
+
+    TAB_HOME --> S_HOME["SchoolHomeScreenV2"]:::screen
+    TAB_PEOPLE --> S_PEOPLE["SchoolPeopleScreenV2<br><small>3 sub-tabs: Students / Teachers / Staff</small>"]:::screen
+    TAB_RECORDS --> S_RECORDS["SchoolRecordsScreenV2"]:::screen
+    TAB_COMMS --> S_COMMS["SchoolCommsScreenV2"]:::screen
+    TAB_SETTINGS --> S_SETTINGS["SchoolSettingsScreenV2"]:::screen
+
+    %% Home overlays
+    S_HOME --> O_NOTIF["NotificationsScreenV2"]:::overlay
+    S_HOME --> O_CAL["AcademicCalendarPlatformScreenV2"]:::overlay
+    S_HOME --> O_ANALYTICS["AnalyticsDashboardScreenV2"]:::overlay
+    S_HOME -->|"PEWS at-risk"| TAB_PEOPLE
+
+    %% Calendar platform nested overlays
+    O_CAL --> O_CREATE["CreateEventScreenV2<br><small>7-step wizard</small>"]:::overlay
+    O_CAL --> O_YEAR["AcademicYearManagementScreenV2"]:::overlay
+
+    %% People overlays
+    S_PEOPLE --> O_LINK["LinkRequestsScreenV2<br><small>Parent→child approval queue</small>"]:::overlay
+    S_PEOPLE --> O_STUDENT_R["StudentRosterScreenV2"]:::overlay
+    S_PEOPLE --> O_STUDENT_P["StudentProfileScreenV2<br><small>attendance/marks/leave/fees</small>"]:::overlay
+    S_PEOPLE --> O_TEACHER_P["TeacherProfileScreenV2<br><small>assignments/coverage</small>"]:::overlay
+    S_PEOPLE --> O_TEACHER_A["TeacherAssignmentManagementScreen<br><small>class/subject assignment</small>"]:::overlay
+    S_PEOPLE --> O_STAFF["StaffProfileScreenV2<br><small>non-teaching staff</small>"]:::overlay
+
+    O_STUDENT_R --> O_STUDENT_P
+
+    %% Comms overlays
+    S_COMMS --> O_MSG["MessagesScreenV2"]:::overlay
+    S_COMMS --> O_PTM["SchedulePtmScreenV2"]:::overlay
+
+    %% Settings overlays
+    S_SETTINGS --> O_EDIT["EditSchoolProfileScreenV2"]:::overlay
+    S_SETTINGS --> O_YEAR2["AcademicYearManagementScreenV2"]:::overlay
+    S_SETTINGS -->|"Teacher mgmt"| TAB_PEOPLE
+    S_SETTINGS -->|"Logout"| LOGOUT["viewModel.logout()<br><small>→ UnauthFlow</small>"]:::gate
+
+    classDef screen fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#0d47a1
+    classDef gate fill:#fff9c4,stroke:#f9a825,stroke-width:1.5px,color:#e65100
+    classDef tab fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
+    classDef overlay fill:#fce4ec,stroke:#c62828,stroke-width:1.5px,color:#b71c1c
+  </div>
+
+  <h3>School Portal — All Screens</h3>
+  <table>
+    <tr><th>Category</th><th>Screen Name</th><th>Accessed From</th></tr>
+    <tr><td>Tab</td><td>SchoolHomeScreenV2</td><td>Bottom nav — Home</td></tr>
+    <tr><td>Tab</td><td>SchoolPeopleScreenV2</td><td>Bottom nav — People</td></tr>
+    <tr><td>Tab</td><td>SchoolRecordsScreenV2</td><td>Bottom nav — Records</td></tr>
+    <tr><td>Tab</td><td>SchoolCommsScreenV2</td><td>Bottom nav — Comms</td></tr>
+    <tr><td>Tab</td><td>SchoolSettingsScreenV2</td><td>Bottom nav — Settings</td></tr>
+    <tr><td>Gate</td><td>SchoolOnboardingScreenV2</td><td>AuthedFlow — server onboarding status</td></tr>
+    <tr><td>Overlay</td><td>NotificationsScreenV2</td><td>Home — bell icon</td></tr>
+    <tr><td>Overlay</td><td>AcademicCalendarPlatformScreenV2</td><td>Home — calendar card</td></tr>
+    <tr><td>Overlay</td><td>CreateEventScreenV2</td><td>Calendar Platform — create event</td></tr>
+    <tr><td>Overlay</td><td>AcademicYearManagementScreenV2</td><td>Calendar Platform / Settings</td></tr>
+    <tr><td>Overlay</td><td>AnalyticsDashboardScreenV2</td><td>Home — analytics card</td></tr>
+    <tr><td>Overlay</td><td>MessagesScreenV2</td><td>Comms — messages</td></tr>
+    <tr><td>Overlay</td><td>SchedulePtmScreenV2</td><td>Comms — schedule PTM</td></tr>
+    <tr><td>Overlay</td><td>LinkRequestsScreenV2</td><td>People — link approval queue</td></tr>
+    <tr><td>Overlay</td><td>StudentRosterScreenV2</td><td>People — students sub-tab</td></tr>
+    <tr><td>Overlay</td><td>StudentProfileScreenV2</td><td>Student Roster — row tap</td></tr>
+    <tr><td>Overlay</td><td>TeacherProfileScreenV2</td><td>People — teachers sub-tab</td></tr>
+    <tr><td>Overlay</td><td>TeacherAssignmentManagementScreen</td><td>Teacher Profile / People</td></tr>
+    <tr><td>Overlay</td><td>StaffProfileScreenV2</td><td>People — staff sub-tab</td></tr>
+    <tr><td>Overlay</td><td>EditSchoolProfileScreenV2</td><td>Settings — edit profile</td></tr>
+    <tr><td>Overlay</td><td>LeaveRequestsScreenV2</td><td>People / Records</td></tr>
+    <tr><td>Overlay</td><td>AdmissionsCrmScreenV2</td><td>Records / Home</td></tr>
+    <tr><td>Overlay</td><td>ResultsPublishScreenV2</td><td>Records</td></tr>
+    <tr><td>Overlay</td><td>DailyAttendanceScreenV2</td><td>Records / Home</td></tr>
+    <tr><td>Overlay</td><td>ClassPerformanceScreenV2</td><td>Records / Analytics</td></tr>
+    <tr><td>Overlay</td><td>TeacherPerformanceScreenV2</td><td>Records / Analytics</td></tr>
+  </table>
+</div>
+
+<!-- ───────────────── PAGE 4: Teacher Flow ───────────────── -->
+<div class="page" id="teacher">
+  <h2>3. Teacher Role Flow</h2>
+  <p class="subtitle">Teachers authenticate via the Admin path — 4-tab portal with first-login change-password gate.</p>
+
+  <div class="mermaid">
+flowchart TD
+    ADMIN_AUTH["AdminAuthScreenV2<br><small>Credentials login (shared with Admin)</small>"]:::screen
+
+    ADMIN_AUTH --> AUTHED["AuthedFlow<br>EntryRole.Teacher"]:::screen
+
+    AUTHED --> PCHECK{"profileCompleted?<br><small>local cached flag</small>"}:::gate
+
+    PCHECK -->|"false"| FIRST_LOGIN["TeacherFirstLoginScreenV2<br><small>Change password gate<br>POST /auth/change-password</small>"]:::screen
+    PCHECK -->|"true"| PORTAL["TeacherPortalV2<br><small>tone = Warm (default)</small>"]:::screen
+
+    FIRST_LOGIN -->|"onDone"| PORTAL
+
+    PORTAL --> TAB_HOME["Home"]:::tab
+    PORTAL --> TAB_UPDATE["Update"]:::tab
+    PORTAL --> TAB_CLASSES["Classes"]:::tab
+    PORTAL --> TAB_PROFILE["Profile"]:::tab
+
+    TAB_HOME --> T_HOME["TeacherHomeScreenV2<br><small>Greeting, schedule, obligations,<br>attendance summary, assignments</small>"]:::screen
+    TAB_UPDATE --> T_UPDATE["TeacherUpdateScreenV2<br><small>Scope gate: class/section/subject</small>"]:::screen
+    TAB_CLASSES --> T_CLASSES["TeacherClassesScreenV2<br><small>Class list → detail → student drill-down</small>"]:::screen
+    TAB_PROFILE --> T_PROFILE["TeacherProfileScreenV2<br><small>Identity, leave, password, theme, logout</small>"]:::screen
+
+    %% Home → Update pre-scoped
+    T_HOME -->|"CTA: attendance for assignment"| TAB_UPDATE
+    T_HOME -->|"Open Update tab (fresh)"| TAB_UPDATE
+
+    %% Update tools
+    T_UPDATE --> TOOL_ATT["Attendance"]:::overlay
+    T_UPDATE --> TOOL_MARKS["Marks"]:::overlay
+    T_UPDATE --> TOOL_SYLLABUS["Syllabus"]:::overlay
+    T_UPDATE --> TOOL_HW["Homework"]:::overlay
+
+    %% Home overlay
+    T_HOME --> O_NOTIF["NotificationsScreenV2"]:::overlay
+
+    %% Profile actions
+    T_PROFILE --> LOGOUT["onLogout → UnauthFlow"]:::gate
+    T_PROFILE --> THEME["Theme switch<br><small>Warm / Light / Night</small>"]:::gate
+
+    %% Back behavior
+    T_HOME -.->|"Back from non-home"| TAB_HOME
+    O_NOTIF -.->|"Back"| T_HOME
+
+    classDef screen fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#0d47a1
+    classDef gate fill:#fff9c4,stroke:#f9a825,stroke-width:1.5px,color:#e65100
+    classDef tab fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
+    classDef overlay fill:#fce4ec,stroke:#c62828,stroke-width:1.5px,color:#b71c1c
+  </div>
+
+  <h3>Teacher Portal — All Screens</h3>
+  <table>
+    <tr><th>Category</th><th>Screen Name</th><th>Accessed From</th></tr>
+    <tr><td>Gate</td><td>TeacherFirstLoginScreenV2</td><td>AuthedFlow — profileCompleted = false</td></tr>
+    <tr><td>Tab</td><td>TeacherHomeScreenV2</td><td>Bottom nav — Home</td></tr>
+    <tr><td>Tab</td><td>TeacherUpdateScreenV2</td><td>Bottom nav — Update / Home CTA (pre-scoped)</td></tr>
+    <tr><td>Tab</td><td>TeacherClassesScreenV2</td><td>Bottom nav — Classes</td></tr>
+    <tr><td>Tab</td><td>TeacherProfileScreenV2</td><td>Bottom nav — Profile</td></tr>
+    <tr><td>Overlay</td><td>NotificationsScreenV2</td><td>Header bell icon</td></tr>
+  </table>
+
+  <h3>Update Tab — Tools</h3>
+  <table>
+    <tr><th>Tool</th><th>Description</th><th>Scope Gate</th></tr>
+    <tr><td>Attendance</td><td>Mark daily attendance for a class/section</td><td>Class → Section → Subject</td></tr>
+    <tr><td>Marks</td><td>Enter/publish assessment marks</td><td>Class → Section → Subject</td></tr>
+    <tr><td>Syllabus</td><td>Update syllabus completion status</td><td>Class → Section → Subject</td></tr>
+    <tr><td>Homework</td><td>Assign/publish homework</td><td>Class → Section → Subject</td></tr>
+  </table>
+
+  <h3>Back Navigation Behavior</h3>
+  <table>
+    <tr><th>Current State</th><th>Back Press Action</th></tr>
+    <tr><td>Overlay open (Notifications)</td><td>Closes overlay → returns to current tab</td></tr>
+    <tr><td>Non-home tab (Update/Classes/Profile)</td><td>Returns to Home tab</td></tr>
+    <tr><td>Home tab</td><td>System default (exit app)</td></tr>
+  </table>
+</div>
+
+<!-- ───────────────── PAGE 5: Parent Flow ───────────────── -->
+<div class="page" id="parent">
+  <h2>4. Parent Role Flow</h2>
+  <p class="subtitle">OTP-based auth — 5-tab portal with unlinked-child gate and 8 overlay screens.</p>
+
+  <div class="mermaid">
+flowchart TD
+    PARENT_AUTH["ParentAuthScreenV2<br><small>OTP login</small>"]:::screen
+
+    PARENT_AUTH --> AUTHED["AuthedFlow<br>EntryRole.Parent"]:::screen
+
+    AUTHED -->|"No gate — straight to portal"| PORTAL["ParentPortalV2<br><small>tone = Light</small>"]:::screen
+
+    PORTAL --> UNLINKED{"Dashboard resolved?<br>0 children?"}:::gate
+
+    UNLINKED -->|"Yes — no children"| UNLINKED_SCR["ParentUnlinkedScreenV2<br><small>2-tab: Link child / Explore schools</small>"]:::screen
+    UNLINKED -->|"No — has children"| TABS["5-tab portal"]:::screen
+
+    UNLINKED_SCR -->|"School approves link<br>→ dashboard reloads"| TABS
+    UNLINKED_SCR -->|"Link child"| O_LINK["ParentLinkChildScreenV2"]:::overlay
+    UNLINKED_SCR -->|"Explore"| O_DISCOVERY["DiscoveryScreenV2"]:::overlay
+
+    TABS --> TAB_HOME["Home"]:::tab
+    TABS --> TAB_ACAD["Academics"]:::tab
+    TABS --> TAB_FEES["Fees"]:::tab
+    TABS --> TAB_CONV["Conversations"]:::tab
+    TABS --> TAB_PROFILE["Profile"]:::tab
+
+    TAB_HOME --> P_HOME["ParentHomeScreenV2<br><small>Dashboard, attendance, marks,<br>featured schools, quick links</small>"]:::screen
+    TAB_ACAD --> P_ACAD["ParentAcademicsScreenV2<br><small>Track progress, marks,<br>attendance, leave</small>"]:::screen
+    TAB_FEES --> P_FEES["ParentFeesScreenV2<br><small>Fee summary, invoices,<br>payment history</small>"]:::screen
+    TAB_CONV --> P_CONV["ParentConversationsScreenV2<br><small>Two-way messaging +<br>announcements</small>"]:::screen
+    TAB_PROFILE --> P_PROFILE["ParentProfileCardScreenV2<br><small>Collectible player card,<br>swipe-down: logout/link/discover</small>"]:::screen
+
+    %% Home overlays
+    P_HOME --> O_NOTIF["NotificationsScreenV2"]:::overlay
+    P_HOME --> O_DISC2["DiscoveryScreenV2<br><small>Featured schools</small>"]:::overlay
+    P_HOME -->|"Quick link"| TAB_FEES
+    P_HOME -->|"Quick link"| TAB_ACAD
+
+    %% Academics overlays
+    P_ACAD --> O_LEAVE["ParentLeaveScreenV2<br><small>Apply/view leave</small>"]:::overlay
+
+    %% Profile overlays
+    P_PROFILE --> O_LINK2["ParentLinkChildScreenV2"]:::overlay
+    P_PROFILE --> O_DISC3["DiscoveryScreenV2"]:::overlay
+    P_PROFILE --> LOGOUT["onLogout → UnauthFlow"]:::gate
+
+    %% Header overlays (all tabs)
+    TABS -.->|"Header bell"| O_NOTIF
+    TABS -.->|"Header messages"| O_MSG["ParentMessagesScreenV2<br><small>Parent ↔ teacher/admin</small>"]:::overlay
+    TABS -.->|"Header avatar"| O_PROF["ParentProfileScreenV2<br><small>Account settings, logout,<br>link child, discover</small>"]:::overlay
+
+    O_PROF --> O_LINK2
+    O_PROF --> O_DISC3
+
+    %% Other overlays
+    TABS -.->|"Calendar"| O_CAL["AcademicCalendarScreenV2<br><small>Read-only month grid</small>"]:::overlay
+    TABS -.->|"Scholarships"| O_SCHOL["ScholarshipsScreenV2"]:::overlay
+
+    classDef screen fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#0d47a1
+    classDef gate fill:#fff9c4,stroke:#f9a825,stroke-width:1.5px,color:#e65100
+    classDef tab fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
+    classDef overlay fill:#fce4ec,stroke:#c62828,stroke-width:1.5px,color:#b71c1c
+  </div>
+
+  <h3>Parent Portal — All Screens</h3>
+  <table>
+    <tr><th>Category</th><th>Screen Name</th><th>Accessed From</th></tr>
+    <tr><td>Gate</td><td>ParentUnlinkedScreenV2</td><td>Portal — 0 children detected</td></tr>
+    <tr><td>Tab</td><td>ParentHomeScreenV2</td><td>Bottom nav — Home</td></tr>
+    <tr><td>Tab</td><td>ParentAcademicsScreenV2</td><td>Bottom nav — Academics</td></tr>
+    <tr><td>Tab</td><td>ParentFeesScreenV2</td><td>Bottom nav — Fees</td></tr>
+    <tr><td>Tab</td><td>ParentConversationsScreenV2</td><td>Bottom nav — Conversations</td></tr>
+    <tr><td>Tab</td><td>ParentProfileCardScreenV2</td><td>Bottom nav — Profile</td></tr>
+    <tr><td>Overlay</td><td>NotificationsScreenV2</td><td>Header bell icon</td></tr>
+    <tr><td>Overlay</td><td>ParentMessagesScreenV2</td><td>Header chat icon</td></tr>
+    <tr><td>Overlay</td><td>ParentProfileScreenV2</td><td>Header avatar</td></tr>
+    <tr><td>Overlay</td><td>ParentLinkChildScreenV2</td><td>Profile / Unlinked screen</td></tr>
+    <tr><td>Overlay</td><td>ParentLeaveScreenV2</td><td>Academics — apply leave</td></tr>
+    <tr><td>Overlay</td><td>DiscoveryScreenV2</td><td>Home / Profile — browse schools</td></tr>
+    <tr><td>Overlay</td><td>AcademicCalendarScreenV2</td><td>Calendar access</td></tr>
+    <tr><td>Overlay</td><td>ScholarshipsScreenV2</td><td>Scholarships access</td></tr>
+  </table>
+
+  <h3>Header — Canonical Parent Header (All Tabs)</h3>
+  <table>
+    <tr><th>Element</th><th>Action</th></tr>
+    <tr><td>Child identity chip (avatar + name + level)</td><td>Opens dropdown child switcher (if >1 child)</td></tr>
+    <tr><td>Messages icon</td><td>Opens ParentMessagesScreenV2 overlay</td></tr>
+    <tr><td>Notifications icon (with unread dot)</td><td>Opens NotificationsScreenV2 overlay</td></tr>
+    <tr><td>Account avatar</td><td>Opens ParentProfileScreenV2 overlay</td></tr>
+  </table>
+</div>
+
+<!-- ───────────────── PAGE 6: Summary ───────────────── -->
+<div class="page" id="summary">
+  <h2>5. Summary & Comparison Table</h2>
+  <p class="subtitle">Side-by-side comparison of all three roles.</p>
+
+  <table>
+    <tr>
+      <th>Aspect</th>
+      <th>School / Admin</th>
+      <th>Teacher</th>
+      <th>Parent</th>
+    </tr>
+    <tr>
+      <td><strong>Auth Screen</strong></td>
+      <td>AdminAuthScreenV2</td>
+      <td>AdminAuthScreenV2 (shared)</td>
+      <td>ParentAuthScreenV2</td>
+    </tr>
+    <tr>
+      <td><strong>Auth Method</strong></td>
+      <td>Username + Password</td>
+      <td>Username + Password</td>
+      <td>Phone + OTP</td>
+    </tr>
+    <tr>
+      <td><strong>JWT Role</strong></td>
+      <td>ADMIN / SCHOOL_ADMIN / SUPER_ADMIN</td>
+      <td>TEACHER</td>
+      <td>PARENT</td>
+    </tr>
+    <tr>
+      <td><strong>Post-Login Gate</strong></td>
+      <td>Server onboarding status<br>(GET /onboarding/status)</td>
+      <td>profileCompleted flag<br>→ change password if false</td>
+      <td>None (straight to portal)</td>
+    </tr>
+    <tr>
+      <td><strong>Gate Screen</strong></td>
+      <td>SchoolOnboardingScreenV2</td>
+      <td>TeacherFirstLoginScreenV2</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><strong>Portal</strong></td>
+      <td>SchoolPortalV2</td>
+      <td>TeacherPortalV2</td>
+      <td>ParentPortalV2</td>
+    </tr>
+    <tr>
+      <td><strong>Theme Tone</strong></td>
+      <td>Warm (lavender)</td>
+      <td>Warm / Light / Night (user switch)</td>
+      <td>Light</td>
+    </tr>
+    <tr>
+      <td><strong>Bottom Nav Tabs</strong></td>
+      <td>5: Home, People, Records, Comms, Settings</td>
+      <td>4: Home, Update, Classes, Profile</td>
+      <td>5: Home, Academics, Fees, Conversations, Profile</td>
+    </tr>
+    <tr>
+      <td><strong>Overlay Screens</strong></td>
+      <td>21</td>
+      <td>1 (Notifications)</td>
+      <td>8</td>
+    </tr>
+    <tr>
+      <td><strong>Unlinked Gate</strong></td>
+      <td>—</td>
+      <td>—</td>
+      <td>ParentUnlinkedScreenV2 (0 children)</td>
+    </tr>
+    <tr>
+      <td><strong>Child Switcher</strong></td>
+      <td>—</td>
+      <td>—</td>
+      <td>Header dropdown (if >1 child)</td>
+    </tr>
+    <tr>
+      <td><strong>Notifications</strong></td>
+      <td>Overlay from Home</td>
+      <td>Overlay from Home</td>
+      <td>Overlay from Header (all tabs)</td>
+    </tr>
+    <tr>
+      <td><strong>Messaging</strong></td>
+      <td>MessagesScreenV2 (Comms tab)</td>
+      <td>—</td>
+      <td>ParentMessagesScreenV2 (Header)</td>
+    </tr>
+    <tr>
+      <td><strong>Calendar</strong></td>
+      <td>AcademicCalendarPlatformScreenV2<br>+ CreateEvent wizard + AcademicYear mgmt</td>
+      <td>—</td>
+      <td>AcademicCalendarScreenV2 (read-only)</td>
+    </tr>
+    <tr>
+      <td><strong>Analytics</strong></td>
+      <td>AnalyticsDashboard, ClassPerformance,<br>TeacherPerformance</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><strong>Leave Management</strong></td>
+      <td>LeaveRequestsScreenV2 (approve/reject)</td>
+      <td>Apply from Profile tab</td>
+      <td>ParentLeaveScreenV2 (apply/view)</td>
+    </tr>
+    <tr>
+      <td><strong>Back Behavior</strong></td>
+      <td>Overlay → tabs; tab → stays</td>
+      <td>Overlay → tabs; non-home → Home</td>
+      <td>Overlay → tabs; tab → stays</td>
+    </tr>
+    <tr>
+      <td><strong>Logout</strong></td>
+      <td>Settings tab</td>
+      <td>Profile tab</td>
+      <td>Profile card swipe-down / Profile overlay</td>
+    </tr>
+  </table>
+
+  <div class="footer-note">
+    Generated from source code analysis of NavGraphV2.kt, SchoolPortalV2.kt, TeacherPortalV2.kt, ParentPortalV2.kt, and App.kt.<br>
+    VidyaSetu / EnRoll+ — Kotlin Multiplatform · Jetpack Compose · Jun 2026
+  </div>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#e3f2fd',
+      primaryTextColor: '#0d47a1',
+      primaryBorderColor: '#1565c0',
+      lineColor: '#78909c',
+      fontSize: '13px',
+      fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
+    },
+    flowchart: {
+      curve: 'basis',
+      padding: 20,
+      nodeSpacing: 40,
+      rankSpacing: 50,
+    },
+  });
+</script>
+
+</body>
+</html>

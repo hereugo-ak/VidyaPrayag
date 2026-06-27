@@ -76,13 +76,28 @@
 --     \i docs/backend/sql/02_teacher_schema.sql
 --     \i scripts/schema-patch-2026-06-07.sql
 --     \i docs/db/schema-patch-school-onboarding.sql
+--     \i docs/db/migration_005_class_normalization_and_student_code_standard.sql
+--     \i docs/db/migration_006_parent_link_review_fields.sql
+--     \i docs/db/migration_007_child_link_robustness.sql
+--     \i docs/db/migration_008_enrollments.sql
+--     \i docs/db/migration_009_tsa_fks.sql
+--     \i docs/db/migration_010_typed_dates.sql
+--     \i docs/db/migration_011_periods.sql
+--     \i docs/db/migration_012_holidays_merge.sql
+--     \i docs/db/migration_013_teacher_checkins.sql
+--     \i docs/db/migration_014_attendance.sql
+--     \i docs/db/migration_015_assessments.sql
+--     \i docs/db/migration_016_syllabus.sql
+--     \i docs/db/migration_017_homework.sql
+--     \i docs/db/migration_025_lesson_planning.sql
+--     \i docs/db/migration_050_health_records.sql
 --     \i scripts/seed-2026-06-07.sql
 --
 -- ----------------------------------------------------------------------------
 -- ALTERNATIVE: let the backend self-create everything
 -- ----------------------------------------------------------------------------
 -- Set AUTO_CREATE_TABLES=true on first boot and Exposed will run
--- createMissingTablesAndColumns() for the 38 registered tables. After it
+-- createMissingTablesAndColumns() for all registered tables. After it
 -- succeeds you can flip the env var back to false.
 -- ============================================================================
 

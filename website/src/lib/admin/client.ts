@@ -41,6 +41,17 @@ import type {
   TimetableDto,
   CalendarResponse,
   AttendanceDailyResponse,
+  OtpProvidersResponse,
+  UpdateOtpProviderResponse,
+  TriggerPulseResponse,
+  DevSendNotificationResponse,
+  AlumniDto,
+  AlumniListResponse,
+  AlumniCampaignDto,
+  AlumniDonationDto,
+  AlumniAnalyticsDto,
+  AlumniMentorshipDto,
+  AlumniMentorshipRequestDto,
 } from "./types";
 
 interface Opts {
@@ -242,4 +253,73 @@ export const adminApi = {
   schoolProfile: () => authRequest<SchoolProfileDto>("/api/v1/school/profile"),
   updateSchoolProfile: (body: UpdateSchoolProfileRequest) =>
     authRequest<SchoolProfileDto>("/api/v1/school/profile", { method: "PUT", body }),
+
+  // dev tools (super_admin only)
+  otpProviders: () => authRequest<OtpProvidersResponse>("/api/v1/admin/dev/otp-providers"),
+  updateOtpProvider: (provider: string) =>
+    authRequest<UpdateOtpProviderResponse>("/api/v1/admin/dev/otp-provider", { method: "PUT", body: { provider } }),
+  triggerPulse: () =>
+    authRequest<TriggerPulseResponse>("/api/v1/admin/dev/trigger-pulse", { method: "POST" }),
+  devSendNotification: (body: { user_id: string; title: string; body: string; deep_link?: string; category?: string; school_id?: string }) =>
+    authRequest<DevSendNotificationResponse>("/api/v1/admin/dev/send-notification", { method: "POST", body }),
+
+  // alumni management
+  alumniList: (params?: { year?: number; profession?: string; city?: string; q?: string; page?: number; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.year) qs.set("year", String(params.year));
+    if (params?.profession) qs.set("profession", params.profession);
+    if (params?.city) qs.set("city", params.city);
+    if (params?.q) qs.set("q", params.q);
+    qs.set("page", String(params?.page ?? 1));
+    qs.set("limit", String(params?.limit ?? 20));
+    return authRequest<AlumniListResponse>(`/api/v1/school/alumni?${qs.toString()}`);
+  },
+  alumniGet: (id: string) =>
+    authRequest<AlumniDto>(`/api/v1/school/alumni/${id}`),
+  alumniCreate: (body: Record<string, unknown>) =>
+    authRequest<AlumniDto>("/api/v1/school/alumni", { method: "POST", body }),
+  alumniUpdate: (id: string, body: Record<string, unknown>) =>
+    authRequest<AlumniDto>(`/api/v1/school/alumni/${id}`, { method: "PATCH", body }),
+  alumniDeactivate: (id: string) =>
+    authRequest<unknown>(`/api/v1/school/alumni/${id}/deactivate`, { method: "PATCH" }),
+  alumniVerify: (id: string, action: "approve" | "decline") =>
+    authRequest<AlumniDto>(`/api/v1/school/alumni/${id}/verify`, { method: "PATCH", body: { action } }),
+  alumniToggleFeatured: (id: string) =>
+    authRequest<AlumniDto>(`/api/v1/school/alumni/${id}/feature`, { method: "PATCH" }),
+  alumniPending: () =>
+    authRequest<AlumniDto[]>("/api/v1/school/alumni/pending"),
+  alumniCampaigns: () =>
+    authRequest<AlumniCampaignDto[]>("/api/v1/school/alumni/campaigns"),
+  alumniCampaignCreate: (body: Record<string, unknown>) =>
+    authRequest<AlumniCampaignDto>("/api/v1/school/alumni/campaigns", { method: "POST", body }),
+  alumniCampaignGet: (id: string) =>
+    authRequest<AlumniCampaignDto>(`/api/v1/school/alumni/campaigns/${id}`),
+  alumniCampaignUpdate: (id: string, status: string) =>
+    authRequest<AlumniCampaignDto>(`/api/v1/school/alumni/campaigns/${id}`, { method: "PATCH", body: { status } }),
+  alumniDonations: (campaignId?: string, alumniId?: string) => {
+    const qs = new URLSearchParams();
+    if (campaignId) qs.set("campaign_id", campaignId);
+    if (alumniId) qs.set("alumni_id", alumniId);
+    return authRequest<AlumniDonationDto[]>(`/api/v1/school/alumni/donations${qs.toString() ? `?${qs.toString()}` : ""}`);
+  },
+  alumniDonationCreate: (body: Record<string, unknown>) =>
+    authRequest<AlumniDonationDto>("/api/v1/school/alumni/donations", { method: "POST", body }),
+  alumniAnalytics: () =>
+    authRequest<AlumniAnalyticsDto>("/api/v1/school/alumni/analytics/overview"),
+  alumniEngagement: () =>
+    authRequest<Record<string, unknown>>("/api/v1/school/alumni/analytics/engagement"),
+  alumniDonationAnalytics: () =>
+    authRequest<Record<string, unknown>>("/api/v1/school/alumni/analytics/donations"),
+  alumniCareerAnalytics: () =>
+    authRequest<Record<string, unknown>>("/api/v1/school/alumni/analytics/career"),
+  alumniReceipt: (donationId: string) =>
+    `/api/v1/school/alumni/donations/${donationId}/receipt`,
+  alumniForm10BD: (year?: number) =>
+    `/api/v1/school/alumni/donations/80g/form10bd${year ? `?year=${year}` : ""}`,
+  alumniMentorships: () =>
+    authRequest<AlumniMentorshipDto[]>("/api/v1/school/alumni/mentorships"),
+  alumniMentorshipRequests: () =>
+    authRequest<AlumniMentorshipRequestDto[]>("/api/v1/school/alumni/mentorship-requests"),
+  alumniMentorshipRequestOverride: (requestId: string, action: string) =>
+    authRequest<AlumniMentorshipRequestDto>(`/api/v1/school/alumni/mentorship-requests/${requestId}`, { method: "PATCH", body: { action } }),
 };
