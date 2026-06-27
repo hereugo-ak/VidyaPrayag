@@ -1,8 +1,14 @@
 package com.littlebridge.enrollplus.ui.v2.navigation
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -10,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
+import com.littlebridge.enrollplus.core.prefs.PreferenceRepository
 import com.littlebridge.enrollplus.feature.admin.presentation.OnboardingGate
 import com.littlebridge.enrollplus.feature.admin.presentation.OnboardingGateViewModel
 import com.littlebridge.enrollplus.feature.auth.domain.repository.AuthRepository
@@ -27,8 +34,10 @@ import com.littlebridge.enrollplus.ui.v2.screens.parent.ParentPortalV2
 import com.littlebridge.enrollplus.ui.v2.screens.school.SchoolPortalV2
 import com.littlebridge.enrollplus.ui.v2.screens.teacher.TeacherPortalV2
 import com.littlebridge.enrollplus.ui.v2.theme.VMotion
-import com.littlebridge.enrollplus.ui.v2.theme.VPortalTone
+import com.littlebridge.enrollplus.ui.v2.theme.VStatusBarAdapter
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
+import com.littlebridge.enrollplus.ui.v2.theme.VThemeDef
+import com.littlebridge.enrollplus.ui.v2.theme.VThemeRegistry
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -57,7 +66,15 @@ fun NavGraphV2(
     modifier: Modifier = Modifier,
 ) {
     val entryRole = EntryRole.from(role)
-    val tone = entryRole.tone(isAuthenticated)
+
+    // ── Theme resolution from user preference ────────────────────────────────
+    // The theme is applied at the NavGraphV2 level so ALL portals (parent,
+    // teacher, admin) honour the user's preference — not just the teacher portal.
+    val preferenceRepository = koinInject<PreferenceRepository>()
+    val themeMode by preferenceRepository.getThemeMode().collectAsState(initial = "system")
+    val customThemeId by preferenceRepository.getCustomThemeId().collectAsState(initial = null)
+
+    val resolvedDef = resolveThemeDef(themeMode, customThemeId, entryRole, isAuthenticated)
 
     // Parse the deep link once when it arrives.
     var pendingNavigation by remember { mutableStateOf<DeepLinkTarget?>(null) }
@@ -68,17 +85,59 @@ fun NavGraphV2(
         }
     }
 
-    VTheme(tone = tone) {
-        if (isAuthenticated) {
-            AuthedFlow(
-                role = entryRole,
-                onLogout = onLogout,
-                deepLinkTarget = pendingNavigation,
-                onDeepLinkNavigated = { pendingNavigation = null },
-                modifier = modifier,
-            )
-        } else {
-            UnauthFlow(modifier = modifier)
+    // Smooth crossfade on theme switch (300ms) — avoids a jarring flash.
+    AnimatedContent(
+        targetState = resolvedDef,
+        transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(200)) },
+        label = "theme-switch",
+    ) { def ->
+        VTheme(themeDef = def) {
+            // Phase 7: adapt system bars (status bar / nav bar) to match the
+            // active theme — light icons on dark themes, dark icons on light.
+            VStatusBarAdapter(def.colors.isNight)
+
+            if (isAuthenticated) {
+                AuthedFlow(
+                    role = entryRole,
+                    onLogout = onLogout,
+                    deepLinkTarget = pendingNavigation,
+                    onDeepLinkNavigated = { pendingNavigation = null },
+                    modifier = modifier,
+                )
+            } else {
+                UnauthFlow(modifier = modifier)
+            }
+        }
+    }
+}
+
+/**
+ * Resolves the user's theme preference into a [VThemeDef].
+ *
+ * - "system" → follows OS dark/light via [isSystemInDarkTheme]
+ * - "light" / "dark" → forces that theme
+ * - "custom" → uses the stored custom theme id
+ *
+ * Before the user has chosen (mode == "system" and no prior preference), the
+ * role-based default is used as a fallback so admins/teachers still get their
+ * canonical warm look on first launch.
+ */
+@Composable
+private fun resolveThemeDef(
+    mode: String,
+    customId: String?,
+    entryRole: EntryRole,
+    isAuthenticated: Boolean,
+): VThemeDef {
+    return when (mode) {
+        "light" -> VThemeRegistry.resolve("light")
+        "dark" -> VThemeRegistry.resolve("dark")
+        "custom" -> VThemeRegistry.resolveInclusive(customId ?: "warm")
+        else -> {
+            // "system" — follow OS, but use role-based default on first launch
+            // (before the user has explicitly chosen a mode).
+            val systemDark = isSystemInDarkTheme()
+            VThemeRegistry.resolveSystem(systemDark)
         }
     }
 }
@@ -128,12 +187,6 @@ fun parseDeepLink(path: String, currentRole: EntryRole): DeepLinkTarget {
 /** Typed app role, parsed once from the persisted JWT role string (LAW: no scattered role literals). */
 enum class EntryRole {
     Parent, SchoolAdmin, SuperAdmin, Teacher, Unknown;
-
-    fun tone(isAuthenticated: Boolean): VPortalTone = when {
-        !isAuthenticated -> VPortalTone.Light
-        this == SchoolAdmin || this == SuperAdmin || this == Teacher -> VPortalTone.Warm
-        else -> VPortalTone.Light
-    }
 
     companion object {
         fun from(raw: String?): EntryRole = when (raw?.trim()?.uppercase()) {

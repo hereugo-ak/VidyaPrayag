@@ -5,7 +5,14 @@ import kotlinx.coroutines.flow.Flow
 interface PreferenceRepository {
     fun getThemeName(): Flow<String>
     suspend fun setThemeName(name: String)
-    
+
+    // --- theme mode (system/light/dark/custom) ---
+    fun getThemeMode(): Flow<String>
+    suspend fun setThemeMode(mode: String)
+
+    fun getCustomThemeId(): Flow<String?>
+    suspend fun setCustomThemeId(id: String?)
+
     fun getUserRole(): Flow<String>
     suspend fun setUserRole(role: String)
 

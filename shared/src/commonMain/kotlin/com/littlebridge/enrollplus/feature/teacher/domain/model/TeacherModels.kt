@@ -67,6 +67,10 @@ data class ResolvedPeriodDto(
     // one — Doc 05 §6 "two periods overlap"). UI shows a warning chip.
     @SerialName("has_overlap") val hasOverlap: Boolean = false,
     val note: String = "",
+    // Lesson plan for this period's assignment on this day (LESSON_PLANNING_SPEC
+    // §7 — Today tab integration). Null when no plan exists; status when one does.
+    @SerialName("lesson_plan_id") val lessonPlanId: String? = null,
+    @SerialName("lesson_plan_status") val lessonPlanStatus: String? = null, // planned | completed | skipped
 )
 
 @Serializable
@@ -1128,4 +1132,142 @@ data class StudentProfileResponse(
     val success: Boolean = false,
     val message: String? = null,
     val data: StudentProfileData? = null,
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Lesson Planning (LESSON_PLANNING_SPEC.md — P1-20)
+//
+// Mirrors server DTOs in feature/teacher/TeacherLessonPlanRouting.kt
+// field-for-field (Lp* prefix). Assignment-scoped (X-1 ownership pattern).
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class LessonActivityDto(
+    val activity: String,
+    @SerialName("duration_min") val durationMin: Int = 15,
+)
+
+@Serializable
+data class LessonPlanDto(
+    val id: String,
+    @SerialName("assignment_id") val assignmentId: String,
+    @SerialName("class_id") val classId: String = "",
+    val section: String = "",
+    @SerialName("subject_name") val subjectName: String = "",
+    @SerialName("curriculum_unit_id") val curriculumUnitId: String? = null,
+    @SerialName("curriculum_unit_title") val curriculumUnitTitle: String? = null,
+    val title: String,
+    val objectives: List<String> = emptyList(),
+    val activities: List<LessonActivityDto> = emptyList(),
+    val resources: List<String> = emptyList(),
+    @SerialName("assessment_method") val assessmentMethod: String? = null,
+    @SerialName("duration_minutes") val durationMinutes: Int = 45,
+    @SerialName("homework_id") val homeworkId: String? = null,
+    @SerialName("planned_date") val plannedDate: String? = null,
+    @SerialName("completed_at") val completedAt: String? = null,
+    val status: String = "planned",
+    @SerialName("template_source_id") val templateSourceId: String? = null,
+    @SerialName("created_at") val createdAt: String = "",
+    @SerialName("updated_at") val updatedAt: String = "",
+)
+
+@Serializable
+data class LessonPlanListResponse(
+    val success: Boolean = true,
+    val message: String? = null,
+    val data: List<LessonPlanDto> = emptyList(),
+)
+
+@Serializable
+data class LessonPlanSingleResponse(
+    val success: Boolean = true,
+    val message: String? = null,
+    val data: LessonPlanDto,
+)
+
+@Serializable
+data class CreateLessonPlanRequest(
+    @SerialName("assignment_id") val assignmentId: String,
+    @SerialName("curriculum_unit_id") val curriculumUnitId: String? = null,
+    val title: String,
+    val objectives: List<String> = emptyList(),
+    val activities: List<LessonActivityDto> = emptyList(),
+    val resources: List<String> = emptyList(),
+    @SerialName("assessment_method") val assessmentMethod: String? = null,
+    @SerialName("duration_minutes") val durationMinutes: Int = 45,
+    @SerialName("homework_id") val homeworkId: String? = null,
+    @SerialName("planned_date") val plannedDate: String? = null,
+)
+
+@Serializable
+data class UpdateLessonPlanRequest(
+    @SerialName("curriculum_unit_id") val curriculumUnitId: String? = null,
+    val title: String? = null,
+    val objectives: List<String>? = null,
+    val activities: List<LessonActivityDto>? = null,
+    val resources: List<String>? = null,
+    @SerialName("assessment_method") val assessmentMethod: String? = null,
+    @SerialName("duration_minutes") val durationMinutes: Int? = null,
+    @SerialName("homework_id") val homeworkId: String? = null,
+    @SerialName("planned_date") val plannedDate: String? = null,
+)
+
+@Serializable
+data class LessonCalendarDayDto(
+    val date: String,
+    val plans: List<LessonPlanDto> = emptyList(),
+)
+
+@Serializable
+data class LessonCalendarDto(
+    val month: String,
+    val days: List<LessonCalendarDayDto> = emptyList(),
+)
+
+@Serializable
+data class LessonCalendarResponse(
+    val success: Boolean = true,
+    val message: String? = null,
+    val data: LessonCalendarDto,
+)
+
+// ── Templates ────────────────────────────────────────────────────────────────
+
+@Serializable
+data class LessonTemplateDto(
+    val id: String,
+    @SerialName("assignment_id") val assignmentId: String,
+    @SerialName("subject_name") val subjectName: String = "",
+    val title: String,
+    val objectives: List<String> = emptyList(),
+    val activities: List<LessonActivityDto> = emptyList(),
+    val resources: List<String> = emptyList(),
+    @SerialName("assessment_method") val assessmentMethod: String? = null,
+    @SerialName("duration_minutes") val durationMinutes: Int = 45,
+    @SerialName("is_shared") val isShared: Boolean = false,
+)
+
+@Serializable
+data class LessonTemplateListResponse(
+    val success: Boolean = true,
+    val message: String? = null,
+    val data: List<LessonTemplateDto> = emptyList(),
+)
+
+@Serializable
+data class SaveLessonTemplateRequest(
+    @SerialName("assignment_id") val assignmentId: String,
+    val title: String,
+    val objectives: List<String> = emptyList(),
+    val activities: List<LessonActivityDto> = emptyList(),
+    val resources: List<String> = emptyList(),
+    @SerialName("assessment_method") val assessmentMethod: String? = null,
+    @SerialName("duration_minutes") val durationMinutes: Int = 45,
+    @SerialName("is_shared") val isShared: Boolean = false,
+)
+
+@Serializable
+data class InstantiateFromTemplateRequest(
+    @SerialName("assignment_id") val assignmentId: String,
+    @SerialName("planned_date") val plannedDate: String,
 )

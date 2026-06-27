@@ -61,9 +61,6 @@ data class VColors(
     val isNight: Boolean,
 )
 
-/** Which surface aesthetic a portal renders with. */
-enum class VPortalTone { Light, Warm, Night }
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Raw token values (single declaration site — mirrors theme.css :root / .theme-night)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -196,7 +193,35 @@ val NightVColors = VColors(
     isNight = true,
 )
 
-fun vColorsFor(tone: VPortalTone): VColors = when (tone) {
-    VPortalTone.Light, VPortalTone.Warm -> LightVColors
-    VPortalTone.Night -> NightVColors
+// ─────────────────────────────────────────────────────────────────────────────
+// WCAG 2.1 contrast utilities (Phase 7)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Relative luminance of a Color per WCAG 2.1 §1.4.3. */
+private fun Color.relativeLuminance(): Double {
+    fun channel(c: Float): Double {
+        val s = c.toDouble()
+        return if (s <= 0.03928) s / 12.92 else Math.pow((s + 0.055) / 1.055, 2.4)
+    }
+    val r = channel(red)
+    val g = channel(green)
+    val b = channel(blue)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
 }
+
+/** Contrast ratio (1.0–21.0) between two colors per WCAG 2.1 §1.4.3. */
+fun contrastRatio(fg: Color, bg: Color): Double {
+    val l1 = fg.relativeLuminance()
+    val l2 = bg.relativeLuminance()
+    val (lighter, darker) = if (l1 >= l2) l1 to l2 else l2 to l1
+    return (lighter + 0.05) / (darker + 0.05)
+}
+
+/** WCAG AA threshold for normal text (4.5:1). */
+const val WCAG_AA_NORMAL = 4.5
+
+/** WCAG AA threshold for large text (3.0:1). */
+const val WCAG_AA_LARGE = 3.0
+
+/** Returns true if the fg/bg pair meets WCAG AA for normal text. */
+fun meetsWCAGAA(fg: Color, bg: Color): Boolean = contrastRatio(fg, bg) >= WCAG_AA_NORMAL

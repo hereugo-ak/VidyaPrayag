@@ -39,8 +39,8 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.littlebridge.enrollplus.ui.v2.components.VBrandLogo
 import com.littlebridge.enrollplus.ui.v2.theme.VMotion
-import com.littlebridge.enrollplus.ui.v2.theme.VPortalTone
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
+import com.littlebridge.enrollplus.ui.v2.theme.VThemeRegistry
 import com.littlebridge.enrollplus.ui.v2.theme.colored
 import kotlinx.coroutines.launch
 
@@ -58,7 +58,7 @@ import kotlinx.coroutines.launch
  * decision so Splash never needs to know about roles or destinations.
  */
 @Composable
-fun SplashScreenV2(modifier: Modifier = Modifier) = VTheme(tone = VPortalTone.Light) {
+fun SplashScreenV2(modifier: Modifier = Modifier) = VTheme(themeDef = VThemeRegistry.resolve("light")) {
     val c = VTheme.colors
 
     // Entrance reveal — logo spring fires at once, wordmark/tagline follow shortly after.

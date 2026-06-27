@@ -79,6 +79,20 @@ class AuthApi(
     }
 
     /**
+     * Phase 6: sync the user's theme preference to the server so it persists
+     * across devices. The bearer token is attached automatically by the Ktor
+     * Auth plugin.
+     */
+    suspend fun setThemePref(themePref: String): NetworkResult<ApiResponse<Map<String, String>>> {
+        return safeApiCall {
+            client.put(getUrl("api/v1/user/theme-pref")) {
+                contentType(ContentType.Application.Json)
+                setBody(mapOf("theme_pref" to themePref))
+            }
+        }
+    }
+
+    /**
      * Exchange a refresh token for a fresh access token (audit §3.4, finding F).
      * The server's /refresh route was previously unreachable because no client
      * method called it.

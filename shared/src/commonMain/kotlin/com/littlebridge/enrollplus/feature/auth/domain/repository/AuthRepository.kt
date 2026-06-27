@@ -18,4 +18,6 @@ interface AuthRepository {
     suspend fun changePassword(oldPassword: String?, newPassword: String): NetworkResult<Unit>
     suspend fun logout()
     suspend fun getUserDetails(token: String): NetworkResult<UserDetailsResponse>
+    /** Phase 6: sync theme preference to server for cross-device persistence. */
+    suspend fun syncThemePref(themePref: String): NetworkResult<Unit>
 }

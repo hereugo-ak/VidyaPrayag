@@ -65,9 +65,17 @@ class TeacherProfileActionsViewModel(
     private val _password = MutableStateFlow<ActionResult>(ActionResult.Idle)
     val password: StateFlow<ActionResult> = _password.asStateFlow()
 
-    /** Current theme name ("WARM" | "LIGHT" | "NIGHT"), upper-cased; defaults WARM for teachers. */
+    /** Current theme name (legacy: "WARM" | "LIGHT" | "NIGHT"), upper-cased; defaults WARM for teachers. */
     val themeName: StateFlow<String> = preferenceRepository.getThemeName()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "WARM")
+
+    /** Theme mode ("system" | "light" | "dark" | "custom"); defaults system. */
+    val themeMode: StateFlow<String> = preferenceRepository.getThemeMode()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "system")
+
+    /** Custom theme id when mode == "custom"; null otherwise. */
+    val customThemeId: StateFlow<String?> = preferenceRepository.getCustomThemeId()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     init {
         loadLeave()
@@ -158,10 +166,24 @@ class TeacherProfileActionsViewModel(
 
     fun clearPasswordResult() { _password.value = ActionResult.Idle }
 
-    /** Set the global theme preference; the teacher portal reads this to drive its tone. */
+    /** Set the global theme preference (legacy: "WARM" | "LIGHT" | "NIGHT"). */
     fun setTheme(name: String) {
         viewModelScope.launch {
             preferenceRepository.setThemeName(name.uppercase())
+        }
+    }
+
+    /** Set the theme mode ("system" | "light" | "dark" | "custom"). */
+    fun setThemeMode(mode: String) {
+        viewModelScope.launch {
+            preferenceRepository.setThemeMode(mode)
+        }
+    }
+
+    /** Set the custom theme id (used when mode == "custom"). */
+    fun setCustomThemeId(id: String?) {
+        viewModelScope.launch {
+            preferenceRepository.setCustomThemeId(id)
         }
     }
 }

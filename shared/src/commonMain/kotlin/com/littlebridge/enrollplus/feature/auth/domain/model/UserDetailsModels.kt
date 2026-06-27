@@ -22,7 +22,8 @@ data class PersonalDetails(
     val name: String,
     @SerialName("profile_pic") val profilePic: String? = null,
     val email: String? = null,
-    val mobile: String? = null
+    val mobile: String? = null,
+    @SerialName("theme_pref") val themePref: String? = null
 )
 
 @Serializable

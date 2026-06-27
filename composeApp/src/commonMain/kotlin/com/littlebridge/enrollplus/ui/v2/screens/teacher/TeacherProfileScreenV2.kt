@@ -48,6 +48,7 @@ import com.littlebridge.enrollplus.ui.v2.components.VButtonVariant
 import com.littlebridge.enrollplus.ui.v2.components.VDatePicker
 import com.littlebridge.enrollplus.ui.v2.components.VIcons
 import com.littlebridge.enrollplus.ui.v2.components.VInput
+import com.littlebridge.enrollplus.ui.v2.components.VThemePicker
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
 import com.littlebridge.enrollplus.ui.v2.theme.colored
@@ -79,6 +80,8 @@ fun TeacherProfileScreenV2(
     val applyResult by actionsViewModel.apply.collectAsStateV2()
     val passwordResult by actionsViewModel.password.collectAsStateV2()
     val themeName by actionsViewModel.themeName.collectAsStateV2()
+    val themeMode by actionsViewModel.themeMode.collectAsStateV2()
+    val customThemeId by actionsViewModel.customThemeId.collectAsStateV2()
 
     var showLeaveComposer by remember { mutableStateOf(false) }
     var showPasswordForm by remember { mutableStateOf(false) }
@@ -148,7 +151,16 @@ fun TeacherProfileScreenV2(
 
         // 4 — Theme
         item {
-            ThemeCard(current = themeName, onSelect = { actionsViewModel.setTheme(it) })
+            TCard {
+                VThemePicker(
+                    currentMode = themeMode,
+                    currentCustomId = customThemeId,
+                    onSelect = { mode, customId ->
+                        actionsViewModel.setThemeMode(mode)
+                        actionsViewModel.setCustomThemeId(customId)
+                    },
+                )
+            }
         }
 
         // 5 — Logout

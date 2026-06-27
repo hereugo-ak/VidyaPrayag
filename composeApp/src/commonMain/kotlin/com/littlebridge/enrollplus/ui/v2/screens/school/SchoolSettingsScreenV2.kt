@@ -20,9 +20,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +33,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.littlebridge.enrollplus.core.prefs.PreferenceRepository
 import com.littlebridge.enrollplus.feature.admin.presentation.InstitutionalProfileState
 import com.littlebridge.enrollplus.feature.admin.presentation.InstitutionalProfileViewModel
 import com.littlebridge.enrollplus.ui.v2.components.VBadge
@@ -40,10 +43,13 @@ import com.littlebridge.enrollplus.ui.v2.components.VConfirmDialog
 import com.littlebridge.enrollplus.ui.v2.components.VIcons
 import com.littlebridge.enrollplus.ui.v2.components.VProgressBar
 import com.littlebridge.enrollplus.ui.v2.components.VProgressRing
+import com.littlebridge.enrollplus.ui.v2.components.VThemePicker
 import com.littlebridge.enrollplus.ui.v2.screens.VStateHost
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
 import com.littlebridge.enrollplus.ui.v2.theme.colored
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -67,10 +73,22 @@ fun SchoolSettingsScreenV2(
     onOpenAcademicYear: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: InstitutionalProfileViewModel = koinViewModel(),
+    preferenceRepository: PreferenceRepository = koinInject(),
 ) {
     val state by viewModel.state.collectAsStateV2()
+    val themeMode by preferenceRepository.getThemeMode().collectAsState(initial = "system")
+    val customThemeId by preferenceRepository.getCustomThemeId().collectAsState(initial = null)
+    val scope = rememberCoroutineScope()
     SchoolSettingsContent(
         state = state,
+        themeMode = themeMode,
+        customThemeId = customThemeId,
+        onThemeSelect = { mode, customId ->
+            scope.launch {
+                preferenceRepository.setThemeMode(mode)
+                preferenceRepository.setCustomThemeId(customId)
+            }
+        },
         onLogout = onLogout,
         onOpenTeachers = onOpenTeachers,
         onOpenProfile = onOpenProfile,
@@ -85,6 +103,9 @@ fun SchoolSettingsScreenV2(
 @Composable
 private fun SchoolSettingsContent(
     state: InstitutionalProfileState,
+    themeMode: String,
+    customThemeId: String?,
+    onThemeSelect: (String, String?) -> Unit,
     onLogout: () -> Unit,
     onOpenTeachers: () -> Unit,
     onOpenProfile: () -> Unit,
@@ -236,6 +257,15 @@ private fun SchoolSettingsContent(
                         }
                     }
                 }
+            }
+
+            // ── Appearance / theme picker ─────────────────────────────────────
+            VCard {
+                VThemePicker(
+                    currentMode = themeMode,
+                    currentCustomId = customThemeId,
+                    onSelect = onThemeSelect,
+                )
             }
         }
     }

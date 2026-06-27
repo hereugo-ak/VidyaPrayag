@@ -33,9 +33,8 @@ import com.littlebridge.enrollplus.presentation.MainViewModel
 import com.littlebridge.enrollplus.ui.v2.navigation.NavGraphV2
 import com.littlebridge.enrollplus.ui.v2.screens.auth.SplashScreenV2
 import com.littlebridge.enrollplus.ui.v2.theme.VColors
-import com.littlebridge.enrollplus.ui.v2.theme.VPortalTone
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
-import com.littlebridge.enrollplus.ui.v2.theme.vColorsFor
+import com.littlebridge.enrollplus.ui.v2.theme.VThemeRegistry
 import com.littlebridge.enrollplus.util.Config
 import io.ktor.client.*
 import okio.FileSystem
@@ -50,7 +49,7 @@ import org.koin.core.annotation.KoinExperimentalAPI
  * The legacy `ui/` (theme/components/auth/screens) and the old 35-destination
  * `navigation/NavGraph.kt` have been removed; navigation is now role-driven through
  * [NavGraphV2], which selects the correct portal (`SchoolPortalV2` / `TeacherPortalV2` /
- * `ParentPortalV2`) and applies the matching [VPortalTone].
+ * `ParentPortalV2`) and applies the matching theme via [VThemeRegistry].
  *
  * Flow:
  *  - `KoinContext` → [MainViewModel] (auth state).
@@ -114,8 +113,8 @@ fun App(
                 .build()
         }
 
-        // Resolve the colors for a lavender (Light) splash before the portal tone is known.
-        val splashColors: VColors = vColorsFor(VPortalTone.Light)
+        // Resolve the colors for a lavender (Light) splash before the portal theme is known.
+        val splashColors: VColors = VThemeRegistry.resolve("light").colors
 
         // ── SESSION-BLEED FIX (root cause) ───────────────────────────────────────
         // This app has NO NavHost / NavController: NavGraphV2 is a hand-rolled

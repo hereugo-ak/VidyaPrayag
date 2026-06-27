@@ -25,6 +25,8 @@ class LocalStoragePreferenceManager : PreferenceRepository {
     }
 
     private val themeName = MutableStateFlow(read(KEY_THEME) ?: "LIGHT")
+    private val themeMode = MutableStateFlow(read(KEY_THEME_MODE) ?: migrateMode(read(KEY_THEME)))
+    private val customThemeId = MutableStateFlow(migrateCustomId(read(KEY_THEME)))
     private val userRole = MutableStateFlow(read(KEY_ROLE) ?: "GUEST")
     private val userToken = MutableStateFlow(read(KEY_TOKEN))
     private val userId = MutableStateFlow(read(KEY_USER_ID))
@@ -36,6 +38,18 @@ class LocalStoragePreferenceManager : PreferenceRepository {
     override suspend fun setThemeName(name: String) {
         themeName.value = name
         write(KEY_THEME, name)
+    }
+
+    override fun getThemeMode(): Flow<String> = themeMode
+    override suspend fun setThemeMode(mode: String) {
+        themeMode.value = mode
+        write(KEY_THEME_MODE, mode)
+    }
+
+    override fun getCustomThemeId(): Flow<String?> = customThemeId
+    override suspend fun setCustomThemeId(id: String?) {
+        customThemeId.value = id
+        write(KEY_CUSTOM_THEME_ID, id)
     }
 
     override fun getUserRole(): Flow<String> = userRole
@@ -92,6 +106,8 @@ class LocalStoragePreferenceManager : PreferenceRepository {
 
     private companion object {
         const val KEY_THEME = "vp.themeName"
+        const val KEY_THEME_MODE = "vp.themeMode"
+        const val KEY_CUSTOM_THEME_ID = "vp.customThemeId"
         const val KEY_ROLE = "vp.userRole"
         const val KEY_TOKEN = "vp.userToken"
         const val KEY_USER_ID = "vp.userId"
@@ -112,3 +128,13 @@ private fun lsSetItem(key: String, value: String) {
 private fun lsRemoveItem(key: String) {
     js("window.localStorage.removeItem(key)")
 }
+
+private fun migrateMode(oldThemeName: String?): String = when (oldThemeName?.uppercase()) {
+    "LIGHT" -> "light"
+    "NIGHT" -> "dark"
+    "WARM" -> "custom"
+    else -> "system"
+}
+
+private fun migrateCustomId(oldThemeName: String?): String? =
+    if (oldThemeName?.uppercase() == "WARM") "warm" else null

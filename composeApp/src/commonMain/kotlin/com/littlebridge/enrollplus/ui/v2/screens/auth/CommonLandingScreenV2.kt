@@ -76,8 +76,8 @@ import com.littlebridge.enrollplus.ui.v2.components.VButtonSize
 import com.littlebridge.enrollplus.ui.v2.components.VButtonTone
 import com.littlebridge.enrollplus.ui.v2.components.VButtonVariant
 import com.littlebridge.enrollplus.ui.v2.components.VIcons
-import com.littlebridge.enrollplus.ui.v2.theme.VPortalTone
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
+import com.littlebridge.enrollplus.ui.v2.theme.VThemeRegistry
 import com.littlebridge.enrollplus.ui.v2.theme.colored
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -122,7 +122,7 @@ fun CommonLandingScreenV2(
     onAdmin: () -> Unit,
     modifier: Modifier = Modifier,
     onLegal: (LegalDoc) -> Unit = {},
-) = VTheme(tone = VPortalTone.Light) {
+) = VTheme(themeDef = VThemeRegistry.resolve("light")) {
     val c = VTheme.colors
     val d = VTheme.dimens
 

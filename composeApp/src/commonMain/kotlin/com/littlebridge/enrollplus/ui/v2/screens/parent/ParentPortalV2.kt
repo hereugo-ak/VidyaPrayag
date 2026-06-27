@@ -53,7 +53,7 @@ import com.littlebridge.enrollplus.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays a portal can push above its tab content (back returns to the tabs). */
-private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, Profile, Leave, Messages, LinkChild, Discovery }
+private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, Profile, Leave, Messages, LinkChild, Discovery, Health }
 
 /**
  * ParentPortalV2 — the 5-tab parent shell, a faithful copy of `Parent.tsx → ParentApp`.
@@ -188,6 +188,16 @@ fun ParentPortalV2(
             )
             return
         }
+        ParentOverlay.Health -> {
+            val child = dashboard.selectedChild
+            if (child == null) { overlay = ParentOverlay.None; return }
+            ParentHealthScreenV2(
+                childId = child.id,
+                onBack = { overlay = ParentOverlay.None },
+                modifier = modifier,
+            )
+            return
+        }
         ParentOverlay.None -> Unit
     }
 
@@ -258,8 +268,8 @@ fun ParentPortalV2(
                 )
             }
         },
-    ) { _ ->
-        Box(Modifier.fillMaxSize()) {
+    ) { padding ->
+        Box(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())) {
             when (tab) {
                 "home" -> ParentHomeScreenV2(
                     onDiscoverSchools = { overlay = ParentOverlay.Discovery },
@@ -267,7 +277,7 @@ fun ParentPortalV2(
                     onOpenFees = { tab = "fees" },
                     onOpenAcademics = { tab = "academics" },
                 )
-                "academics" -> ParentAcademicsScreenV2(onOpenLeave = { overlay = ParentOverlay.Leave })
+                "academics" -> ParentAcademicsScreenV2(onOpenLeave = { overlay = ParentOverlay.Leave }, onOpenHealth = { overlay = ParentOverlay.Health })
                 "fees" -> ParentFeesScreenV2()
                 // Phase 3 (commit 9): the Conversations hub — messaging-first, announcements second.
                 "conversations" -> ParentConversationsScreenV2(messageViewModel = messageViewModel)

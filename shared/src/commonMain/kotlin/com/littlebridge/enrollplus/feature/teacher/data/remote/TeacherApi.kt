@@ -430,4 +430,122 @@ class TeacherApi(
             setBody(request)
         }
     }
+
+    // ── Lesson Planning (LESSON_PLANNING_SPEC.md — P1-20) ──────────────────────
+
+    suspend fun listLessonPlans(
+        token: String,
+        assignmentId: String,
+        status: String? = null,
+        from: String? = null,
+        to: String? = null,
+        unitId: String? = null,
+    ): NetworkResult<LessonPlanListResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/lesson-plans")) {
+            parameter("assignmentId", assignmentId)
+            if (status != null) parameter("status", status)
+            if (from != null) parameter("from", from)
+            if (to != null) parameter("to", to)
+            if (unitId != null) parameter("unitId", unitId)
+        }
+    }
+
+    suspend fun getLessonPlan(
+        token: String,
+        planId: String,
+    ): NetworkResult<LessonPlanSingleResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/lesson-plans/$planId"))
+    }
+
+    suspend fun createLessonPlan(
+        token: String,
+        request: CreateLessonPlanRequest,
+    ): NetworkResult<LessonPlanSingleResponse> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/lesson-plans")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    suspend fun updateLessonPlan(
+        token: String,
+        planId: String,
+        request: UpdateLessonPlanRequest,
+    ): NetworkResult<LessonPlanSingleResponse> = safeApiCall {
+        client.patch(getUrl("api/v1/teacher/lesson-plans/$planId")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    suspend fun deleteLessonPlan(
+        token: String,
+        planId: String,
+    ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
+        client.delete(getUrl("api/v1/teacher/lesson-plans/$planId"))
+    }
+
+    suspend fun completeLessonPlan(
+        token: String,
+        planId: String,
+    ): NetworkResult<LessonPlanSingleResponse> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/lesson-plans/$planId/complete"))
+    }
+
+    suspend fun skipLessonPlan(
+        token: String,
+        planId: String,
+    ): NetworkResult<LessonPlanSingleResponse> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/lesson-plans/$planId/skip"))
+    }
+
+    suspend fun getLessonCalendar(
+        token: String,
+        assignmentId: String,
+        month: String,
+    ): NetworkResult<LessonCalendarResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/lesson-plans/calendar")) {
+            parameter("assignmentId", assignmentId)
+            parameter("month", month)
+        }
+    }
+
+    // ── Lesson templates ───────────────────────────────────────────────────────
+
+    suspend fun listLessonTemplates(
+        token: String,
+        assignmentId: String,
+    ): NetworkResult<LessonTemplateListResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/lesson-plan-templates")) {
+            parameter("assignmentId", assignmentId)
+        }
+    }
+
+    suspend fun saveLessonTemplate(
+        token: String,
+        request: SaveLessonTemplateRequest,
+    ): NetworkResult<LessonTemplateDto> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/lesson-plan-templates")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    suspend fun deleteLessonTemplate(
+        token: String,
+        templateId: String,
+    ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
+        client.delete(getUrl("api/v1/teacher/lesson-plan-templates/$templateId"))
+    }
+
+    suspend fun instantiateLessonFromTemplate(
+        token: String,
+        templateId: String,
+        request: InstantiateFromTemplateRequest,
+    ): NetworkResult<LessonPlanSingleResponse> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/lesson-plans/from-template/$templateId")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
 }

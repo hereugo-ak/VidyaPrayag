@@ -70,6 +70,10 @@ object AppUsersTable : UUIDTable("app_users", "id") {
     // POST /auth/change-password endpoint clears it (and flips profile_completed)
     // once the teacher sets their own password. NavGraphV2 reads it via login.
     val mustChangePassword = bool("must_change_password").default(false)
+    // Phase 6: server-side theme preference (stores VThemeMode storage value:
+    // "system" | "light" | "dark" | "custom:<themeId>"). Synced from the client
+    // via PUT /api/v1/user/theme-pref and read back in GET /api/v1/user/details.
+    val themePref         = varchar("theme_pref", 64).nullable()
     val isActive         = bool("is_active").default(true)
     val lastLoginAt      = timestamp("last_login_at").nullable()
     val createdAt        = timestamp("created_at")
@@ -1694,5 +1698,184 @@ object NotificationPreferencesTable : UUIDTable("notification_preferences", "id"
     init {
         // One preference row per user per category.
         uniqueIndex("ux_notif_prefs_user_category", userId, category)
+    }
+}
+
+// =====================================================================
+// Lesson Planning (LESSON_PLANNING_SPEC.md — P1-20)
+//
+// Three tables back the teacher lesson-plan surface:
+//   1. LessonPlansTable          — the plan itself (scoped to a TSA, X-1)
+//   2. LessonPlanTemplatesTable  — reusable templates (separate shape/lifecycle)
+//   3. LessonPlanAttachmentsTable — URL-based file/link attachments
+//
+// Created/applied by docs/db/migration_025_lesson_planning.sql. Registered
+// in DatabaseFactory.allTables — AUTO_CREATE_TABLES is OFF in production, so
+// that migration MUST be applied in Supabase before the matching deploy or
+// validateSchema() refuses to boot.
+// =====================================================================
+
+/**
+ * A lesson plan authored by a teacher for one class+section+subject, scoped
+ * to a [TeacherSubjectAssignmentsTable] row (X-1 ownership). Every read/write
+ * is guarded by `requireOwnedAssignment()`. `teacher_id`, `class_id`,
+ * `section`, `subject_id`, `subject_name` are denormalised from the TSA for
+ * query convenience (same pattern as [HomeworkTable]).
+ *
+ * On completion (`status = "completed"`), if `curriculumUnitId` is set, the
+ * handler upserts [SyllabusProgressTable] (isCovered=true, coveredOn=today,
+ * coveredBy=teacher) keyed on `(unitId, section, assignmentId)`.
+ *
+ * `deleted_at` soft-delete: all queries filter `WHERE deleted_at IS NULL`.
+ */
+object LessonPlansTable : UUIDTable("lesson_plans", "id") {
+    val schoolId           = uuid("school_id")
+    val teacherId          = uuid("teacher_id")
+    val assignmentId       = uuid("assignment_id")             // FK teacher_subject_assignments.id (X-1 scope)
+    val classId            = uuid("class_id")                   // denormalised from TSA
+    val section            = varchar("section", 8).default("A") // denormalised from TSA
+    val subjectId          = uuid("subject_id").nullable()      // denormalised from TSA
+    val subjectName        = text("subject_name")               // display column
+    val curriculumUnitId   = uuid("curriculum_unit_id").nullable() // FK curriculum_units.id (optional)
+    val title              = text("title")
+    val objectives         = text("objectives")                 // JSON array: ["Objective 1", ...]
+    val activities         = text("activities").nullable()      // JSON: [{"activity":"...","duration_min":15}]
+    val resources          = text("resources").nullable()       // JSON: ["Textbook pg 45", ...]
+    val assessmentMethod   = text("assessment_method").nullable()
+    val durationMinutes    = integer("duration_minutes").default(45)
+    val homeworkId         = uuid("homework_id").nullable()     // FK homework.id (optional)
+    val plannedDate        = date("planned_date").nullable()
+    val completedAt        = timestamp("completed_at").nullable()
+    val status             = varchar("status", 16).default("planned") // planned | completed | skipped
+    val isTemplate         = bool("is_template").default(false)
+    val templateSourceId   = uuid("template_source_id").nullable() // FK lesson_plans.id (if from a template)
+    val deletedAt          = timestamp("deleted_at").nullable() // soft delete
+    val createdAt          = timestamp("created_at")
+    val updatedAt          = timestamp("updated_at")
+}
+
+/**
+ * A reusable lesson-plan template. Separate table because templates have no
+ * `planned_date`, no `status`, no `homework_id`, no `completed_at` — a
+ * different shape and lifecycle. `is_shared` enables cross-teacher reuse
+ * within a school (future co-planning foundation).
+ */
+object LessonPlanTemplatesTable : UUIDTable("lesson_plan_templates", "id") {
+    val schoolId           = uuid("school_id")
+    val teacherId          = uuid("teacher_id")
+    val assignmentId       = uuid("assignment_id")             // FK teacher_subject_assignments.id (scope)
+    val subjectName        = text("subject_name")
+    val title              = text("title")
+    val objectives         = text("objectives")                 // JSON array
+    val activities         = text("activities").nullable()      // JSON array
+    val resources          = text("resources").nullable()       // JSON array
+    val assessmentMethod   = text("assessment_method").nullable()
+    val durationMinutes    = integer("duration_minutes").default(45)
+    val isShared           = bool("is_shared").default(false)
+    val deletedAt          = timestamp("deleted_at").nullable()
+    val createdAt          = timestamp("created_at")
+    val updatedAt          = timestamp("updated_at")
+}
+
+/**
+ * A file/link attached to a lesson plan (URL-based). Follows the
+ * [HomeworkAttachmentsTable] pattern exactly.
+ */
+object LessonPlanAttachmentsTable : UUIDTable("lesson_plan_attachments", "id") {
+    val lessonPlanId       = uuid("lesson_plan_id")            // FK lesson_plans.id (CASCADE)
+    val url                = text("url")
+    val filename           = text("filename").default("")
+    val mime               = text("mime").default("")
+    val sizeBytes          = long("size_bytes").default(0)
+    val uploadedBy         = uuid("uploaded_by").nullable()    // FK app_users.id
+    val createdAt          = timestamp("created_at")
+}
+
+// =====================================================================
+// Student Health Records (HEALTH_RECORDS_SPEC.md — P1-12)
+//
+// Three tables back the student health surface:
+//   1. StudentHealthProfilesTable   — per-student health profile (1:1)
+//   2. StudentImmunizationsTable    — immunization/vaccine tracking
+//   3. StudentHealthIncidentsTable  — health incident log
+//
+// Created/applied by docs/db/migration_050_health_records.sql. Registered
+// in DatabaseFactory.allTables — AUTO_CREATE_TABLES is OFF in production,
+// so that migration MUST be applied in Supabase before the matching deploy
+// or validateSchema() refuses to boot.
+// =====================================================================
+
+/**
+ * A student's health profile — one row per student (UNIQUE on student_id).
+ * Stores blood group, physical measurements, allergies, chronic conditions,
+ * medications (JSON-as-text), and emergency contact / doctor information.
+ *
+ * JSON columns follow the existing convention (see Tables.kt header):
+ * `allergies` is a JSON array string e.g. ["Peanuts","Penicillin"];
+ * `chronicConditions` is a JSON array of objects e.g.
+ *   [{"condition":"Asthma","notes":"..."}];
+ * `medications` is a JSON array of objects e.g.
+ *   [{"name":"Inhaler","dose":"2 puffs","frequency":"as needed"}].
+ */
+object StudentHealthProfilesTable : UUIDTable("student_health_profiles", "id") {
+    val schoolId              = uuid("school_id")
+    val studentId             = uuid("student_id").uniqueIndex()   // FK students.id — 1:1
+    val bloodGroup            = varchar("blood_group", 8).nullable()
+    val heightCm              = double("height_cm").nullable()
+    val weightKg              = double("weight_kg").nullable()
+    val allergies             = text("allergies").default("[]")           // JSON array
+    val chronicConditions     = text("chronic_conditions").default("[]")  // JSON array of objects
+    val medications           = text("medications").default("[]")         // JSON array of objects
+    val emergencyContactName  = text("emergency_contact_name").nullable()
+    val emergencyContactPhone = varchar("emergency_contact_phone", 32).nullable()
+    val doctorName            = text("doctor_name").nullable()
+    val doctorPhone           = varchar("doctor_phone", 32).nullable()
+    val updatedAt             = timestamp("updated_at")
+    val createdAt             = timestamp("created_at")
+}
+
+/**
+ * An immunization record for a student — one row per dose administered.
+ * Tracks vaccine name, dose number, date administered, next due date, and
+ * the administering doctor/clinic. Indexed on student_id for fast lookups.
+ */
+object StudentImmunizationsTable : UUIDTable("student_immunizations", "id") {
+    val studentId         = uuid("student_id")               // FK students.id
+    val vaccineName       = text("vaccine_name")             // "BCG", "DPT", "MMR", "COVID-19", …
+    val doseNumber        = integer("dose_number").default(1)
+    val dateAdministered  = date("date_administered")
+    val nextDueDate       = date("next_due_date").nullable()
+    val administeredBy    = text("administered_by").nullable()  // doctor/clinic name
+    val createdAt         = timestamp("created_at")
+
+    init {
+        index("idx_immunizations_student", false, studentId)
+    }
+}
+
+/**
+ * A health incident log entry — what happened, treatment, medication given,
+ * whether the parent was notified, and which staff member attended. Indexed
+ * on (student_id, date DESC) for the incident history view.
+ *
+ * `severity` is a controlled vocabulary: minor | moderate | major.
+ */
+object StudentHealthIncidentsTable : UUIDTable("student_health_incidents", "id") {
+    val schoolId          = uuid("school_id")
+    val studentId         = uuid("student_id")               // FK students.id
+    val date              = date("date")
+    val time              = varchar("time", 8).nullable()    // "HH:mm"
+    val description       = text("description")              // "Fell during recess, scraped knee"
+    val treatment         = text("treatment").nullable()     // "Cleaned with antiseptic, bandage applied"
+    val medicationGiven   = text("medication_given").nullable()
+    val parentNotified    = bool("parent_notified").default(false)
+    val parentNotifiedAt  = timestamp("parent_notified_at").nullable()
+    val attendedBy        = uuid("attended_by").nullable()   // FK app_users.id (staff)
+    val attendedByName    = text("attended_by_name").nullable()
+    val severity          = varchar("severity", 16).default("minor")  // minor | moderate | major
+    val createdAt         = timestamp("created_at")
+
+    init {
+        index("idx_health_incidents_student", false, studentId, date)
     }
 }

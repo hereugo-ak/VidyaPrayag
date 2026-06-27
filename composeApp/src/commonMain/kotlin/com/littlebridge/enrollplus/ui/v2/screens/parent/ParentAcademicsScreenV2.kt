@@ -38,6 +38,7 @@ import com.littlebridge.enrollplus.feature.parent.presentation.ParentAcademicsSt
 import com.littlebridge.enrollplus.feature.parent.presentation.ParentAcademicsViewModel
 import com.littlebridge.enrollplus.feature.parent.presentation.TrackProgressState
 import com.littlebridge.enrollplus.feature.parent.presentation.TrackProgressViewModel
+import com.littlebridge.enrollplus.ui.v2.components.VActionCard
 import com.littlebridge.enrollplus.ui.v2.components.VBadge
 import com.littlebridge.enrollplus.ui.v2.components.VBadgeTone
 import com.littlebridge.enrollplus.ui.v2.components.VCard
@@ -68,6 +69,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun ParentAcademicsScreenV2(
     modifier: Modifier = Modifier,
     onOpenLeave: () -> Unit = {},
+    onOpenHealth: () -> Unit = {},
     viewModel: TrackProgressViewModel = koinViewModel(),
     academicsViewModel: ParentAcademicsViewModel = koinViewModel(),
 ) {
@@ -80,6 +82,7 @@ fun ParentAcademicsScreenV2(
         onLoadMarks = { academicsViewModel.loadMarks() },
         onLoadSyllabus = { academicsViewModel.loadSyllabus() },
         onOpenLeave = onOpenLeave,
+        onOpenHealth = onOpenHealth,
         modifier = modifier,
     )
 }
@@ -93,6 +96,7 @@ private fun ParentAcademicsContent(
     onLoadMarks: () -> Unit,
     onLoadSyllabus: () -> Unit,
     onOpenLeave: () -> Unit = {},
+    onOpenHealth: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -167,6 +171,14 @@ private fun ParentAcademicsContent(
                 Icon(VIcons.ArrowRight, contentDescription = null, tint = c.accentDeep, modifier = Modifier.size(18.dp))
             }
         }
+        // ── Health Records entry — quick access to child's health profile ─────
+        VActionCard(
+            title = "Health Records",
+            subtitle = "View health profile, immunizations, and incidents",
+            icon = VIcons.Heart,
+            onClick = onOpenHealth,
+            modifier = Modifier.padding(horizontal = 20.dp),
+        )
         Spacer(Modifier.height(12.dp))
 
         // ONE CANONICAL CHILD SWITCHER (design law): the active child is chosen ONLY from the

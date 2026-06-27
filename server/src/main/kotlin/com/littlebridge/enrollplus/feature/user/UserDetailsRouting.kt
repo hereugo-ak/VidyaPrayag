@@ -30,6 +30,7 @@ import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.feature.onboarding.computeOnboardingStatus
 import io.ktor.http.*
 import io.ktor.server.auth.*
+import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -38,6 +39,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.update
 import java.util.UUID
 
 @Serializable
@@ -47,7 +49,8 @@ data class PersonalDetails(
     val name: String,
     @SerialName("profile_pic") val profilePic: String? = null,
     val email: String? = null,
-    val mobile: String? = null
+    val mobile: String? = null,
+    @SerialName("theme_pref") val themePref: String? = null
 )
 
 @Serializable
@@ -118,6 +121,11 @@ private val DEFAULT_THEMES = listOf(
 
 private val lenientJson = Json { ignoreUnknownKeys = true; isLenient = true }
 
+@Serializable
+data class ThemePrefRequest(
+    @SerialName("theme_pref") val themePref: String
+)
+
 fun Route.userDetailsRouting() {
     authenticate("jwt") {
         route("/api/v1/user") {
@@ -145,7 +153,8 @@ fun Route.userDetailsRouting() {
                         name = u[AppUsersTable.fullName],
                         profilePic = u[AppUsersTable.profilePicUrl],
                         email = u[AppUsersTable.email],
-                        mobile = u[AppUsersTable.phone]
+                        mobile = u[AppUsersTable.phone],
+                        themePref = u[AppUsersTable.themePref]
                     )
 
                     val basicsDone = status.basicsDone
@@ -214,6 +223,34 @@ fun Route.userDetailsRouting() {
                 } else {
                     call.ok(payload, message = "User details fetched")
                 }
+            }
+
+            // ── Phase 6: theme preference sync ──────────────────────────────────
+            put("/theme-pref") {
+                val uid = call.principalUserId() ?: run {
+                    call.fail("Invalid token", HttpStatusCode.Unauthorized); return@put
+                }
+                val userUuid = runCatching { UUID.fromString(uid) }.getOrNull() ?: run {
+                    call.fail("Malformed token subject", HttpStatusCode.Unauthorized); return@put
+                }
+
+                val body = runCatching {
+                    call.receive<ThemePrefRequest>()
+                }.getOrNull() ?: run {
+                    call.fail("Invalid request body", HttpStatusCode.BadRequest); return@put
+                }
+
+                val pref = body.themePref.trim()
+                if (pref.length > 64 || pref.isEmpty()) {
+                    call.fail("theme_pref must be 1-64 characters", HttpStatusCode.BadRequest); return@put
+                }
+
+                dbQuery {
+                    AppUsersTable.update({ AppUsersTable.id eq userUuid }) {
+                        it[AppUsersTable.themePref] = pref
+                    }
+                }
+                call.ok(mapOf("theme_pref" to pref), message = "Theme preference saved")
             }
         }
     }

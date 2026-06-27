@@ -2,6 +2,7 @@ package com.littlebridge.enrollplus.ui.v2.screens.school
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,8 +22,6 @@ import com.littlebridge.enrollplus.ui.v2.navigation.DeepLinkTarget
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.screens.discovery.AcademicCalendarScreenV2
 import com.littlebridge.enrollplus.ui.v2.screens.notifications.NotificationsScreenV2
-import com.littlebridge.enrollplus.ui.v2.theme.VPortalTone
-import com.littlebridge.enrollplus.ui.v2.theme.VTheme
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays the admin portal can push above its tab content. */
@@ -51,6 +50,7 @@ private enum class SchoolOverlay {
     TeacherProfile,
     TeacherAssignments,
     Staff,
+    HealthRecords,
 }
 
 /**
@@ -74,10 +74,9 @@ fun SchoolPortalV2(
 ) {
     // UI_FIDELITY_AUDIT §0.5: Admin.tsx renders under `PhoneFrame dark`, but legacy `dark` == the
     // `.warm` scope, which is a WARM-LIGHT theme (lavender bg, dark ink, white cards) — NOT black.
-    // So the admin portal must be Warm, never Night.
-    VTheme(tone = VPortalTone.Warm) {
-        var tab by remember { mutableStateOf("home") }
-        var overlay by remember { mutableStateOf(SchoolOverlay.None) }
+    // Theme is now applied globally at the NavGraphV2 level from user preference.
+    var tab by remember { mutableStateOf("home") }
+    var overlay by remember { mutableStateOf(SchoolOverlay.None) }
 
         // Apply deep-link routing: set tab from the typed target.
         LaunchedEffect(deepLinkTarget) {
@@ -91,6 +90,9 @@ fun SchoolPortalV2(
         var selectedTeacherId by remember { mutableStateOf<String?>(null) }
         // RA-S17 — id carried into the non-teaching-staff profile overlay.
         var selectedStaffId by remember { mutableStateOf<String?>(null) }
+        // Health Records — student id + name carried into the health records overlay.
+        var healthStudentId by remember { mutableStateOf<String?>(null) }
+        var healthStudentName by remember { mutableStateOf<String?>(null) }
         // RA-S12 — the Comms badge counts message threads with unread messages
         // (GET /school/messages/threads), not a hardcoded literal.
         val messagesState by messagesViewModel.state.collectAsStateV2()
@@ -107,12 +109,12 @@ fun SchoolPortalV2(
         when (overlay) {
             SchoolOverlay.Notifications -> {
                 NotificationsScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
-                return@VTheme
+                return
             }
             SchoolOverlay.Calendar -> {
                 // Legacy read-only month grid (kept for back-compat / deep-links).
                 AcademicCalendarScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
-                return@VTheme
+                return
             }
             SchoolOverlay.AcademicCalendarPlatform -> {
                 // VP-CAL — the premium centralized planning & scheduling platform.
@@ -122,7 +124,7 @@ fun SchoolPortalV2(
                     onOpenEvent = { /* event detail handled in-screen via overflow actions */ },
                     modifier = modifier,
                 )
-                return@VTheme
+                return
             }
             SchoolOverlay.CreateEvent -> {
                 // 7-step create-event wizard; pops back to the platform on success.
@@ -131,57 +133,57 @@ fun SchoolPortalV2(
                     onCreated = { overlay = SchoolOverlay.AcademicCalendarPlatform },
                     modifier = modifier,
                 )
-                return@VTheme
+                return
             }
             SchoolOverlay.AcademicYear -> {
                 AcademicYearManagementScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
-                return@VTheme
+                return
             }
             SchoolOverlay.Messages -> {
                 MessagesScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
-                return@VTheme
+                return
             }
             SchoolOverlay.LeaveRequests -> {
                 LeaveRequestsScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
-                return@VTheme
+                return
             }
             SchoolOverlay.LinkRequests -> {
                 // RA-48: the parent→child link approval queue.
                 LinkRequestsScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
-                return@VTheme
+                return
             }
             SchoolOverlay.AdmissionsCRM -> {
                 AdmissionsCrmScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
-                return@VTheme
+                return
             }
             SchoolOverlay.Results -> {
                 ResultsPublishScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
-                return@VTheme
+                return
             }
             SchoolOverlay.SchedulePTM -> {
                 SchedulePtmScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
-                return@VTheme
+                return
             }
             SchoolOverlay.DailyAttendance -> {
                 DailyAttendanceScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
-                return@VTheme
+                return
             }
             SchoolOverlay.ClassPerformance -> {
                 ClassPerformanceScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
-                return@VTheme
+                return
             }
             SchoolOverlay.TeacherPerformance -> {
                 TeacherPerformanceScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
-                return@VTheme
+                return
             }
             SchoolOverlay.AnalyticsDashboard -> {
                 AnalyticsDashboardScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
-                return@VTheme
+                return
             }
             SchoolOverlay.EditProfile -> {
                 // RA-47 — edit the live schools row (institutional profile).
                 EditSchoolProfileScreenV2(onBack = { overlay = SchoolOverlay.None }, modifier = modifier)
-                return@VTheme
+                return
             }
             SchoolOverlay.StudentRoster -> {
                 // RA-45 — the live student roster; rows open a student profile.
@@ -190,28 +192,33 @@ fun SchoolPortalV2(
                     onOpenStudent = { id -> selectedStudentId = id; overlay = SchoolOverlay.StudentProfile },
                     modifier = modifier,
                 )
-                return@VTheme
+                return
             }
             SchoolOverlay.StudentProfile -> {
                 // RA-45 — single student record (attendance/marks/leave/fees).
                 // RA-S17 — reached from the People→Students sub-tab; back pops to
                 // the People tab. `onRemoved` also pops back so the roster refreshes.
                 val id = selectedStudentId
-                if (id == null) { overlay = SchoolOverlay.None; return@VTheme }
+                if (id == null) { overlay = SchoolOverlay.None; return }
                 StudentProfileScreenV2(
                     studentId = id,
                     onBack = { overlay = SchoolOverlay.None },
                     onRemoved = { overlay = SchoolOverlay.None
                         studentRefreshKey++
                                 },
+                    onOpenHealth = { sid, sname ->
+                        healthStudentId = sid
+                        healthStudentName = sname
+                        overlay = SchoolOverlay.HealthRecords
+                    },
                     modifier = modifier,
                 )
-                return@VTheme
+                return
             }
             SchoolOverlay.TeacherProfile -> {
                 // RA-45 — single teacher detail (assignments/coverage).
                 val id = selectedTeacherId
-                if (id == null) { overlay = SchoolOverlay.None; return@VTheme }
+                if (id == null) { overlay = SchoolOverlay.None; return }
                 TeacherProfileScreenV2(
                     teacherId = id,
                     onBack = { overlay = SchoolOverlay.None },
@@ -221,31 +228,43 @@ fun SchoolPortalV2(
                     onOpenAssignments = { overlay = SchoolOverlay.TeacherAssignments },
                     modifier = modifier,
                 )
-                return@VTheme
+                return
             }
             SchoolOverlay.TeacherAssignments -> {
                 // RA-TAM — the single reusable Teacher Assignment Management
                 // screen, reached from Teacher Listing and Teacher Profile.
                 val id = selectedTeacherId
-                if (id == null) { overlay = SchoolOverlay.None; return@VTheme }
+                if (id == null) { overlay = SchoolOverlay.None; return }
                 TeacherAssignmentManagementScreen(
                     teacherId = id,
                     onBack = { overlay = SchoolOverlay.None },
                     modifier = modifier,
                 )
-                return@VTheme
+                return
             }
             SchoolOverlay.Staff -> {
                 // RA-S17 — single non-teaching-staff record; delete-in-profile.
                 val id = selectedStaffId
-                if (id == null) { overlay = SchoolOverlay.None; return@VTheme }
+                if (id == null) { overlay = SchoolOverlay.None; return }
                 StaffProfileScreenV2(
                     staffId = id,
                     onBack = { overlay = SchoolOverlay.None },
                     onRemoved = { overlay = SchoolOverlay.None },
                     modifier = modifier,
                 )
-                return@VTheme
+                return
+            }
+            SchoolOverlay.HealthRecords -> {
+                val id = healthStudentId
+                val name = healthStudentName ?: "Student"
+                if (id == null) { overlay = SchoolOverlay.None; return }
+                HealthRecordsScreenV2(
+                    studentId = id,
+                    studentName = name,
+                    onBack = { overlay = SchoolOverlay.None },
+                    modifier = modifier,
+                )
+                return
             }
             SchoolOverlay.None -> Unit
         }
@@ -263,8 +282,8 @@ fun SchoolPortalV2(
             bottomBar = {
                 VBottomNav(items = items, selected = tab, onSelect = { tab = it })
             },
-        ) { _ ->
-            Box(Modifier.fillMaxSize()) {
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())) {
                 when (tab) {
                     "home" -> SchoolHomeScreenV2(
                         onOpenNotifications = { overlay = SchoolOverlay.Notifications },
@@ -312,5 +331,4 @@ fun SchoolPortalV2(
                 }
             }
         }
-    }
 }

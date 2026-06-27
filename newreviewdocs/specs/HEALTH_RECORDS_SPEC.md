@@ -117,12 +117,12 @@ GET /api/v1/parent/health/{childId}
 
 ## 6. Acceptance Criteria
 
-- [ ] Health profile maintained per student
-- [ ] Immunization tracking with next-due alerts
-- [ ] Health incidents logged with treatment details
-- [ ] Allergy alerts visible to teachers
-- [ ] Parent can view child's health records
-- [ ] Emergency contact information stored
+- [x] Health profile maintained per student
+- [x] Immunization tracking with next-due alerts
+- [x] Health incidents logged with treatment details
+- [x] Allergy alerts visible to teachers
+- [x] Parent can view child's health records
+- [x] Emergency contact information stored
 
 ---
 

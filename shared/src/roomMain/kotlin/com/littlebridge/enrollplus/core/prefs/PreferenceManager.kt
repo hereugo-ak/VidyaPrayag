@@ -11,6 +11,8 @@ class PreferenceManager(
 ) : PreferenceRepository {
 
     private val THEME_NAME_KEY = stringPreferencesKey("theme_name")
+    private val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
+    private val CUSTOM_THEME_ID_KEY = stringPreferencesKey("custom_theme_id")
     private val USER_ROLE_KEY = stringPreferencesKey("user_role")
     private val USER_TOKEN_KEY = stringPreferencesKey("user_token")
     private val USER_ID_KEY = stringPreferencesKey("user_id")
@@ -32,6 +34,54 @@ class PreferenceManager(
     override suspend fun setThemeName(name: String) {
         dataStore.edit { preferences ->
             preferences[THEME_NAME_KEY] = name
+        }
+    }
+
+    // --- theme mode (system/light/dark/custom) ---
+    // One-time migration: if THEME_MODE_KEY is absent but THEME_NAME_KEY exists,
+    // map the old value to the new mode + customId.
+    override fun getThemeMode(): Flow<String> {
+        return dataStore.data.map { preferences ->
+            val mode = preferences[THEME_MODE_KEY]
+            if (mode != null) {
+                mode
+            } else {
+                // Migrate from old theme_name key
+                when (preferences[THEME_NAME_KEY]?.uppercase()) {
+                    "LIGHT" -> "light"
+                    "NIGHT" -> "dark"
+                    "WARM" -> "custom"
+                    else -> "system"
+                }
+            }
+        }
+    }
+
+    override suspend fun setThemeMode(mode: String) {
+        dataStore.edit { preferences ->
+            preferences[THEME_MODE_KEY] = mode
+        }
+    }
+
+    override fun getCustomThemeId(): Flow<String?> {
+        return dataStore.data.map { preferences ->
+            val customId = preferences[CUSTOM_THEME_ID_KEY]
+            if (customId != null) {
+                customId
+            } else {
+                // Migrate: old "WARM" theme_name → custom theme id "warm"
+                if (preferences[THEME_NAME_KEY]?.uppercase() == "WARM") "warm" else null
+            }
+        }
+    }
+
+    override suspend fun setCustomThemeId(id: String?) {
+        dataStore.edit { preferences ->
+            if (id == null) {
+                preferences.remove(CUSTOM_THEME_ID_KEY)
+            } else {
+                preferences[CUSTOM_THEME_ID_KEY] = id
+            }
         }
     }
 
