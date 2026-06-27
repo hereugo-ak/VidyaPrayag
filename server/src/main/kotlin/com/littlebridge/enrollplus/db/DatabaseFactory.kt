@@ -205,7 +205,18 @@ object DatabaseFactory {
         // Parent Pulse (PARENT_PULSE_SPEC.md — weekly AI digest for parents)
         // Applied by docs/db/migration_051_parent_pulse.sql (must run before
         // deploy; AUTO_CREATE_TABLES is OFF in prod).
-        ParentPulsesTable
+        ParentPulsesTable,
+        // Alumni Management (ALUMNI_MANAGEMENT_SPEC.md — alumni directory, mentorship,
+        // donations, career tracking)
+        // Applied by docs/db/migration_052_alumni_management.sql (must run before
+        // deploy; AUTO_CREATE_TABLES is OFF in prod).
+        AlumniTable,
+        AlumniDonationCampaignsTable,
+        AlumniDonationsTable,            // FK to alumni + campaigns
+        AlumniMentorshipRequestsTable,   // FK to alumni + students
+        AlumniMentorshipsTable,          // FK to alumni + students + requests
+        AlumniCareerHistoryTable,        // FK to alumni
+        AlumniMentorshipSettingsTable    // FK to schools
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

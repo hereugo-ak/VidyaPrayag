@@ -405,3 +405,135 @@ export interface TriggerPulseResponse {
 export interface DevSendNotificationResponse {
   sent: boolean;
 }
+
+// ── Alumni Management (ALUMNI_MANAGEMENT_SPEC.md) ───────────────────────────
+export interface AlumniDto {
+  id: string;
+  schoolId: string;
+  studentId: string | null;
+  userId: string | null;
+  name: string;
+  graduationYear: number;
+  lastClass: string | null;
+  currentProfession: string | null;
+  company: string | null;
+  city: string | null;
+  email: string | null;
+  phone: string | null;
+  linkedinUrl: string | null;
+  photoUrl: string | null;
+  skills: string | null;
+  achievements: string | null;
+  isMentor: boolean;
+  mentorExpertise: string | null;
+  isFeatured: boolean;
+  verificationStatus: string;
+  verifiedAt: string | null;
+  showPhone: boolean;
+  showEmail: boolean;
+  showLinkedin: boolean;
+  visibilityLevel: string;
+  profileCompleteness: number;
+  lastActiveAt: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  careerHistory: CareerHistoryDto[];
+}
+export interface CareerHistoryDto {
+  id: string;
+  alumniId: string;
+  jobTitle: string;
+  company: string;
+  industry: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  isCurrent: boolean;
+  createdAt: string;
+}
+export interface AlumniListResponse {
+  alumni: AlumniDto[];
+  page: number;
+  limit: number;
+  total: number;
+}
+export interface AlumniCampaignDto {
+  id: string;
+  schoolId: string;
+  title: string;
+  description: string | null;
+  cause: string | null;
+  targetAmount: number;
+  amountRaised: number;
+  targetBatchYear: number | null;
+  startDate: string;
+  endDate: string | null;
+  status: string;
+  isActive: boolean;
+  donorCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface AlumniDonationDto {
+  id: string;
+  schoolId: string;
+  alumniId: string;
+  alumniName: string;
+  campaignId: string | null;
+  campaignTitle: string | null;
+  amount: number;
+  purpose: string | null;
+  donationDate: string;
+  paymentMode: string | null;
+  referenceNumber: string | null;
+  receiptNumber: string | null;
+  receiptIssued: boolean;
+  is80gEligible: boolean;
+  createdAt: string;
+}
+export interface AlumniAnalyticsDto {
+  totalAlumni: number;
+  activeAlumni: number;
+  pendingVerifications: number;
+  byGraduationYear: Record<string, number>;
+  byProfession: Record<string, number>;
+  byCity: Record<string, number>;
+  totalDonations: number;
+  donationCount: number;
+  activeCampaigns: number;
+  activeMentorships: number;
+  mentorshipRequestsPending: number;
+  engagementRate: number;
+}
+
+export interface AlumniMentorshipDto {
+  id: string;
+  schoolId: string;
+  alumniId: string;
+  alumniName: string;
+  studentId: string;
+  studentName: string;
+  requestId: string | null;
+  status: string;
+  startDate: string;
+  endDate: string | null;
+  notes: string | null;
+  sessionCount: number;
+  createdAt: string;
+}
+
+export interface AlumniMentorshipRequestDto {
+  id: string;
+  schoolId: string;
+  alumniId: string;
+  alumniName: string;
+  studentId: string;
+  studentName: string;
+  requestedBy: string;
+  requestedByName: string;
+  expertiseArea: string | null;
+  message: string | null;
+  status: string;
+  respondedAt: string | null;
+  createdAt: string;
+}

@@ -57,6 +57,7 @@ import com.littlebridge.enrollplus.db.DatabaseFactory
 import com.littlebridge.enrollplus.feature.admissions.admissionRouting
 import com.littlebridge.enrollplus.feature.announcements.announcementRouting
 import com.littlebridge.enrollplus.feature.auth.authRouting
+import com.littlebridge.enrollplus.feature.alumni.alumniRouting
 import com.littlebridge.enrollplus.feature.calendar.academicCalendarRouting
 import com.littlebridge.enrollplus.feature.calendar.academicYearRouting
 import com.littlebridge.enrollplus.feature.auth.otpAdminRouting
@@ -359,5 +360,11 @@ fun Application.module() {
         //   /api/v1/teacher/health/alerts                              — teacher allergy alerts
         //   /api/v1/parent/health/{childId}                            — parent view
         healthRouting()
+
+        // Alumni Management (ALUMNI_MANAGEMENT_SPEC.md)
+        //   /api/v1/school/alumni/*  — admin endpoints (school context)
+        //   /api/v1/alumni/*         — alumni self-service (alumni context)
+        //   /api/v1/alumni/register  — public self-registration
+        alumniRouting()
     }
 }

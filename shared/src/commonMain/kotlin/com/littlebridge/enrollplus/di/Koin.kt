@@ -378,6 +378,17 @@ val commonModule = module {
         com.littlebridge.enrollplus.feature.health.data.repository.HealthRepositoryImpl(get())
     }
 
+    // Alumni Management (ALUMNI_MANAGEMENT_SPEC.md)
+    single {
+        com.littlebridge.enrollplus.feature.alumni.data.remote.AlumniApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single<com.littlebridge.enrollplus.feature.alumni.domain.repository.AlumniRepository> {
+        com.littlebridge.enrollplus.feature.alumni.data.repository.AlumniRepositoryImpl(get())
+    }
+
     // UseCases
     factory { GetSchoolsUseCase(get()) }
 }
@@ -481,6 +492,8 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.health.presentation.AdminHealthViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.health.presentation.TeacherHealthAlertsViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.health.presentation.ParentHealthViewModel(get(), get()) }
+    // Alumni Management (ALUMNI_MANAGEMENT_SPEC.md)
+    factory { com.littlebridge.enrollplus.feature.alumni.presentation.AlumniViewModel(get(), get()) }
 }
 
 fun initKoin(

@@ -172,7 +172,8 @@ private fun ParentDashboardContent(
                         radius = size.width * 0.9f,
                     ),
                 )
-            },
+            }
+            .padding(bottom = 130.dp),
     ) {
         // CRITICAL LAYOUT FIX (root cause of the "cards crammed at the top, ~70% empty space" bug):
         // the dashboard body used to live inside VStateHost, whose loading leg drives an

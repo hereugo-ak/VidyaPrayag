@@ -8,6 +8,7 @@ import {
   IconPeople,
   IconSettings,
   IconBolt,
+  IconAlumni,
 } from "@/components/admin/icons";
 
 export interface NavItem {
@@ -21,6 +22,7 @@ export interface NavItem {
 export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/dashboard", label: "Dashboard", icon: IconDashboard },
   { href: "/admin/people", label: "People", icon: IconPeople },
+  { href: "/admin/alumni", label: "Alumni", icon: IconAlumni },
   { href: "/admin/attendance", label: "Attendance", icon: IconAttendance },
   { href: "/admin/marks", label: "Marks", icon: IconMarks },
   { href: "/admin/fees", label: "Fees", icon: IconFees },

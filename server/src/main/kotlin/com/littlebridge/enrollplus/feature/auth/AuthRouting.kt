@@ -239,6 +239,7 @@ private fun roleNormalised(input: String?): String {
         "admin", "school_admin" -> "school_admin"
         "teacher" -> "teacher"
         "super_admin" -> "super_admin"
+        "alumni" -> "alumni"
         else -> "parent"
     }
 }

@@ -152,6 +152,7 @@ sealed class DeepLinkTarget {
     data class ParentTab(override val role: EntryRole, val tab: String, val overlay: String? = null) : DeepLinkTarget()
     data class TeacherScreen(override val role: EntryRole, val screen: String) : DeepLinkTarget()
     data class SchoolScreen(override val role: EntryRole, val screen: String) : DeepLinkTarget()
+    data class AlumniScreen(override val role: EntryRole, val screen: String, val alumniId: String? = null) : DeepLinkTarget()
     data class Generic(override val role: EntryRole, val path: String) : DeepLinkTarget()
 }
 
@@ -174,6 +175,11 @@ fun parseDeepLink(path: String, currentRole: EntryRole): DeepLinkTarget {
         }
         "teacher" -> DeepLinkTarget.TeacherScreen(EntryRole.Teacher, segments.getOrNull(1) ?: "home")
         "school", "admin" -> DeepLinkTarget.SchoolScreen(EntryRole.SchoolAdmin, segments.getOrNull(1) ?: "home")
+        "alumni" -> {
+            val screen = segments.getOrNull(1) ?: "directory"
+            val alumniId = segments.getOrNull(2)
+            DeepLinkTarget.AlumniScreen(EntryRole.SchoolAdmin, screen, alumniId)
+        }
         "announcements" -> DeepLinkTarget.Generic(currentRole, path)
         "calendar" -> DeepLinkTarget.Generic(currentRole, path)
         else -> DeepLinkTarget.Generic(currentRole, path)
@@ -186,7 +192,7 @@ fun parseDeepLink(path: String, currentRole: EntryRole): DeepLinkTarget {
 
 /** Typed app role, parsed once from the persisted JWT role string (LAW: no scattered role literals). */
 enum class EntryRole {
-    Parent, SchoolAdmin, SuperAdmin, Teacher, Unknown;
+    Parent, SchoolAdmin, SuperAdmin, Teacher, Alumni, Unknown;
 
     companion object {
         fun from(raw: String?): EntryRole = when (raw?.trim()?.uppercase()) {
@@ -196,6 +202,7 @@ enum class EntryRole {
             // portal. It is an operator/admin role, so it lands on the admin surface.
             "SUPER_ADMIN", "SUPERADMIN" -> SuperAdmin
             "TEACHER" -> Teacher
+            "ALUMNI" -> Alumni
             else -> Unknown
         }
     }
@@ -362,6 +369,10 @@ private fun AuthedFlow(
                 // RA-S04: a parent is NEVER pushed into the child-link flow after signup/login.
                 EntryRole.Parent -> AuthedRoute.Portal
                 EntryRole.Teacher -> if (localProfileCompleted) AuthedRoute.Portal else AuthedRoute.TeacherFirstLogin
+                // Alumni self-service UI is Phase 2 (deferred). For now alumni
+                // land on the parent portal surface — their deep links route to
+                // school admin alumni screens when accessed by admins.
+                EntryRole.Alumni -> AuthedRoute.Portal
                 EntryRole.Unknown -> AuthedRoute.Portal
                 else -> AuthedRoute.Portal
             }
@@ -444,7 +455,8 @@ private fun RolePortal(
             deepLinkTarget = deepLinkTarget,
         )
         // Authenticated but role unknown → safest default is the parent surface.
-        EntryRole.Unknown -> ParentPortalV2(
+        // Alumni also use the parent portal surface until Phase 2 self-service UI ships.
+        EntryRole.Alumni, EntryRole.Unknown -> ParentPortalV2(
             onLogout = onLogout,
             modifier = modifier,
             deepLinkTarget = deepLinkTarget,

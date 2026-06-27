@@ -273,7 +273,7 @@ fun ParentPortalV2(
             }
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())) {
+        Box(Modifier.fillMaxSize()) {
             when (tab) {
                 "home" -> ParentHomeScreenV2(
                     onDiscoverSchools = { overlay = ParentOverlay.Discovery },

@@ -198,7 +198,8 @@ fun ParentProfileCardScreenV2(
                     ),
                 )
                 drawContent()
-            },
+            }
+            .padding(bottom = 130.dp),
     ) {
         Column(
             Modifier
