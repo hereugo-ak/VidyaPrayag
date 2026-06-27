@@ -9,11 +9,14 @@ import com.littlebridge.enrollplus.feature.parent.domain.model.ParentMessageThre
 import com.littlebridge.enrollplus.feature.parent.domain.model.ParentRecipientDto
 import com.littlebridge.enrollplus.feature.parent.domain.model.ParentSendMessageRequest
 import com.littlebridge.enrollplus.feature.parent.domain.repository.ParentRepository
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
@@ -41,6 +44,7 @@ data class ParentMessageState(
     // compose (reply)
     val sending: Boolean = false,
     val sendError: String? = null,
+    val replyError: String? = null,
 
     // RA-S07 — compose-NEW (start a conversation with a teacher/admin)
     val composeOpen: Boolean = false,
@@ -60,8 +64,14 @@ class ParentMessageViewModel(
     private val preferenceRepository: PreferenceRepository,
 ) : ViewModel() {
 
+    private companion object {
+        const val POLL_INTERVAL_MS = 5_000L
+    }
+
     private val _state = MutableStateFlow(ParentMessageState())
     val state: StateFlow<ParentMessageState> = _state.asStateFlow()
+
+    private var pollJob: Job? = null
 
     private suspend fun token(): String? = preferenceRepository.getUserToken().first()
 
@@ -84,6 +94,7 @@ class ParentMessageViewModel(
     }
 
     fun openThread(threadId: String, fallbackName: String) {
+        stopPolling()
         viewModelScope.launch {
             _state.update {
                 it.copy(
@@ -92,6 +103,7 @@ class ParentMessageViewModel(
                     messages = emptyList(),
                     conversationLoading = true,
                     conversationError = null,
+                    replyError = null,
                 )
             }
             val token = token() ?: run {
@@ -110,6 +122,7 @@ class ParentMessageViewModel(
                     }
                     // opening clears the unread badge server-side; refresh the list.
                     loadThreads()
+                    startPolling()
                 }
                 is NetworkResult.Error ->
                     _state.update { it.copy(conversationLoading = false, conversationError = r.message) }
@@ -120,8 +133,45 @@ class ParentMessageViewModel(
     }
 
     fun closeThread() {
+        stopPolling()
         _state.update {
-            it.copy(openThreadId = null, openThreadName = "", messages = emptyList(), conversationError = null, sendError = null)
+            it.copy(openThreadId = null, openThreadName = "", messages = emptyList(), conversationError = null, sendError = null, replyError = null)
+        }
+    }
+
+    /**
+     * Reloads the currently-open conversation's messages WITHOUT clearing them
+     * first (unlike [openThread]). This prevents UI flicker after a successful
+     * reply and during real-time polling.
+     */
+    private fun reloadConversation() {
+        val threadId = _state.value.openThreadId ?: return
+        viewModelScope.launch {
+            val token = token() ?: return@launch
+            when (val r = repository.getThreadMessages(token, threadId)) {
+                is NetworkResult.Success -> {
+                    val data = r.data.data
+                    _state.update {
+                        it.copy(
+                            messages = data?.messages ?: emptyList(),
+                            openThreadName = data?.senderName ?: it.openThreadName,
+                            conversationError = null,
+                        )
+                    }
+                    loadThreads()
+                }
+                is NetworkResult.Error -> {
+                    // P1-5: Surface polling errors to the UI.
+                    if (_state.value.conversationError == null) {
+                        _state.update { it.copy(conversationError = r.message) }
+                    }
+                }
+                is NetworkResult.ConnectionError -> {
+                    if (_state.value.conversationError == null) {
+                        _state.update { it.copy(conversationError = "Connection error") }
+                    }
+                }
+            }
         }
     }
 
@@ -129,25 +179,96 @@ class ParentMessageViewModel(
     fun reply(body: String) {
         val threadId = _state.value.openThreadId ?: return
         if (body.isBlank()) return
+
+        // P1-3: Optimistic send — insert a temp message immediately for instant UI feedback.
+        val tempId = "optimistic-${System.currentTimeMillis()}"
+        val optimisticMsg = ParentMessageDto(
+            id = tempId,
+            body = body.trim(),
+            isMine = true,
+            createdAt = "",
+            time = "Now",
+            status = "SENT",
+        )
+        _state.update {
+            it.copy(
+                messages = it.messages + optimisticMsg,
+                sending = true,
+                replyError = null,
+            )
+        }
+
         viewModelScope.launch {
-            _state.update { it.copy(sending = true, sendError = null) }
             val token = token() ?: run {
-                _state.update { it.copy(sending = false, sendError = "Not signed in") }
+                _state.update {
+                    it.copy(
+                        messages = it.messages.filterNot { msg -> msg.id == tempId },
+                        sending = false,
+                        replyError = "Not signed in",
+                    )
+                }
                 return@launch
             }
-            val req = ParentSendMessageRequest(threadId = threadId, body = body.trim())
+            val req = ParentSendMessageRequest(
+                threadId = threadId,
+                body = body.trim(),
+                clientMsgId = java.util.UUID.randomUUID().toString(),
+            )
             when (val r = repository.sendMessage(token, req)) {
                 is NetworkResult.Success -> {
-                    _state.update { it.copy(sending = false) }
-                    // re-fetch the conversation so the new message appears with server timestamp.
-                    openThread(threadId, _state.value.openThreadName)
+                    _state.update { it.copy(sending = false, replyError = null) }
+                    // Reload without clearing — no flicker.
+                    reloadConversation()
                 }
                 is NetworkResult.Error ->
-                    _state.update { it.copy(sending = false, sendError = r.message) }
+                    _state.update {
+                        it.copy(
+                            messages = it.messages.filterNot { msg -> msg.id == tempId },
+                            sending = false,
+                            replyError = r.message,
+                        )
+                    }
                 is NetworkResult.ConnectionError ->
-                    _state.update { it.copy(sending = false, sendError = "Connection error") }
+                    _state.update {
+                        it.copy(
+                            messages = it.messages.filterNot { msg -> msg.id == tempId },
+                            sending = false,
+                            replyError = "Connection error",
+                        )
+                    }
             }
         }
+    }
+
+    /** Clears the inline reply error banner. */
+    fun clearReplyError() {
+        _state.update { it.copy(replyError = null) }
+    }
+
+    /**
+     * Starts periodic polling for new messages in the open conversation.
+     * Called when a conversation is opened; stopped when it's closed.
+     */
+    private fun startPolling() {
+        stopPolling()
+        pollJob = viewModelScope.launch {
+            while (isActive) {
+                delay(POLL_INTERVAL_MS)
+                if (_state.value.openThreadId != null && !_state.value.sending) {
+                    reloadConversation()
+                }
+            }
+        }
+    }
+
+    private fun stopPolling() {
+        pollJob?.cancel()
+        pollJob = null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopPolling()
     }
 
     /**
@@ -199,7 +320,11 @@ class ParentMessageViewModel(
                 _state.update { it.copy(sending = false, composeError = "Not signed in") }
                 return@launch
             }
-            val req = ParentSendMessageRequest(recipientUserId = recipientUserId, body = body.trim())
+            val req = ParentSendMessageRequest(
+                recipientUserId = recipientUserId,
+                body = body.trim(),
+                clientMsgId = java.util.UUID.randomUUID().toString(),
+            )
             when (val r = repository.sendMessage(token, req)) {
                 is NetworkResult.Success -> {
                     val newThreadId = r.data.data?.threadId
@@ -212,8 +337,13 @@ class ParentMessageViewModel(
                             composeError = null,
                         )
                     }
-                    loadThreads()
-                    if (newThreadId != null) openThread(newThreadId, recipientName)
+                    if (newThreadId != null) {
+                        // openThread() already calls loadThreads() — no double fetch.
+                        openThread(newThreadId, recipientName)
+                    } else {
+                        // Fallback: refresh threads so the new conversation appears.
+                        loadThreads()
+                    }
                 }
                 is NetworkResult.Error ->
                     _state.update { it.copy(sending = false, composeError = r.message) }

@@ -14,8 +14,11 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -81,8 +84,11 @@ fun ParentConversationsScreenV2(
         modifier
             .fillMaxSize()
             .background(c.background)
+            .statusBarsPadding()
+            .imePadding()
+            .navigationBarsPadding()
             .padding(horizontal = 20.dp)
-            .padding(top = 20.dp),
+            .padding(top = 12.dp),
     ) {
         Text(
             "Conversations",
@@ -100,7 +106,7 @@ fun ParentConversationsScreenV2(
         AnimatedContent(
             targetState = segment,
             transitionSpec = { VMotion.quietFade() },
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.weight(1f).fillMaxWidth(),
             label = "conversations-segment",
         ) { seg ->
             when (seg) {

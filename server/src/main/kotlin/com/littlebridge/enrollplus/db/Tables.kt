@@ -752,6 +752,11 @@ object MessageThreadsTable : UUIDTable("message_threads", "id") {
     val lastMessageAt  = timestamp("last_message_at")
     val unreadCount    = integer("unread_count").default(0)
     val isRead         = bool("is_read").default(true)
+    // Phase 1 (MESSAGING_SYSTEM_SPEC §8.1): thread-level preferences.
+    val isMuted        = bool("is_muted").default(false)
+    val isPinned       = bool("is_pinned").default(false)
+    val isArchived     = bool("is_archived").default(false)
+    val draftBody      = text("draft_body").nullable()
     val createdAt      = timestamp("created_at")
     val updatedAt      = timestamp("updated_at")
 }
@@ -760,8 +765,74 @@ object MessagesTable : UUIDTable("messages", "id") {
     val threadId       = uuid("thread_id")                              // FK message_threads.id (the sender's owning row)
     val conversationId = uuid("conversation_id").nullable()             // RA-51: shared key — both participants read by this
     val senderId       = uuid("sender_id").nullable()                   // null for system messages
-    val body           = text("body")
+    val body           = text("body").nullable()                        // nullable for soft-delete tombstones
     val createdAt      = timestamp("created_at")
+    // Phase 1 (MESSAGING_SYSTEM_SPEC §8.1): ordering, idempotency, edit/delete, replies.
+    val seq            = integer("seq").nullable()                      // server-assigned monotonic per conversation
+    val clientMsgId    = uuid("client_msg_id").nullable()               // idempotency key (unique when non-null)
+    val editedAt       = timestamp("edited_at").nullable()              // non-null = message was edited
+    val deletedAt      = timestamp("deleted_at").nullable()             // non-null = tombstoned (body nulled)
+    val replyToId      = uuid("reply_to_id").nullable()                 // FK messages.id (quoted original)
+
+    init {
+        // Delta sync + pagination: WHERE conversation_id=? AND seq>? ORDER BY seq
+        index("idx_messages_conv_seq", isUnique = false, conversationId, seq)
+    }
+}
+
+/**
+ * Phase 1 (§7.1) — atomic per-conversation sequence counter.
+ * Prevents duplicate seq values under concurrent inserts.
+ * UPSERT: INSERT ... ON CONFLICT (conversation_id) DO UPDATE SET next_val = next_val + 1 RETURNING next_val.
+ */
+object ConversationSeqTable : UUIDTable("conversation_seq", "id") {
+    val conversationId = uuid("conversation_id").uniqueIndex()
+    val nextVal        = integer("next_val")
+    val updatedAt      = timestamp("updated_at")
+}
+
+/**
+ * Phase 1 (MESSAGING_SYSTEM_SPEC §8.2) — per-message per-user delivery status.
+ * Tracks the SENT → DELIVERED → READ state machine (§4.2).
+ * UNIQUE(message_id, user_id) prevents duplicate status rows.
+ */
+object MessageStatusTable : UUIDTable("message_status", "id") {
+    val messageId      = uuid("message_id")                             // FK messages.id (CASCADE)
+    val conversationId = uuid("conversation_id")
+    val userId         = uuid("user_id")                               // the recipient whose status this tracks
+    val status         = varchar("status", 16)                         // SENT | DELIVERED | READ
+    val createdAt      = timestamp("created_at")
+
+    init {
+        uniqueIndex("ux_message_status_msg_user", messageId, userId)
+        index("idx_msg_status_conv_user", isUnique = false, conversationId, userId)
+    }
+}
+
+/**
+ * Phase 1 (MESSAGING_SYSTEM_SPEC §8.2, §12) — media attachments on messages.
+ * Reuses the Supabase Storage pipeline (SupabaseStorage.kt) with kind "MESSAGE".
+ * Storage path: {schoolId}/message/{uuid}.{ext}
+ */
+object MessageAttachmentsTable : UUIDTable("message_attachments", "id") {
+    val messageId      = uuid("message_id")                             // FK messages.id (CASCADE)
+    val conversationId = uuid("conversation_id")
+    val senderId       = uuid("sender_id")
+    val schoolId       = uuid("school_id")
+    val fileName       = text("file_name")
+    val mimeType       = text("mime_type")
+    val sizeBytes      = long("size_bytes")
+    val storageUrl     = text("storage_url")
+    val thumbnailUrl   = text("thumbnail_url").nullable()
+    val attachmentType = varchar("attachment_type", 16).default("IMAGE") // IMAGE | VIDEO | DOCUMENT | AUDIO
+    val width          = integer("width").nullable()
+    val height         = integer("height").nullable()
+    val durationMs     = integer("duration_ms").nullable()
+    val createdAt      = timestamp("created_at")
+
+    init {
+        index("idx_attachments_message", isUnique = false, messageId)
+    }
 }
 
 /**

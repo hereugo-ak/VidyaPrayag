@@ -97,11 +97,30 @@ object SupabaseStorage {
         "video/quicktime" to "mov",
         "video/webm" to "webm",
     )
+    // Phase 1 (MESSAGING_SYSTEM_SPEC §12.2): document + audio support for message attachments.
+    private val DOCUMENT_TYPES = mapOf(
+        "application/pdf" to "pdf",
+        "application/msword" to "doc",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" to "docx",
+        "application/vnd.ms-excel" to "xls",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" to "xlsx",
+        "application/vnd.ms-powerpoint" to "ppt",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation" to "pptx",
+        "text/plain" to "txt",
+    )
+    private val AUDIO_TYPES = mapOf(
+        "audio/mpeg" to "mp3",
+        "audio/mp4" to "m4a",
+        "audio/aac" to "aac",
+        "audio/ogg" to "ogg",
+    )
 
     fun extensionFor(contentType: String, kind: String): String? {
         val ct = contentType.substringBefore(';').trim().lowercase()
         return when (kind.uppercase()) {
             "VIDEO" -> VIDEO_TYPES[ct]
+            "DOCUMENT" -> DOCUMENT_TYPES[ct]
+            "AUDIO" -> AUDIO_TYPES[ct]
             else -> IMAGE_TYPES[ct]
         }
     }

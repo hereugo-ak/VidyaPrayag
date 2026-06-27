@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.littlebridge.enrollplus.feature.parent.presentation.NotificationsViewModel
 import com.littlebridge.enrollplus.feature.parent.presentation.ParentDashboardViewModel
+import com.littlebridge.enrollplus.feature.parent.presentation.ParentMessageViewModel
 import com.littlebridge.enrollplus.feature.parent.presentation.TrackProgressViewModel
 import com.littlebridge.enrollplus.ui.v2.components.VAvatar
 import com.littlebridge.enrollplus.ui.v2.components.VDivider
@@ -77,6 +78,9 @@ fun ParentPortalV2(
     headerViewModel: TrackProgressViewModel = koinViewModel(),
     // RA-S06: drives the header bell's unread dot from the real notifications feed.
     notificationsViewModel: NotificationsViewModel = koinViewModel(),
+    // Shared with ParentConversationsScreenV2 so the portal can hide the floating
+    // dock when a conversation or compose-new is open (WhatsApp pattern).
+    messageViewModel: ParentMessageViewModel = koinViewModel(),
 ) {
     var tab by remember { mutableStateOf("home") }
     var overlay by remember { mutableStateOf(ParentOverlay.None) }
@@ -100,6 +104,7 @@ fun ParentPortalV2(
     val dashboard by dashboardViewModel.state.collectAsStateV2()
     val progress by headerViewModel.state.collectAsStateV2()
     val notifications by notificationsViewModel.state.collectAsStateV2()
+    val messageState by messageViewModel.state.collectAsStateV2()
 
     // ── Unlinked-parent gate ────────────────────────────────────────────────────
     // A parent with NO child linked yet shouldn't land in the 5-tab portal where every tab is an
@@ -239,11 +244,19 @@ fun ParentPortalV2(
             // The Parents Portal's signature premium FLOATING DOCK (ParentDock) — a detached glass
             // bar with a liquid violet active-lozenge. The shared VBottomNav stays in place for the
             // Admin/Teacher portals; this bespoke dock is exclusive to the parent experience.
-            ParentDock(
-                items = items,
-                selected = tab,
-                onSelect = { tab = it },
-            )
+            //
+            // HIDDEN when the Conversations tab has an open thread or compose-new active —
+            // the conversation/compose surface needs the full screen height for its compose bar
+            // (WhatsApp pattern: no bottom nav inside a chat).
+            val hideDock = tab == "conversations" &&
+                (messageState.openThreadId != null || messageState.composeOpen)
+            if (!hideDock) {
+                ParentDock(
+                    items = items,
+                    selected = tab,
+                    onSelect = { tab = it },
+                )
+            }
         },
     ) { _ ->
         Box(Modifier.fillMaxSize()) {
@@ -257,7 +270,7 @@ fun ParentPortalV2(
                 "academics" -> ParentAcademicsScreenV2(onOpenLeave = { overlay = ParentOverlay.Leave })
                 "fees" -> ParentFeesScreenV2()
                 // Phase 3 (commit 9): the Conversations hub — messaging-first, announcements second.
-                "conversations" -> ParentConversationsScreenV2()
+                "conversations" -> ParentConversationsScreenV2(messageViewModel = messageViewModel)
                 // Phase 4 (commits 10–11): the flagship collectible player card, with a
                 // swipe-down account-options reveal (logout / link child / discover schools).
                 "profile" -> ParentProfileCardScreenV2(

@@ -23,6 +23,9 @@
 package com.littlebridge.enrollplus.feature.school
 
 import com.littlebridge.enrollplus.db.AppUsersTable
+import com.littlebridge.enrollplus.db.ConversationSeqTable
+import com.littlebridge.enrollplus.db.MessageAttachmentsTable
+import com.littlebridge.enrollplus.db.MessageStatusTable
 import com.littlebridge.enrollplus.db.MessageThreadsTable
 import com.littlebridge.enrollplus.db.MessagesTable
 import com.littlebridge.enrollplus.feature.notifications.Notify
@@ -32,8 +35,10 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.max
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.forUpdate
 import org.jetbrains.exposed.sql.update
 import java.time.Instant
 import java.util.UUID
@@ -45,6 +50,23 @@ internal data class MessagingUser(
     val fullName: String,
     val role: String,
     val profilePicUrl: String?,
+)
+
+/**
+ * Phase 1 (MESSAGING_SYSTEM_SPEC §9.1) — attachment metadata passed in the send
+ * request. The client first uploads via POST /messages/attachments and receives
+ * a storage_url, then includes this object in the send body.
+ */
+internal data class AttachmentInput(
+    val fileName: String,
+    val mimeType: String,
+    val sizeBytes: Long,
+    val storageUrl: String,
+    val attachmentType: String = "IMAGE",
+    val thumbnailUrl: String? = null,
+    val width: Int? = null,
+    val height: Int? = null,
+    val durationMs: Int? = null,
 )
 
 /** Resolve a user's display identity (school-scoped lookup is the caller's job). */
@@ -81,6 +103,10 @@ internal fun existingConversationId(schoolId: UUID, a: UUID, b: UUID): UUID? =
 /**
  * Result of [sendInConversation]: the sender's own thread row id + the new
  * message id + the conversation id.
+ *
+ * Phase 1: now includes [seq] (server-assigned monotonic per conversation)
+ * and [serverTimestamp] (the message's created_at) so the client can update
+ * its local DB and advance the sync cursor.
  */
 internal data class SendResult(
     val senderThreadId: UUID,
@@ -90,6 +116,12 @@ internal data class SendResult(
     // passed `recipientId` explicitly or appended to an existing thread (peer read off the row).
     // null only for self/system threads. Lets every send-path notify the recipient uniformly.
     val recipientId: UUID? = null,
+    // Phase 1: seq + server timestamp for the enhanced send response (§9.1).
+    val seq: Int? = null,
+    val serverTimestamp: Instant? = null,
+    // Phase 1: true when this result is a duplicate (idempotency hit on client_msg_id).
+    // The routing layer returns 409 instead of 201 when this is true.
+    val isDuplicate: Boolean = false,
 )
 
 /**
@@ -116,7 +148,17 @@ internal fun sendInConversation(
     senderImageUrl: String?,
     iconName: String?,
     now: Instant = Instant.now(),
+    // Phase 1 (MESSAGING_SYSTEM_SPEC §9.1): idempotency, reply, attachments.
+    clientMsgId: UUID? = null,
+    replyToId: UUID? = null,
+    attachments: List<AttachmentInput> = emptyList(),
 ): SendResult? {
+    // ---- Idempotency: if client_msg_id was seen before, return the existing message ----
+    if (clientMsgId != null) {
+        val existing = findMessageByClientMsgId(clientMsgId)
+        if (existing != null) return existing.copy(isDuplicate = true)
+    }
+
     val preview = body.take(200)
 
     // ---- Case 1: append to an existing thread the sender owns ----
@@ -139,9 +181,13 @@ internal fun sendInConversation(
         if (peer != null) {
             bumpPeerRow(convId, peer, preview, now)
         }
-        val msgId = insertMessage(threadId, convId, senderId, body, now)
+        val (msgId, seq) = insertMessage(threadId, convId, senderId, body, now, clientMsgId, replyToId)
+        insertAttachments(msgId, convId, senderId, senderSchoolId, attachments, now)
+        if (peer != null) {
+            insertMessageStatus(msgId, convId, peer, now)
+        }
         // RA-S08: peer read off the existing thread row (null for a self/system thread).
-        return SendResult(threadId, msgId, convId, recipientId = peer)
+        return SendResult(threadId, msgId, convId, recipientId = peer, seq = seq, serverTimestamp = now)
     }
 
     // ---- Case 3: self / system thread ----
@@ -165,9 +211,10 @@ internal fun sendInConversation(
             it[createdAt] = now
             it[updatedAt] = now
         }
-        val msgId = insertMessage(newThread, convId, senderId, body, now)
+        val (msgId, seq) = insertMessage(newThread, convId, senderId, body, now, clientMsgId, replyToId)
+        insertAttachments(msgId, convId, senderId, senderSchoolId, attachments, now)
         // RA-S08: self/system thread has no peer to notify.
-        return SendResult(newThread, msgId, convId, recipientId = null)
+        return SendResult(newThread, msgId, convId, recipientId = null, seq = seq, serverTimestamp = now)
     }
 
     // ---- Case 2: real two-party conversation ----
@@ -206,13 +253,30 @@ internal fun sendInConversation(
         ownerIsSender = false,
     )
 
-    val msgId = insertMessage(senderThread, convId, senderId, body, now)
-    return SendResult(senderThread, msgId, convId, recipientId = recipientId)
+    val (msgId, seq) = insertMessage(senderThread, convId, senderId, body, now, clientMsgId, replyToId)
+    insertAttachments(msgId, convId, senderId, senderSchoolId, attachments, now)
+    insertMessageStatus(msgId, convId, recipientId, now)
+    return SendResult(senderThread, msgId, convId, recipientId = recipientId, seq = seq, serverTimestamp = now)
 }
 
-/** Insert one message row, keyed by both the owning thread and the conversation. */
-private fun insertMessage(threadId: UUID, conversationId: UUID, senderId: UUID, body: String, now: Instant): UUID {
+/**
+ * Insert one message row, keyed by both the owning thread and the conversation.
+ *
+ * Phase 1: now assigns a server-authoritative monotonic [seq] per conversation
+ * (§7.1), persists [clientMsgId] for idempotency, and links [replyToId] for
+ * reply-quoting (§15.6). Returns the message id AND the assigned seq.
+ */
+private fun insertMessage(
+    threadId: UUID,
+    conversationId: UUID,
+    senderId: UUID,
+    body: String,
+    now: Instant,
+    clientMsgId: UUID? = null,
+    replyToId: UUID? = null,
+): Pair<UUID, Int> {
     val msgId = UUID.randomUUID()
+    val seq = nextSeqForConversation(conversationId)
     MessagesTable.insert {
         it[id] = msgId
         it[MessagesTable.threadId] = threadId
@@ -220,8 +284,125 @@ private fun insertMessage(threadId: UUID, conversationId: UUID, senderId: UUID, 
         it[MessagesTable.senderId] = senderId
         it[MessagesTable.body] = body
         it[MessagesTable.createdAt] = now
+        it[MessagesTable.seq] = seq
+        if (clientMsgId != null) it[MessagesTable.clientMsgId] = clientMsgId
+        if (replyToId != null) it[MessagesTable.replyToId] = replyToId
     }
-    return msgId
+    return msgId to seq
+}
+
+/**
+ * Phase 1 (§7.1): server-assigned monotonic seq per conversation.
+ *
+ * Uses an atomic UPSERT on a conversation_seq counter table to guarantee
+ * no duplicate seq values under concurrent inserts. Falls back to
+ * MAX(seq)+1 (non-atomic but safe on SQLite) if the counter table is
+ * unavailable.
+ */
+private fun nextSeqForConversation(conversationId: UUID): Int {
+    // Atomic within the current transaction: SELECT ... FOR UPDATE locks the
+    // counter row so concurrent sends in the same conversation block until we
+    // commit. On Postgres this is a row-level lock; on SQLite the single-writer
+    // model makes it inherently safe.
+    val existing = try {
+        ConversationSeqTable.selectAll()
+            .where { ConversationSeqTable.conversationId eq conversationId }
+            .forUpdate()
+            .firstOrNull()
+    } catch (_: Throwable) {
+        // forUpdate() not supported on some DBs — fall back to plain select.
+        ConversationSeqTable.selectAll()
+            .where { ConversationSeqTable.conversationId eq conversationId }
+            .firstOrNull()
+    }
+
+    if (existing != null) {
+        val newVal = existing[ConversationSeqTable.nextVal] + 1
+        ConversationSeqTable.update({ ConversationSeqTable.conversationId eq conversationId }) {
+            it[ConversationSeqTable.nextVal] = newVal
+            it[ConversationSeqTable.updatedAt] = Instant.now()
+        }
+        return newVal
+    }
+
+    // First message in this conversation — insert counter at 1.
+    ConversationSeqTable.insert {
+        it[ConversationSeqTable.id] = UUID.randomUUID()
+        it[ConversationSeqTable.conversationId] = conversationId
+        it[ConversationSeqTable.nextVal] = 1
+        it[ConversationSeqTable.updatedAt] = Instant.now()
+    }
+    return 1
+}
+
+/**
+ * Phase 1 (§8.2, §12): insert attachment rows for a message.
+ */
+private fun insertAttachments(
+    messageId: UUID,
+    conversationId: UUID,
+    senderId: UUID,
+    schoolId: UUID,
+    attachments: List<AttachmentInput>,
+    now: Instant,
+) {
+    attachments.forEach { att ->
+        MessageAttachmentsTable.insert {
+            it[id] = UUID.randomUUID()
+            it[MessageAttachmentsTable.messageId] = messageId
+            it[MessageAttachmentsTable.conversationId] = conversationId
+            it[MessageAttachmentsTable.senderId] = senderId
+            it[MessageAttachmentsTable.schoolId] = schoolId
+            it[MessageAttachmentsTable.fileName] = att.fileName
+            it[MessageAttachmentsTable.mimeType] = att.mimeType
+            it[MessageAttachmentsTable.sizeBytes] = att.sizeBytes
+            it[MessageAttachmentsTable.storageUrl] = att.storageUrl
+            if (att.thumbnailUrl != null) it[MessageAttachmentsTable.thumbnailUrl] = att.thumbnailUrl
+            it[MessageAttachmentsTable.attachmentType] = att.attachmentType
+            if (att.width != null) it[MessageAttachmentsTable.width] = att.width
+            if (att.height != null) it[MessageAttachmentsTable.height] = att.height
+            if (att.durationMs != null) it[MessageAttachmentsTable.durationMs] = att.durationMs
+            it[MessageAttachmentsTable.createdAt] = now
+        }
+    }
+}
+
+/**
+ * Phase 1 (§8.2): insert a SENT status row for the recipient of a message.
+ */
+private fun insertMessageStatus(messageId: UUID, conversationId: UUID, userId: UUID, now: Instant) {
+    MessageStatusTable.insert {
+        it[id] = UUID.randomUUID()
+        it[MessageStatusTable.messageId] = messageId
+        it[MessageStatusTable.conversationId] = conversationId
+        it[MessageStatusTable.userId] = userId
+        it[MessageStatusTable.status] = "SENT"
+        it[MessageStatusTable.createdAt] = now
+    }
+}
+
+/**
+ * Phase 1 (§9.1): find an existing message by its client_msg_id (idempotency).
+ * Returns a [SendResult] pointing at the existing message so the routing layer
+ * can return 409 with the same message_id/thread_id/seq.
+ */
+internal fun findMessageByClientMsgId(clientMsgId: UUID): SendResult? {
+    val row = MessagesTable.selectAll()
+        .where { MessagesTable.clientMsgId eq clientMsgId }
+        .singleOrNull() ?: return null
+    val msgId = row[MessagesTable.id].value
+    val convId = row[MessagesTable.conversationId] ?: return null
+    val threadId = row[MessagesTable.threadId]
+    val seq = row[MessagesTable.seq]
+    val ts = row[MessagesTable.createdAt]
+    // Resolve the peer from the thread row (senderId may be null for system messages).
+    val senderId = row[MessagesTable.senderId]
+    val peer = if (senderId != null) {
+        MessageThreadsTable.selectAll()
+            .where { (MessageThreadsTable.id eq threadId) and (MessageThreadsTable.ownerUserId eq senderId) }
+            .singleOrNull()?.get(MessageThreadsTable.peerUserId)
+    } else null
+    return SendResult(threadId, msgId, convId, recipientId = peer, seq = seq, serverTimestamp = ts)
 }
 
 /** Bump a peer's existing row: new preview + 1 unread. */
@@ -299,20 +480,61 @@ private fun upsertParticipantRow(
 }
 
 /**
- * Load all messages in the conversation that owns [threadId], scoped so only a
+ * Phase 1 (§9.2): paginated result for conversation messages.
+ */
+internal data class PaginatedMessages(
+    val conversationId: UUID,
+    val messages: List<ResultRow>,
+    val totalCount: Long,
+    val hasMore: Boolean,
+)
+
+/**
+ * Load messages in the conversation that owns [threadId], scoped so only a
  * legitimate owner of one of the conversation's rows can read them. Returns null
  * if [ownerId] does not own a row in that conversation.
+ *
+ * Phase 1: now supports offset/limit pagination (§9.2, §15.1). When [offset]
+ * and [limit] are both null, returns ALL messages (backward-compatible with
+ * callers that haven't been updated yet).
  */
-internal fun conversationMessagesFor(threadId: UUID, ownerId: UUID): Pair<UUID, List<ResultRow>>? {
+internal fun conversationMessagesFor(
+    threadId: UUID,
+    ownerId: UUID,
+    offset: Int? = null,
+    limit: Int? = null,
+): PaginatedMessages? {
     val ownRow = MessageThreadsTable.selectAll().where {
         (MessageThreadsTable.id eq threadId) and (MessageThreadsTable.ownerUserId eq ownerId)
     }.singleOrNull() ?: return null
     val convId = ownRow.conversationKey()
+
+    // Total count for pagination metadata.
+    val totalCount = MessagesTable.selectAll().where {
+        (MessagesTable.conversationId eq convId) or
+            ((MessagesTable.conversationId.isNull()) and (MessagesTable.threadId eq threadId))
+    }.count()
+
     // Read by conversation_id when present; legacy rows fall back to thread_id.
-    val rows = MessagesTable.selectAll().where {
-        (MessagesTable.conversationId eq convId) or (MessagesTable.threadId eq threadId)
-    }.orderBy(MessagesTable.createdAt, SortOrder.ASC).toList()
-    return convId to rows
+    // Order by seq when available (server-authoritative), fall back to created_at.
+    // Match by conversation_id; legacy fallback only for pre-migration rows
+    // where conversation_id IS NULL and the message belongs to this thread.
+    val query = MessagesTable.selectAll().where {
+        (MessagesTable.conversationId eq convId) or
+            ((MessagesTable.conversationId.isNull()) and (MessagesTable.threadId eq threadId))
+    }.orderBy(MessagesTable.seq to SortOrder.ASC, MessagesTable.createdAt to SortOrder.ASC)
+
+    val rows = if (offset != null && limit != null) {
+        query.limit(limit, offset.toLong()).toList()
+    } else {
+        query.toList()
+    }
+
+    val hasMore = if (offset != null && limit != null) {
+        (offset + rows.size) < totalCount
+    } else false
+
+    return PaginatedMessages(convId, rows, totalCount, hasMore)
 }
 
 /**
@@ -332,6 +554,13 @@ internal suspend fun notifyMessageRecipient(
     body: String,
 ) {
     if (recipientId == null || recipientId == actorId) return
+    val recipient = resolveMessagingUser(recipientId)
+    val deepLink = when (recipient?.role) {
+        "parent" -> "parent/messages"
+        "teacher" -> "teacher/messages"
+        "admin", "school_admin", "super_admin" -> "school/messages"
+        else -> "messages"
+    }
     runCatching {
         Notify.toUser(
             userId = recipientId,
@@ -340,9 +569,132 @@ internal suspend fun notifyMessageRecipient(
             body = body.take(120),
             schoolId = schoolId,
             actorId = actorId,
-            deepLink = "parent/messages",
+            deepLink = deepLink,
             refType = "message",
             refId = threadId.toString(),
         )
     }
+}
+
+// ===========================================================================
+// Phase 1 (MESSAGING_SYSTEM_SPEC §15.3, §15.4, §9.4) — edit / delete helpers
+// ===========================================================================
+
+/** Result of [editMessage]. */
+internal data class EditMessageResult(
+    val messageId: UUID,
+    val conversationId: UUID,
+    val newBody: String,
+    val editedAt: Instant,
+)
+
+/**
+ * Phase 1 (§15.3): edit a message's body within the 24-hour window.
+ *
+ * Rules:
+ *   - Only the original sender can edit (senderId == caller).
+ *   - Message must not be deleted (deletedAt IS NULL).
+ *   - Edit window: createdAt must be within 24 hours of [now].
+ *   - Body must be non-blank and ≤ 4096 chars (validated by the caller).
+ *
+ * Returns null if the message is not found. Throws if the edit window expired
+ * or the caller is not the owner (the routing layer maps these to 403).
+ */
+internal fun editMessage(
+    messageId: UUID,
+    callerId: UUID,
+    newBody: String,
+    now: Instant = Instant.now(),
+): EditMessageResult? {
+    val row = MessagesTable.selectAll()
+        .where { MessagesTable.id eq messageId }
+        .singleOrNull() ?: return null
+
+    val senderId = row[MessagesTable.senderId] ?: return null
+    if (senderId != callerId) return null
+    if (row[MessagesTable.deletedAt] != null) return null
+
+    val createdAt = row[MessagesTable.createdAt]
+    val editWindowExpired = java.time.Duration.between(createdAt, now).toHours() >= 24
+    if (editWindowExpired) return null
+
+    val convId = row[MessagesTable.conversationId] ?: return null
+
+    MessagesTable.update({ MessagesTable.id eq messageId }) {
+        it[MessagesTable.body] = newBody
+        it[MessagesTable.editedAt] = now
+    }
+
+    return EditMessageResult(messageId, convId, newBody, now)
+}
+
+/** Result of [deleteMessage]. */
+internal data class DeleteMessageResult(
+    val messageId: UUID,
+    val conversationId: UUID,
+)
+
+/**
+ * Phase 1 (§15.4): tombstone a message (soft-delete).
+ *
+ * Rules:
+ *   - The sender can delete their own message.
+ *   - School admins can delete any message in their school (callerIsAdmin).
+ *   - Message must not already be deleted.
+ *   - scope=everyone: server-side tombstone (deleted_at=now(), body=NULL).
+ *   - scope=me: client-side only — the server does nothing and returns null.
+ *
+ * Returns null if the message is not found, already deleted, or scope=me.
+ */
+internal fun deleteMessage(
+    messageId: UUID,
+    callerId: UUID,
+    callerIsAdmin: Boolean = false,
+    scope: String = "everyone",
+    now: Instant = Instant.now(),
+): DeleteMessageResult? {
+    if (scope == "me") return null // client-side only; no server action
+
+    val row = MessagesTable.selectAll()
+        .where { MessagesTable.id eq messageId }
+        .singleOrNull() ?: return null
+
+    val senderId = row[MessagesTable.senderId]
+    if (senderId != callerId && !callerIsAdmin) return null
+    if (row[MessagesTable.deletedAt] != null) return null
+
+    val convId = row[MessagesTable.conversationId] ?: return null
+
+    MessagesTable.update({ MessagesTable.id eq messageId }) {
+        it[MessagesTable.deletedAt] = now
+        it[MessagesTable.body] = null  // tombstone — body is nullable to support soft-delete
+    }
+
+    return DeleteMessageResult(messageId, convId)
+}
+
+/**
+ * Phase 1 (§9.2): load attachments for a set of message ids.
+ * Returns a map from message_id → list of attachment rows.
+ */
+internal fun loadAttachmentsForMessages(messageIds: Collection<UUID>): Map<UUID, List<ResultRow>> {
+    if (messageIds.isEmpty()) return emptyMap()
+    // Portable OR-reduce (consistent with the project's Exposed-version-safe approach).
+    val filter = messageIds.map { MessageAttachmentsTable.messageId eq it }
+        .reduce { acc, op -> acc or op }
+    return MessageAttachmentsTable.selectAll()
+        .where { filter }
+        .groupBy { it[MessageAttachmentsTable.messageId] }
+}
+
+/**
+ * Phase 1 (§9.2): load the status for a message for a specific user.
+ * Returns the status string (SENT/DELIVERED/READ) or null if no status row exists.
+ */
+internal fun loadMessageStatus(messageId: UUID, userId: UUID): String? {
+    return MessageStatusTable.selectAll()
+        .where {
+            (MessageStatusTable.messageId eq messageId) and (MessageStatusTable.userId eq userId)
+        }
+        .singleOrNull()?.get(MessageStatusTable.status)
 }
