@@ -1,7 +1,7 @@
 # Family Circle — Technical Specification
 
-> **Document status:** Implementation-ready blueprint
-> **Last updated:** 2026-06-27
+> **Document status:** Partial (40%) — multi-parent links, primary guardian enforcement, relation field, approval workflow exist; role-based visibility, delegation, notification routing, shared RSVP TODO
+> **Last updated:** 2026-06-28
 > **Prerequisites:** None
 > **Source:** `DIFFERENTIATING_FEATURES.md` §2.2
 

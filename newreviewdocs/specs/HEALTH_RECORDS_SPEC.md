@@ -1,7 +1,7 @@
 # Student Health Records — Technical Specification
 
-> **Document status:** Implementation-ready blueprint
-> **Last updated:** 2026-06-27
+> **Document status:** Implemented (90%) — FR-7 (health checkup scheduling) still pending
+> **Last updated:** 2026-06-28
 > **Prerequisites:** None
 
 ---
@@ -23,9 +23,14 @@ Student health and immunization record management: medical history, allergies, m
 
 ## 2. Current System Assessment
 
-- `feature_audit.csv` L120: Health Records missing (0%)
-- `StudentsTable` may have `bloodGroup` field (needs verification)
-- No health tables in `Tables.kt`
+- **Implemented** in commit `14a59a9` (2026-06-27) — DB migration `migration_050_health_records.sql`, Exposed tables, services, routing, and client UI all shipped
+- `StudentHealthProfilesTable` (`Tables.kt`) — blood group, height, weight, allergies, chronic conditions, medications, emergency contact, doctor info
+- `StudentImmunizationsTable` (`Tables.kt`) — vaccine name, dose number, date administered, next due, administered by
+- `StudentHealthIncidentsTable` (`Tables.kt`) — date, time, description, treatment, medication, parent notified, severity, attended by
+- `HealthRouting.kt` (`server/.../feature/health/`) — admin/nurse CRUD, teacher alerts, parent read-only endpoints
+- Client UI: `HealthRecordsScreenV2.kt` (admin), `ParentHealthScreenV2.kt` (parent), `TeacherHealthAlertsScreenV2.kt` (teacher)
+- Shared layer: `HealthApi.kt`, `HealthRepositoryImpl.kt`, `HealthDtos.kt`, `AdminHealthViewModel.kt`, `ParentHealthViewModel.kt`, `TeacherHealthAlertsViewModel.kt`
+- FR-7 (health checkup scheduling and results) is the only remaining unimplemented requirement
 
 ---
 

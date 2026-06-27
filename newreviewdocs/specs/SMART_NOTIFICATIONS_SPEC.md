@@ -1,7 +1,7 @@
 # Smart Notifications — Technical Specification
 
-> **Document status:** Implementation-ready blueprint
-> **Last updated:** 2026-06-27
+> **Document status:** Partial (65%) — preferences filtering, rate limiting, scheduler, push bridge implemented; AI priority, batching, quiet hours, daily digest TODO
+> **Last updated:** 2026-06-28
 > **Prerequisites:** `AI_INFRASTRUCTURE_SPEC.md`, `WHATSAPP_INTEGRATION_SPEC.md`
 > **Source:** `DIFFERENTIATING_FEATURES.md` §4.1
 
@@ -24,10 +24,15 @@ AI-powered notification prioritization, batching, and smart delivery. Instead of
 
 ## 2. Current System Assessment
 
-- `NotificationsTable` (`Tables.kt:1280-1300`) — per-recipient notifications with `category`, `isRead`
-- `NotificationPreferencesTable` (`Tables.kt:1675-1687`) — per-category enable/disable + sound
-- `Notify.kt` — sends immediately on trigger via FCM
-- No priority, no batching, no quiet hours, no smart channel selection
+- `NotificationsTable` (`Tables.kt`) — per-recipient notifications with `category`, `isRead`
+- `NotificationPreferencesTable` (`Tables.kt`) — per-category enable/disable + sound
+- `Notify.kt` — now includes **preferences filtering** (drops recipients who disabled a category), **rate limiting** (max 50/user/day, max 10/category/hour), and **push bridge** (fire-and-forget FCM dispatch via `NotificationService`)
+- `NotificationPreferencesRouting.kt` (`server/.../feature/notifications/`) — API for reading/updating per-category notification preferences
+- `NotificationScheduler.kt` (`server/.../feature/notifications/`) — scheduling infrastructure for delayed/batched notifications
+- `NotificationService.kt` (`server/.../feature/notification/service/`) — FCM push dispatch with `SendNotificationRequest`
+- `DeviceTokenRepository.kt` — manages FCM device tokens
+- `NotificationPermissionLauncher` — cross-platform permission request flow (Android, iOS, JVM, web)
+- **Not yet implemented:** AI priority assignment, smart batching (grouping related notifications), quiet hours, daily digest, smart channel selection (WhatsApp + FCM routing), notification grouping
 - `DIFFERENTIATING_FEATURES.md` §4.1: Smart Notifications, effort M
 
 ---

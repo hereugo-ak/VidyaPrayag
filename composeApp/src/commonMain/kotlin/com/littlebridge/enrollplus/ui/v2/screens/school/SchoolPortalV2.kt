@@ -61,6 +61,7 @@ private enum class SchoolOverlay {
     Alumni,
     AlumniDetail,
     AlumniCampaign,
+    TransportManagement,
 }
 
 /**
@@ -99,24 +100,30 @@ fun SchoolPortalV2(
         }
     }
 
-        // Apply deep-link routing: set tab from the typed target.
-        LaunchedEffect(deepLinkTarget) {
-            when (deepLinkTarget) {
-                is DeepLinkTarget.SchoolScreen -> tab = deepLinkTarget.screen
-                else -> Unit
+    // Apply deep-link routing: set tab from the typed target.
+    LaunchedEffect(deepLinkTarget) {
+        when (deepLinkTarget) {
+            is DeepLinkTarget.SchoolScreen -> {
+                if (deepLinkTarget.screen == "transport") {
+                    overlay = SchoolOverlay.TransportManagement
+                } else {
+                    tab = deepLinkTarget.screen
+                }
             }
+            else -> Unit
         }
-        // RA-45 — id carried into the student/teacher profile overlays.
-        var selectedStudentId by remember { mutableStateOf<String?>(null) }
-        var selectedTeacherId by remember { mutableStateOf<String?>(null) }
-        // RA-S17 — id carried into the non-teaching-staff profile overlay.
-        var selectedStaffId by remember { mutableStateOf<String?>(null) }
-        // Health Records — student id + name carried into the health records overlay.
-        var healthStudentId by remember { mutableStateOf<String?>(null) }
-        var healthStudentName by remember { mutableStateOf<String?>(null) }
-        // Alumni Management — selected alumni/campaign IDs for detail overlays.
-        var selectedAlumniId by remember { mutableStateOf<String?>(null) }
-        var selectedCampaignId by remember { mutableStateOf<String?>(null) }
+    }
+    // RA-45 — id carried into the student/teacher profile overlays.
+    var selectedStudentId by remember { mutableStateOf<String?>(null) }
+    var selectedTeacherId by remember { mutableStateOf<String?>(null) }
+    // RA-S17 — id carried into the non-teaching-staff profile overlay.
+    var selectedStaffId by remember { mutableStateOf<String?>(null) }
+    // Health Records — student id + name carried into the health records overlay.
+    var healthStudentId by remember { mutableStateOf<String?>(null) }
+    var healthStudentName by remember { mutableStateOf<String?>(null) }
+    // Alumni Management — selected alumni/campaign IDs for detail overlays.
+    var selectedAlumniId by remember { mutableStateOf<String?>(null) }
+    var selectedCampaignId by remember { mutableStateOf<String?>(null) }
         // RA-S12 — the Comms badge counts message threads with unread messages
         // (GET /school/messages/threads), not a hardcoded literal.
         val messagesState by messagesViewModel.state.collectAsStateV2()
@@ -319,6 +326,13 @@ fun SchoolPortalV2(
                 )
                 return
             }
+            SchoolOverlay.TransportManagement -> {
+                TransportManagementScreenV2(
+                    onBack = { overlay = SchoolOverlay.None },
+                    modifier = modifier,
+                )
+                return
+            }
             SchoolOverlay.None -> Unit
         }
 
@@ -347,6 +361,7 @@ fun SchoolPortalV2(
                         // tab) instead of dead Coming-Soon placeholders.
                         onOpenAnalytics = { overlay = SchoolOverlay.AnalyticsDashboard },
                         onOpenPews = { tab = "people" },
+                        onOpenTransport = { overlay = SchoolOverlay.TransportManagement },
                         // §7 finding K — tapping the avatar opens the Settings tab (where logout
                         // lives), instead of logging the admin out outright.
                         onExit = { tab = "settings" },

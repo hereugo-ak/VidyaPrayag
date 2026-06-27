@@ -1,7 +1,7 @@
 # Parent Pulse — Technical Specification
 
-> **Document status:** Implementation-ready blueprint
-> **Last updated:** 2026-06-27
+> **Document status:** Implemented (85%) — AI narrative generation pending (uses heuristic summaries currently)
+> **Last updated:** 2026-06-28
 > **Prerequisites:** `AI_INFRASTRUCTURE_SPEC.md`
 > **Source:** `DIFFERENTIATING_FEATURES.md` §2.1
 
@@ -24,10 +24,17 @@ AI-generated weekly summary card for parents that distills all school activity f
 
 ## 2. Current System Assessment
 
-- All data exists: `AttendanceRecordsTable`, `AssessmentMarksTable`, `HomeworkTable` + `HomeworkSubmissionsTable`, `AnnouncementsTable`, `MessagesTable`, `NotificationsTable`
-- `ParentAchievementsTable` — badges, competencies, EI metrics (partial engagement data)
-- No digest/summary feature exists
-- `DIFFERENTIATING_FEATURES.md` §2.1: Parent Pulse, effort M, data readiness: "All data exists"
+- **Implemented** in commit `db1dd67` (2026-06-27) — DB migration `migration_051_parent_pulse.sql`, service, routing, weekly job, and client UI all shipped
+- `ParentPulsesTable` (`Tables.kt`) — stores weekly pulse snapshots per parent-child pair
+- `ParentPulseService.kt` (`server/.../feature/pulse/`) — aggregates attendance %, marks, homework, announcements, messages into weekly pulse
+- `PulseRouting.kt` — API endpoints for retrieving current and past pulses
+- `PulseWeeklyJob.kt` — scheduled job generates pulses every Sunday at 6 PM IST
+- `ParentPulseScreen.kt` + `PulseCard.kt` (`composeApp/.../ui/v2/screens/parent/`) — UI with attendance ring, trend indicators, and actionable insights
+- `ParentPulseViewModel.kt` (shared layer) — client-side state management
+- `DevToolsRouting.kt` — admin dev-tools endpoint for manual pulse regeneration
+- Tests: `ParentPulseServiceTest.kt` — 310 lines covering pulse aggregation logic
+- **Not yet implemented:** AI-generated narrative summary (currently uses heuristic text generation; will swap to LLM once `AI_INFRASTRUCTURE_SPEC.md` is built)
+- `ParentAchievementsTable` — badges, competencies, EI metrics (separate feature, not part of pulse)
 
 ---
 

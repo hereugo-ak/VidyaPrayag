@@ -216,7 +216,17 @@ object DatabaseFactory {
         AlumniMentorshipRequestsTable,   // FK to alumni + students
         AlumniMentorshipsTable,          // FK to alumni + students + requests
         AlumniCareerHistoryTable,        // FK to alumni
-        AlumniMentorshipSettingsTable    // FK to schools
+        AlumniMentorshipSettingsTable,    // FK to schools
+        // Transport Tracking (TRANSPORT_TRACKING_SPEC.md — GPS bus tracking,
+        // route/vehicle/driver management, student pickup/drop, transport fees)
+        // Applied by docs/db/migration_053_transport_tracking.sql (must run
+        // before deploy; AUTO_CREATE_TABLES is OFF in prod).
+        TransportRoutesTable,
+        TransportStopsTable,              // FK to routes
+        TransportVehiclesTable,           // FK to routes (nullable)
+        TransportAssignmentsTable,        // FK to routes + stops + vehicles
+        TransportTrackingTable,           // FK to vehicles
+        TransportAttendanceTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

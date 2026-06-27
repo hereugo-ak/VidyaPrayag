@@ -58,6 +58,7 @@ import com.littlebridge.enrollplus.feature.admissions.admissionRouting
 import com.littlebridge.enrollplus.feature.announcements.announcementRouting
 import com.littlebridge.enrollplus.feature.auth.authRouting
 import com.littlebridge.enrollplus.feature.alumni.alumniRouting
+import com.littlebridge.enrollplus.feature.transport.transportRouting
 import com.littlebridge.enrollplus.feature.calendar.academicCalendarRouting
 import com.littlebridge.enrollplus.feature.calendar.academicYearRouting
 import com.littlebridge.enrollplus.feature.auth.otpAdminRouting
@@ -366,5 +367,11 @@ fun Application.module() {
         //   /api/v1/alumni/*         — alumni self-service (alumni context)
         //   /api/v1/alumni/register  — public self-registration
         alumniRouting()
+
+        // Transport Tracking (TRANSPORT_TRACKING_SPEC.md)
+        //   /api/v1/school/transport/{routes,vehicles,assignments,attendance,fees}  — admin
+        //   /api/v1/transport/{location,pickup,drop}                                — driver
+        //   /api/v1/parent/transport/{live-location,route}/{childId}                — parent
+        transportRouting()
     }
 }

@@ -182,6 +182,16 @@ fun parseDeepLink(path: String, currentRole: EntryRole): DeepLinkTarget {
         }
         "announcements" -> DeepLinkTarget.Generic(currentRole, path)
         "calendar" -> DeepLinkTarget.Generic(currentRole, path)
+        "transport" -> {
+            when (currentRole) {
+                EntryRole.SchoolAdmin, EntryRole.SuperAdmin ->
+                    DeepLinkTarget.SchoolScreen(currentRole, "transport")
+                EntryRole.Teacher ->
+                    DeepLinkTarget.TeacherScreen(currentRole, "transport")
+                else ->
+                    DeepLinkTarget.ParentTab(EntryRole.Parent, "home", "transport")
+            }
+        }
         else -> DeepLinkTarget.Generic(currentRole, path)
     }
 }

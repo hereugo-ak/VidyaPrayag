@@ -1,8 +1,8 @@
 # Theming System — Technical Specification
 
-> **Document status:** Implementation-ready blueprint
+> **Document status:** Implemented (90%) — VThemeRegistry, VThemeDef, VStatusBarAdapter, theme picker, user preference persistence, migration-031 all shipped
 > **Audience:** Senior engineer / AI agent implementing the system
-> **Last updated:** 2026-06-27
+> **Last updated:** 2026-06-28
 > **Prerequisites:** None
 > **Supersedes:** Previous DARK_MODE_SPEC.md (which was out of sync with the codebase)
 

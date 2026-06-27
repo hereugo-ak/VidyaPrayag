@@ -6,6 +6,9 @@
     <!-- Real "use current location" in school onboarding (report §11.2). -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Transport Tracking — foreground service for background GPS polling. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <!-- Required on API 33+ (Tiramisu) to post foreground/local notifications.
          Requested at runtime; NotificationManagerHelper gates posting on
          NotificationManagerCompat.areNotificationsEnabled() as well. -->
@@ -46,6 +49,17 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!--
+          Transport Tracking — foreground service that polls GPS every 30s
+          and POSTs to /api/v1/transport/location for driver-mode bus
+          tracking. foregroundServiceType=location requires
+          ACCESS_FINE_LOCATION (already declared above).
+        -->
+        <service
+            android:name=".platform.transport.TransportLocationService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
 
         <!--
           Notification action button receiver. Handles inline actions from

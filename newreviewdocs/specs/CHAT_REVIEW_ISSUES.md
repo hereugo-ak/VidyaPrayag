@@ -1,6 +1,7 @@
 # VidyaPrayag Chat Feature — Comprehensive Issue Report
 
 > **Generated:** 2026-06-27
+> **Last updated:** 2026-06-28 — P0-1 through P0-6 marked as ✅ FIXED; P0-7 partially fixed (admin pagination/edit/delete done, attachment upload + parent API TODO)
 > **Reviewers:** Senior Android Dev, Android Architect, Senior QA, Lead Product Manager
 > **Scope:** Full messaging stack — backend (`MessagingCore.kt`, `MessagesRouting.kt`, `TeacherMessagesRouting.kt`, `ParentMessagesRouting.kt`), client models (`MessageModels.kt`, `ParentMessageModels.kt`), API layer (`MessagesApi.kt`), ViewModels (`MessagesViewModel.kt`, `ParentMessageViewModel.kt`), UI screens (`MessagesScreenV2.kt`, `ParentMessagesScreenV2.kt`, `TeacherPortalV2.kt`)
 > **Reference spec:** `MESSAGING_SYSTEM_SPEC.md`
@@ -23,7 +24,7 @@
 
 | Priority | Count | Category |
 |---|---|---|
-| **P0** | 7 | Bugs, data corruption, client-server contract mismatch |
+| **P0** | 7 | 6 fixed, 1 partially fixed |
 | **P1** | 13 | UX degradation, performance, inconsistency |
 | **P2** | 10 | Spec'd features with no client-side implementation |
 | **P3** | 7 | Minor polish items |
@@ -33,7 +34,9 @@
 
 ## 2. P0 — Bugs & Data Integrity Issues
 
-### P0-1: Race condition in `nextSeqForConversation`
+### P0-1: Race condition in `nextSeqForConversation` — ✅ FIXED
+
+**Status:** Fixed in commit `7eb2672`. Now uses `ConversationSeqTable` with `forUpdate()` row-level lock for atomic seq assignment.
 
 **File:** `server/.../feature/school/MessagingCore.kt:296-302`
 
@@ -61,7 +64,9 @@ private fun nextSeqForConversation(conversationId: UUID): Int {
 
 ---
 
-### P0-2: `deleteMessage` sets body to `""` instead of `NULL`
+### P0-2: `deleteMessage` sets body to `""` instead of `NULL` — ✅ FIXED
+
+**Status:** Fixed in commit `7eb2672`. `deleteMessage` now sets `it[MessagesTable.body] = null` (line 670).
 
 **File:** `server/.../feature/school/MessagingCore.kt:623-626`
 
@@ -92,7 +97,9 @@ If the Exposed column is non-nullable, a migration is needed to make `body` null
 
 ---
 
-### P0-3: `conversationMessagesFor` OR clause can match wrong messages
+### P0-3: `conversationMessagesFor` OR clause can match wrong messages — ✅ FIXED
+
+**Status:** Fixed in commit `7eb2672`. OR clause now includes `(MessagesTable.conversationId.isNull()) and` guard (lines 514-515, 522-524).
 
 **File:** `server/.../feature/school/MessagingCore.kt:480-486`
 
@@ -122,7 +129,9 @@ This ensures the legacy fallback only applies when `conversation_id` is genuinel
 
 ---
 
-### P0-4: `notifyMessageRecipient` deep link hardcoded to `"parent/messages"`
+### P0-4: `notifyMessageRecipient` deep link hardcoded to `"parent/messages"` — ✅ FIXED
+
+**Status:** Fixed in commit `7eb2672`. Now resolves recipient role and constructs role-appropriate deep link (lines 557-572).
 
 **File:** `server/.../feature/school/MessagingCore.kt:527`
 
@@ -148,7 +157,9 @@ val deepLink = when (recipient?.role) {
 
 ---
 
-### P0-5: Client domain models out of sync with server DTOs
+### P0-5: Client domain models out of sync with server DTOs — ✅ FIXED
+
+**Status:** Fixed in commit `7eb2672`. Both `MessageModels.kt` and `ParentMessageModels.kt` now include `seq`, `status`, `edited_at`, `deleted_at`, `reply_to_id`, `attachments`, `has_more`, `total_count`.
 
 **Files:**
 - `shared/.../feature/admin/domain/model/MessageModels.kt:79-86` (`Message` class)
@@ -181,7 +192,9 @@ Because `Json { ignoreUnknownKeys = true }` is configured, these fields are **si
 
 ---
 
-### P0-6: `SendMessageRequest` missing Phase 1 fields
+### P0-6: `SendMessageRequest` missing Phase 1 fields — ✅ FIXED
+
+**Status:** Fixed in commit `7eb2672`. Both `SendMessageRequest` and `ParentSendMessageRequest` now include `client_msg_id`, `reply_to_id`, and `attachments`.
 
 **File:** `shared/.../feature/admin/domain/model/MessageModels.kt:55-63`
 
@@ -213,7 +226,9 @@ Same issue exists in `shared/.../feature/parent/domain/model/ParentMessageModels
 
 ---
 
-### P0-7: `MessagesApi.kt` missing pagination, edit, delete, attachment endpoints
+### P0-7: `MessagesApi.kt` missing pagination, edit, delete, attachment endpoints — 🟡 PARTIALLY FIXED
+
+**Status:** Admin `MessagesApi.kt` now has pagination (offset/limit), `editMessage` (PATCH), and `deleteMessage` (DELETE). **Still missing:** `uploadAttachment` method on admin API, and all Phase 1 methods (pagination, edit, delete, attachments) on parent `ParentApi.kt`.
 
 **File:** `shared/.../feature/admin/data/remote/MessagesApi.kt:54-59`
 
@@ -987,13 +1002,13 @@ In the parent screen, move the `body = ""` into the success callback path, not b
 
 | ID | Priority | Effort | Component | One-line description |
 |---|---|---|---|---|
-| P0-1 | 🔴 Critical | M | Backend | Seq race condition — use atomic counter |
-| P0-2 | 🔴 Critical | S | Backend | Delete sets body="" instead of NULL |
-| P0-3 | 🔴 Critical | S | Backend | OR clause can leak cross-conversation messages |
-| P0-4 | 🔴 Critical | S | Backend | Deep link hardcoded to "parent/messages" |
-| P0-5 | 🔴 Critical | M | Client models | Domain models missing Phase 1 fields |
-| P0-6 | 🔴 Critical | S | Client models | SendMessageRequest missing clientMsgId, replyToId, attachments |
-| P0-7 | 🔴 Critical | M | Client API | MessagesApi missing pagination, edit, delete, attachment methods |
+| P0-1 | ✅ FIXED | M | Backend | Seq race condition — use atomic counter |
+| P0-2 | ✅ FIXED | S | Backend | Delete sets body="" instead of NULL |
+| P0-3 | ✅ FIXED | S | Backend | OR clause can leak cross-conversation messages |
+| P0-4 | ✅ FIXED | S | Backend | Deep link hardcoded to "parent/messages" |
+| P0-5 | ✅ FIXED | M | Client models | Domain models missing Phase 1 fields |
+| P0-6 | ✅ FIXED | S | Client models | SendMessageRequest missing clientMsgId, replyToId, attachments |
+| P0-7 | � Partial | M | Client API | MessagesApi missing pagination, edit, delete, attachment methods — admin pagination/edit/delete done; attachment upload + parent API TODO |
 | P1-1 | 🟠 High | S | Admin UI | Replace verticalScroll with LazyColumn (conversation) |
 | P1-2 | 🟠 High | S | Admin UI | Replace verticalScroll with LazyColumn (thread list) |
 | P1-3 | 🟠 High | M | Both VMs | No optimistic send — UI flicker |

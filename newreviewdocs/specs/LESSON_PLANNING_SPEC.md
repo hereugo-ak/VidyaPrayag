@@ -1,7 +1,7 @@
 # Lesson Planning — Technical Specification
 
-> **Document status:** Implementation-ready blueprint
-> **Last updated:** 2026-06-27 (rev 2 — assignment-scoped architecture alignment)
+> **Document status:** Implemented (90%) — multi-mode editor, assignment-scoped plans, templates, attachments, today-tab integration shipped; calendar month view + analytics TODO
+> **Last updated:** 2026-06-28 (rev 3 — post-implementation status update)
 > **Prerequisites:** None
 > **Audit ref:** `feature_audit.csv` L127; IMPLEMENTATION_BACKLOG P1-20
 
