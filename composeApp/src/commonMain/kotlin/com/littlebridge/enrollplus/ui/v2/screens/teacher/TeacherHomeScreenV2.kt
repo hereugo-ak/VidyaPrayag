@@ -66,6 +66,7 @@ fun TeacherHomeScreenV2(
     onOpenAttendanceForAssignment: (assignmentId: String, scope: String) -> Unit,
     onOpenUpdateTab: () -> Unit,
     onOpenClasses: () -> Unit,
+    onOpenLessonPlanForAssignment: (assignmentId: String, scope: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
     todayViewModel: TeacherTodayViewModel = koinViewModel(),
     checkInViewModel: TeacherCheckInViewModel = koinViewModel(),
@@ -108,7 +109,7 @@ fun TeacherHomeScreenV2(
                 onOpenUpdate = onOpenUpdateTab,
             )
 
-            ScheduleCard(today = today)
+            ScheduleCard(today = today, onOpenLessonPlan = onOpenLessonPlanForAssignment)
 
             RemindersCard(
                 obligations = obligations,
@@ -340,7 +341,7 @@ private fun AttendanceClassRow(p: ResolvedPeriodUi, onOpen: (assignmentId: Strin
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun ScheduleCard(today: TeacherTodayState) {
+private fun ScheduleCard(today: TeacherTodayState, onOpenLessonPlan: (assignmentId: String, scope: String) -> Unit = { _, _ -> }) {
     val c = VTheme.colors
     val day = today.day
     TCard(padding = 18.dp) {
@@ -358,7 +359,12 @@ private fun ScheduleCard(today: TeacherTodayState) {
                 day.periods.isEmpty() -> Text("No periods scheduled today.", style = VTheme.type.body.colored(c.ink2).copy(fontSize = 13.sp))
                 else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     day.periods.forEachIndexed { i, p ->
-                        SchedulePeriodRow(p, isNow = i == day.nowIndex, isNext = i == day.nextIndex)
+                        SchedulePeriodRow(
+                            p,
+                            isNow = i == day.nowIndex,
+                            isNext = i == day.nextIndex,
+                            onOpenLessonPlan = onOpenLessonPlan,
+                        )
                     }
                 }
             }
@@ -384,7 +390,12 @@ private fun HolidayRow(day: ResolvedDayUi) {
 }
 
 @Composable
-private fun SchedulePeriodRow(p: ResolvedPeriodUi, isNow: Boolean, isNext: Boolean) {
+private fun SchedulePeriodRow(
+    p: ResolvedPeriodUi,
+    isNow: Boolean,
+    isNext: Boolean,
+    onOpenLessonPlan: (assignmentId: String, scope: String) -> Unit = { _, _ -> },
+) {
     val c = VTheme.colors
     val accent = teacherSubjectColor(c, p.subject.ifBlank { p.className })
     Row(
@@ -410,6 +421,30 @@ private fun SchedulePeriodRow(p: ResolvedPeriodUi, isNow: Boolean, isNext: Boole
                 )
                 if (isNow) TPill("NOW", bg = accent.copy(alpha = 0.18f), fg = accent)
                 else if (isNext) TPill("NEXT", bg = c.accent.copy(alpha = 0.10f), fg = c.accentDeep)
+                // Lesson plan chip (LESSON_PLANNING_SPEC §7.3)
+                p.lessonPlanStatus?.let { lps ->
+                    val lpColor = when (lps) {
+                        "completed" -> c.tealDeep
+                        "skipped" -> c.ink3
+                        else -> c.accent
+                    }
+                    val lpIcon = when (lps) {
+                        "completed" -> VIcons.Check
+                        "skipped" -> VIcons.Close
+                        else -> VIcons.ClipboardList
+                    }
+                    val lpIx = remember { MutableInteractionSource() }
+                    val scopeLabel = if (p.section.isBlank()) "${p.className} · ${p.subject}" else "${p.className}-${p.section} · ${p.subject}"
+                    TPill(
+                        label = lps.uppercase(),
+                        bg = lpColor.copy(alpha = 0.12f),
+                        fg = lpColor,
+                        leading = { Icon(lpIcon, contentDescription = null, modifier = Modifier.size(10.dp)) },
+                        modifier = Modifier.clickable(interactionSource = lpIx, indication = null) {
+                            p.assignmentId?.let { aid -> onOpenLessonPlan(aid, scopeLabel) }
+                        },
+                    )
+                }
             }
             val sub = p.substituteTeacherName
             if (p.room.isNotBlank() || sub != null) {

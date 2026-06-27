@@ -260,8 +260,19 @@ fun TEyebrow(text: String, dot: Color? = null, modifier: Modifier = Modifier) {
 
 /** A small rounded status pill. */
 @Composable
-fun TPill(label: String, bg: Color, fg: Color, modifier: Modifier = Modifier) {
-    Box(modifier.clip(RoundedCornerShape(999.dp)).background(bg).padding(horizontal = 9.dp, vertical = 3.dp)) {
+fun TPill(
+    label: String,
+    bg: Color,
+    fg: Color,
+    modifier: Modifier = Modifier,
+    leading: (@Composable () -> Unit)? = null,
+) {
+    Row(
+        modifier.clip(RoundedCornerShape(999.dp)).background(bg).padding(horizontal = 9.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        if (leading != null) leading()
         Text(label, style = VTheme.type.label.colored(fg).copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp))
     }
 }

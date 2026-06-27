@@ -2,6 +2,7 @@ package com.littlebridge.enrollplus.ui.v2.screens.teacher
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -156,14 +157,21 @@ fun TeacherPortalV2(
             bottomBar = {
                 TeacherDock(items = items, selected = tab, onSelect = { tab = it })
             },
-        ) { _ ->
-            Box(Modifier.fillMaxSize()) {
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())) {
                 when (tab) {
                     "home" -> TeacherHomeScreenV2(
                         onOpenAttendanceForAssignment = { assignmentId, scope ->
                             updateAssignmentId = assignmentId
                             updateScopeLabel = scope
                             updateInitialTool = UpdateTool.Attendance
+                            updateScopeNonce++
+                            tab = "update"
+                        },
+                        onOpenLessonPlanForAssignment = { assignmentId, scope ->
+                            updateAssignmentId = assignmentId
+                            updateScopeLabel = scope
+                            updateInitialTool = UpdateTool.LessonPlan
                             updateScopeNonce++
                             tab = "update"
                         },

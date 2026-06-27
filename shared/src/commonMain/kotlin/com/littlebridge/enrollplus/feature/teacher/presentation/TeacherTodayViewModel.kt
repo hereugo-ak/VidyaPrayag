@@ -75,6 +75,8 @@ data class ResolvedPeriodUi(
     val isSubstituteForMe: Boolean,
     val hasOverlap: Boolean,
     val note: String,
+    val lessonPlanId: String? = null,
+    val lessonPlanStatus: String? = null,
 ) {
     val isCancelled: Boolean get() = status == "CANCELLED"
     /** "Class-Section" display label, e.g. "7-B". */
@@ -186,6 +188,8 @@ private fun ResolvedPeriodDto.toUi() = ResolvedPeriodUi(
     isSubstituteForMe = isSubstituteForMe,
     hasOverlap = hasOverlap,
     note = note,
+    lessonPlanId = lessonPlanId,
+    lessonPlanStatus = lessonPlanStatus,
 )
 
 private fun CalendarOverlayDto.toUi() = CalendarOverlayUi(

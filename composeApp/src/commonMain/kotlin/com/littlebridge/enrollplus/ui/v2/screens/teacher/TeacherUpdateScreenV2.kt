@@ -42,12 +42,13 @@ import com.littlebridge.enrollplus.ui.v2.theme.VTheme
 import com.littlebridge.enrollplus.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
-/** The four scoped tools the Update tab fronts. */
+/** The five scoped tools the Update tab fronts. */
 enum class UpdateTool(val label: String, val icon: ImageVector) {
     Attendance("Attendance", VIcons.ListChecks),
     Marks("Marks", VIcons.GraduationCap),
     Syllabus("Syllabus", VIcons.BookOpen),
     Homework("Homework", VIcons.FileText),
+    LessonPlan("Lesson", VIcons.ClipboardList),
 }
 
 /**
@@ -125,6 +126,7 @@ fun TeacherUpdateScreenV2(
                             UpdateTool.Marks -> TeacherMarksScreenV2(asg, pickedLabel)
                             UpdateTool.Syllabus -> TeacherSyllabusScreenV2(asg, pickedLabel)
                             UpdateTool.Homework -> TeacherHomeworkScreenV2(asg, pickedLabel)
+                            UpdateTool.LessonPlan -> TeacherLessonPlanScreenV2(asg, pickedLabel)
                         }
                     }
                 }

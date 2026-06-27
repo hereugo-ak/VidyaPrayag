@@ -58,6 +58,7 @@ import com.littlebridge.enrollplus.db.CalendarEventsTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.db.HomeworkSubmissionsTable
 import com.littlebridge.enrollplus.db.HomeworkTable
+import com.littlebridge.enrollplus.db.LessonPlansTable
 import com.littlebridge.enrollplus.db.LeaveRequestsTable
 import com.littlebridge.enrollplus.db.PeriodExceptionsTable
 import com.littlebridge.enrollplus.db.TeacherPeriodsTable
@@ -109,6 +110,8 @@ data class ResolvedPeriodDto(
     @SerialName("is_substitute_for_me") val isSubstituteForMe: Boolean = false,
     @SerialName("has_overlap") val hasOverlap: Boolean = false,
     val note: String = "",
+    @SerialName("lesson_plan_id") val lessonPlanId: String? = null,
+    @SerialName("lesson_plan_status") val lessonPlanStatus: String? = null,
 )
 
 @Serializable
@@ -486,8 +489,24 @@ private fun resolveDayInTxn(
         }
     }
 
+    // ── 8b. Batch-load lesson plans for this date + owned assignments ──────────
+    // (LESSON_PLANNING_SPEC §7 — Today tab integration). One query, not per-period.
+    val assignmentIdsOnDay = resolved.mapNotNull { it.assignmentId }.toSet()
+    val lessonPlansByAssignment = if (assignmentIdsOnDay.isNotEmpty()) {
+        LessonPlansTable.selectAll().where {
+            (LessonPlansTable.assignmentId inList assignmentIdsOnDay) and
+                (LessonPlansTable.plannedDate eq date) and
+                (LessonPlansTable.deletedAt.isNull())
+        }.associate { row ->
+            row[LessonPlansTable.assignmentId] to (row[LessonPlansTable.id].value.toString() to row[LessonPlansTable.status])
+        }
+    } else {
+        emptyMap()
+    }
+
     val periodDtos = resolved.mapIndexed { idx, p ->
         val grade = "${p.className}-${p.section}"
+        val lp = p.assignmentId?.let { lessonPlansByAssignment[it] }
         ResolvedPeriodDto(
             periodId = p.periodId?.toString(),
             assignmentId = p.assignmentId?.toString(),
@@ -503,6 +522,8 @@ private fun resolveDayInTxn(
             isSubstituteForMe = p.isSubstituteForMe,
             hasOverlap = idx in overlapped,
             note = p.note,
+            lessonPlanId = lp?.first,
+            lessonPlanStatus = lp?.second,
         )
     }
 

@@ -76,4 +76,24 @@ interface TeacherRepository {
 
     // RA-51: message all parents of an owned class.
     suspend fun broadcastToClass(token: String, request: TeacherClassBroadcastRequest): NetworkResult<TeacherClassBroadcastResponse>
+
+    // Lesson Planning (LESSON_PLANNING_SPEC.md — P1-20)
+    suspend fun listLessonPlans(
+        token: String, assignmentId: String, status: String? = null,
+        from: String? = null, to: String? = null, unitId: String? = null,
+    ): NetworkResult<LessonPlanListResponse>
+
+    suspend fun getLessonPlan(token: String, planId: String): NetworkResult<LessonPlanSingleResponse>
+    suspend fun createLessonPlan(token: String, request: CreateLessonPlanRequest): NetworkResult<LessonPlanSingleResponse>
+    suspend fun updateLessonPlan(token: String, planId: String, request: UpdateLessonPlanRequest): NetworkResult<LessonPlanSingleResponse>
+    suspend fun deleteLessonPlan(token: String, planId: String): NetworkResult<ApiResponse<Unit>>
+    suspend fun completeLessonPlan(token: String, planId: String): NetworkResult<LessonPlanSingleResponse>
+    suspend fun skipLessonPlan(token: String, planId: String): NetworkResult<LessonPlanSingleResponse>
+    suspend fun getLessonCalendar(token: String, assignmentId: String, month: String): NetworkResult<LessonCalendarResponse>
+
+    // Lesson templates
+    suspend fun listLessonTemplates(token: String, assignmentId: String): NetworkResult<LessonTemplateListResponse>
+    suspend fun saveLessonTemplate(token: String, request: SaveLessonTemplateRequest): NetworkResult<LessonTemplateDto>
+    suspend fun deleteLessonTemplate(token: String, templateId: String): NetworkResult<ApiResponse<Unit>>
+    suspend fun instantiateLessonFromTemplate(token: String, templateId: String, request: InstantiateFromTemplateRequest): NetworkResult<LessonPlanSingleResponse>
 }

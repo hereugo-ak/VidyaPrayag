@@ -1696,3 +1696,93 @@ object NotificationPreferencesTable : UUIDTable("notification_preferences", "id"
         uniqueIndex("ux_notif_prefs_user_category", userId, category)
     }
 }
+
+// =====================================================================
+// Lesson Planning (LESSON_PLANNING_SPEC.md — P1-20)
+//
+// Three tables back the teacher lesson-plan surface:
+//   1. LessonPlansTable          — the plan itself (scoped to a TSA, X-1)
+//   2. LessonPlanTemplatesTable  — reusable templates (separate shape/lifecycle)
+//   3. LessonPlanAttachmentsTable — URL-based file/link attachments
+//
+// Created/applied by docs/db/migration_025_lesson_planning.sql. Registered
+// in DatabaseFactory.allTables — AUTO_CREATE_TABLES is OFF in production, so
+// that migration MUST be applied in Supabase before the matching deploy or
+// validateSchema() refuses to boot.
+// =====================================================================
+
+/**
+ * A lesson plan authored by a teacher for one class+section+subject, scoped
+ * to a [TeacherSubjectAssignmentsTable] row (X-1 ownership). Every read/write
+ * is guarded by `requireOwnedAssignment()`. `teacher_id`, `class_id`,
+ * `section`, `subject_id`, `subject_name` are denormalised from the TSA for
+ * query convenience (same pattern as [HomeworkTable]).
+ *
+ * On completion (`status = "completed"`), if `curriculumUnitId` is set, the
+ * handler upserts [SyllabusProgressTable] (isCovered=true, coveredOn=today,
+ * coveredBy=teacher) keyed on `(unitId, section, assignmentId)`.
+ *
+ * `deleted_at` soft-delete: all queries filter `WHERE deleted_at IS NULL`.
+ */
+object LessonPlansTable : UUIDTable("lesson_plans", "id") {
+    val schoolId           = uuid("school_id")
+    val teacherId          = uuid("teacher_id")
+    val assignmentId       = uuid("assignment_id")             // FK teacher_subject_assignments.id (X-1 scope)
+    val classId            = uuid("class_id")                   // denormalised from TSA
+    val section            = varchar("section", 8).default("A") // denormalised from TSA
+    val subjectId          = uuid("subject_id").nullable()      // denormalised from TSA
+    val subjectName        = text("subject_name")               // display column
+    val curriculumUnitId   = uuid("curriculum_unit_id").nullable() // FK curriculum_units.id (optional)
+    val title              = text("title")
+    val objectives         = text("objectives")                 // JSON array: ["Objective 1", ...]
+    val activities         = text("activities").nullable()      // JSON: [{"activity":"...","duration_min":15}]
+    val resources          = text("resources").nullable()       // JSON: ["Textbook pg 45", ...]
+    val assessmentMethod   = text("assessment_method").nullable()
+    val durationMinutes    = integer("duration_minutes").default(45)
+    val homeworkId         = uuid("homework_id").nullable()     // FK homework.id (optional)
+    val plannedDate        = date("planned_date").nullable()
+    val completedAt        = timestamp("completed_at").nullable()
+    val status             = varchar("status", 16).default("planned") // planned | completed | skipped
+    val isTemplate         = bool("is_template").default(false)
+    val templateSourceId   = uuid("template_source_id").nullable() // FK lesson_plans.id (if from a template)
+    val deletedAt          = timestamp("deleted_at").nullable() // soft delete
+    val createdAt          = timestamp("created_at")
+    val updatedAt          = timestamp("updated_at")
+}
+
+/**
+ * A reusable lesson-plan template. Separate table because templates have no
+ * `planned_date`, no `status`, no `homework_id`, no `completed_at` — a
+ * different shape and lifecycle. `is_shared` enables cross-teacher reuse
+ * within a school (future co-planning foundation).
+ */
+object LessonPlanTemplatesTable : UUIDTable("lesson_plan_templates", "id") {
+    val schoolId           = uuid("school_id")
+    val teacherId          = uuid("teacher_id")
+    val assignmentId       = uuid("assignment_id")             // FK teacher_subject_assignments.id (scope)
+    val subjectName        = text("subject_name")
+    val title              = text("title")
+    val objectives         = text("objectives")                 // JSON array
+    val activities         = text("activities").nullable()      // JSON array
+    val resources          = text("resources").nullable()       // JSON array
+    val assessmentMethod   = text("assessment_method").nullable()
+    val durationMinutes    = integer("duration_minutes").default(45)
+    val isShared           = bool("is_shared").default(false)
+    val deletedAt          = timestamp("deleted_at").nullable()
+    val createdAt          = timestamp("created_at")
+    val updatedAt          = timestamp("updated_at")
+}
+
+/**
+ * A file/link attached to a lesson plan (URL-based). Follows the
+ * [HomeworkAttachmentsTable] pattern exactly.
+ */
+object LessonPlanAttachmentsTable : UUIDTable("lesson_plan_attachments", "id") {
+    val lessonPlanId       = uuid("lesson_plan_id")            // FK lesson_plans.id (CASCADE)
+    val url                = text("url")
+    val filename           = text("filename").default("")
+    val mime               = text("mime").default("")
+    val sizeBytes          = long("size_bytes").default(0)
+    val uploadedBy         = uuid("uploaded_by").nullable()    // FK app_users.id
+    val createdAt          = timestamp("created_at")
+}

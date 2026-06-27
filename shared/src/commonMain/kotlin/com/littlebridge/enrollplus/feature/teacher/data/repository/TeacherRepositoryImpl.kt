@@ -118,4 +118,44 @@ class TeacherRepositoryImpl(
 
     override suspend fun broadcastToClass(token: String, request: TeacherClassBroadcastRequest): NetworkResult<TeacherClassBroadcastResponse> =
         api.broadcastToClass(token, request)
+
+    // Lesson Planning (LESSON_PLANNING_SPEC.md — P1-20)
+    override suspend fun listLessonPlans(
+        token: String, assignmentId: String, status: String?,
+        from: String?, to: String?, unitId: String?,
+    ): NetworkResult<LessonPlanListResponse> =
+        api.listLessonPlans(token, assignmentId, status, from, to, unitId)
+
+    override suspend fun getLessonPlan(token: String, planId: String): NetworkResult<LessonPlanSingleResponse> =
+        api.getLessonPlan(token, planId)
+
+    override suspend fun createLessonPlan(token: String, request: CreateLessonPlanRequest): NetworkResult<LessonPlanSingleResponse> =
+        api.createLessonPlan(token, request)
+
+    override suspend fun updateLessonPlan(token: String, planId: String, request: UpdateLessonPlanRequest): NetworkResult<LessonPlanSingleResponse> =
+        api.updateLessonPlan(token, planId, request)
+
+    override suspend fun deleteLessonPlan(token: String, planId: String): NetworkResult<ApiResponse<Unit>> =
+        api.deleteLessonPlan(token, planId)
+
+    override suspend fun completeLessonPlan(token: String, planId: String): NetworkResult<LessonPlanSingleResponse> =
+        api.completeLessonPlan(token, planId)
+
+    override suspend fun skipLessonPlan(token: String, planId: String): NetworkResult<LessonPlanSingleResponse> =
+        api.skipLessonPlan(token, planId)
+
+    override suspend fun getLessonCalendar(token: String, assignmentId: String, month: String): NetworkResult<LessonCalendarResponse> =
+        api.getLessonCalendar(token, assignmentId, month)
+
+    override suspend fun listLessonTemplates(token: String, assignmentId: String): NetworkResult<LessonTemplateListResponse> =
+        api.listLessonTemplates(token, assignmentId)
+
+    override suspend fun saveLessonTemplate(token: String, request: SaveLessonTemplateRequest): NetworkResult<LessonTemplateDto> =
+        api.saveLessonTemplate(token, request)
+
+    override suspend fun deleteLessonTemplate(token: String, templateId: String): NetworkResult<ApiResponse<Unit>> =
+        api.deleteLessonTemplate(token, templateId)
+
+    override suspend fun instantiateLessonFromTemplate(token: String, templateId: String, request: InstantiateFromTemplateRequest): NetworkResult<LessonPlanSingleResponse> =
+        api.instantiateLessonFromTemplate(token, templateId, request)
 }

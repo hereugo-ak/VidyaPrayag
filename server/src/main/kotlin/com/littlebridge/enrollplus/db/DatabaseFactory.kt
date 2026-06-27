@@ -188,7 +188,13 @@ object DatabaseFactory {
         // Applied by docs/db/migration_013_teacher_checkins.sql (must run before deploy;
         // AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates boot on it).
         // Closes B-ATT-5 (teacher self check-in) at the schema layer.
-        TeacherCheckInsTable
+        TeacherCheckInsTable,
+        // Lesson Planning (LESSON_PLANNING_SPEC.md — P1-20)
+        // Applied by docs/db/migration_025_lesson_planning.sql (must run before deploy;
+        // AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates boot on it).
+        LessonPlansTable,
+        LessonPlanTemplatesTable,
+        LessonPlanAttachmentsTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

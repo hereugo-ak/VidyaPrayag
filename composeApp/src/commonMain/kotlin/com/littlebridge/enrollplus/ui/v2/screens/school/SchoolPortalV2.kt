@@ -2,6 +2,7 @@ package com.littlebridge.enrollplus.ui.v2.screens.school
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -263,8 +264,8 @@ fun SchoolPortalV2(
             bottomBar = {
                 VBottomNav(items = items, selected = tab, onSelect = { tab = it })
             },
-        ) { _ ->
-            Box(Modifier.fillMaxSize()) {
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())) {
                 when (tab) {
                     "home" -> SchoolHomeScreenV2(
                         onOpenNotifications = { overlay = SchoolOverlay.Notifications },

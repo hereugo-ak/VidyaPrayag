@@ -91,6 +91,7 @@ import com.littlebridge.enrollplus.feature.school.schoolRecordsRouting
 import com.littlebridge.enrollplus.feature.school.schoolStudentsRouting
 import com.littlebridge.enrollplus.feature.school.schoolTimetableRouting
 import com.littlebridge.enrollplus.feature.school.nonTeachingStaffRouting
+import com.littlebridge.enrollplus.feature.school.schoolLessonPlanRouting
 import com.littlebridge.enrollplus.feature.school.schoolRouting
 import com.littlebridge.enrollplus.feature.school.teacherAssignmentRouting
 import com.littlebridge.enrollplus.feature.school.teacherProvisioningRouting
@@ -99,6 +100,7 @@ import com.littlebridge.enrollplus.feature.teacher.teacherClassesRouting
 import com.littlebridge.enrollplus.feature.teacher.teacherDayRouting
 import com.littlebridge.enrollplus.feature.teacher.teacherGradebookRouting
 import com.littlebridge.enrollplus.feature.teacher.teacherHomeworkRouting
+import com.littlebridge.enrollplus.feature.teacher.teacherLessonPlanRouting
 import com.littlebridge.enrollplus.feature.teacher.teacherLeaveRouting
 import com.littlebridge.enrollplus.feature.teacher.teacherMessagesRouting
 import com.littlebridge.enrollplus.feature.teacher.teacherRouting
@@ -309,6 +311,7 @@ fun Application.module() {
         nonTeachingStaffRouting()    // /api/v1/school/staff[…] — RA-S17 non-teaching-staff vertical (school-scoped CRUD)
         schoolRecordsRouting()       // /api/v1/school/{attendance/summary,marks/summary,fees/ledger} — RA-52 admin Records rollups (school-scoped reads)
         schoolTimetableRouting()     // /api/v1/school/timetable — school-wide weekly schedule (all classes) from teacher_periods, for the Command Center calendar (read-only, additive)
+        schoolLessonPlanRouting()    // /api/v1/school/lesson-plans — admin review of teacher lesson plans (read-only, school-scoped, filterable)
         mediaRouting()               // /api/v1/school/media/upload[…] — REAL binary uploads → Supabase Storage (kills URL placeholders)
 
         // Academic Calendar platform (VP-CAL) — centralized planning & scheduling
@@ -327,6 +330,7 @@ fun Application.module() {
         teacherLeaveRouting()        // /api/v1/teacher/leave-requests[…] — RA-44 teacher lists/decides STUDENT leave routed to their classes
         teacherSelfLeaveRouting()    // T-602a /api/v1/teacher/leave[…] — the teacher's OWN leave: apply (requester_role=teacher, routed to school admins) + list-own-status (Doc 04 §5.14)
         teacherMessagesRouting()     // /api/v1/teacher/messages[…] — RA-51 teacher↔parent messaging + class broadcast
+        teacherLessonPlanRouting()   // /api/v1/teacher/lesson-plans[…] — typed, assignment-scoped lesson plans: CRUD, complete/skip, calendar, templates (LESSON_PLANNING_SPEC P1-20)
 
         // Cross-user notification spine (audit part-2 RA-41/42/46/50) — role-aware
         // inbox replacing the parent-only synth; persisted read state; bell summary.
