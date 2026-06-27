@@ -1,9 +1,10 @@
 # Vidya Prayag — Implementation Backlog & Dependency Graph
 
 > **Generated:** 2026-06-27
+> **Last Updated:** 2026-06-28
 > **Source documents:** `feature_audit.csv`, `DIFFERENTIATING_FEATURES.md`, `COMPETITIVE_GAP_ANALYSIS.md`
 > **Reference spec:** `MESSAGING_SYSTEM_SPEC.md`
-> **Schema reference:** `server/.../db/Tables.kt` (50+ tables, Exposed ORM)
+> **Schema reference:** `server/.../db/Tables.kt` (70+ tables, Exposed ORM)
 
 ---
 
@@ -22,7 +23,7 @@ Features requiring implementation specs, deduplicated across all three source do
 | P0-05 | `BULK_IMPORT_EXPORT_SPEC.md` | CSV Import/Export for Students, Teachers, Marks | Gap #12; Audit L159 | 🟡 Partial (30%) | High | M | None |
 | P0-06 | `AI_INFRASTRUCTURE_SPEC.md` | LLM Integration Layer (Shared AI Service) | Diff §1.1-1.4; Gap AI features | 🔴 Missing | Critical | M | None |
 | P0-07 | `OFFLINE_MODE_SPEC.md` | Full Offline-First Architecture | Audit L146; MESSAGING_SPEC §6 | 🟡 Partial (15%) | High | L | None |
-| P0-08 | `DARK_MODE_SPEC.md` | Dark Theme + System-Aware Switching | Audit L147 | 🟡 Partial (30%) | Medium | M | None |
+| P0-08 | `DARK_MODE_SPEC.md` | Dark Theme + System-Aware Switching | Audit L147 | � Implemented (90%) | Medium | M | None |
 | P0-09 | `TABLET_LAYOUT_SPEC.md` | Responsive Tablet Layouts | Audit L148 | 🟡 Partial (20%) | Medium | M | None |
 | P0-10 | `WEB_APP_SPEC.md` | Web Application (wasmJs/js Target) | Audit L145 | 🟡 Partial (40%) | High | L | None |
 | P0-11 | `IOS_PUSH_SPEC.md` | APNs Push for iOS | Audit L144 | 🔴 Missing | High | M | None |
@@ -44,7 +45,7 @@ Features requiring implementation specs, deduplicated across all three source do
 | P1-09 | `HOSTEL_MANAGEMENT_SPEC.md` | Hostel Management | Gap #8 | 🔴 Missing | Medium | L | None |
 | P1-10 | `PAYROLL_MANAGEMENT_SPEC.md` | Staff Payroll + Payslips | Gap #9 | 🔴 Missing | Medium | L | None |
 | P1-11 | `ID_CARD_GENERATION_SPEC.md` | ID Card Generation | Gap #11 | 🔴 Missing | Medium | S | None |
-| P1-12 | `HEALTH_RECORDS_SPEC.md` | Student Health & Immunization Records | Audit L120; Gap #47 | 🔴 Missing | High | L | None |
+| P1-12 | `HEALTH_RECORDS_SPEC.md` | Student Health & Immunization Records | Audit L120; Gap #47 | � Implemented (90%) | High | L | None |
 | P1-13 | `MULTI_BRANCH_SPEC.md` | Multi-Branch / School Chain Support | Gap #13; Audit L156 | 🔴 Missing | Medium | L | None |
 | P1-14 | `EXPENSE_MANAGEMENT_SPEC.md` | School Expense Tracking | Audit L136; Gap #10 | 🔴 Missing | Medium | L | None |
 | P1-15 | `INVENTORY_MANAGEMENT_SPEC.md` | School Inventory / Asset Tracking | Audit L139; Gap #49 | 🔴 Missing | Low | L | None |
@@ -52,27 +53,27 @@ Features requiring implementation specs, deduplicated across all three source do
 | P1-17 | `SCHEDULED_ANNOUNCEMENTS_SPEC.md` | Schedule Announcements for Future | Audit L160 | 🔴 Missing | Low | S | None |
 | P1-18 | `BROADCAST_GROUPS_SPEC.md` | Admin-Managed Broadcast Groups | Audit L123 | 🟡 Partial (30%) | Medium | M | None |
 | P1-19 | `EXAM_TIMETABLE_SPEC.md` | Exam Schedule Management | Audit L125 | 🔴 Missing | Medium | M | None |
-| P1-20 | `LESSON_PLANNING_SPEC.md` | Teacher Lesson Planning | Audit L127 | 🔴 Missing | Medium | M | None |
+| P1-20 | `LESSON_PLANNING_SPEC.md` | Teacher Lesson Planning | Audit L127 | � Implemented (90%) | Medium | M | None |
 | P1-21 | `ONLINE_ASSIGNMENTS_SPEC.md` | Student-Facing Assignment Portal | Audit L128 | 🟡 Partial (40%) | High | L | `STUDENT_APP_SPEC.md` |
 | P1-22 | `SCHOLARSHIP_WORKFLOW_SPEC.md` | Scholarship Application + Approval Workflow | Audit L138 | 🟡 Partial (40%) | Medium | M | None |
 | P1-23 | `DOCUMENTS_MANAGEMENT_SPEC.md` | School Documents / Media Storage | Audit L69, L108 | 🟠 Stub (10%) | Medium | M | None |
-| P1-24 | `ADMIN_NOTIFICATIONS_SPEC.md` | Admin Notification Composer UI | Audit L74, L109 | 🟠 Stub (15%) | Medium | M | None |
+| P1-24 | `ADMIN_NOTIFICATIONS_SPEC.md` | Admin Notification Composer UI | Audit L74, L109 | � Partial (50%) | Medium | M | None |
 | P1-25 | `BIOMETRIC_IOS_SPEC.md` | iOS Biometric Authentication | Audit L11, L114 | 🟠 Stub (10%) | Medium | M | None |
 | P1-26 | `CUSTOM_REPORT_BUILDER_SPEC.md` | Custom Report Generation | Audit L133 | 🔴 Missing | Medium | L | None |
 | P1-27 | `CALENDAR_SYNC_SPEC.md` | Google/Outlook Calendar Sync | Audit L152; Diff §10.2 | 🔴 Missing | Low | S | None |
 | P1-28 | `CURRICULUM_TEMPLATES_SPEC.md` | Pre-built Curriculum Templates by Board | Audit L153 | 🔴 Missing | Medium | L | `NEP_COMPLIANCE_SPEC.md` |
 | P1-29 | `EVENT_REGISTRATION_SPEC.md` | Event RSVP / PTM Slot Booking | Audit L155 | 🟡 Partial (30%) | Medium | M | None |
 | P1-30 | `VISITOR_MANAGEMENT_SPEC.md` | Visitor Check-in/Check-out | Audit L140; Gap #50 | 🔴 Missing | Low | M | None |
-| P1-31 | `ALUMNI_MANAGEMENT_SPEC.md` | Alumni Network & Tracking | Audit L141; Gap #48 | 🔴 Missing | Low | L | None |
+| P1-31 | `ALUMNI_MANAGEMENT_SPEC.md` | Alumni Network & Tracking | Audit L141; Gap #48 | � Implemented (85%) | Low | L | None |
 
 ### Phase 2 — Differentiate: Unique Features (4-8 months)
 
 | # | Spec File | Feature | Source | Status | Priority | Effort | Prerequisites |
 |---|---|---|---|---|---|---|---|
-| P2-01 | `PARENT_PULSE_SPEC.md` | Parent Engagement Gamification | Diff §2.1; Gap #52 | 🟡 Partial (badges exist) | High | M | None |
-| P2-02 | `FAMILY_CIRCLE_SPEC.md` | Multi-Parent with Role-Based Visibility | Diff §2.2; Gap #53 | 🟡 Partial (relation exists) | High | M | None |
+| P2-01 | `PARENT_PULSE_SPEC.md` | Parent Engagement Gamification | Diff §2.1; Gap #52 | � Implemented (85%) | High | M | None |
+| P2-02 | `FAMILY_CIRCLE_SPEC.md` | Multi-Parent with Role-Based Visibility | Diff §2.2; Gap #53 | 🟡 Partial (multi-parent links + primary guardian exist; role-based visibility + delegation TODO) | High | M | None |
 | P2-03 | `CLASS_COMMUNITY_FEED_SPEC.md` | Class-Scoped Social Feed | Diff §2.3; Gap #35 | 🔴 Missing | High | M | None |
-| P2-04 | `SMART_NOTIFICATIONS_SPEC.md` | Actionable Notifications + Quiet Hours + Digest | Diff §2.4 | 🟡 Partial (prefs exist) | High | M | None |
+| P2-04 | `SMART_NOTIFICATIONS_SPEC.md` | Actionable Notifications + Quiet Hours + Digest | Diff §2.4 | 🟡 Partial (65% — prefs filtering + rate limiting + scheduler + push bridge implemented; AI priority, batching, quiet hours, digest TODO) | High | M | None |
 | P2-05 | `MULTI_LANGUAGE_SPEC.md` | Multi-Language Content Translation Engine | Audit L121; Diff §8.1; Gap #38 | 🔴 Missing | High | M | None |
 | P2-06 | `MARKETPLACE_SPEC.md` | School Discovery Full Flow (SRI + Reviews + Admission) | Audit L33, L110; Diff §3.1 | 🟡 Partial (40%) | High | L | None |
 | P2-07 | `PARENT_ANALYTICS_SPEC.md` | Parent-Facing Analytics (Growth, Radar, Predictive) | Diff §9.1 | 🔴 Missing | High | M | None |
@@ -318,9 +319,9 @@ These are shared infrastructure components needed by multiple features:
 | **Networking** | Ktor Client 3.4.3 (OkHttp/Darwin/CIO), NetworkResult<T> | `shared/.../core/network/` |
 | **Design System** | V Design System (VTheme, VColors, VDimens, VType, VAtoms) | `composeApp/.../ui/v2/components/` |
 
-### Existing Tables (50+)
+### Existing Tables (70+)
 
-`AppUsersTable`, `AuthOtpsTable`, `OtpDeliveryAttemptsTable`, `UserSessionsTable`, `LandingContentTable`, `AppConfigTable`, `SchoolsTable`, `OnboardingDraftsTable`, `SchoolClassesTable`, `SchoolSubjectsTable`, `TeacherSubjectAssignmentsTable`, `AnnouncementsTable`, `WhatsappLogsTable`, `AdmissionEnquiriesTable`, `SchoolPhilosophyTable`, `SchoolMediaTable`, `StorageMetricsTable`, `AcademicCalendarTable`, `HolidayListTable` (deprecated), `FacultyTable`, `AttendanceRecordsTable`, `StudentsTable`, `EnrollmentsTable`, `ChildrenTable`, `FeeRecordsTable`, `LeaveRequestsTable`, `PtmEventsTable`, `PtmClassProgressTable`, `MessageThreadsTable`, `MessagesTable`, `MessageStatusTable`, `MessageAttachmentsTable`, `ExamResultsTable` (deprecated), `AssessmentsTable`, `AssessmentMarksTable`, `SyllabusUnitsTable`, `CurriculumUnitsTable`, `SyllabusProgressTable`, `HomeworkTable`, `HomeworkAttachmentsTable`, `HomeworkSubmissionsTable`, `HomeworkExtensionsTable`, `TeacherPeriodsTable`, `PeriodExceptionsTable`, `ScholarshipsTable`, `ScholarshipApplicationsTable`, `NotificationsTable`, `DeviceTokensTable`, `OtpGatewayDevicesTable`, `SmsRequestsTable`, `ParentChildLinksTable`, `NonTeachingStaffTable`, `ParentAchievementsTable`, `CalendarEventsTable`, `AcademicYearsTable`, `TeacherCheckInsTable`, `NotificationPreferencesTable`
+`AppUsersTable`, `AuthOtpsTable`, `OtpDeliveryAttemptsTable`, `UserSessionsTable`, `LandingContentTable`, `AppConfigTable`, `SchoolsTable`, `OnboardingDraftsTable`, `SchoolClassesTable`, `SchoolSubjectsTable`, `TeacherSubjectAssignmentsTable`, `AnnouncementsTable`, `WhatsappLogsTable`, `AdmissionEnquiriesTable`, `SchoolPhilosophyTable`, `SchoolMediaTable`, `StorageMetricsTable`, `AcademicCalendarTable`, `HolidayListTable` (deprecated), `FacultyTable`, `AttendanceRecordsTable`, `StudentsTable`, `EnrollmentsTable`, `ChildrenTable`, `FeeRecordsTable`, `LeaveRequestsTable`, `PtmEventsTable`, `PtmClassProgressTable`, `MessageThreadsTable`, `MessagesTable`, `ConversationSeqTable`, `MessageStatusTable`, `MessageAttachmentsTable`, `ExamResultsTable` (deprecated), `AssessmentsTable`, `AssessmentMarksTable`, `SyllabusUnitsTable`, `CurriculumUnitsTable`, `SyllabusProgressTable`, `HomeworkTable`, `HomeworkAttachmentsTable`, `HomeworkSubmissionsTable`, `HomeworkExtensionsTable`, `TeacherPeriodsTable`, `PeriodExceptionsTable`, `ScholarshipsTable`, `ScholarshipApplicationsTable`, `NotificationsTable`, `DeviceTokensTable`, `OtpGatewayDevicesTable`, `SmsRequestsTable`, `ParentChildLinksTable`, `NonTeachingStaffTable`, `ParentAchievementsTable`, `CalendarEventsTable`, `AcademicYearsTable`, `TeacherCheckInsTable`, `NotificationPreferencesTable`, `LessonPlansTable`, `LessonPlanTemplatesTable`, `LessonPlanAttachmentsTable`, `StudentHealthProfilesTable`, `StudentImmunizationsTable`, `StudentHealthIncidentsTable`, `ParentPulsesTable`, `AlumniTable`, `AlumniDonationCampaignsTable`, `AlumniDonationsTable`, `AlumniMentorshipRequestsTable`, `AlumniMentorshipsTable`, `AlumniCareerHistoryTable`, `AlumniMentorshipSettingsTable`
 
 ---
 
@@ -328,9 +329,9 @@ These are shared infrastructure components needed by multiple features:
 
 | Phase | Spec Count | Effort Distribution |
 |---|---|---|
-| Phase 0 — Infrastructure | 13 | 7L, 4M, 2S |
-| Phase 1 — Catch-Up | 31 | 12L, 14M, 2S, 3 partial→full |
-| Phase 2 — Differentiate | 11 | 1L, 8M, 2S |
+| Phase 0 — Infrastructure | 13 | 7L, 4M, 2S, 1 implemented (dark mode) |
+| Phase 1 — Catch-Up | 31 | 12L, 14M, 2S, 3 implemented (health, lesson planning, alumni) |
+| Phase 2 — Differentiate | 11 | 1L, 8M, 2S, 1 implemented (parent pulse), 2 partial (family circle, smart notifications) |
 | Phase 3 — Leapfrog | 11 | 3L, 7M, 1S |
 | Phase 4 — Future | 11 | 4L, 6M, 1S |
-| **Total** | **77** | |
+| **Total** | **77** | **5 implemented, 2 partial** |

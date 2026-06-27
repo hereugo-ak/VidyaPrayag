@@ -1,8 +1,8 @@
 # VidyaPrayag Messaging System — Technical Specification
 
-> **Document status:** Implementation-ready blueprint
+> **Document status:** Phase 1 backend implemented (seq ordering, edit/delete, attachments, pagination, idempotency, preferences filtering, rate limiting, push bridge); Phase 1 client partially done (admin API has pagination/edit/delete; parent API + attachment upload + UI for edit/delete/attachments TODO)
 > **Audience:** Senior engineer / AI agent implementing the system
-> **Last updated:** 2026-06-12
+> **Last updated:** 2026-06-28
 
 ---
 

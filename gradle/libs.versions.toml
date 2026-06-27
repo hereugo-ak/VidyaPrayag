@@ -40,6 +40,10 @@ firebase-admin = "9.4.3"
 firebase-bom = "33.7.0"
 firebase-messaging = "25.0.1"
 google-services = "4.4.3"
+# Transport Tracking — Google Maps Compose for Android bus tracking map
+play-services-maps = "19.2.0"
+play-services-location = "21.3.0"
+maps-compose = "6.4.1"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -98,6 +102,10 @@ dotenv = { module = "io.github.cdimascio:dotenv-kotlin", version.ref = "dotenv" 
 firebase-admin = { module = "com.google.firebase:firebase-admin", version.ref = "firebase-admin" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
 firebase-messaging = { module = "com.google.firebase:firebase-messaging", version.ref = "firebase-messaging" }
+# Transport Tracking — Google Maps Compose for Android bus tracking map
+play-services-maps = { module = "com.google.android.gms:play-services-maps", version.ref = "play-services-maps" }
+play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "play-services-location" }
+maps-compose = { module = "com.google.maps.android:maps-compose", version.ref = "maps-compose" }
 
 [plugins]
 google-services = { id = "com.google.gms.google-services", version.ref = "google-services" }

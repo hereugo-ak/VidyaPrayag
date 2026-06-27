@@ -27,7 +27,7 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays the teacher portal can push above its tab content. */
-private enum class TeacherOverlay { None, Notifications, HealthAlerts }
+private enum class TeacherOverlay { None, Notifications, HealthAlerts, TransportAttendance }
 
 /**
  * TeacherPortalV2 — the teacher shell, rebuilt FROM SCRATCH on the Parents-Portal
@@ -73,7 +73,13 @@ fun TeacherPortalV2(
     // Apply deep-link routing: set tab from the typed target.
     LaunchedEffect(deepLinkTarget) {
         when (deepLinkTarget) {
-            is DeepLinkTarget.TeacherScreen -> tab = deepLinkTarget.screen
+            is DeepLinkTarget.TeacherScreen -> {
+                if (deepLinkTarget.screen == "transport") {
+                    overlay = TeacherOverlay.TransportAttendance
+                } else {
+                    tab = deepLinkTarget.screen
+                }
+            }
             else -> Unit
         }
     }
@@ -106,6 +112,14 @@ fun TeacherPortalV2(
         }
         TeacherOverlay.HealthAlerts -> {
             TeacherHealthAlertsScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
+            return
+        }
+        TeacherOverlay.TransportAttendance -> {
+            TransportAttendanceScreenV2(
+                routeId = "",
+                onBack = { overlay = TeacherOverlay.None },
+                modifier = modifier,
+            )
             return
         }
         TeacherOverlay.None -> Unit
@@ -177,6 +191,7 @@ fun TeacherPortalV2(
                     },
                     onOpenClasses = { tab = "classes" },
                     onOpenHealthAlerts = { overlay = TeacherOverlay.HealthAlerts },
+                    onOpenTransportAttendance = { overlay = TeacherOverlay.TransportAttendance },
                 )
 
                 "update" -> key(updateScopeNonce) {

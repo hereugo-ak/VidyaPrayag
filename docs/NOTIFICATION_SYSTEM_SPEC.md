@@ -1,8 +1,8 @@
 # Notification System — Exhaustive Specification
 
-> **Status**: Foundation built, push-bridge incomplete, logout token cleanup missing, channels/sounds/custom-views/deep-link-routing not yet implemented.
+> **Status**: Foundation + push bridge + preferences filtering + rate limiting implemented. Logout token cleanup, channels/sounds/custom-views/deep-link-routing partially done. AI priority, smart batching, quiet hours, daily digest still TODO.
 >
-> **Last updated**: 2026-06-27 (rev 4 — filled all 9 implementation gaps: NavGraphV2 deep-link routing, NotificationScheduler full Exposed queries, permission callback fix, merged displayNotification(), preferences API contracts + routing, AuthApi.logout() signature, clearSession() JS/wasm fix, preferences filtering in Notify.toUsers(), pull-to-refresh wiring)
+> **Last updated**: 2026-06-28 (rev 5 — push bridge via NotificationService, preferences filtering in Notify.toUsers(), rate limiting (50/day, 10/hr/category), NotificationScheduler, NotificationPermissionLauncher all implemented in commits 7eb2672 + 3d4ce63)
 
 ---
 

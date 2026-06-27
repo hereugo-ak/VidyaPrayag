@@ -91,6 +91,7 @@ fun ParentHomeScreenV2(
     onOpenFees: () -> Unit = {},
     onOpenAcademics: () -> Unit = {},
     onOpenPulse: () -> Unit = {},
+    onOpenTransport: () -> Unit = {},
     viewModel: ParentDashboardViewModel = koinViewModel(),
     permissionVm: PermissionViewModel = koinViewModel(),
 ) {
@@ -125,6 +126,7 @@ fun ParentHomeScreenV2(
         onOpenFees = onOpenFees,
         onOpenAcademics = onOpenAcademics,
         onOpenPulse = onOpenPulse,
+        onOpenTransport = onOpenTransport,
         modifier = modifier,
     )
 
@@ -149,6 +151,7 @@ private fun ParentDashboardContent(
     onOpenFees: () -> Unit,
     onOpenAcademics: () -> Unit,
     onOpenPulse: () -> Unit = {},
+    onOpenTransport: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -285,6 +288,15 @@ private fun ParentDashboardContent(
                     ParentFeesCard(
                         fees = state.fees,
                         onOpenFees = onOpenFees,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    // ── Transport: track bus ────────────────────────────────────────
+                    VActionCard(
+                        title = "Track Bus",
+                        subtitle = "Live bus location & ETA for your child",
+                        icon = VIcons.MapPin,
+                        onClick = onOpenTransport,
                         modifier = Modifier.fillMaxWidth(),
                     )
 

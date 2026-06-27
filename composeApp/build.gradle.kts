@@ -104,6 +104,11 @@ kotlin {
             implementation(libs.androidx.biometric)
 
             implementation(libs.firebase.messaging)
+            // Transport Tracking — Google Maps Compose for the parent bus
+            // tracking map (Android-only; iOS/JVM use a Canvas fallback).
+            implementation(libs.play.services.maps)
+            implementation(libs.play.services.location)
+            implementation(libs.maps.compose)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)

@@ -389,6 +389,17 @@ val commonModule = module {
         com.littlebridge.enrollplus.feature.alumni.data.repository.AlumniRepositoryImpl(get())
     }
 
+    // Transport Tracking (TRANSPORT_TRACKING_SPEC.md)
+    single {
+        com.littlebridge.enrollplus.feature.transport.data.remote.TransportApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single<com.littlebridge.enrollplus.feature.transport.domain.repository.TransportRepository> {
+        com.littlebridge.enrollplus.feature.transport.data.repository.TransportRepositoryImpl(get())
+    }
+
     // UseCases
     factory { GetSchoolsUseCase(get()) }
 }
@@ -494,6 +505,8 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.health.presentation.ParentHealthViewModel(get(), get()) }
     // Alumni Management (ALUMNI_MANAGEMENT_SPEC.md)
     factory { com.littlebridge.enrollplus.feature.alumni.presentation.AlumniViewModel(get(), get()) }
+    // Transport Tracking (TRANSPORT_TRACKING_SPEC.md)
+    factory { com.littlebridge.enrollplus.feature.transport.presentation.TransportViewModel(get(), get()) }
 }
 
 fun initKoin(

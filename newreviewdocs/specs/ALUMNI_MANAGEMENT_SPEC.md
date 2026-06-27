@@ -1,7 +1,7 @@
 # Alumni Management — Technical Specification
 
-> **Document status:** Implementation-ready blueprint (reviewed 2026-06-27)
-> **Last updated:** 2026-06-27
+> **Document status:** Implemented (85%) — core alumni CRUD, directory, campaigns, donations, mentorship, career history, deep linking, web admin pages shipped; Phase 2 self-service alumni UI deferred
+> **Last updated:** 2026-06-28
 > **Prerequisites:** None for core features. FR-5 (event RSVP) requires `EVENT_REGISTRATION_SPEC.md` — `EventRegistrationsTable` does not exist yet.
 > **Industry benchmark:** SchoolDeck, CodePex ERP, Vidyalaya, Edumerge, Alumnipad, Hivebrite, 360Alumni, Edulab
 

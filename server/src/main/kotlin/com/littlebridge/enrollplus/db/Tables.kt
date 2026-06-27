@@ -2125,3 +2125,112 @@ object AlumniMentorshipSettingsTable : UUIDTable("alumni_mentorship_settings", "
         uniqueIndex("ux_alumni_mentorship_settings_school", schoolId)
     }
 }
+
+// =====================================================================
+// Transport Tracking (TRANSPORT_TRACKING_SPEC.md — GPS bus tracking,
+// route/vehicle/driver management, student pickup/drop, transport fees)
+//
+// Six tables back the transport tracking surface:
+//   1. TransportRoutesTable     — route definitions (name, description)
+//   2. TransportStopsTable      — ordered stops per route (lat/lng, ETA)
+//   3. TransportVehiclesTable   — buses with driver info, assigned to routes
+//   4. TransportAssignmentsTable — student-to-route/stop/vehicle mapping
+//   5. TransportTrackingTable   — real-time GPS pings (lat/lng/speed/heading)
+//   6. TransportAttendanceTable — daily pickup/drop status per student
+//
+// Created/applied by docs/db/migration_053_transport_tracking.sql. Registered
+// in DatabaseFactory.allTables — AUTO_CREATE_TABLES is OFF in production, so
+// that migration MUST be applied in Supabase before the matching deploy or
+// validateSchema() refuses to boot.
+// =====================================================================
+
+object TransportRoutesTable : UUIDTable("transport_routes", "id") {
+    val schoolId    = uuid("school_id")
+    val name        = text("name")
+    val description = text("description").nullable()
+    val isActive    = bool("is_active").default(true)
+    val createdAt   = timestamp("created_at")
+    val updatedAt   = timestamp("updated_at")
+
+    init {
+        index("idx_transport_routes_school", false, schoolId, isActive)
+    }
+}
+
+object TransportStopsTable : UUIDTable("transport_stops", "id") {
+    val routeId      = uuid("route_id")              // FK transport_routes.id
+    val name         = text("name")
+    val latitude     = double("latitude")
+    val longitude    = double("longitude")
+    val sequence     = integer("sequence")
+    val estimatedTime = varchar("estimated_time", 8).nullable()  // "07:15"
+    val createdAt    = timestamp("created_at")
+
+    init {
+        index("idx_transport_stops_route", false, routeId, sequence)
+    }
+}
+
+object TransportVehiclesTable : UUIDTable("transport_vehicles", "id") {
+    val schoolId      = uuid("school_id")
+    val routeId       = uuid("route_id").nullable()   // FK transport_routes.id
+    val busNumber     = text("bus_number")
+    val capacity      = integer("capacity").default(40)
+    val driverName    = text("driver_name").nullable()
+    val driverPhone   = varchar("driver_phone", 32).nullable()
+    val driverLicense = text("driver_license").nullable()
+    val isActive      = bool("is_active").default(true)
+    val createdAt     = timestamp("created_at")
+    val updatedAt     = timestamp("updated_at")
+
+    init {
+        index("idx_transport_vehicles_school", false, schoolId, isActive)
+    }
+}
+
+object TransportAssignmentsTable : UUIDTable("transport_assignments", "id") {
+    val schoolId  = uuid("school_id")
+    val studentId = uuid("student_id")
+    val routeId   = uuid("route_id")                  // FK transport_routes.id
+    val stopId    = uuid("stop_id")                   // FK transport_stops.id
+    val vehicleId = uuid("vehicle_id")                // FK transport_vehicles.id
+    val isActive  = bool("is_active").default(true)
+    val createdAt = timestamp("created_at")
+
+    init {
+        index("idx_transport_assignments_school", false, schoolId, isActive)
+        index("idx_transport_assignments_student", false, studentId, isActive)
+        index("idx_transport_assignments_route", false, routeId, isActive)
+    }
+}
+
+object TransportTrackingTable : UUIDTable("transport_tracking", "id") {
+    val vehicleId = uuid("vehicle_id")                // FK transport_vehicles.id
+    val latitude  = double("latitude")
+    val longitude = double("longitude")
+    val speed     = float("speed").nullable()         // km/h
+    val heading   = float("heading").nullable()       // degrees
+    val recordedAt = timestamp("recorded_at")
+
+    init {
+        index("idx_transport_tracking_vehicle", false, vehicleId, recordedAt)
+    }
+}
+
+object TransportAttendanceTable : UUIDTable("transport_attendance", "id") {
+    val schoolId     = uuid("school_id")
+    val studentId    = uuid("student_id")
+    val routeId      = uuid("route_id")
+    val date         = date("date")
+    val pickupStatus = varchar("pickup_status", 16).nullable()   // picked | missed | absent
+    val dropStatus   = varchar("drop_status", 16).nullable()     // dropped | missed
+    val pickupTime   = timestamp("pickup_time").nullable()
+    val dropTime     = timestamp("drop_time").nullable()
+    val createdAt    = timestamp("created_at")
+
+    init {
+        uniqueIndex("ux_transport_attendance_unique", schoolId, studentId, date)
+        index("idx_transport_attendance_route_date", false, routeId, date)
+        index("idx_transport_attendance_school_date", false, schoolId, date)
+    }
+}
