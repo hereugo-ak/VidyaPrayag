@@ -13,11 +13,14 @@
  */
 package com.littlebridge.enrollplus.feature.notifications
 
+import com.littlebridge.enrollplus.db.AlumniTable
 import com.littlebridge.enrollplus.db.AppUsersTable
 import com.littlebridge.enrollplus.db.ChildrenTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.db.TeacherSubjectAssignmentsTable
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import java.util.UUID
@@ -69,6 +72,21 @@ object NotifyRecipients {
                 ((AppUsersTable.role eq "school_admin") or (AppUsersTable.role eq "admin")) and
                 (AppUsersTable.isActive eq true)
         }.map { it[AppUsersTable.id].value }.distinct()
+    }
+
+    /**
+     * Alumni app_users.id for a school — active, approved, with user_id linked.
+     * Optionally filtered by graduation_year for batch-wise targeting.
+     */
+    suspend fun alumniInSchool(schoolId: UUID, graduationYear: Int? = null): List<UUID> = dbQuery {
+        val query = AlumniTable.selectAll().where {
+            (AlumniTable.schoolId eq schoolId) and
+                (AlumniTable.isActive eq true) and
+                (AlumniTable.verificationStatus eq "approved") and
+                (AlumniTable.userId.isNotNull())
+        }
+        graduationYear?.let { query.andWhere { AlumniTable.graduationYear eq it } }
+        query.mapNotNull { it[AlumniTable.userId] }.distinct()
     }
 
     /**
@@ -124,6 +142,13 @@ object NotifyRecipients {
                     (ChildrenTable.schoolId eq schoolId) and (ChildrenTable.isActive eq true)
                 }.filter { it[ChildrenTable.studentCode]?.trim() in wanted }
                     .map { it[ChildrenTable.parentId] }.distinct()
+            }
+
+            "ALUMNI" -> {
+                // Alumni notifications are resolved via alumniInSchool() directly
+                // by the caller, not through parentsForAudience. Return empty here
+                // — the announcement routing handles ALUMNI audience separately.
+                emptyList()
             }
 
             // ALL_SCHOOL / CUSTOM / unknown → whole-school parents.

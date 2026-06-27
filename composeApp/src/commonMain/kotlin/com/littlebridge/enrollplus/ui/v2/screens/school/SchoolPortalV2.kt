@@ -14,6 +14,9 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
 import com.littlebridge.enrollplus.feature.admin.presentation.MessagesViewModel
+import com.littlebridge.enrollplus.feature.alumni.domain.model.GraduateStudentsRequest
+import com.littlebridge.enrollplus.feature.alumni.domain.repository.AlumniRepository
+import com.littlebridge.enrollplus.core.prefs.PreferenceRepository
 import com.littlebridge.enrollplus.ui.v2.components.VBottomNav
 import com.littlebridge.enrollplus.ui.v2.components.VIcons
 import com.littlebridge.enrollplus.ui.v2.components.VNavItem
@@ -22,6 +25,10 @@ import com.littlebridge.enrollplus.ui.v2.navigation.DeepLinkTarget
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.screens.discovery.AcademicCalendarScreenV2
 import com.littlebridge.enrollplus.ui.v2.screens.notifications.NotificationsScreenV2
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays the admin portal can push above its tab content. */
@@ -51,6 +58,9 @@ private enum class SchoolOverlay {
     TeacherAssignments,
     Staff,
     HealthRecords,
+    Alumni,
+    AlumniDetail,
+    AlumniCampaign,
 }
 
 /**
@@ -78,6 +88,17 @@ fun SchoolPortalV2(
     var tab by remember { mutableStateOf("home") }
     var overlay by remember { mutableStateOf(SchoolOverlay.None) }
 
+    val scope = rememberCoroutineScope()
+    val alumniRepo = koinInject<AlumniRepository>()
+    val prefs = koinInject<PreferenceRepository>()
+
+    fun graduateStudents(studentIds: List<String>, year: Int) {
+        scope.launch {
+            val token = prefs.getUserToken().first() ?: return@launch
+            alumniRepo.graduateStudents(token, GraduateStudentsRequest(studentIds, year))
+        }
+    }
+
         // Apply deep-link routing: set tab from the typed target.
         LaunchedEffect(deepLinkTarget) {
             when (deepLinkTarget) {
@@ -93,6 +114,9 @@ fun SchoolPortalV2(
         // Health Records — student id + name carried into the health records overlay.
         var healthStudentId by remember { mutableStateOf<String?>(null) }
         var healthStudentName by remember { mutableStateOf<String?>(null) }
+        // Alumni Management — selected alumni/campaign IDs for detail overlays.
+        var selectedAlumniId by remember { mutableStateOf<String?>(null) }
+        var selectedCampaignId by remember { mutableStateOf<String?>(null) }
         // RA-S12 — the Comms badge counts message threads with unread messages
         // (GET /school/messages/threads), not a hardcoded literal.
         val messagesState by messagesViewModel.state.collectAsStateV2()
@@ -266,6 +290,35 @@ fun SchoolPortalV2(
                 )
                 return
             }
+            SchoolOverlay.Alumni -> {
+                AlumniScreen(
+                    onBack = { overlay = SchoolOverlay.None },
+                    onOpenAlumni = { id -> selectedAlumniId = id; overlay = SchoolOverlay.AlumniDetail },
+                    onOpenCampaign = { id -> selectedCampaignId = id; overlay = SchoolOverlay.AlumniCampaign },
+                    modifier = modifier,
+                )
+                return
+            }
+            SchoolOverlay.AlumniDetail -> {
+                val id = selectedAlumniId
+                if (id == null) { overlay = SchoolOverlay.None; return }
+                AlumniDetailScreen(
+                    alumniId = id,
+                    onBack = { overlay = SchoolOverlay.Alumni },
+                    modifier = modifier,
+                )
+                return
+            }
+            SchoolOverlay.AlumniCampaign -> {
+                val id = selectedCampaignId
+                if (id == null) { overlay = SchoolOverlay.None; return }
+                AlumniCampaignScreen(
+                    campaignId = id,
+                    onBack = { overlay = SchoolOverlay.Alumni },
+                    modifier = modifier,
+                )
+                return
+            }
             SchoolOverlay.None -> Unit
         }
 
@@ -283,7 +336,7 @@ fun SchoolPortalV2(
                 VBottomNav(items = items, selected = tab, onSelect = { tab = it })
             },
         ) { padding ->
-            Box(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())) {
+            Box(Modifier.fillMaxSize()) {
                 when (tab) {
                     "home" -> SchoolHomeScreenV2(
                         onOpenNotifications = { overlay = SchoolOverlay.Notifications },
@@ -310,6 +363,12 @@ fun SchoolPortalV2(
                         // RA-TAM — Teacher Listing entry point into the reusable module.
                         onAssignClasses = { id -> selectedTeacherId = id; overlay = SchoolOverlay.TeacherAssignments },
                         onOpenStaff = { id -> selectedStaffId = id; overlay = SchoolOverlay.Staff },
+                        // Alumni Management — opens the alumni directory overlay.
+                        onOpenAlumni = { overlay = SchoolOverlay.Alumni },
+                        // Mark students as alumni (graduation bulk action)
+                        onGraduateStudents = { studentIds, year ->
+                            graduateStudents(studentIds, year)
+                        },
                     )
                     "records" -> SchoolRecordsScreenV2()
                     "comms" -> SchoolCommsScreenV2(

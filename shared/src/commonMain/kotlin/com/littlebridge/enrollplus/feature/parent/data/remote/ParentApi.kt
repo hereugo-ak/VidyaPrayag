@@ -167,4 +167,20 @@ class ParentApi(
             client.get(getUrl("api/v1/parent/messages/recipients"))
         }
     }
+
+    // ── Parent Pulse (PARENT_PULSE_SPEC.md — weekly AI digest) ───────────────
+
+    suspend fun getLatestPulse(token: String, childId: String): NetworkResult<PulseResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/pulse/latest/$childId"))
+        }
+    }
+
+    suspend fun getPulseHistory(token: String, childId: String, weeks: Int = 12): NetworkResult<PulseHistoryResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/pulse/history/$childId")) {
+                url { parameters.append("weeks", weeks.toString()) }
+            }
+        }
+    }
 }

@@ -57,11 +57,13 @@ import com.littlebridge.enrollplus.db.DatabaseFactory
 import com.littlebridge.enrollplus.feature.admissions.admissionRouting
 import com.littlebridge.enrollplus.feature.announcements.announcementRouting
 import com.littlebridge.enrollplus.feature.auth.authRouting
+import com.littlebridge.enrollplus.feature.alumni.alumniRouting
 import com.littlebridge.enrollplus.feature.calendar.academicCalendarRouting
 import com.littlebridge.enrollplus.feature.calendar.academicYearRouting
 import com.littlebridge.enrollplus.feature.auth.otpAdminRouting
 import com.littlebridge.enrollplus.feature.config.appStatusRouting
 import com.littlebridge.enrollplus.feature.config.versionRouting
+import com.littlebridge.enrollplus.feature.devtools.devToolsRouting
 import com.littlebridge.enrollplus.feature.content.landingRouting
 import com.littlebridge.enrollplus.feature.content.supportRouting
 import com.littlebridge.enrollplus.feature.gateway.api.gatewayRouting
@@ -78,6 +80,8 @@ import com.littlebridge.enrollplus.feature.parent.parentLeaveRouting
 import com.littlebridge.enrollplus.feature.parent.parentLinkRouting
 import com.littlebridge.enrollplus.feature.parent.parentAcademicsRouting
 import com.littlebridge.enrollplus.feature.parent.trackProgressRouting
+import com.littlebridge.enrollplus.feature.pulse.pulseRouting
+import com.littlebridge.enrollplus.feature.pulse.PulseWeeklyJob
 import com.littlebridge.enrollplus.feature.school.adminDashboardRouting
 import com.littlebridge.enrollplus.feature.school.adminDashboardOverviewRouting
 import com.littlebridge.enrollplus.feature.school.leaveRequestsRouting
@@ -160,6 +164,9 @@ fun main() {
 
     // Start the notification scheduler (fee reminders, calendar reminders).
     NotificationScheduler.start(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default))
+
+    // Start the Parent Pulse weekly job (Sunday 6 PM IST pulse generation).
+    PulseWeeklyJob.start(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default))
 
     embeddedServer(
         Netty,
@@ -294,6 +301,7 @@ fun Application.module() {
         parentFeesRouting()          // /api/v1/parent/fees
         parentLeaveRouting()         // /api/v1/parent/leave — RA-44 parent applies/lists child leave (routes to class teacher)
         parentLinkRouting()          // /api/v1/parent/{schools/search, link-child} + /api/v1/school/link-requests{,/{id}/approve|reject} — RA-48 link approval workflow
+        pulseRouting()               // /api/v1/parent/pulse/{latest,history}/{childId} — weekly AI digest (PARENT_PULSE_SPEC)
 
         // School ecosystem (school_api_spec.artifact.md)
         schoolDashboardRouting()     // /api/v1/school/dashboard
@@ -343,10 +351,20 @@ fun Application.module() {
         //   /api/admin/notifications/send — school-admin broadcast via Firebase Admin SDK
         notificationRouting()
 
+        // Super-admin developer tools (OTP provider switch, pulse trigger, ad-hoc
+        // notification send). Guarded by requireSuperAdmin() inside the route.
+        devToolsRouting()
+
         // Student Health Records (HEALTH_RECORDS_SPEC.md — P1-12)
         //   /api/v1/school/health/{profiles,immunizations,incidents}  — admin/nurse
         //   /api/v1/teacher/health/alerts                              — teacher allergy alerts
         //   /api/v1/parent/health/{childId}                            — parent view
         healthRouting()
+
+        // Alumni Management (ALUMNI_MANAGEMENT_SPEC.md)
+        //   /api/v1/school/alumni/*  — admin endpoints (school context)
+        //   /api/v1/alumni/*         — alumni self-service (alumni context)
+        //   /api/v1/alumni/register  — public self-registration
+        alumniRouting()
     }
 }

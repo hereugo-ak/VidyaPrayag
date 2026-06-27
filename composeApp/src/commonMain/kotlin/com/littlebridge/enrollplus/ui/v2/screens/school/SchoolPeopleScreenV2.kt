@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -38,6 +40,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.littlebridge.enrollplus.feature.admin.domain.model.TeacherCardDto
+import com.littlebridge.enrollplus.feature.alumni.domain.model.GraduateStudentsRequest
+import com.littlebridge.enrollplus.feature.alumni.domain.repository.AlumniRepository
+import com.littlebridge.enrollplus.core.prefs.PreferenceRepository
 import com.littlebridge.enrollplus.feature.admin.presentation.RiskStudent
 import com.littlebridge.enrollplus.feature.admin.presentation.SchoolTeachersState
 import com.littlebridge.enrollplus.feature.admin.presentation.SchoolTeachersViewModel
@@ -92,6 +97,8 @@ fun SchoolPeopleScreenV2(
     // RA-TAM — overflow "Assign classes" opens the reusable assignment module.
     onAssignClasses: (String) -> Unit = {},
     onOpenStaff: (String) -> Unit = {},
+    onOpenAlumni: () -> Unit = {},
+    onGraduateStudents: (List<String>, Int) -> Unit = { _, _ -> },
     viewModel: StudentAnalyticsViewModel = koinViewModel(),
     teachersViewModel: SchoolTeachersViewModel = koinViewModel(),
     studentsViewModel: StudentRosterViewModel = koinViewModel(),
@@ -133,6 +140,8 @@ fun SchoolPeopleScreenV2(
         onOpenTeacher = onOpenTeacher,
         onAssignClasses = onAssignClasses,
         onOpenStaff = onOpenStaff,
+        onOpenAlumni = onOpenAlumni,
+        onGraduateStudents = onGraduateStudents,
         modifier = modifier,
     )
 }
@@ -161,6 +170,8 @@ private fun SchoolPeopleContent(
     onOpenTeacher: (String) -> Unit,
     onAssignClasses: (String) -> Unit,
     onOpenStaff: (String) -> Unit,
+    onOpenAlumni: () -> Unit,
+    onGraduateStudents: (List<String>, Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -203,7 +214,7 @@ private fun SchoolPeopleContent(
 
         // ── RA-S17: sub-tabs ─────────────────────────────────────────────────
         VTopTabs(
-            tabs = listOf("Teachers", "Students", "Non-teaching staff"),
+            tabs = listOf("Teachers", "Students", "Non-teaching staff", "Alumni"),
             selected = subTab,
             onSelect = { subTab = it },
         )
@@ -230,6 +241,7 @@ private fun SchoolPeopleContent(
                     onOpenStudent = onOpenStudent,
                     onAddClick = { showAddStudent = true },
                     onImportClick = { showImportStudents = true },
+                    onGraduateClick = { studentIds, year -> onGraduateStudents(studentIds, year) },
                     analyticsState = analyticsState,
                     onAnalyticsRetry = onAnalyticsRetry,
                 )
@@ -240,6 +252,15 @@ private fun SchoolPeopleContent(
                     onAddClick = { showAddStaff = true },
                     onOpenStaff = onOpenStaff,
                 )
+                "Alumni" -> {
+                    VActionCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        title = "Alumni Management",
+                        subtitle = "View alumni directory, donations, mentorship, and analytics",
+                        icon = VIcons.Users,
+                        onClick = onOpenAlumni,
+                    )
+                }
             }
         }
     }
@@ -623,6 +644,7 @@ private fun lastActiveLabel(iso: String?): String {
 
 // ───────────────────────── Students sub-tab ─────────────────────────
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun StudentsSubTab(
     state: StudentRosterState,
@@ -630,19 +652,29 @@ private fun StudentsSubTab(
     onOpenStudent: (String) -> Unit,
     onAddClick: () -> Unit,
     onImportClick: () -> Unit,
+    onGraduateClick: (List<String>, Int) -> Unit,
     analyticsState: StudentAnalyticsState,
     onAnalyticsRetry: () -> Unit,
 ) {
     val c = VTheme.colors
     var query by remember { mutableStateOf("") }
+    var showGraduate by remember { mutableStateOf(false) }
 
-    Row(
-        Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Students", style = VTheme.type.h3.colored(c.ink))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            VButton(
+                text = "Add student",
+                onClick = onAddClick,
+                variant = VButtonVariant.Secondary,
+                size = VButtonSize.Sm,
+                leading = { Icon(VIcons.Plus, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                enabled = !state.isSaving && !state.isImporting,
+            )
             VButton(
                 text = "Import CSV",
                 onClick = onImportClick,
@@ -652,12 +684,12 @@ private fun StudentsSubTab(
                 enabled = !state.isImporting && !state.isSaving,
             )
             VButton(
-                text = "Add student",
-                onClick = onAddClick,
-                variant = VButtonVariant.Secondary,
+                text = "Graduate",
+                onClick = { showGraduate = true },
+                variant = VButtonVariant.Ghost,
                 size = VButtonSize.Sm,
-                leading = { Icon(VIcons.Plus, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                enabled = !state.isSaving && !state.isImporting,
+                leading = { Icon(VIcons.Users, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                enabled = !state.isLoading && state.students.isNotEmpty(),
             )
         }
     }
@@ -782,6 +814,52 @@ private fun StudentsSubTab(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    // ── Graduation dialog ─────────────────────────────────────────────────
+    if (showGraduate) {
+        var gradYear by remember { mutableStateOf("") }
+        val currentYear = 2026
+        Dialog(onDismissRequest = { showGraduate = false }) {
+            VCard {
+                Text("Mark students as alumni", style = VTheme.type.h3.colored(c.ink))
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "This will mark ${filtered.size} filtered student(s) as graduated and create alumni records for them.",
+                    style = VTheme.type.body.colored(c.ink2),
+                )
+                Spacer(Modifier.height(16.dp))
+                VInput(
+                    value = gradYear,
+                    onValueChange = { gradYear = it.filter { ch -> ch.isDigit() }.take(4) },
+                    label = "Graduation year",
+                    placeholder = currentYear.toString(),
+                    keyboardType = KeyboardType.Number,
+                )
+                Spacer(Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    VButton(
+                        text = "Cancel",
+                        onClick = { showGraduate = false },
+                        variant = VButtonVariant.Ghost,
+                        size = VButtonSize.Sm,
+                        modifier = Modifier.weight(1f),
+                    )
+                    VButton(
+                        text = "Graduate",
+                        onClick = {
+                            val year = gradYear.toIntOrNull() ?: currentYear
+                            onGraduateClick(filtered.map { it.id }, year)
+                            showGraduate = false
+                        },
+                        variant = VButtonVariant.Primary,
+                        size = VButtonSize.Sm,
+                        modifier = Modifier.weight(1f),
+                        enabled = filtered.isNotEmpty(),
+                    )
                 }
             }
         }

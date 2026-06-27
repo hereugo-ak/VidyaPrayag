@@ -30,4 +30,7 @@ interface ParentRepository {
     suspend fun sendMessage(token: String, request: ParentSendMessageRequest): NetworkResult<ParentSendMessageResponse>
     // RA-S07: compose-new — who the parent can start a conversation with.
     suspend fun getMessageRecipients(token: String): NetworkResult<ParentRecipientsResponse>
+    // Parent Pulse (PARENT_PULSE_SPEC.md — weekly AI digest).
+    suspend fun getLatestPulse(token: String, childId: String): NetworkResult<PulseResponse>
+    suspend fun getPulseHistory(token: String, childId: String, weeks: Int = 12): NetworkResult<PulseHistoryResponse>
 }

@@ -132,7 +132,8 @@ private fun ParentAcademicsContent(
             }
             .verticalScroll(rememberScrollState())
             // Breathing room under the last card (EI) so it never sits flush against the nav.
-            .padding(bottom = 28.dp),
+            .padding(bottom = 28.dp)
+            .padding(bottom = 130.dp),
     ) {
         Text(
             "Academics",

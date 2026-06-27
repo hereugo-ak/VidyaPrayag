@@ -37,12 +37,15 @@
  */
 package com.littlebridge.enrollplus.feature.auth.delivery
 
+import com.littlebridge.enrollplus.db.AppConfigTable
+import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.feature.auth.delivery.providers.ConsoleProvider
 import com.littlebridge.enrollplus.feature.auth.delivery.providers.Fast2SmsProvider
 import com.littlebridge.enrollplus.feature.auth.delivery.providers.Msg91Provider
 import com.littlebridge.enrollplus.feature.auth.delivery.providers.SmtpEmailProvider
 import com.littlebridge.enrollplus.feature.auth.delivery.providers.TwilioProvider
 import com.littlebridge.enrollplus.feature.auth.delivery.providers.WhatsAppCloudProvider
+import org.jetbrains.exposed.sql.selectAll
 import org.slf4j.LoggerFactory
 
 object OtpDeliveryDispatcher {
@@ -63,7 +66,8 @@ object OtpDeliveryDispatcher {
      * Run the chain. Returns a [DispatchOutcome] describing every attempt.
      */
     suspend fun dispatch(request: OtpDeliveryRequest): DispatchOutcome {
-        val chain = buildProviderChain(request)
+        val runtimeOverride = readRuntimeProviderOverride()
+        val chain = buildProviderChain(request, runtimeOverride)
         val attempts = mutableListOf<OtpDeliveryResult>()
 
         if (chain.isEmpty()) {
@@ -126,10 +130,26 @@ object OtpDeliveryDispatcher {
         )
     }
 
+    /**
+     * Read a runtime OTP provider override from app_config (set by super admin
+     * dev tools). Returns null when no override is stored, so the env var chain
+     * is used as the fallback.
+     */
+    private suspend fun readRuntimeProviderOverride(): String? = dbQuery {
+        AppConfigTable.selectAll()
+            .where { AppConfigTable.key eq "otp_provider_override" }
+            .singleOrNull()
+            ?.get(AppConfigTable.value)
+            ?.takeIf { it.isNotBlank() }
+    }
+
     /** Build the per-request chain honouring all env-driven overrides. */
-    internal fun buildProviderChain(request: OtpDeliveryRequest): List<OtpProvider> {
-        // ---- Highest priority: hard pin via OTP_PROVIDER ----
-        val pinned = OtpEnv.get("OTP_PROVIDER")?.lowercase()
+    internal fun buildProviderChain(
+        request: OtpDeliveryRequest,
+        runtimeOverride: String? = null,
+    ): List<OtpProvider> {
+        // ---- Highest priority: runtime override from app_config (super admin dev tools) ----
+        val pinned = (runtimeOverride ?: OtpEnv.get("OTP_PROVIDER"))?.lowercase()
         if (!pinned.isNullOrBlank() && pinned !in setOf("auto", "chain", "default")) {
             knownProviders.firstOrNull { it.name.equals(pinned, ignoreCase = true) }
                 ?.let { return listOf(it) }

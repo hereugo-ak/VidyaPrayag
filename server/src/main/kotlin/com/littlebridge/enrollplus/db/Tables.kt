@@ -238,6 +238,13 @@ object SchoolsTable : UUIDTable("schools", "id") {
     // cleanly distinguishes a registration placeholder from genuine step
     // completion. NULL/empty for a freshly-registered school → resume at BASIC.
     val onboardingStepsDone = text("onboarding_steps_done").nullable()
+    // Alumni self-registration lookup (ALUMNI_MANAGEMENT_SPEC.md §20.9 D1)
+    val schoolCode          = varchar("school_code", 20).nullable()
+    // 80G donation receipt fields (ALUMNI_MANAGEMENT_SPEC.md §6.1)
+    val panNumber           = varchar("pan_number", 20).nullable()
+    val g80RegistrationNumber = varchar("g80_registration_number", 50).nullable()
+    val g80ValidityDate     = date("g80_validity_date").nullable()
+    val g80CertificateUrl   = text("g80_certificate_url").nullable()
     val createdAt      = timestamp("created_at")
     val updatedAt      = timestamp("updated_at")
 }
@@ -573,7 +580,7 @@ object EnrollmentsTable : UUIDTable("enrollments", "id") {
     val classId    = uuid("class_id")                   // FK school_classes.id
     val section    = varchar("section", 8).default("A")
     val rollNumber = integer("roll_number").nullable()
-    val status     = varchar("status", 16).default("active") // active|transferred|withdrawn
+    val status     = varchar("status", 16).default("active") // active|transferred|withdrawn|graduated
     val startDate  = date("start_date")
     val endDate    = date("end_date").nullable()        // transfers/withdrawals (Doc 06 E4/E5)
     val createdAt  = timestamp("created_at")
@@ -1595,7 +1602,7 @@ object CalendarEventsTable : UUIDTable("calendar_events", "id") {
     val allDay          = bool("all_day").default(true)
     val bannerUrl       = text("banner_url").nullable()
     val icon            = text("icon").nullable()
-    // audience: ALL_SCHOOL | GRADES | CLASSES | SECTIONS | TEACHERS | PARENTS | STUDENTS
+    // audience: ALL_SCHOOL | GRADES | CLASSES | SECTIONS | TEACHERS | PARENTS | STUDENTS | ALUMNI
     val audience        = varchar("audience", 16).default("ALL_SCHOOL")
     val classIds        = text("class_ids").nullable()          // JSON array (string) of class/grade ids
     val sectionIds      = text("section_ids").nullable()        // JSON array (string) of section ids
@@ -1877,5 +1884,244 @@ object StudentHealthIncidentsTable : UUIDTable("student_health_incidents", "id")
 
     init {
         index("idx_health_incidents_student", false, studentId, date)
+    }
+}
+
+// =====================================================================
+// parent_pulses  (PARENT_PULSE_SPEC.md — weekly AI digest for parents)
+//
+//   One row per (parent, student, week). Generated every Sunday 6 PM IST
+//   by PulseWeeklyJob. Stores the aggregated weekly snapshot + a
+//   narrative summary (AI-generated when available, template-based
+//   fallback otherwise). The UNIQUE constraint prevents duplicate
+//   pulses for the same (parent, student, week_start_date) triple.
+// =====================================================================
+object ParentPulsesTable : UUIDTable("parent_pulses", "id") {
+    val schoolId            = uuid("school_id")
+    val parentId            = uuid("parent_id")
+    val studentId           = uuid("student_id")          // FK students.id
+    val studentName         = text("student_name")
+    val weekStartDate       = date("week_start_date")
+    val weekEndDate         = date("week_end_date")
+    val attendancePercentage = double("attendance_percentage").nullable()
+    val attendanceTrend     = varchar("attendance_trend", 8).nullable()   // up | down | stable
+    val marksSummary        = text("marks_summary").nullable()            // JSON array
+    val homeworkPending     = integer("homework_pending").default(0)
+    val homeworkCompleted   = integer("homework_completed").default(0)
+    val announcementsCount  = integer("announcements_count").default(0)
+    val unreadMessages      = integer("unread_messages").default(0)
+    val upcomingEvents      = text("upcoming_events").nullable()          // JSON array
+    val aiNarrative         = text("ai_narrative")
+    val actionableItems     = text("actionable_items").nullable()         // JSON array
+    val modelUsed           = varchar("model_used", 64).nullable()
+    val tokensUsed          = integer("tokens_used").nullable()
+    val createdAt           = timestamp("created_at")
+
+    init {
+        uniqueIndex("ux_parent_pulses_parent_student_week", parentId, studentId, weekStartDate)
+        index("idx_parent_pulses_parent", false, parentId, weekStartDate)
+    }
+}
+
+// =====================================================================
+// alumni  (ALUMNI_MANAGEMENT_SPEC.md — alumni directory & engagement)
+//
+//   Core alumni records for graduated students. Linked to app_users via
+//   user_id (for auth + notifications) and optionally to students via
+//   student_id (for SIS verification). Includes privacy controls (DPDP Act
+//   2023), verification status for self-registration, and engagement
+//   tracking.
+//
+//   Applied by docs/db/migration_052_alumni_management.sql (must run before
+//   deploy; AUTO_CREATE_TABLES is OFF in prod).
+// =====================================================================
+object AlumniTable : UUIDTable("alumni", "id") {
+    val schoolId           = uuid("school_id")                    // FK schools.id — tenant scope
+    val studentId          = uuid("student_id").nullable()        // FK students.id — if linked to former student
+    val userId             = uuid("user_id").nullable()           // FK app_users.id — for auth + notifications
+    val name               = text("name")
+    val graduationYear     = integer("graduation_year")
+    val lastClass          = text("last_class").nullable()
+    val currentProfession  = text("current_profession").nullable()
+    val company            = text("company").nullable()
+    val city               = text("city").nullable()
+    val email              = text("email").nullable()
+    val phone              = varchar("phone", 32).nullable()
+    val linkedinUrl        = text("linkedin_url").nullable()
+    val photoUrl           = text("photo_url").nullable()
+    val skills             = text("skills").nullable()            // comma-separated
+    val achievements       = text("achievements").nullable()
+    val isMentor           = bool("is_mentor").default(false)
+    val mentorExpertise    = text("mentor_expertise").nullable()
+    val isFeatured         = bool("is_featured").default(false)
+    // Verification (SIS-matched self-registration)
+    val verificationStatus = varchar("verification_status", 16).default("approved") // approved | pending | declined
+    val verifiedAt         = timestamp("verified_at").nullable()
+    val verifiedBy         = uuid("verified_by").nullable()       // FK app_users.id — admin who approved
+    // Privacy controls (DPDP Act 2023)
+    val showPhone          = bool("show_phone").default(false)
+    val showEmail          = bool("show_email").default(false)
+    val showLinkedin       = bool("show_linkedin").default(true)
+    val visibilityLevel    = varchar("visibility_level", 16).default("batch") // public | batch | private
+    // Engagement
+    val lastActiveAt       = timestamp("last_active_at").nullable()
+    val isActive           = bool("is_active").default(true)
+    val createdAt          = timestamp("created_at")
+    val updatedAt          = timestamp("updated_at")
+
+    init {
+        index("idx_alumni_school_year", false, schoolId, graduationYear)
+        index("idx_alumni_user_id", false, userId)
+        index("idx_alumni_verification", false, schoolId, verificationStatus)
+        index("idx_alumni_featured", false, schoolId, isFeatured)
+    }
+}
+
+// =====================================================================
+// alumni_donation_campaigns  (ALUMNI_MANAGEMENT_SPEC.md — donation campaigns)
+//
+//   School-scoped campaigns with target amounts, progress tracking, and
+//   optional batch-year targeting. amount_raised is a cache updated on each
+//   donation to avoid expensive aggregate queries.
+// =====================================================================
+object AlumniDonationCampaignsTable : UUIDTable("alumni_donation_campaigns", "id") {
+    val schoolId         = uuid("school_id")
+    val title            = text("title")
+    val description      = text("description").nullable()
+    val cause            = text("cause").nullable()
+    val targetAmount     = double("target_amount")
+    val amountRaised     = double("amount_raised").default(0.0)
+    val targetBatchYear  = integer("target_batch_year").nullable()
+    val startDate        = date("start_date")
+    val endDate          = date("end_date").nullable()
+    val status           = varchar("status", 16).default("active") // active | closed | paused
+    val isActive         = bool("is_active").default(true)
+    val createdAt        = timestamp("created_at")
+    val updatedAt        = timestamp("updated_at")
+
+    init {
+        index("idx_alumni_campaigns_school", false, schoolId, status)
+    }
+}
+
+// =====================================================================
+// alumni_donations  (ALUMNI_MANAGEMENT_SPEC.md — donation tracking + 80G)
+//
+//   Individual donation records with 80G-compliant receipt fields.
+//   receipt_number is auto-generated (SCH-80G-YYYY-NNNNN) and unique.
+//   is_80g_eligible is set based on whether the school has a valid 80G
+//   certificate at the time of donation.
+// =====================================================================
+object AlumniDonationsTable : UUIDTable("alumni_donations", "id") {
+    val schoolId         = uuid("school_id")
+    val alumniId         = uuid("alumni_id")                     // FK alumni.id — ON DELETE CASCADE
+    val campaignId       = uuid("campaign_id").nullable()        // FK alumni_donation_campaigns.id
+    val amount           = double("amount")
+    val purpose          = text("purpose").nullable()
+    val donationDate     = date("donation_date")
+    val paymentMode      = varchar("payment_mode", 16).nullable() // upi | bank_transfer | cheque | cash | card
+    val referenceNumber  = text("reference_number").nullable()
+    // 80G receipt fields
+    val receiptNumber    = text("receipt_number").nullable()     // auto-generated: SCH-80G-2026-00001
+    val receiptIssued    = bool("receipt_issued").default(false)
+    val is80gEligible    = bool("is_80g_eligible").default(false)
+    val createdAt        = timestamp("created_at")
+    val updatedAt        = timestamp("updated_at")
+
+    init {
+        index("idx_alumni_donations_school", false, schoolId, donationDate)
+        index("idx_alumni_donations_alumni", false, alumniId)
+        index("idx_alumni_donations_campaign", false, campaignId)
+    }
+}
+
+// =====================================================================
+// alumni_mentorship_requests  (ALUMNI_MANAGEMENT_SPEC.md — student-initiated)
+//
+//   Student (via parent/teacher) requests mentorship from an alumni.
+//   Two-way flow: alumni accept/decline. Admin can override.
+// =====================================================================
+object AlumniMentorshipRequestsTable : UUIDTable("alumni_mentorship_requests", "id") {
+    val schoolId         = uuid("school_id")
+    val alumniId         = uuid("alumni_id")                     // FK alumni.id — ON DELETE CASCADE
+    val studentId        = uuid("student_id")                    // FK students.id
+    val requestedBy      = uuid("requested_by")                  // FK app_users.id — parent or teacher
+    val expertiseArea    = text("expertise_area").nullable()
+    val message          = text("message").nullable()
+    val status           = varchar("status", 16).default("pending") // pending | accepted | declined | expired
+    val respondedAt      = timestamp("responded_at").nullable()
+    val createdAt        = timestamp("created_at")
+    val updatedAt        = timestamp("updated_at")
+
+    init {
+        index("idx_alumni_mentor_req_school", false, schoolId, status)
+        index("idx_alumni_mentor_req_alumni", false, alumniId, status)
+    }
+}
+
+// =====================================================================
+// alumni_mentorships  (ALUMNI_MANAGEMENT_SPEC.md — active relationships)
+//
+//   Active mentorship relationships between alumni and students.
+//   Can be created from a request (request_id) or directly by admin.
+// =====================================================================
+object AlumniMentorshipsTable : UUIDTable("alumni_mentorships", "id") {
+    val schoolId         = uuid("school_id")
+    val alumniId         = uuid("alumni_id")                     // FK alumni.id — ON DELETE CASCADE
+    val studentId        = uuid("student_id")                    // FK students.id
+    val requestId        = uuid("request_id").nullable()         // FK alumni_mentorship_requests.id
+    val status           = varchar("status", 16).default("active") // active | ended
+    val startDate        = date("start_date")
+    val endDate          = date("end_date").nullable()
+    val notes            = text("notes").nullable()
+    val sessionCount     = integer("session_count").default(0)
+    val createdAt        = timestamp("created_at")
+    val updatedAt        = timestamp("updated_at")
+
+    init {
+        index("idx_alumni_mentorships_school", false, schoolId, status)
+        index("idx_alumni_mentorships_alumni", false, alumniId)
+    }
+}
+
+// =====================================================================
+// alumni_career_history  (ALUMNI_MANAGEMENT_SPEC.md — career progression)
+//
+//   Employment history with timestamps. Alumni update own career info via
+//   self-service. is_current flags the latest job.
+// =====================================================================
+object AlumniCareerHistoryTable : UUIDTable("alumni_career_history", "id") {
+    val alumniId         = uuid("alumni_id")                     // FK alumni.id — ON DELETE CASCADE
+    val jobTitle         = text("job_title")
+    val company          = text("company")
+    val industry         = text("industry").nullable()
+    val startDate        = date("start_date").nullable()
+    val endDate          = date("end_date").nullable()
+    val isCurrent        = bool("is_current").default(false)
+    val createdAt        = timestamp("created_at")
+
+    init {
+        index("idx_alumni_career_alumni", false, alumniId, isCurrent)
+    }
+}
+
+// =====================================================================
+// alumni_mentorship_settings  (ALUMNI_MANAGEMENT_SPEC.md — admin config)
+//
+//   Per-school mentorship configuration. Admin can set which classes are
+//   eligible, max mentees per alumni, and whether approval is required.
+//   One row per school (UNIQUE on school_id).
+// =====================================================================
+object AlumniMentorshipSettingsTable : UUIDTable("alumni_mentorship_settings", "id") {
+    val schoolId                 = uuid("school_id")
+    val enabled                  = bool("enabled").default(true)
+    val eligibleClassIds         = text("eligible_class_ids").nullable()  // JSON array of UUIDs
+    val maxMenteesPerAlumni      = integer("max_mentees_per_alumni").default(5)
+    val requestApprovalRequired  = bool("request_approval_required").default(true)
+    val createdAt                = timestamp("created_at")
+    val updatedAt                = timestamp("updated_at")
+
+    init {
+        uniqueIndex("ux_alumni_mentorship_settings_school", schoolId)
     }
 }

@@ -147,6 +147,13 @@ dependencies {
     // -----------------------------------------------------------------
     implementation(libs.firebase.admin)
 
+    // -----------------------------------------------------------------
+    // OpenPDF — lightweight PDF generation for 80G-compliant donation
+    // receipts (ALUMNI_MANAGEMENT_SPEC.md §B4). MIT-licensed, pure-Java,
+    // no native dependencies. Used by AlumniReceiptService.kt.
+    // -----------------------------------------------------------------
+    implementation("com.github.librepdf:openpdf:2.0.3")
+
     testImplementation(libs.ktor.serverTestHost)
     testImplementation(libs.kotlin.testJunit)
 }

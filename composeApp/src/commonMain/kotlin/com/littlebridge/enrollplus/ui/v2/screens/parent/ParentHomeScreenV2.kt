@@ -90,6 +90,7 @@ fun ParentHomeScreenV2(
     onOpenNotifications: () -> Unit = {},
     onOpenFees: () -> Unit = {},
     onOpenAcademics: () -> Unit = {},
+    onOpenPulse: () -> Unit = {},
     viewModel: ParentDashboardViewModel = koinViewModel(),
     permissionVm: PermissionViewModel = koinViewModel(),
 ) {
@@ -123,6 +124,7 @@ fun ParentHomeScreenV2(
         onRetry = viewModel::load,
         onOpenFees = onOpenFees,
         onOpenAcademics = onOpenAcademics,
+        onOpenPulse = onOpenPulse,
         modifier = modifier,
     )
 
@@ -146,6 +148,7 @@ private fun ParentDashboardContent(
     onRetry: () -> Unit,
     onOpenFees: () -> Unit,
     onOpenAcademics: () -> Unit,
+    onOpenPulse: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -169,7 +172,8 @@ private fun ParentDashboardContent(
                         radius = size.width * 0.9f,
                     ),
                 )
-            },
+            }
+            .padding(bottom = 130.dp),
     ) {
         // CRITICAL LAYOUT FIX (root cause of the "cards crammed at the top, ~70% empty space" bug):
         // the dashboard body used to live inside VStateHost, whose loading leg drives an
@@ -239,6 +243,9 @@ private fun ParentDashboardContent(
                     if (state.alerts.isNotEmpty()) {
                         AlertStrip(alerts = state.alerts)
                     }
+
+                    // ── Weekly Pulse entry point ────────────────────────────────────
+                    PulseEntryButton(onOpenPulse = onOpenPulse)
 
                     // ── Attendance card (primary feature) ────────────────────────────
                     ParentAttendanceCard(
@@ -551,4 +558,60 @@ private fun contextLineFor(state: ParentDashboardState): String {
         AttendanceDayState.NoData -> "Here's $firstName's day at a glance."
     }
     return "Good $partOfDay. $tail"
+}
+
+/**
+ * PulseEntryButton — a compact, tappable card on the Home screen that opens
+ * the full Parent Pulse overlay. Shows a heartbeat icon + label.
+ */
+@Composable
+private fun PulseEntryButton(onOpenPulse: () -> Unit) {
+    val c = VTheme.colors
+    com.littlebridge.enrollplus.ui.v2.components.VCard(
+        modifier = Modifier.fillMaxWidth(),
+        padding = 14.dp,
+        onClick = onOpenPulse,
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Box(
+                    Modifier
+                        .size(36.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(c.accent.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        VIcons.Activity,
+                        contentDescription = null,
+                        tint = c.accent,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                Column {
+                    Text(
+                        "Weekly Pulse",
+                        style = VTheme.type.h4.colored(c.ink).copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
+                    )
+                    Text(
+                        "Your child's week at a glance",
+                        style = VTheme.type.label.colored(c.ink3).copy(fontSize = 11.sp),
+                    )
+                }
+            }
+            Icon(
+                VIcons.ChevronRight,
+                contentDescription = null,
+                tint = c.ink3,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
 }

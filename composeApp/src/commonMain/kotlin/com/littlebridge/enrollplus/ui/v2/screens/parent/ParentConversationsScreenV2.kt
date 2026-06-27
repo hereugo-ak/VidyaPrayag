@@ -88,7 +88,8 @@ fun ParentConversationsScreenV2(
             .imePadding()
             .navigationBarsPadding()
             .padding(horizontal = 20.dp)
-            .padding(top = 12.dp),
+            .padding(top = 12.dp)
+            .padding(bottom = 130.dp),
     ) {
         Text(
             "Conversations",

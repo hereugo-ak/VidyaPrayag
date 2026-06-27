@@ -87,4 +87,12 @@ class ParentRepositoryImpl(
     override suspend fun getMessageRecipients(token: String): NetworkResult<ParentRecipientsResponse> {
         return api.getMessageRecipients(token)
     }
+
+    override suspend fun getLatestPulse(token: String, childId: String): NetworkResult<PulseResponse> {
+        return api.getLatestPulse(token, childId)
+    }
+
+    override suspend fun getPulseHistory(token: String, childId: String, weeks: Int): NetworkResult<PulseHistoryResponse> {
+        return api.getPulseHistory(token, childId, weeks)
+    }
 }

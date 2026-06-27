@@ -23,6 +23,7 @@
 package com.littlebridge.enrollplus.feature.school
 
 import com.littlebridge.enrollplus.db.AppUsersTable
+import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.db.ConversationSeqTable
 import com.littlebridge.enrollplus.db.MessageAttachmentsTable
 import com.littlebridge.enrollplus.db.MessageStatusTable
@@ -553,7 +554,7 @@ internal suspend fun notifyMessageRecipient(
     body: String,
 ) {
     if (recipientId == null || recipientId == actorId) return
-    val recipient = resolveMessagingUser(recipientId)
+    val recipient = dbQuery { resolveMessagingUser(recipientId) }
     val deepLink = when (recipient?.role) {
         "parent" -> "parent/messages"
         "teacher" -> "teacher/messages"

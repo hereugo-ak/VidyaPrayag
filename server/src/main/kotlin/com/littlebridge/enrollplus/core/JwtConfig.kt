@@ -14,7 +14,7 @@
  *
  * Token claims:
  *   - sub        : userId (UUID string)
- *   - role       : ADMIN | PARENT | TEACHER
+ *   - role       : ADMIN | PARENT | TEACHER | ALUMNI
  *   - name       : display name (convenience)
  *
  * Used by:

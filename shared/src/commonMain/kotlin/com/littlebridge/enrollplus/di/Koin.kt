@@ -378,6 +378,17 @@ val commonModule = module {
         com.littlebridge.enrollplus.feature.health.data.repository.HealthRepositoryImpl(get())
     }
 
+    // Alumni Management (ALUMNI_MANAGEMENT_SPEC.md)
+    single {
+        com.littlebridge.enrollplus.feature.alumni.data.remote.AlumniApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single<com.littlebridge.enrollplus.feature.alumni.domain.repository.AlumniRepository> {
+        com.littlebridge.enrollplus.feature.alumni.data.repository.AlumniRepositoryImpl(get())
+    }
+
     // UseCases
     factory { GetSchoolsUseCase(get()) }
 }
@@ -415,6 +426,7 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.parent.presentation.ParentDashboardViewModel(get(), get(), get()) }
     factory { com.littlebridge.enrollplus.feature.parent.presentation.ParentLeaveViewModel(get(), get(), get()) }
     factory { com.littlebridge.enrollplus.feature.parent.presentation.ParentMessageViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.parent.presentation.ParentPulseViewModel(get(), get(), get()) }
     factory { SchoolDashboardViewModel(get(), get(), get()) }
     factory { InstitutionalBasicOBViewModel(get(), get()) }
     factory { BrandingInfoOBViewModel(get(), get(), get()) }
@@ -480,6 +492,8 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.health.presentation.AdminHealthViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.health.presentation.TeacherHealthAlertsViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.health.presentation.ParentHealthViewModel(get(), get()) }
+    // Alumni Management (ALUMNI_MANAGEMENT_SPEC.md)
+    factory { com.littlebridge.enrollplus.feature.alumni.presentation.AlumniViewModel(get(), get()) }
 }
 
 fun initKoin(

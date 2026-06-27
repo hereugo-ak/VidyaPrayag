@@ -107,7 +107,7 @@ data class CreateAnnouncementDto(
 
 /** Audience scopes a broadcast can target. */
 private val VALID_AUDIENCE_TYPES = setOf(
-    "ALL_SCHOOL", "CLASS", "SECTION", "SUBJECT", "STUDENT", "CUSTOM"
+    "ALL_SCHOOL", "CLASS", "SECTION", "SUBJECT", "STUDENT", "CUSTOM", "ALUMNI"
 )
 
 @Serializable
