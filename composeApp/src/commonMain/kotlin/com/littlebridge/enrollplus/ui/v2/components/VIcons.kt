@@ -391,6 +391,39 @@ object VIcons {
             moveTo(17f, 6f); lineTo(23f, 6f); lineTo(23f, 12f)
         }
     }
+
+    /** TrendingDown (lucide) — falling line + arrow. */
+    val TrendingDown: ImageVector by lazy {
+        materialStroke("v_trending_down") {
+            moveTo(23f, 18f); lineTo(13.5f, 8.5f); lineTo(8.5f, 13.5f); lineTo(1f, 6f)
+            moveTo(17f, 18f); lineTo(23f, 18f); lineTo(23f, 12f)
+        }
+    }
+
+    /** Activity / pulse (lucide) — heartbeat line. */
+    val Activity: ImageVector by lazy {
+        materialStroke("v_activity") {
+            moveTo(22f, 12f); lineTo(18f, 12f); lineTo(15f, 21f); lineTo(9f, 3f); lineTo(6f, 12f); lineTo(2f, 12f)
+        }
+    }
+
+    /** History / clock-back (lucide) — clock with counter-clockwise arrow. */
+    val History: ImageVector by lazy {
+        materialStroke("v_history") {
+            moveTo(3f, 3f); lineTo(3f, 9f); lineTo(9f, 9f)
+            moveTo(3.51f, 9f); curveTo(5.02f, 4.93f, 8.93f, 2f, 13.5f, 2f)
+            curveTo(19.3f, 2f, 24f, 6.7f, 24f, 12f); curveTo(24f, 17.3f, 19.3f, 22f, 13.5f, 22f)
+            curveTo(8.7f, 22f, 4f, 17.3f, 4f, 12f); lineTo(4f, 9f)
+            moveTo(12f, 7f); lineTo(12f, 12f); lineTo(15f, 14f)
+        }
+    }
+
+    /** Minus (lucide) — horizontal line. */
+    val Minus: ImageVector by lazy {
+        materialStroke("v_minus") {
+            moveTo(5f, 12f); lineTo(19f, 12f)
+        }
+    }
 }
 
 // ── Builders ───────────────────────────────────────────────────────────────────

@@ -381,3 +381,27 @@ export interface OnboardingStatusResponse {
   total_step_count: number;
   steps: { step: string; current_step_count: number; is_done: boolean }[];
 }
+
+// ── Dev Tools (super_admin only) ─────────────────────────────────────────────
+export interface OtpProviderInfo {
+  name: string;
+  channel: string;
+  configured: boolean;
+}
+export interface OtpProvidersResponse {
+  providers: OtpProviderInfo[];
+  envPinnedProvider: string;
+  runtimeOverride: string | null;
+  effectiveProvider: string;
+}
+export interface UpdateOtpProviderResponse {
+  provider: string;
+  isOverride: boolean;
+}
+export interface TriggerPulseResponse {
+  weekStart: string;
+  pulsesGenerated: number;
+}
+export interface DevSendNotificationResponse {
+  sent: boolean;
+}

@@ -1879,3 +1879,39 @@ object StudentHealthIncidentsTable : UUIDTable("student_health_incidents", "id")
         index("idx_health_incidents_student", false, studentId, date)
     }
 }
+
+// =====================================================================
+// parent_pulses  (PARENT_PULSE_SPEC.md — weekly AI digest for parents)
+//
+//   One row per (parent, student, week). Generated every Sunday 6 PM IST
+//   by PulseWeeklyJob. Stores the aggregated weekly snapshot + a
+//   narrative summary (AI-generated when available, template-based
+//   fallback otherwise). The UNIQUE constraint prevents duplicate
+//   pulses for the same (parent, student, week_start_date) triple.
+// =====================================================================
+object ParentPulsesTable : UUIDTable("parent_pulses", "id") {
+    val schoolId            = uuid("school_id")
+    val parentId            = uuid("parent_id")
+    val studentId           = uuid("student_id")          // FK students.id
+    val studentName         = text("student_name")
+    val weekStartDate       = date("week_start_date")
+    val weekEndDate         = date("week_end_date")
+    val attendancePercentage = double("attendance_percentage").nullable()
+    val attendanceTrend     = varchar("attendance_trend", 8).nullable()   // up | down | stable
+    val marksSummary        = text("marks_summary").nullable()            // JSON array
+    val homeworkPending     = integer("homework_pending").default(0)
+    val homeworkCompleted   = integer("homework_completed").default(0)
+    val announcementsCount  = integer("announcements_count").default(0)
+    val unreadMessages      = integer("unread_messages").default(0)
+    val upcomingEvents      = text("upcoming_events").nullable()          // JSON array
+    val aiNarrative         = text("ai_narrative")
+    val actionableItems     = text("actionable_items").nullable()         // JSON array
+    val modelUsed           = varchar("model_used", 64).nullable()
+    val tokensUsed          = integer("tokens_used").nullable()
+    val createdAt           = timestamp("created_at")
+
+    init {
+        uniqueIndex("ux_parent_pulses_parent_student_week", parentId, studentId, weekStartDate)
+        index("idx_parent_pulses_parent", false, parentId, weekStartDate)
+    }
+}

@@ -41,6 +41,10 @@ import type {
   TimetableDto,
   CalendarResponse,
   AttendanceDailyResponse,
+  OtpProvidersResponse,
+  UpdateOtpProviderResponse,
+  TriggerPulseResponse,
+  DevSendNotificationResponse,
 } from "./types";
 
 interface Opts {
@@ -242,4 +246,13 @@ export const adminApi = {
   schoolProfile: () => authRequest<SchoolProfileDto>("/api/v1/school/profile"),
   updateSchoolProfile: (body: UpdateSchoolProfileRequest) =>
     authRequest<SchoolProfileDto>("/api/v1/school/profile", { method: "PUT", body }),
+
+  // dev tools (super_admin only)
+  otpProviders: () => authRequest<OtpProvidersResponse>("/api/v1/admin/dev/otp-providers"),
+  updateOtpProvider: (provider: string) =>
+    authRequest<UpdateOtpProviderResponse>("/api/v1/admin/dev/otp-provider", { method: "PUT", body: { provider } }),
+  triggerPulse: () =>
+    authRequest<TriggerPulseResponse>("/api/v1/admin/dev/trigger-pulse", { method: "POST" }),
+  devSendNotification: (body: { user_id: string; title: string; body: string; deep_link?: string; category?: string; school_id?: string }) =>
+    authRequest<DevSendNotificationResponse>("/api/v1/admin/dev/send-notification", { method: "POST", body }),
 };

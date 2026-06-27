@@ -92,7 +92,7 @@ export function Sidebar() {
             collapsed ? "flex flex-col items-center gap-2 px-0" : "space-y-1 px-3"
           }`}
         >
-          {ADMIN_NAV.map((item) => {
+          {ADMIN_NAV.filter((item) => !item.superAdminOnly || session?.role === "super_admin").map((item) => {
             const active =
               pathname === item.href || pathname.startsWith(item.href + "/");
             const Icon = item.icon;

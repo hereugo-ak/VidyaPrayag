@@ -415,6 +415,7 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.parent.presentation.ParentDashboardViewModel(get(), get(), get()) }
     factory { com.littlebridge.enrollplus.feature.parent.presentation.ParentLeaveViewModel(get(), get(), get()) }
     factory { com.littlebridge.enrollplus.feature.parent.presentation.ParentMessageViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.parent.presentation.ParentPulseViewModel(get(), get(), get()) }
     factory { SchoolDashboardViewModel(get(), get(), get()) }
     factory { InstitutionalBasicOBViewModel(get(), get()) }
     factory { BrandingInfoOBViewModel(get(), get(), get()) }

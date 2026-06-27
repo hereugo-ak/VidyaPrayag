@@ -7,12 +7,14 @@ import {
   IconMarks,
   IconPeople,
   IconSettings,
+  IconBolt,
 } from "@/components/admin/icons";
 
 export interface NavItem {
   href: string;
   label: string;
   icon: (p: { className?: string }) => JSX.Element;
+  superAdminOnly?: boolean;
 }
 
 /** Single source of truth for the admin sidebar + route map. */
@@ -25,4 +27,5 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/announcements", label: "Announcements", icon: IconAnnounce },
   { href: "/admin/leave", label: "Leave", icon: IconLeave },
   { href: "/admin/settings", label: "Settings", icon: IconSettings },
+  { href: "/admin/dev-tools", label: "Dev Tools", icon: IconBolt, superAdminOnly: true },
 ];

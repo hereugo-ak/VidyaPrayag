@@ -9,7 +9,7 @@ import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { SidebarProvider, useSidebar } from "./SidebarContext";
 
-const SCHOOL_ROLES = new Set(["school_admin", "school_staff", "admin"]);
+const SCHOOL_ROLES = new Set(["school_admin", "school_staff", "admin", "super_admin"]);
 
 function titleForPath(pathname: string): string {
   const match = ADMIN_NAV.find(
