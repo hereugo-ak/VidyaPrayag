@@ -2234,3 +2234,202 @@ object TransportAttendanceTable : UUIDTable("transport_attendance", "id") {
         index("idx_transport_attendance_school_date", false, schoolId, date)
     }
 }
+
+// =====================================================================
+// AI GATEWAY (AI_FEATURES_PLAN.md §4 / AI_INFRASTRUCTURE_SPEC.md §6)
+//   The shared, multi-provider AI choke point every AI feature calls.
+//   Provider strategy: five OpenAI-compatible free-tier providers
+//   (Cerebras / Groq / SambaNova / Mistral / OpenRouter) — see KeyVault.
+//
+//   Applied by docs/db/migration_060_ai_gateway.sql (must run BEFORE the
+//   matching deploy; AUTO_CREATE_TABLES is OFF in prod and validateSchema()
+//   gates boot on table presence). Column names/types are kept in lock-step
+//   with that migration.
+//
+//   NOTE on money columns: cost is stored as `double` (USD) to stay
+//   dependency-free and consistent with fee_records.amount (also double).
+//   Free-tier providers are $0, so cost is informational only.
+// =====================================================================
+
+/**
+ * Provider registry. One row per (provider, model). `api_key_encrypted`
+ * holds the AES-256-GCM ciphertext of the provider key (IV-prefixed,
+ * base64). KeyVault seeds/refreshes these rows from the AI_<PROVIDER>_API_KEY
+ * env vars on boot and decrypts on demand (never logs the plaintext).
+ */
+object AiProviderConfigTable : UUIDTable("ai_provider_config", "id") {
+    val provider            = varchar("provider", 32)               // cerebras|groq|sambanova|mistral|openrouter
+    val model               = varchar("model", 96)                  // pinned model id (capability, not brand)
+    val apiKeyEncrypted     = text("api_key_encrypted")             // AES-256-GCM (empty = unconfigured)
+    val baseUrl             = text("base_url")                      // OpenAI-compatible /v1 base
+    val isActive            = bool("is_active").default(true)
+    val priority            = integer("priority").default(0)        // failover order within a lane (0 = primary)
+    val tier                = varchar("tier", 16).default("fast")   // fast|reason|batch|stt
+    val noTraining          = bool("no_training").default(true)     // false = training opt-in (PII-restricted)
+    val maxTokensPerRequest = integer("max_tokens_per_request").default(2048)
+    val temperature         = double("temperature").default(0.4)
+    val createdAt           = timestamp("created_at")
+    val updatedAt           = timestamp("updated_at")
+    init { uniqueIndex("ux_ai_provider_model", provider, model) }
+}
+
+/**
+ * Versioned prompt templates. `pii_allowed_providers` is a CSV allow-list that
+ * gates which providers a PII-bearing prompt may use (privacy routing rule).
+ */
+object AiPromptTemplatesTable : UUIDTable("ai_prompt_templates", "id") {
+    val feature             = varchar("feature", 48)                // pews|report_card|...
+    val name                = varchar("name", 128)
+    val version             = integer("version").default(1)
+    val systemPrompt        = text("system_prompt")
+    val userPromptTemplate  = text("user_prompt_template")          // with {{var}} placeholders
+    val variables           = text("variables").default("[]")       // JSON array of names
+    val piiAllowedProviders = text("pii_allowed_providers").default("") // CSV; empty = all no-training
+    val guardrailConfig     = text("guardrail_config").default("{}")
+    val trafficWeight       = integer("traffic_weight").default(100)
+    val isActive            = bool("is_active").default(true)
+    val createdAt           = timestamp("created_at")
+    init { uniqueIndex("ux_ai_prompt", feature, name, version) }
+}
+
+/** Per-school observability + quota source. Append-only. */
+object AiUsageLogTable : UUIDTable("ai_usage_log", "id") {
+    val schoolId            = uuid("school_id").nullable()          // null for platform/system calls
+    val userId              = uuid("user_id").nullable()
+    val feature             = varchar("feature", 48)
+    val provider            = varchar("provider", 32)               // requested lane primary
+    val model               = varchar("model", 96)
+    val providerUsed        = varchar("provider_used", 32).nullable() // actual (may differ on failover)
+    val modelUsed           = varchar("model_used", 96).nullable()
+    val inputTokens         = integer("input_tokens").default(0)
+    val outputTokens        = integer("output_tokens").default(0)
+    val costUsd             = double("cost_usd").default(0.0)
+    val latencyMs           = integer("latency_ms").default(0)
+    val status              = varchar("status", 16)                 // success|failed|cached|guardrail_blocked
+    val routingDecision     = varchar("routing_decision", 32).default("direct") // direct|cache_l1_hit|failed_over
+    val errorMessage        = text("error_message").nullable()
+    val createdAt           = timestamp("created_at")
+    init {
+        index("idx_ai_usage_school_date", false, schoolId, createdAt)
+        index("idx_ai_usage_feature", false, schoolId, feature, createdAt)
+    }
+}
+
+/** L1 exact-match response cache (SHA-256 of prompt+model+temp), school-scoped, TTL. */
+object AiResponseCacheTable : UUIDTable("ai_response_cache", "id") {
+    val cacheKey            = text("cache_key")
+    val schoolId            = uuid("school_id").nullable()
+    val feature             = varchar("feature", 48)
+    val response            = text("response")
+    val inputTokens         = integer("input_tokens").default(0)
+    val outputTokens        = integer("output_tokens").default(0)
+    val providerUsed        = varchar("provider_used", 32).nullable()
+    val modelUsed           = varchar("model_used", 96).nullable()
+    val expiresAt           = timestamp("expires_at")
+    val createdAt           = timestamp("created_at")
+    init {
+        uniqueIndex("ux_ai_cache_key", cacheKey)
+        index("idx_ai_cache_expiry", false, expiresAt)
+    }
+}
+
+/** Batch job queue for class/school-wide AI runs. */
+object AiJobsTable : UUIDTable("ai_jobs", "id") {
+    val schoolId            = uuid("school_id")
+    val feature             = varchar("feature", 48)
+    val status              = varchar("status", 16).default("queued") // queued|processing|completed|failed
+    val totalItems          = integer("total_items").default(0)
+    val completedItems      = integer("completed_items").default(0)
+    val result              = text("result").nullable()
+    val createdBy           = uuid("created_by").nullable()
+    val createdAt           = timestamp("created_at")
+    val updatedAt           = timestamp("updated_at")
+    val completedAt         = timestamp("completed_at").nullable()
+    init { index("idx_ai_jobs_status", false, schoolId, status, createdAt) }
+}
+
+/** Per-(provider,model) circuit-breaker state + rolling health for dual-home routing. */
+object AiProviderHealthTable : UUIDTable("ai_provider_health", "id") {
+    val provider            = varchar("provider", 32)
+    val model               = varchar("model", 96)
+    val circuitState        = varchar("circuit_state", 16).default("closed") // closed|open|half_open
+    val totalRequests       = integer("total_requests").default(0)
+    val totalFailures       = integer("total_failures").default(0)
+    val consecutiveFailures = integer("consecutive_failures").default(0)
+    val avgLatencyMs        = integer("avg_latency_ms").default(0)
+    val rateLimitHits       = integer("rate_limit_hits").default(0)
+    val lastFailureAt       = timestamp("last_failure_at").nullable()
+    val circuitOpenedAt     = timestamp("circuit_opened_at").nullable()
+    val lastUpdated         = timestamp("last_updated")
+    init { uniqueIndex("ux_ai_health_provider_model", provider, model) }
+}
+
+// =====================================================================
+// PEWS — Predictive Early Warning System (AI_FEATURES_PLAN.md Part A §A.3)
+//   The agent's memory: deterministic risk snapshots, the intervention
+//   Act+Learn loop, and per-school tuning. Inputs (attendance/marks/leave)
+//   come from EXISTING tables — no schema change there.
+//
+//   Applied by docs/db/migration_061_pews.sql (must run BEFORE the matching
+//   deploy; AUTO_CREATE_TABLES is OFF in prod).
+// =====================================================================
+
+/**
+ * One auditable, reproducible row per (school, student, run_date). The
+ * deterministic layer owns every number; the ai_* columns are nullable and
+ * filled only by the Reason stage (null = not yet reasoned). Every AI field
+ * therefore traces to a real snapshot (honesty LAW 6).
+ */
+object PewsRiskSnapshotsTable : UUIDTable("pews_risk_snapshots", "id") {
+    val schoolId          = uuid("school_id")
+    val studentCode       = text("student_code")
+    val runDate           = date("run_date")
+    val riskScore         = integer("risk_score")            // 0..100 composite (deterministic)
+    val riskLevel         = varchar("risk_level", 8)         // watch | medium | high
+    val attendancePct     = integer("attendance_pct").nullable()
+    val marksPct          = integer("marks_pct").nullable()
+    val leaveCount        = integer("leave_count").default(0)
+    val attendanceSlope   = double("attendance_slope").nullable() // negative = sliding
+    val marksSlope        = double("marks_slope").nullable()
+    val signalsJson       = text("signals_json")            // deterministic reasons array (JSON)
+    val signalHash        = varchar("signal_hash", 64)      // SHA-256 of the signal bundle (cache key)
+    val aiNarrative       = text("ai_narrative").nullable()
+    val aiCause           = text("ai_cause").nullable()
+    val aiRecommendation  = text("ai_recommendation").nullable()
+    val aiProviderUsed    = varchar("ai_provider_used", 32).nullable()
+    val createdAt         = timestamp("created_at")
+    init {
+        uniqueIndex("ux_pews_snap_unique", schoolId, studentCode, runDate)
+        index("idx_pews_snap", false, schoolId, runDate, riskLevel)
+    }
+}
+
+/** Intervention tasks — the Act + Learn loop. */
+object PewsInterventionsTable : UUIDTable("pews_interventions", "id") {
+    val schoolId      = uuid("school_id")
+    val studentCode   = text("student_code")
+    val snapshotId    = uuid("snapshot_id").nullable()      // FK pews_risk_snapshots.id
+    val ownerUserId   = uuid("owner_user_id")               // assigned teacher/admin
+    val actionType    = varchar("action_type", 32)          // parent_call|home_visit|counselling|remedial_class|parent_message|observe
+    val status        = varchar("status", 16).default("open") // open|in_progress|done|dismissed
+    val notes         = text("notes").nullable()
+    val openedAt      = timestamp("opened_at")
+    val resolvedAt    = timestamp("resolved_at").nullable()
+    val outcome       = varchar("outcome", 16).nullable()   // improved|unchanged|worsened (Learn stage)
+    val createdAt     = timestamp("created_at")
+    init { index("idx_pews_intv", false, schoolId, status, ownerUserId) }
+}
+
+/** Per-school tuning so thresholds aren't hardcoded. PK = school_id. */
+object PewsConfigTable : UUIDTable("pews_config", "id") {
+    // id is the school_id (one row per school); we still use UUIDTable for
+    // mapping uniformity but treat id as the school identity.
+    val useRelativeThresholds = bool("use_relative_thresholds").default(true)
+    val attendanceFloorPct    = integer("attendance_floor_pct").default(75)
+    val marksFloorPct         = integer("marks_floor_pct").default(40)
+    val leaveFloorCount       = integer("leave_floor_count").default(3)
+    val runFrequency          = varchar("run_frequency", 8).default("daily") // daily|weekly
+    val aiNarrativeEnabled    = bool("ai_narrative_enabled").default(true)
+    val parentShareEnabled    = bool("parent_share_enabled").default(false)
+    val updatedAt             = timestamp("updated_at")
+}

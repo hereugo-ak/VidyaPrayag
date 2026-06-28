@@ -226,7 +226,21 @@ object DatabaseFactory {
         TransportVehiclesTable,           // FK to routes (nullable)
         TransportAssignmentsTable,        // FK to routes + stops + vehicles
         TransportTrackingTable,           // FK to vehicles
-        TransportAttendanceTable
+        TransportAttendanceTable,
+        // AI Gateway (AI_FEATURES_PLAN.md §4 / AI_INFRASTRUCTURE_SPEC.md §6)
+        // Applied by docs/db/migration_060_ai_gateway.sql (must run before deploy;
+        // AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates boot on it).
+        AiProviderConfigTable,
+        AiPromptTemplatesTable,
+        AiUsageLogTable,
+        AiResponseCacheTable,
+        AiJobsTable,
+        AiProviderHealthTable,
+        // PEWS — Predictive Early Warning System (AI_FEATURES_PLAN.md Part A)
+        // Applied by docs/db/migration_061_pews.sql (must run before deploy).
+        PewsRiskSnapshotsTable,
+        PewsInterventionsTable,
+        PewsConfigTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */
