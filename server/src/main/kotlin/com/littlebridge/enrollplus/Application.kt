@@ -60,6 +60,7 @@ import com.littlebridge.enrollplus.feature.auth.authRouting
 import com.littlebridge.enrollplus.feature.alumni.alumniRouting
 import com.littlebridge.enrollplus.feature.transport.transportRouting
 import com.littlebridge.enrollplus.feature.scholarship.scholarshipRouting
+import com.littlebridge.enrollplus.feature.branding.brandingRouting
 import com.littlebridge.enrollplus.feature.calendar.academicCalendarRouting
 import com.littlebridge.enrollplus.feature.calendar.academicYearRouting
 import com.littlebridge.enrollplus.feature.auth.otpAdminRouting
@@ -386,5 +387,10 @@ fun Application.module() {
         //   /api/v1/school/scholarship-renewals{,/{id}/{approve,reject}}              — admin renewals
         //   /api/v1/parent/scholarships{,/apply,/applications,/{id}/renew}            — parent
         scholarshipRouting()
+
+        // School Branding Kit (SCHOOL_BRANDING_KIT_SPEC.md)
+        //   /api/v1/school/branding{,/reset,/subdomain{,/check}}  — admin
+        //   /api/v1/branding/{schoolId,/subdomain/{subdomain}}     — public
+        brandingRouting()
     }
 }

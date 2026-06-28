@@ -2336,3 +2336,30 @@ object TransportAttendanceTable : UUIDTable("transport_attendance", "id") {
         index("idx_transport_attendance_school_date", false, schoolId, date)
     }
 }
+
+// =====================================================================
+// School Branding (SCHOOL_BRANDING_KIT_SPEC.md)
+// Per-school branding customization: logo, colors, subdomain, assets.
+// Applied by docs/db/migration_101_school_branding.sql (must run before
+// deploy; AUTO_CREATE_TABLES is OFF in prod).
+// =====================================================================
+object SchoolBrandingTable : UUIDTable("school_branding", "id") {
+    val schoolId           = uuid("school_id").uniqueIndex()
+    val logoUrl            = text("logo_url").nullable()
+    val logoDarkUrl        = text("logo_dark_url").nullable()
+    val faviconUrl         = text("favicon_url").nullable()
+    val appIconUrl         = text("app_icon_url").nullable()
+    val splashScreenUrl    = text("splash_screen_url").nullable()
+    val primaryColor       = varchar("primary_color", 8).default("#2563EB")
+    val secondaryColor     = varchar("secondary_color", 8).default("#1E40AF")
+    val accentColor        = varchar("accent_color", 8).default("#3B82F6")
+    val customSubdomain    = text("custom_subdomain").nullable()
+    val loginBackgroundUrl = text("login_background_url").nullable()
+    val isCustomized       = bool("is_customized").default(false)
+    val createdAt          = timestamp("created_at")
+    val updatedAt          = timestamp("updated_at")
+
+    init {
+        index("idx_school_branding_subdomain", false, customSubdomain)
+    }
+}

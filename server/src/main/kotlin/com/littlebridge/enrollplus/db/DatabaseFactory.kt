@@ -230,7 +230,11 @@ object DatabaseFactory {
         TransportVehiclesTable,           // FK to routes (nullable)
         TransportAssignmentsTable,        // FK to routes + stops + vehicles
         TransportTrackingTable,           // FK to vehicles
-        TransportAttendanceTable
+        TransportAttendanceTable,
+        // School Branding Kit (SCHOOL_BRANDING_KIT_SPEC.md — per-school branding)
+        // Applied by docs/db/migration_101_school_branding.sql (must run before
+        // deploy; AUTO_CREATE_TABLES is OFF in prod).
+        SchoolBrandingTable,
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

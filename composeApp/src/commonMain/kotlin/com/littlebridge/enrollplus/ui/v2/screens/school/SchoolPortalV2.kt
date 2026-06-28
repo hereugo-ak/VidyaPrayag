@@ -63,6 +63,7 @@ private enum class SchoolOverlay {
     AlumniCampaign,
     TransportManagement,
     ScholarshipManagement,
+    BrandingKit,
 }
 
 /**
@@ -341,6 +342,13 @@ fun SchoolPortalV2(
                 )
                 return
             }
+            SchoolOverlay.BrandingKit -> {
+                BrandingSettingsScreen(
+                    onBack = { overlay = SchoolOverlay.None },
+                    modifier = modifier,
+                )
+                return
+            }
             SchoolOverlay.None -> Unit
         }
 
@@ -413,6 +421,8 @@ fun SchoolPortalV2(
                         onOpenTransport = { overlay = SchoolOverlay.TransportManagement },
                         // Scholarship Management — schemes, applications & renewals.
                         onOpenScholarships = { overlay = SchoolOverlay.ScholarshipManagement },
+                        // School Branding Kit — colors, logo, subdomain.
+                        onOpenBranding = { overlay = SchoolOverlay.BrandingKit },
                     )
                 }
             }
