@@ -71,6 +71,7 @@ import com.littlebridge.enrollplus.feature.content.landingRouting
 import com.littlebridge.enrollplus.feature.content.supportRouting
 import com.littlebridge.enrollplus.feature.gateway.api.gatewayRouting
 import com.littlebridge.enrollplus.feature.health.healthRouting
+import com.littlebridge.enrollplus.feature.healthcheck.healthCheckRouting
 import com.littlebridge.enrollplus.feature.media.mediaRouting
 import com.littlebridge.enrollplus.feature.notification.api.notificationRouting
 import com.littlebridge.enrollplus.feature.notifications.notificationsRouting
@@ -387,6 +388,9 @@ fun Application.module() {
         //   /api/v1/school/scholarship-renewals{,/{id}/{approve,reject}}              — admin renewals
         //   /api/v1/parent/scholarships{,/apply,/applications,/{id}/renew}            — parent
         scholarshipRouting()
+
+        // Server health check — pinged by GitHub Action every 1 min to keep Render awake
+        healthCheckRouting()           // /api/v1/health
 
         // School Branding Kit (SCHOOL_BRANDING_KIT_SPEC.md)
         //   /api/v1/school/branding{,/reset,/subdomain{,/check}}  — admin
