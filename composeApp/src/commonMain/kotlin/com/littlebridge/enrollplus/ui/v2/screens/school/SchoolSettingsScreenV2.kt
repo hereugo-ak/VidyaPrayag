@@ -71,6 +71,8 @@ fun SchoolSettingsScreenV2(
     onOpenProfile: () -> Unit = {},
     // VP-CAL — open the real Academic Year management screen.
     onOpenAcademicYear: () -> Unit = {},
+    // Transport Management — routes, vehicles, student assignments.
+    onOpenTransport: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: InstitutionalProfileViewModel = koinViewModel(),
     preferenceRepository: PreferenceRepository = koinInject(),
@@ -93,6 +95,7 @@ fun SchoolSettingsScreenV2(
         onOpenTeachers = onOpenTeachers,
         onOpenProfile = onOpenProfile,
         onOpenAcademicYear = onOpenAcademicYear,
+        onOpenTransport = onOpenTransport,
         onRetry = viewModel::load,
         modifier = modifier.statusBarsPadding()
             .imePadding()
@@ -110,6 +113,7 @@ private fun SchoolSettingsContent(
     onOpenTeachers: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenAcademicYear: () -> Unit,
+    onOpenTransport: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -165,6 +169,7 @@ private fun SchoolSettingsContent(
                 SettingRow(VIcons.Calendar, "Academic year", "Manage term dates & holidays", false, onClick = onOpenAcademicYear),
                 SettingRow(VIcons.BookOpen, "Classes & subjects", "Class & subject setup", true),
                 SettingRow(VIcons.Users, "Teacher management", "Add, view & remove teachers",false, onClick = onOpenTeachers),
+                SettingRow(VIcons.MapPin, "Transport Management", "Routes, vehicles & student assignments", false, onClick = onOpenTransport),
                 SettingRow(VIcons.Wallet, "Fee structure", "Edit heads & amounts for next cycle ", true),
                 SettingRow(VIcons.Bell, "Notifications", "Channels & quiet hours", true),
                 SettingRow(VIcons.Download, "Data export", "CSV / PDF / UDISE", true),

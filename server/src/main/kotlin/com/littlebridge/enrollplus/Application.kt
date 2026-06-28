@@ -169,6 +169,11 @@ fun main() {
     // Start the Parent Pulse weekly job (Sunday 6 PM IST pulse generation).
     PulseWeeklyJob.start(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default))
 
+    // Start the Transport job scheduler (GPS staleness check + daily attendance finalization).
+    com.littlebridge.enrollplus.feature.transport.TransportJobScheduler.start(
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+    )
+
     embeddedServer(
         Netty,
         port = port,

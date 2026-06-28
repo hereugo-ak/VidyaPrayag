@@ -401,6 +401,8 @@ fun SchoolPortalV2(
                         onOpenProfile = { overlay = SchoolOverlay.EditProfile },
                         // VP-CAL — "Academic year" is now a real management screen.
                         onOpenAcademicYear = { overlay = SchoolOverlay.AcademicYear },
+                        // Transport Management — routes, vehicles & assignments.
+                        onOpenTransport = { overlay = SchoolOverlay.TransportManagement },
                     )
                 }
             }
