@@ -411,6 +411,21 @@ val commonModule = module {
         com.littlebridge.enrollplus.feature.scholarship.data.repository.ScholarshipRepositoryImpl(get())
     }
 
+    // School Branding Kit (SCHOOL_BRANDING_KIT_SPEC.md)
+    single {
+        com.littlebridge.enrollplus.feature.branding.data.remote.BrandingApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single<com.littlebridge.enrollplus.feature.branding.domain.repository.BrandingRepository> {
+        com.littlebridge.enrollplus.feature.branding.data.repository.BrandingRepositoryImpl(get())
+    }
+    // Dynamic theming — app-lifecycle singleton holding school branding
+    single {
+        com.littlebridge.enrollplus.feature.branding.presentation.BrandingThemeManager(get(), get())
+    }
+
     // UseCases
     factory { GetSchoolsUseCase(get()) }
 }
@@ -520,6 +535,8 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.transport.presentation.TransportViewModel(get(), get()) }
     // Scholarship Workflow (SCHOLARSHIP_WORKFLOW_SPEC.md)
     factory { com.littlebridge.enrollplus.feature.scholarship.presentation.ScholarshipViewModel(get(), get()) }
+    // School Branding Kit (SCHOOL_BRANDING_KIT_SPEC.md)
+    factory { com.littlebridge.enrollplus.feature.branding.presentation.BrandingViewModel(get(), get()) }
 }
 
 fun initKoin(
