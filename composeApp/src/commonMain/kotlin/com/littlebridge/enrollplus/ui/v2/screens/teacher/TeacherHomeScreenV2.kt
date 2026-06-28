@@ -69,6 +69,7 @@ fun TeacherHomeScreenV2(
     onOpenClasses: () -> Unit,
     onOpenLessonPlanForAssignment: (assignmentId: String, scope: String) -> Unit = { _, _ -> },
     onOpenHealthAlerts: () -> Unit = {},
+    onOpenTransportAttendance: () -> Unit = {},
     modifier: Modifier = Modifier,
     todayViewModel: TeacherTodayViewModel = koinViewModel(),
     checkInViewModel: TeacherCheckInViewModel = koinViewModel(),
@@ -124,6 +125,13 @@ fun TeacherHomeScreenV2(
                 subtitle = "Allergies & conditions for students in your classes",
                 icon = VIcons.Heart,
                 onClick = onOpenHealthAlerts,
+            )
+
+            VActionCard(
+                title = "Transport Attendance",
+                subtitle = "Mark pickup & drop for students on your bus route",
+                icon = VIcons.MapPin,
+                onClick = onOpenTransportAttendance,
             )
         }
 

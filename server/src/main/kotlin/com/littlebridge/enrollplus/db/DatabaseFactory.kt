@@ -162,8 +162,12 @@ object DatabaseFactory {
         TeacherPeriodsTable,
         PeriodExceptionsTable,   // T-101: one-off overrides to the weekly pattern (Doc 05 §2.2)
         // Parent scholarships (audit §4.2/§5.2 — DB-backed, replaces hardcoded list)
+        // Extended per SCHOLARSHIP_WORKFLOW_SPEC.md — full workflow with renewals.
+        // Applied by docs/db/migration_060_scholarship_workflow.sql (must run before
+        // deploy; AUTO_CREATE_TABLES is OFF in prod).
         ScholarshipsTable,
         ScholarshipApplicationsTable,
+        ScholarshipRenewalsTable,
         // Notification spine + push registry + link approval (audit part-2 RA-41/42/46/48/50)
         NotificationsTable,
         DeviceTokensTable,
@@ -216,7 +220,21 @@ object DatabaseFactory {
         AlumniMentorshipRequestsTable,   // FK to alumni + students
         AlumniMentorshipsTable,          // FK to alumni + students + requests
         AlumniCareerHistoryTable,        // FK to alumni
-        AlumniMentorshipSettingsTable    // FK to schools
+        AlumniMentorshipSettingsTable,    // FK to schools
+        // Transport Tracking (TRANSPORT_TRACKING_SPEC.md — GPS bus tracking,
+        // route/vehicle/driver management, student pickup/drop, transport fees)
+        // Applied by docs/db/migration_053_transport_tracking.sql (must run
+        // before deploy; AUTO_CREATE_TABLES is OFF in prod).
+        TransportRoutesTable,
+        TransportStopsTable,              // FK to routes
+        TransportVehiclesTable,           // FK to routes (nullable)
+        TransportAssignmentsTable,        // FK to routes + stops + vehicles
+        TransportTrackingTable,           // FK to vehicles
+        TransportAttendanceTable,
+        // School Branding Kit (SCHOOL_BRANDING_KIT_SPEC.md — per-school branding)
+        // Applied by docs/db/migration_101_school_branding.sql (must run before
+        // deploy; AUTO_CREATE_TABLES is OFF in prod).
+        SchoolBrandingTable,
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

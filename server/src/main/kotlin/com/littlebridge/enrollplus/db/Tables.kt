@@ -653,6 +653,16 @@ object FeeRecordsTable : UUIDTable("fee_records", "id") {
     val updatedAt   = timestamp("updated_at")
     // Notification scheduler: throttle fee reminders to at most once per 24h.
     val lastRemindedAt = timestamp("last_reminded_at").nullable()
+
+    // ── Scholarship waiver fields (migration_060) ───────────────────────
+    // When a scholarship is approved, FeeService.applyScholarship() records
+    // the waiver here so the fee record shows the original amount, the
+    // scholarship reduction, and the net payable. This is an additive change
+    // — existing rows have nulls (no scholarship applied).
+    val scholarshipId         = uuid("scholarship_id").nullable()      // FK scholarships.id
+    val scholarshipType       = varchar("scholarship_type", 16).nullable()  // fixed | full_waiver | partial_waiver
+    val scholarshipAmount     = double("scholarship_amount").nullable()     // waiver/discount amount applied
+    val originalAmount        = double("original_amount").nullable()        // fee amount before scholarship
 }
 
 // =====================================================================
@@ -1247,15 +1257,26 @@ object PeriodExceptionsTable : UUIDTable("period_exceptions", "id") {
 // =====================================================================
 
 /**
- * Scholarship opportunities surfaced on the parent Scholarships screen.
+ * Scholarship schemes managed by school admins.
  *
- * Replaces the hardcoded `"$45,000 STEM Award"` fiction (audit §4.2/§5.2) the
- * `/scholarships` route used to return. Rows are operator-curated (seeded /
- * managed) opportunities; the endpoint reads real rows from here so adding or
- * retiring a scholarship is a DB write, not a redeploy. `isActive=false` hides
- * a row without deleting it. `position` controls display order.
+ * Originally a display-only parent feed table (title, display amount string,
+ * timeLeft). Extended per SCHOLARSHIP_WORKFLOW_SPEC.md to support the full
+ * workflow: scholarship types (fixed/full_waiver/partial_waiver), eligibility
+ * criteria, start/end dates, renewable flag, and school-scoping.
+ *
+ * Legacy display fields (title, amount as text, timeLeft, category, isCritical,
+ * position) are preserved for backward compatibility with the existing parent
+ * scholarships screen. New workflow fields are nullable/defaulted so existing
+ * rows and seed data continue to work.
+ *
+ * `isActive=false` hides a row without deleting it. `position` controls display
+ * order on the parent screen.
+ *
+ * Created/applied by docs/db/migration_060_scholarship_workflow.sql. Registered
+ * in DatabaseFactory.allTables.
  */
 object ScholarshipsTable : UUIDTable("scholarships", "id") {
+    // ── Legacy display fields (preserved for backward compat) ───────────
     val title       = text("title")
     val description = text("description")
     val amount      = text("amount")                    // display string e.g. "₹45,000"
@@ -1266,22 +1287,103 @@ object ScholarshipsTable : UUIDTable("scholarships", "id") {
     val isActive    = bool("is_active").default(true)
     val createdAt   = timestamp("created_at")
     val updatedAt   = timestamp("updated_at")
+
+    // ── Workflow fields (migration_060) ─────────────────────────────────
+    val schoolId              = uuid("school_id").nullable()          // FK schools.id — tenant scope (nullable for legacy rows)
+    val scholarshipType       = varchar("scholarship_type", 16).default("fixed")  // fixed | full_waiver | partial_waiver
+    val waiverPercentage      = float("waiver_percentage").nullable()  // for partial_waiver (0-100)
+    val numericAmount         = double("numeric_amount").nullable()    // numeric amount for fixed type (display amount stays as text)
+    val eligibilityCriteria   = text("eligibility_criteria").default("")  // human-readable criteria
+    val startDate             = varchar("start_date", 12).nullable()   // YYYY-MM-DD
+    val endDate               = varchar("end_date", 12).nullable()     // YYYY-MM-DD
+    val isRenewable           = bool("is_renewable").default(false)
+    val renewalPeriodMonths   = integer("renewal_period_months").nullable()  // 12 for annual
+
+    init {
+        index("idx_scholarships_school", false, schoolId, isActive)
+    }
 }
 
 /**
- * A parent's scholarship applications (the "applications" list on the same
- * screen). Scoped to the applying parent so each parent sees only their own.
- * `iconName` mirrors the UI's institution glyph.
+ * Scholarship applications from parents on behalf of students.
+ *
+ * Originally a display-only table (parentId, institution, program, status as
+ * display strings). Extended per SCHOLARSHIP_WORKFLOW_SPEC.md to support the
+ * full application workflow: link to scholarship scheme, student, academic
+ * year, document uploads, approval/rejection with remarks, disbursement
+ * tracking, and application text.
+ *
+ * Legacy display fields (parentId, institution, program, status as display
+ * string, iconName, position) are preserved for backward compatibility. The
+ * `status` field now serves dual duty: legacy display values (Received/Under
+ * Review/Shortlisted) for old rows, and workflow values (PENDING/APPROVED/
+ * REJECTED/DISBURSED) for new workflow applications.
+ *
+ * Created/applied by docs/db/migration_060_scholarship_workflow.sql.
  */
 object ScholarshipApplicationsTable : UUIDTable("scholarship_applications", "id") {
+    // ── Legacy display fields (preserved for backward compat) ───────────
     val parentId    = uuid("parent_id")                 // FK app_users.id
     val institution = text("institution")
     val program     = text("program")
-    val status      = varchar("status", 24).default("Received") // Received | Under Review | Shortlisted
+    val status      = varchar("status", 24).default("PENDING") // PENDING | APPROVED | REJECTED | DISBURSED (legacy: Received|Under Review|Shortlisted)
     val iconName    = varchar("icon_name", 32).default("school")
     val position    = integer("position").default(0)
     val createdAt   = timestamp("created_at")
     val updatedAt   = timestamp("updated_at")
+
+    // ── Workflow fields (migration_060) ─────────────────────────────────
+    val scholarshipId           = uuid("scholarship_id").nullable()    // FK scholarships.id
+    val studentId              = uuid("student_id").nullable()         // FK children/students table
+    val academicYearId         = uuid("academic_year_id").nullable()   // FK academic_years.id
+    val documentUrls           = text("document_urls").nullable()      // JSON array of S3 URLs
+    val parentApplicationText  = text("parent_application_text").nullable()
+    val reviewedAt             = timestamp("reviewed_at").nullable()
+    val reviewedBy             = uuid("reviewed_by").nullable()        // FK app_users.id (admin)
+    val remarks                = text("remarks").nullable()
+    val disbursementAmount     = double("disbursement_amount").nullable()
+    val disbursementDate       = timestamp("disbursement_date").nullable()
+    val disbursementReference  = text("disbursement_reference").nullable()
+
+    init {
+        index("idx_scholarship_apps_status", false, status, academicYearId)
+        index("idx_scholarship_apps_parent", false, parentId)
+        index("idx_scholarship_apps_scholarship", false, scholarshipId)
+    }
+}
+
+// =====================================================================
+// Scholarship Renewals (SCHOLARSHIP_WORKFLOW_SPEC.md §6.2)
+// =====================================================================
+
+/**
+ * Renewal applications for renewable scholarships.
+ *
+ * Linked to the original approved application. Follows the same approval
+ * workflow (pending → approved/rejected). On approval, fee waiver is
+ * re-applied for the new academic year.
+ *
+ * Created/applied by docs/db/migration_060_scholarship_workflow.sql.
+ * Registered in DatabaseFactory.allTables.
+ */
+object ScholarshipRenewalsTable : UUIDTable("scholarship_renewals", "id") {
+    val originalApplicationId = uuid("original_application_id")        // FK scholarship_applications.id
+    val studentId             = uuid("student_id")
+    val scholarshipId         = uuid("scholarship_id")                 // FK scholarships.id
+    val schoolId              = uuid("school_id")
+    val academicYearId        = uuid("academic_year_id")               // FK academic_years.id
+    val status                = varchar("status", 16).default("pending")  // pending | approved | rejected
+    val documentUrls          = text("document_urls").nullable()       // JSON array of S3 URLs
+    val appliedAt             = timestamp("applied_at")
+    val reviewedAt            = timestamp("reviewed_at").nullable()
+    val reviewedBy            = uuid("reviewed_by").nullable()         // FK app_users.id (admin)
+    val remarks               = text("remarks").nullable()
+
+    init {
+        index("idx_scholarship_renewals_original", false, originalApplicationId)
+        index("idx_scholarship_renewals_student", false, studentId, academicYearId)
+        index("idx_scholarship_renewals_school", false, schoolId, status)
+    }
 }
 
 // =====================================================================
@@ -2123,5 +2225,141 @@ object AlumniMentorshipSettingsTable : UUIDTable("alumni_mentorship_settings", "
 
     init {
         uniqueIndex("ux_alumni_mentorship_settings_school", schoolId)
+    }
+}
+
+// =====================================================================
+// Transport Tracking (TRANSPORT_TRACKING_SPEC.md — GPS bus tracking,
+// route/vehicle/driver management, student pickup/drop, transport fees)
+//
+// Six tables back the transport tracking surface:
+//   1. TransportRoutesTable     — route definitions (name, description)
+//   2. TransportStopsTable      — ordered stops per route (lat/lng, ETA)
+//   3. TransportVehiclesTable   — buses with driver info, assigned to routes
+//   4. TransportAssignmentsTable — student-to-route/stop/vehicle mapping
+//   5. TransportTrackingTable   — real-time GPS pings (lat/lng/speed/heading)
+//   6. TransportAttendanceTable — daily pickup/drop status per student
+//
+// Created/applied by docs/db/migration_053_transport_tracking.sql. Registered
+// in DatabaseFactory.allTables — AUTO_CREATE_TABLES is OFF in production, so
+// that migration MUST be applied in Supabase before the matching deploy or
+// validateSchema() refuses to boot.
+// =====================================================================
+
+object TransportRoutesTable : UUIDTable("transport_routes", "id") {
+    val schoolId    = uuid("school_id")
+    val name        = text("name")
+    val description = text("description").nullable()
+    val isActive    = bool("is_active").default(true)
+    val createdAt   = timestamp("created_at")
+    val updatedAt   = timestamp("updated_at")
+
+    init {
+        index("idx_transport_routes_school", false, schoolId, isActive)
+    }
+}
+
+object TransportStopsTable : UUIDTable("transport_stops", "id") {
+    val routeId      = uuid("route_id")              // FK transport_routes.id
+    val name         = text("name")
+    val latitude     = double("latitude")
+    val longitude    = double("longitude")
+    val sequence     = integer("sequence")
+    val estimatedTime = varchar("estimated_time", 8).nullable()  // "07:15"
+    val createdAt    = timestamp("created_at")
+
+    init {
+        index("idx_transport_stops_route", false, routeId, sequence)
+    }
+}
+
+object TransportVehiclesTable : UUIDTable("transport_vehicles", "id") {
+    val schoolId      = uuid("school_id")
+    val routeId       = uuid("route_id").nullable()   // FK transport_routes.id
+    val busNumber     = text("bus_number")
+    val capacity      = integer("capacity").default(40)
+    val driverName    = text("driver_name").nullable()
+    val driverPhone   = varchar("driver_phone", 32).nullable()
+    val driverLicense = text("driver_license").nullable()
+    val isActive      = bool("is_active").default(true)
+    val createdAt     = timestamp("created_at")
+    val updatedAt     = timestamp("updated_at")
+
+    init {
+        index("idx_transport_vehicles_school", false, schoolId, isActive)
+    }
+}
+
+object TransportAssignmentsTable : UUIDTable("transport_assignments", "id") {
+    val schoolId  = uuid("school_id")
+    val studentId = uuid("student_id")
+    val routeId   = uuid("route_id")                  // FK transport_routes.id
+    val stopId    = uuid("stop_id")                   // FK transport_stops.id
+    val vehicleId = uuid("vehicle_id")                // FK transport_vehicles.id
+    val isActive  = bool("is_active").default(true)
+    val createdAt = timestamp("created_at")
+
+    init {
+        index("idx_transport_assignments_school", false, schoolId, isActive)
+        index("idx_transport_assignments_student", false, studentId, isActive)
+        index("idx_transport_assignments_route", false, routeId, isActive)
+    }
+}
+
+object TransportTrackingTable : UUIDTable("transport_tracking", "id") {
+    val vehicleId = uuid("vehicle_id")                // FK transport_vehicles.id
+    val latitude  = double("latitude")
+    val longitude = double("longitude")
+    val speed     = float("speed").nullable()         // km/h
+    val heading   = float("heading").nullable()       // degrees
+    val recordedAt = timestamp("recorded_at")
+
+    init {
+        index("idx_transport_tracking_vehicle", false, vehicleId, recordedAt)
+    }
+}
+
+object TransportAttendanceTable : UUIDTable("transport_attendance", "id") {
+    val schoolId     = uuid("school_id")
+    val studentId    = uuid("student_id")
+    val routeId      = uuid("route_id")
+    val date         = date("date")
+    val pickupStatus = varchar("pickup_status", 16).nullable()   // picked | missed | absent
+    val dropStatus   = varchar("drop_status", 16).nullable()     // dropped | missed
+    val pickupTime   = timestamp("pickup_time").nullable()
+    val dropTime     = timestamp("drop_time").nullable()
+    val createdAt    = timestamp("created_at")
+
+    init {
+        uniqueIndex("ux_transport_attendance_unique", schoolId, studentId, date)
+        index("idx_transport_attendance_route_date", false, routeId, date)
+        index("idx_transport_attendance_school_date", false, schoolId, date)
+    }
+}
+
+// =====================================================================
+// School Branding (SCHOOL_BRANDING_KIT_SPEC.md)
+// Per-school branding customization: logo, colors, subdomain, assets.
+// Applied by docs/db/migration_101_school_branding.sql (must run before
+// deploy; AUTO_CREATE_TABLES is OFF in prod).
+// =====================================================================
+object SchoolBrandingTable : UUIDTable("school_branding", "id") {
+    val schoolId           = uuid("school_id").uniqueIndex()
+    val logoUrl            = text("logo_url").nullable()
+    val logoDarkUrl        = text("logo_dark_url").nullable()
+    val faviconUrl         = text("favicon_url").nullable()
+    val appIconUrl         = text("app_icon_url").nullable()
+    val splashScreenUrl    = text("splash_screen_url").nullable()
+    val primaryColor       = varchar("primary_color", 8).default("#2563EB")
+    val secondaryColor     = varchar("secondary_color", 8).default("#1E40AF")
+    val accentColor        = varchar("accent_color", 8).default("#3B82F6")
+    val customSubdomain    = text("custom_subdomain").nullable()
+    val loginBackgroundUrl = text("login_background_url").nullable()
+    val isCustomized       = bool("is_customized").default(false)
+    val createdAt          = timestamp("created_at")
+    val updatedAt          = timestamp("updated_at")
+
+    init {
+        index("idx_school_branding_subdomain", false, customSubdomain)
     }
 }

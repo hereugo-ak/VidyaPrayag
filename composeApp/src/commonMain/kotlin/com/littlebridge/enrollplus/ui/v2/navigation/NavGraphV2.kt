@@ -33,6 +33,8 @@ import com.littlebridge.enrollplus.ui.v2.screens.discovery.DiscoveryScreenV2
 import com.littlebridge.enrollplus.ui.v2.screens.parent.ParentPortalV2
 import com.littlebridge.enrollplus.ui.v2.screens.school.SchoolPortalV2
 import com.littlebridge.enrollplus.ui.v2.screens.teacher.TeacherPortalV2
+import com.littlebridge.enrollplus.feature.branding.presentation.BrandingThemeManager
+import com.littlebridge.enrollplus.ui.v2.theme.BrandingColorMapper
 import com.littlebridge.enrollplus.ui.v2.theme.VMotion
 import com.littlebridge.enrollplus.ui.v2.theme.VStatusBarAdapter
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
@@ -71,10 +73,22 @@ fun NavGraphV2(
     // The theme is applied at the NavGraphV2 level so ALL portals (parent,
     // teacher, admin) honour the user's preference — not just the teacher portal.
     val preferenceRepository = koinInject<PreferenceRepository>()
+    val brandingThemeManager = koinInject<BrandingThemeManager>()
     val themeMode by preferenceRepository.getThemeMode().collectAsState(initial = "system")
     val customThemeId by preferenceRepository.getCustomThemeId().collectAsState(initial = null)
+    val schoolBranding by brandingThemeManager.branding.collectAsState()
 
-    val resolvedDef = resolveThemeDef(themeMode, customThemeId, entryRole, isAuthenticated)
+    val baseDef = resolveThemeDef(themeMode, customThemeId, entryRole, isAuthenticated)
+    val resolvedDef = remember(baseDef, schoolBranding) {
+        val brandedColors = BrandingColorMapper.apply(baseDef.colors, schoolBranding)
+        if (brandedColors !== baseDef.colors) baseDef.copy(colors = brandedColors) else baseDef
+    }
+
+    // Fetch school branding when authenticated; clear on logout
+    LaunchedEffect(isAuthenticated) {
+        if (isAuthenticated) brandingThemeManager.loadBranding()
+        else brandingThemeManager.clear()
+    }
 
     // Parse the deep link once when it arrives.
     var pendingNavigation by remember { mutableStateOf<DeepLinkTarget?>(null) }
@@ -85,7 +99,7 @@ fun NavGraphV2(
         }
     }
 
-    // Smooth crossfade on theme switch (300ms) — avoids a jarring flash.
+    // Smooth crossfade on theme/branding switch (300ms) — avoids a jarring flash.
     AnimatedContent(
         targetState = resolvedDef,
         transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(200)) },
@@ -182,6 +196,16 @@ fun parseDeepLink(path: String, currentRole: EntryRole): DeepLinkTarget {
         }
         "announcements" -> DeepLinkTarget.Generic(currentRole, path)
         "calendar" -> DeepLinkTarget.Generic(currentRole, path)
+        "transport" -> {
+            when (currentRole) {
+                EntryRole.SchoolAdmin, EntryRole.SuperAdmin ->
+                    DeepLinkTarget.SchoolScreen(currentRole, "transport")
+                EntryRole.Teacher ->
+                    DeepLinkTarget.TeacherScreen(currentRole, "transport")
+                else ->
+                    DeepLinkTarget.ParentTab(EntryRole.Parent, "home", "transport")
+            }
+        }
         else -> DeepLinkTarget.Generic(currentRole, path)
     }
 }

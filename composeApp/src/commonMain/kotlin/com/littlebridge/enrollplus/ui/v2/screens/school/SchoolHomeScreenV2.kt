@@ -113,6 +113,7 @@ fun SchoolHomeScreenV2(
     onOpenCalendar: () -> Unit = {},
     onOpenAnalytics: () -> Unit = {},
     onOpenPews: () -> Unit = {},
+    onOpenTransport: () -> Unit = {},
     onExit: () -> Unit = {},
     viewModel: SchoolDashboardViewModel = koinViewModel(),
     notificationsViewModel: NotificationsViewModel = koinViewModel(),
@@ -165,6 +166,7 @@ fun SchoolHomeScreenV2(
         onOpenCalendar = onOpenCalendar,
         onOpenAnalytics = onOpenAnalytics,
         onOpenPews = onOpenPews,
+        onOpenTransport = onOpenTransport,
         onExit = onExit,
     )
     VConfirmDialog(
@@ -196,6 +198,7 @@ private fun SchoolDashboardContent(
     onOpenCalendar: () -> Unit,
     onOpenAnalytics: () -> Unit,
     onOpenPews: () -> Unit,
+    onOpenTransport: () -> Unit,
     onExit: () -> Unit,
 ) {
     // Pull-to-refresh: swipe down anywhere on the dashboard to re-sync the
@@ -243,6 +246,7 @@ private fun SchoolDashboardContent(
                     onEvent = onOpenCalendar,
                     onNotice = onOpenNotifications,
                     onReports = onOpenAnalytics,
+                    onTransport = onOpenTransport,
                 )
 
                 // 1b. Academic Calendar integration — Quick Insights + Upcoming
@@ -447,6 +451,7 @@ private fun QuickActionsRow(
     onEvent: () -> Unit,
     onNotice: () -> Unit,
     onReports: () -> Unit,
+    onTransport: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -456,6 +461,7 @@ private fun QuickActionsRow(
         QuickActionChip("Add Event", VIcons.Calendar, onEvent)
         QuickActionChip("Send Notice", VIcons.Send, onNotice)
         QuickActionChip("Reports", VIcons.TrendingUp, onReports)
+        QuickActionChip("Transport", VIcons.MapPin, onTransport)
     }
 }
 
