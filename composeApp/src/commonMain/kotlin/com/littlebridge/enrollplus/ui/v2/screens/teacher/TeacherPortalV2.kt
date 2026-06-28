@@ -27,7 +27,7 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays the teacher portal can push above its tab content. */
-private enum class TeacherOverlay { None, Notifications, HealthAlerts, TransportAttendance }
+private enum class TeacherOverlay { None, Notifications, HealthAlerts, TransportAttendance, Pews }
 
 /**
  * TeacherPortalV2 — the teacher shell, rebuilt FROM SCRATCH on the Parents-Portal
@@ -122,6 +122,11 @@ fun TeacherPortalV2(
             )
             return
         }
+        TeacherOverlay.Pews -> {
+            // PEWS — the teacher's own-class "students needing attention".
+            TeacherPewsScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
+            return
+        }
         TeacherOverlay.None -> Unit
     }
 
@@ -192,6 +197,7 @@ fun TeacherPortalV2(
                     onOpenClasses = { tab = "classes" },
                     onOpenHealthAlerts = { overlay = TeacherOverlay.HealthAlerts },
                     onOpenTransportAttendance = { overlay = TeacherOverlay.TransportAttendance },
+                    onOpenPews = { overlay = TeacherOverlay.Pews },
                 )
 
                 "update" -> key(updateScopeNonce) {

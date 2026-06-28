@@ -70,6 +70,7 @@ fun TeacherHomeScreenV2(
     onOpenLessonPlanForAssignment: (assignmentId: String, scope: String) -> Unit = { _, _ -> },
     onOpenHealthAlerts: () -> Unit = {},
     onOpenTransportAttendance: () -> Unit = {},
+    onOpenPews: () -> Unit = {},
     modifier: Modifier = Modifier,
     todayViewModel: TeacherTodayViewModel = koinViewModel(),
     checkInViewModel: TeacherCheckInViewModel = koinViewModel(),
@@ -118,6 +119,13 @@ fun TeacherHomeScreenV2(
                 obligations = obligations,
                 onOpenUpdate = onOpenUpdateTab,
                 onOpenClasses = onOpenClasses,
+            )
+
+            VActionCard(
+                title = "Needs Attention",
+                subtitle = "Students in your classes the early-warning system has flagged",
+                icon = VIcons.AlertTriangle,
+                onClick = onOpenPews,
             )
 
             VActionCard(
