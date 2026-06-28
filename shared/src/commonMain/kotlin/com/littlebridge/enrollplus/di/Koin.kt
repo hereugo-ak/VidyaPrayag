@@ -400,6 +400,17 @@ val commonModule = module {
         com.littlebridge.enrollplus.feature.transport.data.repository.TransportRepositoryImpl(get())
     }
 
+    // Scholarship Workflow (SCHOLARSHIP_WORKFLOW_SPEC.md)
+    single {
+        com.littlebridge.enrollplus.feature.scholarship.data.remote.ScholarshipApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single<com.littlebridge.enrollplus.feature.scholarship.domain.repository.ScholarshipRepository> {
+        com.littlebridge.enrollplus.feature.scholarship.data.repository.ScholarshipRepositoryImpl(get())
+    }
+
     // UseCases
     factory { GetSchoolsUseCase(get()) }
 }
@@ -507,6 +518,8 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.alumni.presentation.AlumniViewModel(get(), get()) }
     // Transport Tracking (TRANSPORT_TRACKING_SPEC.md)
     factory { com.littlebridge.enrollplus.feature.transport.presentation.TransportViewModel(get(), get()) }
+    // Scholarship Workflow (SCHOLARSHIP_WORKFLOW_SPEC.md)
+    factory { com.littlebridge.enrollplus.feature.scholarship.presentation.ScholarshipViewModel(get(), get()) }
 }
 
 fun initKoin(

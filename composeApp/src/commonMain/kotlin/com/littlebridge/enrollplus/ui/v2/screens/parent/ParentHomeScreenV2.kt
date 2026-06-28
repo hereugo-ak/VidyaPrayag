@@ -92,6 +92,7 @@ fun ParentHomeScreenV2(
     onOpenAcademics: () -> Unit = {},
     onOpenPulse: () -> Unit = {},
     onOpenTransport: () -> Unit = {},
+    onOpenScholarships: () -> Unit = {},
     viewModel: ParentDashboardViewModel = koinViewModel(),
     permissionVm: PermissionViewModel = koinViewModel(),
 ) {
@@ -127,6 +128,7 @@ fun ParentHomeScreenV2(
         onOpenAcademics = onOpenAcademics,
         onOpenPulse = onOpenPulse,
         onOpenTransport = onOpenTransport,
+        onOpenScholarships = onOpenScholarships,
         modifier = modifier,
     )
 
@@ -152,6 +154,7 @@ private fun ParentDashboardContent(
     onOpenAcademics: () -> Unit,
     onOpenPulse: () -> Unit = {},
     onOpenTransport: () -> Unit = {},
+    onOpenScholarships: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -297,6 +300,15 @@ private fun ParentDashboardContent(
                         subtitle = "Live bus location & ETA for your child",
                         icon = VIcons.MapPin,
                         onClick = onOpenTransport,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    // ── Scholarships ───────────────────────────────────────────────
+                    VActionCard(
+                        title = "Scholarships",
+                        subtitle = "Browse & apply for scholarship opportunities",
+                        icon = VIcons.Sparkles,
+                        onClick = onOpenScholarships,
                         modifier = Modifier.fillMaxWidth(),
                     )
 

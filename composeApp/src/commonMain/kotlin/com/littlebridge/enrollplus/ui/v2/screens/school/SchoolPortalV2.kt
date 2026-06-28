@@ -62,6 +62,7 @@ private enum class SchoolOverlay {
     AlumniDetail,
     AlumniCampaign,
     TransportManagement,
+    ScholarshipManagement,
 }
 
 /**
@@ -333,6 +334,13 @@ fun SchoolPortalV2(
                 )
                 return
             }
+            SchoolOverlay.ScholarshipManagement -> {
+                ScholarshipManagementScreenV2(
+                    onBack = { overlay = SchoolOverlay.None },
+                    modifier = modifier,
+                )
+                return
+            }
             SchoolOverlay.None -> Unit
         }
 
@@ -403,6 +411,8 @@ fun SchoolPortalV2(
                         onOpenAcademicYear = { overlay = SchoolOverlay.AcademicYear },
                         // Transport Management — routes, vehicles & assignments.
                         onOpenTransport = { overlay = SchoolOverlay.TransportManagement },
+                        // Scholarship Management — schemes, applications & renewals.
+                        onOpenScholarships = { overlay = SchoolOverlay.ScholarshipManagement },
                     )
                 }
             }
