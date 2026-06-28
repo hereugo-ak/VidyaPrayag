@@ -94,19 +94,17 @@ fun TransportManagementScreenV2(
             ) {
                 // ── Routes section ──────────────────────────────────────────
                 item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        VSectionHeader(title = "Routes (${state.routes.size})")
-                        VButton(
-                            text = "+ Add Route",
-                            variant = VButtonVariant.Primary,
-                            size = VButtonSize.Sm,
-                            onClick = { showRouteForm = !showRouteForm },
-                        )
-                    }
+                    VSectionHeader(
+                        title = "Routes (${state.routes.size})",
+                        action = {
+                            VButton(
+                                text = "+ Add Route",
+                                variant = VButtonVariant.Primary,
+                                size = VButtonSize.Sm,
+                                onClick = { showRouteForm = !showRouteForm },
+                            )
+                        },
+                    )
                 }
                 if (showRouteForm) {
                     item { CreateRouteForm(viewModel = viewModel) }
@@ -121,19 +119,17 @@ fun TransportManagementScreenV2(
                 // ── Vehicles section ────────────────────────────────────────
                 item {
                     Spacer(Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        VSectionHeader(title = "Vehicles (${state.vehicles.size})")
-                        VButton(
-                            text = "+ Add Vehicle",
-                            variant = VButtonVariant.Primary,
-                            size = VButtonSize.Sm,
-                            onClick = { showVehicleForm = !showVehicleForm },
-                        )
-                    }
+                    VSectionHeader(
+                        title = "Vehicles (${state.vehicles.size})",
+                        action = {
+                            VButton(
+                                text = "+ Add Vehicle",
+                                variant = VButtonVariant.Primary,
+                                size = VButtonSize.Sm,
+                                onClick = { showVehicleForm = !showVehicleForm },
+                            )
+                        },
+                    )
                 }
                 if (showVehicleForm) {
                     item { CreateVehicleForm(viewModel = viewModel, routes = state.routes) }
@@ -148,19 +144,17 @@ fun TransportManagementScreenV2(
                 // ── Assignments section ─────────────────────────────────────
                 item {
                     Spacer(Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        VSectionHeader(title = "Student Assignments (${state.assignments.size})")
-                        VButton(
-                            text = "+ Assign",
-                            variant = VButtonVariant.Primary,
-                            size = VButtonSize.Sm,
-                            onClick = { showAssignmentForm = !showAssignmentForm },
-                        )
-                    }
+                    VSectionHeader(
+                        title = "Student Assignments (${state.assignments.size})",
+                        action = {
+                            VButton(
+                                text = "+ Assign",
+                                variant = VButtonVariant.Primary,
+                                size = VButtonSize.Sm,
+                                onClick = { showAssignmentForm = !showAssignmentForm },
+                            )
+                        },
+                    )
                 }
                 if (showAssignmentForm) {
                     item { CreateAssignmentForm(viewModel = viewModel, routes = state.routes, vehicles = state.vehicles) }
@@ -306,6 +300,8 @@ private fun CreateAssignmentForm(
     var selectedRouteId by remember { mutableStateOf("") }
     var selectedStopId by remember { mutableStateOf("") }
     var selectedVehicleId by remember { mutableStateOf("") }
+    var feeAmount by remember { mutableStateOf("") }
+    var feeDueDate by remember { mutableStateOf("") }
 
     val selectedRoute = routes.find { it.id == selectedRouteId }
 
@@ -386,6 +382,21 @@ private fun CreateAssignmentForm(
                     }
                 }
             }
+            VInput(
+                value = feeAmount,
+                onValueChange = { feeAmount = it },
+                label = "Transport fee amount (optional)",
+                placeholder = "e.g. 6000",
+                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            VInput(
+                value = feeDueDate,
+                onValueChange = { feeDueDate = it },
+                label = "Fee due date (optional)",
+                placeholder = "YYYY-MM-DD",
+                modifier = Modifier.fillMaxWidth(),
+            )
             VButton(
                 text = "Assign Student",
                 variant = VButtonVariant.Primary,
@@ -398,6 +409,8 @@ private fun CreateAssignmentForm(
                             routeId = selectedRouteId,
                             stopId = selectedStopId,
                             vehicleId = selectedVehicleId,
+                            feeAmount = feeAmount.toDoubleOrNull(),
+                            feeDueDate = feeDueDate.ifBlank { null },
                         )
                     )
                 },

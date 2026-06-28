@@ -158,7 +158,9 @@ data class CreateAssignmentRequest(
     val studentId: String,
     val routeId: String,
     val stopId: String,
-    val vehicleId: String
+    val vehicleId: String,
+    val feeAmount: Double? = null,
+    val feeDueDate: String? = null
 )
 
 @Serializable
@@ -421,7 +423,44 @@ class TransportService {
             it[createdAt] = now
         }[TransportAssignmentsTable.id]
 
-        rowToAssignment(TransportAssignmentsTable.selectAll().where { TransportAssignmentsTable.id eq assignmentId }.single())
+        val assignment = rowToAssignment(
+            TransportAssignmentsTable.selectAll().where { TransportAssignmentsTable.id eq assignmentId }.single()
+        )
+
+        // BR-005: Auto-create transport fee when feeAmount is provided.
+        if (req.feeAmount != null && req.feeAmount > 0.0) {
+            val student = StudentsTable.selectAll()
+                .where { StudentsTable.id eq studentId }
+                .singleOrNull()
+            val studentCode = student?.get(StudentsTable.studentCode)
+            val parentId = if (studentCode != null) {
+                ChildrenTable.selectAll()
+                    .where {
+                        (ChildrenTable.studentCode eq studentCode) and (ChildrenTable.isActive eq true)
+                    }
+                    .map { it[ChildrenTable.parentId] }
+                    .firstOrNull()
+            } else null
+
+            if (parentId != null) {
+                FeeRecordsTable.insert {
+                    it[FeeRecordsTable.schoolId] = schoolId
+                    it[FeeRecordsTable.childId] = studentId
+                    it[FeeRecordsTable.parentId] = parentId
+                    it[title] = "Transport Fee"
+                    it[description] = "Transport fee for ${student?.get(StudentsTable.fullName) ?: "student"}"
+                    it[amount] = req.feeAmount
+                    it[currency] = "INR"
+                    it[dueDate] = req.feeDueDate
+                    it[status] = "DUE"
+                    it[category] = "Transport"
+                    it[createdAt] = now
+                    it[updatedAt] = now
+                }
+            }
+        }
+
+        assignment
     }
 
     suspend fun deactivateAssignment(schoolId: UUID, assignmentId: UUID): Boolean = dbQuery {

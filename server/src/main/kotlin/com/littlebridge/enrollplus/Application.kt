@@ -59,6 +59,8 @@ import com.littlebridge.enrollplus.feature.announcements.announcementRouting
 import com.littlebridge.enrollplus.feature.auth.authRouting
 import com.littlebridge.enrollplus.feature.alumni.alumniRouting
 import com.littlebridge.enrollplus.feature.transport.transportRouting
+import com.littlebridge.enrollplus.feature.scholarship.scholarshipRouting
+import com.littlebridge.enrollplus.feature.branding.brandingRouting
 import com.littlebridge.enrollplus.feature.calendar.academicCalendarRouting
 import com.littlebridge.enrollplus.feature.calendar.academicYearRouting
 import com.littlebridge.enrollplus.feature.auth.otpAdminRouting
@@ -168,6 +170,11 @@ fun main() {
 
     // Start the Parent Pulse weekly job (Sunday 6 PM IST pulse generation).
     PulseWeeklyJob.start(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default))
+
+    // Start the Transport job scheduler (GPS staleness check + daily attendance finalization).
+    com.littlebridge.enrollplus.feature.transport.TransportJobScheduler.start(
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+    )
 
     embeddedServer(
         Netty,
@@ -373,5 +380,17 @@ fun Application.module() {
         //   /api/v1/transport/{location,pickup,drop}                                — driver
         //   /api/v1/parent/transport/{live-location,route}/{childId}                — parent
         transportRouting()
+
+        // Scholarship Workflow (SCHOLARSHIP_WORKFLOW_SPEC.md)
+        //   /api/v1/school/scholarships{,/{id}}                    — admin scheme CRUD
+        //   /api/v1/school/scholarship-applications{,/{id}/{approve,reject,disburse}}  — admin review
+        //   /api/v1/school/scholarship-renewals{,/{id}/{approve,reject}}              — admin renewals
+        //   /api/v1/parent/scholarships{,/apply,/applications,/{id}/renew}            — parent
+        scholarshipRouting()
+
+        // School Branding Kit (SCHOOL_BRANDING_KIT_SPEC.md)
+        //   /api/v1/school/branding{,/reset,/subdomain{,/check}}  — admin
+        //   /api/v1/branding/{schoolId,/subdomain/{subdomain}}     — public
+        brandingRouting()
     }
 }

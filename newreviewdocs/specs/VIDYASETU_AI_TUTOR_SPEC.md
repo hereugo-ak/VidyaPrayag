@@ -4,12 +4,28 @@
 > **Last updated:** 2026-06-27
 > **Prerequisites:** `AI_INFRASTRUCTURE_SPEC.md`, `CURRICULUM_TEMPLATES_SPEC.md`
 > **Source:** `DIFFERENTIATING_FEATURES.md` §1.1
+> **Template:** `_SPEC_TEMPLATE.md` v1 (25 mandatory + 6 optional sections)
 
 ---
 
 ## 1. Feature Overview
 
+### What
+
 AI-powered personalized tutor for students that provides adaptive learning, homework help, concept explanation, and practice questions based on the student's curriculum, performance, and learning pace. Accessible via parent app (for younger students) or future student app.
+
+### Why — Product Rationale
+
+Students need personalized tutoring that adapts to their pace and level. Traditional tutoring is expensive and not scalable. An AI tutor provides 24/7 personalized guidance at a fraction of the cost. It doesn't replace teachers — it supplements classroom learning with one-on-one guidance.
+
+This is a **differentiating feature** (Priority P1, Phase 3, effort XL, "High" value per `DIFFERENTIATING_FEATURES.md`). It's the flagship AI feature that sets Vidya Prayag apart from all competitors.
+
+### What Stands Out (Competitive Moat)
+
+From `DIFFERENTIATING_FEATURES.md` §1.1:
+> "VidyaSetu AI Tutor — adaptive learning, homework help, concept explanation, practice questions. Data readiness: Marks + curriculum data exists."
+
+No major Indian school ERP offers an AI tutor integrated with the school's curriculum and assessment data. The key moat is **curriculum-aware** tutoring — the AI knows what the student is studying, their marks, and their mastery level.
 
 ### Goals
 
@@ -20,9 +36,38 @@ AI-powered personalized tutor for students that provides adaptive learning, home
 - Progress tracking with mastery levels per topic
 - Teacher visibility into AI tutor usage and gaps identified
 
+### Non-goals
+
+- [ ] Direct homework solving (AI guides, doesn't solve)
+- [ ] Full course content creation (AI explains, doesn't replace textbooks)
+- [ ] Voice-based interaction (text + image only initially)
+- [ ] Real-time human tutor handoff (future enhancement)
+- [ ] Cross-school peer learning (future enhancement)
+- [ ] Gamification/leaderboards (future enhancement)
+- [ ] Parent-facing tutor controls (parent app provides access only)
+
+### Dependencies
+
+- `AI_INFRASTRUCTURE_SPEC.md` — LLM integration with multi-provider failover
+- `CURRICULUM_TEMPLATES_SPEC.md` — curriculum units and syllabus structure
+- `AssessmentMarksTable` — student performance data for adaptive difficulty
+- `CurriculumUnitsTable` + `SyllabusProgressTable` — curriculum context
+- `HomeworkTable` + `HomeworkSubmissionsTable` — homework context
+- `StudentsTable` — student grade, class info
+- `MULTI_LANGUAGE_SPEC.md` — multi-language support for explanations
+
+### Related Modules
+
+- `server/.../feature/ai/tutor/` — new AI tutor module
+- `server/.../feature/ai/` — existing AI infrastructure
+- `composeApp/.../ui/v2/screens/parent/` — AI tutor UI (parent app)
+- `composeApp/.../ui/v2/screens/teacher/` — teacher insights UI
+
 ---
 
 ## 2. Current System Assessment
+
+### Existing Code
 
 - `AssessmentMarksTable` — performance data for adaptive difficulty
 - `CurriculumUnitsTable` + `SyllabusProgressTable` — curriculum context
@@ -31,25 +76,229 @@ AI-powered personalized tutor for students that provides adaptive learning, home
 - `DIFFERENTIATING_FEATURES.md` §1.1: VidyaSetu AI Tutor, effort XL, data readiness: "Marks + curriculum data exists"
 - `feature_audit.csv` L158: AI Tutoring missing (0%)
 
+### Existing Database
+
+- `AssessmentMarksTable` — marks per assessment (for mastery calculation)
+- `CurriculumUnitsTable` — curriculum units per class/subject
+- `SyllabusProgressTable` — syllabus progress tracking
+- `HomeworkTable` + `HomeworkSubmissionsTable` — homework data
+- `StudentsTable` — student grade, class info
+- No AI tutor tables exist
+
+### Existing APIs
+
+- AI infrastructure APIs (from `AI_INFRASTRUCTURE_SPEC.md`) — LLM completion, classification
+- No AI tutor API endpoints exist
+
+### Existing UI
+
+- No AI tutor UI exists
+- Parent app has homework viewing (no AI help)
+
+### Existing Services
+
+- `AiService` — existing LLM service with multi-provider failover
+- No AI tutor service exists
+
+### Existing Documentation
+
+- `DIFFERENTIATING_FEATURES.md` §1.1 — VidyaSetu AI Tutor
+- `AI_INFRASTRUCTURE_SPEC.md` — AI infrastructure spec
+- `feature_audit.csv` L158 — AI Tutoring missing (0%)
+
+### Technical Debt
+
+| # | Gap | Details |
+|---|---|---|
+| TD-1 | No AI tutor tables | No `ai_tutor_sessions`, `ai_tutor_mastery`, `ai_tutor_daily_usage` tables |
+| TD-2 | No AI tutor service | No `AiTutorService` for session management, question handling |
+| TD-3 | No adaptive path engine | No algorithm for recommending topics based on mastery |
+| TD-4 | No mastery tracking | No per-topic mastery level tracking |
+| TD-5 | No safety guidelines | No system prompts for homework help safety |
+| TD-6 | No teacher insights | No aggregation of student mastery gaps for teachers |
+| TD-7 | No rate limiting | No per-student daily usage tracking |
+
+### Gaps
+
+| # | Gap | Impact | Severity |
+|---|---|---|---|
+| G1 | No AI tutor | Students have no personalized learning support | **Critical** |
+| G2 | No adaptive learning | No personalized path based on performance | **High** |
+| G3 | No mastery tracking | No visibility into student's topic-level proficiency | **High** |
+| G4 | No teacher insights | Teachers can't see where students struggle | **Medium** |
+| G5 | No homework help | Students can't get help outside school hours | **High** |
+
 ---
 
 ## 3. Functional Requirements
 
+### FR-001
+| Field | Value |
+|---|---|
+| **Title** | Adaptive Learning Path |
+| **Description** | Adaptive learning path: AI recommends next topics based on mastery + syllabus progress. |
+| **Priority** | High |
+| **User Roles** | Parent (on behalf of student) |
+| **Acceptance notes** | Returns top 5 topic recommendations. Sorted by: current syllabus unit (not mastered) > mastery < 60% > upcoming > review. |
+
+### FR-002
+| Field | Value |
+|---|---|
+| **Title** | Homework Help |
+| **Description** | Homework help: student asks question (text or photo) → AI explains concept step-by-step (no direct answers). |
+| **Priority** | Critical |
+| **User Roles** | Parent (on behalf of student) |
+| **Acceptance notes** | AI guides, doesn't solve. Identifies concept, explains with example, gives hint, asks student to try. Image upload supported. |
+
+### FR-003
+| Field | Value |
+|---|---|
+| **Title** | Practice Questions |
+| **Description** | Practice questions: AI generates questions calibrated to student's level (easy/medium/hard). |
+| **Priority** | High |
+| **User Roles** | Parent (on behalf of student) |
+| **Acceptance notes** | AI generates N questions with question_text, options (if MCQ), correct_answer, explanation. Difficulty based on mastery level. |
+
+### FR-004
+| Field | Value |
+|---|---|
+| **Title** | Concept Explanation |
+| **Description** | Concept explanation: AI explains topic in student's language with examples. |
+| **Priority** | High |
+| **User Roles** | Parent (on behalf of student) |
+| **Acceptance notes** | AI explains in student's preferred language. Uses grade-appropriate language. Includes examples. |
+
+### FR-005
+| Field | Value |
+|---|---|
+| **Title** | Mastery Tracking |
+| **Description** | Mastery tracking: per-topic mastery level (0-100%) based on practice performance. |
+| **Priority** | High |
+| **User Roles** | Parent (on behalf of student), Teacher |
+| **Acceptance notes** | Mastery = correct/attempted per topic. Updated on each practice answer. Displayed as percentage. |
+
+### FR-006
+| Field | Value |
+|---|---|
+| **Title** | Teacher Dashboard |
+| **Description** | Teacher dashboard: see which topics students are struggling with (aggregated). |
+| **Priority** | Medium |
+| **User Roles** | Teacher |
+| **Acceptance notes** | Aggregated mastery gaps per class. Shows topics where average mastery < 60%. No individual student data exposed to other students. |
+
+### FR-007
+| Field | Value |
+|---|---|
+| **Title** | Conversation History |
+| **Description** | Conversation history: student can revisit past tutoring sessions. |
+| **Priority** | Medium |
+| **User Roles** | Parent (on behalf of student) |
+| **Acceptance notes** | Paginated list of past sessions. Tap to view full conversation. Sessions stored in DB. |
+
+### FR-008
+| Field | Value |
+|---|---|
+| **Title** | Safety — No Direct Answers |
+| **Description** | Safety: AI refuses to solve homework directly, guides instead. |
+| **Priority** | Critical |
+| **User Roles** | System |
+| **Acceptance notes** | System prompt enforces "guide, don't solve" behavior. AI explains concepts, gives hints, asks student to try. |
+
+### FR-009
+| Field | Value |
+|---|---|
+| **Title** | Rate Limiting |
+| **Description** | Rate limiting: 50 questions per day per student (configurable). |
+| **Priority** | High |
+| **User Roles** | System |
+| **Acceptance notes** | `ai_tutor_daily_usage` table tracks daily count. 50/day default. Configurable via env var. Returns 429 when exceeded. |
+
+### Non-Functional Requirements
+
 | ID | Requirement |
 |---|---|
-| FR-1 | Adaptive learning path: AI recommends next topics based on mastery + syllabus progress |
-| FR-2 | Homework help: student asks question (text or photo) → AI explains concept step-by-step (no direct answers) |
-| FR-3 | Practice questions: AI generates questions calibrated to student's level (easy/medium/hard) |
-| FR-4 | Concept explanation: AI explains topic in student's language with examples |
-| FR-5 | Mastery tracking: per-topic mastery level (0-100%) based on practice performance |
-| FR-6 | Teacher dashboard: see which topics students are struggling with (aggregated) |
-| FR-7 | Conversation history: student can revisit past tutoring sessions |
-| FR-8 | Safety: AI refuses to solve homework directly, guides instead |
-| FR-9 | Rate limiting: 50 questions per day per student (configurable) |
+| NFR-1 | AI response time: < 5 seconds per question |
+| NFR-2 | Practice question generation: < 10 seconds for 5 questions |
+| NFR-3 | Mastery update: < 500ms after practice answer |
+| NFR-4 | Adaptive path calculation: < 1 second |
+| NFR-5 | Conversation history paginated (20 sessions per page) |
+| NFR-6 | All AI conversations logged for DPDP compliance |
+| NFR-7 | Rate limit enforced server-side (not client-side) |
+| NFR-8 | Multi-language support (student's preferred language) |
 
 ---
 
-## 4. Database Design
+## 4. User Stories
+
+### Parent (on behalf of student)
+- [ ] Start a tutoring session for my child in any subject
+- [ ] Ask a homework question (text or photo) and get guided help
+- [ ] Generate practice questions for my child at appropriate difficulty
+- [ ] View my child's mastery levels per topic
+- [ ] See recommended next topics for my child
+- [ ] View past tutoring sessions
+- [ ] Use AI tutor in my child's preferred language
+
+### Teacher
+- [ ] View class-wide mastery gaps (aggregated)
+- [ ] See which topics students are struggling with
+- [ ] Review AI tutor conversations for quality (optional)
+
+### System
+- [ ] Enforce "guide, don't solve" safety guidelines
+- [ ] Track daily usage per student (rate limiting)
+- [ ] Calculate mastery levels from practice performance
+- [ ] Generate adaptive learning path recommendations
+- [ ] Log all conversations for DPDP compliance
+- [ ] Support multi-language explanations
+
+---
+
+## 5. Business Rules
+
+### BR-001
+**Rule:** AI must guide, not solve.
+**Enforcement:** System prompt explicitly instructs AI to explain concepts, give hints, and ask student to try. AI must not provide direct answers to homework or exam questions.
+
+### BR-002
+**Rule:** Rate limit: 50 questions per day per student.
+**Enforcement:** `ai_tutor_daily_usage` table tracks daily count. Server checks before processing. Returns 429 when exceeded. Configurable via `AI_TUTOR_DAILY_QUESTION_LIMIT`.
+
+### BR-003
+**Rule:** Mastery level = correct / attempted per topic.
+**Enforcement:** `ai_tutor_mastery.mastery_level = questions_correct / questions_attempted`. Updated on each practice answer. Range: 0.0 to 1.0.
+
+### BR-004
+**Rule:** Adaptive path prioritizes current syllabus topics.
+**Enforcement:** Topics in current syllabus unit with mastery < 60% get highest priority. Then mastery < 60% for other topics. Then upcoming topics. Then review of mastered topics.
+
+### BR-005
+**Rule:** Parent acts on behalf of student (no student app yet).
+**Enforcement:** All API calls from parent app with `student_id` parameter. Parent-child link verified via `ChildAccessResolver`.
+
+### BR-006
+**Rule:** Teacher insights are aggregated, not individual.
+**Enforcement:** Teacher sees class-wide average mastery per topic. No individual student names or scores in teacher view. Aggregation: average mastery, count of students below 60%.
+
+### BR-007
+**Rule:** All conversations logged for DPDP compliance.
+**Enforcement:** All AI tutor sessions and messages stored in `ai_tutor_sessions.messages` JSON. Retained per school's data retention policy. Teacher can review for quality.
+
+### BR-008
+**Rule:** AI uses student's preferred language.
+**Enforcement:** Student's `preferred_language` from `StudentsTable` (or parent's language) passed to system prompt. AI responds in that language.
+
+---
+
+## 6. Database Design
+
+### 6.1 Entity Relationship Summary
+
+Three new tables: `ai_tutor_sessions` (conversation history), `ai_tutor_mastery` (per-topic mastery tracking), `ai_tutor_daily_usage` (rate limiting).
+
+### 6.2 New Tables
+
+#### `ai_tutor_sessions` table
 
 ```sql
 CREATE TABLE ai_tutor_sessions (
@@ -65,7 +314,11 @@ CREATE TABLE ai_tutor_sessions (
     created_at      TIMESTAMP NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_tutor_sessions_student ON ai_tutor_sessions(student_id, created_at DESC);
+```
 
+#### `ai_tutor_mastery` table
+
+```sql
 CREATE TABLE ai_tutor_mastery (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     school_id       UUID NOT NULL,
@@ -81,7 +334,11 @@ CREATE TABLE ai_tutor_mastery (
     UNIQUE(student_id, subject, topic)
 );
 CREATE INDEX idx_tutor_mastery_student ON ai_tutor_mastery(student_id, subject);
+```
 
+#### `ai_tutor_daily_usage` table
+
+```sql
 CREATE TABLE ai_tutor_daily_usage (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id      UUID NOT NULL,
@@ -92,11 +349,196 @@ CREATE TABLE ai_tutor_daily_usage (
 );
 ```
 
+### 6.3 Modified Tables
+
+N/A — no existing tables modified.
+
+### 6.4 Indexes
+
+- `ai_tutor_sessions(student_id, created_at DESC)` — session history lookup
+- `ai_tutor_mastery(student_id, subject)` — mastery lookup per student
+- `ai_tutor_mastery(student_id, subject, topic)` — UNIQUE, for mastery upsert
+- `ai_tutor_daily_usage(student_id, date)` — UNIQUE, for rate limiting
+
+### 6.5 Constraints
+
+- `ai_tutor_sessions.school_id` — NOT NULL
+- `ai_tutor_sessions.student_id` — NOT NULL
+- `ai_tutor_sessions.session_type` — NOT NULL, VARCHAR(16)
+- `ai_tutor_mastery.mastery_level` — NOT NULL, REAL, default 0, range 0.0-1.0
+- `ai_tutor_mastery(student_id, subject, topic)` — UNIQUE
+- `ai_tutor_daily_usage(student_id, date)` — UNIQUE
+
+### 6.6 Foreign Keys
+
+- `ai_tutor_sessions.school_id` → `schools.id` (implicit)
+- `ai_tutor_sessions.student_id` → `students.id` (implicit)
+- `ai_tutor_mastery.school_id` → `schools.id` (implicit)
+- `ai_tutor_mastery.student_id` → `students.id` (implicit)
+- `ai_tutor_daily_usage.student_id` → `students.id` (implicit)
+
+### 6.7 Soft Delete Strategy
+
+N/A — sessions are retained for DPDP compliance. No soft delete. Hard delete only per data retention policy.
+
+### 6.8 Audit Fields
+
+- `ai_tutor_sessions.created_at` — when session created
+- `ai_tutor_mastery.created_at` — when mastery row created
+- `ai_tutor_mastery.updated_at` — when mastery last updated
+- `ai_tutor_mastery.last_practiced_at` — when student last practiced this topic
+
+### 6.9 Migration Notes
+
+Migration: `docs/db/migration_076_ai_tutor.sql`
+- CREATE 3 tables: `ai_tutor_sessions`, `ai_tutor_mastery`, `ai_tutor_daily_usage`
+- No data migration (new feature)
+- Indexes created in same migration
+
+### 6.10 Exposed Mappings
+
+```kotlin
+object AiTutorSessionsTable : UUIDTable("ai_tutor_sessions", "id") {
+    val schoolId    = uuid("school_id")
+    val studentId   = uuid("student_id")
+    val sessionType = varchar("session_type", 16)
+    val subject     = text("subject")
+    val topic       = text("topic").nullable()
+    val messages    = text("messages")  // JSON
+    val modelUsed   = varchar("model_used", 64).nullable()
+    val tokensUsed  = integer("tokens_used").nullable()
+    val createdAt   = timestamp("created_at")
+}
+
+object AiTutorMasteryTable : UUIDTable("ai_tutor_mastery", "id") {
+    val schoolId           = uuid("school_id")
+    val studentId          = uuid("student_id")
+    val subject            = text("subject")
+    val topic              = text("topic")
+    val masteryLevel       = float("mastery_level").default(0f)
+    val questionsAttempted = integer("questions_attempted").default(0)
+    val questionsCorrect   = integer("questions_correct").default(0)
+    val lastPracticedAt    = timestamp("last_practiced_at").nullable()
+    val createdAt          = timestamp("created_at")
+    val updatedAt          = timestamp("updated_at")
+
+    init {
+        uniqueIndex("idx_tutor_mastery_unique", studentId, subject, topic)
+    }
+}
+
+object AiTutorDailyUsageTable : UUIDTable("ai_tutor_daily_usage", "id") {
+    val studentId    = uuid("student_id")
+    val date         = date("date")
+    val questionCount = integer("question_count").default(0)
+    val tokensUsed   = integer("tokens_used").default(0)
+
+    init {
+        uniqueIndex("idx_tutor_daily_unique", studentId, date)
+    }
+}
+```
+
+Register all 3 in `DatabaseFactory.allTables`.
+
+### 6.11 Seed Data
+
+N/A — AI tutor data created by usage. No seed data needed.
+
 ---
 
-## 5. Backend Architecture
+## 7. State Machines
 
-### 5.1 AiTutorService
+### Session State Machine
+
+```
+created ──student_asks──> active ──student_asks_more──> active
+  │                          │
+  │                          │──student_ends──> completed
+  │                          │
+  │                          │──rate_limit_exceeded──> rate_limited
+  │                          │
+  │                          │──ai_error──> error
+  │
+  └──session_timeout (30 min idle)──> completed
+```
+
+| Current State | Event | Next State | Guard / Condition |
+|---|---|---|---|
+| `created` | Student asks first question | `active` | Rate limit not exceeded |
+| `created` | Rate limit exceeded | `rate_limited` | Daily limit reached |
+| `active` | Student asks another question | `active` | Rate limit not exceeded |
+| `active` | Student ends session | `completed` | User action |
+| `active` | 30 min idle | `completed` | Timeout |
+| `active` | Rate limit exceeded | `rate_limited` | Daily limit reached |
+| `active` | AI service error | `error` | LLM call fails |
+| `rate_limited` | Next day | `created` (new session) | Daily reset |
+| `error` | Student retries | `active` | AI service available |
+
+### Mastery Level State Machine
+
+```
+new (0.0) ──correct_answer──> increasing ──mastery_updated──> mastered (≥0.8)
+  │                              │
+  │──wrong_answer──>             │──wrong_answer──> declining
+  declining                      declining
+  │                              │
+  └──mastery < 0.6──>            └──mastery < 0.6──>
+     needs_practice                 needs_practice
+```
+
+| Current State | Event | Next State | Guard / Condition |
+|---|---|---|---|
+| `new` (0.0) | Correct answer | `increasing` | `questions_correct / questions_attempted` increases |
+| `new` (0.0) | Wrong answer | `declining` | Mastery stays low |
+| `increasing` | Mastery ≥ 0.8 | `mastered` | 80%+ correct |
+| `increasing` | Wrong answer | `declining` | Mastery decreases |
+| `declining` | Correct answer | `increasing` | Mastery increases |
+| `declining` | Mastery < 0.6 | `needs_practice` | Below 60% threshold |
+| `needs_practice` | Correct answer | `increasing` | Mastery increases |
+| `mastered` | Wrong answer | `declining` | Mastery decreases |
+| `mastered` | Not practiced for 30 days | `needs_review` | Stale mastery |
+
+### Daily Usage State Machine
+
+```
+new_day (0 questions) ──ask_question──> counting ──ask_more──> counting
+  │                                        │
+  └──midnight_reset──>                     │──limit_reached (50)──> blocked
+  new_day                                 blocked
+                                           │
+                                           └──midnight_reset──> new_day
+```
+
+| Current State | Event | Next State | Guard / Condition |
+|---|---|---|---|
+| `new_day` | Student asks question | `counting` | `question_count = 1` |
+| `counting` | Student asks question | `counting` | `question_count < 50` |
+| `counting` | `question_count = 50` | `blocked` | Daily limit reached |
+| `blocked` | Student asks question | `blocked` | Return 429 |
+| `blocked` | Midnight (new day) | `new_day` | Daily reset |
+| `counting` | Midnight (new day) | `new_day` | Daily reset |
+
+---
+
+## 8. Backend Architecture
+
+### 8.1 Component Overview
+
+`AiTutorService` handles session management, question processing, practice generation, grading, and mastery tracking. `AdaptivePathEngine` computes topic recommendations. Uses existing `AiService` from `AI_INFRASTRUCTURE_SPEC.md` for LLM calls with multi-provider failover.
+
+### 8.2 Design Principles
+
+1. **Guide, don't solve** — AI must explain concepts and guide, never give direct answers
+2. **Curriculum-aware** — AI knows student's grade, curriculum, syllabus progress, and mastery levels
+3. **Rate-limited** — 50 questions/day per student, enforced server-side
+4. **Mastery-driven** — practice difficulty and adaptive path based on mastery levels
+5. **DPDP compliant** — all conversations logged, teacher can review
+6. **Multi-language** — AI responds in student's preferred language
+
+### 8.3 Core Types
+
+#### AiTutorService
 
 ```kotlin
 class AiTutorService(private val aiService: AiService) {
@@ -118,7 +560,92 @@ class AiTutorService(private val aiService: AiService) {
 }
 ```
 
-### 5.2 System Prompts
+#### AdaptivePathEngine
+
+```kotlin
+fun getAdaptivePath(studentId: UUID): List<TopicRecommendation> {
+    // 1. Get all curriculum units for student's class+subject
+    // 2. Get mastery levels for each topic
+    // 3. Sort by:
+    //    a. Topics in current syllabus unit (not yet mastered) — highest priority
+    //    b. Topics with mastery < 0.6 — high priority
+    //    c. Upcoming topics (pre-learning) — medium priority
+    //    d. Mastered topics (review) — low priority
+    // 4. Return top 5 recommendations
+}
+```
+
+### 8.4 Repositories
+
+- `TutorSessionRepository` — CRUD for `ai_tutor_sessions`
+- `TutorMasteryRepository` — CRUD for `ai_tutor_mastery` (with upsert for mastery update)
+- `TutorDailyUsageRepository` — CRUD for `ai_tutor_daily_usage` (with upsert for daily count)
+
+### 8.5 Mappers
+
+- `TutorSessionMapper` — maps `ai_tutor_sessions` rows to `SessionDto`
+- `TutorMasteryMapper` — maps `ai_tutor_mastery` rows to `MasteryDto`
+
+### 8.6 Permission Checks
+
+- Parent endpoints: parent role + `ChildAccessResolver` (parent-child link)
+- Teacher endpoints: teacher role + class assignment verification
+- All endpoints: JWT auth via `requireAuth()`
+
+### 8.7 Background Jobs
+
+- **Mastery Decay Check** — weekly
+  1. Query `ai_tutor_mastery` where `last_practiced_at < now() - 30 days` AND `mastery_level >= 0.8`
+  2. Mark as `needs_review` (reduce mastery by 10% for stale topics)
+  3. Return count
+
+- **Daily Usage Reset** — daily at midnight
+  1. No action needed — new rows created on first question each day
+  2. Old daily usage rows retained for analytics
+
+### 8.8 Domain Events
+
+- `TutorSessionStarted` — emitted when session created
+- `TutorQuestionAsked` — emitted when student asks a question (includes tokens used)
+- `PracticeQuestionGenerated` — emitted when practice questions generated
+- `PracticeAnswerGraded` — emitted when practice answer graded (includes correct/incorrect)
+- `MasteryUpdated` — emitted when mastery level changes
+- `RateLimitExceeded` — emitted when student hits daily limit
+
+### 8.9 Caching
+
+- Mastery levels: cached per student per subject, 5-minute TTL
+- Adaptive path: cached per student, 10-minute TTL
+- Teacher insights: cached per class, 10-minute TTL
+- Session messages: not cached (real-time, stored in DB)
+
+### 8.10 Transactions
+
+- Session creation: single transaction (insert session row)
+- Question asking: single transaction (update session messages, update daily usage)
+- Practice grading: single transaction (update mastery, update session if applicable)
+- Mastery upsert: single transaction (insert or update mastery row)
+
+### 8.11 Rate Limiting
+
+- 50 questions per day per student (configurable via `AI_TUTOR_DAILY_QUESTION_LIMIT`)
+- Enforced server-side via `ai_tutor_daily_usage` table
+- Returns 429 with message "Daily limit reached. Try again tomorrow."
+- Practice question generation counts as 1 question (not N)
+
+### 8.12 Configuration
+
+- `AI_TUTOR_ENABLED` — default `true`; enable/disable feature
+- `AI_TUTOR_DAILY_QUESTION_LIMIT` — default `50`; max questions per student per day
+- `AI_TUTOR_MAX_TOKENS_PER_QUESTION` — default `2000`; max tokens per AI response
+- `AI_TUTOR_SESSION_TIMEOUT_MINUTES` — default `30`; idle session timeout
+- `AI_TUTOR_MASTERY_THRESHOLD` — default `0.6`; below this = needs practice
+- `AI_TUTOR_MASTERY_MASTERED` — default `0.8`; at or above = mastered
+- `AI_TUTOR_MASTERY_DECAY_DAYS` — default `30`; days without practice before decay
+- `AI_TUTOR_MASTERY_DECAY_RATE` — default `0.1`; mastery reduction for stale topics
+- `AI_TUTOR_PRACTICE_QUESTIONS_PER_REQUEST` — default `5`; questions per generation
+
+### 8.13 System Prompts
 
 **Homework help:**
 ```
@@ -143,42 +670,509 @@ Each question should have: question_text, options (if MCQ), correct_answer, expl
 Output JSON array.
 ```
 
-### 5.3 Adaptive Path Algorithm
+---
+
+## 9. API Contracts
+
+### 9.1 Parent Endpoints
+
+```
+POST /api/v1/parent/ai-tutor/session
+  Body: { student_id: "uuid", session_type: "homework_help", subject: "Math", topic: "Fractions" }
+  → 201: SessionDto
+
+POST /api/v1/parent/ai-tutor/session/{id}/ask
+  Body: { question: "How do I add fractions?", image_url: "https://supabase.url/hw.webp" }
+  → 200: { answer: "Let me explain...", tokens_used: 350 }
+  → 429: Daily limit reached
+
+POST /api/v1/parent/ai-tutor/practice
+  Body: { student_id: "uuid", subject: "Math", topic: "Fractions", difficulty: "medium" }
+  → 200: { questions: [PracticeQuestion] }
+
+POST /api/v1/parent/ai-tutor/practice/grade
+  Body: { student_id: "uuid", question_id: "uuid", answer: "3/4" }
+  → 200: { correct: true, explanation: "...", updated_mastery: 0.75 }
+
+GET /api/v1/parent/ai-tutor/adaptive-path/{studentId}
+  → 200: { recommendations: [TopicRecommendation] }
+
+GET /api/v1/parent/ai-tutor/mastery/{studentId}
+  → 200: { subjects: [{ subject: "Math", topics: [{ topic: "Fractions", mastery: 0.75 }] }] }
+
+GET /api/v1/parent/ai-tutor/sessions/{studentId}?page={n}
+  → 200: { sessions: [SessionDto], total: Int, page: Int, pageSize: Int }
+```
+
+### 9.2 Teacher Endpoints
+
+```
+GET /api/v1/teacher/ai-tutor/insights/{classId}
+  → 200: {
+    subjects: [{
+      subject: "Math",
+      topics: [{
+        topic: "Fractions",
+        averageMastery: 0.55,
+        studentsBelowThreshold: 12,
+        totalStudents: 30
+      }]
+    }]
+  }
+```
+
+### 9.3 DTO Models
+
+All `@Serializable`, wrapped in `ApiResponse<T>` pattern.
 
 ```kotlin
-fun getAdaptivePath(studentId: UUID): List<TopicRecommendation> {
-    // 1. Get all curriculum units for student's class+subject
-    // 2. Get mastery levels for each topic
-    // 3. Sort by:
-    //    a. Topics in current syllabus unit (not yet mastered) — highest priority
-    //    b. Topics with mastery < 0.6 — high priority
-    //    c. Upcoming topics (pre-learning) — medium priority
-    //    d. Mastered topics (review) — low priority
-    // 4. Return top 5 recommendations
+@Serializable data class SessionDto(
+    val id: String,
+    val sessionType: String,
+    val subject: String,
+    val topic: String?,
+    val messages: List<ChatMessage>,
+    val createdAt: String,
+)
+
+@Serializable data class ChatMessage(
+    val role: String,       // "user" | "assistant"
+    val content: String,
+    val timestamp: String,
+)
+
+@Serializable data class AnswerDto(
+    val answer: String,
+    val tokensUsed: Int,
+)
+
+@Serializable data class PracticeQuestion(
+    val id: String,
+    val questionText: String,
+    val options: List<String>?,  // null if not MCQ
+    val correctAnswer: String,
+    val explanation: String,
+    val difficulty: String,      // "easy" | "medium" | "hard"
+)
+
+@Serializable data class GradeResult(
+    val correct: Boolean,
+    val explanation: String,
+    val updatedMastery: Double,
+)
+
+@Serializable data class TopicRecommendation(
+    val subject: String,
+    val topic: String,
+    val reason: String,          // "current_unit_not_mastered" | "low_mastery" | "upcoming" | "review"
+    val currentMastery: Double,
+    val priority: Int,           // 1 (highest) to 5
+)
+
+@Serializable data class MasteryDto(
+    val subject: String,
+    val topic: String,
+    val masteryLevel: Double,    // 0.0 to 1.0
+    val questionsAttempted: Int,
+    val questionsCorrect: Int,
+    val lastPracticedAt: String?,
+)
+
+@Serializable data class TeacherInsightDto(
+    val subjects: List<SubjectInsight>,
+)
+
+@Serializable data class SubjectInsight(
+    val subject: String,
+    val topics: List<TopicInsight>,
+)
+
+@Serializable data class TopicInsight(
+    val topic: String,
+    val averageMastery: Double,
+    val studentsBelowThreshold: Int,
+    val totalStudents: Int,
+)
+
+enum class SessionType { HOMEWORK_HELP, CONCEPT_EXPLANATION, PRACTICE, ADAPTIVE_PATH }
+```
+
+---
+
+## 10. Frontend Architecture
+
+### 10.1 Screens
+
+| Screen | Platform | Role | Description |
+|---|---|---|---|
+| `AiTutorScreen` | Compose | Parent | Chat interface for homework help and concept explanation |
+| `AiTutorMasteryScreen` | Compose | Parent | Mastery dashboard showing per-topic mastery levels |
+| `AiTutorPracticeScreen` | Compose | Parent | Practice questions with grading feedback |
+| `AiTutorInsightsScreen` | Compose | Teacher | Class-wide mastery gaps and insights |
+
+### 10.2 Navigation
+
+- Parent: Home tab → AI Tutor → Chat / Practice / Mastery
+- Parent: AI Tutor → Session History → Session Detail
+- Teacher: Admin tab → AI Tutor Insights → Class view
+
+### 10.3 UX Flows
+
+#### Parent: Homework Help
+1. Parent opens AI Tutor
+2. Selects child (if multiple)
+3. Selects subject and topic (or "General")
+4. Types question or uploads photo of homework
+5. AI responds with guided explanation (not direct answer)
+6. Parent/student follows up with more questions
+7. Session saved automatically
+
+#### Parent: Practice Questions
+1. Parent opens AI Tutor → Practice
+2. Selects child, subject, topic
+3. Selects difficulty (easy/medium/hard) or "Adaptive"
+4. AI generates 5 practice questions
+5. Student answers each question
+6. AI grades answer, shows correct/incorrect with explanation
+7. Mastery level updated
+
+#### Parent: View Mastery
+1. Parent opens AI Tutor → Mastery
+2. Sees per-subject, per-topic mastery levels (0-100%)
+3. Color-coded: green (≥80%), yellow (60-80%), red (<60%)
+4. Taps topic → sees practice history
+
+#### Teacher: View Insights
+1. Teacher opens AI Tutor Insights
+2. Selects class
+3. Sees per-subject, per-topic average mastery
+4. Topics with average mastery < 60% highlighted
+5. Can see count of students below threshold
+
+### 10.4 State Management
+
+```kotlin
+data class AiTutorState(
+    val selectedChildId: String?,
+    val currentSession: SessionDto?,
+    val messages: List<ChatMessage>,
+    val isLoading: Boolean,
+    val error: String?,
+    val dailyQuestionsUsed: Int,
+    val dailyQuestionLimit: Int,
+)
+
+data class MasteryState(
+    val subjects: List<MasteryDto>,
+    val isLoading: Boolean,
+    val error: String?,
+)
+
+data class PracticeState(
+    val questions: List<PracticeQuestion>,
+    val currentQuestionIndex: Int,
+    val answers: Map<String, String>,
+    val gradingResults: Map<String, GradeResult>,
+    val isLoading: Boolean,
+)
+
+data class TeacherInsightsState(
+    val subjects: List<SubjectInsight>,
+    val selectedClassId: String?,
+    val isLoading: Boolean,
+    val error: String?,
+)
+```
+
+### 10.5 Offline Support
+
+- Session messages: not available offline (requires AI)
+- Mastery levels: cached locally (last fetched)
+- Practice questions: not available offline (requires AI generation)
+- Session history: cached locally (last fetched)
+
+### 10.6 Loading States
+
+- AI response: "VidyaSetu is thinking..." with animated indicator
+- Practice generation: "Generating practice questions..."
+- Mastery load: "Loading mastery levels..."
+- Grading: "Checking your answer..."
+
+### 10.7 Error Handling (UI)
+
+- Rate limit: "Daily limit of 50 questions reached. Try again tomorrow."
+- AI error: "VidyaSetu is having trouble right now. Please try again."
+- No data: "No mastery data yet. Start practicing to build mastery!"
+- Network error: "Connection issue. Please check your internet."
+
+### 10.8 Component Integration Guidelines
+
+| Rule | Description |
+|---|---|
+| **R1** | Chat interface with message bubbles (user right, AI left) |
+| **R2** | Image upload button in chat (for homework photos) |
+| **R3** | Typing indicator while AI responds |
+| **R4** | Mastery displayed as progress bars (0-100%) with color coding |
+| **R5** | Practice questions with MCQ options or text input |
+| **R6** | Grading feedback shows correct answer + explanation |
+| **R7** | Adaptive path shown as recommendation cards |
+| **R8** | Teacher insights as heatmap or table (topics vs mastery) |
+| **R9** | Daily usage counter shown ("12/50 questions used today") |
+| **R10** | Session history as paginated list with date, subject, topic |
+
+---
+
+## 11. Shared Module Changes (KMP)
+
+### 11.1 DTOs
+
+All DTOs defined in section 9.3, placed in `shared/.../ai/tutor/domain/model/AiTutorModels.kt`.
+
+### 11.2 Domain Models
+
+```kotlin
+data class TutorSession(
+    val id: String,
+    val studentId: String,
+    val sessionType: SessionType,
+    val subject: String,
+    val topic: String?,
+    val messages: List<ChatMessage>,
+    val createdAt: Instant,
+)
+
+data class TopicMastery(
+    val subject: String,
+    val topic: String,
+    val masteryLevel: Double,
+    val questionsAttempted: Int,
+    val questionsCorrect: Int,
+    val lastPracticedAt: Instant?,
+)
+
+data class PracticeQuestion(
+    val id: String,
+    val questionText: String,
+    val options: List<String>?,
+    val correctAnswer: String,
+    val explanation: String,
+    val difficulty: Difficulty,
+)
+
+enum class Difficulty { EASY, MEDIUM, HARD }
+```
+
+### 11.3 Repository Interfaces
+
+```kotlin
+interface AiTutorRepository {
+    suspend fun startSession(token: String, request: StartSessionRequest): NetworkResult<SessionDto>
+    suspend fun askQuestion(token: String, sessionId: String, request: AskQuestionRequest): NetworkResult<AnswerDto>
+    suspend fun generatePractice(token: String, request: PracticeRequest): NetworkResult<List<PracticeQuestion>>
+    suspend fun gradeAnswer(token: String, request: GradeRequest): NetworkResult<GradeResult>
+    suspend fun getAdaptivePath(token: String, studentId: String): NetworkResult<List<TopicRecommendation>>
+    suspend fun getMastery(token: String, studentId: String): NetworkResult<List<MasteryDto>>
+    suspend fun getSessions(token: String, studentId: String, page: Int): NetworkResult<PaginatedResult<SessionDto>>
+}
+
+interface AiTutorInsightsRepository {
+    suspend fun getTeacherInsights(token: String, classId: String): NetworkResult<TeacherInsightDto>
 }
 ```
 
+### 11.4 UseCases
+
+- `StartTutorSessionUseCase`
+- `AskTutorQuestionUseCase`
+- `GeneratePracticeQuestionsUseCase`
+- `GradePracticeAnswerUseCase`
+- `GetAdaptivePathUseCase`
+- `GetMasteryUseCase`
+- `GetSessionHistoryUseCase`
+- `GetTeacherInsightsUseCase`
+
+### 11.5 Validation
+
+- `student_id`: valid UUID, linked to parent
+- `session_type`: one of `homework_help`, `concept_explanation`, `practice`, `adaptive_path`
+- `subject`: non-empty
+- `difficulty`: one of `easy`, `medium`, `hard`
+- `question`: non-empty (text or image_url required)
+- `page`: ≥ 1
+
+### 11.6 Serialization
+
+Standard Kotlinx serialization. Enums serialized as lowercase strings. `SessionType` and `Difficulty` as snake_case.
+
+### 11.7 Network APIs
+
+Ktor `@Resource` route definitions in `AiTutorApi.kt`:
+- POST `/api/v1/parent/ai-tutor/session`
+- POST `/api/v1/parent/ai-tutor/session/{id}/ask`
+- POST `/api/v1/parent/ai-tutor/practice`
+- POST `/api/v1/parent/ai-tutor/practice/grade`
+- GET `/api/v1/parent/ai-tutor/adaptive-path/{studentId}`
+- GET `/api/v1/parent/ai-tutor/mastery/{studentId}`
+- GET `/api/v1/parent/ai-tutor/sessions/{studentId}`
+- GET `/api/v1/teacher/ai-tutor/insights/{classId}`
+
+### 11.8 Database Models (Local Cache)
+
+- Mastery levels cached in DataStore (JSON, 5-minute TTL)
+- Session history cached in local DB (last fetched)
+- Daily usage count cached in memory (reset on app restart)
+
 ---
 
-## 6. API Contracts
+## 12. Permissions Matrix
 
-```
-# Parent (on behalf of student)
-POST /api/v1/parent/ai-tutor/session  { student_id, session_type, subject, topic }
-POST /api/v1/parent/ai-tutor/session/{id}/ask  { question, image_url }
-POST /api/v1/parent/ai-tutor/practice  { student_id, subject, topic, difficulty }
-POST /api/v1/parent/ai-tutor/practice/grade  { student_id, question_id, answer }
-GET /api/v1/parent/ai-tutor/adaptive-path/{studentId}
-GET /api/v1/parent/ai-tutor/mastery/{studentId}
-GET /api/v1/parent/ai-tutor/sessions/{studentId}?page={n}
-
-# Teacher
-GET /api/v1/teacher/ai-tutor/insights/{classId}
-```
+| Action | Super Admin | School Admin | Teacher | Parent |
+|---|---|---|---|---|
+| Start tutoring session | N/A | N/A | N/A | ✅ |
+| Ask homework question | N/A | N/A | N/A | ✅ |
+| Generate practice questions | N/A | N/A | N/A | ✅ |
+| Grade practice answer | N/A | N/A | N/A | ✅ |
+| View own child's mastery | N/A | N/A | N/A | ✅ |
+| View own child's sessions | N/A | N/A | N/A | ✅ |
+| View adaptive path | N/A | N/A | N/A | ✅ |
+| View class insights | ✅ | ✅ | ✅ | ❌ |
+| Review AI conversations | ✅ | ✅ | ✅ | ❌ |
+| Configure rate limit | ✅ | ✅ | ❌ | ❌ |
 
 ---
 
-## 7. Safety & Content Guidelines
+## 13. Notifications
+
+### AI Tutor Notifications
+
+| Trigger | Recipient | Channel | Template |
+|---|---|---|---|
+| Daily limit reached | Parent | FCM + in-app | "Your child has reached the daily AI tutor limit (50 questions)." |
+| Mastery milestone (80%) | Parent | FCM + in-app | "Great! Your child has mastered {topic} in {subject}!" |
+| Mastery decline (<40%) | Parent | FCM + in-app | "Your child may need help with {topic} in {subject}." |
+| Stale mastery (30 days) | Parent | FCM + in-app | "It's been a while since {child} practiced {topic}. Consider a review session." |
+
+### Notification Integration
+
+Uses existing `Notify.kt` dispatch. Notifications created with category "ai_tutor" and sent via FCM + in-app.
+
+---
+
+## 14. Background Jobs
+
+### Mastery Decay Check Job
+
+| Property | Value |
+|---|---|
+| **Name** | `MasteryDecayCheckJob` |
+| **Schedule** | Weekly (Sunday 2 AM IST) |
+| **Duration** | < 2 minutes |
+| **Retry** | None (next week) |
+
+#### Job Flow
+
+1. Query `ai_tutor_mastery` where `last_practiced_at < now() - 30 days` AND `mastery_level >= 0.8`
+2. Reduce mastery by 10% (decay rate configurable)
+3. Send "stale mastery" notification to parent
+4. Return count
+
+### Daily Usage Reset
+
+No job needed — new rows created on first question each day. Old rows retained for analytics.
+
+---
+
+## 15. Integrations
+
+### Internal Integrations
+
+| System | Integration Point | Direction | Protocol | Error Handling |
+|---|---|---|---|---|
+| `AiService` (`AI_INFRASTRUCTURE_SPEC.md`) | LLM completion | Call | Direct call | Multi-provider failover |
+| `AssessmentMarksTable` | Student performance | Read | Direct DB | Use 0% if no data |
+| `CurriculumUnitsTable` | Curriculum context | Read | Direct DB | Return empty if no curriculum |
+| `SyllabusProgressTable` | Current syllabus unit | Read | Direct DB | Default to first unit |
+| `HomeworkTable` | Homework context | Read | Direct DB | Optional context |
+| `StudentsTable` | Student grade, language | Read | Direct DB | Return error if not found |
+| `ChildAccessResolver` | Parent-child link | Read | Direct call | Return 403 if not linked |
+| `Notify.kt` | Notifications | Call | Direct call | Log on failure |
+| Supabase Storage | Homework photo storage | Upload/Read | HTTP API | Log on failure |
+
+### External Integrations
+
+| System | Purpose | Direction | Protocol | Authentication | Error Handling |
+|---|---|---|---|---|---|
+| LLM Provider (via `AiService`) | AI tutoring responses | Outbound | HTTP API | API key (existing) | Multi-provider failover |
+
+### Integration Patterns
+
+- **AiService:** `aiService.complete(null, null, "tutor", "tutor_v1", context)` — uses existing AI infrastructure
+- **Curriculum context:** Fetched from `CurriculumUnitsTable` and `SyllabusProgressTable` to build AI context
+- **Mastery context:** Fetched from `ai_tutor_mastery` to inform AI of student's level
+- **Notifications:** `Notify.kt` called with category "ai_tutor" for milestones and decline alerts
+
+---
+
+## 16. Security
+
+### Authentication
+
+- All AI tutor APIs: JWT auth via `requireAuth()`
+- Parent endpoints: parent role + `ChildAccessResolver`
+- Teacher endpoints: teacher role + class assignment
+
+### Authorization
+
+- Parent can only access AI tutor for linked children
+- Teacher can only view insights for assigned classes
+- No cross-school AI tutor access
+
+### Data Protection
+
+- AI conversations: stored in DB, accessible to parent (own child) and teacher (class)
+- Mastery data: same sensitivity as marks data
+- No PII sent to LLM (only grade, subject, topic, mastery level)
+- Student name NOT sent to LLM
+
+### Input Validation
+
+- `student_id`: valid UUID, linked to parent
+- `session_type`: one of allowed values
+- `subject`: non-empty, max 100 characters
+- `topic`: max 200 characters
+- `question`: non-empty, max 2000 characters
+- `image_url`: valid URL (if provided)
+- `difficulty`: one of `easy`, `medium`, `hard`
+
+### Rate Limiting
+
+- 50 questions per day per student (server-side enforced)
+- Practice generation counts as 1 question
+- Returns 429 when exceeded
+
+### Audit Logging
+
+- Session started: parent ID, student ID, session type, subject, topic
+- Question asked: session ID, question length, tokens used, model
+- Practice generated: student ID, subject, topic, difficulty, count
+- Practice graded: student ID, question ID, correct/incorrect, mastery change
+- Rate limit exceeded: student ID, daily count
+
+### PII Handling
+
+- Student name NOT sent to LLM (only grade, subject, topic)
+- Conversations stored in DB (DPDP compliance)
+- Teacher can review conversations for quality
+- No PII in notifications (only child reference and topic name)
+
+### Multi-tenant Isolation
+
+- `ai_tutor_sessions.school_id` — school-scoped
+- `ai_tutor_mastery.school_id` — school-scoped
+- All queries filtered by `school_id`
+- No cross-school AI tutor access
+
+### Safety & Content Guidelines
 
 - AI must NOT solve homework directly — must guide and explain
 - AI must NOT provide answers to exam questions
@@ -190,7 +1184,212 @@ GET /api/v1/teacher/ai-tutor/insights/{classId}
 
 ---
 
-## 8. Acceptance Criteria
+## 17. Performance & Scalability
+
+### Expected Scale
+
+- 1 student asks 10-50 questions per day
+- 100 students per school → 1,000-5,000 questions per day per school
+- 10 schools → 10,000-50,000 questions per day
+- Each question: 1 LLM call (~2,000 tokens)
+
+### Query Optimization
+
+- Session history: `idx_tutor_sessions_student(student_id, created_at DESC)` — paginated
+- Mastery lookup: `idx_tutor_mastery_student(student_id, subject)` — indexed
+- Daily usage: `idx_tutor_daily_unique(student_id, date)` — UNIQUE, O(1) lookup
+
+### Indexing Strategy
+
+- `ai_tutor_sessions(student_id, created_at DESC)` — session history
+- `ai_tutor_mastery(student_id, subject, topic)` — UNIQUE, mastery lookup
+- `ai_tutor_daily_usage(student_id, date)` — UNIQUE, rate limiting
+
+### Caching Strategy
+
+- Mastery levels: cached per student per subject, 5-minute TTL
+- Adaptive path: cached per student, 10-minute TTL
+- Teacher insights: cached per class, 10-minute TTL
+- Session messages: not cached (real-time)
+
+### Pagination
+
+- Session history: 20 sessions per page
+
+### Connection Pooling
+
+Uses existing HikariCP connection pool. No additional pooling needed.
+
+### Async Processing
+
+- AI calls: synchronous (with timeout)
+- Mastery updates: synchronous (within transaction)
+- Notifications: async (fire-and-forget via `Notify.kt`)
+
+### Scalability Concerns
+
+- LLM calls: 50,000/day → ~0.6 QPS average, ~5 QPS peak. Manageable with existing AI infrastructure.
+- Token usage: 50,000 × 2,000 tokens = 100M tokens/day. Monitor costs.
+- DB storage: 50,000 sessions/day × ~5KB messages = ~250MB/day. Manageable.
+- Mastery table: 1 row per student per topic. ~100 topics × 1,000 students = 100K rows. Negligible.
+
+---
+
+## 18. Edge Cases
+
+| # | Scenario | Expected Behavior |
+|---|---|---|
+| EC-1 | Student asks direct homework answer | AI refuses, explains concept instead, gives hint |
+| EC-2 | Student uploads unclear photo | AI asks student to retype question or upload clearer photo |
+| EC-3 | Rate limit exceeded mid-session | Return 429. Session saved. Student can continue next day. |
+| EC-4 | LLM provider unavailable | Multi-provider failover. If all fail, return "VidyaSetu is unavailable." |
+| EC-5 | LLM response exceeds token limit | Truncate response. Log warning. |
+| EC-6 | No curriculum data for student | AI tutor works with reduced context. No adaptive path available. |
+| EC-7 | No mastery data (new student) | Mastery starts at 0. Adaptive path shows current syllabus topics. |
+| EC-8 | Student asks question in different language | AI responds in student's preferred language (set in profile) |
+| EC-9 | Teacher views insights for class with no AI tutor usage | Return empty insights. "No AI tutor data for this class yet." |
+| EC-10 | Parent tries to access another parent's child | Return 403 "Access denied." |
+| EC-11 | Session timeout (30 min idle) | Session marked completed. Student can start new session. |
+| EC-12 | Practice question generation fails | Return error. Student can retry. No charge to daily limit. |
+| EC-13 | Grading ambiguous answer | AI attempts best-match grading. Shows explanation. Student can dispute. |
+| EC-14 | Mastery calculation: first attempt | Mastery = 1.0 if correct, 0.0 if wrong. Updates with each attempt. |
+| EC-15 | Topic not in curriculum | AI tutor still works. Adaptive path won't recommend non-curriculum topics. |
+| EC-16 | Student asks inappropriate question | AI refuses. Log incident. Notify school admin. |
+| EC-17 | LLM returns invalid JSON for practice questions | Retry with stricter prompt. If still fails, return error. |
+| EC-18 | Daily usage row doesn't exist for today | Create new row with count = 1. |
+| EC-19 | Mastery decay reduces below threshold | Send "needs practice" notification. Include in adaptive path. |
+| EC-20 | Concurrent questions from same student | Allow (different sessions). Rate limit checks total daily count. |
+
+---
+
+## 19. Error Handling
+
+### Error Response Format
+
+Standard `ApiResponse` error format.
+
+### Error Codes
+
+| Code | HTTP Status | Description | User Message |
+|---|---|---|---|
+| `RATE_LIMIT_EXCEEDED` | 429 | Daily question limit reached | "Daily limit of {limit} questions reached. Try again tomorrow." |
+| `SESSION_NOT_FOUND` | 404 | Session ID not found | "Session not found." |
+| `CHILD_NOT_LINKED` | 403 | Parent doesn't have access to child | "You do not have access to this child." |
+| `AI_SERVICE_UNAVAILABLE` | 503 | All LLM providers unavailable | "VidyaSetu is unavailable right now. Please try again." |
+| `INVALID_SESSION_TYPE` | 400 | Session type not valid | "Invalid session type." |
+| `INVALID_DIFFICULTY` | 400 | Difficulty not valid | "Invalid difficulty. Use easy, medium, or hard." |
+| `QUESTION_EMPTY` | 400 | No question text or image | "Please enter a question or upload a photo." |
+| `CLASS_NOT_ASSIGNED` | 403 | Teacher not assigned to class | "You do not have access to this class." |
+
+### Error Handling Strategy
+
+- **AI errors:** Multi-provider failover. If all fail, return 503. No charge to daily limit.
+- **Rate limit:** Return 429. Session saved. No charge for rejected question.
+- **Validation errors:** Return 400 with specific message.
+- **Permission errors:** Return 403.
+
+### Retry Strategy
+
+- AI service: multi-provider failover (existing infrastructure)
+- Client: retry on 503 (3 attempts with 5-second intervals)
+- Practice generation: retry with stricter prompt on invalid JSON
+
+### Fallback Behavior
+
+- AI unavailable: "VidyaSetu is unavailable. Please try again later."
+- No curriculum data: AI tutor works with reduced context
+- No mastery data: start at 0, adaptive path shows current syllabus
+- LLM timeout: return 503, no charge to daily limit
+
+---
+
+## 20. Analytics & Reporting
+
+### Analytics Dashboard Data
+
+| Metric | Source | Derivation |
+|---|---|---|
+| Total sessions per day | `ai_tutor_sessions` | Count by date |
+| Total questions per day | `ai_tutor_daily_usage` | Sum of `question_count` |
+| Average questions per student | `ai_tutor_daily_usage` | Avg of `question_count` |
+| Tokens used per day | `ai_tutor_daily_usage` | Sum of `tokens_used` |
+| Average mastery per subject | `ai_tutor_mastery` | Avg `mastery_level` grouped by subject |
+| Topics with lowest mastery | `ai_tutor_mastery` | Sort by `mastery_level` ascending |
+| Most asked subjects | `ai_tutor_sessions` | Count by subject |
+| Most asked topics | `ai_tutor_sessions` | Count by topic |
+| Practice completion rate | `ai_tutor_mastery` | `questions_attempted` / sessions |
+| Rate limit hits per day | Audit logs | Count of 429 responses |
+
+### Export Capabilities
+
+- Session export (CSV) — student, subject, topic, date, tokens
+- Mastery export (CSV) — student, subject, topic, mastery level, questions attempted
+
+### Report Types
+
+| Report | Format | Frequency | Recipient |
+|---|---|---|---|
+| AI tutor usage | JSON (API) | On-demand | School Admin |
+| Mastery summary | JSON (API) | On-demand | Teacher |
+| Token usage | JSON (API) | Weekly | Dev Team |
+| Cost analysis | JSON (API) | Monthly | Dev Team |
+
+---
+
+## 21. Testing Strategy
+
+### Unit Tests
+
+- `AiTutorService.startSession()` — session creation, validation
+- `AiTutorService.askQuestion()` — rate limit check, context building, AI call, message update
+- `AiTutorService.generatePracticeQuestions()` — prompt building, JSON parsing, difficulty calibration
+- `AiTutorService.gradePracticeAnswer()` — answer comparison, mastery update
+- `AdaptivePathEngine.getAdaptivePath()` — sorting logic, priority calculation, top 5 selection
+- `AiTutorService.getTeacherInsights()` — aggregation, average mastery, threshold counting
+- Rate limiting — daily count check, 429 response, daily reset
+- Mastery calculation — correct/incorrect, mastery update, decay
+
+### Integration Tests
+
+- Full tutoring flow: start session → ask question → get AI response → verify session updated
+- Practice flow: generate questions → answer → grade → verify mastery updated
+- Rate limit: ask 50 questions → 51st returns 429
+- Adaptive path: with mastery data → verify recommendations sorted correctly
+- Teacher insights: multiple students with varying mastery → verify aggregation
+- Multi-provider failover: primary LLM fails → secondary used
+
+### E2E Tests
+
+- Parent starts homework help session → asks question → gets guided response
+- Parent generates practice → student answers → mastery updates → adaptive path adjusts
+- Teacher views class insights → sees mastery gaps
+
+### Performance Tests
+
+- AI response: < 5 seconds per question
+- Practice generation: < 10 seconds for 5 questions
+- Mastery update: < 500ms
+- Adaptive path: < 1 second
+- Teacher insights: < 2 seconds for class of 50 students
+
+### Test Data
+
+- 5 students with varying mastery levels (0%, 30%, 60%, 80%, 100%)
+- 3 subjects with 5 topics each
+- 20 sample sessions with messages
+- Mock LLM (returns guided responses, practice questions, grading)
+- Mock Supabase Storage (for homework photos)
+
+### Test Environment
+
+- Test database with AI tutor tables
+- Mock LLM provider (returns controlled responses)
+- Mock Supabase Storage
+- Test JWT tokens for parent and teacher roles
+
+---
+
+## 22. Acceptance Criteria
 
 - [ ] Student can start tutoring session for any subject/topic
 - [ ] AI guides homework help without giving direct answers
@@ -201,34 +1400,401 @@ GET /api/v1/teacher/ai-tutor/insights/{classId}
 - [ ] Conversation history available
 - [ ] Rate limiting enforced (50 questions/day)
 - [ ] Multi-language support
+- [ ] Image upload for homework photos
+- [ ] Daily usage counter visible to parent
+- [ ] AI safety guidelines enforced (no direct answers)
 
 ---
 
-## 9. Implementation Roadmap
+## 23. Implementation Roadmap
 
 | Phase | Duration | Tasks |
 |---|---|---|
-| 1 | 2 days | DB migration, Exposed tables |
-| 2 | 3 days | AiTutorService (session, ask, practice, grade) |
-| 3 | 2 days | Adaptive path algorithm + mastery tracking |
+| 1 | 2 days | DB migration `migration_076_ai_tutor.sql`, Exposed tables, register in `DatabaseFactory` |
+| 2 | 3 days | `AiTutorService` (session, ask, practice, grade) |
+| 3 | 2 days | `AdaptivePathEngine` + mastery tracking |
 | 4 | 2 days | System prompts + safety guidelines |
 | 5 | 2 days | Teacher insights aggregation |
 | 6 | 2 days | API endpoints + rate limiting |
-| 7 | 5 days | Client UI (chat interface, practice questions, mastery dashboard, teacher view) |
-| 8 | 2 days | Tests |
+| 7 | 5 days | Client UI: `AiTutorScreen` (chat), `AiTutorPracticeScreen`, `AiTutorMasteryScreen`, `AiTutorInsightsScreen` |
+| 8 | 2 days | Tests: unit, integration, E2E |
+
+### Pre-Implementation Checklist
+
+- [ ] Verify `AI_INFRASTRUCTURE_SPEC.md` is implemented and `AiService` available
+- [ ] Verify `CURRICULUM_TEMPLATES_SPEC.md` is implemented
+- [ ] Verify `AssessmentMarksTable` has test data
+- [ ] Verify `ChildAccessResolver` works correctly
+- [ ] Verify LLM provider supports JSON output for practice questions
+- [ ] Verify Supabase Storage for homework photo uploads
+- [ ] Verify `Notify.kt` supports "ai_tutor" category
 
 ---
 
-## 10. File-Level Impact Analysis
+## 24. File-Level Impact Analysis
+
+### Server
 
 | File | Change Type | Description |
 |---|---|---|
-| `server/.../db/Tables.kt` | Add | 3 AI tutor tables |
-| `server/.../feature/ai/tutor/AiTutorService.kt` | New | Core service |
-| `server/.../feature/ai/tutor/AdaptivePathEngine.kt` | New | Adaptive learning algorithm |
-| `server/.../feature/ai/tutor/AiTutorRouting.kt` | New | API endpoints |
-| `docs/db/migration_076_ai_tutor.sql` | New | DDL |
-| `shared/.../feature/ai/tutor/AiTutorApi.kt` | New | Client API |
-| `composeApp/.../ui/v2/screens/parent/AiTutorScreen.kt` | New | Chat interface |
-| `composeApp/.../ui/v2/screens/parent/AiTutorMasteryScreen.kt` | New | Mastery dashboard |
-| `composeApp/.../ui/v2/screens/teacher/AiTutorInsightsScreen.kt` | New | Teacher insights |
+| `server/.../db/Tables.kt` | Add | `AiTutorSessionsTable`, `AiTutorMasteryTable`, `AiTutorDailyUsageTable` |
+| `server/.../db/DatabaseFactory.kt` | Modify | Register 3 AI tutor tables in `allTables` |
+| `server/.../feature/ai/tutor/AiTutorService.kt` | **New** | Core service (session, ask, practice, grade, mastery, insights) |
+| `server/.../feature/ai/tutor/AdaptivePathEngine.kt` | **New** | Adaptive learning algorithm |
+| `server/.../feature/ai/tutor/AiTutorRouting.kt` | **New** | API endpoints (parent + teacher) |
+| `server/.../feature/ai/tutor/MasteryDecayCheckJob.kt` | **New** | Weekly mastery decay job |
+| `docs/db/migration_076_ai_tutor.sql` | **New** | DDL: 3 AI tutor tables |
+
+### Shared (KMP)
+
+| File | Change Type | Description |
+|---|---|---|
+| `shared/.../ai/tutor/domain/model/AiTutorModels.kt` | **New** | DTOs, domain models, enums |
+| `shared/.../ai/tutor/domain/repository/AiTutorRepository.kt` | **New** | Repository interface |
+| `shared/.../ai/tutor/data/remote/AiTutorApi.kt` | **New** | HTTP API definitions |
+
+### Client (Compose)
+
+| File | Change Type | Description |
+|---|---|---|
+| `composeApp/.../ui/v2/screens/parent/AiTutorScreen.kt` | **New** | Chat interface for homework help |
+| `composeApp/.../ui/v2/screens/parent/AiTutorPracticeScreen.kt` | **New** | Practice questions with grading |
+| `composeApp/.../ui/v2/screens/parent/AiTutorMasteryScreen.kt` | **New** | Mastery dashboard |
+| `composeApp/.../ui/v2/screens/teacher/AiTutorInsightsScreen.kt` | **New** | Teacher insights (class mastery gaps) |
+
+---
+
+## 25. Future Enhancements
+
+| # | Enhancement | Priority | Effort | Notes |
+|---|---|---|---|---|
+| F-1 | Voice-based interaction | Medium | L | Voice input and output for younger students |
+| F-2 | Real-time human tutor handoff | Medium | L | Switch to human tutor when AI can't help |
+| F-3 | Gamification (badges, streaks) | Medium | M | Motivate students with achievements |
+| F-4 | Cross-school peer learning | Low | L | Anonymized peer comparisons |
+| F-5 | Parent-facing tutor controls | Medium | S | Parent can set topics, restrict subjects |
+| F-6 | AI tutor for teachers (lesson planning) | Medium | M | AI helps teachers create lesson plans |
+| F-7 | Video explanation generation | Low | L | AI generates video explanations |
+| F-8 | Interactive whiteboard | Low | L | AI draws diagrams/steps on whiteboard |
+| F-9 | Multi-modal input (math equations) | Medium | M | LaTeX/math equation input support |
+| F-10 | Adaptive difficulty within sessions | Medium | S | AI adjusts difficulty based on real-time performance |
+
+---
+
+## Appendix A: Sequence Diagrams
+
+### A.1 Homework Help Flow
+
+```
+Parent (app)       Server              AiService          LLM
+  │                  │                    │                 │
+  │  POST /session   │                    │                 │
+  │  {student_id,    │                    │                 │
+  │   type: hw_help, │                    │                 │
+  │   subject: Math} │                    │                 │
+  │  ──────────────> │                    │                 │
+  │                  │──create session──> │                 │
+  │  ←──201: SessionDto                   │                 │
+  │                  │                    │                 │
+  │  POST /session/{id}/ask               │                 │
+  │  {question: "How do I add fractions?"}│                 │
+  │  ──────────────> │                    │                 │
+  │                  │──check rate limit──>│                 │
+  │                  │──build context─────││                 │
+  │                  │  (grade, mastery,  ││                 │
+  │                  │   curriculum)      ││                 │
+  │                  │──call AiService───→│                 │
+  │                  │                    │──LLM call──────→│
+  │                  │                    │←──AI response───│
+  │                  │←──answer───────────│                 │
+  │                  │──update session───→│                 │
+  │                  │──update usage─────→│                 │
+  │  ←──200: answer + tokens_used         │                 │
+  │                  │                    │                 │
+  │  ──render chat response──             │                 │
+  │                  │                    │                 │
+```
+
+### A.2 Practice & Mastery Flow
+
+```
+Parent (app)       Server              AiService          DB
+  │                  │                    │                 │
+  │  POST /practice  │                    │                 │
+  │  {student_id,    │                    │                 │
+  │   subject, topic,│                    │                 │
+  │   difficulty}    │                    │                 │
+  │  ──────────────> │                    │                 │
+  │                  │──generate prompt──→│                 │
+  │                  │                    │──LLM call──────→│
+  │                  │                    │←──JSON questions│
+  │  ←──200: 5 practice questions         │                 │
+  │                  │                    │                 │
+  │  POST /practice/grade                 │                 │
+  │  {question_id, answer}                │                 │
+  │  ──────────────> │                    │                 │
+  │                  │──grade answer─────→│                 │
+  │                  │──update mastery────────────────────→│
+  │                  │←──updated mastery───────────────────│
+  │  ←──200: correct, explanation,        │                 │
+  │           updated_mastery              │                 │
+  │                  │                    │                 │
+```
+
+---
+
+## Appendix B: Domain Model / ER Diagram
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                    ai_tutor_sessions (new)                             │
+│  id (PK)                                                              │
+│  school_id, student_id                                                │
+│  session_type (homework_help|concept_explanation|practice|adaptive)   │
+│  subject, topic                                                       │
+│  messages (JSON: [{role, content, timestamp}])                        │
+│  model_used, tokens_used                                              │
+│  created_at                                                           │
+│  INDEX: (student_id, created_at DESC)                                 │
+└──────────────────────────┬───────────────────────────────────────────┘
+                           │
+                           │  student_id
+                           ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                     ai_tutor_mastery (new)                             │
+│  id (PK)                                                              │
+│  school_id, student_id                                                │
+│  subject, topic                                                       │
+│  mastery_level (0.0-1.0)                                              │
+│  questions_attempted, questions_correct                               │
+│  last_practiced_at, created_at, updated_at                            │
+│  UNIQUE: (student_id, subject, topic)                                 │
+│  INDEX: (student_id, subject)                                         │
+└──────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────┐
+│                   ai_tutor_daily_usage (new)                           │
+│  id (PK)                                                              │
+│  student_id, date                                                     │
+│  question_count, tokens_used                                          │
+│  UNIQUE: (student_id, date)                                           │
+└──────────────────────────────────────────────────────────────────────┘
+
+Existing tables used (read-only):
+┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+│ assessment_marks  │  │ curriculum_units │  │ syllabus_progress│
+│ (existing)        │  │ (existing)       │  │ (existing)       │
+└──────────────────┘  └──────────────────┘  └──────────────────┘
+```
+
+---
+
+## Appendix C: Event Flow
+
+### Domain Events
+
+| Event | Emitter | Consumers | Payload | Side Effects |
+|---|---|---|---|---|
+| `TutorSessionStarted` | `AiTutorService.startSession()` | None (logged) | `sessionId, studentId, type, subject, topic` | Session created |
+| `TutorQuestionAsked` | `AiTutorService.askQuestion()` | None (logged) | `sessionId, questionLength, tokensUsed, model` | Daily usage updated |
+| `PracticeQuestionGenerated` | `AiTutorService.generatePracticeQuestions()` | None (logged) | `studentId, subject, topic, difficulty, count` | None |
+| `PracticeAnswerGraded` | `AiTutorService.gradePracticeAnswer()` | `Notify.kt` (on milestone) | `studentId, questionId, correct, masteryChange` | Mastery updated, notification if milestone |
+| `MasteryUpdated` | `AiTutorService.gradePracticeAnswer()` | `Notify.kt` (on decline) | `studentId, subject, topic, oldLevel, newLevel` | Notification if decline < 40% |
+| `RateLimitExceeded` | `AiTutorService.askQuestion()` | None (logged) | `studentId, dailyCount` | 429 returned |
+| `MasteryDecayed` | `MasteryDecayCheckJob` | `Notify.kt` | `studentId, subject, topic, oldLevel, newLevel` | Stale mastery notification |
+
+### Event Delivery Guarantees
+
+- Events emitted synchronously within service methods
+- All events logged for audit (DPDP compliance)
+- Notification dispatch is async (fire-and-forget)
+
+---
+
+## Appendix D: Configuration
+
+### Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `AI_TUTOR_ENABLED` | `true` | Enable/disable AI tutor feature |
+| `AI_TUTOR_DAILY_QUESTION_LIMIT` | `50` | Max questions per student per day |
+| `AI_TUTOR_MAX_TOKENS_PER_QUESTION` | `2000` | Max tokens per AI response |
+| `AI_TUTOR_SESSION_TIMEOUT_MINUTES` | `30` | Idle session timeout |
+| `AI_TUTOR_MASTERY_THRESHOLD` | `0.6` | Below this = needs practice |
+| `AI_TUTOR_MASTERY_MASTERED` | `0.8` | At or above = mastered |
+| `AI_TUTOR_MASTERY_DECAY_DAYS` | `30` | Days without practice before decay |
+| `AI_TUTOR_MASTERY_DECAY_RATE` | `0.1` | Mastery reduction for stale topics |
+| `AI_TUTOR_PRACTICE_QUESTIONS_PER_REQUEST` | `5` | Questions per generation |
+| `AI_TUTOR_MODEL` | `tutor_v1` | AI model identifier |
+
+### Feature Flags
+
+| Flag | Default | Description |
+|---|---|---|
+| `AI_TUTOR_ENABLED` | `true` | Enable/disable AI tutor |
+| `AI_TUTOR_HOMEWORK_HELP_ENABLED` | `true` | Enable/disable homework help |
+| `AI_TUTOR_PRACTICE_ENABLED` | `true` | Enable/disable practice questions |
+| `AI_TUTOR_ADAPTIVE_PATH_ENABLED` | `true` | Enable/disable adaptive path |
+| `AI_TUTOR_TEACHER_INSIGHTS_ENABLED` | `true` | Enable/disable teacher insights |
+| `AI_TUTOR_MASTERY_DECAY_ENABLED` | `true` | Enable/disable mastery decay |
+
+### School-Level Settings
+
+| Setting | Default | Description |
+|---|---|---|
+| `ai_tutor_daily_limit` | `50` | Per-school override for daily question limit |
+| `ai_tutor_enabled` | `true` | Per-school enable/disable |
+
+---
+
+## Appendix E: Migration & Rollback
+
+### Migration: `migration_076_ai_tutor.sql`
+
+```sql
+-- Migration 076: VidyaSetu AI Tutor
+-- Creates ai_tutor_sessions, ai_tutor_mastery, ai_tutor_daily_usage tables
+
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS ai_tutor_sessions (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    school_id       UUID NOT NULL,
+    student_id      UUID NOT NULL,
+    session_type    VARCHAR(16) NOT NULL,
+    subject         TEXT NOT NULL,
+    topic           TEXT,
+    messages        TEXT NOT NULL,
+    model_used      VARCHAR(64),
+    tokens_used     INTEGER,
+    created_at      TIMESTAMP NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tutor_sessions_student
+    ON ai_tutor_sessions (student_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS ai_tutor_mastery (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    school_id       UUID NOT NULL,
+    student_id      UUID NOT NULL,
+    subject         TEXT NOT NULL,
+    topic           TEXT NOT NULL,
+    mastery_level   REAL NOT NULL DEFAULT 0,
+    questions_attempted INTEGER NOT NULL DEFAULT 0,
+    questions_correct   INTEGER NOT NULL DEFAULT 0,
+    last_practiced_at   TIMESTAMP,
+    created_at      TIMESTAMP NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMP NOT NULL DEFAULT now(),
+    UNIQUE(student_id, subject, topic)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tutor_mastery_student
+    ON ai_tutor_mastery (student_id, subject);
+
+CREATE TABLE IF NOT EXISTS ai_tutor_daily_usage (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id      UUID NOT NULL,
+    date            DATE NOT NULL,
+    question_count  INTEGER NOT NULL DEFAULT 0,
+    tokens_used     INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(student_id, date)
+);
+
+COMMIT;
+```
+
+### Rollback: `migration_076_rollback.sql`
+
+```sql
+BEGIN;
+DROP TABLE IF EXISTS ai_tutor_daily_usage;
+DROP TABLE IF EXISTS ai_tutor_mastery;
+DROP TABLE IF EXISTS ai_tutor_sessions;
+COMMIT;
+```
+
+### Migration Validation
+
+- Verify 3 tables created with correct columns
+- Verify `ai_tutor_mastery(student_id, subject, topic)` UNIQUE constraint
+- Verify `ai_tutor_daily_usage(student_id, date)` UNIQUE constraint
+- Verify indexes created
+- Run `SELECT count(*) FROM ai_tutor_sessions` — should be 0 (new feature)
+
+---
+
+## Appendix F: Observability
+
+### Structured Logging
+
+| Log Level | Event | Context Fields |
+|---|---|---|
+| INFO | Session started | `sessionId, studentId, schoolId, type, subject, topic` |
+| INFO | Question asked | `sessionId, studentId, questionLength, tokensUsed, model` |
+| INFO | Practice generated | `studentId, subject, topic, difficulty, count` |
+| INFO | Practice graded | `studentId, questionId, correct, masteryChange` |
+| INFO | Mastery updated | `studentId, subject, topic, oldLevel, newLevel` |
+| INFO | Teacher insights viewed | `teacherId, classId` |
+| WARN | Rate limit exceeded | `studentId, dailyCount, limit` |
+| WARN | AI safety trigger | `sessionId, studentId, question` (inappropriate request) |
+| WARN | Mastery decayed | `studentId, subject, topic, oldLevel, newLevel` |
+| WARN | LLM provider failover | `primaryProvider, secondaryProvider, reason` |
+| ERROR | AI service unavailable | `sessionId, studentId, error` |
+| ERROR | Practice JSON parse failed | `studentId, rawResponse, error` |
+| ERROR | Session not found | `sessionId, studentId` |
+
+### Metrics
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `ai_tutor_sessions_total` | Counter | `school_id, type` | Total sessions by type |
+| `ai_tutor_questions_total` | Counter | `school_id, subject` | Total questions asked |
+| `ai_tutor_tokens_used` | Counter | `model` | Total tokens consumed |
+| `ai_tutor_response_duration` | Histogram | `type` | AI response latency |
+| `ai_tutor_rate_limit_hits` | Counter | `school_id` | Rate limit 429 count |
+| `ai_tutor_avg_mastery` | Gauge | `school_id, subject` | Average mastery per subject |
+| `ai_tutor_practice_accuracy` | Gauge | `school_id, subject` | Practice correct rate |
+| `ai_tutor_active_sessions` | Gauge | `school_id` | Currently active sessions |
+| `ai_tutor_daily_active_students` | Gauge | `school_id` | Unique students using tutor per day |
+
+### Health Checks
+
+| Check | Endpoint | Description |
+|---|---|---|
+| AI tutor service | `/health/ai-tutor` | Verify service and DB accessible |
+| LLM connectivity | `/health/ai` | Verify LLM providers reachable (existing) |
+
+### Alerts
+
+| Alert | Condition | Severity | Notification |
+|---|---|---|---|
+| AI tutor error rate high | Error rate > 5% | Warning | Email to dev team |
+| LLM failover rate high | Failover > 20% | Warning | Email to dev team |
+| Token usage spike | Daily tokens > 150% of average | Warning | Email to dev team (cost) |
+| Rate limit hits increasing | 429 rate > 10% | Info | Email to product team (consider raising limit) |
+| AI safety triggers | Any safety trigger | Critical | Email to dev team + school admin |
+
+### Dashboards
+
+| Dashboard | Panels | Audience |
+|---|---|---|
+| AI Tutor Usage | Sessions/day, questions/day, active students, tokens/day | Product Team |
+| AI Tutor Performance | Response duration, error rate, failover rate | Dev Team |
+| Mastery Overview | Avg mastery per subject, topics with low mastery | School Admin |
+| Cost Analysis | Tokens/day, cost/day, cost per student | Dev Team |
+| Safety | Safety triggers, inappropriate requests | Dev Team + School Admin |
+
+### Risk Analysis
+
+| Risk | Likelihood | Impact | Mitigation |
+|---|---|---|---|
+| LLM gives direct answers | Medium | High | System prompt enforces "guide, don't solve". Teacher review. |
+| LLM unavailable | Low | High | Multi-provider failover. Graceful 503. |
+| Token cost explosion | Medium | Medium | Rate limiting (50/day). Token monitoring. Alerts on spike. |
+| Inappropriate content | Low | High | Safety guidelines. AI refuses. Log + notify admin. |
+| Student over-reliance on AI | Medium | Medium | "Guide, don't solve" policy. Teacher visibility. |
+| Mastery data inaccurate | Low | Medium | Based on practice performance. Teacher can review. |
+| Slow AI responses | Medium | Medium | 5-second target. Timeout at 15 seconds. |
+| DB storage growth | Low | Low | ~250MB/day. Manageable. Archive old sessions. |
+| Privacy/DPDP non-compliance | Low | High | All conversations logged. No PII to LLM. Teacher review. |
