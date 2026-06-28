@@ -335,7 +335,7 @@ N/A — branding row is never deleted. If school wants to revert, set `is_custom
 
 ### 6.9 Migration Notes
 
-Migration: `docs/db/migration_075_school_branding.sql`
+Migration: `docs/db/migration_101_school_branding.sql`
 - CREATE `school_branding` table
 - No data migration (new feature)
 - Existing `SchoolsTable.logoUrl` not migrated (superseded by `school_branding.logo_url`)
@@ -1110,7 +1110,7 @@ N/A — branding data not exportable.
 
 | Phase | Duration | Tasks |
 |---|---|---|
-| 1 | 1 day | DB migration `migration_075_school_branding.sql`, Exposed table, register in `DatabaseFactory` |
+| 1 | 1 day | DB migration `migration_101_school_branding.sql`, Exposed table, register in `DatabaseFactory` |
 | 2 | 2 days | `BrandingService` (CRUD, asset upload, subdomain management) |
 | 3 | 2 days | Dynamic theming in `VColors`/`VTheme` — `BrandingManager` |
 | 4 | 2 days | Login screen + splash screen branding |
@@ -1140,7 +1140,7 @@ N/A — branding data not exportable.
 | `server/.../feature/branding/BrandingService.kt` | **New** | Core branding service (CRUD, upload, subdomain) |
 | `server/.../feature/branding/BrandingRepository.kt` | **New** | Branding repository |
 | `server/.../feature/branding/BrandingRouting.kt` | **New** | API endpoints (admin + public) |
-| `docs/db/migration_075_school_branding.sql` | **New** | DDL: `school_branding` table |
+| `docs/db/migration_101_school_branding.sql` | **New** | DDL: `school_branding` table |
 
 ### Shared (KMP)
 
@@ -1335,10 +1335,10 @@ N/A — branding IS the school-level setting. No additional configuration needed
 
 ## Appendix E: Migration & Rollback
 
-### Migration: `migration_075_school_branding.sql`
+### Migration: `migration_101_school_branding.sql`
 
 ```sql
--- Migration 075: School Branding Kit
+-- Migration 101: School Branding Kit
 -- Creates school_branding table for per-school branding customization
 
 BEGIN;
@@ -1368,7 +1368,7 @@ CREATE INDEX IF NOT EXISTS idx_school_branding_subdomain
 COMMIT;
 ```
 
-### Rollback: `migration_075_rollback.sql`
+### Rollback: `migration_101_rollback.sql`
 
 ```sql
 BEGIN;
