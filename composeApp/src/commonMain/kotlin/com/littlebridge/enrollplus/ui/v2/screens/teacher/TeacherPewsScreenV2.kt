@@ -182,11 +182,12 @@ private fun TeacherStudentCard(
         interventions.filter { it.status == "open" || it.status == "in_progress" }.forEach { iv ->
             Spacer(Modifier.height(10.dp))
             Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(c.cream).padding(10.dp)) {
+                val notes = iv.notes
                 Column {
                     Text(iv.actionType.replace('_', ' '), style = VTheme.type.label.colored(c.ink).copy(fontWeight = FontWeight.SemiBold, fontSize = 12.sp))
-                    if (!iv.notes.isNullOrBlank()) {
+                    if (!notes.isNullOrBlank()) {
                         Spacer(Modifier.height(4.dp))
-                        Text(iv.notes, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 17.sp))
+                        Text(notes, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 17.sp))
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
