@@ -275,14 +275,16 @@ private fun InterventionCard(
             Text(iv.actionType.replace('_', ' '), style = VTheme.type.bodyStrong.colored(c.ink), modifier = Modifier.weight(1f))
             VBadge(text = iv.status.replace('_', ' '), tone = statusTone)
         }
-        if (!iv.notes.isNullOrBlank()) {
+        val notes = iv.notes
+        if (!notes.isNullOrBlank()) {
             Spacer(Modifier.height(6.dp))
-            Text(iv.notes, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 17.sp))
+            Text(notes, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 17.sp))
         }
         Spacer(Modifier.height(4.dp))
         Text("Opened ${iv.openedAt}", style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))
 
         val open = iv.status == "open" || iv.status == "in_progress"
+        val outcome = iv.outcome
         if (open) {
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -308,9 +310,9 @@ private fun InterventionCard(
                     enabled = !isUpdating,
                 )
             }
-        } else if (!iv.outcome.isNullOrBlank()) {
+        } else if (!outcome.isNullOrBlank()) {
             Spacer(Modifier.height(6.dp))
-            Text("Outcome: ${iv.outcome}", style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp))
+            Text("Outcome: $outcome", style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp))
         }
     }
 }
