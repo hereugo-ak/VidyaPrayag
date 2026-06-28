@@ -30,6 +30,7 @@
 19. [Development Phases & Milestones](#19-development-phases--milestones)
 20. [Risk Register](#20-risk-register)
 21. [Review & Approval Model](#21-review--approval-model)
+22. [Implementation Questions — Resolved](#22-implementation-questions--resolved)
 - [Appendix A: Crop Growth Timer Implementation](#appendix-a-crop-growth-timer-implementation)
 - [Appendix B: Farm Grid Data Model](#appendix-b-farm-grid-data-model-jsonb)
 - [Appendix C: Localization Keys](#appendix-c-localization-keys-sample)
@@ -228,7 +229,7 @@ Plant Seeds → Wait for Growth Timer → Harvest Crops → Sell at Market → E
 
 1. **All game actions write to local Room DB first** — zero latency for the player.
 2. **WorkManager syncs changes to backend** when network is available (exponential backoff).
-3. **Conflict resolution:** Last-write-wins for farm state; server-authoritative for economy (coins, purchases).
+3. **Conflict resolution:** Optimistic concurrency with per-tile last-write-wins. The `farms.version` field tracks the number of accepted actions. On sync, the server compares the client's `baseVersion` against the server's `version` to detect conflicts. Conflicts are resolved per-tile using `clientTimestamp` vs `lastModifiedAt` comparison (see Section 22.1, Q2). Server-authoritative for economy (coins, purchases).
 4. **Timers run on device time** — crop growth uses real-world timestamps, not active session time.
 5. **If offline > 24h:** On reconnect, server reconciles farm state, validates no cheating (time manipulation detection).
 6. **Game config caching:** Crop/animal/decoration/quest definitions are fetched on app launch and cached in Room DB. A `config_version` check (single API call) determines if re-fetch is needed. Full re-fetch only when version bumps.
@@ -425,6 +426,8 @@ The renderer is injected via Hilt, so switching is a one-line DI change with zer
 | Subscription check | Every 1 hour | Check for expired subscriptions, update is_premium flag |
 | Farm value recalc | Every 6 hours | Recalculate farm_value for all users based on current grid contents |
 | Seasonal event rotation | Configurable | Activate/deactivate seasonal events based on start/end dates |
+| Crop notification dispatch | Every 1 minute | Query `planted_crops` for matured/wilting crops, send FCM pushes (see Section 22.5, Q20/Q21) |
+| Quiet hours delivery | Every 5 minutes | Scan Redis quiet_queue for notifications past quiet hours end, deliver via FCM (see Section 22.5, Q22) |
 
 ### 5.2 API Design Principles
 
@@ -482,7 +485,10 @@ CREATE TABLE users (
     gems            INT NOT NULL DEFAULT 10,       -- premium currency
     farm_name       VARCHAR(50) NOT NULL,
     farm_grid_size  INT NOT NULL DEFAULT 6,        -- 6x6 starting grid
+    grid_expansion_discount INT NOT NULL DEFAULT 0,  -- one-time discount from Starter Bundle (500 = 500 coins off next expansion)
     friend_code     VARCHAR(6) UNIQUE NOT NULL,      -- 6-char alphanumeric for friend invites
+    phone_hash      VARCHAR(64) UNIQUE,              -- SHA-256 hash of normalized phone for contact sync lookup
+    discoverable_by_phone BOOLEAN NOT NULL DEFAULT TRUE,  -- user can opt out of phone contact discovery
     total_harvest_count BIGINT NOT NULL DEFAULT 0,  -- for leaderboards
     streak_days     INT NOT NULL DEFAULT 0,         -- daily login streak
     last_reward_claimed_at TIMESTAMPTZ,             -- last daily reward claim
@@ -494,6 +500,8 @@ CREATE TABLE users (
     is_premium      BOOLEAN NOT NULL DEFAULT FALSE,
     premium_expires_at TIMESTAMPTZ,                -- null if not premium
     is_guest        BOOLEAN NOT NULL DEFAULT FALSE,
+    role            VARCHAR(10) NOT NULL DEFAULT 'user',  -- 'user' or 'admin'; admin accounts access admin panel only
+    CHECK(role IN ('user', 'admin')),
     is_banned       BOOLEAN NOT NULL DEFAULT FALSE,
     ban_reason      VARCHAR(200),           -- reason shown to user in banned flow
     banned_at       TIMESTAMPTZ,            -- when ban was applied
@@ -597,6 +605,7 @@ CREATE TABLE gifts (
     item_type       VARCHAR(30) NOT NULL,
     item_id         VARCHAR(50) NOT NULL,
     quantity        INT NOT NULL DEFAULT 1,
+    CHECK(quantity > 0),
     message         VARCHAR(200),
     sender_balance_after BIGINT,  -- running balance for anti-cheat audit
     status          VARCHAR(15) NOT NULL DEFAULT 'pending',  -- 'pending', 'accepted', 'expired', 'rejected'
@@ -638,6 +647,7 @@ CREATE TABLE quest_definitions (
     reward_item_qty INT,
     level_required  INT NOT NULL DEFAULT 1,
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+    objectives      JSONB,  -- nullable; story quests use multi-step objectives array, daily quests use single-objective fields above
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -648,14 +658,14 @@ CREATE TABLE user_quests (
     progress        INT NOT NULL DEFAULT 0,
     status          VARCHAR(15) NOT NULL DEFAULT 'active',  -- 'active', 'completed', 'claimed'
     assigned_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    assigned_date   DATE NOT NULL DEFAULT CURRENT_DATE,  -- for daily quest reset/expiry
+    assigned_date   DATE,  -- NULL for story/achievement quests; set to CURRENT_DATE for daily quests
     completed_at    TIMESTAMPTZ,
     claimed_at      TIMESTAMPTZ,
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
--- Note: UNIQUE(user_id, quest_id) is NOT suitable for daily quests since the same quest_id
--- is re-assigned daily. Use UNIQUE(user_id, quest_id, assigned_date) for daily quests.
--- For story/achievement quests, use UNIQUE(user_id, quest_id).
+-- Note: For daily quests, assigned_date is set to CURRENT_DATE. For story/achievement quests, assigned_date is NULL.
+-- UNIQUE(user_id, quest_id, assigned_date) handles daily quest dedup.
+-- UNIQUE(user_id, quest_id) WHERE assigned_date IS NULL handles story/achievement quest dedup.
 
 -- ============ NOTIFICATIONS ============
 CREATE TABLE notification_log (
@@ -684,7 +694,9 @@ CREATE TABLE iap_transactions (
     reward_coins    BIGINT,
     reward_gems     INT,
     status          VARCHAR(15) NOT NULL DEFAULT 'pending',  -- 'pending', 'fulfilled', 'failed', 'refunded'
+    CHECK(status IN ('pending', 'fulfilled', 'failed', 'refunded')),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     fulfilled_at    TIMESTAMPTZ
 );
 
@@ -706,6 +718,8 @@ CREATE TABLE achievement_definitions (
     display_name    VARCHAR(100) NOT NULL,
     description     TEXT NOT NULL,
     category        VARCHAR(30) NOT NULL,  -- 'farming', 'social', 'economic', 'special'
+    objective_type  VARCHAR(30),  -- 'harvest_count', 'plant_count', 'earn_coins', 'reach_level', 'streak_days', etc.
+    objective_target INT,  -- target value for progress tracking
     icon_url        TEXT,
     tier            VARCHAR(10) NOT NULL DEFAULT 'bronze',  -- 'bronze', 'silver', 'gold', 'platinum'
     xp_reward       INT NOT NULL DEFAULT 0,
@@ -789,7 +803,8 @@ CREATE TABLE building_definitions (
 CREATE TABLE daily_reward_claims (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    streak_days     INT NOT NULL,              -- streak count at time of claim (snapshot)
+    streak_days     INT NOT NULL,
+    CHECK(streak_days >= 0),
     claimed_reward  JSONB NOT NULL,  -- { "coins": 100, "gems": 1, "item": "wheat_seed", "qty": 5 }
     claimed_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -848,6 +863,66 @@ CREATE TABLE subscription_status (
     UNIQUE(user_id)
 );
 
+-- ============ PLANTED CROPS (Server-Side Push Tracking) ============
+-- Projection table for push notification scheduling. NOT the source of truth
+-- for farm grid state (that's farms.grid_data JSONB). One row per growing crop,
+-- deleted on harvest or wither. See Section 22.5, Q20.
+CREATE TABLE planted_crops (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    farm_id         UUID NOT NULL REFERENCES farms(id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tile_id         VARCHAR(10) NOT NULL,
+    crop_id         VARCHAR(50) NOT NULL REFERENCES crop_definitions(id),
+    planted_at      TIMESTAMPTZ NOT NULL,
+    matures_at      TIMESTAMPTZ NOT NULL,
+    withers_at      TIMESTAMPTZ NOT NULL,
+    wither_warning_at TIMESTAMPTZ NOT NULL,
+    notification_sent BOOLEAN NOT NULL DEFAULT FALSE,
+    wither_notification_sent BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ============ SYNCED ACTIONS (Idempotency Log) ============
+-- Records each accepted sync-batch action to prevent replay on retry.
+-- See Section 22.1, Q1.
+CREATE TABLE synced_actions (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    action_id       UUID NOT NULL UNIQUE,  -- client-generated actionId
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    action_type     VARCHAR(30) NOT NULL,
+    processed_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_synced_actions_user ON synced_actions(user_id, processed_at DESC);
+
+-- ============ LEADERBOARD SNAPSHOTS ============
+-- Historical snapshots of weekly/seasonal leaderboards for records.
+-- See Section 22.7, Q29.
+CREATE TABLE leaderboard_snapshots (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    board_type      VARCHAR(30) NOT NULL,  -- 'weekly_harvest', 'seasonal'
+    period          VARCHAR(20) NOT NULL,  -- '2026-W26', 'harvest_festival_2026'
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    rank            INT NOT NULL,
+    score           BIGINT NOT NULL,
+    snapshot_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_leaderboard_snapshots_board ON leaderboard_snapshots(board_type, period, rank);
+
+-- ============ ADMIN AUDIT LOG ============
+-- Records all admin panel actions for accountability.
+-- See Section 22.7, Q30.
+CREATE TABLE admin_audit_log (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    admin_user_id   UUID NOT NULL REFERENCES users(id),
+    action          VARCHAR(50) NOT NULL,
+    target_type     VARCHAR(30),
+    target_id       UUID,
+    details         JSONB,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_admin_audit_admin ON admin_audit_log(admin_user_id, created_at DESC);
+CREATE INDEX idx_admin_audit_target ON admin_audit_log(target_type, target_id);
+
 -- ============ INDEXES ============
 -- Existing indexes
 CREATE INDEX idx_farms_user_id ON farms(user_id);
@@ -877,6 +952,9 @@ CREATE INDEX idx_farm_ratings_farm ON farm_ratings(farm_user_id);
 CREATE INDEX idx_user_devices_user ON user_devices(user_id);
 CREATE INDEX idx_subscription_status_user ON subscription_status(user_id, status);
 CREATE INDEX idx_iap_user_status ON iap_transactions(user_id, status);  -- purchase history
+CREATE INDEX idx_planted_crops_matures ON planted_crops(matures_at) WHERE notification_sent = FALSE;
+CREATE INDEX idx_planted_crops_wither_warn ON planted_crops(wither_warning_at) WHERE wither_notification_sent = FALSE;
+CREATE INDEX idx_planted_crops_user ON planted_crops(user_id);
 CREATE INDEX idx_iap_purchase_token ON iap_transactions(purchase_token);  -- dedup — same token not redeemed twice
 -- New table indexes (added in audit)
 CREATE UNIQUE INDEX idx_farm_visits_unique ON farm_visits(visitor_id, host_id, (visited_at::date));  -- 1 visit/day/friend
@@ -889,7 +967,7 @@ CREATE INDEX idx_friend_requests_expires ON friend_requests(expires_at);  -- cro
 CREATE UNIQUE INDEX idx_friend_requests_pending_unique ON friend_requests(sender_id, receiver_id) WHERE status = 'pending';  -- only 1 pending request per pair
 CREATE INDEX idx_blocked_users_blocker ON blocked_users(blocker_id);
 CREATE INDEX idx_blocked_users_blocked ON blocked_users(blocked_id);
-CREATE UNIQUE INDEX idx_user_quests_daily_unique ON user_quests(user_id, quest_id, assigned_date);  -- daily quest dedup
+CREATE UNIQUE INDEX idx_user_quests_daily_unique ON user_quests(user_id, quest_id, assigned_date) WHERE assigned_date IS NOT NULL;  -- daily quest dedup (one per day)
 CREATE UNIQUE INDEX idx_user_quests_story_unique ON user_quests(user_id, quest_id) WHERE assigned_date IS NULL;  -- story/achievement quest dedup (no daily reset)
 CREATE INDEX idx_gifts_receiver_status ON gifts(receiver_id, status);  -- pending received gifts
 CREATE INDEX idx_gifts_sender_status ON gifts(sender_id, status);  -- sent gifts history
@@ -918,6 +996,7 @@ CREATE TRIGGER trg_inventory_updated_at BEFORE UPDATE ON inventory_items FOR EAC
 CREATE TRIGGER trg_market_listings_updated_at BEFORE UPDATE ON market_listings FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER trg_user_quests_updated_at BEFORE UPDATE ON user_quests FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER trg_subscription_status_updated_at BEFORE UPDATE ON subscription_status FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_iap_transactions_updated_at BEFORE UPDATE ON iap_transactions FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 ```
 
 ### 6.3 Room Database (Client-Side)
@@ -938,6 +1017,8 @@ Mirrors server schema but simplified for offline use:
 - `BlockedUserEntity` — blocked users list (local cache for offline block enforcement)
 - `AdWatchLogEntity` — local ad watch log for frequency cap enforcement offline
 - `ConfigVersionEntity` — single-row table tracking last synced game config version
+- `PlantedCropEntity` — server-side push tracking table (client cache for local notification scheduling when app is foregrounded)
+- `SyncedActionEntity` — idempotency log for sync-batch actions (prevents replay on retry)
 
 ---
 
@@ -1112,7 +1193,7 @@ Empty Tile → Till (instant) → Plant Seed (choose crop) → Growing (real-tim
 | 9 | 5,500 | Quest slot 4 (4th daily quest) |
 | 10 | 8,000 | Grid expansion to 8×8 (cost: 5,000 coins) |
 | 11 | 12,000 | Premium decoration: Garden Gnome |
-| 12 | 17,000 | Second animal pen (place 2 animals on same tile) |
+| 12 | 17,000 | Co-house 2 small animals of same type on 1 tile (chicken, goat only) |
 | 13 | 23,000 | Market listing slot 5 (5 active listings) |
 | 14 | 30,000 | Story Quest Chapter 2 |
 | 15 | 40,000 | Grid expansion to 9×9 (cost: 12,000 coins) |
@@ -1309,7 +1390,7 @@ Empty Tile → Till (instant) → Plant Seed (choose crop) → Growing (real-tim
 | coins_mega | Vault of Coins | ₹499 | 8,000 coins (+60% bonus) |
 | gems_small | handful of Gems | ₹99 | 20 gems |
 | gems_medium | Pile of Gems | ₹299 | 75 gems (+25% bonus) |
-| starter_bundle | Starter Bundle | ₹149 | 1,000 coins + 10 gems + 5 free tiles |
+| starter_bundle | Starter Bundle | ₹149 | 1,000 coins + 10 gems + 500-coin grid expansion discount |
 | premium_monthly | Premium Farmer (Monthly) | ₹99/mo | See below |
 
 ### 10.3 Premium Farmer Subscription
@@ -1650,6 +1731,7 @@ Settings → Account → "Manage Subscription"
 | POST | `/api/v1/auth/upgrade-guest` | Convert guest to full account |
 | POST | `/api/v1/auth/refresh` | Refresh access token |
 | POST | `/api/v1/auth/logout` | Invalidate refresh token |
+| POST | `/api/v1/auth/ws-ticket` | Get short-lived WebSocket auth ticket (30s TTL) |
 
 #### Farm
 
@@ -1657,12 +1739,17 @@ Settings → Account → "Manage Subscription"
 |---|---|---|
 | GET | `/api/v1/farm` | Get current user's farm state |
 | PUT | `/api/v1/farm` | Sync full farm state (with version) |
+| POST | `/api/v1/farm/sync-batch` | Batch sync offline actions (max 500, action replay) |
 | POST | `/api/v1/farm/plant` | Plant a crop on a tile |
 | POST | `/api/v1/farm/harvest` | Harvest a mature crop |
 | POST | `/api/v1/farm/till` | Till a grass tile |
 | POST | `/api/v1/farm/place` | Place decoration/animal/building |
 | POST | `/api/v1/farm/remove` | Remove item from tile |
 | POST | `/api/v1/farm/expand` | Expand grid size |
+| POST | `/api/v1/farm/animal/feed` | Feed own animal (consumes crop from inventory) |
+| POST | `/api/v1/farm/animal/collect` | Collect animal product (adds to inventory) |
+| POST | `/api/v1/farm/speed-up` | Speed up crop growth (gems or ad reward) |
+| POST | `/api/v1/farm/revive` | Revive withered crop (gems or ad reward) |
 | GET | `/api/v1/farm/{userId}` | Get friend's farm snapshot (read-only) |
 
 #### Economy
@@ -1699,6 +1786,8 @@ Settings → Account → "Manage Subscription"
 | POST | `/api/v1/friends/water/{userId}` | Water friend's crops |
 | POST | `/api/v1/friends/feed/{userId}` | Feed friend's animals |
 | POST | `/api/v1/friends/rate/{userId}` | Rate friend's farm |
+| GET | `/api/v1/friends/search` | Search users by username or friend code (preview before sending request) |
+| POST | `/api/v1/friends/contacts-lookup` | Batch lookup hashed phone numbers for contact sync |
 | GET | `/api/v1/friends/code` | Get own friend code |
 | POST | `/api/v1/friends/code/regenerate` | Regenerate friend code (max once per 30 days) |
 
@@ -1717,6 +1806,7 @@ Settings → Account → "Manage Subscription"
 | Method | Path | Description |
 |---|---|---|
 | GET | `/api/v1/market/listings` | Browse market listings (filters, pagination) |
+| GET | `/api/v1/market/my-listings` | Get own listings (active + history) |
 | POST | `/api/v1/market/listings` | Create a listing |
 | DELETE | `/api/v1/market/listings/{id}` | Cancel own listing |
 | POST | `/api/v1/market/listings/{id}/buy` | Buy from a listing |
@@ -1727,6 +1817,7 @@ Settings → Account → "Manage Subscription"
 |---|---|---|
 | GET | `/api/v1/quests/active` | Get active quests + progress |
 | GET | `/api/v1/quests/daily` | Get today's daily quests |
+| GET | `/api/v1/quests/story` | Get story quests + progress |
 | POST | `/api/v1/quests/{id}/claim` | Claim quest reward |
 
 #### Leaderboards
@@ -1786,15 +1877,23 @@ Settings → Account → "Manage Subscription"
 | GET | `/api/v1/account/export` | Export user data (GDPR/DPDP compliance) |
 | POST | `/api/v1/account/report` | Report another user |
 
-#### Notification Preferences
+#### Notifications
 
 | Method | Path | Description |
 |---|---|---|
+| GET | `/api/v1/notifications` | Get notification list (paginated, filterable by type) |
 | GET | `/api/v1/notifications/preferences` | Get notification preferences + quiet hours |
 | PUT | `/api/v1/notifications/preferences` | Update notification preferences + quiet hours |
 | GET | `/api/v1/notifications/unread-count` | Get unread notification count (for badge) |
 | POST | `/api/v1/notifications/{id}/read` | Mark notification as read |
 | POST | `/api/v1/notifications/read-all` | Mark all notifications as read |
+
+#### Events
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/v1/events` | Get active seasonal events (user-facing, with event-specific quests/shop) |
+| GET | `/api/v1/events/{id}` | Get event details (quests, special crops, decorations, leaderboard) |
 
 #### Game Config
 
@@ -1804,12 +1903,32 @@ Settings → Account → "Manage Subscription"
 | GET | `/api/v1/config/crops` | Get all crop definitions |
 | GET | `/api/v1/config/animals` | Get all animal definitions |
 | GET | `/api/v1/config/quests` | Get all quest definitions |
-| GET | `/api/v1/config/events` | Get active seasonal events |
+| GET | `/api/v1/config/events` | Get active seasonal events (config cache) |
 | GET | `/api/v1/config/decorations` | Get all decoration definitions |
 | GET | `/api/v1/config/buildings` | Get all building definitions |
 | GET | `/api/v1/config/achievements` | Get all achievement definitions |
 | GET | `/api/v1/config/levels` | Get level/XP table |
 | GET | `/api/v1/config/daily-rewards` | Get daily reward tier table |
+
+#### Admin (separate web app, IP allowlist + 2FA required)
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/v1/admin/login` | Admin login (email + password + 2FA TOTP) |
+| GET | `/api/v1/admin/users` | Search/list users (filter by username, phone, ban status) |
+| POST | `/api/v1/admin/users/{id}/ban` | Ban user (specify reason + duration) |
+| POST | `/api/v1/admin/users/{id}/unban` | Unban user |
+| GET | `/api/v1/admin/economy` | Economy dashboard data (coin supply, faucet/sink, inflation rate) |
+| GET | `/api/v1/admin/flagged` | Flagged accounts (cheating, market manipulation, multi-account) |
+| GET | `/api/v1/admin/config/crops` | View crop definitions |
+| PUT | `/api/v1/admin/config/crops/{id}` | Update crop definition |
+| POST | `/api/v1/admin/config/crops` | Create new crop definition |
+| GET | `/api/v1/admin/config/quests` | View quest definitions |
+| PUT | `/api/v1/admin/config/quests/{id}` | Update quest definition |
+| GET | `/api/v1/admin/events` | View/manage seasonal events |
+| POST | `/api/v1/admin/events` | Create seasonal event |
+| PUT | `/api/v1/admin/events/{id}` | Update seasonal event |
+| GET | `/api/v1/admin/audit-log` | View admin action audit log |
 
 ### 13.2 WebSocket Events
 
@@ -2362,27 +2481,45 @@ data class PlantedCrop(
     val plantedAt: Long,  // epoch millis
     val growthTimeSec: Long,
     val witherMultiplier: Float = 2.0f,  // 2.0 for free, 3.0 for premium
-    val watered: Boolean = false,        // true if a friend watered this crop
-    val wateredBy: String? = null,       // user UUID of friend who watered
-    val wateredAt: Long? = null,         // epoch millis when watered
+    val wateringCount: Int = 0,           // 0–3 (max 3 waterings by different friends)
+    val wateredBy: List<String> = emptyList(),  // user UUIDs of friends who watered (max 3)
+    val wateredAt: List<Long> = emptyList(),    // epoch millis when each watering happened
+    val wateringReductionSec: Long = 0L,  // cumulative reduction from all waterings
 ) {
-    // Watering reduces remaining growth time by 10%. Applied at calculation time, not retroactively.
-    val effectiveGrowthTimeSec: Long get() =
-        if (watered) (growthTimeSec * 0.9).toLong() else growthTimeSec
+    val maturesAt: Long
+        get() = plantedAt + (growthTimeSec * 1000) - (wateringReductionSec * 1000)
 
-    val maturesAt: Long get() = plantedAt + (effectiveGrowthTimeSec * 1000)
-    val withersAt: Long get() = maturesAt + (growthTimeSec * 1000 * witherMultiplier.toLong())  // 2x or 3x original growth time
+    val withersAt: Long
+        get() = maturesAt + (growthTimeSec * 1000 * witherMultiplier.toLong())  // 2x or 3x original growth time
+
+    fun water(currentTime: Long = System.currentTimeMillis()): PlantedCrop {
+        if (wateringCount >= 3) return this  // cap reached
+        val remainingSec = ((maturesAt - currentTime) / 1000).coerceAtLeast(0)
+        if (remainingSec == 0L) return this  // already mature, no effect
+        val reductionSec = (remainingSec * 0.1).toLong()  // 10% of remaining time
+        return copy(
+            wateringCount = wateringCount + 1,
+            wateredBy = wateredBy + "friend_uuid",  // caller sets actual UUID
+            wateredAt = wateredAt + currentTime,
+            wateringReductionSec = wateringReductionSec + reductionSec
+        )
+    }
 
     fun getStage(currentTime: Long = System.currentTimeMillis()): CropStage {
         return when {
-            currentTime < maturesAt -> CropStage.GROWING(progress = ((currentTime - plantedAt).toFloat() / (maturesAt - plantedAt)))
-            currentTime < withersAt -> CropStage.MATURE
-            else -> CropStage.WITHERED
+            currentTime >= withersAt -> CropStage.WITHERED
+            currentTime >= maturesAt -> CropStage.MATURE
+            progress(currentTime) < 0.25f -> CropStage.SEED
+            progress(currentTime) < 0.50f -> CropStage.SPROUT
+            else -> CropStage.GROWING
         }
     }
+
+    private fun progress(currentTime: Long): Float =
+        (currentTime - plantedAt).toFloat() / (maturesAt - plantedAt)
 }
 
-enum class CropStage { GROWING, MATURE, WITHERED }
+enum class CropStage { SEED, SPROUT, GROWING, MATURE, WITHERED }
 ```
 
 ## Appendix B: Farm Grid Data Model (JSONB)
@@ -2400,9 +2537,10 @@ enum class CropStage { GROWING, MATURE, WITHERED }
         "plantedAt": 1719561600000,
         "growthTimeSec": 30,
         "witherMultiplier": 2.0,
-        "watered": true,
-        "wateredBy": "user_uuid_here",
-        "wateredAt": 1719561700000
+        "wateringCount": 1,
+        "wateredBy": ["user_uuid_here"],
+        "wateredAt": [1719561700000],
+        "wateringReductionSec": 3
       }
     },
     {
@@ -2429,8 +2567,8 @@ enum class CropStage { GROWING, MATURE, WITHERED }
       }
     }
   ],
-  "decorations": [
-    { "tileId": "3,4", "decorationId": "fence_wood" }
+  "overlays": [
+    { "tileId": "0,1", "decorationId": "lamp_post" }
   ]
 }
 ```
@@ -2516,3 +2654,991 @@ enum class CropStage { GROWING, MATURE, WITHERED }
 | Refund requests | Routed to Google Play's refund flow for IAP; subscription refunds handled per Section 10.6 |
 | Bug reports | Auto-include: device model, Android version, app version, logs (if user consents) |
 | FAQ content | Updated monthly based on top support tickets |
+
+---
+
+## 22. Implementation Questions — Resolved
+
+> The following questions were identified during an implementation-readiness review. Each answer has been reviewed from the perspective of a **senior developer** (technical feasibility), **product manager** (player experience & economy balance), **QA engineer** (edge cases & testability), and **end user** (is this fun and fair?). Answers are normative — they amend and clarify the spec. Where an answer modifies existing spec text, the conflict is noted.
+>
+> **Critical questions** (would block implementation immediately): Q1, Q10, Q20, Q26, Q33.
+
+### 22.1 Offline Sync
+
+**Q1: How does the server validate individual offline actions?**
+
+**Answer:** The server uses **action replay**, not full-state replacement. The sync flow:
+
+1. Client sends the `PendingActionEntity` queue to `POST /api/v1/farm/sync-batch` (new endpoint) as an ordered array of actions, each with a client-generated `actionId` (UUID), `actionType` (`PLANT`, `HARVEST`, `TILL`, `WATER`, `FEED`, `BUY`, `SELL`, `PLACE_DECORATION`, `REMOVE_DECORATION`, `PLACE_BUILDING`, `EXPAND_GRID`), `tileId`, relevant `cropId`/`itemId`/`animalId`, `clientTimestamp` (epoch millis), and `clientBalanceSnapshot` (coins/gems at time of action).
+2. Server processes actions **sequentially in order**. For each action:
+   - Validates timestamp: `|clientTimestamp - serverTimeAtReceipt| < 5 min` (grace for network latency). Actions outside this window are flagged but not auto-rejected — they enter a reconciliation path (see Q3).
+   - Validates economy: checks that the client's coin/gem balance snapshot is consistent with the server's authoritative ledger. If the action would result in a negative balance, the action is **rejected**.
+   - Validates game logic: e.g., can't plant on a tile that already has a crop, can't harvest an immature crop, can't sell an item not in inventory.
+   - If valid: applies the action to the server-side `farms.grid_data`, updates the `transactions` ledger, increments `version`, and records `actionId` in a new `synced_actions` log table (for idempotency — prevents replay).
+   - If invalid: **skips the action**, records it in the response as `{ actionId, status: "rejected", reason: "..." }`, and **continues processing remaining actions**. No rollback of previously accepted actions in the same batch.
+3. Server returns the full updated state (farm grid, coins, gems, XP, inventory) plus a per-action result array. Client replaces its local state with the server-confirmed state.
+
+**New endpoint:** `POST /api/v1/farm/sync-batch` (max 500 actions per request, 60s timeout).
+
+**Rationale (developer):** Sequential replay with per-action accept/reject is the only model that preserves server-authoritative economy while allowing partial offline progress. Full-state replacement would make anti-cheat impossible. Rollback-on-failure would punish players for a single invalid action in a long offline session.
+
+**Rationale (QA):** Test cases: (a) all actions valid → all accepted, (b) action #3 invalid → #1–#2 accepted, #3 rejected, #4–#10 accepted, (c) duplicate actionId (retry) → idempotent, returns original result, (d) > 500 actions → 400 error, client must chunk.
+
+**Rationale (end user):** If one action is rejected, you keep all your other progress. You see a non-intrusive toast: "1 action couldn't be synced — your farm has been updated."
+
+---
+
+**Q2: What's the conflict resolution for concurrent device sessions?**
+
+**Answer:** **Per-tile last-write-wins with timestamp comparison.** Each tile in `grid_data` carries a `lastModifiedAt` timestamp. When a sync-batch action modifies a tile, the server compares the action's `clientTimestamp` against the tile's current `lastModifiedAt`:
+
+- If `clientTimestamp > lastModifiedAt`: the new action wins. The tile is updated, `lastModifiedAt` is set to `clientTimestamp`.
+- If `clientTimestamp <= lastModifiedAt`: the action is **rejected** with reason `STALE_TILE`. The client receives the current server state for that tile.
+
+**Scenario:** Device A plants wheat on tile (0,0) at 10:00. Device B plants rice on tile (0,0) at 10:01. Both sync at 10:05.
+- Device A syncs first → server tile (0,0) = wheat, `lastModifiedAt` = 10:00.
+- Device B syncs → action timestamp 10:01 > 10:00 → rice replaces wheat. Device A's wheat seed is **refunded** (server detects seed was consumed by a now-overwritten action and credits it back via the `transactions` ledger as a `refund` type).
+- If Device B syncs first → rice at 10:01. Device A syncs → 10:00 < 10:01 → rejected as `STALE_TILE`. Device A's wheat seed is refunded (it was never consumed server-side since the action was rejected).
+
+**Seed refund mechanism:** When a `PLANT` action is rejected (`STALE_TILE` or `TILE_OCCUPIED`), the sync response includes a `refunds` array: `[{ actionId, itemType: "seed", itemId: "wheat_seed", quantity: 1 }]`. The client applies refunds to local inventory.
+
+**Rationale (product):** Refunding seeds on conflict is critical for player trust. A player who loses seeds because their other device synced first would feel cheated. The refund costs the economy nothing (the seed was never planted server-side).
+
+**Rationale (QA):** Test: two devices, same tile, sync in both orders. Verify refund. Test: three devices, rapid succession. Test: same-timestamp actions (resolve by `actionId` lexicographic order as tiebreaker).
+
+---
+
+**Q3: How long can a user stay offline before server rejects the sync?**
+
+**Answer:**
+
+| Offline Duration | Behavior |
+|---|---|
+| 0–24 hours | Normal sync-batch. All actions processed via standard validation. |
+| 24–72 hours | **Reconciliation mode.** Server processes actions but applies additional checks: (a) crop growth times re-validated against real elapsed time — if a player claims to have harvested a crop that couldn't have matured in the offline period, the action is rejected. (b) Total coins earned offline cannot exceed the theoretical maximum (all tiles planted + harvested at optimal cycles for the duration). If exceeded, excess is clawed back. (c) A `reconciliation_report` is included in the sync response showing any adjustments. |
+| 72 hours – 7 days | **Capped reconciliation.** Same as above, but the server only honors the **last 500 actions** (FIFO from the pending queue). Older actions are discarded. The player receives: "Some actions older than 3 days could not be synced. Your farm has been updated to the latest confirmed state." |
+| > 7 days | **Hard cutoff.** Sync is rejected with `409 CONFLICT` and `error.code = "OFFLINE_TOO_LONG"`. The client must discard its local pending queue and fetch the server state fresh. Player sees: "You've been offline for over 7 days. Your farm has been restored to its last saved state." |
+
+**Max batch size:** 500 actions per `sync-batch` request. If the pending queue exceeds 500, the client sends multiple sequential requests (chunked by timestamp order). WorkManager handles chunking automatically.
+
+**Rationale (developer):** 7 days is the hard cutoff because beyond that, the theoretical-max-earnings validation becomes unreliable. 500 actions caps request size at ~1 MB.
+
+**Rationale (end user):** 72 hours covers a long weekend trip. 7 days covers a vacation without internet. Beyond that, it's reasonable to say "we couldn't save your progress."
+
+**Rationale (QA):** Test boundary conditions: 23h59m (normal), 24h01m (reconciliation), 71h59m (capped), 7d01m (hard cutoff). Test 501 actions → 2 chunks.
+
+### 22.2 Economy & Transactions
+
+**Q4: What's the exact gem cost formula for speed-ups and revives?**
+
+**Answer:**
+
+**Speed-up (instantly mature a growing crop):**
+```
+gemCost = speedUpTier(remainingTimeSec)
+```
+Tiered pricing (non-linear — longer waits cost progressively more per minute saved):
+
+| Remaining Time | Gem Cost |
+|---|---|
+| < 10 min | 1 gem |
+| 10–20 min | 2 gems |
+| 20–30 min | 3 gems |
+| 30–45 min | 5 gems |
+| 45–60 min | 6 gems |
+| 1–2 hours | 10 gems |
+| 2+ hours | 15 gems (cap) |
+
+**Revive (restore a withered crop):**
+```
+gemCost = ceil(originalGrowthTimeSec / 900) × 1 gem per 15-minute block
+```
+| Crop Growth Time | Revive Cost |
+|---|---|
+| 30 sec (wheat) | 1 gem |
+| 5 min (tomato) | 1 gem |
+| 10 min (carrot) | 1 gem |
+| 30 min (mango) | 2 gems |
+| 45 min (cotton) | 3 gems |
+
+**Rationale (product):** Speed-up cost scales with remaining time so it's never "cheaper" to speed up early. Revive cost scales with original growth time (longer crops are more valuable to revive). Both are rounded up to ensure the gem sink is meaningful.
+
+**Rationale (end user):** A player with 1 gem can always revive a short crop. Speed-ups for long crops cost more, which feels fair — you're saving more waiting time.
+
+**Rationale (QA):** Test boundary: remaining time = exactly 10 min → 2 gems (not 1). Test revive on premium crop. Test speed-up on a crop with 1 second remaining → 1 gem (minimum).
+
+---
+
+**Q5: How does "grid expansion discount" with gems work?**
+
+**Answer:** Players can spend gems to reduce the coin cost of grid expansion by **50%**. The gem cost is fixed per expansion tier:
+
+| Grid Expansion | Coin Cost (normal) | Gem Cost (for 50% discount) | Coin Cost (with gem discount) |
+|---|---|---|---|
+| 6×6 → 7×7 | 2,000 | 5 gems | 1,000 |
+| 7×7 → 8×8 | 5,000 | 10 gems | 2,500 |
+| 8×8 → 9×9 | 12,000 | 15 gems | 6,000 |
+| 9×9 → 10×10 | 25,000 | 20 gems | 12,500 |
+| 10×10 → 12×12 | 50,000 | 30 gems | 25,000 |
+
+The player sees a toggle in the grid expansion dialog: "Use 10 gems to save 2,500 coins." If they have enough gems, they can choose either option.
+
+**Rationale (product):** 50% flat discount is simple to communicate. The gem cost scales with the coin savings, making it a meaningful sink at all levels. A high-level player with excess gems but coin-poor can use this; a low-level player with few gems will pay full coin price.
+
+---
+
+**Q6: What's the coin-to-gem conversion rate (if any)?**
+
+**Answer:** **No conversion in either direction.** Coins and gems are separate currencies with separate faucets and sinks. This is deliberate:
+
+- Coins are the "soft" currency — earned through gameplay, inflated over time, used for standard operations.
+- Gems are the "hard" currency — earned sparingly (daily rewards, achievements, IAP), used for convenience and premium content.
+- Allowing coin→gem conversion would let free players bypass the gem sink entirely, devaluing IAP. Allowing gem→coin conversion would let paying players skip the gameplay loop, reducing engagement.
+
+**Rationale (product):** This follows the standard freemium mobile game economy model (e.g., Clash of Clans: gold/elixir vs. gems). Mixing the two currencies undermines both.
+
+**Rationale (end user):** "I can't buy my way to gems, but I earn them by playing every day. That feels fair."
+
+---
+
+**Q7: How are market prices validated server-side?**
+
+**Answer:**
+
+| Rule | Value |
+|---|---|
+| **Min listing price** | 1 coin per unit |
+| **Max listing price** | 10× the NPC sell price for that item (e.g., wheat sell price = 12 → max listing = 120 coins/unit) |
+| **Suggested price range** | 50%–200% of NPC sell price (shown to player as a "fair price" guide in the UI) |
+| **Price anomaly detection** | Listings outside 50%–200% of NPC sell price are flagged for review. Listings above 5× NPC sell price are **auto-cancelled** at creation with error `PRICE_TOO_HIGH`. Listings below 25% of NPC sell price are allowed but flagged (could be a legitimate quick-sell). |
+| **Bulk listing threshold** | If a single user lists > 50 units of the same item in 24 hours, all their listings are flagged for review (potential coin-transfer via mule account). |
+
+**Rationale (developer):** The NPC sell price is the natural anchor — it's the price the game guarantees for any item. Capping at 10× prevents extreme coin transfers between accounts (the primary market abuse vector). The 50%–200% "fair price" guide helps players price reasonably without forcing them.
+
+**Rationale (QA):** Test: list at 1 coin → allowed. List at 11× NPC price → rejected. List at exactly 10× → allowed (boundary). List 51 units → flagged. Test: two accounts listing same item at extreme prices to transfer coins → both flagged.
+
+---
+
+**Q8: What happens when a buyer purchases a listing but the seller has simultaneously cancelled it?**
+
+**Answer:** The buy operation uses a **PostgreSQL row-level lock** (`SELECT ... FOR UPDATE`) on the `market_listings` row. The flow:
+
+1. Buyer calls `POST /api/v1/market/listings/{id}/buy`.
+2. Server begins transaction, locks the listing row.
+3. Checks `status == 'active'`. If `status == 'cancelled'` (seller cancelled first), returns `409 CONFLICT` with `error.code = "LISTING_CANCELLED"`. Buyer's coins are not deducted. Buyer sees: "This listing was cancelled by the seller."
+4. If `status == 'active'`, sets `status = 'sold'`, deducts buyer coins, credits seller coins, transfers item to buyer inventory, commits transaction.
+
+**Seller cancellation flow:**
+1. Seller calls `DELETE /api/v1/market/listings/{id}`.
+2. Server begins transaction, locks the listing row.
+3. Checks `status == 'active'`. If `status == 'sold'` (buyer purchased first), returns `409 CONFLICT` with `error.code = "ALREADY_SOLD"`. Seller sees: "This item was already sold."
+4. If `status == 'active'`, sets `status = 'cancelled'`, returns item to seller inventory, commits.
+
+**Guarantee:** Exactly one of the two operations succeeds. The row lock ensures atomicity. No double-spend, no duplicate items.
+
+**Rationale (developer):** `SELECT FOR UPDATE` is the standard PostgreSQL pattern for this race condition. The transaction is short-lived (single row lock + 2 table updates), so contention is minimal.
+
+**Rationale (QA):** Test: simulate concurrent buy + cancel on same listing. Verify exactly one succeeds. Test: 10 concurrent buyers on same listing → only 1 succeeds, 9 get `LISTING_SOLD`.
+
+### 22.3 Game Mechanics Gaps
+
+**Q9: What are the 4 crop growth stages?**
+
+**Answer:**
+
+| Stage | Name | Threshold | Sprite Description |
+|---|---|---|---|
+| 1 | Seed | 0% – <25% | Small mound of soil with a tiny sprout barely visible |
+| 2 | Sprout | 25% – <50% | Green sprout with 2 small leaves |
+| 3 | Growing | 50% – <100% | Larger plant, leaves spread, buds forming (crop-specific shape) |
+| 4 | Mature | 100% | Full-grown crop, ready to harvest (golden wheat, red tomato, etc.) |
+
+**Implementation:** The `getStage()` function in Appendix A should be updated to return granular stages for sprite selection:
+
+```kotlin
+enum class CropStage { SEED, SPROUT, GROWING, MATURE, WITHERED }
+
+fun getSpriteStage(currentTime: Long = System.currentTimeMillis()): CropStage {
+    val progress = (currentTime - plantedAt).toFloat() / (maturesAt - plantedAt)
+    return when {
+        currentTime >= withersAt -> CropStage.WITHERED
+        currentTime >= maturesAt -> CropStage.MATURE
+        progress < 0.25f -> CropStage.SEED
+        progress < 0.50f -> CropStage.SPROUT
+        else -> CropStage.GROWING
+    }
+}
+```
+
+**Rationale (end user):** Four visually distinct stages give players a clear sense of progress. The 25/50/100 thresholds mean the first stage change happens quickly (encouraging), and the final stage is the payoff.
+
+**Note:** This updates the `CropStage` enum in Appendix A. The existing `GROWING` stage is split into `SEED`, `SPROUT`, and `GROWING`. `MATURE` and `WITHERED` remain unchanged.
+
+---
+
+**Q10: How does "watering" actually work in the data model?**
+
+**Answer:** The spec text in Section 9.2 is correct: watering **reduces remaining growth time by 10%**. The Appendix A code is **wrong** and must be updated. The discrepancy:
+
+- **Appendix A (incorrect):** `effectiveGrowthTimeSec = growthTimeSec * 0.9` — reduces *total* growth time by 10%, regardless of when watering happens.
+- **Section 9.2 (correct):** "reduces remaining growth time by 10%" — reduces *remaining* time at the moment of watering.
+
+**Corrected implementation (replaces Appendix A logic):**
+
+```kotlin
+data class PlantedCrop(
+    val cropId: String,
+    val plantedAt: Long,
+    val growthTimeSec: Long,
+    val witherMultiplier: Float = 2.0f,
+    val watered: Boolean = false,
+    val wateredBy: String? = null,
+    val wateredAt: Long? = null,
+    val wateringReductionSec: Long = 0L,
+) {
+    val maturesAt: Long
+        get() = plantedAt + (growthTimeSec * 1000) - (wateringReductionSec * 1000)
+
+    val withersAt: Long
+        get() = maturesAt + (growthTimeSec * 1000 * witherMultiplier.toLong())
+
+    fun water(currentTime: Long = System.currentTimeMillis()): PlantedCrop {
+        if (watered) return this
+        val remainingSec = ((maturesAt - currentTime) / 1000).coerceAtLeast(0)
+        val reductionSec = (remainingSec * 0.1).toLong()
+        return copy(
+            watered = true,
+            wateredAt = currentTime,
+            wateringReductionSec = reductionSec
+        )
+    }
+}
+```
+
+**Watering is applied at calculation time.** The `wateringReductionSec` is computed once when watering happens and stored. Watering early (e.g., at 10% progress) removes 10% of remaining 90% = 9% of total growth time. Watering late (e.g., at 90% progress) removes 10% of remaining 10% = 1% of total. This rewards early watering.
+
+**Rationale (product):** "Remaining time" reduction is more intuitive: "My friend watered my crops and they'll be ready sooner." It also makes the social visit loop more meaningful — visiting a friend who just planted helps more.
+
+**Rationale (QA):** Test: plant wheat (30s), water at t=0 → matures at 27s (10% of 30s = 3s reduction). Water at t=27s (3s remaining) → matures at 26.7s (10% of 3s = 0.3s). Verify `maturesAt` and `withersAt` calculations.
+
+**Note:** This corrects Appendix A. The `effectiveGrowthTimeSec` property is removed and replaced with `wateringReductionSec`.
+
+---
+
+**Q11: Can crops be watered multiple times by different friends?**
+
+**Answer:** **Yes, but with diminishing returns and a per-crop cap of 3 waterings.**
+
+- Each crop can be watered a **maximum of 3 times** (by 3 different friends).
+- Each watering applies 10% reduction to the *remaining* time at the moment of that watering.
+- Waterings are **multiplicative**: the second watering applies 10% to the already-reduced remaining time.
+
+**Example:** Wheat (30s), planted at t=0, all waterings at t=0 for simplicity:
+- Friend 1: remaining = 30s → reduction = 3s → new remaining = 27s.
+- Friend 2: remaining = 27s → reduction = 2.7s → new remaining = 24.3s.
+- Friend 3: remaining = 24.3s → reduction = 2.43s → new remaining = 21.87s.
+- Friend 4 → rejected, cap reached. Max reduction ~27%.
+
+**Data model update:** `PlantedCrop` gains `wateringCount: Int` (0–3). `watered: Boolean` becomes `wateringCount > 0`. `wateredBy` becomes `wateredBy: List<String>` (max 3 UUIDs). `wateredAt` becomes `wateredAt: List<Long>`.
+
+**Per-friend-per-day limit:** Each friend can water a given farm once per day (existing spec, Section 9.2). Tracked in `farm_visits.actions_performed`.
+
+**Rationale (product):** 3 waterings × 10% multiplicative = max ~27% reduction. Meaningful but not game-breaking. Encourages having 3+ active friends without making watering mandatory.
+
+**Rationale (QA):** Test: 3 friends water same crop → verify cumulative reduction. Test: 4th friend → rejected. Test: same friend waters twice → rejected. Test: watering after maturity → no effect.
+
+---
+
+**Q12: What does "second animal pen (place 2 animals on same tile)" at Level 12 mean?**
+
+**Answer:** At Level 12, players unlock **co-housing** — placing 2 animals of the same type on a single tile.
+
+| Rule | Detail |
+|---|---|
+| Which animals | Same species only (2 chickens, 2 cows, 2 goats, 2 sheep). Cannot mix types. |
+| Production | **Doubled.** Each animal produces independently. 2 chickens = 2 eggs every 30 min. |
+| Feed cost | **Doubled.** Each animal needs to be fed separately. 2 chickens = 2 crops per feeding cycle. |
+| Tile occupancy | Still 1 tile. |
+| Sick state | If unfed > 24h, both animals become sick. Medicine cost is per-animal. |
+| Visual | Tile sprite shows 2 animals side-by-side (scaled down slightly). |
+| Restriction | Only animals with `tile_size = 1` (chicken, goat). Larger animals (`tile_size = 2`) cannot be co-housed. |
+
+**Note:** The Level 12 unlock text in the leveling table (Section 8.4) has been updated in-place to read: "Co-house 2 small animals of same type on 1 tile (chicken, goat only)."
+
+**Rationale (product):** Mid-game capacity upgrade. Rewards livestock-focused players without requiring grid expansion. Doubled feed cost prevents it from being a pure free upgrade.
+
+**Rationale (QA):** Test: place 2 chickens on 1 tile → verify 2 egg production. Test: place chicken + cow → rejected. Test: feed 1, leave 1 unfed → only 1 stops producing. Test: co-house with `tile_size = 2` animal → rejected.
+
+---
+
+**Q13: What are the story quest definitions?**
+
+**Answer:**
+
+| Chapter | Unlock Level | Quest ID | Objectives (sequential) | Rewards |
+|---|---|---|---|---|
+| 1 | 1 | `story_ch1_new_beginnings` | 1. Till 5 tiles → 2. Plant 10 wheat → 3. Harvest 10 wheat → 4. Sell 10 wheat at NPC shop | 200 coins + 50 XP + 5 carrot seeds |
+| 2 | 14 | `story_ch2_livestock_baron` | 1. Build a barn → 2. Place 5 animals → 3. Collect 20 animal products → 4. Earn 1,000 coins from animal products | 1,000 coins + 200 XP + 1 goat |
+| 3 | 19 | `story_ch3_market_mogul` | 1. Create 10 market listings → 2. Sell 5 items on market → 3. Buy 5 items from market → 4. Earn 2,000 coins from market sales | 2,000 coins + 300 XP + 10 gems |
+| 4 | 21 | `story_ch4_social_farmer` | 1. Add 10 friends → 2. Visit 20 friend farms → 3. Water 50 crops (friends') → 4. Send 20 gifts | 1,500 coins + 250 XP + exclusive "Social Butterfly" decoration |
+| 5 | 24 | `story_ch5_master_grower` | 1. Plant every crop type → 2. Harvest 100 crops → 3. Reach farm value 10,000 → 4. Expand grid to 10×10 | 3,000 coins + 500 XP + 15 gems + exclusive "Master Grower" statue |
+| 6 | 28 | `story_ch6_farm_legend` | 1. Reach level 30 → 2. Earn 50,000 total coins → 3. Complete all daily quests 7 consecutive days → 4. Achieve top 100 on any leaderboard | 5,000 coins + 1,000 XP + 30 gems + exclusive "Legend" farm theme + title "Farm Legend" |
+
+**Implementation:** Each chapter is a `quest_definitions` row with `type = 'story'`. Multi-step objectives stored as JSONB in a new `objectives` column:
+
+```json
+{
+  "steps": [
+    { "id": "till_5", "objective_type": "till_count", "target": 5 },
+    { "id": "plant_10_wheat", "objective_type": "plant_count", "target": 10, "crop_id": "wheat" }
+  ]
+}
+```
+
+`user_quests.progress` tracks the current step index (0-based). Steps are sequential — step N+1 doesn't start tracking until step N is complete.
+
+**Schema change:** Add `objectives JSONB` column to `quest_definitions` (nullable — daily quests use existing single-objective fields; story quests use the `objectives` array).
+
+**Rationale (product):** Story quests provide long-term progression goals. Chapter 6 is aspirational — most players won't complete it for months.
+
+---
+
+**Q14: What are the achievement definitions?**
+
+**Answer:** 30 achievements across 4 categories:
+
+| ID | Display Name | Category | Objective | Tier | XP | Gems |
+|---|---|---|---|---|---|---|
+| `first_harvest` | First Harvest | Farming | Harvest 1 crop | Bronze | 10 | 0 |
+| `harvest_100` | Centurion Farmer | Farming | Harvest 100 crops | Bronze | 25 | 0 |
+| `harvest_1000` | Master Harvester | Farming | Harvest 1,000 crops | Silver | 50 | 2 |
+| `harvest_10000` | Legend of the Harvest | Farming | Harvest 10,000 crops | Gold | 100 | 5 |
+| `first_plant` | First Seed | Farming | Plant 1 seed | Bronze | 10 | 0 |
+| `plant_500` | Dedicated Planter | Farming | Plant 500 seeds | Silver | 50 | 2 |
+| `all_crops_planted` | Crop Encyclopedia | Farming | Plant every crop type at least once | Gold | 100 | 5 |
+| `first_animal` | Animal Lover | Farming | Buy first animal | Bronze | 10 | 0 |
+| `animal_collector_5` | Livestock Baron | Farming | Own 5 animals simultaneously | Silver | 50 | 2 |
+| `animal_collector_20` | Noah's Farm | Farming | Own 20 animals simultaneously | Gold | 100 | 5 |
+| `product_100` | Dairy Tycoon | Farming | Collect 100 animal products | Silver | 50 | 2 |
+| `first_sell` | First Sale | Economic | Sell 1 item | Bronze | 10 | 0 |
+| `earn_10000` | First Fortune | Economic | Earn 10,000 total coins | Silver | 50 | 2 |
+| `earn_100000` | Wealthy Farmer | Economic | Earn 100,000 total coins | Gold | 100 | 5 |
+| `earn_1000000` | Coin Magnate | Economic | Earn 1,000,000 total coins | Platinum | 200 | 10 |
+| `market_first_sale` | Market Trader | Economic | Complete first market sale | Bronze | 10 | 0 |
+| `market_100_sales` | Market Mogul | Economic | Complete 100 market sales | Silver | 50 | 2 |
+| `market_500_sales` | Tycoon | Economic | Complete 500 market sales | Gold | 100 | 5 |
+| `first_friend` | Friendly Farmer | Social | Add first friend | Bronze | 10 | 0 |
+| `friends_10` | Social Butterfly | Social | Add 10 friends | Silver | 50 | 2 |
+| `friends_50` | Popular Farmer | Social | Add 50 friends | Gold | 100 | 5 |
+| `first_visit` | Good Neighbor | Social | Visit 1 friend's farm | Bronze | 10 | 0 |
+| `visit_100` | Frequent Visitor | Social | Visit 100 friend farms | Silver | 50 | 2 |
+| `water_100` | Helpful Waterer | Social | Water friends' crops 100 times | Silver | 50 | 2 |
+| `gift_50` | Generous Soul | Social | Send 50 gifts | Silver | 50 | 2 |
+| `level_10` | Rising Star | Special | Reach level 10 | Bronze | 25 | 0 |
+| `level_20` | Experienced Farmer | Special | Reach level 20 | Silver | 50 | 2 |
+| `level_30` | Farm Veteran | Special | Reach level 30 | Gold | 100 | 5 |
+| `streak_7` | Weekly Devotion | Special | 7-day login streak | Bronze | 25 | 1 |
+| `streak_30` | Monthly Dedication | Special | 30-day login streak | Gold | 100 | 5 |
+
+**Hidden achievements** (`is_hidden = true`): `all_crops_planted`, `animal_collector_20`, `earn_1000000`, `market_500_sales`, `friends_50`, `streak_30`. Not visible until unlocked — provides surprise delight.
+
+**Implementation:** Seeded into `achievement_definitions` via migration. Progress tracking is event-driven: when a relevant analytics event fires (e.g., `crop_harvested`), the server checks achievements with matching `objective_type` and increments progress. When `progress >= target`, achievement is unlocked and reward granted.
+
+**Schema change:** Add `objective_type VARCHAR(30)` and `objective_target INT` columns to `achievement_definitions` for server-side progress tracking.
+
+**Rationale (product):** 30 achievements is enough for variety without overwhelming. Rewards are small enough to not disrupt economy balance but meaningful enough to feel rewarding.
+
+---
+
+**Q15: How is `farm_value` calculated?**
+
+**Answer:**
+
+```
+farm_value = sum(crop_current_value) + sum(animal_value) + sum(decoration_value) + sum(building_value) + grid_expansion_value
+```
+
+| Component | Formula |
+|---|---|
+| Crop current value | For each growing/mature crop: `crop_definitions.sell_price × 0.5` (50% of sell price). Withered crops: 0. |
+| Animal value | For each animal: `animal_definitions.buy_cost` (full). Sick animals: `buy_cost × 0.5`. |
+| Decoration value | For each placed decoration: `decoration_definitions.buy_cost` (full). |
+| Building value | For each placed building: `building_definitions.buy_cost` (full). |
+| Grid expansion value | `(current_grid_size² - 6²) × 100` — each tile beyond starting 6×6 is worth 100 coins. E.g., 8×8 = (64-36) × 100 = 2,800. |
+
+**No depreciation.** Farm value measures total investment, not current market value. This keeps calculation simple and makes farm value always increase as players invest.
+
+**Cron job:** Runs every 6 hours (existing spec, Section 5.1.7). Parses `grid_data` JSONB, looks up current prices, computes sum, updates `farms.farm_value`.
+
+**Performance:** At 50,000 users, 6-hour cron = ~8,333 farms/hour = ~2.3 farms/sec. Each parse + lookup ~5ms. Total: ~12 seconds of processing per hour. No concern.
+
+**Rationale (product):** Growing crops at 50% value prevents exploiting farm_value by planting expensive crops right before the cron runs. Animals and buildings at full value rewards permanent investments.
+
+**Rationale (QA):** Test: farm with 10 wheat (sell=12) growing, 1 cow (buy=500), 1 fence (buy=20), 1 barn (buy=1000), 8×8 grid. Expected: (10×6) + 500 + 20 + 1000 + 2800 = 4,380. Test withered crops contribute 0. Test sick animal at 50%.
+
+### 22.4 Social — Missing Details
+
+**Q16: How is the friend's farm snapshot generated and cached?**
+
+**Answer:** The snapshot is a **point-in-time copy of `farms.grid_data`** served from the server, cached in Redis for **5 minutes** per visitor-host pair.
+
+**Flow:**
+1. Visitor taps friend → client calls `POST /api/v1/friends/visit/{userId}`.
+2. Server fetches `farms.grid_data` for the host user.
+3. Server creates a read-only snapshot: strips sensitive data, adds computed fields (current crop stages, animal states at current server time).
+4. Server caches the snapshot in Redis under key `farm_snapshot:{visitorId}:{hostId}` with TTL 5 minutes.
+5. Returns the snapshot to the visitor.
+6. Subsequent visits within 5 minutes return the cached snapshot (no DB hit).
+7. After 5 minutes, the cache expires and a fresh snapshot is generated on next visit.
+
+**Watering affects the live farm, not the snapshot.** When a visitor waters crops, the server modifies the host's `farms.grid_data` directly. The visitor's snapshot is not updated (they already see the "before" state). The host sees the watering effect when they next load their farm.
+
+**Why 5 minutes?** Short enough that the farm feels fresh. Long enough to avoid hammering the DB if a visitor navigates away and back. The TTL is per-visitor, so different visitors get independent snapshots.
+
+**Rationale (developer):** Redis caching with per-visitor TTL is the standard pattern for read-heavy, slightly-stale-OK data. 5 minutes balances freshness with DB load.
+
+**Rationale (QA):** Test: visit farm, wait 4 min, visit again → same snapshot. Wait 6 min → fresh snapshot. Test: host modifies farm while visitor is viewing → visitor doesn't see changes. Test: visitor waters → host's `grid_data` updated server-side.
+
+---
+
+**Q17: What happens when you water a friend's crops but they're offline?**
+
+**Answer:** The watering effect is applied **immediately server-side** to the host's `farms.grid_data`. The host doesn't need to be online or sync.
+
+**Flow:**
+1. Visitor calls `POST /api/v1/friends/water/{userId}`.
+2. Server loads host's `farms.grid_data` from `farms` table.
+3. For each growing crop (not yet mature, not yet at 3 waterings), applies the watering reduction (per Q11 rules).
+4. Updates `farms.grid_data` with new crop states, increments `farms.version`.
+5. Records the visit in `farm_visits` with `actions_performed: ["watered"]`.
+6. Sends a push notification (`FARM_VISITED`) to the host if notifications enabled.
+7. If host is online (WebSocket connected), sends a `farm_visited` WebSocket event so their client can refresh the farm grid in real-time.
+8. If host is offline, the watering is already in their server-side `grid_data`. When they next open the app, their client fetches the latest `grid_data` and sees the watered state.
+
+**Concurrent watering by multiple friends:** The server processes watering requests sequentially (each request loads `grid_data`, applies watering, saves). If 2 friends water simultaneously, each is a separate DB transaction with row-level lock on the `farms` row. No conflict.
+
+**Rationale (developer):** Server-side immediate application is the only safe model. If watering were deferred to the host's next sync, the host could make conflicting changes (e.g., harvest the crop before the watering applies), creating complex rollback scenarios.
+
+---
+
+**Q18: How does phone contact sync work?**
+
+**Answer:** **Privacy-first approach — no bulk contact upload.**
+
+1. **Permission:** App requests `READ_CONTACTS` permission with rationale: "Find friends already playing Ibibo Farms! We'll check your contacts' phone numbers — we never store your contact list."
+2. **Client-side hashing:** App reads contacts locally, extracts phone numbers, normalizes them (E.164 format), computes SHA-256 hashes.
+3. **Batch lookup:** App sends hashed phone numbers to `POST /api/v1/friends/contacts-lookup` (new endpoint). Server compares hashes against `users.phone_hash` column.
+4. **Response:** Server returns matches: `[{ userId, display_name, avatar_url, level, is_friend: false }]` — only users who have `discoverable_by_phone = true`.
+5. **Friend requests:** User sees matched contacts and can send friend requests individually. No auto-add.
+6. **No storage:** Server does **not** store the hashed contact list. The lookup is stateless — hashes are compared and discarded.
+
+**New endpoint:** `POST /api/v1/friends/contacts-lookup`
+
+**Schema changes:** Add `phone_hash VARCHAR(64) UNIQUE` and `discoverable_by_phone BOOLEAN NOT NULL DEFAULT TRUE` columns to `users`.
+
+**Compliance:**
+- **DPDP Act:** No bulk contact data stored. Only hashed numbers transmitted for one-time lookup. Privacy policy states: "We use hashed phone numbers to find friends already on Ibibo Farms. We do not store your contact list."
+- **GDPR:** Hashed phone numbers with a static app-level salt are not considered personal data under GDPR. The hash is deterministic for lookup but not reversible without the salt.
+- **Permission:** `READ_CONTACTS` requested with rationale. User can deny and still use the app. Contact sync is never auto-triggered — only when user taps "Find friends from contacts."
+
+**Rationale (product):** Phone contact sync is the #1 driver of social graph growth in Indian mobile games. But privacy is paramount — the hashed-lookup approach gives the social benefit without the privacy risk.
+
+**Rationale (QA):** Test: 100 contacts, 5 matches → only 5 returned. Test: user with `discoverable_by_phone = false` → not returned. Test: deny permission → graceful fallback to username/friend code search.
+
+---
+
+**Q19: What's the QR code flow?**
+
+**Answer:**
+
+**My QR code (share):**
+- The QR encodes a deep link: `https://ibibofarms.app/add?code={friend_code}` (using the app link domain — works both in-app and in a browser).
+- Displayed on the user's profile screen as a QR image (generated client-side using the `zxing` library — no server round-trip needed).
+- User can screenshot and share via WhatsApp, etc.
+
+**Scan QR code (add friend):**
+- In the Friends tab, a "Scan QR" button opens the device camera (using Google's ML Kit Barcode Scanning — on-device, no network needed).
+- On scanning a valid Ibibo Farms QR, the app parses the friend code and navigates to a friend preview screen (shows display name, level, avatar) with an "Add Friend" button.
+- If the QR is not a valid Ibibo Farms link: "This isn't an Ibibo Farms friend code."
+
+**Deep link handling:**
+- QR link opened on device with app installed → app opens directly to friend preview screen (via Android App Links).
+- QR link opened on device without app → web page with "Get Ibibo Farms" (Play Store link) + friend code displayed for later use.
+
+**Rationale (end user):** "I show my QR code, my friend scans it, and we're connected. No typing codes. Works in person or over WhatsApp."
+
+**Rationale (developer):** ZXing for QR generation and ML Kit for scanning are both lightweight, well-maintained, and work offline.
+
+**Rationale (QA):** Test: scan valid QR → friend preview. Test: scan random QR → error message. Test: scan own QR → "You can't add yourself!" Test: deep link from browser → app opens correctly.
+
+### 22.5 Push Notifications — Timing & Logic
+
+**Q20: When exactly is CROP_READY sent?**
+
+**Answer:** CROP_READY is sent **server-side** when the crop matures, using a **dedicated `planted_crops` tracking table** (not by parsing `grid_data` JSONB).
+
+**New table:**
+```sql
+CREATE TABLE planted_crops (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    farm_id         UUID NOT NULL REFERENCES farms(id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tile_id         VARCHAR(10) NOT NULL,
+    crop_id         VARCHAR(50) NOT NULL REFERENCES crop_definitions(id),
+    planted_at      TIMESTAMPTZ NOT NULL,
+    matures_at      TIMESTAMPTZ NOT NULL,
+    withers_at      TIMESTAMPTZ NOT NULL,
+    wither_warning_at TIMESTAMPTZ NOT NULL,
+    notification_sent BOOLEAN NOT NULL DEFAULT FALSE,
+    wither_notification_sent BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_planted_crops_matures ON planted_crops(matures_at) WHERE notification_sent = FALSE;
+CREATE INDEX idx_planted_crops_wither_warn ON planted_crops(wither_warning_at) WHERE wither_notification_sent = FALSE;
+CREATE INDEX idx_planted_crops_user ON planted_crops(user_id);
+```
+
+**Flow:**
+1. When a `PLANT` action is processed (via sync-batch or real-time API), the server inserts a row into `planted_crops` with computed `matures_at`, `withers_at`, and `wither_warning_at` timestamps.
+2. A **cron job runs every 1 minute** (Quartz Scheduler), queries `planted_crops WHERE matures_at <= NOW() AND notification_sent = FALSE`, and for each result:
+   - Checks if the user has `crop_ready` notification preference enabled.
+   - Checks quiet hours (see Q22).
+   - Sends FCM push notification.
+   - Sets `notification_sent = TRUE`.
+3. When a crop is harvested or withered, the `planted_crops` row is deleted.
+
+**Dual-write requirement:** Any server-side action that modifies crop state (PLANT, HARVEST, WITHER, WATER) must update **both** `farms.grid_data` JSONB (source of truth for client rendering) AND the `planted_crops` table (for push scheduling) within the same database transaction. On PLANT: insert `planted_crops` row. On HARVEST/WITHER: delete `planted_crops` row. On WATER (by friend): update `planted_crops.matures_at` and `planted_crops.withers_at` to reflect the reduced growth time. This ensures push notifications are always scheduled from the same state the client sees.
+
+**Why a separate table instead of parsing JSONB?** Parsing `grid_data` JSONB every minute for 50,000 users would be extremely expensive. The `planted_crops` table with an index on `matures_at` is a simple, indexed query: `SELECT ... WHERE matures_at <= NOW() AND notification_sent = FALSE LIMIT 1000`. This scales to millions of planted crops.
+
+**Performance:** At 50,000 DAU with ~10 crops planted per day per user = 500,000 rows/day. The 1-minute cron processes ~350 rows per minute. Each FCM send takes ~50ms. Total: ~17 seconds of processing per minute. Well within capacity.
+
+**Client-side fallback:** If the app is open when a crop matures, the client's own timer detects this immediately and shows the harvest-ready state without waiting for the push. The push is only needed when the app is closed or backgrounded.
+
+**Rationale (developer):** The separate table is the only scalable approach. JSONB parsing for push scheduling is an anti-pattern. The table is lightweight (one row per growing crop, deleted on harvest).
+
+**Rationale (QA):** Test: plant crop → verify `planted_crops` row created. Test: wait until `matures_at` → verify push sent. Test: harvest before maturity → row deleted, no push. Test: notification preference OFF → no push sent. Test: quiet hours → push queued (see Q22).
+
+---
+
+**Q21: How does CROP_WILTING (50% warning) work?**
+
+**Answer:** CROP_WILTING is sent when **50% of the wither window has elapsed** — i.e., the crop has been mature for half of its wither duration.
+
+**Definition:**
+- `witherWindow = growthTimeSec × witherMultiplier` (2× free, 3× premium)
+- `witherWarningAt = maturesAt + (witherWindow × 0.5)`
+- CROP_WILTING push is sent at `witherWarningAt`
+
+**Example:** Wheat (30s growth, free player, 2× wither):
+- `maturesAt` = plantedAt + 30s
+- `witherWindow` = 30s × 2 = 60s
+- `withersAt` = maturesAt + 60s
+- `witherWarningAt` = maturesAt + 30s (50% of 60s wither window)
+- Player gets a warning 30 seconds after maturity, with 30 seconds left to harvest.
+
+**Implementation:** The `planted_crops` table (from Q20) includes `wither_warning_at` and `wither_notification_sent` columns. The same 1-minute cron job that sends CROP_READY also checks for `wither_warning_at <= NOW() AND wither_notification_sent = FALSE` and sends CROP_WILTING pushes.
+
+**Rationale (product):** "50% of the wither window remains" is the most useful warning point. Too early (at maturity) and players ignore it. Too late (80% elapsed) and they've already lost the crop. 50% gives a fair chance to harvest.
+
+**Rationale (QA):** Test: verify `witherWarningAt` = `maturesAt + (growthTimeSec × witherMultiplier × 0.5)`. Test: premium player (3×) gets warning later than free player (2×). Test: crop harvested before warning → no CROP_WILTING sent. Test: crop already withered before cron runs → no CROP_WILTING sent.
+
+---
+
+**Q22: How are quiet hours enforced server-side?**
+
+**Answer:** A **delayed queue** using Redis Sorted Sets, processed by a cron job.
+
+**Flow:**
+1. When the notification cron (from Q20) prepares to send a non-critical notification, it checks the user's `quiet_hours_start` and `quiet_hours_end` (in `users` table) against the **user's timezone** (`users.timezone` column, IANA format).
+2. If the current time (in the user's timezone) falls within quiet hours:
+   - The notification is **not sent immediately**.
+   - Instead, it's added to a Redis Sorted Set: `quiet_queue:{userId}` with score = epoch timestamp of quiet hours end (converted to UTC).
+   - The notification content is stored as the member value (JSON: type, title, body, data).
+3. A **cron job runs every 5 minutes** that:
+   - Scans all `quiet_queue:*` keys (via Redis SCAN).
+   - For each key, checks if current UTC time >= score (quiet hours end).
+   - If yes, sends all queued notifications via FCM and deletes the key.
+4. **Critical notifications** (`GIFT_RECEIVED`, `MARKET_SOLD`) **bypass quiet hours entirely** — sent immediately regardless of quiet hours (per Section 14.3).
+
+**Timezone handling:** Server converts the user's `quiet_hours_end` (e.g., "08:00") to UTC using the user's `timezone` (e.g., "Asia/Kolkata" → UTC+5:30 → "08:00" IST = "02:30" UTC). This correctly handles DST (not applicable to India but relevant for future global users).
+
+**Max queue size:** 10 notifications per user in quiet queue. If more than 10 non-critical notifications accumulate during quiet hours, only the 10 most recent are delivered (older ones dropped). Prevents a notification flood when quiet hours end.
+
+**Rationale (developer):** Redis Sorted Sets with timestamp scores is the standard pattern for delayed delivery. The 5-minute cron is lightweight (SCAN + ZRANGEBYSCORE). No heavy DB queries needed.
+
+**Rationale (product):** Players in India who sleep 10 PM – 8 AM won't be woken up by "your crop is ready" but will still get "you received a gift" immediately. When they wake up, they get the queued crop notifications.
+
+**Rationale (QA):** Test: notification at 10:30 PM IST with quiet hours 22:00–08:00 → queued, delivered at 08:00 IST. Test: critical notification at 10:30 PM → sent immediately. Test: 15 non-critical notifications during quiet hours → only 10 delivered. Test: timezone conversion.
+
+### 22.6 Monetization Edge Cases
+
+**Q23: What happens to premium-only crops when subscription expires?**
+
+**Answer:**
+
+| State | Behavior |
+|---|---|
+| Currently growing in farm | **Finishes normally.** The crop grows to maturity and can be harvested. Premium crop status is "grandfathered" for crops already planted. |
+| Seeds in inventory | **Can be sold at NPC shop** (at 50% of seed cost, same as any seed sell-back). **Cannot be planted.** UI shows: "Premium subscription required to plant this crop." |
+| Harvested crop in inventory | **Can be sold normally** (NPC shop or market). No restriction — the player earned these while premium. |
+| Premium decorations placed on farm | **Stay placed.** Decorations are permanent once placed. |
+| Premium decorations in inventory (not placed) | **Can be placed.** Once owned, decorations can be placed regardless of subscription status. Only the *purchase* requires premium. |
+
+**Rationale (product):** The principle is: "you keep what you earned." Premium is about access, not ownership. This is player-friendly and avoids the negative experience of losing items you paid for.
+
+**Rationale (end user):** "My subscription expired but my premium crops still grow and I can sell my premium seeds back. I just can't plant new ones until I resubscribe."
+
+**Rationale (QA):** Test: premium crop growing when sub expires → verify it matures and can be harvested. Test: try to plant premium seed with expired sub → blocked. Test: sell premium seed to NPC → allowed at 50%. Test: place premium decoration with expired sub → allowed.
+
+---
+
+**Q24: How does the "daily double" ad reward interact with quest rewards?**
+
+**Answer:**
+
+- **Applies to:** Daily quests only (not story quests, not seasonal quests).
+- **Doubles:** Coins only. XP is **not** doubled. Gems (if any) are **not** doubled. Item rewards are **not** doubled.
+- **Frequency:** 1×/day (existing spec, Section 10.4).
+- **Flow:**
+  1. Player completes a daily quest and taps "Claim."
+  2. UI shows: "Claim 50 coins + 20 XP" with a "Watch ad for 2× coins" button.
+  3. If player watches ad → claims 100 coins + 20 XP (coins doubled, XP unchanged).
+  4. If player skips → claims 50 coins + 20 XP.
+  5. The daily double is consumed for the day. No other quest can use it that day.
+- **Ad reward log:** Recorded in `ad_watch_log` with `placement = 'daily_double'`, `reward_type = 'quest_double'`, `reward_amount = 50` (the extra coins).
+
+**Rationale (product):** Doubling coins (the soft currency) is valuable but not game-breaking. Doubling XP would accelerate progression too much. Limiting to daily quests keeps the scope tight. 1×/day prevents ad spam.
+
+**Rationale (end user):** "I finished my daily quest and got double coins by watching an ad. Worth it for 30 seconds."
+
+**Rationale (QA):** Test: claim with ad → verify 2× coins, 1× XP. Test: claim second daily quest with ad → "Daily double already used today." Test: claim story quest with ad → no daily double option shown.
+
+---
+
+**Q25: What's the "free tiles" in the Starter Bundle?**
+
+**Answer:** "5 free tiles" means a **flat 500-coin discount** on the next grid expansion — not a literal 5-tile addition (which would break the N×N grid model).
+
+**How it works:**
+- The player receives a one-time `grid_expansion_discount` of 500 coins, stored as a column `grid_expansion_discount INT NOT NULL DEFAULT 0` on the `users` table. When applied, it is set to 0.
+- When the player next expands their grid (e.g., 6×6 → 7×7, which costs 2,000 coins), the discount is applied: cost = 1,500 coins.
+- The discount is consumed on first use.
+
+**Note:** The Starter Bundle description in Section 10.2 has been updated in-place to: "1,000 coins + 10 gems + 500-coin grid expansion discount."
+
+**Rationale (product):** The flat discount is simpler for players to understand and for developers to implement. Pro-rating tiles adds complexity for minimal benefit.
+
+**Rationale (QA):** Test: buy Starter Bundle → verify discount applied on next grid expansion. Test: discount consumed after first expansion. Test: discount not applied to non-grid purchases.
+
+### 22.7 Technical Architecture
+
+**Q26: How does the server know which crops are planted to send CROP_READY pushes?**
+
+**Answer:** See **Q20** — a dedicated `planted_crops` table is used for server-side crop tracking and push scheduling. The server does **not** parse `grid_data` JSONB for push notifications.
+
+**Summary:**
+- `planted_crops` table stores one row per growing crop with `matures_at`, `withers_at`, and `wither_warning_at` timestamps.
+- 1-minute cron job queries `planted_crops WHERE matures_at <= NOW() AND notification_sent = FALSE` and sends pushes.
+- On harvest/wither, the `planted_crops` row is deleted.
+- On watering (by friend), the `planted_crops` row is updated with new `matures_at`.
+- `farms.grid_data` JSONB remains the source of truth for the farm grid state (what the client renders). `planted_crops` is a server-side projection table for push scheduling only.
+
+---
+
+**Q27: How does "priority sync" for premium work?**
+
+**Answer:**
+
+| Aspect | Free Users | Premium Users |
+|---|---|---|
+| WorkManager sync interval | 15 minutes | 5 minutes |
+| API rate limit | 100 req/min | 200 req/min |
+| Sync endpoint | `POST /api/v1/farm/sync-batch` | Same endpoint, but premium requests are prioritized in the server queue |
+| Server queue priority | Standard queue | Priority queue (processed first when server is under load) |
+
+**Implementation:**
+- **Client:** WorkManager uses different `PeriodicWorkRequest` intervals based on subscription status. When subscription status changes (upgrade/downgrade), the WorkManager request is rescheduled.
+- **Server:** The sync-batch endpoint checks `is_premium` and routes premium requests to a priority queue (Redis). Under normal load, both queues are processed immediately. Under high load (> 80% CPU), the priority queue is drained first, then the standard queue.
+
+**Rationale (product):** 5-minute vs 15-minute sync interval is a meaningful perk for active premium players who want their actions confirmed faster. The priority queue ensures premium users aren't affected by server congestion during peak hours.
+
+**Rationale (end user):** "As a premium player, my farm syncs every 5 minutes instead of 15. My progress is saved faster."
+
+**Rationale (QA):** Test: premium user sync interval = 5 min. Test: free user sync interval = 15 min. Test: downgrade from premium → interval changes to 15 min. Test: server under load → premium requests processed first.
+
+---
+
+**Q28: What's the WebSocket authentication flow?**
+
+**Answer:**
+
+**Connection:**
+1. Client obtains a JWT access token (15-min TTL) via standard auth flow.
+2. Client calls `POST /api/v1/auth/ws-ticket` (REST, authenticated with JWT) to get a short-lived (30-second) ticket.
+3. Client opens WebSocket connection to `wss://api.ibibofarms.app/ws/v1?ticket={ticket}`.
+4. Server validates the ticket on connection upgrade. If invalid/expired, returns `401 Unauthorized` and refuses the upgrade. Ticket is single-use and discarded after validation.
+5. If valid, server establishes the WebSocket connection, associates the socket with the user ID, and registers presence in Redis (`presence:{userId} = socket_id`, TTL 60 seconds, refreshed by heartbeat).
+
+**JWT expiry mid-session:**
+1. Client sets a timer 1 minute before JWT expiry.
+2. Client uses the refresh token to obtain a new JWT via `POST /api/v1/auth/refresh` (REST call, not over WebSocket).
+3. Client sends a `auth_refresh` event over WebSocket with the new JWT: `{ event: "auth_refresh", token: "new_jwt" }`.
+4. Server validates the new JWT, updates the association, and responds with `{ event: "auth_refreshed" }`.
+5. If the client fails to refresh before expiry, the server sends `{ event: "auth_expired" }` and closes the connection with code `4401`. The client must reconnect with a fresh token.
+
+**Heartbeat:**
+- Client sends `{ event: "ping" }` every 30 seconds.
+- Server responds with `{ event: "pong" }`.
+- If no ping received for 90 seconds, server considers the connection dead and closes it (presence removed).
+
+**Security:**
+- The ticket pattern is used instead of passing JWT in the URL. WebSocket APIs don't support custom headers on upgrade, so a short-lived ticket (30s TTL, single-use) avoids exposing the JWT in URLs or server logs.
+- The `auth_refresh` event carries the new JWT over the already-authenticated WebSocket channel, not in a URL.
+
+**New endpoint:** `POST /api/v1/auth/ws-ticket` → returns `{ ticket: "short_lived_token", expiresIn: 30 }`.
+
+**Rationale (developer):** The ticket pattern is the standard for WebSocket auth in mobile apps. It avoids JWT exposure in URLs/logs while keeping the flow simple.
+
+**Rationale (QA):** Test: valid ticket → connection established. Test: expired ticket → connection refused. Test: JWT expires mid-session → `auth_refresh` event → connection maintained. Test: no refresh before expiry → `auth_expired` + disconnect. Test: no ping for 90s → connection closed.
+
+---
+
+**Q29: How are leaderboard rankings computed and cached?**
+
+**Answer:** **Redis Sorted Sets** for real-time ranking, with periodic PostgreSQL snapshots for persistence.
+
+**Implementation:**
+
+| Board | Redis Key | Score | Member | Update Trigger |
+|---|---|---|---|---|
+| Weekly Harvest | `leaderboard:weekly_harvest` | `total_harvest_count` (weekly) | `userId` | On every harvest action (server increments score) |
+| Farm Value | `leaderboard:farm_value` | `farm_value` | `userId` | On every `farm_value` recalculation (6-hour cron) |
+| Friends | `leaderboard:friends:{userId}` | `xp` | `friendUserId` | On XP change (computed per-user from friends list) |
+| Seasonal Event | `leaderboard:seasonal:{eventId}` | Event-specific metric | `userId` | On event action (e.g., harvest event crop) |
+
+**Read flow:**
+1. Client calls `GET /api/v1/leaderboard/weekly?limit=20&offset=0`.
+2. Server uses Redis `ZREVRANGE leaderboard:weekly_harvest {offset} {offset+limit-1} WITHSCORES` — O(log N + limit) time complexity.
+3. Server enriches with user display names/avatars from PostgreSQL (batch `SELECT` by user IDs).
+4. Returns ranked list.
+
+**Pagination:** Cursor-based. `limit=20` per page. `offset` is the rank position. For "Top 100" boards, the client can request up to 100 entries. For friends leaderboard, all friends are returned (max 50 or 200).
+
+**Caching:** Redis Sorted Sets are the live cache — always up-to-date. No separate cache layer needed.
+
+**Persistence:** Every Monday 00:00 UTC (existing cron, Section 5.1.7), the weekly leaderboard is snapshotted to PostgreSQL (`leaderboard_snapshots` table) for historical records, then the Redis key is reset (scores zeroed).
+
+**Friends leaderboard:** Computed on-demand. Server fetches the user's friend list, then `ZMSCORE leaderboard:farm_value {friendIds...}` to get scores. Sorted client-side or server-side. Cached in Redis for 5 minutes under key `leaderboard:friends:{userId}`.
+
+**Performance:** Redis `ZREVRANGE` is O(log N + limit). For 500,000 users, log(500000) ≈ 19. With limit=20, total ~39 operations — sub-millisecond. Enrichment with PostgreSQL: batch SELECT by 20 user IDs, ~2ms. Total: < 5ms per leaderboard request.
+
+**Rationale (developer):** Redis Sorted Sets are purpose-built for leaderboards. They maintain sorted order on insert/update with O(log N) complexity. No need for periodic PostgreSQL queries.
+
+**Rationale (QA):** Test: 1000 users, verify correct ranking. Test: user harvests → score increments in Redis. Test: weekly reset → scores zeroed, snapshot saved. Test: friends leaderboard with 50 friends → all returned, correctly sorted. Test: pagination (offset=20, limit=20) → returns ranks 21-40.
+
+---
+
+**Q30: How does the admin panel work?**
+
+**Answer:** The admin panel is a **separate web application** — not part of the Android app.
+
+**Tech stack:**
+
+| Layer | Technology | Rationale |
+|---|---|---|
+| Frontend | React + TailwindCSS | Fast to build, responsive, wide ecosystem |
+| Hosting | AWS S3 + CloudFront (static hosting) | Simple, cheap, no server needed for SPA |
+| Auth | Same JWT system as app, but with admin-specific claims (`role: "admin"`) | Reuses existing auth infrastructure |
+| API | Same Ktor backend, under `/api/v1/admin/` prefix | No separate backend needed |
+| Access control | IP allowlist (configured in Ktor) + 2FA (TOTP via Google Authenticator) | Per Section 5.1.6 |
+
+**Admin API endpoints (new, under `/api/v1/admin/`):**
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/v1/admin/login` | Admin login (email + password + 2FA TOTP) |
+| GET | `/api/v1/admin/users` | Search/list users (filter by username, phone, ban status) |
+| POST | `/api/v1/admin/users/{id}/ban` | Ban user (specify reason + duration) |
+| POST | `/api/v1/admin/users/{id}/unban` | Unban user |
+| GET | `/api/v1/admin/economy` | Economy dashboard data (coin supply, faucet/sink, inflation rate) |
+| GET | `/api/v1/admin/flagged` | Flagged accounts (cheating, market manipulation, multi-account) |
+| GET | `/api/v1/admin/config/crops` | View crop definitions |
+| PUT | `/api/v1/admin/config/crops/{id}` | Update crop definition (price, growth time, etc.) |
+| POST | `/api/v1/admin/config/crops` | Create new crop definition |
+| GET | `/api/v1/admin/config/quests` | View quest definitions |
+| PUT | `/api/v1/admin/config/quests/{id}` | Update quest definition |
+| GET | `/api/v1/admin/events` | View/manage seasonal events |
+| POST | `/api/v1/admin/events` | Create seasonal event |
+| PUT | `/api/v1/admin/events/{id}` | Update seasonal event |
+| GET | `/api/v1/admin/audit-log` | View admin action audit log |
+
+**Admin UI screens:**
+1. **Dashboard** — Overview: DAU, new users, economy health, flagged accounts count
+2. **User Management** — Search, ban/unban, view user details (farm, transactions, devices)
+3. **Economy Monitor** — Coin supply chart, faucet/sink breakdown, inflation rate, price logs
+4. **Game Config** — CRUD for crops, animals, decorations, buildings, quests, achievements
+5. **Events Manager** — Create/edit/schedule seasonal events
+6. **Flagged Accounts** — Review flagged users, take action (ban, shadow-ban, dismiss)
+7. **Audit Log** — All admin actions with timestamp, admin user, action, target
+
+**Security:**
+- Admin JWT has `role: "admin"` claim. Validated on every admin API request.
+- IP allowlist: admin endpoints only accessible from configured IP ranges (office VPN, specific IPs).
+- 2FA: TOTP required at login. Admin JWT has 1-hour TTL (shorter than user JWT).
+- Audit log: every admin action is logged in `admin_audit_log` table (admin_user_id, action, target_id, details, timestamp).
+
+**New table:**
+```sql
+CREATE TABLE admin_audit_log (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    admin_user_id   UUID NOT NULL REFERENCES users(id),
+    action          VARCHAR(50) NOT NULL,
+    target_type     VARCHAR(30),
+    target_id       UUID,
+    details         JSONB,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_admin_audit_admin ON admin_audit_log(admin_user_id, created_at DESC);
+CREATE INDEX idx_admin_audit_target ON admin_audit_log(target_type, target_id);
+```
+
+**Rationale (developer):** A separate web app is the standard pattern for admin panels. It keeps the Android app focused on the player experience and allows non-technical staff (product managers, community managers) to manage the game without an Android device.
+
+**Rationale (QA):** Test: admin login with 2FA. Test: non-admin JWT → 403 on admin endpoints. Test: IP outside allowlist → 403. Test: ban user → user can't login. Test: update crop definition → config version bumps, clients re-fetch. Test: audit log records all actions.
+
+### 22.8 Data Model Ambiguities
+
+**Q31: Where are decoration/animal placements stored on the grid?**
+
+**Answer:** Both decorations and animals are stored as **tiles** in the `tiles` array within `grid_data` JSONB. The `decorations` array in Appendix B is **removed** — it was an inconsistency. The unified model:
+
+**Tile types in `grid_data.tiles`:**
+
+| `type` | Contents | Can overlap with crops? |
+|---|---|---|
+| `GRASS` | Empty, buildable | N/A (no crop) |
+| `TILLED` | Prepared for planting | N/A (no crop yet) |
+| `PLANTED` | Has a `crop` object | N/A (the crop IS the tile content) |
+| `ANIMAL` | Has an `animal` object | No — animal occupies the tile |
+| `BUILDING` | Has a `building` object | No — building occupies the tile |
+| `DECORATION` | Has a `decoration` object | **Depends on decoration type** |
+| `WATER` | Decorative pond | No |
+| `PATH` | Decorative walkway | No |
+
+**Decoration overlap rules:**
+
+| Decoration Category | Can overlap crops? | Can overlap tilled soil? | Can overlap other decorations? |
+|---|---|---|---|
+| `fence` | No | No | No |
+| `path` | No | No | No |
+| `lighting` | **Yes** (lamp post on a tilled tile) | Yes | Yes |
+| `nature` (tree, bush, flower bed) | No | No | No |
+| `misc` (garden gnome, statue, fountain) | No | No | No |
+
+**Implementation:** Lighting decorations (lamp posts, string lights) are "overlays" — they can be placed on top of any tile except `WATER`. They're stored as a separate `overlays` array in `grid_data`:
+
+```json
+{
+  "tiles": [ ... ],
+  "overlays": [
+    { "tileId": "0,0", "decorationId": "lamp_post" }
+  ]
+}
+```
+
+All other decorations are tiles with `type: "DECORATION"`. You cannot place a fence on a tilled tile — the UI prevents it. If a player tries, they see: "Clear this tile first."
+
+**Note:** Appendix B has been updated in-place — the `decorations` array is replaced by the `overlays` array (for lighting only). All other decorations are tiles.
+
+**Rationale (developer):** Unifying decorations as tiles (except lighting overlays) simplifies the grid model. Each tile has exactly one primary content type. Overlays are the exception for lighting, which logically sits "on top of" a tile without replacing its content.
+
+**Rationale (end user):** "I can put a lamp post next to my crops to light up the farm at night. But I can't put a fence on top of my wheat — that doesn't make sense."
+
+**Rationale (QA):** Test: place fence on tilled tile → rejected. Test: place lamp post on tilled tile → allowed (overlay). Test: place lamp post on water tile → rejected. Test: place tree on planted crop → rejected. Test: remove crop → tile returns to `TILLED`, overlay (lamp post) stays.
+
+---
+
+**Q32: How does inventory capacity interact with buildings on the grid?**
+
+**Answer:**
+
+| Rule | Detail |
+|---|---|
+| Capacity bonus is **global** | Barn gives +150 crop slots to the player's total inventory capacity, not per-barn. |
+| Stacking | **Yes, stacking is allowed.** 2 barns = +300 crop slots. 3 barns = +450. |
+| Stacking limit | **Max 3 buildings of the same type.** A player can place at most 3 barns, 3 silos, 3 farmhouses. This prevents unlimited capacity. |
+| Building footprint | Each barn occupies 4 tiles (2×2). 3 barns = 12 tiles. On a 12×12 grid (144 tiles), this is 8.3% — a meaningful trade-off. |
+| Capacity recalculation | When a building is placed, inventory capacity increases immediately. When a building is removed/sold, capacity decreases. If current inventory exceeds new capacity, the player cannot harvest/collect until they sell items to get under capacity. |
+
+**Capacity formula:**
+```
+total_crop_capacity = base_capacity (100) + (num_barns × 150)
+total_seed_capacity = base_capacity (50 per type) + (num_silos × 100)
+total_decoration_capacity = base_capacity (30) + (num_farmhouses × 50)
+```
+
+**Premium override:** Premium subscribers have **unlimited** inventory capacity regardless of buildings. If premium expires, the capacity reverts to the building-based formula. If current inventory exceeds the new capacity, the player can still sell items but cannot harvest/collect new ones.
+
+**Rationale (product):** Stacking with a limit of 3 gives players flexibility to invest in storage without making it unlimited. The tile footprint cost (12 tiles for 3 barns) creates a meaningful trade-off between storage and farm space.
+
+**Rationale (end user):** "I can build up to 3 barns for more storage, but each one takes 4 tiles. Do I want more storage or more farming space?"
+
+**Rationale (QA):** Test: place 1 barn → +150 capacity. Test: place 3 barns → +450. Test: place 4th barn → rejected. Test: remove barn with over-capacity inventory → blocked with "Sell items first." Test: premium with 0 barns → unlimited. Test: premium expires with 500 crops and 0 barns → can sell but not harvest.
+
+---
+
+**Q33: What's the `version` field in `farms` for?**
+
+**Answer:** The `version` field is for **optimistic concurrency control**, and the spec's mention of "last-write-wins" in Section 4.2 is **misleading and corrected here**.
+
+**Corrected conflict resolution model:**
+
+The system uses **optimistic concurrency with server-side validation**, not naive last-write-wins. Here's how it works:
+
+1. **Client reads farm state:** Client receives `grid_data` with `version: N`.
+2. **Client makes actions offline:** Actions are queued in `PendingActionEntity` with the `version` at the time of each action.
+3. **Client syncs:** Client sends `sync-batch` with actions and the `baseVersion` (the `version` the client had when the actions were performed).
+4. **Server validates:**
+   - If `baseVersion == server.version`: **No conflict.** Server applies all actions, increments `version` by the number of accepted actions, returns new state with `version: N + accepted_count`.
+   - If `baseVersion < server.version`: **Conflict detected.** Another device/session has synced since this client last fetched. Server processes actions using **per-tile last-write-wins** (per Q2): each action's `clientTimestamp` is compared against the tile's `lastModifiedAt`. Accepted actions update the tile and increment `version`. Rejected actions (`STALE_TILE`) don't increment `version`.
+   - If `baseVersion > server.version`: **Impossible** (client has a newer version than server). This indicates a bug or tampering. Server rejects the entire batch with `400 BAD_REQUEST` and `error.code = "VERSION_AHEAD"`.
+
+5. **Client updates:** Client replaces local state with server-confirmed state and `version`.
+
+**Why this isn't "last-write-wins":** Naive last-write-wins would accept the entire client farm state regardless of what changed on the server. This would overwrite other devices' changes. The per-tile timestamp comparison (Q2) ensures that only tiles the client actually modified are updated, and only if they haven't been modified more recently on the server.
+
+**Note:** Section 4.2 has been updated in-place to reflect this corrected conflict resolution model.
+
+**Rationale (developer):** Optimistic concurrency is the standard pattern for multi-device sync. The `version` field is the optimistic lock token. Per-tile resolution (rather than full-state rejection) ensures that concurrent changes to different tiles don't conflict — only same-tile changes trigger the `STALE_TILE` path.
+
+**Rationale (QA):** Test: sync with `baseVersion == server.version` → all actions processed, version increments. Test: sync with `baseVersion < server.version` → per-tile conflict resolution. Test: sync with `baseVersion > server.version` → rejected. Test: two devices modify different tiles → both syncs succeed, no conflict. Test: two devices modify same tile → second sync gets `STALE_TILE` for that tile only.
+
+---
+
+> **End of Section 22 — Implementation Questions Resolved**
+>
+> All 33 questions have been answered with normative specifications. All corrections have been **propagated to the original sections** — the original text has been updated in-place. The changes are:
+> - **Q9:** Updates `CropStage` enum in Appendix A (adds `SEED`, `SPROUT` stages). ✅ Applied to Appendix A.
+> - **Q10:** Corrects Appendix A watering logic (replaces `effectiveGrowthTimeSec` with `wateringReductionSec`). ✅ Applied to Appendix A.
+> - **Q11:** Updates `PlantedCrop` data model (adds `wateringCount`, changes `wateredBy` to list). ✅ Applied to Appendix A and Appendix B.
+> - **Q12:** Corrects Level 12 unlock description. ✅ Applied to leveling table in Section 8.
+> - **Q13:** Adds `objectives JSONB` column to `quest_definitions`. ✅ Applied to Section 6 schema.
+> - **Q14:** Adds `objective_type` and `objective_target` columns to `achievement_definitions`. ✅ Applied to Section 6 schema.
+> - **Q18:** Adds `phone_hash` and `discoverable_by_phone` columns to `users`. ✅ Applied to Section 6 schema.
+> - **Q20:** Adds `planted_crops` table. ✅ Applied to Section 6 schema + indexes + Room DB entities.
+> - **Q25:** Updates Starter Bundle description. ✅ Applied to Section 10.2 IAP catalog. Adds `grid_expansion_discount` column to `users`.
+> - **Q28:** Adds `POST /api/v1/auth/ws-ticket` endpoint. ✅ Applied to Section 13.1 Auth endpoints. Ticket flow is the sole auth method (query-param JWT removed).
+> - **Q30:** Adds `admin_audit_log` table and admin API endpoints. ✅ Applied to Section 6 schema + Section 13.1 admin endpoints. Adds `role` column to `users` for admin accounts.
+> - **Q31:** Replaces `decorations` array in Appendix B with `overlays` array (lighting only); other decorations become tiles. ✅ Applied to Appendix B.
+> - **Q33:** Corrects Section 4.2 conflict resolution description. ✅ Applied to Section 4.2.
+>
+> New endpoints added (all in Section 13.1): `POST /api/v1/farm/sync-batch`, `POST /api/v1/friends/contacts-lookup`, `POST /api/v1/auth/ws-ticket`, admin endpoints under `/api/v1/admin/`.
+>
+> New tables added (all in Section 6 schema): `planted_crops`, `admin_audit_log`, `synced_actions` (idempotency log for Q1), `leaderboard_snapshots` (historical snapshots for Q29).
+>
+> New columns added to `users`: `phone_hash`, `discoverable_by_phone`, `role`, `grid_expansion_discount`.
+>
+> New cron jobs added to Section 5.1.7: crop notification dispatch (1 min), quiet hours delivery (5 min).
+>
+> These changes must go through the Change Management process defined in Section 21.3.
