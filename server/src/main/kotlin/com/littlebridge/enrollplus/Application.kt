@@ -83,6 +83,10 @@ import com.littlebridge.enrollplus.feature.parent.parentAcademicsRouting
 import com.littlebridge.enrollplus.feature.parent.trackProgressRouting
 import com.littlebridge.enrollplus.feature.pulse.pulseRouting
 import com.littlebridge.enrollplus.feature.pulse.PulseWeeklyJob
+import com.littlebridge.enrollplus.feature.ai.KeyVault
+import com.littlebridge.enrollplus.feature.ai.aiRouting
+import com.littlebridge.enrollplus.feature.pews.PewsDailyJob
+import com.littlebridge.enrollplus.feature.pews.pewsRouting
 import com.littlebridge.enrollplus.feature.school.adminDashboardRouting
 import com.littlebridge.enrollplus.feature.school.adminDashboardOverviewRouting
 import com.littlebridge.enrollplus.feature.school.leaveRequestsRouting
@@ -168,6 +172,18 @@ fun main() {
 
     // Start the Parent Pulse weekly job (Sunday 6 PM IST pulse generation).
     PulseWeeklyJob.start(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default))
+
+    // AI gateway: seed/refresh encrypted provider keys from env (idempotent).
+    // Blocking is fine here — this runs once at boot before the server accepts
+    // traffic, and a missing key simply leaves that provider unconfigured.
+    kotlinx.coroutines.runBlocking {
+        runCatching { KeyVault.bootstrapFromEnv() }
+            .onFailure { org.slf4j.LoggerFactory.getLogger("Application")
+                .warn("KeyVault bootstrap failed (AI will degrade gracefully): {}", it.message) }
+    }
+
+    // Start the PEWS daily job (Sense → Reason → Act pipeline; hourly tick).
+    PewsDailyJob.start(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default))
 
     embeddedServer(
         Netty,
@@ -309,6 +325,10 @@ fun Application.module() {
         adminDashboardRouting()      // /api/admin/dashboard/{summary,analytics,activity} — redesigned SchoolHomeScreenV2 data
         adminDashboardOverviewRouting() // /api/admin/dashboard/overview — consolidated command-center payload for SchoolHomeScreenV2
         schoolIntelligenceRouting()  // /api/v1/school/dashboard/intelligence — Command Center: attendance timeline+anomalies+exam overlay, early-warning students, academic health grid, activity feed (all real-data)
+
+        // AI gateway + PEWS (AI_FEATURES_PLAN.md feature #1)
+        aiRouting()                  // /api/v1/school/ai/usage (school-admin) + /api/v1/admin/ai/{providers,health,rotate} (platform-admin)
+        pewsRouting()                // /api/v1/{school,teacher,parent}/pews/… — Predictive Early Warning System (Sense→Reason→Act→Learn)
         schoolAnalyticsRouting()     // /api/v1/school/analytics/{overview,class-performance,teacher-performance,student/{id},syllabus-coverage}
         leaveRequestsRouting()       // /api/v1/school/leave-requests[…]
         ptmRouting()                 // /api/v1/school/ptm
