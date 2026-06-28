@@ -18,6 +18,7 @@
  */
 package com.littlebridge.enrollplus.feature.ai
 
+import com.littlebridge.enrollplus.core.EnvConfig
 import org.slf4j.LoggerFactory
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -27,7 +28,11 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 class EncryptionService(
-    rawEnvKey: String? = System.getenv("AI_ENCRYPTION_KEY")?.takeIf { it.isNotBlank() }
+    // Resolve via the shared .env-aware resolver (not just System.getenv), so a
+    // key placed in `.env` or local.properties is honoured — same sources as
+    // DATABASE_URL. Previously this only read System.getenv → on a local run the
+    // .env key was invisible and the service silently ran in DEV passthrough.
+    rawEnvKey: String? = EnvConfig.get("AI_ENCRYPTION_KEY")
 ) {
     private val log = LoggerFactory.getLogger("AiEncryptionService")
 

@@ -265,6 +265,13 @@ fun Application.module() {
             isLenient = true
             encodeDefaults = true
             explicitNulls = false
+            // Fall back to a property's default when the incoming JSON sends an
+            // explicit null (or an out-of-domain enum) for it. Without this, a
+            // client that omits/null-sends an optional field on a DTO that has a
+            // default triggers a MissingFieldException → 400. This was the cause
+            // of the repeated `400 Bad Request: PUT /api/v1/school/pews/config`
+            // (the parent_share toggle never saved → parents saw no nudge).
+            coerceInputValues = true
         })
     }
 

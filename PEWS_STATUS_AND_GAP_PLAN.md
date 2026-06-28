@@ -16,6 +16,64 @@ The **PEWS backend is ~90% built and correctly wired** (tables, migrations, snap
 
 ---
 
+## 0.5 SESSION UPDATE (2026-06-28, evening) — ROOT CAUSE of "AI still off + no parent UI" FIXED
+
+The previous two commits on `aifeatures` fixed the intervention-crash and added the
+parent/web surfaces, **but the user still saw (a) no AI in the logs even after
+setting all 5 keys, and (b) no parent nudge**. The real root causes were deeper
+than the doc above assumed:
+
+**Root cause A — the AI keys in `.env` were never read by the AI layer.**
+The server reads config from **three** sources via the `dotenv-kotlin` library:
+`.env` (dotenv) → `System.getenv()` → `local.properties`. `DatabaseFactory` used
+all three (that's why `DATABASE_URL` works). But `KeyVault`, `EncryptionService`
+and `AiService` had their **own** env helpers that only read `System.getenv()` +
+`local.properties` — **they never consulted `.env`**. On a normal local/Android-Studio
+run a `.env` file is *not* loaded into the JVM process environment, so
+`System.getenv("AI_CEREBRAS_API_KEY")` was `null` even though the key sat in `.env`
+(the exact location `.env.example` tells you to put it). Result:
+`KeyVault.bootstrapFromEnv()` seeded **0** providers →
+`AiService.anyProviderConfigured()` = false → every run logged
+*"PEWS reasoning skipped … no AI provider configured."*
+**Fix:** a single shared, `.env`-aware resolver `core/EnvConfig.kt` (same 3-source
+order as `DatabaseFactory`), now used by `KeyVault`, `EncryptionService` and
+`AiService`. The AI keys in `.env` are finally visible → providers seed → REASON
+turns on.
+
+**Root cause B — the parent UI couldn't appear because the admin could never
+enable parent-sharing.** The log shows three consecutive
+`400 Bad Request: PUT /api/v1/school/pews/config`. The parent nudge only renders
+when `pews_config.parent_share_enabled = true` **and** a real concern exists. The
+admin's three attempts to save that toggle all failed because the **server's**
+`PewsConfigDto` had **no default values** (every field required) while the JSON
+parser lacked `coerceInputValues`; any partial/null field → `MissingFieldException`
+→ 400 → toggle never saved → parents saw nothing. The parent VM/screen wiring from
+the last commit was actually correct; it was simply never given a `show=true`.
+**Fix:** added `coerceInputValues = true` to the server JSON config, gave the
+server `PewsConfigDto` the same defaults as the shared client DTO, and made the
+config PUT log the real parse reason instead of an opaque 400.
+
+**Net effect of this session (no behaviour was faked):**
+- AI REASON lights up the moment the keys (already set) are read → `ai_narrative`
+  starts populating on high/medium snapshots; the existing admin/teacher cards
+  already render those nullable fields.
+- The admin can now save the PEWS config, including `parent_share_enabled`; once
+  on (and a real concern exists for a child), the **already-built** parent nudge
+  card appears on the parent dashboard.
+- The web School-Admin "Early Warning" surface (added last commit) is confirmed to
+  build and route (`/admin/early-warning`, `next build` ✓) — it was never a UI
+  regression; it shows once deployed.
+
+**Files changed this session:**
+- `server/.../core/EnvConfig.kt` (new shared resolver)
+- `server/.../feature/ai/KeyVault.kt`, `EncryptionService.kt`, `AiService.kt`
+  (use `EnvConfig` → read `.env`)
+- `server/.../Application.kt` (`coerceInputValues = true`)
+- `server/.../feature/pews/PewsRouting.kt` (`PewsConfigDto` defaults + better
+  400 diagnostics)
+
+---
+
 ## 1. Architecture recap (so the gap map makes sense)
 
 PEWS is an **agent with four stages**, layered on the existing deterministic early-warning SQL:

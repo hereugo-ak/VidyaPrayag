@@ -130,13 +130,17 @@ data class PewsEffectivenessDto(
 
 @Serializable
 data class PewsConfigDto(
-    @SerialName("use_relative_thresholds") val useRelativeThresholds: Boolean,
-    @SerialName("attendance_floor_pct") val attendanceFloorPct: Int,
-    @SerialName("marks_floor_pct") val marksFloorPct: Int,
-    @SerialName("leave_floor_count") val leaveFloorCount: Int,
-    @SerialName("run_frequency") val runFrequency: String,
-    @SerialName("ai_narrative_enabled") val aiNarrativeEnabled: Boolean,
-    @SerialName("parent_share_enabled") val parentShareEnabled: Boolean,
+    // Defaults mirror the shared client DTO (PewsModels.kt) and readConfig()'s
+    // fallbacks so a body that omits a field deserializes to a sane value instead
+    // of throwing MissingFieldException → 400. Combined with coerceInputValues on
+    // the server JSON, the config PUT is now resilient to partial/null bodies.
+    @SerialName("use_relative_thresholds") val useRelativeThresholds: Boolean = true,
+    @SerialName("attendance_floor_pct") val attendanceFloorPct: Int = 75,
+    @SerialName("marks_floor_pct") val marksFloorPct: Int = 40,
+    @SerialName("leave_floor_count") val leaveFloorCount: Int = 3,
+    @SerialName("run_frequency") val runFrequency: String = "daily",
+    @SerialName("ai_narrative_enabled") val aiNarrativeEnabled: Boolean = true,
+    @SerialName("parent_share_enabled") val parentShareEnabled: Boolean = false,
 )
 
 @Serializable
@@ -310,8 +314,15 @@ fun Route.pewsRouting() {
 
         put("/api/v1/school/pews/config") {
             val ctx = call.requireSchoolAdmin() ?: return@put
-            val body = runCatching { call.receive<PewsConfigDto>() }.getOrNull()
-                ?: run { call.fail("invalid body"); return@put }
+            // Parse the body; on failure, surface the real reason (and log it)
+            // instead of an opaque 400 so a client contract drift is debuggable.
+            val parsed = runCatching { call.receive<PewsConfigDto>() }
+            val body = parsed.getOrElse { err ->
+                org.slf4j.LoggerFactory.getLogger("PewsRouting")
+                    .warn("PEWS config PUT rejected for school {}: {}", ctx.schoolId, err.message)
+                call.fail("invalid body: ${err.message}")
+                return@put
+            }
             writeConfig(ctx.schoolId, body)
             call.ok(readConfig(ctx.schoolId), "PEWS config updated")
         }

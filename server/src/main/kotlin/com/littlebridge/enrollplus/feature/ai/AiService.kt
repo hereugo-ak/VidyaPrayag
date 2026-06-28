@@ -35,11 +35,9 @@ import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.slf4j.LoggerFactory
-import java.io.File
 import java.security.MessageDigest
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util.Properties
 import java.util.UUID
 
 /** The capability lanes a caller can request (provider-agnostic). */
@@ -67,16 +65,9 @@ object AiService {
     private val llm = LlmClient()
 
     // ── env tuning ──────────────────────────────────────────────────────────
-    private val localProps: Properties by lazy {
-        Properties().apply {
-            runCatching {
-                val f = File("local.properties")
-                if (f.exists()) f.inputStream().use { load(it) }
-            }
-        }
-    }
-    private fun env(key: String): String? =
-        (System.getenv(key) ?: localProps.getProperty(key))?.takeIf { it.isNotBlank() }
+    // Delegate to the shared .env-aware resolver so AI tuning vars are read from
+    // the same sources as the provider keys (.env → env → local.properties).
+    private fun env(key: String): String? = com.littlebridge.enrollplus.core.EnvConfig.get(key)
 
     private val defaultCacheTtlMin: Long get() = env("AI_DEFAULT_CACHE_TTL_MIN")?.toLongOrNull() ?: 1440L
 

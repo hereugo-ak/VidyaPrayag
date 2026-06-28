@@ -30,3 +30,23 @@ devBaseUrl=http://192.168.1.9:8080
 #   http://192.168.1.9:8080/api/v1/config/version
 # The `git_sha` you get back must match your laptop's HEAD. If it shows the old
 # Render SHA or you can't connect, see the checklist in SERVER_QUICKSTART.md.
+
+# ---------------------------------------------------------------------------
+# AI GATEWAY / PEWS — provider keys (REASON loop)
+#
+# The server reads these from .env (preferred), the process environment, OR this
+# file — whichever it finds first. If you keep secrets in `.env`, you can leave
+# this section empty; it is documented here so a dev who uses ONLY local.properties
+# (the Android-Studio convention) still knows the exact key names.
+#
+# Without at least ONE provider key, PEWS runs deterministically only and the
+# backend logs: "PEWS reasoning skipped … no AI provider configured".
+#
+# Generate the encryption key with:  openssl rand -hex 32
+# AI_ENCRYPTION_KEY=
+# AI_CEREBRAS_API_KEY=
+# AI_GROQ_API_KEY=
+# AI_SAMBANOVA_API_KEY=
+# AI_MISTRAL_API_KEY=
+# AI_OPENROUTER_API_KEY=
+# ---------------------------------------------------------------------------

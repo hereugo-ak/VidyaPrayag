@@ -27,6 +27,7 @@
  */
 package com.littlebridge.enrollplus.feature.ai
 
+import com.littlebridge.enrollplus.core.EnvConfig
 import com.littlebridge.enrollplus.db.AiProviderConfigTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -35,9 +36,7 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import org.slf4j.LoggerFactory
-import java.io.File
 import java.time.Instant
-import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -123,20 +122,15 @@ object KeyVault {
     private var bootstrapped = false
 
     // ------------------------------------------------------------------
-    // Env reading (System.getenv → root local.properties fallback)
+    // Env reading — delegated to the shared, .env-aware EnvConfig so the AI
+    // keys are resolved from the SAME sources as DATABASE_URL:
+    //   .env (dotenv) → System.getenv → local.properties.
+    // Previously this only read System.getenv + local.properties, so a key in
+    // `.env` (the documented location in .env.example) was never seen and every
+    // provider stayed "unconfigured".
     // ------------------------------------------------------------------
 
-    private val localProps: Properties by lazy {
-        Properties().apply {
-            runCatching {
-                val f = File("local.properties")
-                if (f.exists()) f.inputStream().use { load(it) }
-            }
-        }
-    }
-
-    private fun env(key: String): String? =
-        (System.getenv(key) ?: localProps.getProperty(key))?.takeIf { it.isNotBlank() }
+    private fun env(key: String): String? = EnvConfig.get(key)
 
     // ------------------------------------------------------------------
     // Bootstrap — env → encrypt → upsert ai_provider_config (idempotent)
