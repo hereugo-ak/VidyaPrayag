@@ -116,10 +116,17 @@ private fun PewsCohortContent(
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
+    // The screen is only "empty" (full-screen empty state) when there is NOTHING
+    // to manage at all — no cohort AND no config loaded. When the cohort has no
+    // at-risk students but config/effectiveness exist, we must still render the
+    // list so the admin can reach the Config card (incl. the "Share with parents"
+    // toggle) and Effectiveness — otherwise a school with no current risk could
+    // never enable parent sharing or change thresholds.
+    val nothingToShow = state.isEmpty && state.config == null && state.effectiveness == null
     VStateHost(
         loading = state.isLoading,
         error = state.error,
-        isEmpty = state.isEmpty,
+        isEmpty = nothingToShow,
         emptyIcon = VIcons.ShieldCheck,
         emptyTitle = "No students need attention",
         emptyBody = "Every student in the selected band is on track right now. " +
@@ -127,21 +134,29 @@ private fun PewsCohortContent(
         onRetry = onRetry,
         modifier = modifier,
     ) {
-        val cohort = state.cohort ?: return@VStateHost
+        val cohort = state.cohort
+        val students = cohort?.students.orEmpty()
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { RiskBandSummary(cohort) }
+            if (cohort != null) {
+                item { RiskBandSummary(cohort) }
+            }
             item {
                 BandFilterRow(selected = state.minLevel, onSelect = onSetMinLevel)
             }
-            if (!cohort.aiEnabled) {
+            if (cohort != null && !cohort.aiEnabled) {
                 item { AiDisabledNote() }
             }
-            items(cohort.students, key = { it.studentCode }) { s ->
-                PewsStudentRow(s, onClick = { onOpenStudent(s.studentCode) })
+            if (students.isEmpty()) {
+                // Inline "all on track" note so config/effectiveness stay reachable.
+                item { AllOnTrackNote() }
+            } else {
+                items(students, key = { it.studentCode }) { s ->
+                    PewsStudentRow(s, onClick = { onOpenStudent(s.studentCode) })
+                }
             }
             // ── Effectiveness rollup (LEARN loop) — admin parity with the web portal
             state.effectiveness?.let { eff ->
@@ -467,6 +482,29 @@ private fun AiDisabledNote() {
         Icon(VIcons.AlertCircle, contentDescription = null, tint = c.ink3, modifier = Modifier.size(16.dp))
         Text(
             "AI explanations are off. Rows still show the real attendance, marks and leave signals.",
+            style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 17.sp),
+        )
+    }
+}
+
+/**
+ * Inline "all on track" note shown in place of the student list when the cohort
+ * is empty — so the Configuration card (incl. "Share with parents") and the
+ * Effectiveness rollup below remain reachable instead of being hidden behind a
+ * full-screen empty state.
+ */
+@Composable
+private fun AllOnTrackNote() {
+    val c = VTheme.colors
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+            .background(c.cream).padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(VIcons.ShieldCheck, contentDescription = null, tint = c.accent, modifier = Modifier.size(18.dp))
+        Text(
+            "No students need attention in this band right now. Settings below still apply.",
             style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 17.sp),
         )
     }

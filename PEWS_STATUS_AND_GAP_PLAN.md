@@ -64,6 +64,18 @@ config PUT log the real parse reason instead of an opaque 400.
   build and route (`/admin/early-warning`, `next build` ✓) — it was never a UI
   regression; it shows once deployed.
 
+**Root cause C — admin mobile could not reach Config when the cohort was empty.**
+`PewsCohortScreenV2` rendered Effectiveness + Config **inside** the cohort list,
+and the screen's `VStateHost` short-circuited to a full-screen "No students need
+attention" empty state whenever `cohort.students` was empty. So a school with no
+*current* at-risk students could never open the Config card → never flip
+`parent_share_enabled` → parents never get a nudge (chicken-and-egg).
+**Fix:** the cohort screen now only shows the full-screen empty state when there is
+truly nothing to manage (no cohort AND no config AND no effectiveness); otherwise
+it renders the list with an inline "all on track" note and keeps the Config +
+Effectiveness cards reachable — matching the web workspace, which already renders
+those independently of the cohort.
+
 **Files changed this session:**
 - `server/.../core/EnvConfig.kt` (new shared resolver)
 - `server/.../feature/ai/KeyVault.kt`, `EncryptionService.kt`, `AiService.kt`
@@ -71,6 +83,50 @@ config PUT log the real parse reason instead of an opaque 400.
 - `server/.../Application.kt` (`coerceInputValues = true`)
 - `server/.../feature/pews/PewsRouting.kt` (`PewsConfigDto` defaults + better
   400 diagnostics)
+- `composeApp/.../ui/v2/screens/school/PewsCohortScreenV2.kt` (Config/Effectiveness
+  reachable when cohort is empty)
+
+---
+
+## 0.6 TRI-PORTAL ACCESS AUDIT (2026-06-28) — what each portal HAS, verified in code
+
+Re-verified end-to-end that every portal has its screens + access wired to a real,
+scope-guarded endpoint. Result: **all three portals are complete for the current
+phase** (the remaining items are *new features* from §6, not missing wiring).
+
+**🏫 SCHOOL ADMIN — mobile (`composeApp`) + web (`website`)**
+| Surface | Mobile | Web | Endpoint (guard `requireSchoolAdmin`) |
+|---|---|---|---|
+| Cohort + risk bands + band filter | ✅ `PewsCohortScreenV2` | ✅ `PewsWorkspace` | `GET /school/pews/cohort` |
+| Per-student drill-down (signals + AI + history) | ✅ `PewsStudentDetailScreenV2` | ✅ `PewsStudentPanel` | `GET /school/pews/student/{code}` |
+| Interventions list | ✅ | ✅ | `GET /school/pews/interventions` |
+| Update intervention (outcome/close) | ✅ (full-DTO contract, crash fixed) | ✅ | `PATCH /school/pews/interventions/{id}` |
+| Effectiveness (LEARN) | ✅ EffectivenessCard | ✅ EffectivenessCard | `GET /school/pews/effectiveness` |
+| Config incl. **Share with parents** | ✅ ConfigCard (now reachable when empty) | ✅ ConfigCard | `GET`+`PUT /school/pews/config` |
+| Manual Recompute | ✅ | ✅ | `POST /school/pews/run` |
+| Entry point | ✅ `onOpenPews` from school home | ✅ "Early Warning" nav item | — |
+
+**🧑‍🏫 TEACHER — mobile**
+| Surface | Status | Endpoint (guard `requireTeacherContext` + ownership) |
+|---|---|---|
+| Own-class at-risk ("Needs Attention") | ✅ `TeacherPewsScreenV2` | `GET /teacher/pews/students` |
+| Signals + AI line per student | ✅ | (in the students payload) |
+| Interventions (open/own) | ✅ | `GET /teacher/pews/interventions` |
+| Mark done / dismiss (outcome) | ✅ (`{updated:true}` contract, matches client) | `PATCH /teacher/pews/interventions/{id}` |
+| Entry point | ✅ "Needs Attention" `VActionCard` on teacher home | — |
+
+**👪 PARENT — mobile (read-only, opt-in, gentle)**
+| Surface | Status | Endpoint (child-scoped + `parent_share_enabled`) |
+|---|---|---|
+| Gentle nudge card (label-free) | ✅ `ParentNudgeCard` in `ParentHomeScreenV2` | `GET /parent/pews/{childId}` |
+| Nudge ViewModel (3-state, per active child) | ✅ `ParentNudgeViewModel` (Koin-registered) | — |
+| Actions deep-link (View attendance / Message teacher) | ✅ routed to academics/messages | — |
+| Visibility | ✅ shows only when server returns `show=true` | (gated by config + real concern) |
+
+**Still NEW work (not wiring gaps), per §6 backlog:** teacher→parent one-tap
+draft-message (`POST /teacher/pews/interventions/{id}/draft-message`), patterns
+endpoint+UI, AI-usage/provider-health admin screen, parent **push** fan-out,
+on-write recompute hooks, reassign-owner.
 
 ---
 
