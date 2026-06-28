@@ -100,7 +100,8 @@ private fun PewsStudentDetailContent(
         onRetry = onRetry,
         modifier = modifier,
     ) {
-        val cur = state.detail?.current ?: return@VStateHost
+        val detail = state.detail ?: return@VStateHost
+        val cur = detail.current ?: return@VStateHost
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -123,7 +124,7 @@ private fun PewsStudentDetailContent(
                     )
                 }
             }
-            if (state.detail.history.size > 1) HistoryCard(state.detail.history)
+            if (detail.history.size > 1) HistoryCard(detail.history)
             Spacer(Modifier.height(24.dp))
         }
     }
