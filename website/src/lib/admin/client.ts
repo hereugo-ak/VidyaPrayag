@@ -52,6 +52,15 @@ import type {
   AlumniAnalyticsDto,
   AlumniMentorshipDto,
   AlumniMentorshipRequestDto,
+  PewsCohort,
+  PewsStudentDetail,
+  PewsIntervention,
+  UpdatePewsInterventionRequest,
+  PewsEffectiveness,
+  PewsConfig,
+  PewsRunResult,
+  PewsRiskLevel,
+  PewsInterventionStatus,
 } from "./types";
 
 interface Opts {
@@ -322,4 +331,29 @@ export const adminApi = {
     authRequest<AlumniMentorshipRequestDto[]>("/api/v1/school/alumni/mentorship-requests"),
   alumniMentorshipRequestOverride: (requestId: string, action: string) =>
     authRequest<AlumniMentorshipRequestDto>(`/api/v1/school/alumni/mentorship-requests/${requestId}`, { method: "PATCH", body: { action } }),
+
+  // ── PEWS (Predictive Early Warning System) ───────────────────────────────────
+  // The admin is the owner of the whole Sense→Reason→Act→Learn loop. Every route
+  // is school-scoped from the JWT (requireSchoolAdmin) — the client never sends a
+  // school_id. AI narrative fields are nullable and shown only when present.
+  pewsCohort: (minLevel?: PewsRiskLevel) => {
+    const qs = minLevel ? `?min_level=${encodeURIComponent(minLevel)}` : "";
+    return authRequest<PewsCohort>(`/api/v1/school/pews/cohort${qs}`);
+  },
+  pewsStudent: (studentCode: string) =>
+    authRequest<PewsStudentDetail>(`/api/v1/school/pews/student/${encodeURIComponent(studentCode)}`),
+  pewsInterventions: (status?: PewsInterventionStatus) => {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+    return authRequest<PewsIntervention[]>(`/api/v1/school/pews/interventions${qs}`);
+  },
+  // Server now returns the full updated intervention DTO (richer contract), so
+  // callers can update their list in place; we still re-fetch for simplicity.
+  pewsUpdateIntervention: (id: string, body: UpdatePewsInterventionRequest) =>
+    authRequest<PewsIntervention>(`/api/v1/school/pews/interventions/${id}`, { method: "PATCH", body }),
+  pewsEffectiveness: () =>
+    authRequest<PewsEffectiveness>("/api/v1/school/pews/effectiveness"),
+  pewsConfig: () => authRequest<PewsConfig>("/api/v1/school/pews/config"),
+  pewsUpdateConfig: (body: PewsConfig) =>
+    authRequest<PewsConfig>("/api/v1/school/pews/config", { method: "PUT", body }),
+  pewsRun: () => authRequest<PewsRunResult>("/api/v1/school/pews/run", { method: "POST" }),
 };

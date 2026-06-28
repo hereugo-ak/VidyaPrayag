@@ -16,6 +16,7 @@ import com.littlebridge.enrollplus.core.network.NetworkResult
 import com.littlebridge.enrollplus.core.prefs.PreferenceRepository
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsCohortDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsConfigDto
+import com.littlebridge.enrollplus.feature.pews.domain.model.PewsEffectivenessDto
 import com.littlebridge.enrollplus.feature.pews.domain.repository.PewsRepository
 import com.littlebridge.enrollplus.util.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +38,8 @@ data class PewsCohortState(
     val config: PewsConfigDto? = null,
     val isSavingConfig: Boolean = false,
     val configError: String? = null,
+    // effectiveness rollup (the LEARN loop) — admin parity with the web portal
+    val effectiveness: PewsEffectivenessDto? = null,
 ) {
     val isEmpty: Boolean get() = !isLoading && error == null && (cohort?.students?.isEmpty() ?: true)
 }
@@ -71,6 +74,22 @@ class PewsCohortViewModel(
                 is NetworkResult.ConnectionError ->
                     _state.value = _state.value.copy(isLoading = false, error = "Connection error. Check your internet.")
             }
+            // Side-load the admin extras (non-fatal) so the cohort screen has the
+            // same effectiveness + config surface as the web portal.
+            loadEffectiveness()
+            loadConfig()
+        }
+    }
+
+    /** Effectiveness rollup (LEARN loop). Non-fatal: failures leave the card hidden. */
+    fun loadEffectiveness() {
+        viewModelScope.launch {
+            val t = token() ?: return@launch
+            when (val r = repository.getEffectiveness(t)) {
+                is NetworkResult.Success ->
+                    _state.value = _state.value.copy(effectiveness = r.data.data)
+                else -> { /* non-fatal: the effectiveness card simply stays hidden */ }
+            }
         }
     }
 
@@ -94,6 +113,7 @@ class PewsCohortViewModel(
                     val n = r.data.data?.atRisk ?: 0
                     _state.value = _state.value.copy(isRunning = false, infoMessage = "Recompute complete — $n students need attention")
                     load()
+                    loadEffectiveness()
                 }
                 is NetworkResult.Error -> {
                     AppLogger.e("PewsCohortVM", "runNow error: ${r.message}")

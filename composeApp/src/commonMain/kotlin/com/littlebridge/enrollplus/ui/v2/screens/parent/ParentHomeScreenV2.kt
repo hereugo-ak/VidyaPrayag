@@ -90,12 +90,24 @@ fun ParentHomeScreenV2(
     onOpenNotifications: () -> Unit = {},
     onOpenFees: () -> Unit = {},
     onOpenAcademics: () -> Unit = {},
+    onOpenMessages: () -> Unit = {},
     onOpenPulse: () -> Unit = {},
     onOpenTransport: () -> Unit = {},
     viewModel: ParentDashboardViewModel = koinViewModel(),
     permissionVm: PermissionViewModel = koinViewModel(),
+    nudgeViewModel: com.littlebridge.enrollplus.feature.pews.presentation.ParentNudgeViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
+    val nudgeState by nudgeViewModel.state.collectAsStateV2()
+
+    // PEWS parent nudge — re-scope to the active child whenever it changes.
+    // The card renders only when the server returns show=true (real concern AND
+    // the school enabled parent sharing). Use the RESOLVED child id (selectedChild
+    // falls back to the first child when no explicit pick has been made yet).
+    val activeChildId = state.selectedChild?.id
+    LaunchedEffect(activeChildId) {
+        nudgeViewModel.load(activeChildId)
+    }
     val showRationale by permissionVm.showNotificationRationale.collectAsStateV2()
     val launchPermission by permissionVm.launchPermissionRequest.collectAsStateV2()
 
@@ -127,6 +139,18 @@ fun ParentHomeScreenV2(
         onOpenAcademics = onOpenAcademics,
         onOpenPulse = onOpenPulse,
         onOpenTransport = onOpenTransport,
+        nudge = nudgeState.nudge?.takeIf { nudgeState.visible },
+        onNudgeAction = { action ->
+            // The server's deep-link targets map onto existing parent surfaces.
+            // We route by intent: anything mentioning "message"/"teacher" → the
+            // conversations surface; everything else (attendance) → academics.
+            val target = action.deepLink.lowercase()
+            if (target.contains("message") || target.contains("teacher") || target.contains("chat")) {
+                onOpenMessages()
+            } else {
+                onOpenAcademics()
+            }
+        },
         modifier = modifier,
     )
 
@@ -152,6 +176,8 @@ private fun ParentDashboardContent(
     onOpenAcademics: () -> Unit,
     onOpenPulse: () -> Unit = {},
     onOpenTransport: () -> Unit = {},
+    nudge: com.littlebridge.enrollplus.feature.pews.domain.model.PewsParentNudgeDto? = null,
+    onNudgeAction: (com.littlebridge.enrollplus.feature.pews.domain.model.PewsParentActionDto) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -245,6 +271,14 @@ private fun ParentDashboardContent(
                     // ── Alert strip (real /dashboard alerts — populated for the demo) ─
                     if (state.alerts.isNotEmpty()) {
                         AlertStrip(alerts = state.alerts)
+                    }
+
+                    // ── PEWS gentle nudge (opt-in, label-free) ──────────────────────
+                    // Renders only when the school enabled parent sharing AND there's a
+                    // real concern (server returns show=true). The card is supportive,
+                    // never alarming, and deep-links into attendance / message teacher.
+                    if (nudge != null) {
+                        ParentNudgeCard(nudge = nudge, onAction = onNudgeAction)
                     }
 
                     // ── Weekly Pulse entry point ────────────────────────────────────

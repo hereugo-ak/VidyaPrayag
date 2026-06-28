@@ -282,8 +282,15 @@ fun Route.pewsRouting() {
                 ?: run { call.fail("invalid body"); return@patch }
             val ok = interventionService.updateIntervention(
                 ctx.schoolId, id, actor, body.status, body.notes, body.outcome, body.actionType)
-            if (!ok) call.fail("Intervention not found or invalid update", HttpStatusCode.NotFound)
-            else call.ok(mapOf("updated" to true), "Intervention updated")
+            if (!ok) {
+                call.fail("Intervention not found or invalid update", HttpStatusCode.NotFound)
+            } else {
+                // Re-read the updated row so the client can update its list in place
+                // (richer contract: returns the full PewsInterventionDto, not {updated:true}).
+                val updated = interventionService.getIntervention(ctx.schoolId, id)
+                if (updated == null) call.fail("Intervention not found after update", HttpStatusCode.NotFound)
+                else call.ok(updated.toDto(), "Intervention updated")
+            }
         }
 
         get("/api/v1/school/pews/effectiveness") {

@@ -514,6 +514,7 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.pews.presentation.PewsCohortViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.pews.presentation.PewsStudentDetailViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.pews.presentation.TeacherPewsViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.pews.presentation.ParentNudgeViewModel(get(), get()) }
     // Health Records (P1-12) — admin/nurse + teacher + parent view models
     factory { com.littlebridge.enrollplus.feature.health.presentation.AdminHealthViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.health.presentation.TeacherHealthAlertsViewModel(get(), get()) }

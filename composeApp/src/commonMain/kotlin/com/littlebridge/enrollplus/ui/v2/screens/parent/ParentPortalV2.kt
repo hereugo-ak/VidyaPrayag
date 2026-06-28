@@ -291,6 +291,7 @@ fun ParentPortalV2(
                     onOpenNotifications = { overlay = ParentOverlay.Notifications },
                     onOpenFees = { tab = "fees" },
                     onOpenAcademics = { tab = "academics" },
+                    onOpenMessages = { overlay = ParentOverlay.Messages },
                     onOpenPulse = { overlay = ParentOverlay.Pulse },
                     onOpenTransport = { overlay = ParentOverlay.Transport },
                 )

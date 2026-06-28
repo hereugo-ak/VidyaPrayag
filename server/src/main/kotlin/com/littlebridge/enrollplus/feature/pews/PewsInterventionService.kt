@@ -237,6 +237,37 @@ class PewsInterventionService {
         }
     }
 
+    /** Read a single intervention (with student identity) by id, scoped to school. */
+    suspend fun getIntervention(
+        schoolId: UUID,
+        interventionId: UUID,
+    ): InterventionView? = dbQuery {
+        val r = PewsInterventionsTable.selectAll().where {
+            (PewsInterventionsTable.id eq interventionId) and
+                (PewsInterventionsTable.schoolId eq schoolId)
+        }.singleOrNull() ?: return@dbQuery null
+
+        val code = r[PewsInterventionsTable.studentCode]
+        val s = StudentsTable.selectAll().where {
+            (StudentsTable.schoolId eq schoolId) and (StudentsTable.studentCode eq code)
+        }.singleOrNull()
+
+        InterventionView(
+            id = r[PewsInterventionsTable.id].value,
+            studentCode = code,
+            studentName = s?.get(StudentsTable.fullName) ?: code,
+            className = s?.get(StudentsTable.className) ?: "",
+            section = s?.get(StudentsTable.section) ?: "",
+            ownerUserId = r[PewsInterventionsTable.ownerUserId],
+            actionType = r[PewsInterventionsTable.actionType],
+            status = r[PewsInterventionsTable.status],
+            notes = r[PewsInterventionsTable.notes],
+            outcome = r[PewsInterventionsTable.outcome],
+            openedAt = r[PewsInterventionsTable.openedAt].toString(),
+            resolvedAt = r[PewsInterventionsTable.resolvedAt]?.toString(),
+        )
+    }
+
     /** List interventions for a school, optionally filtered by owner/status. */
     suspend fun listInterventions(
         schoolId: UUID,
