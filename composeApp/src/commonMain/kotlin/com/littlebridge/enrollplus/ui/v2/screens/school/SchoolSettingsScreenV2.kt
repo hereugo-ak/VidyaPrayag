@@ -73,6 +73,8 @@ fun SchoolSettingsScreenV2(
     onOpenAcademicYear: () -> Unit = {},
     // Transport Management — routes, vehicles, student assignments.
     onOpenTransport: () -> Unit = {},
+    // Scholarship Management — schemes, applications & renewals.
+    onOpenScholarships: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: InstitutionalProfileViewModel = koinViewModel(),
     preferenceRepository: PreferenceRepository = koinInject(),
@@ -96,6 +98,7 @@ fun SchoolSettingsScreenV2(
         onOpenProfile = onOpenProfile,
         onOpenAcademicYear = onOpenAcademicYear,
         onOpenTransport = onOpenTransport,
+        onOpenScholarships = onOpenScholarships,
         onRetry = viewModel::load,
         modifier = modifier.statusBarsPadding()
             .imePadding()
@@ -114,6 +117,7 @@ private fun SchoolSettingsContent(
     onOpenProfile: () -> Unit,
     onOpenAcademicYear: () -> Unit,
     onOpenTransport: () -> Unit,
+    onOpenScholarships: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -170,6 +174,7 @@ private fun SchoolSettingsContent(
                 SettingRow(VIcons.BookOpen, "Classes & subjects", "Class & subject setup", true),
                 SettingRow(VIcons.Users, "Teacher management", "Add, view & remove teachers",false, onClick = onOpenTeachers),
                 SettingRow(VIcons.MapPin, "Transport Management", "Routes, vehicles & student assignments", false, onClick = onOpenTransport),
+                SettingRow(VIcons.Sparkles, "Scholarship Management", "Schemes, applications & renewals", false, onClick = onOpenScholarships),
                 SettingRow(VIcons.Wallet, "Fee structure", "Edit heads & amounts for next cycle ", true),
                 SettingRow(VIcons.Bell, "Notifications", "Channels & quiet hours", true),
                 SettingRow(VIcons.Download, "Data export", "CSV / PDF / UDISE", true),

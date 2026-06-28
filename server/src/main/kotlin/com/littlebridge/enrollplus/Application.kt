@@ -59,6 +59,7 @@ import com.littlebridge.enrollplus.feature.announcements.announcementRouting
 import com.littlebridge.enrollplus.feature.auth.authRouting
 import com.littlebridge.enrollplus.feature.alumni.alumniRouting
 import com.littlebridge.enrollplus.feature.transport.transportRouting
+import com.littlebridge.enrollplus.feature.scholarship.scholarshipRouting
 import com.littlebridge.enrollplus.feature.calendar.academicCalendarRouting
 import com.littlebridge.enrollplus.feature.calendar.academicYearRouting
 import com.littlebridge.enrollplus.feature.auth.otpAdminRouting
@@ -378,5 +379,12 @@ fun Application.module() {
         //   /api/v1/transport/{location,pickup,drop}                                — driver
         //   /api/v1/parent/transport/{live-location,route}/{childId}                — parent
         transportRouting()
+
+        // Scholarship Workflow (SCHOLARSHIP_WORKFLOW_SPEC.md)
+        //   /api/v1/school/scholarships{,/{id}}                    — admin scheme CRUD
+        //   /api/v1/school/scholarship-applications{,/{id}/{approve,reject,disburse}}  — admin review
+        //   /api/v1/school/scholarship-renewals{,/{id}/{approve,reject}}              — admin renewals
+        //   /api/v1/parent/scholarships{,/apply,/applications,/{id}/renew}            — parent
+        scholarshipRouting()
     }
 }

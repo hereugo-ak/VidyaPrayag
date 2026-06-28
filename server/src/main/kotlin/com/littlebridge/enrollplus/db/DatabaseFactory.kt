@@ -162,8 +162,12 @@ object DatabaseFactory {
         TeacherPeriodsTable,
         PeriodExceptionsTable,   // T-101: one-off overrides to the weekly pattern (Doc 05 §2.2)
         // Parent scholarships (audit §4.2/§5.2 — DB-backed, replaces hardcoded list)
+        // Extended per SCHOLARSHIP_WORKFLOW_SPEC.md — full workflow with renewals.
+        // Applied by docs/db/migration_060_scholarship_workflow.sql (must run before
+        // deploy; AUTO_CREATE_TABLES is OFF in prod).
         ScholarshipsTable,
         ScholarshipApplicationsTable,
+        ScholarshipRenewalsTable,
         // Notification spine + push registry + link approval (audit part-2 RA-41/42/46/48/50)
         NotificationsTable,
         DeviceTokensTable,
