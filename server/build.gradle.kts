@@ -51,6 +51,16 @@ kotlin {
     }
 }
 
+// Pin every Java compile task to Java 21 so javac and the Kotlin compiler agree
+// on the JVM target even when Gradle runs on a much newer JDK (e.g. 26) that
+// Kotlin has not added support for yet. Without this, the build fails with
+// "Inconsistent JVM-target compatibility between Java and Kotlin tasks
+// (compileJava=26, compileKotlin=21)".
+tasks.withType<JavaCompile>().configureEach {
+    sourceCompatibility = JavaVersion.VERSION_21.toString()
+    targetCompatibility = JavaVersion.VERSION_21.toString()
+}
+
 group = "com.littlebridge.enrollplus"
 version = "1.0.0"
 application {
