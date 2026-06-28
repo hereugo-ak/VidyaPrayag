@@ -7,7 +7,7 @@
  * so the same JSON decodes on both sides.
  *
  * Honesty (RA-S10 / LAW 6): every value here is a real, deterministic snapshot
- * served by GET /api/v1/school/pews/*. The AI fields (aiNarrative/aiCause/
+ * served by GET /api/v1/school/pews/(routes). The AI fields (aiNarrative/aiCause/
  * aiRecommendation) are explanations of the provided signal bundle and may be
  * null when the LLM is unavailable — the UI must degrade gracefully and never
  * invent a student, a number, or a recommendation.
