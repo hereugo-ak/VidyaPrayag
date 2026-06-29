@@ -76,7 +76,7 @@ object NarratorTools {
                     .firstOrNull()
             } ?: return JsonObject(mapOf("found" to JsonPrimitive(false))).toString()
 
-            buildJsonObject {
+            return buildJsonObject {
                 put("found", true)
                 put("term", row[ReportCardDraftsTable.term])
                 put("ai_draft", row[ReportCardDraftsTable.aiDraft] ?: "")
@@ -193,7 +193,7 @@ object NarratorTools {
                     .firstOrNull()
             } ?: return JsonObject(mapOf("found" to JsonPrimitive(false))).toString()
 
-            buildJsonObject {
+            return buildJsonObject {
                 put("found", true)
                 put("risk_score", row[PewsRiskSnapshotsTable.riskScore])
                 put("risk_level", row[PewsRiskSnapshotsTable.riskLevel])
@@ -236,7 +236,7 @@ object NarratorTools {
         override suspend fun execute(schoolId: UUID, arguments: String): String {
             // Per-question marks are not yet stored in the DB.
             // Graceful: return empty — the agent will work without topic gaps.
-            JsonObject(mapOf(
+            return JsonObject(mapOf(
                 "available" to JsonPrimitive(false),
                 "message" to JsonPrimitive("Topic-level marks not yet available. Use subject-level trajectory instead.")
             )).toString()
@@ -284,7 +284,7 @@ object NarratorTools {
             }
 
             // Fallback
-            JsonObject(mapOf(
+            return JsonObject(mapOf(
                 "board" to JsonPrimitive(boardParam ?: "CBSE"),
                 "message" to JsonPrimitive("Using default CBSE 9-point scale")
             )).toString()
@@ -322,7 +322,7 @@ object NarratorTools {
             // parent_achievements uses child_id (children table), not student_id directly.
             // Best-effort: return empty — graceful.
             // In future, map student_id → children.student_code for lookup.
-            JsonObject(mapOf(
+            return JsonObject(mapOf(
                 "badges" to JsonArray(emptyList()),
                 "message" to JsonPrimitive("No competency badges linked yet.")
             )).toString()

@@ -26,6 +26,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.SortOrder
@@ -68,7 +69,7 @@ class ReportAssemblyService(
 
     @Serializable
     data class BatchResult(
-        val jobId: UUID,
+        @Contextual val jobId: UUID,
         val totalStudents: Int,
         val completed: Int,
         val failed: Int,
@@ -80,8 +81,8 @@ class ReportAssemblyService(
 
     @Serializable
     data class RegenerateResult(
-        val draftId: UUID,
-        val studentId: UUID,
+        @Contextual val draftId: UUID,
+        @Contextual val studentId: UUID,
         val success: Boolean,
         val grounded: Boolean,
         val fallbackUsed: Boolean,
@@ -102,7 +103,7 @@ class ReportAssemblyService(
 
     @Serializable
     data class OversightSummary(
-        val schoolId: UUID,
+        @Contextual val schoolId: UUID,
         val classes: List<ClassOversightRow>,
     )
 

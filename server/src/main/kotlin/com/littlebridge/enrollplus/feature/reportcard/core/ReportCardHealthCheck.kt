@@ -2,6 +2,8 @@
 package com.littlebridge.enrollplus.feature.reportcard.core
 
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
+import com.littlebridge.enrollplus.db.ReportCardDraftsTable
+import com.littlebridge.enrollplus.db.StudentsTable
 import com.littlebridge.enrollplus.feature.ai.AiService
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.selectAll
@@ -59,26 +61,19 @@ object ReportCardHealthCheck {
         }
 
         // Check core tables (students, assessments, assessment_marks)
-        val coreOk = runCatching {
-            dbQuery {
-                org.jetbrains.exposed.sql.selectAll()
-                    .from(com.littlebridge.enrollplus.db.StudentsTable)
-                    .limit(1)
-                    .toList()
-            }
+        val coreOk = try {
+            dbQuery { StudentsTable.selectAll().limit(1).toList() }
             true
-        }.getOrElse {
-            warnings.add("Core tables check failed: ${it.message}")
+        } catch (e: Exception) {
+            warnings.add("Core tables check failed: ${e.message}")
             false
         }
 
         // Check report card tables
-        val rcOk = runCatching {
-            dbQuery {
-                com.littlebridge.enrollplus.db.ReportCardDraftsTable.selectAll().limit(1).toList()
-            }
+        val rcOk = try {
+            dbQuery { ReportCardDraftsTable.selectAll().limit(1).toList() }
             true
-        }.getOrElse {
+        } catch (e: Exception) {
             warnings.add("Report card tables not yet created — run migration_062_report_card.sql")
             false
         }

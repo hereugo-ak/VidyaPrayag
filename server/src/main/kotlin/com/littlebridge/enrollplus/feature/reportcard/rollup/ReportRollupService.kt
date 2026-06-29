@@ -202,12 +202,7 @@ class ReportRollupService(
 
     // ── Private helpers ────────────────────────────────────────────────
 
-    private data class Quad<A, B, C, D>(val a: A, val b: B, val c: C, val d: D) {
-        operator fun component1() = a
-        operator fun component2() = b
-        operator fun component3() = c
-        operator fun component4() = d
-    }
+    private data class Quad<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
 
     private fun emptyBundle(
         schoolId: UUID, studentId: UUID, term: String, academicYearId: UUID?,
@@ -398,10 +393,10 @@ class ReportRollupService(
 
     private fun labelTrajectory(marksSlope: Double?, attendanceSlope: Double?): String {
         val ms = marksSlope ?: 0.0
-        val as = attendanceSlope ?: 0.0
+        val attSlope = attendanceSlope ?: 0.0
         return when {
-            ms >= 5.0 && as >= 0.0 -> "improved"
-            ms <= -5.0 || as <= -10.0 -> "slid"
+            ms >= 5.0 && attSlope >= 0.0 -> "improved"
+            ms <= -5.0 || attSlope <= -10.0 -> "slid"
             kotlin.math.abs(ms) >= 10.0 -> "volatile"
             else -> "steady"
         }

@@ -167,7 +167,7 @@ class TermPatternService {
             ClassPatternRow(className, section, bundles.size, avgPct, improved, slid, steady, fas)
         }.sortedBy { it.className + "-" + it.section }
 
-        val avgOverall = overallPcts.takeIf { it.isNotEmpty() }?.average
+        val avgOverall = overallPcts.takeIf { it.isNotEmpty() }?.average()
         val confidence = when {
             drafts.size >= 50 -> ReportCardConstants.Confidence.HIGH
             drafts.size >= 20 -> ReportCardConstants.Confidence.MEDIUM

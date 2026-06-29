@@ -12,6 +12,7 @@ import com.littlebridge.enrollplus.db.ChildrenTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.db.StudentsTable
 import com.littlebridge.enrollplus.feature.reportcard.core.ReportCardConfig
+import com.littlebridge.enrollplus.feature.reportcard.data.ReportCardDraftRepository
 import com.littlebridge.enrollplus.feature.reportcard.queue.ReportCardJob
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
