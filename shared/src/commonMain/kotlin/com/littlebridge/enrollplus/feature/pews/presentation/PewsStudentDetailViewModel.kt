@@ -18,6 +18,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.littlebridge.enrollplus.core.network.NetworkResult
 import com.littlebridge.enrollplus.core.prefs.PreferenceRepository
+import com.littlebridge.enrollplus.feature.pews.domain.model.ParentDraftDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsInterventionDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsStudentDetailDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.UpdateInterventionRequest
@@ -37,6 +38,8 @@ data class PewsStudentDetailState(
     val interventions: List<PewsInterventionDto> = emptyList(),
     val updatingIds: Set<String> = emptySet(),
     val infoMessage: String? = null,
+    val parentDrafts: Map<String, ParentDraftDto> = emptyMap(),
+    val draftLoadingIds: Set<String> = emptySet(),
 ) {
     val isEmpty: Boolean get() = !isLoading && error == null && detail?.current == null
 }
@@ -120,6 +123,51 @@ class PewsStudentDetailViewModel(
                     _state.value = _state.value.copy(updatingIds = _state.value.updatingIds - interventionId, error = "Connection error. Check your internet.")
             }
         }
+    }
+
+    fun generateParentDraft(interventionId: String, lang: String = "hi") {
+        viewModelScope.launch {
+            val t = token() ?: run {
+                _state.value = _state.value.copy(error = "You are not signed in. Please log in again.")
+                return@launch
+            }
+            _state.value = _state.value.copy(draftLoadingIds = _state.value.draftLoadingIds + interventionId)
+            when (val r = repository.generateParentDraft(t, interventionId, lang)) {
+                is NetworkResult.Success -> {
+                    val draft = r.data.data
+                    if (draft != null) {
+                        _state.value = _state.value.copy(
+                            draftLoadingIds = _state.value.draftLoadingIds - interventionId,
+                            parentDrafts = _state.value.parentDrafts + (interventionId to draft),
+                            infoMessage = "Parent message draft generated",
+                        )
+                    } else {
+                        _state.value = _state.value.copy(
+                            draftLoadingIds = _state.value.draftLoadingIds - interventionId,
+                            error = "Failed to generate draft",
+                        )
+                    }
+                }
+                is NetworkResult.Error -> {
+                    AppLogger.e("PewsStudentVM", "generateParentDraft error: ${r.message}")
+                    _state.value = _state.value.copy(
+                        draftLoadingIds = _state.value.draftLoadingIds - interventionId,
+                        error = r.message,
+                    )
+                }
+                is NetworkResult.ConnectionError ->
+                    _state.value = _state.value.copy(
+                        draftLoadingIds = _state.value.draftLoadingIds - interventionId,
+                        error = "Connection error. Check your internet.",
+                    )
+            }
+        }
+    }
+
+    fun clearDraft(interventionId: String) {
+        _state.value = _state.value.copy(
+            parentDrafts = _state.value.parentDrafts - interventionId,
+        )
     }
 
     fun clearMessages() {

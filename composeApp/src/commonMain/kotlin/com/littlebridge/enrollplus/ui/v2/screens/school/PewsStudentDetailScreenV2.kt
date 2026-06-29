@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.littlebridge.enrollplus.feature.pews.domain.model.ParentDraftDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsInterventionDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsStudentDto
 import com.littlebridge.enrollplus.feature.pews.presentation.PewsStudentDetailState
@@ -84,7 +85,10 @@ fun PewsStudentDetailScreenV2(
             onStart = { id -> viewModel.updateIntervention(id, status = "in_progress") },
             onMarkDone = { id, outcome -> viewModel.updateIntervention(id, status = "done", outcome = outcome) },
             onDismiss = { id -> viewModel.updateIntervention(id, status = "dismissed") },
+            onGenerateDraft = viewModel::generateParentDraft,
             onSendParentMessage = viewModel::sendParentMessage,
+            onClearDraft = viewModel::clearDraft,
+            onClearMessage = viewModel::clearMessages,
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -97,7 +101,10 @@ private fun PewsStudentDetailContent(
     onStart: (String) -> Unit,
     onMarkDone: (String, String) -> Unit,
     onDismiss: (String) -> Unit,
+    onGenerateDraft: (String) -> Unit,
     onSendParentMessage: (String) -> Unit,
+    onClearDraft: (String) -> Unit,
+    onClearMessage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -130,10 +137,14 @@ private fun PewsStudentDetailContent(
                     InterventionCard(
                         iv = iv,
                         isUpdating = iv.id in state.updatingIds,
+                        parentDrafts = state.parentDrafts,
+                        draftLoadingIds = state.draftLoadingIds,
                         onStart = onStart,
                         onMarkDone = onMarkDone,
                         onDismiss = onDismiss,
+                        onGenerateDraft = onGenerateDraft,
                         onSendParentMessage = onSendParentMessage,
+                        onClearDraft = onClearDraft,
                     )
                 }
             }
@@ -273,10 +284,14 @@ private fun AiExplanationCard(s: PewsStudentDto) {
 private fun InterventionCard(
     iv: PewsInterventionDto,
     isUpdating: Boolean,
+    parentDrafts: Map<String, ParentDraftDto>,
+    draftLoadingIds: Set<String>,
     onStart: (String) -> Unit,
     onMarkDone: (String, String) -> Unit,
     onDismiss: (String) -> Unit,
+    onGenerateDraft: (String) -> Unit,
     onSendParentMessage: (String) -> Unit,
+    onClearDraft: (String) -> Unit,
 ) {
     val c = VTheme.colors
     val statusTone = when (iv.status) {
@@ -367,8 +382,13 @@ private fun InterventionCard(
             }
         }
 
-        // Parent draft (pre-generated from CaseFile)
-        iv.parentDraftBody?.let { body ->
+        // Parent draft — prefer API-generated from parentDrafts, fall back to pre-generated from CaseFile
+        val draftBody = parentDrafts[iv.id]?.body ?: iv.parentDraftBody
+        val draftLang = parentDrafts[iv.id]?.language ?: iv.parentDraftLang
+        val isParentAction = iv.actionType.contains("parent") || iv.actionType.contains("message") || iv.actionType.contains("call") || iv.actionType.contains("visit")
+        val hasDraft = !draftBody.isNullOrBlank()
+
+        if (hasDraft && draftBody != null) {
             Spacer(Modifier.height(8.dp))
             Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(c.teal.copy(alpha = 0.1f)).padding(8.dp)) {
                 Column {
@@ -376,13 +396,16 @@ private fun InterventionCard(
                         Icon(VIcons.Sparkles, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(12.dp))
                         Spacer(Modifier.size(4.dp))
                         Text(
-                            "PARENT MESSAGE (${iv.parentDraftLang?.uppercase() ?: "HI"})",
+                            "PARENT MESSAGE (${draftLang?.uppercase() ?: "HI"})",
                             style = VTheme.type.label.colored(c.tealDeep).copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
                             modifier = Modifier.weight(1f),
                         )
+                        if (parentDrafts[iv.id] != null) {
+                            VButton("✕", { onClearDraft(iv.id) }, variant = VButtonVariant.Ghost, size = VButtonSize.Sm)
+                        }
                     }
                     Spacer(Modifier.height(4.dp))
-                    Text(body, style = VTheme.type.body.colored(c.ink).copy(fontSize = 12.sp, lineHeight = 17.sp))
+                    Text(draftBody, style = VTheme.type.body.colored(c.ink).copy(fontSize = 12.sp, lineHeight = 17.sp))
                 }
             }
         }
@@ -392,8 +415,7 @@ private fun InterventionCard(
 
         val open = iv.status == "open" || iv.status == "in_progress"
         val outcome = iv.outcome
-        val isParentAction = iv.actionType.contains("parent") || iv.actionType.contains("message") || iv.actionType.contains("call") || iv.actionType.contains("visit")
-        val hasDraft = !iv.parentDraftBody.isNullOrBlank()
+        val isDraftLoading = iv.id in draftLoadingIds
         if (open) {
             Spacer(Modifier.height(10.dp))
             if (iv.status == "open") {
@@ -415,15 +437,25 @@ private fun InterventionCard(
                 }
             } else {
                 // In-progress: action-type-specific
-                if (isParentAction && hasDraft) {
+                if (isParentAction) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        VButton(
-                            text = "Send to parent",
-                            onClick = { onSendParentMessage(iv.id) },
-                            variant = VButtonVariant.Primary,
-                            size = VButtonSize.Sm,
-                            enabled = !isUpdating,
-                        )
+                        if (hasDraft) {
+                            VButton(
+                                text = "Send to parent",
+                                onClick = { onSendParentMessage(iv.id) },
+                                variant = VButtonVariant.Primary,
+                                size = VButtonSize.Sm,
+                                enabled = !isUpdating,
+                            )
+                        } else {
+                            VButton(
+                                text = "Draft parent message",
+                                onClick = { onGenerateDraft(iv.id) },
+                                variant = VButtonVariant.Secondary,
+                                size = VButtonSize.Sm,
+                                enabled = !isDraftLoading,
+                            )
+                        }
                         VButton(
                             text = "Dismiss",
                             onClick = { onDismiss(iv.id) },

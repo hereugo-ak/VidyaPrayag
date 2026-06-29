@@ -1,6 +1,9 @@
 // FILE: server/src/main/kotlin/com/littlebridge/enrollplus/feature/tutor/core/TutorRouter.kt
 package com.littlebridge.enrollplus.feature.tutor.core
 
+import com.littlebridge.enrollplus.feature.tutor.agent.AgentModule
+import com.littlebridge.enrollplus.feature.tutor.sense.SenseModule
+import com.littlebridge.enrollplus.feature.tutor.triage.TriageModule
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.route
 import org.slf4j.LoggerFactory
@@ -31,10 +34,10 @@ private val log = LoggerFactory.getLogger("TutorRouter")
  */
 fun registerTutorModules() {
     log.info("Registering AI Tutor 2.0 modules…")
-    // Modules will be registered here as they are built in TICK 03+:
-    //   TutorModuleRegistry.register(SenseModule)
-    //   TutorModuleRegistry.register(TriageModule)
-    //   TutorModuleRegistry.register(AgentModule)
+    TutorModuleRegistry.register(SenseModule)
+    TutorModuleRegistry.register(TriageModule)
+    TutorModuleRegistry.register(AgentModule)
+    // Modules will be registered here as they are built in TICK 06+:
     //   TutorModuleRegistry.register(ActModule)
     //   TutorModuleRegistry.register(LearnModule)
     //   TutorModuleRegistry.register(IngestModule)
