@@ -84,6 +84,7 @@ fun PewsStudentDetailScreenV2(
             onStart = { id -> viewModel.updateIntervention(id, status = "in_progress") },
             onMarkDone = { id, outcome -> viewModel.updateIntervention(id, status = "done", outcome = outcome) },
             onDismiss = { id -> viewModel.updateIntervention(id, status = "dismissed") },
+            onSendParentMessage = viewModel::sendParentMessage,
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -96,6 +97,7 @@ private fun PewsStudentDetailContent(
     onStart: (String) -> Unit,
     onMarkDone: (String, String) -> Unit,
     onDismiss: (String) -> Unit,
+    onSendParentMessage: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -131,6 +133,7 @@ private fun PewsStudentDetailContent(
                         onStart = onStart,
                         onMarkDone = onMarkDone,
                         onDismiss = onDismiss,
+                        onSendParentMessage = onSendParentMessage,
                     )
                 }
             }
@@ -273,6 +276,7 @@ private fun InterventionCard(
     onStart: (String) -> Unit,
     onMarkDone: (String, String) -> Unit,
     onDismiss: (String) -> Unit,
+    onSendParentMessage: (String) -> Unit,
 ) {
     val c = VTheme.colors
     val statusTone = when (iv.status) {
@@ -388,6 +392,8 @@ private fun InterventionCard(
 
         val open = iv.status == "open" || iv.status == "in_progress"
         val outcome = iv.outcome
+        val isParentAction = iv.actionType.contains("parent") || iv.actionType.contains("message") || iv.actionType.contains("call") || iv.actionType.contains("visit")
+        val hasDraft = !iv.parentDraftBody.isNullOrBlank()
         if (open) {
             Spacer(Modifier.height(10.dp))
             if (iv.status == "open") {
@@ -408,28 +414,48 @@ private fun InterventionCard(
                     )
                 }
             } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    VButton(
-                        text = "Improved",
-                        onClick = { onMarkDone(iv.id, "improved") },
-                        variant = VButtonVariant.Primary,
-                        size = VButtonSize.Sm,
-                        enabled = !isUpdating,
-                    )
-                    VButton(
-                        text = "No change",
-                        onClick = { onMarkDone(iv.id, "unchanged") },
-                        variant = VButtonVariant.Secondary,
-                        size = VButtonSize.Sm,
-                        enabled = !isUpdating,
-                    )
-                    VButton(
-                        text = "Dismiss",
-                        onClick = { onDismiss(iv.id) },
-                        variant = VButtonVariant.Ghost,
-                        size = VButtonSize.Sm,
-                        enabled = !isUpdating,
-                    )
+                // In-progress: action-type-specific
+                if (isParentAction && hasDraft) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        VButton(
+                            text = "Send to parent",
+                            onClick = { onSendParentMessage(iv.id) },
+                            variant = VButtonVariant.Primary,
+                            size = VButtonSize.Sm,
+                            enabled = !isUpdating,
+                        )
+                        VButton(
+                            text = "Dismiss",
+                            onClick = { onDismiss(iv.id) },
+                            variant = VButtonVariant.Ghost,
+                            size = VButtonSize.Sm,
+                            enabled = !isUpdating,
+                        )
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        VButton(
+                            text = "Mark improved",
+                            onClick = { onMarkDone(iv.id, "improved") },
+                            variant = VButtonVariant.Primary,
+                            size = VButtonSize.Sm,
+                            enabled = !isUpdating,
+                        )
+                        VButton(
+                            text = "No change",
+                            onClick = { onMarkDone(iv.id, "unchanged") },
+                            variant = VButtonVariant.Secondary,
+                            size = VButtonSize.Sm,
+                            enabled = !isUpdating,
+                        )
+                        VButton(
+                            text = "Dismiss",
+                            onClick = { onDismiss(iv.id) },
+                            variant = VButtonVariant.Ghost,
+                            size = VButtonSize.Sm,
+                            enabled = !isUpdating,
+                        )
+                    }
                 }
             }
         } else if (!outcome.isNullOrBlank()) {

@@ -125,4 +125,31 @@ class PewsStudentDetailViewModel(
     fun clearMessages() {
         _state.value = _state.value.copy(infoMessage = null)
     }
+
+    fun sendParentMessage(interventionId: String) {
+        val code = studentCode ?: return
+        viewModelScope.launch {
+            val t = token() ?: run {
+                _state.value = _state.value.copy(error = "You are not signed in. Please log in again.")
+                return@launch
+            }
+            _state.value = _state.value.copy(updatingIds = _state.value.updatingIds + interventionId)
+            when (val r = repository.sendParentMessage(t, interventionId)) {
+                is NetworkResult.Success -> {
+                    val sent = r.data.data
+                    _state.value = _state.value.copy(
+                        updatingIds = _state.value.updatingIds - interventionId,
+                        infoMessage = if (sent != null) "Message sent to ${sent.sentCount} parent(s)" else "Message sent",
+                    )
+                    loadInterventionsFor(t, code)
+                }
+                is NetworkResult.Error -> {
+                    AppLogger.e("PewsStudentVM", "sendParentMessage error: ${r.message}")
+                    _state.value = _state.value.copy(updatingIds = _state.value.updatingIds - interventionId, error = r.message)
+                }
+                is NetworkResult.ConnectionError ->
+                    _state.value = _state.value.copy(updatingIds = _state.value.updatingIds - interventionId, error = "Connection error. Check your internet.")
+            }
+        }
+    }
 }

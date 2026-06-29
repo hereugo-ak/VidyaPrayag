@@ -20,6 +20,7 @@ import com.littlebridge.enrollplus.feature.pews.domain.model.PewsRunResultDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsStudentDetailDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsStudentDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.ParentDraftDto
+import com.littlebridge.enrollplus.feature.pews.domain.model.SendParentMessageDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.UpdateInterventionRequest
 
 interface PewsRepository {
@@ -40,6 +41,7 @@ interface PewsRepository {
     suspend fun getTeacherInterventions(token: String, status: String? = null): NetworkResult<ApiResponse<List<PewsInterventionDto>>>
     suspend fun updateTeacherIntervention(token: String, interventionId: String, request: UpdateInterventionRequest): NetworkResult<ApiResponse<Map<String, Boolean>>>
     suspend fun generateParentDraft(token: String, interventionId: String, lang: String = "hi"): NetworkResult<ApiResponse<ParentDraftDto>>
+    suspend fun sendParentMessage(token: String, interventionId: String): NetworkResult<ApiResponse<SendParentMessageDto>>
 
     // parent
     suspend fun getParentNudge(token: String, childId: String): NetworkResult<ApiResponse<PewsParentNudgeDto>>

@@ -81,6 +81,7 @@ fun TeacherPewsScreenV2(
             onMarkDone = { id, outcome -> viewModel.updateIntervention(id, status = "done", outcome = outcome) },
             onDismiss = { id -> viewModel.updateIntervention(id, status = "dismissed") },
             onGenerateDraft = { id -> viewModel.generateParentDraft(id) },
+            onSendParentMessage = viewModel::sendParentMessage,
             onClearDraft = viewModel::clearDraft,
             onClearMessage = viewModel::clearMessages,
             modifier = Modifier.fillMaxSize(),
@@ -96,6 +97,7 @@ private fun TeacherPewsContent(
     onMarkDone: (String, String) -> Unit,
     onDismiss: (String) -> Unit,
     onGenerateDraft: (String) -> Unit,
+    onSendParentMessage: (String) -> Unit,
     onClearDraft: (String) -> Unit,
     onClearMessage: () -> Unit,
     modifier: Modifier = Modifier,
@@ -129,6 +131,7 @@ private fun TeacherPewsContent(
                     onMarkDone = onMarkDone,
                     onDismiss = onDismiss,
                     onGenerateDraft = onGenerateDraft,
+                    onSendParentMessage = onSendParentMessage,
                     onClearDraft = onClearDraft,
                 )
             }
@@ -148,6 +151,7 @@ private fun TeacherStudentCard(
     onMarkDone: (String, String) -> Unit,
     onDismiss: (String) -> Unit,
     onGenerateDraft: (String) -> Unit,
+    onSendParentMessage: (String) -> Unit,
     onClearDraft: (String) -> Unit,
 ) {
     val c = VTheme.colors
@@ -278,33 +282,40 @@ private fun TeacherStudentCard(
                             VButton("Start", { onStart(iv.id) }, variant = VButtonVariant.Primary, size = VButtonSize.Sm, enabled = !isUpdating)
                             VButton("Dismiss", { onDismiss(iv.id) }, variant = VButtonVariant.Ghost, size = VButtonSize.Sm, enabled = !isUpdating)
                         }
-                    } else {
+                    } else if (iv.status == "in_progress") {
                         // In-progress: action-type-specific workflow
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            VButton("Improved", { onMarkDone(iv.id, "improved") }, variant = VButtonVariant.Primary, size = VButtonSize.Sm, enabled = !isUpdating)
-                            VButton("No change", { onMarkDone(iv.id, "unchanged") }, variant = VButtonVariant.Secondary, size = VButtonSize.Sm, enabled = !isUpdating)
-                        }
-                        Spacer(Modifier.height(6.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            // Show "Draft parent message" only for parent-contact actions without a pre-existing draft
-                            if (isParentAction && !hasDraft) {
-                                VButton(
-                                    "Draft parent message",
-                                    { onGenerateDraft(iv.id) },
-                                    variant = VButtonVariant.Secondary,
-                                    size = VButtonSize.Sm,
-                                    enabled = !isDraftLoading,
-                                )
-                            } else if (isParentAction && hasDraft) {
-                                VButton(
-                                    "Regenerate message",
-                                    { onGenerateDraft(iv.id) },
-                                    variant = VButtonVariant.Secondary,
-                                    size = VButtonSize.Sm,
-                                    enabled = !isDraftLoading,
-                                )
+                        if (isParentAction) {
+                            // Parent-contact action: Send the message
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (hasDraft) {
+                                    VButton(
+                                        "Send to parent",
+                                        { onSendParentMessage(iv.id) },
+                                        variant = VButtonVariant.Primary,
+                                        size = VButtonSize.Sm,
+                                        enabled = !isUpdating,
+                                    )
+                                } else {
+                                    VButton(
+                                        "Draft parent message",
+                                        { onGenerateDraft(iv.id) },
+                                        variant = VButtonVariant.Secondary,
+                                        size = VButtonSize.Sm,
+                                        enabled = !isDraftLoading,
+                                    )
+                                }
+                                VButton("Dismiss", { onDismiss(iv.id) }, variant = VButtonVariant.Ghost, size = VButtonSize.Sm, enabled = !isUpdating)
                             }
-                            VButton("Dismiss", { onDismiss(iv.id) }, variant = VButtonVariant.Ghost, size = VButtonSize.Sm, enabled = !isUpdating)
+                        } else {
+                            // Non-parent action: mark outcome
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                VButton("Mark improved", { onMarkDone(iv.id, "improved") }, variant = VButtonVariant.Primary, size = VButtonSize.Sm, enabled = !isUpdating)
+                                VButton("No change", { onMarkDone(iv.id, "unchanged") }, variant = VButtonVariant.Secondary, size = VButtonSize.Sm, enabled = !isUpdating)
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                VButton("Dismiss", { onDismiss(iv.id) }, variant = VButtonVariant.Ghost, size = VButtonSize.Sm, enabled = !isUpdating)
+                            }
                         }
                     }
                 }

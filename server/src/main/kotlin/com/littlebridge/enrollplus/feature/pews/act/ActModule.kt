@@ -76,7 +76,7 @@ object ActModule : PEWSModule {
                     )
                     if (result.ok) {
                         call.ok(
-                            SendParentMessageResponse(sent_count = result.sentCount),
+                            SendParentMessageResponse(result.sentCount),
                             "Message sent to ${result.sentCount} parent(s)"
                         )
                     } else {
