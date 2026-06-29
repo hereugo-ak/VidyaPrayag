@@ -150,7 +150,6 @@ fun TeacherPortalV2(
                     reportDraftId = draftId
                     overlay = TeacherOverlay.ReportDraftEditor
                 },
-                modifier = modifier,
             )
             return
         }
@@ -159,7 +158,6 @@ fun TeacherPortalV2(
                 draftId = reportDraftId,
                 onBack = { overlay = TeacherOverlay.ReportReview },
                 onSaved = { overlay = TeacherOverlay.ReportReview },
-                modifier = modifier,
             )
             return
         }

@@ -368,14 +368,12 @@ fun SchoolPortalV2(
             SchoolOverlay.ReportPublish -> {
                 AdminReportPublishScreen(
                     onBack = { overlay = SchoolOverlay.None },
-                    modifier = modifier,
                 )
                 return
             }
             SchoolOverlay.ReportEffectiveness -> {
                 AdminReportingEffectivenessScreen(
                     onBack = { overlay = SchoolOverlay.None },
-                    modifier = modifier,
                 )
                 return
             }

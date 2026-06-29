@@ -198,8 +198,9 @@ private fun DraftReviewCard(
                 }
             }
 
-            if (draft.aiDraft != null) {
-                val preview = draft.aiDraft.take(120) + if (draft.aiDraft.length > 120) "…" else ""
+            val aiDraft = draft.aiDraft
+            if (aiDraft != null) {
+                val preview = aiDraft.take(120) + if (aiDraft.length > 120) "…" else ""
                 Text(preview, style = VTheme.type.body.colored(c.ink2).copy(fontSize = 12.sp), maxLines = 3)
             }
 
