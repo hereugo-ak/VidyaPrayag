@@ -159,7 +159,7 @@ class ManagedCaseworkService {
                 }
                 log.debug("Act: updated existing intervention for {} with Case File", snap.studentCode)
             }
-            return false  // didn't open a new one
+            return true  // updated an existing intervention
         }
 
         // Open a new intervention

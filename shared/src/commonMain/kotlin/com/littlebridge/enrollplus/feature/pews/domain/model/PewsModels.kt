@@ -114,6 +114,14 @@ data class UpdateInterventionRequest(
     @SerialName("action_type") val actionType: String? = null,
 )
 
+/** Response from POST .../interventions/{id}/draft-message — vernacular parent message draft. */
+@Serializable
+data class ParentDraftDto(
+    val ok: Boolean,
+    val language: String,
+    val body: String,
+)
+
 /** Aggregate effectiveness counts (the LEARN loop). */
 @Serializable
 data class PewsEffectivenessDto(

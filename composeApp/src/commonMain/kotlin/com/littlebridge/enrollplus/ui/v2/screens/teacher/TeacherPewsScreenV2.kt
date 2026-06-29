@@ -77,8 +77,12 @@ fun TeacherPewsScreenV2(
         TeacherPewsContent(
             state = state,
             onRetry = viewModel::load,
+            onStart = { id -> viewModel.updateIntervention(id, status = "in_progress") },
             onMarkDone = { id, outcome -> viewModel.updateIntervention(id, status = "done", outcome = outcome) },
             onDismiss = { id -> viewModel.updateIntervention(id, status = "dismissed") },
+            onGenerateDraft = { id -> viewModel.generateParentDraft(id) },
+            onClearDraft = viewModel::clearDraft,
+            onClearMessage = viewModel::clearMessages,
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -88,8 +92,12 @@ fun TeacherPewsScreenV2(
 private fun TeacherPewsContent(
     state: TeacherPewsState,
     onRetry: () -> Unit,
+    onStart: (String) -> Unit,
     onMarkDone: (String, String) -> Unit,
     onDismiss: (String) -> Unit,
+    onGenerateDraft: (String) -> Unit,
+    onClearDraft: (String) -> Unit,
+    onClearMessage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -115,8 +123,13 @@ private fun TeacherPewsContent(
                     s = s,
                     interventions = byStudent[s.studentCode].orEmpty(),
                     updatingIds = state.updatingIds,
+                    parentDrafts = state.parentDrafts,
+                    draftLoadingIds = state.draftLoadingIds,
+                    onStart = onStart,
                     onMarkDone = onMarkDone,
                     onDismiss = onDismiss,
+                    onGenerateDraft = onGenerateDraft,
+                    onClearDraft = onClearDraft,
                 )
             }
             item { Spacer(Modifier.height(24.dp)) }
@@ -129,8 +142,13 @@ private fun TeacherStudentCard(
     s: PewsStudentDto,
     interventions: List<PewsInterventionDto>,
     updatingIds: Set<String>,
+    parentDrafts: Map<String, com.littlebridge.enrollplus.feature.pews.domain.model.ParentDraftDto>,
+    draftLoadingIds: Set<String>,
+    onStart: (String) -> Unit,
     onMarkDone: (String, String) -> Unit,
     onDismiss: (String) -> Unit,
+    onGenerateDraft: (String) -> Unit,
+    onClearDraft: (String) -> Unit,
 ) {
     val c = VTheme.colors
     val (tone, levelLabel) = when (s.riskLevel) {
@@ -217,16 +235,59 @@ private fun TeacherStudentCard(
                         val steps = parseTeacherPlanSteps(planJson)
                         if (steps.isNotEmpty()) {
                             Spacer(Modifier.height(6.dp))
+                            Text("PLAN", style = VTheme.type.label.colored(c.ink3).copy(fontWeight = FontWeight.Bold, fontSize = 10.sp))
+                            Spacer(Modifier.height(4.dp))
                             steps.forEachIndexed { i, step ->
                                 Text("${i + 1}. $step", style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp, lineHeight = 15.sp))
                             }
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        VButton("Improved", { onMarkDone(iv.id, "improved") }, variant = VButtonVariant.Primary, size = VButtonSize.Sm, enabled = iv.id !in updatingIds)
-                        VButton("No change", { onMarkDone(iv.id, "unchanged") }, variant = VButtonVariant.Secondary, size = VButtonSize.Sm, enabled = iv.id !in updatingIds)
-                        VButton("Dismiss", { onDismiss(iv.id) }, variant = VButtonVariant.Ghost, size = VButtonSize.Sm, enabled = iv.id !in updatingIds)
+
+                    // Parent draft display (if generated)
+                    parentDrafts[iv.id]?.let { draft ->
+                        Spacer(Modifier.height(8.dp))
+                        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(c.teal.copy(alpha = 0.1f)).padding(8.dp)) {
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(VIcons.Sparkles, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(12.dp))
+                                    Spacer(Modifier.size(4.dp))
+                                    Text("PARENT MESSAGE (${draft.language.uppercase()})", style = VTheme.type.label.colored(c.tealDeep).copy(fontWeight = FontWeight.Bold, fontSize = 10.sp), modifier = Modifier.weight(1f))
+                                    VButton("✕", { onClearDraft(iv.id) }, variant = VButtonVariant.Ghost, size = VButtonSize.Sm)
+                                }
+                                Spacer(Modifier.height(4.dp))
+                                Text(draft.body, style = VTheme.type.body.colored(c.ink).copy(fontSize = 12.sp, lineHeight = 17.sp))
+                            }
+                        }
+                    }
+
+                    // Workflow actions
+                    Spacer(Modifier.height(10.dp))
+                    val isUpdating = iv.id in updatingIds
+                    val isDraftLoading = iv.id in draftLoadingIds
+
+                    // Step 1: Start (only for "open" status)
+                    if (iv.status == "open") {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            VButton("Start", { onStart(iv.id) }, variant = VButtonVariant.Primary, size = VButtonSize.Sm, enabled = !isUpdating)
+                            VButton("Dismiss", { onDismiss(iv.id) }, variant = VButtonVariant.Ghost, size = VButtonSize.Sm, enabled = !isUpdating)
+                        }
+                    } else {
+                        // In-progress: show outcome + draft actions
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            VButton("Improved", { onMarkDone(iv.id, "improved") }, variant = VButtonVariant.Primary, size = VButtonSize.Sm, enabled = !isUpdating)
+                            VButton("No change", { onMarkDone(iv.id, "unchanged") }, variant = VButtonVariant.Secondary, size = VButtonSize.Sm, enabled = !isUpdating)
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            VButton(
+                                if (parentDrafts[iv.id] != null) "Regenerate message" else "Draft parent message",
+                                { onGenerateDraft(iv.id) },
+                                variant = VButtonVariant.Secondary,
+                                size = VButtonSize.Sm,
+                                enabled = !isDraftLoading,
+                            )
+                            VButton("Dismiss", { onDismiss(iv.id) }, variant = VButtonVariant.Ghost, size = VButtonSize.Sm, enabled = !isUpdating)
+                        }
                     }
                 }
             }

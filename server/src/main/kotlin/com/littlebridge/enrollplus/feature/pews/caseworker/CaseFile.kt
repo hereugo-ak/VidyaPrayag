@@ -72,10 +72,18 @@ object CaseFileCodec {
     /** Parse a model's JSON output into a CaseFile. Returns null on failure. */
     fun parse(raw: String): CaseFile? = try {
         // Strip code fences if present
-        val cleaned = raw.trim()
+        var cleaned = raw.trim()
             .removePrefix("```json").removePrefix("```")
             .removeSuffix("```")
             .trim()
+        // If the model wrapped JSON in prose, extract the JSON object
+        if (!cleaned.startsWith("{")) {
+            val firstBrace = cleaned.indexOf('{')
+            val lastBrace = cleaned.lastIndexOf('}')
+            if (firstBrace >= 0 && lastBrace > firstBrace) {
+                cleaned = cleaned.substring(firstBrace, lastBrace + 1)
+            }
+        }
         json.decodeFromString(CaseFile.serializer(), cleaned)
     } catch (e: Exception) {
         null

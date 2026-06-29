@@ -23,6 +23,7 @@ import com.littlebridge.enrollplus.feature.pews.domain.model.PewsParentNudgeDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsRunResultDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsStudentDetailDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsStudentDto
+import com.littlebridge.enrollplus.feature.pews.domain.model.ParentDraftDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.UpdateInterventionRequest
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
@@ -151,6 +152,16 @@ class PewsApi(
         client.patch(getUrl("api/v1/teacher/pews/interventions/$interventionId")) {
             contentType(ContentType.Application.Json)
             setBody(request)
+        }
+    }
+
+    suspend fun generateParentDraft(
+        token: String,
+        interventionId: String,
+        lang: String = "hi",
+    ): NetworkResult<ApiResponse<ParentDraftDto>> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/pews/interventions/$interventionId/draft-message")) {
+            parameter("lang", lang)
         }
     }
 

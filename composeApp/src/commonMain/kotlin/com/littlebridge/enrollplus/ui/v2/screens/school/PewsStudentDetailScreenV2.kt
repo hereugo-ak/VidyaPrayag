@@ -81,6 +81,7 @@ fun PewsStudentDetailScreenV2(
         PewsStudentDetailContent(
             state = state,
             onRetry = { viewModel.load(studentCode) },
+            onStart = { id -> viewModel.updateIntervention(id, status = "in_progress") },
             onMarkDone = { id, outcome -> viewModel.updateIntervention(id, status = "done", outcome = outcome) },
             onDismiss = { id -> viewModel.updateIntervention(id, status = "dismissed") },
             modifier = Modifier.fillMaxSize(),
@@ -92,6 +93,7 @@ fun PewsStudentDetailScreenV2(
 private fun PewsStudentDetailContent(
     state: PewsStudentDetailState,
     onRetry: () -> Unit,
+    onStart: (String) -> Unit,
     onMarkDone: (String, String) -> Unit,
     onDismiss: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -126,6 +128,7 @@ private fun PewsStudentDetailContent(
                     InterventionCard(
                         iv = iv,
                         isUpdating = iv.id in state.updatingIds,
+                        onStart = onStart,
                         onMarkDone = onMarkDone,
                         onDismiss = onDismiss,
                     )
@@ -267,6 +270,7 @@ private fun AiExplanationCard(s: PewsStudentDto) {
 private fun InterventionCard(
     iv: PewsInterventionDto,
     isUpdating: Boolean,
+    onStart: (String) -> Unit,
     onMarkDone: (String, String) -> Unit,
     onDismiss: (String) -> Unit,
 ) {
@@ -366,28 +370,47 @@ private fun InterventionCard(
         val outcome = iv.outcome
         if (open) {
             Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                VButton(
-                    text = "Improved",
-                    onClick = { onMarkDone(iv.id, "improved") },
-                    variant = VButtonVariant.Primary,
-                    size = VButtonSize.Sm,
-                    enabled = !isUpdating,
-                )
-                VButton(
-                    text = "No change",
-                    onClick = { onMarkDone(iv.id, "unchanged") },
-                    variant = VButtonVariant.Secondary,
-                    size = VButtonSize.Sm,
-                    enabled = !isUpdating,
-                )
-                VButton(
-                    text = "Dismiss",
-                    onClick = { onDismiss(iv.id) },
-                    variant = VButtonVariant.Ghost,
-                    size = VButtonSize.Sm,
-                    enabled = !isUpdating,
-                )
+            if (iv.status == "open") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    VButton(
+                        text = "Start",
+                        onClick = { onStart(iv.id) },
+                        variant = VButtonVariant.Primary,
+                        size = VButtonSize.Sm,
+                        enabled = !isUpdating,
+                    )
+                    VButton(
+                        text = "Dismiss",
+                        onClick = { onDismiss(iv.id) },
+                        variant = VButtonVariant.Ghost,
+                        size = VButtonSize.Sm,
+                        enabled = !isUpdating,
+                    )
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    VButton(
+                        text = "Improved",
+                        onClick = { onMarkDone(iv.id, "improved") },
+                        variant = VButtonVariant.Primary,
+                        size = VButtonSize.Sm,
+                        enabled = !isUpdating,
+                    )
+                    VButton(
+                        text = "No change",
+                        onClick = { onMarkDone(iv.id, "unchanged") },
+                        variant = VButtonVariant.Secondary,
+                        size = VButtonSize.Sm,
+                        enabled = !isUpdating,
+                    )
+                    VButton(
+                        text = "Dismiss",
+                        onClick = { onDismiss(iv.id) },
+                        variant = VButtonVariant.Ghost,
+                        size = VButtonSize.Sm,
+                        enabled = !isUpdating,
+                    )
+                }
             }
         } else if (!outcome.isNullOrBlank()) {
             Spacer(Modifier.height(6.dp))
