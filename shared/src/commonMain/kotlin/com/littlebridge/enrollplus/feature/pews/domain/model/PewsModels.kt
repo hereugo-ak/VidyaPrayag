@@ -123,6 +123,12 @@ data class ParentDraftDto(
     val body: String,
 )
 
+/** Response from POST .../interventions/{id}/send-parent-message — confirms message was sent. */
+@Serializable
+data class SendParentMessageDto(
+    @SerialName("sent_count") val sentCount: Int,
+)
+
 /** Aggregate effectiveness counts (the LEARN loop). */
 @Serializable
 data class PewsEffectivenessDto(

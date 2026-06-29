@@ -165,6 +165,13 @@ class PewsApi(
         }
     }
 
+    suspend fun sendParentMessage(
+        token: String,
+        interventionId: String,
+    ): NetworkResult<ApiResponse<SendParentMessageDto>> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/pews/interventions/$interventionId/send-parent-message"))
+    }
+
     // ─────────────────────────────── PARENT ─────────────────────────────────
 
     suspend fun getParentNudge(

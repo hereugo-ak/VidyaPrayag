@@ -23,6 +23,7 @@ import io.ktor.server.auth.authenticate
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import java.util.UUID
@@ -59,6 +60,29 @@ object ActModule : PEWSModule {
                         call.fail(result.errorMessage ?: "draft generation failed")
                     }
                 }
+
+                // Send parent message via messaging system + mark intervention done
+                post("/{id}/send-parent-message") {
+                    val ctx = call.requireTeacherContext() ?: return@post
+                    val interventionId = call.parameters["id"]?.let {
+                        runCatching { UUID.fromString(it) }.getOrNull()
+                    } ?: run { call.fail("invalid intervention id"); return@post }
+
+                    val result = parentDraftService.sendParentMessage(
+                        schoolId = ctx.schoolId,
+                        interventionId = interventionId,
+                        senderId = ctx.userId,
+                        senderName = ctx.fullName,
+                    )
+                    if (result.ok) {
+                        call.ok(
+                            SendParentMessageResponse(sent_count = result.sentCount),
+                            "Message sent to ${result.sentCount} parent(s)"
+                        )
+                    } else {
+                        call.fail(result.errorMessage ?: "failed to send message")
+                    }
+                }
             }
         }
     }
@@ -68,4 +92,9 @@ object ActModule : PEWSModule {
 data class DraftMessageResponse(
     val language: String,
     val body: String,
+)
+
+@Serializable
+data class SendParentMessageResponse(
+    @SerialName("sent_count") val sentCount: Int,
 )

@@ -7,7 +7,7 @@ package com.littlebridge.enrollplus.feature.reportcard.domain.repository
 import com.littlebridge.enrollplus.feature.reportcard.data.remote.ReportCardApi
 import com.littlebridge.enrollplus.feature.reportcard.domain.model.ReportCardModels
 
-class ReportCardRepository(
+open class ReportCardRepository(
     private val api: ReportCardApi,
 ) {
     suspend fun generateBatch(token: String, request: ReportCardModels.GenerateRequest) =

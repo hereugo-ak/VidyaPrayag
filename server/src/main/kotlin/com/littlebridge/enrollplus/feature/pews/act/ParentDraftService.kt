@@ -14,6 +14,8 @@
  */
 package com.littlebridge.enrollplus.feature.pews.act
 
+import com.littlebridge.enrollplus.db.AppUsersTable
+import com.littlebridge.enrollplus.db.ChildrenTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.db.PewsInterventionsTable
 import com.littlebridge.enrollplus.db.PewsRiskSnapshotsTable
@@ -23,10 +25,13 @@ import com.littlebridge.enrollplus.feature.ai.AiService
 import com.littlebridge.enrollplus.feature.ai.LlmMessage
 import com.littlebridge.enrollplus.feature.pews.caseworker.CaseFileCodec
 import com.littlebridge.enrollplus.feature.pews.core.KillSwitchGuard
+import com.littlebridge.enrollplus.feature.school.sendInConversation
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.update
 import org.slf4j.LoggerFactory
+import java.time.Instant
 import java.util.UUID
 
 class ParentDraftService {
@@ -160,6 +165,95 @@ class ParentDraftService {
             body = result.content.trim(),
         )
     }
+
+    /**
+     * Send the parent draft message as a real message to the parent via the
+     * messaging system, and mark the intervention as done.
+     */
+    suspend fun sendParentMessage(
+        schoolId: UUID,
+        interventionId: UUID,
+        senderId: UUID,
+        senderName: String,
+    ): SendResult {
+        KillSwitchGuard.require("act")
+
+        val intervention = dbQuery {
+            PewsInterventionsTable.selectAll().where {
+                (PewsInterventionsTable.id eq interventionId) and
+                    (PewsInterventionsTable.schoolId eq schoolId)
+            }.singleOrNull()
+        } ?: return SendResult(ok = false, errorMessage = "intervention not found")
+
+        val studentCode = intervention[PewsInterventionsTable.studentCode]
+        val planJson = intervention[PewsInterventionsTable.planJson]
+        val interventionPk = intervention[PewsInterventionsTable.id].value
+
+        // Get the parent draft from CaseFile, or generate one
+        val caseFile = planJson?.let { CaseFileCodec.parse(it) }
+        val draftBody = caseFile?.parentDraft?.body
+            ?: run {
+                val generated = generateDraft(schoolId, interventionId, caseFile?.parentDraft?.language ?: "hi")
+                if (!generated.ok || generated.body.isNullOrBlank()) {
+                    return SendResult(ok = false, errorMessage = "no parent draft available")
+                }
+                generated.body
+            }
+
+        // Resolve parent user(s) from student code via ChildrenTable
+        val parentIds = dbQuery {
+            ChildrenTable.selectAll().where {
+                (ChildrenTable.studentCode eq studentCode) and
+                    (ChildrenTable.isActive eq true)
+            }.map { it[ChildrenTable.parentId] }.distinct()
+        }
+
+        if (parentIds.isEmpty()) {
+            return SendResult(ok = false, errorMessage = "no parent linked to this student")
+        }
+
+        // Send the message to each parent
+        val now = Instant.now()
+        var sentCount = 0
+        parentIds.forEach { parentId ->
+            dbQuery {
+                sendInConversation(
+                    senderId = senderId,
+                    senderSchoolId = schoolId,
+                    body = draftBody,
+                    threadId = null,
+                    recipientId = parentId,
+                    senderName = senderName.ifBlank { "Teacher" },
+                    senderRole = "Teacher",
+                    senderImageUrl = null,
+                    iconName = null,
+                    now = now,
+                )
+            }
+            sentCount++
+        }
+
+        // Mark intervention as done
+        dbQuery {
+            PewsInterventionsTable.update({
+                PewsInterventionsTable.id eq interventionPk
+            }) {
+                it[status] = "done"
+                it[outcome] = "message_sent"
+                it[resolvedAt] = now
+            }
+        }
+
+        log.info("ParentDraft: sent message to {} parent(s) for student {}", sentCount, studentCode)
+        return SendResult(ok = true, sentCount = sentCount, body = draftBody)
+    }
+
+    data class SendResult(
+        val ok: Boolean,
+        val sentCount: Int = 0,
+        val body: String? = null,
+        val errorMessage: String? = null,
+    )
 
     private fun deterministicDraft(firstName: String, language: String, actionType: String): String {
         // Simple vernacular templates as fallback
