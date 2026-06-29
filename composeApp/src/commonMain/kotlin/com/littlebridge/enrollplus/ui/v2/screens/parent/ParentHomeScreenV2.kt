@@ -90,13 +90,27 @@ fun ParentHomeScreenV2(
     onOpenNotifications: () -> Unit = {},
     onOpenFees: () -> Unit = {},
     onOpenAcademics: () -> Unit = {},
+    onOpenMessages: () -> Unit = {},
     onOpenPulse: () -> Unit = {},
     onOpenTransport: () -> Unit = {},
+    onOpenTutor: () -> Unit = {},
+    onOpenTutorProgress: () -> Unit = {},
     onOpenScholarships: () -> Unit = {},
     viewModel: ParentDashboardViewModel = koinViewModel(),
     permissionVm: PermissionViewModel = koinViewModel(),
+    nudgeViewModel: com.littlebridge.enrollplus.feature.pews.presentation.ParentNudgeViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
+    val nudgeState by nudgeViewModel.state.collectAsStateV2()
+
+    // PEWS parent nudge — re-scope to the active child whenever it changes.
+    // The card renders only when the server returns show=true (real concern AND
+    // the school enabled parent sharing). Use the RESOLVED child id (selectedChild
+    // falls back to the first child when no explicit pick has been made yet).
+    val activeChildId = state.selectedChild?.id
+    LaunchedEffect(activeChildId) {
+        nudgeViewModel.load(activeChildId)
+    }
     val showRationale by permissionVm.showNotificationRationale.collectAsStateV2()
     val launchPermission by permissionVm.launchPermissionRequest.collectAsStateV2()
 
@@ -128,7 +142,21 @@ fun ParentHomeScreenV2(
         onOpenAcademics = onOpenAcademics,
         onOpenPulse = onOpenPulse,
         onOpenTransport = onOpenTransport,
+        onOpenTutor = onOpenTutor,
+        onOpenTutorProgress = onOpenTutorProgress,
         onOpenScholarships = onOpenScholarships,
+        nudge = nudgeState.nudge?.takeIf { nudgeState.visible },
+        onNudgeAction = { action ->
+            // The server's deep-link targets map onto existing parent surfaces.
+            // We route by intent: anything mentioning "message"/"teacher" → the
+            // conversations surface; everything else (attendance) → academics.
+            val target = action.deepLink.lowercase()
+            if (target.contains("message") || target.contains("teacher") || target.contains("chat")) {
+                onOpenMessages()
+            } else {
+                onOpenAcademics()
+            }
+        },
         modifier = modifier,
     )
 
@@ -154,7 +182,11 @@ private fun ParentDashboardContent(
     onOpenAcademics: () -> Unit,
     onOpenPulse: () -> Unit = {},
     onOpenTransport: () -> Unit = {},
+    onOpenTutor: () -> Unit = {},
+    onOpenTutorProgress: () -> Unit = {},
     onOpenScholarships: () -> Unit = {},
+    nudge: com.littlebridge.enrollplus.feature.pews.domain.model.PewsParentNudgeDto? = null,
+    onNudgeAction: (com.littlebridge.enrollplus.feature.pews.domain.model.PewsParentActionDto) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -250,8 +282,19 @@ private fun ParentDashboardContent(
                         AlertStrip(alerts = state.alerts)
                     }
 
+                    // ── PEWS gentle nudge (opt-in, label-free) ──────────────────────
+                    // Renders only when the school enabled parent sharing AND there's a
+                    // real concern (server returns show=true). The card is supportive,
+                    // never alarming, and deep-links into attendance / message teacher.
+                    if (nudge != null) {
+                        ParentNudgeCard(nudge = nudge, onAction = onNudgeAction)
+                    }
+
                     // ── Weekly Pulse entry point ────────────────────────────────────
                     PulseEntryButton(onOpenPulse = onOpenPulse)
+
+                    // ── AI Tutor entry point ────────────────────────────────────────
+                    TutorEntryButton(onOpenTutor = onOpenTutor, onOpenTutorProgress = onOpenTutorProgress)
 
                     // ── Attendance card (primary feature) ────────────────────────────
                     ParentAttendanceCard(
@@ -636,6 +679,119 @@ private fun PulseEntryButton(onOpenPulse: () -> Unit) {
                 tint = c.ink3,
                 modifier = Modifier.size(20.dp),
             )
+        }
+    }
+}
+
+/**
+ * TutorEntryButton — the AI Tutor entry point on the Home screen.
+ * Two tappable rows: "Ask AI Tutor" (opens Socratic doubt chat)
+ * and "Tutor Progress" (opens mastery deltas + doubts resolved).
+ */
+@Composable
+private fun TutorEntryButton(
+    onOpenTutor: () -> Unit,
+    onOpenTutorProgress: () -> Unit,
+) {
+    val c = VTheme.colors
+    com.littlebridge.enrollplus.ui.v2.components.VCard(
+        modifier = Modifier.fillMaxWidth(),
+        padding = 14.dp,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onOpenTutor() }
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Box(
+                        Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(c.teal.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            VIcons.BookOpen,
+                            contentDescription = null,
+                            tint = c.teal,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    Column {
+                        Text(
+                            "Ask AI Tutor",
+                            style = VTheme.type.h4.colored(c.ink).copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
+                        )
+                        Text(
+                            "Socratic guidance for your child's doubts",
+                            style = VTheme.type.label.colored(c.ink3).copy(fontSize = 11.sp),
+                        )
+                    }
+                }
+                Icon(
+                    VIcons.ChevronRight,
+                    contentDescription = null,
+                    tint = c.ink3,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+
+            Spacer(Modifier.height(0.dp).fillMaxWidth().background(c.hairline).height(1.dp))
+
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onOpenTutorProgress() }
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Box(
+                        Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(c.accent.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            VIcons.TrendingUp,
+                            contentDescription = null,
+                            tint = c.accent,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    Column {
+                        Text(
+                            "Tutor Progress",
+                            style = VTheme.type.h4.colored(c.ink).copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
+                        )
+                        Text(
+                            "Mastery gains & doubts resolved",
+                            style = VTheme.type.label.colored(c.ink3).copy(fontSize = 11.sp),
+                        )
+                    }
+                }
+                Icon(
+                    VIcons.ChevronRight,
+                    contentDescription = null,
+                    tint = c.ink3,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
     }
 }

@@ -86,6 +86,17 @@ import com.littlebridge.enrollplus.feature.parent.parentAcademicsRouting
 import com.littlebridge.enrollplus.feature.parent.trackProgressRouting
 import com.littlebridge.enrollplus.feature.pulse.pulseRouting
 import com.littlebridge.enrollplus.feature.pulse.PulseWeeklyJob
+import com.littlebridge.enrollplus.feature.ai.KeyVault
+import com.littlebridge.enrollplus.feature.ai.aiRouting
+import com.littlebridge.enrollplus.feature.pews.PewsDailyJob
+import com.littlebridge.enrollplus.feature.pews.core.KillSwitchConfig
+import com.littlebridge.enrollplus.feature.pews.core.pewsModuleRouting
+import com.littlebridge.enrollplus.feature.pews.core.registerPewsModules
+import com.littlebridge.enrollplus.feature.reportcard.core.registerReportCardModules
+import com.littlebridge.enrollplus.feature.reportcard.core.reportCardRouting
+import com.littlebridge.enrollplus.feature.tutor.core.registerTutorModules
+import com.littlebridge.enrollplus.feature.tutor.core.tutorRouting
+import com.littlebridge.enrollplus.feature.pews.pewsRouting
 import com.littlebridge.enrollplus.feature.school.adminDashboardRouting
 import com.littlebridge.enrollplus.feature.school.adminDashboardOverviewRouting
 import com.littlebridge.enrollplus.feature.school.leaveRequestsRouting
@@ -172,6 +183,30 @@ fun main() {
     // Start the Parent Pulse weekly job (Sunday 6 PM IST pulse generation).
     PulseWeeklyJob.start(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default))
 
+    // AI gateway: seed/refresh encrypted provider keys from env (idempotent).
+    // Blocking is fine here — this runs once at boot before the server accepts
+    // traffic, and a missing key simply leaves that provider unconfigured.
+    kotlinx.coroutines.runBlocking {
+        runCatching { KeyVault.bootstrapFromEnv() }
+            .onFailure { org.slf4j.LoggerFactory.getLogger("Application")
+                .warn("KeyVault bootstrap failed (AI will degrade gracefully): {}", it.message) }
+    }
+
+    // Start the PEWS daily job (Sense → Reason → Act pipeline; hourly tick).
+    PewsDailyJob.start(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default))
+
+    // AI Report Card 2.0 — start async batch worker + term-close scheduler.
+    com.littlebridge.enrollplus.feature.reportcard.queue.ReportCardJob.startWorker(
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+    )
+    com.littlebridge.enrollplus.feature.reportcard.queue.ReportCardJob.startScheduler(
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+    )
+
+    // PEWS 2.0 — load kill-switch flags from DB and start hot-reload polling.
+    kotlinx.coroutines.runBlocking { runCatching { KillSwitchConfig.reload() } }
+    KillSwitchConfig.startPolling(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default))
+
     // Start the Transport job scheduler (GPS staleness check + daily attendance finalization).
     com.littlebridge.enrollplus.feature.transport.TransportJobScheduler.start(
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
@@ -257,6 +292,13 @@ fun Application.module() {
             isLenient = true
             encodeDefaults = true
             explicitNulls = false
+            // Fall back to a property's default when the incoming JSON sends an
+            // explicit null (or an out-of-domain enum) for it. Without this, a
+            // client that omits/null-sends an optional field on a DTO that has a
+            // default triggers a MissingFieldException → 400. This was the cause
+            // of the repeated `400 Bad Request: PUT /api/v1/school/pews/config`
+            // (the parent_share toggle never saved → parents saw no nudge).
+            coerceInputValues = true
         })
     }
 
@@ -317,6 +359,12 @@ fun Application.module() {
         adminDashboardRouting()      // /api/admin/dashboard/{summary,analytics,activity} — redesigned SchoolHomeScreenV2 data
         adminDashboardOverviewRouting() // /api/admin/dashboard/overview — consolidated command-center payload for SchoolHomeScreenV2
         schoolIntelligenceRouting()  // /api/v1/school/dashboard/intelligence — Command Center: attendance timeline+anomalies+exam overlay, early-warning students, academic health grid, activity feed (all real-data)
+
+        // AI gateway + PEWS (AI_FEATURES_PLAN.md feature #1)
+        aiRouting()                  // /api/v1/school/ai/usage (school-admin) + /api/v1/admin/ai/{providers,health,rotate} (platform-admin)
+        pewsRouting()                // /api/v1/{school,teacher,parent}/pews/… — v1 PEWS endpoints (still in use)
+        registerPewsModules()        // PEWS 2.0: register all modules with ModuleRegistry
+        pewsModuleRouting()          // PEWS 2.0: mount module routes (act, learn, insights, …)
         schoolAnalyticsRouting()     // /api/v1/school/analytics/{overview,class-performance,teacher-performance,student/{id},syllabus-coverage}
         leaveRequestsRouting()       // /api/v1/school/leave-requests[…]
         ptmRouting()                 // /api/v1/school/ptm
@@ -369,6 +417,18 @@ fun Application.module() {
         //   /api/v1/teacher/health/alerts                              — teacher allergy alerts
         //   /api/v1/parent/health/{childId}                            — parent view
         healthRouting()
+
+        // AI Report Card 2.0 (AI_REPORT_CARD_2.0_AGENTIC_REDESIGN.md)
+        //   5-tier agentic report card: Rollup → Triage → Narrator → Assembly → Learn
+        //   Routes: /api/v1/report-card/{generate,review-queue,drafts,approve,publish,published,learn/*}
+        registerReportCardModules()   // Register all 5 modules with ReportCardModuleRegistry
+        reportCardRouting()           // Mount module routes under JWT auth
+
+        // AI Tutor 2.0 (AI_TUTOR_2.0_AGENTIC_REDESIGN.md)
+        //   5-tier agentic learning agent: Sense → Triage → Agent → Act → Learn
+        //   Routes: /api/v1/tutor/{doubt,practice,plan,learner-bundle,teacher-heatmap,…}
+        registerTutorModules()        // Register all Tutor modules with TutorModuleRegistry
+        tutorRouting()                // Mount module routes under JWT auth
 
         // Alumni Management (ALUMNI_MANAGEMENT_SPEC.md)
         //   /api/v1/school/alumni/*  — admin endpoints (school context)

@@ -112,3 +112,26 @@ export const useLeaveRequests = (type?: string, status?: string) =>
 
 export const useSchoolProfile = () =>
   useSWR("school/profile", adminApi.schoolProfile, SLOW);
+
+// ── PEWS hooks ────────────────────────────────────────────────────────────────
+// The cohort + interventions + effectiveness move on the order of minutes (a
+// recompute runs hourly / on demand, a teacher closes an intervention), so
+// NEAR-LIVE (60s) is the right cadence. Config is SLOW (changes rarely).
+import type { PewsRiskLevel, PewsInterventionStatus } from "./types";
+
+export const usePewsCohort = (minLevel?: PewsRiskLevel) =>
+  useSWR(["pews/cohort", minLevel ?? ""], () => adminApi.pewsCohort(minLevel), NEAR_LIVE);
+
+export const usePewsStudent = (studentCode: string | null) =>
+  useSWR(studentCode ? ["pews/student", studentCode] : null, () => adminApi.pewsStudent(studentCode as string), NEAR_LIVE);
+
+export const usePewsInterventions = (status?: PewsInterventionStatus) =>
+  useSWR(["pews/interventions", status ?? ""], () => adminApi.pewsInterventions(status), NEAR_LIVE);
+
+export const usePewsEffectiveness = () =>
+  useSWR("pews/effectiveness", adminApi.pewsEffectiveness, NEAR_LIVE);
+
+export const usePewsTrend = (days?: number) =>
+  useSWR(["pews/trend", days ?? ""], () => adminApi.pewsTrend(days), NEAR_LIVE);
+
+export const usePewsConfig = () => useSWR("pews/config", adminApi.pewsConfig, SLOW);

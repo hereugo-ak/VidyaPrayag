@@ -51,6 +51,16 @@ kotlin {
     }
 }
 
+// Pin every Java compile task to Java 21 so javac and the Kotlin compiler agree
+// on the JVM target even when Gradle runs on a much newer JDK (e.g. 26) that
+// Kotlin has not added support for yet. Without this, the build fails with
+// "Inconsistent JVM-target compatibility between Java and Kotlin tasks
+// (compileJava=26, compileKotlin=21)".
+tasks.withType<JavaCompile>().configureEach {
+    sourceCompatibility = JavaVersion.VERSION_21.toString()
+    targetCompatibility = JavaVersion.VERSION_21.toString()
+}
+
 group = "com.littlebridge.enrollplus"
 version = "1.0.0"
 application {
@@ -153,6 +163,14 @@ dependencies {
     // no native dependencies. Used by AlumniReceiptService.kt.
     // -----------------------------------------------------------------
     implementation("com.github.librepdf:openpdf:2.0.3")
+
+    // -----------------------------------------------------------------
+    // FSRS — Free Spaced Repetition Scheduler v6 (MIT).
+    // The spaced-repetition engine that drives the Tutor's adaptive
+    // review scheduling (AI_TUTOR_2.0_AGENTIC_REDESIGN.md §6.5).
+    // From the open-spaced-repetition org; JVM-native, Maven Central.
+    // -----------------------------------------------------------------
+    implementation("io.github.open-spaced-repetition:fsrs:1.0.0")
 
     testImplementation(libs.ktor.serverTestHost)
     testImplementation(libs.kotlin.testJunit)

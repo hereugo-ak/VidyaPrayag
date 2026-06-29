@@ -26,4 +26,7 @@ actual fun platformModule(): Module = module {
         }
     }
     single<PreferenceRepository> { PreferenceManager(get()) }
+    single<com.littlebridge.enrollplus.feature.notification.domain.service.NotificationService> {
+        com.littlebridge.enrollplus.notification.DesktopNotificationService()
+    }
 }

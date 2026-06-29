@@ -537,3 +537,131 @@ export interface AlumniMentorshipRequestDto {
   respondedAt: string | null;
   createdAt: string;
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// PEWS — Predictive Early Warning System
+// Mirrors server feature.pews.PewsRouting.kt DTOs (snake_case JSON) exactly, so
+// the same envelope (.data) decodes here. AI fields are nullable; the UI shows
+// them only when present and never fabricates a reason/number (LAW 6).
+// ──────────────────────────────────────────────────────────────────────────────
+
+export type PewsRiskLevel = "watch" | "medium" | "high";
+export type PewsInterventionStatus = "open" | "in_progress" | "done" | "dismissed";
+export type PewsOutcome = "improved" | "unchanged" | "worsened";
+
+export interface PewsSignal {
+  kind: string;
+  label: string;
+  severity: number; // 1..3
+}
+
+export interface PewsStudent {
+  student_code: string;
+  name: string;
+  class_name: string;
+  section: string;
+  run_date: string;
+  risk_score: number;
+  risk_level: PewsRiskLevel;
+  attendance_pct: number | null;
+  marks_pct: number | null;
+  leave_count: number;
+  attendance_slope: number | null;
+  marks_slope: number | null;
+  signals: PewsSignal[];
+  ai_narrative: string | null;
+  ai_cause: string | null;
+  ai_recommendation: string | null;
+  ai_provider_used: string | null;
+}
+
+export interface PewsCohort {
+  run_date: string | null;
+  total: number;
+  high: number;
+  medium: number;
+  watch: number;
+  students: PewsStudent[];
+  ai_enabled: boolean;
+}
+
+export interface PewsStudentDetail {
+  current: PewsStudent | null;
+  history: PewsStudent[];
+}
+
+export interface PewsIntervention {
+  id: string;
+  student_code: string;
+  name: string;
+  class_name: string;
+  section: string;
+  owner_user_id: string;
+  action_type: string;
+  status: PewsInterventionStatus;
+  notes: string | null;
+  outcome: PewsOutcome | null;
+  opened_at: string;
+  resolved_at: string | null;
+  // PEWS 2.0 — managed casework fields
+  escalation_level?: number;
+  sla_days?: number | null;
+  follow_up_date?: string | null;
+  urgency?: string | null;
+  cause_family?: string | null;
+  plan_json?: string | null;
+}
+
+export interface UpdatePewsInterventionRequest {
+  status?: PewsInterventionStatus;
+  notes?: string;
+  outcome?: PewsOutcome;
+  action_type?: string;
+}
+
+export interface PewsEffectiveness {
+  total: number;
+  open: number;
+  done: number;
+  dismissed: number;
+  improved: number;
+  unchanged: number;
+  worsened: number;
+}
+
+export interface PewsConfig {
+  use_relative_thresholds: boolean;
+  attendance_floor_pct: number;
+  marks_floor_pct: number;
+  leave_floor_count: number;
+  run_frequency: string; // "daily" | "weekly"
+  ai_narrative_enabled: boolean;
+  parent_share_enabled: boolean;
+}
+
+export interface PewsRunResult {
+  at_risk: number;
+}
+
+export interface PewsJobStatus {
+  job_id: string;
+  status: string; // queued|processing|completed|failed
+  total_items: number;
+  completed_items: number;
+  result: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface PewsTrendPoint {
+  run_date: string;
+  total: number;
+  high: number;
+  medium: number;
+  watch: number;
+}
+
+export interface PewsEffectivenessTrend {
+  points: PewsTrendPoint[];
+  effectiveness: PewsEffectiveness;
+}

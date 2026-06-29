@@ -9,6 +9,7 @@ import {
   IconSettings,
   IconBolt,
   IconAlumni,
+  IconShield,
 } from "@/components/admin/icons";
 
 export interface NavItem {
@@ -24,6 +25,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/people", label: "People", icon: IconPeople },
   { href: "/admin/alumni", label: "Alumni", icon: IconAlumni },
   { href: "/admin/attendance", label: "Attendance", icon: IconAttendance },
+  { href: "/admin/early-warning", label: "Early Warning", icon: IconShield },
   { href: "/admin/marks", label: "Marks", icon: IconMarks },
   { href: "/admin/fees", label: "Fees", icon: IconFees },
   { href: "/admin/announcements", label: "Announcements", icon: IconAnnounce },

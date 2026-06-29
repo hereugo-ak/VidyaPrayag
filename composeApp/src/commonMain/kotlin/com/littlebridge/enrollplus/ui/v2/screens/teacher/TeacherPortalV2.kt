@@ -27,7 +27,7 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays the teacher portal can push above its tab content. */
-private enum class TeacherOverlay { None, Notifications, HealthAlerts, TransportAttendance }
+private enum class TeacherOverlay { None, Notifications, HealthAlerts, TransportAttendance, Pews, ReportReview, ReportDraftEditor, Heatmap }
 
 /**
  * TeacherPortalV2 — the teacher shell, rebuilt FROM SCRATCH on the Parents-Portal
@@ -70,12 +70,25 @@ fun TeacherPortalV2(
     var tab by remember { mutableStateOf("home") }
     var overlay by remember { mutableStateOf(TeacherOverlay.None) }
 
+    // AI Report Card — review queue parameters (declared before LaunchedEffect
+    // so the deep-link handler can write to them).
+    var reportClassName by remember { mutableStateOf("") }
+    var reportSection by remember { mutableStateOf("A") }
+    var reportTerm by remember { mutableStateOf("Term 1") }
+    var reportDraftId by remember { mutableStateOf("") }
+
     // Apply deep-link routing: set tab from the typed target.
     LaunchedEffect(deepLinkTarget) {
         when (deepLinkTarget) {
             is DeepLinkTarget.TeacherScreen -> {
                 if (deepLinkTarget.screen == "transport") {
                     overlay = TeacherOverlay.TransportAttendance
+                } else if (deepLinkTarget.screen == "report-card" || deepLinkTarget.screen == "report-review") {
+                    // Consume query params from notification deep link
+                    deepLinkTarget.params["className"]?.let { reportClassName = it }
+                    deepLinkTarget.params["section"]?.let { reportSection = it }
+                    deepLinkTarget.params["term"]?.let { reportTerm = it }
+                    overlay = TeacherOverlay.ReportReview
                 } else {
                     tab = deepLinkTarget.screen
                 }
@@ -117,6 +130,39 @@ fun TeacherPortalV2(
         TeacherOverlay.TransportAttendance -> {
             TransportAttendanceScreenV2(
                 routeId = "",
+                onBack = { overlay = TeacherOverlay.None },
+                modifier = modifier,
+            )
+            return
+        }
+        TeacherOverlay.Pews -> {
+            // PEWS — the teacher's own-class "students needing attention".
+            TeacherPewsScreenV2(onBack = { overlay = TeacherOverlay.None }, modifier = modifier)
+            return
+        }
+        TeacherOverlay.ReportReview -> {
+            TeacherReportReviewQueueScreen(
+                className = reportClassName,
+                section = reportSection,
+                term = reportTerm,
+                onBack = { overlay = TeacherOverlay.None },
+                onEditDraft = { draftId ->
+                    reportDraftId = draftId
+                    overlay = TeacherOverlay.ReportDraftEditor
+                },
+            )
+            return
+        }
+        TeacherOverlay.ReportDraftEditor -> {
+            TeacherReportDraftEditorScreen(
+                draftId = reportDraftId,
+                onBack = { overlay = TeacherOverlay.ReportReview },
+                onSaved = { overlay = TeacherOverlay.ReportReview },
+            )
+            return
+        }
+        TeacherOverlay.Heatmap -> {
+            com.littlebridge.enrollplus.ui.v2.screens.tutor.TeacherHeatmapScreen(
                 onBack = { overlay = TeacherOverlay.None },
                 modifier = modifier,
             )
@@ -192,6 +238,9 @@ fun TeacherPortalV2(
                     onOpenClasses = { tab = "classes" },
                     onOpenHealthAlerts = { overlay = TeacherOverlay.HealthAlerts },
                     onOpenTransportAttendance = { overlay = TeacherOverlay.TransportAttendance },
+                    onOpenPews = { overlay = TeacherOverlay.Pews },
+                    onOpenReportReview = { overlay = TeacherOverlay.ReportReview },
+                    onOpenHeatmap = { overlay = TeacherOverlay.Heatmap },
                 )
 
                 "update" -> key(updateScopeNonce) {

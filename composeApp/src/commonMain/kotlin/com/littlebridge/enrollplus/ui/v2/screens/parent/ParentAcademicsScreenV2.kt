@@ -203,11 +203,21 @@ private fun ParentAcademicsContent(
                 "Attendance" -> AttendanceTab(academics, onLoadAttendance)
                 "Marks" -> MarksTab(academics, onLoadMarks)
                 "Syllabus" -> SyllabusTab(academics, onLoadSyllabus)
-                "Report" -> VComingSoon(
-                    title = "AI Report Card",
-                    description = "At the end of each term, VidyaSetu will generate a personalised academic summary — narrative strengths, focus areas and study tips.",
-                    preview = { AiReportCardPreview() },
-                )
+                "Report" -> {
+                    val childId = academics.selectedChildId
+                    if (childId != null) {
+                        ParentReportScreen(
+                            childId = childId,
+                            onBack = { tab = "Overview" },
+                        )
+                    } else {
+                        VComingSoon(
+                            title = "AI Report Card",
+                            description = "Link your child to view their AI-generated report cards.",
+                            preview = { AiReportCardPreview() },
+                        )
+                    }
+                }
             }
         }
     }
