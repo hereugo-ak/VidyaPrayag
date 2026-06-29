@@ -180,6 +180,7 @@ private fun TrendChartCard(points: List<PewsTrendPointDto>) {
 
 @Composable
 private fun MiniStat(label: String, value: String, color: androidx.compose.ui.graphics.Color) {
+    val c = VTheme.colors
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             value,
@@ -191,6 +192,7 @@ private fun MiniStat(label: String, value: String, color: androidx.compose.ui.gr
 
 @Composable
 private fun OutcomeBar(label: String, value: Int, total: Int, color: androidx.compose.ui.graphics.Color) {
+    val c = VTheme.colors
     val pct = if (total > 0) (value * 100 / total) else 0
     Column {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -208,6 +210,7 @@ private fun OutcomeBar(label: String, value: Int, total: Int, color: androidx.co
 
 @Composable
 private fun TrendLegend(label: String, color: androidx.compose.ui.graphics.Color) {
+    val c = VTheme.colors
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Box(Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(color))
         Text(label, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 10.sp))

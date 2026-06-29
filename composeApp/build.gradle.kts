@@ -127,6 +127,7 @@ kotlin {
             implementation(libs.okio)
             implementation("org.jetbrains.compose.material:material-icons-extended:1.7.3")
             implementation(libs.androidx.navigation.compose)
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
             implementation(projects.shared)
         }
         commonTest.dependencies {

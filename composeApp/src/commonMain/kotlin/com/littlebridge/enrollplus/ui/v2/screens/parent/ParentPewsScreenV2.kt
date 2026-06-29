@@ -87,7 +87,7 @@ private fun ParentPewsContent(
     VStateHost(
         loading = state.isLoading,
         error = state.error,
-        isEmpty = state.isEmpty,
+        isEmpty = !state.isLoading && state.error == null && state.nudge == null,
         emptyIcon = VIcons.ShieldCheck,
         emptyTitle = "All good!",
         emptyBody = "There's no specific concern for $childName right now. Keep up the great support!",

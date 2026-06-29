@@ -611,6 +611,7 @@ private fun TrendCard(points: List<PewsTrendPointDto>) {
 
 @Composable
 private fun TrendLegend(label: String, color: androidx.compose.ui.graphics.Color) {
+    val c = VTheme.colors
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Box(Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(color))
         Text(label, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 10.sp))
