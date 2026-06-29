@@ -103,6 +103,8 @@ data class PewsInterventionDto(
     val urgency: String? = null,       // low | medium | high
     @SerialName("cause_family") val causeFamily: String? = null,
     @SerialName("plan_json") val planJson: String? = null,
+    @SerialName("parent_draft_body") val parentDraftBody: String? = null,
+    @SerialName("parent_draft_lang") val parentDraftLang: String? = null,
 )
 
 /** Body for PATCH .../interventions/{id} — all fields optional (partial update). */
@@ -117,7 +119,6 @@ data class UpdateInterventionRequest(
 /** Response from POST .../interventions/{id}/draft-message — vernacular parent message draft. */
 @Serializable
 data class ParentDraftDto(
-    val ok: Boolean,
     val language: String,
     val body: String,
 )

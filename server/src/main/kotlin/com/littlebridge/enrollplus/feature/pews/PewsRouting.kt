@@ -41,6 +41,7 @@ import com.littlebridge.enrollplus.feature.pews.queue.PewsJobQueue
 import com.littlebridge.enrollplus.db.ChildrenTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.db.PewsConfigTable
+import com.littlebridge.enrollplus.feature.pews.caseworker.CaseFileCodec
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -132,6 +133,8 @@ data class PewsInterventionDto(
     val urgency: String? = null,
     @SerialName("cause_family") val causeFamily: String? = null,
     @SerialName("plan_json") val planJson: String? = null,
+    @SerialName("parent_draft_body") val parentDraftBody: String? = null,
+    @SerialName("parent_draft_lang") val parentDraftLang: String? = null,
 )
 
 @Serializable
@@ -219,14 +222,19 @@ private fun PewsSnapshotService.StoredSnapshot.toDto() = PewsStudentDto(
     causeFamily = causeFamily, deltasJson = deltasJson,
 )
 
-private fun PewsInterventionService.InterventionView.toDto() = PewsInterventionDto(
-    id = id.toString(), studentCode = studentCode, name = studentName,
-    className = className, section = section, ownerUserId = ownerUserId.toString(),
-    actionType = actionType, status = status, notes = notes, outcome = outcome,
-    openedAt = openedAt, resolvedAt = resolvedAt,
-    escalationLevel = escalationLevel, slaDays = slaDays, followUpDate = followUpDate,
-    urgency = urgency, causeFamily = causeFamily, planJson = planJson,
-)
+private fun PewsInterventionService.InterventionView.toDto(): PewsInterventionDto {
+    val caseFile = planJson?.let { runCatching { CaseFileCodec.parse(it) }.getOrNull() }
+    return PewsInterventionDto(
+        id = id.toString(), studentCode = studentCode, name = studentName,
+        className = className, section = section, ownerUserId = ownerUserId.toString(),
+        actionType = actionType, status = status, notes = notes, outcome = outcome,
+        openedAt = openedAt, resolvedAt = resolvedAt,
+        escalationLevel = escalationLevel, slaDays = slaDays, followUpDate = followUpDate,
+        urgency = urgency, causeFamily = causeFamily, planJson = planJson,
+        parentDraftBody = caseFile?.parentDraft?.body,
+        parentDraftLang = caseFile?.parentDraft?.language,
+    )
+}
 
 // ── config helpers ──────────────────────────────────────────────────────────
 

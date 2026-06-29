@@ -243,49 +243,67 @@ private fun TeacherStudentCard(
                         }
                     }
 
-                    // Parent draft display (if generated)
-                    parentDrafts[iv.id]?.let { draft ->
+                    // Parent draft — prefer pre-generated from CaseFile (DTO), fall back to API-generated
+                    val draftBody = parentDrafts[iv.id]?.body ?: iv.parentDraftBody
+                    val draftLang = parentDrafts[iv.id]?.language ?: iv.parentDraftLang
+                    val isParentAction = iv.actionType.contains("parent") || iv.actionType.contains("message") || iv.actionType.contains("call") || iv.actionType.contains("visit")
+                    val hasDraft = draftBody != null
+
+                    if (hasDraft && draftBody != null) {
                         Spacer(Modifier.height(8.dp))
                         Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(c.teal.copy(alpha = 0.1f)).padding(8.dp)) {
                             Column {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(VIcons.Sparkles, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(12.dp))
                                     Spacer(Modifier.size(4.dp))
-                                    Text("PARENT MESSAGE (${draft.language.uppercase()})", style = VTheme.type.label.colored(c.tealDeep).copy(fontWeight = FontWeight.Bold, fontSize = 10.sp), modifier = Modifier.weight(1f))
-                                    VButton("✕", { onClearDraft(iv.id) }, variant = VButtonVariant.Ghost, size = VButtonSize.Sm)
+                                    Text("PARENT MESSAGE (${draftLang?.uppercase() ?: "HI"})", style = VTheme.type.label.colored(c.tealDeep).copy(fontWeight = FontWeight.Bold, fontSize = 10.sp), modifier = Modifier.weight(1f))
+                                    if (parentDrafts[iv.id] != null) {
+                                        VButton("✕", { onClearDraft(iv.id) }, variant = VButtonVariant.Ghost, size = VButtonSize.Sm)
+                                    }
                                 }
                                 Spacer(Modifier.height(4.dp))
-                                Text(draft.body, style = VTheme.type.body.colored(c.ink).copy(fontSize = 12.sp, lineHeight = 17.sp))
+                                Text(draftBody, style = VTheme.type.body.colored(c.ink).copy(fontSize = 12.sp, lineHeight = 17.sp))
                             }
                         }
                     }
 
-                    // Workflow actions
+                    // Workflow actions — driven by action type and status
                     Spacer(Modifier.height(10.dp))
                     val isUpdating = iv.id in updatingIds
                     val isDraftLoading = iv.id in draftLoadingIds
 
-                    // Step 1: Start (only for "open" status)
                     if (iv.status == "open") {
+                        // Open: Start + Dismiss
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             VButton("Start", { onStart(iv.id) }, variant = VButtonVariant.Primary, size = VButtonSize.Sm, enabled = !isUpdating)
                             VButton("Dismiss", { onDismiss(iv.id) }, variant = VButtonVariant.Ghost, size = VButtonSize.Sm, enabled = !isUpdating)
                         }
                     } else {
-                        // In-progress: show outcome + draft actions
+                        // In-progress: action-type-specific workflow
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             VButton("Improved", { onMarkDone(iv.id, "improved") }, variant = VButtonVariant.Primary, size = VButtonSize.Sm, enabled = !isUpdating)
                             VButton("No change", { onMarkDone(iv.id, "unchanged") }, variant = VButtonVariant.Secondary, size = VButtonSize.Sm, enabled = !isUpdating)
                         }
                         Spacer(Modifier.height(6.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            VButton(
-                                if (parentDrafts[iv.id] != null) "Regenerate message" else "Draft parent message",
-                                { onGenerateDraft(iv.id) },
-                                variant = VButtonVariant.Secondary,
-                                size = VButtonSize.Sm,
-                                enabled = !isDraftLoading,
-                            )
+                            // Show "Draft parent message" only for parent-contact actions without a pre-existing draft
+                            if (isParentAction && !hasDraft) {
+                                VButton(
+                                    "Draft parent message",
+                                    { onGenerateDraft(iv.id) },
+                                    variant = VButtonVariant.Secondary,
+                                    size = VButtonSize.Sm,
+                                    enabled = !isDraftLoading,
+                                )
+                            } else if (isParentAction && hasDraft) {
+                                VButton(
+                                    "Regenerate message",
+                                    { onGenerateDraft(iv.id) },
+                                    variant = VButtonVariant.Secondary,
+                                    size = VButtonSize.Sm,
+                                    enabled = !isDraftLoading,
+                                )
+                            }
                             VButton("Dismiss", { onDismiss(iv.id) }, variant = VButtonVariant.Ghost, size = VButtonSize.Sm, enabled = !isUpdating)
                         }
                     }

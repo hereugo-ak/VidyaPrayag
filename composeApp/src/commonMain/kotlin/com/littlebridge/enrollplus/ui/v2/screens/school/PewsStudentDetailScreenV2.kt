@@ -363,6 +363,26 @@ private fun InterventionCard(
             }
         }
 
+        // Parent draft (pre-generated from CaseFile)
+        iv.parentDraftBody?.let { body ->
+            Spacer(Modifier.height(8.dp))
+            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(c.teal.copy(alpha = 0.1f)).padding(8.dp)) {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(VIcons.Sparkles, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(12.dp))
+                        Spacer(Modifier.size(4.dp))
+                        Text(
+                            "PARENT MESSAGE (${iv.parentDraftLang?.uppercase() ?: "HI"})",
+                            style = VTheme.type.label.colored(c.tealDeep).copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(body, style = VTheme.type.body.colored(c.ink).copy(fontSize = 12.sp, lineHeight = 17.sp))
+                }
+            }
+        }
+
         Spacer(Modifier.height(4.dp))
         Text("Opened ${iv.openedAt}", style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))
 
