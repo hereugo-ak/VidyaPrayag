@@ -69,6 +69,7 @@ private enum class SchoolOverlay {
     ReportEffectiveness,
     ScholarshipManagement,
     BrandingKit,
+    IdCards,
 }
 
 /**
@@ -393,6 +394,13 @@ fun SchoolPortalV2(
                 )
                 return
             }
+            SchoolOverlay.IdCards -> {
+                IdCardScreen(
+                    onBack = { overlay = SchoolOverlay.None },
+                    modifier = modifier,
+                )
+                return
+            }
             SchoolOverlay.None -> Unit
         }
 
@@ -469,6 +477,8 @@ fun SchoolPortalV2(
                         onOpenScholarships = { overlay = SchoolOverlay.ScholarshipManagement },
                         // School Branding Kit — colors, logo, subdomain.
                         onOpenBranding = { overlay = SchoolOverlay.BrandingKit },
+                        // ID Card Generation — templates, card generation, PDF export.
+                        onOpenIdCards = { overlay = SchoolOverlay.IdCards },
                     )
                 }
             }

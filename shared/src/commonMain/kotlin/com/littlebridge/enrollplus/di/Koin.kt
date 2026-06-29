@@ -448,6 +448,17 @@ val commonModule = module {
         com.littlebridge.enrollplus.feature.branding.presentation.BrandingThemeManager(get(), get())
     }
 
+    // ID Card Generation (ID_CARD_GENERATION_SPEC.md)
+    single {
+        com.littlebridge.enrollplus.feature.idcard.data.remote.IdCardApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single<com.littlebridge.enrollplus.feature.idcard.domain.repository.IdCardRepository> {
+        com.littlebridge.enrollplus.feature.idcard.data.repository.IdCardRepositoryImpl(get())
+    }
+
     // UseCases
     factory { GetSchoolsUseCase(get()) }
 }
@@ -588,6 +599,8 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.scholarship.presentation.ScholarshipViewModel(get(), get()) }
     // School Branding Kit (SCHOOL_BRANDING_KIT_SPEC.md)
     factory { com.littlebridge.enrollplus.feature.branding.presentation.BrandingViewModel(get(), get()) }
+    // ID Card Generation (ID_CARD_GENERATION_SPEC.md)
+    factory { com.littlebridge.enrollplus.feature.idcard.presentation.IdCardViewModel(get(), get()) }
 }
 
 fun initKoin(

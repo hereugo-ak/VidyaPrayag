@@ -73,6 +73,7 @@ fun TeacherHomeScreenV2(
     onOpenPews: () -> Unit = {},
     onOpenReportReview: () -> Unit = {},
     onOpenHeatmap: () -> Unit = {},
+    onOpenIdCard: () -> Unit = {},
     modifier: Modifier = Modifier,
     todayViewModel: TeacherTodayViewModel = koinViewModel(),
     checkInViewModel: TeacherCheckInViewModel = koinViewModel(),
@@ -149,6 +150,13 @@ fun TeacherHomeScreenV2(
                 subtitle = "Mark pickup & drop for students on your bus route",
                 icon = VIcons.MapPin,
                 onClick = onOpenTransportAttendance,
+            )
+
+            VActionCard(
+                title = "Digital ID Card",
+                subtitle = "View your digital school ID card",
+                icon = VIcons.IdCard,
+                onClick = onOpenIdCard,
             )
         }
 

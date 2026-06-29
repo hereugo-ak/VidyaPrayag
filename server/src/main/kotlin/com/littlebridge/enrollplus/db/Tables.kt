@@ -1605,6 +1605,7 @@ object ParentChildLinksTable : UUIDTable("parent_child_links", "id") {
  */
 object NonTeachingStaffTable : UUIDTable("non_teaching_staff", "id") {
     val schoolId    = uuid("school_id")                         // FK schools.id — tenant scope
+    val appUserId   = uuid("app_user_id").nullable()            // FK app_users.id — OPT-06
     val fullName    = text("full_name")
     val role        = text("role")                              // e.g. "Accountant", "Librarian"
     val department  = text("department").nullable()             // e.g. "Office", "Transport"
@@ -2923,5 +2924,44 @@ object SchoolBrandingTable : UUIDTable("school_branding", "id") {
 
     init {
         index("idx_school_branding_subdomain", false, customSubdomain)
+    }
+}
+
+// =====================================================================
+// ID Card Generation (ID_CARD_GENERATION_SPEC.md)
+// Per-school ID card templates + generated cards for students/teachers/staff.
+// Applied by docs/db/migration_102_id_card.sql (must run before deploy;
+// AUTO_CREATE_TABLES is OFF in prod).
+// =====================================================================
+object IdCardTemplatesTable : UUIDTable("id_card_templates", "id") {
+    val schoolId    = uuid("school_id")
+    val name        = text("name")
+    val roleType    = varchar("role_type", 16) // student | teacher | staff
+    val frontConfig = text("front_config")     // JSON
+    val backConfig  = text("back_config")      // JSON
+    val isActive    = bool("is_active").default(true)
+    val createdAt   = timestamp("created_at")
+
+    init {
+        index("idx_id_card_templates_school", false, schoolId, roleType, isActive)
+    }
+}
+
+object IdCardsTable : UUIDTable("id_cards", "id") {
+    val schoolId       = uuid("school_id")
+    val personId       = uuid("person_id")
+    val personType     = varchar("person_type", 16) // student | teacher | staff
+    val personName     = text("person_name")
+    val templateId     = uuid("template_id")
+    val pdfUrl         = text("pdf_url").nullable()
+    val digitalCardUrl = text("digital_card_url").nullable()
+    val qrCodeData     = text("qr_code_data")
+    val validTill      = date("valid_till").nullable()
+    val status         = varchar("status", 16).default("ready") // requested|generated|ready|failed
+    val createdAt      = timestamp("created_at")
+
+    init {
+        index("idx_id_cards_person", false, personId, personType)
+        index("idx_id_cards_school", false, schoolId, createdAt)
     }
 }

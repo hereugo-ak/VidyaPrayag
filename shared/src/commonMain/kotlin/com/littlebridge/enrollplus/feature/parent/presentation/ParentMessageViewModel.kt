@@ -181,7 +181,7 @@ class ParentMessageViewModel(
         if (body.isBlank()) return
 
         // P1-3: Optimistic send — insert a temp message immediately for instant UI feedback.
-        val tempId = "optimistic-${System.currentTimeMillis()}"
+        val tempId = "optimistic-${kotlin.random.Random.nextLong()}"
         val optimisticMsg = ParentMessageDto(
             id = tempId,
             body = body.trim(),
@@ -212,7 +212,7 @@ class ParentMessageViewModel(
             val req = ParentSendMessageRequest(
                 threadId = threadId,
                 body = body.trim(),
-                clientMsgId = java.util.UUID.randomUUID().toString(),
+                clientMsgId = kotlin.random.Random.nextLong().toString(),
             )
             when (val r = repository.sendMessage(token, req)) {
                 is NetworkResult.Success -> {
@@ -323,7 +323,7 @@ class ParentMessageViewModel(
             val req = ParentSendMessageRequest(
                 recipientUserId = recipientUserId,
                 body = body.trim(),
-                clientMsgId = java.util.UUID.randomUUID().toString(),
+                clientMsgId = kotlin.random.Random.nextLong().toString(),
             )
             when (val r = repository.sendMessage(token, req)) {
                 is NetworkResult.Success -> {

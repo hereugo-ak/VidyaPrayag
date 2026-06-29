@@ -72,6 +72,8 @@ import com.littlebridge.enrollplus.feature.content.supportRouting
 import com.littlebridge.enrollplus.feature.gateway.api.gatewayRouting
 import com.littlebridge.enrollplus.feature.health.healthRouting
 import com.littlebridge.enrollplus.feature.healthcheck.healthCheckRouting
+import com.littlebridge.enrollplus.feature.idcard.idCardRouting
+import com.littlebridge.enrollplus.feature.idcard.IdCardExpiryCheckJob
 import com.littlebridge.enrollplus.feature.media.mediaRouting
 import com.littlebridge.enrollplus.feature.notification.api.notificationRouting
 import com.littlebridge.enrollplus.feature.notifications.notificationsRouting
@@ -451,6 +453,16 @@ fun Application.module() {
 
         // Server health check — pinged by GitHub Action every 1 min to keep Render awake
         healthCheckRouting()           // /api/v1/health
+
+        // ID Card Generation (ID_CARD_GENERATION_SPEC.md)
+        //   /api/v1/school/id-cards/{templates,generate}  — admin
+        //   /api/v1/parent/id-card/{childId}              — parent
+        //   /api/v1/teacher/id-card                       — teacher
+        //   /api/v1/staff/id-card                         — staff
+        idCardRouting()
+
+        // ID Card Expiry Check — daily background job (§14)
+        IdCardExpiryCheckJob().start()
 
         // School Branding Kit (SCHOOL_BRANDING_KIT_SPEC.md)
         //   /api/v1/school/branding{,/reset,/subdomain{,/check}}  — admin

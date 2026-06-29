@@ -268,6 +268,11 @@ object DatabaseFactory {
         // Applied by docs/db/migration_101_school_branding.sql (must run before
         // deploy; AUTO_CREATE_TABLES is OFF in prod).
         SchoolBrandingTable,
+        // ID Card Generation (ID_CARD_GENERATION_SPEC.md — templates + generated cards)
+        // Applied by docs/db/migration_102_id_card.sql (must run before deploy;
+        // AUTO_CREATE_TABLES is OFF in prod).
+        IdCardTemplatesTable,
+        IdCardsTable,                    // FK to templates
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

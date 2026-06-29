@@ -1,8 +1,9 @@
 # Library Management — Technical Specification
 
 > **Document status:** Implementation-ready blueprint
-> **Last updated:** 2026-06-27
-> **Prerequisites:** None
+> **Last updated:** 2026-06-30
+> **Prerequisites:** `FESTIVAL_CALENDAR_SPEC.md` (holiday-aware due dates)
+> **Related specs:** `STUDENT_APP_SPEC.md`, `FEE_PAYMENT_SPEC.md`
 > **Template:** `_SPEC_TEMPLATE.md` v1 (25 mandatory + 6 optional sections)
 
 ---
@@ -13,31 +14,48 @@ School library management: book catalog, issue/return tracking, reservations, fi
 
 ### Goals
 
-- Admin/librarian manages book catalog (title, author, ISBN, copies, category)
+- Admin/librarian manages book catalog (title, author, ISBN, copies, category, replacement cost)
+- Individual copy tracking with barcode, condition, and status per copy
 - Issue/return books to students/teachers with due dates
-- Reservations for unavailable books
-- Fine calculation for overdue returns
+- Book renewal/extend (max 2 renewals)
+- Borrowing limit enforcement (max books per student, configurable)
+- Reservations for unavailable books (with optional teacher priority)
+- Fine calculation for overdue returns with fine cap at replacement cost
+- Fine lifecycle: pending → paid / waived
+- Lost book handling with replacement cost recovery
+- Bulk CSV import for initial catalog setup
 - Student reading history
-- Search by title, author, ISBN, category
+- Student self-service: view own issued books, due dates, and history
+- Search by title, author, ISBN, category with pagination
+- Book condition recording on return (damage tracking)
+- Holiday-aware due date calculation (skip non-school days)
 
 ### Non-goals
 
 - [ ] E-book / digital library management
 - [ ] Inter-library loan system
-- [ ] Automated ISBN lookup / book metadata enrichment
-- [ ] Barcode/RFID scanning for physical books
+- [ ] Automated ISBN lookup / book metadata enrichment (future enhancement)
+- [ ] RFID scanning for physical books (future enhancement; barcode field is stored but scanning not implemented)
+- [ ] Online fine payment via payment gateway (fines marked manually; gateway integration is future enhancement)
+- [ ] Book reviews and ratings (future enhancement)
+- [ ] Reading challenges / gamification (future enhancement)
 
 ### Dependencies
 
 - `StudentsTable` — student lookup for borrowing
-- `AppUsersTable` — teacher/admin lookup for borrowing
-- `NotificationService` — reservation availability notifications
+- `AppUsersTable` — teacher/admin lookup for borrowing (add `librarian` role)
+- `NotificationService` — reservation availability, overdue, due reminder notifications
+- `FESTIVAL_CALENDAR_SPEC.md` — school calendar for holiday-aware due date calculation
+- `STUDENT_APP_SPEC.md` — student self-service library access via student app
+- `FeeRecordsTable` — optional linkage for fine payment tracking (future)
 
 ### Related Modules
 
 - `server/.../feature/students/` — student management
 - `server/.../feature/notifications/` — notification service
+- `server/.../feature/calendar/` — school calendar (holiday-aware due dates)
 - `server/.../db/Tables.kt` — database tables
+- `server/.../feature/auth/` — role management (librarian role)
 
 ---
 
@@ -103,46 +121,46 @@ School library management: book catalog, issue/return tracking, reservations, fi
 | Field | Value |
 |---|---|
 | **Title** | Book Catalog CRUD |
-| **Description** | Book catalog CRUD with ISBN, title, author, publisher, category, copies, shelf location |
+| **Description** | Book catalog CRUD with ISBN, title, author, publisher, category, copies, shelf location, replacement cost |
 | **Priority** | Critical |
 | **User Roles** | School Admin, Librarian |
-| **Acceptance notes** | Full CRUD with all fields; ISBN optional; copies tracked |
+| **Acceptance notes** | Full CRUD with all fields; ISBN optional; copies tracked; replacement cost for lost book recovery |
 
 ### FR-002
 | Field | Value |
 |---|---|
 | **Title** | Issue Book |
-| **Description** | Issue book to student/teacher with due date (default 14 days) |
+| **Description** | Issue book to student/teacher with due date (default 14 days, holiday-aware). Checks borrowing limit before issue. Specific copy tracked. |
 | **Priority** | Critical |
 | **User Roles** | School Admin, Librarian |
-| **Acceptance notes** | Due date auto-calculated; available_copies decremented |
+| **Acceptance notes** | Due date auto-calculated skipping non-school days; available_copies decremented; borrowing limit enforced (default max 3 books per student); specific copy status set to 'issued' |
 
 ### FR-003
 | Field | Value |
 |---|---|
-| **Title** | Return Book with Fine |
-| **Description** | Return book, calculate fine if overdue (₹1/day configurable) |
+| **Title** | Return Book with Fine and Condition Tracking |
+| **Description** | Return book, calculate fine if overdue (₹1/day configurable, capped at replacement cost). Record return condition (good/fair/damaged) and damage notes. |
 | **Priority** | Critical |
 | **User Roles** | School Admin, Librarian |
-| **Acceptance notes** | Fine calculated based on days overdue; configurable rate |
+| **Acceptance notes** | Fine calculated based on days overdue; configurable rate; fine capped at book replacement_cost; return_condition and damage_notes recorded; copy status set to 'available' (or 'repair' if damaged) |
 
 ### FR-004
 | Field | Value |
 |---|---|
 | **Title** | Reserve Unavailable Book |
-| **Description** | Reserve unavailable book — notified when available |
+| **Description** | Reserve unavailable book — notified when available. Optional teacher priority over student reservations. |
 | **Priority** | Medium |
 | **User Roles** | Parent, Student, Teacher |
-| **Acceptance notes** | Reservation created; notification sent when book returned |
+| **Acceptance notes** | Reservation created; notification sent when book returned; if LIBRARY_TEACHER_RESERVATION_PRIORITY is true, teacher reservations fulfill before student reservations |
 
 ### FR-005
 | Field | Value |
 |---|---|
-| **Title** | Book Search |
-| **Description** | Search by title, author, ISBN, category |
+| **Title** | Book Search with Pagination |
+| **Description** | Search by title, author, ISBN, category with pagination (page + limit params) |
 | **Priority** | High |
 | **User Roles** | School Admin, Librarian, Parent, Student |
-| **Acceptance notes** | Full-text search across title, author, ISBN; filter by category |
+| **Acceptance notes** | Full-text search across title, author, ISBN; filter by category; paginated results (default 20 per page); total count returned in response |
 
 ### FR-006
 | Field | Value |
@@ -157,37 +175,139 @@ School library management: book catalog, issue/return tracking, reservations, fi
 | Field | Value |
 |---|---|
 | **Title** | Library Dashboard |
-| **Description** | Library dashboard: total books, issued, available, overdue |
+| **Description** | Library dashboard: total books, issued, available, overdue, outstanding fines, lost books |
 | **Priority** | Medium |
 | **User Roles** | School Admin, Librarian |
-| **Acceptance notes** | Summary counts displayed on dashboard |
+| **Acceptance notes** | Summary counts displayed on dashboard including fine collection summary and lost book count |
+
+### FR-008
+| Field | Value |
+|---|---|
+| **Title** | Book Renewal |
+| **Description** | Renew issued book to extend due date by loan period (default 14 days, holiday-aware). Max 2 renewals per issue. Cannot renew if pending reservations exist for the book. |
+| **Priority** | High |
+| **User Roles** | School Admin, Librarian, Student (self-service), Parent (on behalf of child) |
+| **Acceptance notes** | Due date extended by LIBRARY_DEFAULT_LOAN_DAYS (holiday-aware); renewal_count incremented; rejected if renewal_count >= LIBRARY_MAX_RENEWALS; rejected if pending reservations exist on the book |
+
+### FR-009
+| Field | Value |
+|---|---|
+| **Title** | Fine Payment and Waiver |
+| **Description** | Record fine payment (cash/other) or waive fine with reason. Fine lifecycle: pending → paid / waived. |
+| **Priority** | High |
+| **User Roles** | School Admin, Librarian |
+| **Acceptance notes** | Fine status transitions: pending → paid (fine_paid_at set) or pending → waived (fine_waived_by, fine_waived_reason set). Outstanding fines tracked on dashboard. Fine cap applied: fine_amount = min(accumulated_fine, replacement_cost). |
+
+### FR-010
+| Field | Value |
+|---|---|
+| **Title** | Borrowing Limit Enforcement |
+| **Description** | Enforce max concurrent books per student (configurable, default 3). Block issue if limit reached. |
+| **Priority** | High |
+| **User Roles** | School Admin, Librarian |
+| **Acceptance notes** | Before issue, count active issues (status=issued) for borrower; if count >= LIBRARY_MAX_BOOKS_PER_STUDENT, return 400 with clear message. Configurable per school. Teachers exempt from limit. |
+
+### FR-011
+| Field | Value |
+|---|---|
+| **Title** | Bulk Book Import (CSV) |
+| **Description** | Import book catalog via CSV upload. Columns: ISBN, title, author, publisher, category, total_copies, shelf_location, replacement_cost. |
+| **Priority** | Medium |
+| **User Roles** | School Admin, Librarian |
+| **Acceptance notes** | CSV parsed server-side; each row validated (title required, total_copies > 0); valid rows inserted, invalid rows reported with row number and error; partial success allowed; duplicate ISBN detection (warn, don't block). |
+
+### FR-012
+| Field | Value |
+|---|---|
+| **Title** | Individual Copy Tracking |
+| **Description** | Track individual book copies with copy number, barcode, condition, and status. Issues reference a specific copy. |
+| **Priority** | Medium |
+| **User Roles** | School Admin, Librarian |
+| **Acceptance notes** | Each copy has: copy_number, barcode (optional), condition (new/good/fair/poor/damaged), status (available/issued/lost/repair). When book created with N copies, N copy records auto-generated. Issue references specific copy_id. Return updates copy condition and status. |
+
+### FR-013
+| Field | Value |
+|---|---|
+| **Title** | Student Self-Service Library Access |
+| **Description** | Students can view their own issued books, due dates, reading history, and search the catalog. |
+| **Priority** | Medium |
+| **User Roles** | Student |
+| **Acceptance notes** | Student endpoints scoped to linked_student_id from JWT. Student sees: currently issued books with due dates, own reading history, can search catalog. Cannot issue/return/reserve (librarian-mediated). Delegates to student app per STUDENT_APP_SPEC.md. |
+
+### FR-014
+| Field | Value |
+|---|---|
+| **Title** | Book Condition Recording on Return |
+| **Description** | Record book condition when processing return. Flag damaged books for repair. |
+| **Priority** | Low |
+| **User Roles** | School Admin, Librarian |
+| **Acceptance notes** | Librarian selects condition on return: good, fair, damaged. If damaged, damage_notes text recorded. Copy status set to 'repair' if damaged. Damaged books excluded from available_copies count. |
+
+### FR-015
+| Field | Value |
+|---|---|
+| **Title** | Lost Book Handling with Replacement Cost |
+| **Description** | Mark issued book as lost. Generate fine equal to replacement_cost. Decrement total_copies (not available_copies). |
+| **Priority** | Medium |
+| **User Roles** | School Admin, Librarian |
+| **Acceptance notes** | When marked lost: issue status=lost, fine_amount=replacement_cost, fine_status=pending. Copy status=lost. total_copies decremented. Borrower notified of replacement charge. |
+
+### Non-Functional Requirements
+
+| ID | Requirement |
+|---|---|
+| NFR-1 | Book search: < 200ms (with 10,000 books) |
+| NFR-2 | Issue book: < 100ms |
+| NFR-3 | Return book: < 100ms |
+| NFR-4 | Dashboard load: < 200ms |
+| NFR-5 | Bulk import: < 5 seconds for 1,000 books |
+| NFR-6 | CSV import max file size: 5MB |
+| NFR-7 | Copy tracking: real-time status sync (no lag) |
 
 ---
 
 ## 4. User Stories
 
 ### School Admin / Librarian
-- [ ] Add a new book to the catalog with ISBN, title, author, and copies
-- [ ] Issue a book to a student or teacher with a due date
-- [ ] Process a book return and calculate fine if overdue
-- [ ] View library dashboard with total, issued, available, and overdue counts
-- [ ] Search for books by title, author, ISBN, or category
+- [ ] Add a new book to the catalog with ISBN, title, author, copies, and replacement cost
+- [ ] Bulk import books via CSV upload
+- [ ] Issue a book to a student or teacher with a due date (holiday-aware)
+- [ ] Process a book return and calculate fine if overdue (capped at replacement cost)
+- [ ] Record book condition on return and flag damaged books
+- [ ] Renew a book to extend due date
+- [ ] Mark a book as lost and charge replacement cost
+- [ ] Record fine payment or waive fine with reason
+- [ ] View library dashboard with total, issued, available, overdue, fines, and lost counts
+- [ ] Search for books by title, author, ISBN, or category with pagination
 - [ ] View a student's reading history
 - [ ] Manage reservations and notify when books become available
+- [ ] View and manage individual book copies (condition, status, barcode)
 
 ### Parent / Student
 - [ ] Search for books in the library catalog
-- [ ] View books currently issued to my child
+- [ ] View books currently issued to my child / myself
 - [ ] Reserve a book that is currently unavailable
-- [ ] View my child's reading history
+- [ ] View my child's / my reading history
 - [ ] Get notified when a reserved book becomes available
+- [ ] Renew a book (student self-service or parent on behalf)
+- [ ] View due dates and overdue status for issued books
+
+### Student (self-service via student app)
+- [ ] Search the library catalog
+- [ ] View my currently issued books and due dates
+- [ ] View my reading history
+- [ ] Renew a book (if within renewal limit and no pending reservations)
 
 ### System
-- [ ] Auto-calculate due date (issue date + 14 days)
-- [ ] Auto-calculate fine for overdue returns (₹1/day configurable)
+- [ ] Auto-calculate due date (issue date + loan days, skipping non-school days)
+- [ ] Auto-calculate fine for overdue returns (₹1/day configurable, capped at replacement_cost)
 - [ ] Decrement available_copies on issue; increment on return
+- [ ] Auto-generate copy records when book created with N copies
 - [ ] Notify reservers when book becomes available
-- [ ] Track all issue/return history
+- [ ] Enforce borrowing limit on issue
+- [ ] Track all issue/return/renewal history
+- [ ] Track fine lifecycle (pending → paid / waived)
+- [ ] Flag damaged books for repair on return
 
 ---
 
