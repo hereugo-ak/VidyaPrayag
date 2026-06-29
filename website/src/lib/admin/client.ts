@@ -72,6 +72,9 @@ import type {
   ReportCardTermConfig,
   TutorTeacherScopeResponse,
   TutorHeatmapResponse,
+  AiRateLimitEntry,
+  AiHealthEntry,
+  AiRecentUsageResponse,
 } from "./types";
 
 interface Opts {
@@ -400,4 +403,12 @@ export const adminApi = {
     authRequest<TutorTeacherScopeResponse>("/api/v1/tutor/heatmap/scope"),
   tutorHeatmap: (classId: string, subjectId: string) =>
     authRequest<TutorHeatmapResponse>(`/api/v1/tutor/heatmap/${encodeURIComponent(classId)}/${encodeURIComponent(subjectId)}`),
+
+  // ── AI Token Monitor (Dev Tools — super admin only) ────────────────────────
+  aiRateLimits: () =>
+    authRequest<AiRateLimitEntry[]>("/api/v1/admin/ai/rate-limits"),
+  aiHealth: () =>
+    authRequest<AiHealthEntry[]>("/api/v1/admin/ai/health"),
+  aiRecentUsage: (limit: number = 50, windowMin: number = 60) =>
+    authRequest<AiRecentUsageResponse>(`/api/v1/admin/ai/recent-usage?limit=${limit}&window=${windowMin}`),
 };

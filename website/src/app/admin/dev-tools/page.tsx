@@ -6,6 +6,7 @@ import { useAdminAuth } from "@/lib/admin/session";
 import { Card, CardHeader, Badge, FadeIn, EmptyState } from "@/components/admin/Primitives";
 import { AdminButton } from "@/components/admin/Toolbar";
 import { IconBolt, IconCheck, IconPulse, IconMessage, IconWarning } from "@/components/admin/icons";
+import { AiTokenMonitor } from "@/components/admin/devtools/AiTokenMonitor";
 import type {
   OtpProvidersResponse,
   TriggerPulseResponse,
@@ -42,6 +43,10 @@ export default function DevToolsPage() {
             </p>
           </div>
         </div>
+      </FadeIn>
+
+      <FadeIn delay={0.03}>
+        <AiTokenMonitor />
       </FadeIn>
 
       <FadeIn delay={0.05}>

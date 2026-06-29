@@ -161,3 +161,24 @@ export const useTutorTeacherScope = () =>
 export const useTutorHeatmap = (classId: string | null, subjectId: string | null) =>
   useSWR(classId && subjectId ? ["tutor/heatmap", classId, subjectId] : null,
     () => adminApi.tutorHeatmap(classId as string, subjectId as string), NEAR_LIVE);
+
+// ── AI Token Monitor hooks (Dev Tools — super admin) ──────────────────────────
+// Rate-limiter and health data are LIVE (10s poll) so the admin sees
+// near-real-time RPM/RPD/TPM usage. Recent usage log is also LIVE for
+// the scrolling log feed.
+
+const AI_LIVE: SWRConfiguration = {
+  refreshInterval: 10_000,
+  revalidateOnFocus: true,
+  keepPreviousData: true,
+};
+
+export const useAiRateLimits = () =>
+  useSWR("ai/rate-limits", adminApi.aiRateLimits, AI_LIVE);
+
+export const useAiHealth = () =>
+  useSWR("ai/health", adminApi.aiHealth, AI_LIVE);
+
+export const useAiRecentUsage = (limit: number = 50, windowMin: number = 60) =>
+  useSWR(["ai/recent-usage", limit, windowMin],
+    () => adminApi.aiRecentUsage(limit, windowMin), AI_LIVE);

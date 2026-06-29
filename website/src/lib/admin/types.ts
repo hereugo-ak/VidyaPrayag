@@ -807,3 +807,50 @@ export interface TutorEfficacyResponse {
   subjectId: string;
   topics: TutorEfficacyTopic[];
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// AI TOKEN MONITOR (Dev Tools — super admin only)
+// Mirrors server feature.ai.AiRouting.kt DTOs for rate-limiter, health, usage.
+// ──────────────────────────────────────────────────────────────────────────────
+
+export interface AiRateLimitEntry {
+  provider: string;
+  model: string;
+  rpm_current: number;
+  rpm_limit: number;
+  rpd_current: number;
+  rpd_limit: number;
+  tpm_current: number;
+  tpm_limit: number;
+  reserve_pct: number;
+}
+
+export interface AiHealthEntry {
+  provider: string;
+  model: string;
+  state: string;
+  total_requests: number;
+  total_failures: number;
+  rate_limit_hits: number;
+  avg_latency_ms: number;
+}
+
+export interface AiRecentUsageEntry {
+  id: string;
+  feature: string;
+  provider_used: string | null;
+  model_used: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  status: string;
+  routing_decision: string;
+  latency_ms: number;
+  error_message: string | null;
+  created_at: string;
+}
+
+export interface AiRecentUsageResponse {
+  entries: AiRecentUsageEntry[];
+  total: number;
+  window_min: number;
+}

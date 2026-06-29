@@ -37,6 +37,7 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import java.time.Instant
@@ -85,6 +86,28 @@ data class AiHealthDto(
     @kotlinx.serialization.SerialName("total_failures") val totalFailures: Long,
     @kotlinx.serialization.SerialName("rate_limit_hits") val rateLimitHits: Long,
     @kotlinx.serialization.SerialName("avg_latency_ms") val avgLatencyMs: Long,
+)
+
+@Serializable
+data class AiRecentUsageDto(
+    val id: String,
+    val feature: String,
+    @kotlinx.serialization.SerialName("provider_used") val providerUsed: String?,
+    @kotlinx.serialization.SerialName("model_used") val modelUsed: String?,
+    @kotlinx.serialization.SerialName("input_tokens") val inputTokens: Int,
+    @kotlinx.serialization.SerialName("output_tokens") val outputTokens: Int,
+    val status: String,
+    @kotlinx.serialization.SerialName("routing_decision") val routingDecision: String,
+    @kotlinx.serialization.SerialName("latency_ms") val latencyMs: Int,
+    @kotlinx.serialization.SerialName("error_message") val errorMessage: String? = null,
+    @kotlinx.serialization.SerialName("created_at") val createdAt: String,
+)
+
+@Serializable
+data class AiRecentUsageResponse(
+    val entries: List<AiRecentUsageDto>,
+    val total: Int,
+    @kotlinx.serialization.SerialName("window_min") val windowMin: Int,
 )
 
 @Serializable
@@ -206,6 +229,41 @@ fun Route.aiRouting() {
                 )
             }
             call.ok(snap, "AI rate-limiter status")
+        }
+
+        // ---- PLATFORM ADMIN: recent AI usage log (live feed) ----
+        get("/api/v1/admin/ai/recent-usage") {
+            call.requirePlatformAdmin() ?: return@get
+            val limit = (call.request.queryParameters["limit"]?.toIntOrNull() ?: 50).coerceIn(1, 200)
+            val windowMin = (call.request.queryParameters["window"]?.toIntOrNull() ?: 60).coerceIn(1, 1440)
+            val since = Instant.now().minus(windowMin.toLong(), ChronoUnit.MINUTES)
+
+            val entries = dbQuery {
+                AiUsageLogTable.selectAll().where {
+                    AiUsageLogTable.createdAt greater since
+                }.orderBy(AiUsageLogTable.createdAt, SortOrder.DESC)
+                    .limit(limit)
+                    .toList()
+                    .map { r ->
+                        AiRecentUsageDto(
+                            id = r[AiUsageLogTable.id].value.toString(),
+                            feature = r[AiUsageLogTable.feature],
+                            providerUsed = r[AiUsageLogTable.providerUsed],
+                            modelUsed = r[AiUsageLogTable.modelUsed],
+                            inputTokens = r[AiUsageLogTable.inputTokens],
+                            outputTokens = r[AiUsageLogTable.outputTokens],
+                            status = r[AiUsageLogTable.status],
+                            routingDecision = r[AiUsageLogTable.routingDecision],
+                            latencyMs = r[AiUsageLogTable.latencyMs],
+                            errorMessage = r[AiUsageLogTable.errorMessage],
+                            createdAt = r[AiUsageLogTable.createdAt].toString(),
+                        )
+                    }
+            }
+            call.ok(
+                AiRecentUsageResponse(entries = entries, total = entries.size, windowMin = windowMin),
+                "Recent AI usage"
+            )
         }
 
         // ---- PLATFORM ADMIN: rotate a provider key (live, no redeploy) ----
