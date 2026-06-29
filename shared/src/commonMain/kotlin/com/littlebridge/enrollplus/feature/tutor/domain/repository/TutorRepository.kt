@@ -4,6 +4,7 @@ import com.littlebridge.enrollplus.core.network.NetworkResult
 import com.littlebridge.enrollplus.feature.tutor.domain.model.*
 
 interface TutorRepository {
+    suspend fun getSubjects(token: String, childId: String): NetworkResult<SubjectsResponse>
     suspend fun askDoubt(token: String, request: DoubtRequest): NetworkResult<DoubtResponse>
     suspend fun getLearnerBundle(token: String, childId: String, subjectId: String): NetworkResult<LearnerBundleResponse>
     suspend fun gradePractice(token: String, request: PracticeGradeRequest): NetworkResult<PracticeGradeResponse>

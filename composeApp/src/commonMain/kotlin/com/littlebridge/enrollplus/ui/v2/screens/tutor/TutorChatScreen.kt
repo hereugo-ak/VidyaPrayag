@@ -17,6 +17,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -24,12 +26,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.littlebridge.enrollplus.feature.tutor.domain.model.SubjectItemDto
 import com.littlebridge.enrollplus.feature.tutor.presentation.ChatMessage
 import com.littlebridge.enrollplus.feature.tutor.presentation.TutorChatViewModel
 import com.littlebridge.enrollplus.ui.v2.components.VBackHeader
@@ -65,7 +71,11 @@ fun TutorChatScreen(
     val listState = rememberLazyListState()
 
     LaunchedEffect(subjectId) {
-        if (subjectId.isNotBlank()) viewModel.updateSubject(subjectId)
+        if (subjectId.isNotBlank()) {
+            viewModel.updateSubject(subjectId)
+        } else {
+            viewModel.loadSubjects()
+        }
     }
 
     LaunchedEffect(state.conversationHistory.size) {
@@ -107,7 +117,7 @@ fun TutorChatScreen(
             } else if (state.conversationHistory.isEmpty() && !state.isLoading) {
                 VEmptyState(
                     title = "Ask a question",
-                    body = "Type your doubt below and the AI tutor will guide you step by step.",
+                    body = "Pick a subject and type your doubt below. The AI tutor will guide you step by step.",
                     icon = VIcons.BookOpen,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -134,24 +144,20 @@ fun TutorChatScreen(
                 }
             }
 
-            if (state.subjectId.isBlank()) {
-                Box(
-                    Modifier.fillMaxWidth().padding(16.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        "Select a subject first",
-                        style = VTheme.type.caption.colored(c.ink3),
-                    )
-                }
-            } else {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .background(c.card)
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(c.card)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                SubjectPicker(
+                    subjects = state.subjects,
+                    selectedSubjectId = state.subjectId,
+                    isLoading = state.isLoadingSubjects,
+                    onSelect = viewModel::updateSubject,
+                )
+                if (state.subjectId.isNotBlank()) {
                     OutlinedTextField(
                         value = state.question,
                         onValueChange = viewModel::updateQuestion,
@@ -223,6 +229,78 @@ private fun ChatBubble(msg: ChatMessage) {
                         fontSize = 13.sp,
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubjectPicker(
+    subjects: List<SubjectItemDto>,
+    selectedSubjectId: String,
+    isLoading: Boolean,
+    onSelect: (String) -> Unit,
+) {
+    val c = VTheme.colors
+    var dropdownOpen by remember { mutableStateOf(false) }
+
+    val selected = subjects.find { it.subjectId == selectedSubjectId }
+    val label = when {
+        isLoading -> "Loading subjects..."
+        subjects.isEmpty() -> "No subjects available"
+        selected != null -> selected.subjectName
+        else -> "Select a subject"
+    }
+
+    Box {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(c.cream)
+                .clickable(enabled = subjects.isNotEmpty()) { dropdownOpen = true }
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                label,
+                style = VTheme.type.body.colored(
+                    if (selected != null) c.ink else c.ink3
+                ),
+            )
+            Icon(
+                VIcons.ChevronDown,
+                contentDescription = null,
+                tint = c.ink3,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+
+        DropdownMenu(
+            expanded = dropdownOpen,
+            onDismissRequest = { dropdownOpen = false },
+            containerColor = c.card,
+        ) {
+            subjects.forEach { subject ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(
+                                subject.subjectName,
+                                style = VTheme.type.body.colored(c.ink),
+                            )
+                            Text(
+                                subject.subjectCode,
+                                style = VTheme.type.caption.colored(c.ink3),
+                            )
+                        }
+                    },
+                    onClick = {
+                        onSelect(subject.subjectId)
+                        dropdownOpen = false
+                    },
+                )
             }
         }
     }

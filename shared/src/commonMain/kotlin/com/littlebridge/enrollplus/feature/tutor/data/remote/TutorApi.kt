@@ -26,6 +26,19 @@ class TutorApi(
         return "$base$cleanPath"
     }
 
+    // ── Subjects (GET /tutor/subjects/{childId}) ──────────────────────
+
+    suspend fun getSubjects(
+        token: String,
+        childId: String,
+    ): NetworkResult<SubjectsResponse> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/tutor/subjects/$childId")) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+            }
+        }
+    }
+
     // ── Doubt (POST /tutor/doubt) ─────────────────────────────────────
 
     suspend fun askDoubt(token: String, request: DoubtRequest): NetworkResult<DoubtResponse> {

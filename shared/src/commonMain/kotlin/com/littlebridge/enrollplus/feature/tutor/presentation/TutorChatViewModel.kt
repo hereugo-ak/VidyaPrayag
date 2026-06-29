@@ -21,6 +21,8 @@ data class TutorChatState(
     val conversationHistory: List<ChatMessage> = emptyList(),
     val error: String? = null,
     val subjectId: String = "",
+    val subjects: List<SubjectItemDto> = emptyList(),
+    val isLoadingSubjects: Boolean = false,
 )
 
 data class ChatMessage(
@@ -45,6 +47,31 @@ class TutorChatViewModel(
 
     fun updateSubject(subjectId: String) {
         _state.update { it.copy(subjectId = subjectId) }
+    }
+
+    fun loadSubjects() {
+        val childId = selectedChildHolder.selectedChildId.value ?: return
+
+        viewModelScope.launch {
+            _state.update { it.copy(isLoadingSubjects = true) }
+            val token = preferenceRepository.getUserToken().first() ?: run {
+                _state.update { it.copy(isLoadingSubjects = false) }
+                return@launch
+            }
+            when (val result = repository.getSubjects(token, childId)) {
+                is NetworkResult.Success -> {
+                    _state.update {
+                        it.copy(
+                            isLoadingSubjects = false,
+                            subjects = result.data.data ?: emptyList(),
+                        )
+                    }
+                }
+                else -> {
+                    _state.update { it.copy(isLoadingSubjects = false) }
+                }
+            }
+        }
     }
 
     fun askDoubt() {

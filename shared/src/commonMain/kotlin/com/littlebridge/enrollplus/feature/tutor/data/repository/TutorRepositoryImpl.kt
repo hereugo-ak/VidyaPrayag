@@ -8,6 +8,9 @@ import com.littlebridge.enrollplus.feature.tutor.domain.repository.TutorReposito
 class TutorRepositoryImpl(
     private val api: TutorApi,
 ) : TutorRepository {
+    override suspend fun getSubjects(token: String, childId: String): NetworkResult<SubjectsResponse> =
+        api.getSubjects(token, childId)
+
     override suspend fun askDoubt(token: String, request: DoubtRequest): NetworkResult<DoubtResponse> =
         api.askDoubt(token, request)
 

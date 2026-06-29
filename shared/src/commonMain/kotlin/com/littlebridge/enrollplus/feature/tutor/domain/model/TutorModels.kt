@@ -11,6 +11,22 @@ data class TutorApiResponse<T>(
     val data: T? = null,
 )
 
+// ── Subjects (for subject picker) ────────────────────────────────────
+
+@Serializable
+data class SubjectItemDto(
+    val subjectId: String,
+    val subjectName: String,
+    val subjectCode: String,
+)
+
+@Serializable
+data class SubjectsResponse(
+    val success: Boolean,
+    val message: String = "",
+    val data: List<SubjectItemDto>? = null,
+)
+
 // ── Doubt (Tier 2 Agent) ─────────────────────────────────────────────
 
 @Serializable
