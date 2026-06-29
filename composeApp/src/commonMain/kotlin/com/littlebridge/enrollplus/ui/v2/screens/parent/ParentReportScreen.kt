@@ -28,7 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import org.koin.compose.viewmodel.koinViewModel
 import com.littlebridge.enrollplus.feature.reportcard.domain.model.ReportCardModels
 import com.littlebridge.enrollplus.feature.reportcard.presentation.ParentReportViewModel
 import com.littlebridge.enrollplus.ui.v2.components.VBadge
@@ -50,7 +50,7 @@ import com.littlebridge.enrollplus.ui.v2.theme.colored
 fun ParentReportScreen(
     childId: String,
     onBack: () -> Unit,
-    viewModel: ParentReportViewModel = viewModel(),
+    viewModel: ParentReportViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
     val c = VTheme.colors

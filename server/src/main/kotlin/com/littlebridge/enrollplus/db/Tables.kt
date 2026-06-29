@@ -959,6 +959,9 @@ object AssessmentsTable : UUIDTable("assessments", "id") {
     // two in sync (status='published' ⇔ is_published=true).
     val status          = varchar("status", 16).default("draft")
     val createdBy       = uuid("created_by").nullable()         // FK app_users.id (author audit)
+    // AI Tutor 2.0: optional FK to curriculum_units for per-topic score derivation.
+    // Nullable for backward compat — existing assessments have no topic mapping.
+    val topicId         = uuid("topic_id").nullable()           // FK curriculum_units.id
 }
 
 /**
@@ -2649,5 +2652,147 @@ object ReportCardTemplatesTable : UUIDTable("report_card_templates", "id") {
     val updatedAt              = timestamp("updated_at")
     init {
         index("idx_rct_board_grade", false, board, gradeRange, isActive)
+    }
+}
+
+// =====================================================================
+// AI Tutor 2.0 (AI_TUTOR_2.0_AGENTIC_REDESIGN.md §12)
+//   Created/applied by docs/db/migration_064_tutor_2.sql (must run before
+//   deploy; AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates
+//   boot on it). Reuses pews_feature_flags for kill-switch flags.
+// =====================================================================
+
+/**
+ * Per-child per-subject AI Tutor agent session. Stores the full conversation
+ * as an array of grounded [TutorTurn] objects plus an audit trail of every
+ * fact and its source. Supersedes the v1 `ai_tutor_sessions` table.
+ *
+ * Spec: §12.2
+ */
+object TutorSessionsTable : UUIDTable("tutor_sessions", "id") {
+    val schoolId       = uuid("school_id")
+    val childId        = uuid("child_id")
+    val subjectId      = uuid("subject_id")
+    val academicYearId = uuid("academic_year_id").nullable()
+    val mode           = varchar("mode", 16).default("DOUBT")
+    val intentClass    = varchar("intent_class", 64).nullable()
+    val turns          = text("turns").default("[]")       // JSONB — array of TutorTurn
+    val groundedRefs   = text("grounded_refs").default("[]") // JSONB — audit: fact + source
+    val providerUsed   = varchar("provider_used", 64).nullable()
+    val tokensUsed     = integer("tokens_used").default(0)
+    val cacheHit       = bool("cache_hit").default(false)
+    val safetyFlag     = varchar("safety_flag", 32).nullable()
+    val createdAt      = timestamp("created_at")
+    val updatedAt      = timestamp("updated_at")
+    init {
+        index("idx_tutor_sessions_child_subject", false, childId, subjectId)
+        index("idx_tutor_sessions_school", false, schoolId)
+        index("idx_tutor_sessions_mode", false, mode)
+    }
+}
+
+/**
+ * FSRS spaced-repetition state per child per topic. The [FsrsScheduler] owns
+ * this table — it reads/writes stability, difficulty, due_at, reps, lapses
+ * using the FSRS v6 algorithm.
+ *
+ * Spec: §12.3
+ */
+object TutorReviewStateTable : UUIDTable("tutor_review_state", "id") {
+    val schoolId       = uuid("school_id")
+    val childId        = uuid("child_id")
+    val topicId        = uuid("topic_id")
+    val stability      = double("stability").default(0.0)
+    val difficulty     = double("difficulty").default(0.0)
+    val dueAt          = timestamp("due_at")
+    val reps           = integer("reps").default(0)
+    val lapses         = integer("lapses").default(0)
+    val lastGrade      = integer("last_grade").default(0)
+    val lastReviewedAt = timestamp("last_reviewed_at").nullable()
+    val createdAt      = timestamp("created_at")
+    val updatedAt      = timestamp("updated_at")
+    init {
+        uniqueIndex("ux_tutor_review_state_unique", childId, topicId)
+        index("idx_tutor_review_due", false, childId, dueAt)
+    }
+}
+
+/**
+ * Grounded mastery per child per topic. Mastery is derived from real marks
+ * (AssessmentMarksTable) and/or practice outcomes — NEVER model-invented
+ * (LAW 6). Source field records whether it came from MARKS, PRACTICE, or
+ * BLENDED.
+ *
+ * Spec: §12.4
+ */
+object TutorMasteryTable : UUIDTable("tutor_mastery", "id") {
+    val schoolId   = uuid("school_id")
+    val childId    = uuid("child_id")
+    val subjectId  = uuid("subject_id")
+    val topicId    = uuid("topic_id")
+    val mastery    = double("mastery").default(0.0)
+    val masterySource = varchar("source", 16).default("MARKS")
+    val attempts   = integer("attempts").default(0)
+    val correct    = integer("correct").default(0)
+    val updatedAt  = timestamp("updated_at")
+    val createdAt  = timestamp("created_at")
+    init {
+        uniqueIndex("ux_tutor_mastery_unique", childId, topicId)
+        index("idx_tutor_mastery_child_subject", false, childId, subjectId)
+    }
+}
+
+/**
+ * Class-wide misconception library. The agent's [logMisconception] tool writes
+ * here; the Teacher Heatmap reads from here. Misconceptions are surfaced to
+ * teachers and tracked to resolution — this is the shared flywheel that makes
+ * every AI feature smarter.
+ *
+ * Spec: §12.5
+ */
+object TutorMisconceptionsTable : UUIDTable("tutor_misconceptions", "id") {
+    val schoolId           = uuid("school_id")
+    val classId            = uuid("class_id")
+    val subjectId          = uuid("subject_id")
+    val topicId            = uuid("topic_id")
+    val childId            = uuid("child_id")
+    val misconceptionType = varchar("misconception_type", 128)
+    val evidence           = text("evidence").default("")
+    val resolved           = bool("resolved").default(false)
+    val surfacedToTeacher  = bool("surfaced_to_teacher").default(false)
+    val createdAt          = timestamp("created_at")
+    init {
+        index("idx_tutor_misconceptions_class_subject", false, classId, subjectId)
+        index("idx_tutor_misconceptions_child", false, childId)
+        index("idx_tutor_misconceptions_topic", false, topicId)
+    }
+}
+
+/**
+ * RAG knowledge chunks for curriculum-grounded retrieval. INERT until Phase 5.
+ * The [RetrieveKnowledgeTool] reads this table; it will be empty until the
+ * NCERT corpus ingestion pipeline lands. The embedding column uses pgvector;
+ * on SQLite (local dev) it falls back to a text/blob column.
+ *
+ * Spec: §12.6
+ *
+ * Created/applied by docs/db/migration_065_tutor_rag.sql.
+ */
+object TutorKnowledgeChunksTable : UUIDTable("tutor_knowledge_chunks", "id") {
+    val schoolId   = uuid("school_id").nullable()   // null = shared NCERT corpus
+    val chunkSource = varchar("source", 128).default("NCERT")
+    val board      = varchar("board", 32).default("CBSE")
+    val classLabel = varchar("class_label", 16)
+    val subject    = varchar("subject", 64)
+    val topicId    = uuid("topic_id").nullable()
+    val chunkText  = text("chunk_text").default("")
+    // embedding: pgvector vector(768) in Postgres — stored as text on SQLite.
+    // On Postgres with pgvector, the migration creates the column as vector(768).
+    // Exposed reads/writes it as text; the repository layer handles serialization.
+    val embedding  = text("embedding").nullable()
+    val createdAt  = timestamp("created_at")
+    init {
+        index("idx_tutor_kc_school_board_class", false, schoolId, board, classLabel, subject)
+        index("idx_tutor_kc_topic", false, topicId)
     }
 }

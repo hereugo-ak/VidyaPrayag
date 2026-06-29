@@ -251,7 +251,15 @@ object DatabaseFactory {
         ReportFocusEffectivenessTable,
         HolisticAssessmentsTable,
         CoScholasticRecordsTable,
-        ReportCardTemplatesTable
+        ReportCardTemplatesTable,
+        // AI Tutor 2.0 (AI_TUTOR_2.0_AGENTIC_REDESIGN.md §12)
+        // Applied by docs/db/migration_064_tutor_2.sql + migration_065_tutor_rag.sql
+        // (must run before deploy; AUTO_CREATE_TABLES is OFF in prod).
+        TutorSessionsTable,
+        TutorReviewStateTable,
+        TutorMasteryTable,
+        TutorMisconceptionsTable,
+        TutorKnowledgeChunksTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

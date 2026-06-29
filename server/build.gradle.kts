@@ -164,6 +164,14 @@ dependencies {
     // -----------------------------------------------------------------
     implementation("com.github.librepdf:openpdf:2.0.3")
 
+    // -----------------------------------------------------------------
+    // FSRS — Free Spaced Repetition Scheduler v6 (MIT).
+    // The spaced-repetition engine that drives the Tutor's adaptive
+    // review scheduling (AI_TUTOR_2.0_AGENTIC_REDESIGN.md §6.5).
+    // From the open-spaced-repetition org; JVM-native, Maven Central.
+    // -----------------------------------------------------------------
+    implementation("io.github.open-spaced-repetition:fsrs:1.0.0")
+
     testImplementation(libs.ktor.serverTestHost)
     testImplementation(libs.kotlin.testJunit)
 }

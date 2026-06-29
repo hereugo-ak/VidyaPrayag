@@ -21,6 +21,8 @@ package com.littlebridge.enrollplus.core
 
 import com.littlebridge.enrollplus.feature.pews.core.PewsDisabledException
 import com.littlebridge.enrollplus.feature.pews.core.PewsDisabledResponse
+import com.littlebridge.enrollplus.feature.tutor.core.TutorDisabledException
+import kotlinx.serialization.Serializable
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.plugins.BadRequestException
@@ -48,7 +50,27 @@ private val errorLog = LoggerFactory.getLogger("VidyaPrayag.Errors")
 private val isProduction: Boolean
     get() = System.getenv("DATABASE_URL")?.takeIf { it.isNotBlank() } != null
 
+/**
+ * Kill-switch response body for AI Tutor 2.0 modules.
+ * Matches the spec: {"tutor":"disabled","module":"<name>"}.
+ */
+@Serializable
+data class TutorDisabledResponse(
+    val tutor: String = "disabled",
+    val module: String,
+)
+
 fun StatusPagesConfig.configureErrorHandling() {
+    // AI Tutor kill switch: when a tutor module is disabled, return 503 with
+    // {"tutor":"disabled","module":"<name>"}. Must be registered BEFORE the
+    // PewsDisabledException handler since TutorDisabledException extends it.
+    exception<TutorDisabledException> { call, cause ->
+        call.respond(
+            HttpStatusCode.ServiceUnavailable,
+            TutorDisabledResponse(module = cause.moduleName),
+        )
+    }
+
     // PEWS kill switch: when a module is disabled, return 503 with the
     // canonical {"pews":"disabled","module":"<name>"} body.
     exception<PewsDisabledException> { call, cause ->

@@ -25,7 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import org.koin.compose.viewmodel.koinViewModel
 import com.littlebridge.enrollplus.feature.reportcard.presentation.TeacherReportDraftEditorViewModel
 import com.littlebridge.enrollplus.ui.v2.components.VButton
 import com.littlebridge.enrollplus.ui.v2.components.VButtonSize
@@ -44,7 +44,7 @@ fun TeacherReportDraftEditorScreen(
     draftId: String,
     onBack: () -> Unit,
     onSaved: () -> Unit,
-    viewModel: TeacherReportDraftEditorViewModel = viewModel(),
+    viewModel: TeacherReportDraftEditorViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
     val c = VTheme.colors

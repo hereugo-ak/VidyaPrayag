@@ -91,6 +91,8 @@ import com.littlebridge.enrollplus.feature.pews.core.pewsModuleRouting
 import com.littlebridge.enrollplus.feature.pews.core.registerPewsModules
 import com.littlebridge.enrollplus.feature.reportcard.core.registerReportCardModules
 import com.littlebridge.enrollplus.feature.reportcard.core.reportCardRouting
+import com.littlebridge.enrollplus.feature.tutor.core.registerTutorModules
+import com.littlebridge.enrollplus.feature.tutor.core.tutorRouting
 import com.littlebridge.enrollplus.feature.pews.pewsRouting
 import com.littlebridge.enrollplus.feature.school.adminDashboardRouting
 import com.littlebridge.enrollplus.feature.school.adminDashboardOverviewRouting
@@ -413,6 +415,12 @@ fun Application.module() {
         //   Routes: /api/v1/report-card/{generate,review-queue,drafts,approve,publish,published,learn/*}
         registerReportCardModules()   // Register all 5 modules with ReportCardModuleRegistry
         reportCardRouting()           // Mount module routes under JWT auth
+
+        // AI Tutor 2.0 (AI_TUTOR_2.0_AGENTIC_REDESIGN.md)
+        //   5-tier agentic learning agent: Sense → Triage → Agent → Act → Learn
+        //   Routes: /api/v1/tutor/{doubt,practice,plan,learner-bundle,teacher-heatmap,…}
+        registerTutorModules()        // Register all Tutor modules with TutorModuleRegistry
+        tutorRouting()                // Mount module routes under JWT auth
 
         // Alumni Management (ALUMNI_MANAGEMENT_SPEC.md)
         //   /api/v1/school/alumni/*  — admin endpoints (school context)

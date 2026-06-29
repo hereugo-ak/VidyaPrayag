@@ -31,7 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import org.koin.compose.viewmodel.koinViewModel
 import com.littlebridge.enrollplus.feature.reportcard.domain.model.ReportCardModels
 import com.littlebridge.enrollplus.feature.reportcard.presentation.AdminReportEffectivenessViewModel
 import com.littlebridge.enrollplus.ui.v2.components.VBadge
@@ -51,7 +51,7 @@ import com.littlebridge.enrollplus.ui.v2.theme.colored
 @Composable
 fun AdminReportingEffectivenessScreen(
     onBack: () -> Unit,
-    viewModel: AdminReportEffectivenessViewModel = viewModel(),
+    viewModel: AdminReportEffectivenessViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
     val c = VTheme.colors

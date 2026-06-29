@@ -27,7 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import org.koin.compose.viewmodel.koinViewModel
 import com.littlebridge.enrollplus.feature.reportcard.domain.model.ReportCardModels
 import com.littlebridge.enrollplus.feature.reportcard.presentation.TeacherReportReviewViewModel
 import com.littlebridge.enrollplus.ui.v2.components.VBadge
@@ -51,7 +51,7 @@ fun TeacherReportReviewQueueScreen(
     term: String,
     onBack: () -> Unit,
     onEditDraft: (String) -> Unit,
-    viewModel: TeacherReportReviewViewModel = viewModel(),
+    viewModel: TeacherReportReviewViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
     val c = VTheme.colors

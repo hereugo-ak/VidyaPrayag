@@ -31,7 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import org.koin.compose.viewmodel.koinViewModel
 import com.littlebridge.enrollplus.feature.reportcard.domain.model.ReportCardModels
 import com.littlebridge.enrollplus.feature.reportcard.presentation.AdminReportPublishViewModel
 import com.littlebridge.enrollplus.ui.v2.components.VButton
@@ -50,7 +50,7 @@ import com.littlebridge.enrollplus.ui.v2.theme.colored
 @Composable
 fun AdminReportPublishScreen(
     onBack: () -> Unit,
-    viewModel: AdminReportPublishViewModel = viewModel(),
+    viewModel: AdminReportPublishViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
     val c = VTheme.colors

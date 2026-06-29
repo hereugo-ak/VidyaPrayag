@@ -6,7 +6,7 @@ package com.littlebridge.enrollplus.feature.pews.core
  * Caught by the global StatusPages handler and mapped to HTTP 503 with
  * `{"pews":"disabled","module":"<name>"}`.
  */
-class PewsDisabledException(
+open class PewsDisabledException(
     val moduleName: String,
 ) : RuntimeException("PEWS module '$moduleName' is disabled by kill switch")
 
