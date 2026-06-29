@@ -787,6 +787,7 @@ private fun Route.assessmentPublishUnpublish() {
         val examName = row[AssessmentsTable.name]
         val subject = row[AssessmentsTable.subject]
         val className = asg?.className ?: row[AssessmentsTable.className]
+        val section = asg?.section ?: "A"
         val parents = NotifyRecipients.parentsOfClass(ctx.schoolId, className)
         if (parents.isNotEmpty()) {
             Notify.toUsers(
@@ -800,6 +801,16 @@ private fun Route.assessmentPublishUnpublish() {
                 refType = "assessment",
                 refId = assessmentId.toString(),
             )
+        }
+
+        // AI Report Card: mark existing drafts for this class as stale so
+        // the next generation cycle picks up the new marks. Best-effort.
+        runCatching {
+            val assemblyService = com.littlebridge.enrollplus.feature.reportcard.assemble.ReportAssemblyService()
+            val currentTerm = com.littlebridge.enrollplus.feature.reportcard.core.ReportCardConfig.currentTerm
+            if (currentTerm != null) {
+                assemblyService.markDraftsStaleOnMarksChange(ctx.schoolId, className, section, currentTerm)
+            }
         }
         call.ok(
             GbPublishResultDto(

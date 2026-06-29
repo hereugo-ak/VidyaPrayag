@@ -389,6 +389,17 @@ val commonModule = module {
         com.littlebridge.enrollplus.feature.pews.data.repository.PewsRepositoryImpl(get())
     }
 
+    // AI Report Card 2.0 — cross-role (teacher / admin / parent)
+    single {
+        com.littlebridge.enrollplus.feature.reportcard.data.remote.ReportCardApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single<com.littlebridge.enrollplus.feature.reportcard.domain.repository.ReportCardRepository> {
+        com.littlebridge.enrollplus.feature.reportcard.data.repository.ReportCardRepositoryImpl(get())
+    }
+
     // Alumni Management (ALUMNI_MANAGEMENT_SPEC.md)
     single {
         com.littlebridge.enrollplus.feature.alumni.data.remote.AlumniApi(
@@ -524,6 +535,13 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.alumni.presentation.AlumniViewModel(get(), get()) }
     // Transport Tracking (TRANSPORT_TRACKING_SPEC.md)
     factory { com.littlebridge.enrollplus.feature.transport.presentation.TransportViewModel(get(), get()) }
+
+    // AI Report Card 2.0 — cross-role view models
+    factory { com.littlebridge.enrollplus.feature.reportcard.presentation.TeacherReportReviewViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.reportcard.presentation.TeacherReportDraftEditorViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.reportcard.presentation.AdminReportPublishViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.reportcard.presentation.AdminReportEffectivenessViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.reportcard.presentation.ParentReportViewModel(get(), get()) }
 }
 
 fun initKoin(

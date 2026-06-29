@@ -2508,3 +2508,146 @@ object PewsEffectivenessPriorsTable : UUIDTable("pews_effectiveness_priors", "id
         uniqueIndex("ux_pews_priors", schoolId, causeFamily, actionType)
     }
 }
+
+// =====================================================================
+// AI Report Card 2.0 (AI_REPORT_CARD_2.0_AGENTIC_REDESIGN.md)
+//   5 new tables for the 5-tier agentic report card system.
+//   Applied by docs/db/migration_062_report_card.sql (must run before deploy;
+//   AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates boot on it).
+// =====================================================================
+
+/**
+ * Per-student AI-generated report card draft. One row per
+ * (school, student, term, academic_year). Status state machine:
+ * draft → flagged_for_review → approved → published → archived.
+ */
+object ReportCardDraftsTable : UUIDTable("report_card_drafts", "id") {
+    val schoolId           = uuid("school_id")
+    val studentId          = uuid("student_id")
+    val classId            = uuid("class_id").nullable()
+    val className          = text("class_name")
+    val section            = varchar("section", 8).default("A")
+    val term               = varchar("term", 16)
+    val academicYearId     = uuid("academic_year_id").nullable()
+    val factBundle         = text("fact_bundle")
+    val factHash           = varchar("fact_hash", 64)
+    val aiDraft            = text("ai_draft").nullable()
+    val classContext       = text("class_context").nullable()
+    val aiProviderUsed     = varchar("ai_provider_used", 32).nullable()
+    val aiModelUsed        = varchar("ai_model_used", 96).nullable()
+    val tokensUsed         = integer("tokens_used").default(0)
+    val templateVersion    = integer("template_version").default(1)
+    val language           = varchar("language", 8).default("hi")
+    val status             = varchar("status", 24).default("draft")
+    val groundingFlags     = text("grounding_flags").nullable()
+    val editedBy           = uuid("edited_by").nullable()
+    val editedAt           = timestamp("edited_at").nullable()
+    val approvedBy         = uuid("approved_by").nullable()
+    val approvedAt         = timestamp("approved_at").nullable()
+    val publishedBy        = uuid("published_by").nullable()
+    val publishedAt        = timestamp("published_at").nullable()
+    val createdAt          = timestamp("created_at")
+    val updatedAt          = timestamp("updated_at")
+    init {
+        index("idx_rcd_school_class_term", false, schoolId, classId, term, academicYearId)
+        index("idx_rcd_status", false, schoolId, status)
+        index("idx_rcd_student", false, studentId, academicYearId)
+        uniqueIndex("ux_rcd_student_term_year", schoolId, studentId, term, academicYearId)
+    }
+}
+
+/**
+ * Tier 4 flywheel: tracks how effective focus-area recommendations were.
+ * One row per (school, focus_area, term, academic_year).
+ */
+object ReportFocusEffectivenessTable : UUIDTable("report_focus_effectiveness", "id") {
+    val schoolId           = uuid("school_id")
+    val focusArea          = varchar("focus_area", 64)
+    val term               = varchar("term", 16)
+    val academicYearId     = uuid("academic_year_id").nullable()
+    val studentsTargeted   = integer("students_targeted").default(0)
+    val studentsImproved   = integer("students_improved").default(0)
+    val avgDelta           = double("avg_delta").default(0.0)
+    val effectivenessScore = double("effectiveness_score").default(0.0)
+    val sampleSize         = integer("sample_size").default(0)
+    val confidence         = varchar("confidence", 16).default("low")
+    val metadata           = text("metadata").nullable()
+    val createdAt          = timestamp("created_at")
+    val updatedAt          = timestamp("updated_at")
+    init {
+        uniqueIndex("ux_rfe_school_focus_term", schoolId, focusArea, term, academicYearId)
+    }
+}
+
+/**
+ * NEP 2020 360-degree holistic assessment. Graceful when empty —
+ * Tier-0 treats absence as "no holistic data" (no crash).
+ */
+object HolisticAssessmentsTable : UUIDTable("holistic_assessments", "id") {
+    val schoolId           = uuid("school_id")
+    val studentId          = uuid("student_id")
+    val classId            = uuid("class_id").nullable()
+    val term               = varchar("term", 16)
+    val academicYearId     = uuid("academic_year_id").nullable()
+    val assessorType       = varchar("assessor_type", 16)  // self|peer|teacher|parent
+    val assessorId         = uuid("assessor_id").nullable()
+    val criticalThinking   = integer("critical_thinking").nullable()
+    val creativity          = integer("creativity").nullable()
+    val communication      = integer("communication").nullable()
+    val collaboration      = integer("collaboration").nullable()
+    val selfAwareness      = integer("self_awareness").nullable()
+    val socialEmotional    = integer("social_emotional").nullable()
+    val remarks            = text("remarks").nullable()
+    val createdAt          = timestamp("created_at")
+    val updatedAt          = timestamp("updated_at")
+    init {
+        index("idx_ha_student_term", false, schoolId, studentId, term, academicYearId)
+    }
+}
+
+/**
+ * NEP co-scholastic records: arts, sports, life skills, values.
+ * Graceful when empty — Tier-0 treats absence as "no co-scholastic data".
+ */
+object CoScholasticRecordsTable : UUIDTable("co_scholastic_records", "id") {
+    val schoolId           = uuid("school_id")
+    val studentId          = uuid("student_id")
+    val classId            = uuid("class_id").nullable()
+    val term               = varchar("term", 16)
+    val academicYearId     = uuid("academic_year_id").nullable()
+    val category           = varchar("category", 32)  // arts|sports|life_skills|values|work_education
+    val activityName       = text("activity_name")
+    val grade              = varchar("grade", 4).nullable()
+    val descriptor         = text("descriptor").nullable()
+    val teacherRemarks     = text("teacher_remarks").nullable()
+    val recordedBy         = uuid("recorded_by").nullable()
+    val createdAt          = timestamp("created_at")
+    val updatedAt          = timestamp("updated_at")
+    init {
+        index("idx_csr_student_term", false, schoolId, studentId, term, academicYearId)
+    }
+}
+
+/**
+ * Board-specific report card layout templates (CBSE, ICSE, IB, State, NEP HPC).
+ * Used by Tier-0 for grading scale and by Tier-3 for layout.
+ */
+object ReportCardTemplatesTable : UUIDTable("report_card_templates", "id") {
+    val schoolId               = uuid("school_id").nullable()  // null = global template
+    val board                  = varchar("board", 32)
+    val gradeRange             = varchar("grade_range", 16)
+    val templateName           = text("template_name")
+    val version                = integer("version").default(1)
+    val gradingScale           = text("grading_scale")
+    val layout                 = text("layout").nullable()
+    val includesHolistic       = bool("includes_holistic").default(true)
+    val includesCoScholastic   = bool("includes_co_scholastic").default(true)
+    val includesAttendance     = bool("includes_attendance").default(true)
+    val includesAiNarrative    = bool("includes_ai_narrative").default(true)
+    val isActive               = bool("is_active").default(true)
+    val createdAt              = timestamp("created_at")
+    val updatedAt              = timestamp("updated_at")
+    init {
+        index("idx_rct_board_grade", false, board, gradeRange, isActive)
+    }
+}

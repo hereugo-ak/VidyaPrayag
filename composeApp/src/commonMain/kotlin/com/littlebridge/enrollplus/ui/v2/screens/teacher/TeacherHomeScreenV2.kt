@@ -71,6 +71,7 @@ fun TeacherHomeScreenV2(
     onOpenHealthAlerts: () -> Unit = {},
     onOpenTransportAttendance: () -> Unit = {},
     onOpenPews: () -> Unit = {},
+    onOpenReportReview: () -> Unit = {},
     modifier: Modifier = Modifier,
     todayViewModel: TeacherTodayViewModel = koinViewModel(),
     checkInViewModel: TeacherCheckInViewModel = koinViewModel(),
@@ -126,6 +127,13 @@ fun TeacherHomeScreenV2(
                 subtitle = "Students in your classes the early-warning system has flagged",
                 icon = VIcons.AlertTriangle,
                 onClick = onOpenPews,
+            )
+
+            VActionCard(
+                title = "Report Card Review",
+                subtitle = "Review and approve AI-generated report card drafts for your classes",
+                icon = VIcons.FileText,
+                onClick = onOpenReportReview,
             )
 
             VActionCard(

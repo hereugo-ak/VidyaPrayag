@@ -26,6 +26,7 @@ import com.littlebridge.enrollplus.db.MessagesTable
 import com.littlebridge.enrollplus.db.MessageThreadsTable
 import com.littlebridge.enrollplus.db.PewsInterventionsTable
 import com.littlebridge.enrollplus.db.PewsRiskSnapshotsTable
+import com.littlebridge.enrollplus.db.ReportFocusEffectivenessTable
 import com.littlebridge.enrollplus.db.StudentsTable
 import com.littlebridge.enrollplus.feature.ai.AiService
 import kotlinx.serialization.json.Json
@@ -518,10 +519,77 @@ object CaseworkerTools {
     }
 
     // ──────────────────────────────────────────────────────────────────────
+    // Tool 7: get_report_card_focus_priors
+    // ──────────────────────────────────────────────────────────────────────
+
+    object GetReportCardFocusPriors : AiService.AgentTool {
+        override val name = "get_report_card_focus_priors"
+        override val description = """
+            Get effectiveness data from AI Report Card focus-area recommendations.
+            Returns which focus areas (attendance, academic_consistency, foundational_skills,
+            engagement) have historically led to student improvement when targeted.
+            Use this to prioritise interventions on areas that have proven effective
+            for this school.
+        """.trimIndent()
+
+        override val parametersSchema = buildJsonObject {
+            put("type", "object")
+            put("properties", buildJsonObject {
+                put("focus_area", buildJsonObject {
+                    put("type", "string")
+                    put("description", "Optional: filter to a specific focus area. If omitted, returns all.")
+                })
+            })
+            put("required", JsonArray(emptyList()))
+        }
+
+        override suspend fun execute(schoolId: UUID, arguments: String): String {
+            val args = parseArgs(arguments)
+            val focusAreaFilter = (args["focus_area"] as? JsonPrimitive)?.content
+
+            val rows = dbQuery {
+                ReportFocusEffectivenessTable.selectAll().where {
+                    val base = ReportFocusEffectivenessTable.schoolId eq schoolId
+                    if (focusAreaFilter != null) {
+                        base and (ReportFocusEffectivenessTable.focusArea eq focusAreaFilter)
+                    } else {
+                        base
+                    }
+                }.orderBy(ReportFocusEffectivenessTable.effectivenessScore, SortOrder.DESC).toList()
+            }
+
+            val arr = buildJsonArray {
+                for (r in rows) {
+                    add(buildJsonObject {
+                        put("focus_area", r[ReportFocusEffectivenessTable.focusArea])
+                        put("term", r[ReportFocusEffectivenessTable.term])
+                        put("students_targeted", r[ReportFocusEffectivenessTable.studentsTargeted])
+                        put("students_improved", r[ReportFocusEffectivenessTable.studentsImproved])
+                        put("effectiveness_score", String.format("%.2f", r[ReportFocusEffectivenessTable.effectivenessScore]))
+                        put("avg_delta", String.format("%.1f", r[ReportFocusEffectivenessTable.avgDelta]))
+                        put("confidence", r[ReportFocusEffectivenessTable.confidence])
+                    })
+                }
+            }
+
+            return buildJsonObject {
+                put("focus_priors", arr)
+                put("summary", buildJsonObject {
+                    put("total_focus_areas", rows.size)
+                    put("best_area", rows.firstOrNull()?.get(ReportFocusEffectivenessTable.focusArea) ?: "none")
+                    put("best_score", rows.firstOrNull()?.let {
+                        String.format("%.2f", it[ReportFocusEffectivenessTable.effectivenessScore])
+                    } ?: "N/A")
+                })
+            }.toString()
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────────────────────────────
 
-    /** All 6 tools as a map keyed by tool name, ready for AiService.runAgent(). */
+    /** All 7 tools as a map keyed by tool name, ready for AiService.runAgent(). */
     fun allTools(): Map<String, AiService.AgentTool> = mapOf(
         GetStudentHistory.name to GetStudentHistory,
         GetPastInterventions.name to GetPastInterventions,
@@ -529,6 +597,7 @@ object CaseworkerTools {
         GetCalendarContext.name to GetCalendarContext,
         GetParentResponsiveness.name to GetParentResponsiveness,
         GetHomeworkDetail.name to GetHomeworkDetail,
+        GetReportCardFocusPriors.name to GetReportCardFocusPriors,
     )
 
     private fun parseArgs(raw: String): Map<String, kotlinx.serialization.json.JsonElement> {

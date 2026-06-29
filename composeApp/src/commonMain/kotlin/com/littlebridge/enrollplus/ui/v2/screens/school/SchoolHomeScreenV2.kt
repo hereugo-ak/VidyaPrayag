@@ -114,6 +114,8 @@ fun SchoolHomeScreenV2(
     onOpenAnalytics: () -> Unit = {},
     onOpenPews: () -> Unit = {},
     onOpenTransport: () -> Unit = {},
+    onOpenReportPublish: () -> Unit = {},
+    onOpenReportEffectiveness: () -> Unit = {},
     onExit: () -> Unit = {},
     viewModel: SchoolDashboardViewModel = koinViewModel(),
     notificationsViewModel: NotificationsViewModel = koinViewModel(),
@@ -167,6 +169,8 @@ fun SchoolHomeScreenV2(
         onOpenAnalytics = onOpenAnalytics,
         onOpenPews = onOpenPews,
         onOpenTransport = onOpenTransport,
+        onOpenReportPublish = onOpenReportPublish,
+        onOpenReportEffectiveness = onOpenReportEffectiveness,
         onExit = onExit,
     )
     VConfirmDialog(
@@ -199,6 +203,8 @@ private fun SchoolDashboardContent(
     onOpenAnalytics: () -> Unit,
     onOpenPews: () -> Unit,
     onOpenTransport: () -> Unit,
+    onOpenReportPublish: () -> Unit,
+    onOpenReportEffectiveness: () -> Unit,
     onExit: () -> Unit,
 ) {
     // Pull-to-refresh: swipe down anywhere on the dashboard to re-sync the
@@ -345,6 +351,8 @@ private fun SchoolDashboardContent(
                 // 14. Entry cards
                 AnalyticsEntryCard(onClick = onOpenAnalytics)
                 PewsEntryCard(onClick = onOpenPews)
+                ReportCardPublishEntryCard(onClick = onOpenReportPublish)
+                ReportCardEffectivenessEntryCard(onClick = onOpenReportEffectiveness)
             }
         }
         }
@@ -1636,6 +1644,30 @@ private fun PewsEntryCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
         description = "Identify students needing attention early",
         icon = VIcons.AlertCircle,
         button = "Open Monitor",
+        onClick = onClick,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun ReportCardPublishEntryCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    FeatureCard(
+        title = "Report Card Publishing",
+        description = "Review oversight & publish approved AI report card drafts",
+        icon = VIcons.FileText,
+        button = "Open Publishing",
+        onClick = onClick,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun ReportCardEffectivenessEntryCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    FeatureCard(
+        title = "Report Card Effectiveness",
+        description = "Run the learning flywheel & view effectiveness priors",
+        icon = VIcons.TrendingUp,
+        button = "Open Effectiveness",
         onClick = onClick,
         modifier = modifier,
     )

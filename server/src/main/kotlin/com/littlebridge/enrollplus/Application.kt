@@ -89,6 +89,8 @@ import com.littlebridge.enrollplus.feature.pews.PewsDailyJob
 import com.littlebridge.enrollplus.feature.pews.core.KillSwitchConfig
 import com.littlebridge.enrollplus.feature.pews.core.pewsModuleRouting
 import com.littlebridge.enrollplus.feature.pews.core.registerPewsModules
+import com.littlebridge.enrollplus.feature.reportcard.core.registerReportCardModules
+import com.littlebridge.enrollplus.feature.reportcard.core.reportCardRouting
 import com.littlebridge.enrollplus.feature.pews.pewsRouting
 import com.littlebridge.enrollplus.feature.school.adminDashboardRouting
 import com.littlebridge.enrollplus.feature.school.adminDashboardOverviewRouting
@@ -187,6 +189,14 @@ fun main() {
 
     // Start the PEWS daily job (Sense → Reason → Act pipeline; hourly tick).
     PewsDailyJob.start(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default))
+
+    // AI Report Card 2.0 — start async batch worker + term-close scheduler.
+    com.littlebridge.enrollplus.feature.reportcard.queue.ReportCardJob.startWorker(
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+    )
+    com.littlebridge.enrollplus.feature.reportcard.queue.ReportCardJob.startScheduler(
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+    )
 
     // PEWS 2.0 — load kill-switch flags from DB and start hot-reload polling.
     kotlinx.coroutines.runBlocking { runCatching { KillSwitchConfig.reload() } }
@@ -397,6 +407,12 @@ fun Application.module() {
         //   /api/v1/teacher/health/alerts                              — teacher allergy alerts
         //   /api/v1/parent/health/{childId}                            — parent view
         healthRouting()
+
+        // AI Report Card 2.0 (AI_REPORT_CARD_2.0_AGENTIC_REDESIGN.md)
+        //   5-tier agentic report card: Rollup → Triage → Narrator → Assembly → Learn
+        //   Routes: /api/v1/report-card/{generate,review-queue,drafts,approve,publish,published,learn/*}
+        registerReportCardModules()   // Register all 5 modules with ReportCardModuleRegistry
+        reportCardRouting()           // Mount module routes under JWT auth
 
         // Alumni Management (ALUMNI_MANAGEMENT_SPEC.md)
         //   /api/v1/school/alumni/*  — admin endpoints (school context)

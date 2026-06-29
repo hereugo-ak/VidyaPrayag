@@ -243,7 +243,15 @@ object DatabaseFactory {
         PewsConfigTable,
         PewsFeatureFlagsTable,
         PewsCaseFilesTable,
-        PewsEffectivenessPriorsTable
+        PewsEffectivenessPriorsTable,
+        // AI Report Card 2.0 (AI_REPORT_CARD_2.0_AGENTIC_REDESIGN.md)
+        // Applied by docs/db/migration_062_report_card.sql (must run before deploy;
+        // AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates boot on it).
+        ReportCardDraftsTable,
+        ReportFocusEffectivenessTable,
+        HolisticAssessmentsTable,
+        CoScholasticRecordsTable,
+        ReportCardTemplatesTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

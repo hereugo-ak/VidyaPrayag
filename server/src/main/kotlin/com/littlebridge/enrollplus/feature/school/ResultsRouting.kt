@@ -405,6 +405,22 @@ fun Route.resultsRouting() {
                     }
                 }
 
+                // AI Report Card: mark existing drafts for this class as stale so
+                // the next generation cycle picks up the new marks. Best-effort,
+                // never fails the publish. The section is extracted from the
+                // student code pattern if available, otherwise "A" is assumed.
+                runCatching {
+                    val assemblyService = com.littlebridge.enrollplus.feature.reportcard.assemble.ReportAssemblyService()
+                    val currentTerm = com.littlebridge.enrollplus.feature.reportcard.core.ReportCardConfig.currentTerm
+                    if (currentTerm != null) {
+                        // Extract section from class name if embedded (e.g. "Class 8-A")
+                        val parts = req.className.split("-")
+                        val className = parts.firstOrNull() ?: req.className
+                        val section = parts.getOrNull(1) ?: "A"
+                        assemblyService.markDraftsStaleOnMarksChange(schoolId, className, section, currentTerm)
+                    }
+                }
+
                 call.created(PublishResultsResponse(upserted), message = "Results published")
             }
         }

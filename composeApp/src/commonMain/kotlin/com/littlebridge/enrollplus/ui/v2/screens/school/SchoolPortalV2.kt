@@ -65,6 +65,8 @@ private enum class SchoolOverlay {
     AlumniDetail,
     AlumniCampaign,
     TransportManagement,
+    ReportPublish,
+    ReportEffectiveness,
 }
 
 /**
@@ -109,6 +111,8 @@ fun SchoolPortalV2(
             is DeepLinkTarget.SchoolScreen -> {
                 if (deepLinkTarget.screen == "transport") {
                     overlay = SchoolOverlay.TransportManagement
+                } else if (deepLinkTarget.screen == "report-card" || deepLinkTarget.screen == "report-review") {
+                    overlay = SchoolOverlay.ReportPublish
                 } else {
                     tab = deepLinkTarget.screen
                 }
@@ -361,6 +365,20 @@ fun SchoolPortalV2(
                 )
                 return
             }
+            SchoolOverlay.ReportPublish -> {
+                AdminReportPublishScreen(
+                    onBack = { overlay = SchoolOverlay.None },
+                    modifier = modifier,
+                )
+                return
+            }
+            SchoolOverlay.ReportEffectiveness -> {
+                AdminReportingEffectivenessScreen(
+                    onBack = { overlay = SchoolOverlay.None },
+                    modifier = modifier,
+                )
+                return
+            }
             SchoolOverlay.None -> Unit
         }
 
@@ -390,6 +408,8 @@ fun SchoolPortalV2(
                         onOpenAnalytics = { overlay = SchoolOverlay.AnalyticsDashboard },
                         onOpenPews = { overlay = SchoolOverlay.PewsCohort },
                         onOpenTransport = { overlay = SchoolOverlay.TransportManagement },
+                        onOpenReportPublish = { overlay = SchoolOverlay.ReportPublish },
+                        onOpenReportEffectiveness = { overlay = SchoolOverlay.ReportEffectiveness },
                         // §7 finding K — tapping the avatar opens the Settings tab (where logout
                         // lives), instead of logging the admin out outright.
                         onExit = { tab = "settings" },
