@@ -17,6 +17,8 @@ import com.littlebridge.enrollplus.core.prefs.PreferenceRepository
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsCohortDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsConfigDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsEffectivenessDto
+import com.littlebridge.enrollplus.feature.pews.domain.model.PewsEffectivenessTrendDto
+import com.littlebridge.enrollplus.feature.pews.domain.model.PewsJobStatusDto
 import com.littlebridge.enrollplus.feature.pews.domain.repository.PewsRepository
 import com.littlebridge.enrollplus.util.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,8 +33,10 @@ data class PewsCohortState(
     val cohort: PewsCohortDto? = null,
     // filter band: watch | medium | high
     val minLevel: String = "watch",
-    // manual recompute
+    // manual recompute (async)
     val isRunning: Boolean = false,
+    val jobId: String? = null,
+    val jobStatus: String? = null,   // queued|processing|completed|failed
     val infoMessage: String? = null,
     // config sheet
     val config: PewsConfigDto? = null,
@@ -40,6 +44,8 @@ data class PewsCohortState(
     val configError: String? = null,
     // effectiveness rollup (the LEARN loop) — admin parity with the web portal
     val effectiveness: PewsEffectivenessDto? = null,
+    // cohort trend (risk distribution over time)
+    val trend: PewsEffectivenessTrendDto? = null,
 ) {
     val isEmpty: Boolean get() = !isLoading && error == null && (cohort?.students?.isEmpty() ?: true)
 }
@@ -78,6 +84,7 @@ class PewsCohortViewModel(
             // same effectiveness + config surface as the web portal.
             loadEffectiveness()
             loadConfig()
+            loadTrend()
         }
     }
 
@@ -93,6 +100,18 @@ class PewsCohortViewModel(
         }
     }
 
+    /** Cohort trend (risk distribution over time). Non-fatal. */
+    fun loadTrend() {
+        viewModelScope.launch {
+            val t = token() ?: return@launch
+            when (val r = repository.getTrend(t, days = 30)) {
+                is NetworkResult.Success ->
+                    _state.value = _state.value.copy(trend = r.data.data)
+                else -> { /* non-fatal */ }
+            }
+        }
+    }
+
     /** Change the minimum risk band shown and reload. */
     fun setMinLevel(level: String) {
         if (level == _state.value.minLevel) return
@@ -100,20 +119,21 @@ class PewsCohortViewModel(
         load()
     }
 
-    /** Manually recompute the cohort now (POST .../run), then reload. */
+    /** Manually recompute the cohort now (POST .../run), then poll for job status. */
     fun runNow() {
         viewModelScope.launch {
             val t = token() ?: run {
                 _state.value = _state.value.copy(error = "You are not signed in. Please log in again.")
                 return@launch
             }
-            _state.value = _state.value.copy(isRunning = true, infoMessage = null)
+            _state.value = _state.value.copy(isRunning = true, infoMessage = null, jobId = null, jobStatus = "queued")
             when (val r = repository.runNow(t)) {
                 is NetworkResult.Success -> {
                     val n = r.data.data?.atRisk ?: 0
                     _state.value = _state.value.copy(isRunning = false, infoMessage = "Recompute complete — $n students need attention")
                     load()
                     loadEffectiveness()
+                    loadTrend()
                 }
                 is NetworkResult.Error -> {
                     AppLogger.e("PewsCohortVM", "runNow error: ${r.message}")
@@ -121,6 +141,30 @@ class PewsCohortViewModel(
                 }
                 is NetworkResult.ConnectionError ->
                     _state.value = _state.value.copy(isRunning = false, error = "Connection error. Check your internet.")
+            }
+        }
+    }
+
+    /** Poll the status of an async PEWS job. */
+    fun pollJobStatus(jobId: String) {
+        viewModelScope.launch {
+            val t = token() ?: return@launch
+            when (val r = repository.getJobStatus(t, jobId)) {
+                is NetworkResult.Success -> {
+                    val status = r.data.data
+                    if (status != null) {
+                        _state.value = _state.value.copy(jobStatus = status.status)
+                        if (status.status == "completed" || status.status == "failed") {
+                            _state.value = _state.value.copy(isRunning = false, jobId = null)
+                            if (status.status == "completed") {
+                                load()
+                                loadEffectiveness()
+                                loadTrend()
+                            }
+                        }
+                    }
+                }
+                else -> { /* non-fatal polling */ }
             }
         }
     }

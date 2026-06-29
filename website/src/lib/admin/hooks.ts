@@ -131,4 +131,7 @@ export const usePewsInterventions = (status?: PewsInterventionStatus) =>
 export const usePewsEffectiveness = () =>
   useSWR("pews/effectiveness", adminApi.pewsEffectiveness, NEAR_LIVE);
 
+export const usePewsTrend = (days?: number) =>
+  useSWR(["pews/trend", days ?? ""], () => adminApi.pewsTrend(days), NEAR_LIVE);
+
 export const usePewsConfig = () => useSWR("pews/config", adminApi.pewsConfig, SLOW);

@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import {
   usePewsCohort,
   usePewsEffectiveness,
+  usePewsTrend,
   usePewsConfig,
 } from "@/lib/admin/hooks";
 import { adminApi } from "@/lib/admin/client";
-import type { PewsRiskLevel, PewsConfig } from "@/lib/admin/types";
+import type { PewsRiskLevel, PewsConfig, PewsJobStatus } from "@/lib/admin/types";
 import {
   Avatar,
   Badge,
@@ -42,22 +43,62 @@ export function PewsWorkspace() {
   const minLevel: PewsRiskLevel = filter === "high" ? "high" : filter === "medium" ? "medium" : "watch";
   const { data: cohort, isLoading, mutate } = usePewsCohort(minLevel);
   const { data: effectiveness, mutate: mutateEff } = usePewsEffectiveness();
+  const { data: trend } = usePewsTrend(30);
   const [selected, setSelected] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [runMsg, setRunMsg] = useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [jobStatus, setJobStatus] = useState<PewsJobStatus | null>(null);
+
+  // Poll job status when we have an active job
+  const pollJob = useCallback(async () => {
+    if (!jobId) return;
+    try {
+      const status = await adminApi.pewsJobStatus(jobId);
+      setJobStatus(status);
+      if (status.status === "completed" || status.status === "failed") {
+        setRunning(false);
+        setJobId(null);
+        if (status.status === "completed") {
+          setRunMsg("Recompute complete. Data refreshed.");
+          await Promise.all([mutate(), mutateEff()]);
+        } else {
+          setRunMsg("Recompute failed. Please try again.");
+        }
+      }
+    } catch {
+      // non-fatal polling error
+    }
+  }, [jobId, mutate, mutateEff]);
+
+  useEffect(() => {
+    if (!jobId) return;
+    const interval = setInterval(pollJob, 3000);
+    return () => clearInterval(interval);
+  }, [jobId, pollJob]);
 
   const students = cohort?.students ?? [];
 
   async function recompute() {
     setRunning(true);
     setRunMsg(null);
+    setJobStatus(null);
     try {
-      const res = await adminApi.pewsRun();
-      setRunMsg(`Recompute complete — ${res.at_risk} student${res.at_risk === 1 ? "" : "s"} at risk.`);
-      await Promise.all([mutate(), mutateEff()]);
+      const res = await adminApi.pewsRun() as unknown as Record<string, unknown>;
+      // If the server returns a job_id, we're in async mode — poll for status
+      if (res.job_id) {
+        const id = res.job_id as string;
+        setJobId(id);
+        setRunMsg("Recompute queued — polling for status…");
+      } else {
+        // Legacy sync mode — result has at_risk directly
+        const atRisk = (res.at_risk as number) ?? 0;
+        setRunMsg(`Recompute complete — ${atRisk} student${atRisk === 1 ? "" : "s"} at risk.`);
+        setRunning(false);
+        await Promise.all([mutate(), mutateEff()]);
+      }
     } catch {
       setRunMsg("Recompute failed. Please try again.");
-    } finally {
       setRunning(false);
     }
   }
@@ -88,10 +129,27 @@ export function PewsWorkspace() {
           </div>
           <div className="mt-4 flex items-center gap-2 px-6">
             <AiStatusBadge enabled={cohort?.ai_enabled ?? false} />
+            {jobStatus && (
+              <span className={`text-[12px] font-semibold ${
+                jobStatus.status === "completed" ? "text-success" :
+                jobStatus.status === "failed" ? "text-danger" : "text-ink-3"
+              }`}>
+                {jobStatus.status === "queued" ? "Queued…" :
+                 jobStatus.status === "processing" ? "Running…" :
+                 jobStatus.status === "completed" ? "Complete" : "Failed"}
+              </span>
+            )}
             {runMsg && <span className="text-[12px] text-ink-3">{runMsg}</span>}
           </div>
         </Card>
       </FadeIn>
+
+      {/* Trend chart */}
+      {trend && trend.points.length > 1 && (
+        <FadeIn delay={0.03}>
+          <TrendCard points={trend.points} />
+        </FadeIn>
+      )}
 
       {/* Filter + cohort list */}
       <FadeIn delay={0.05}>
@@ -197,6 +255,44 @@ export function PewsWorkspace() {
         }}
       />
     </div>
+  );
+}
+
+function TrendCard({ points }: { points: import("@/lib/admin/types").PewsTrendPoint[] }) {
+  const maxTotal = Math.max(...points.map((p) => p.total), 1);
+  const recent = points.slice(-15);
+  return (
+    <Card className="pb-6">
+      <CardHeader
+        title="Risk trend"
+        subtitle="Cohort risk distribution over the last 30 days"
+      />
+      <div className="space-y-1.5 px-6 pt-4">
+        {recent.map((p) => (
+          <div key={p.run_date} className="flex items-center gap-2">
+            <span className="w-12 shrink-0 text-[11px] text-ink-3">{p.run_date.slice(5)}</span>
+            <div className="h-4 flex-1 overflow-hidden rounded-full bg-navy/[0.05]">
+              <div className="flex h-full">
+                <div className="bg-danger" style={{ width: `${(p.high / maxTotal) * 100}%` }} />
+                <div className="bg-warning" style={{ width: `${(p.medium / maxTotal) * 100}%` }} />
+                <div className="bg-success" style={{ width: `${(p.watch / maxTotal) * 100}%` }} />
+              </div>
+            </div>
+          </div>
+        ))}
+        <div className="flex gap-3 pt-2">
+          <span className="flex items-center gap-1.5 text-[11px] text-ink-3">
+            <span className="h-2 w-2 rounded-sm bg-danger" /> High
+          </span>
+          <span className="flex items-center gap-1.5 text-[11px] text-ink-3">
+            <span className="h-2 w-2 rounded-sm bg-warning" /> Medium
+          </span>
+          <span className="flex items-center gap-1.5 text-[11px] text-ink-3">
+            <span className="h-2 w-2 rounded-sm bg-success" /> Watch
+          </span>
+        </div>
+      </div>
+    </Card>
   );
 }
 

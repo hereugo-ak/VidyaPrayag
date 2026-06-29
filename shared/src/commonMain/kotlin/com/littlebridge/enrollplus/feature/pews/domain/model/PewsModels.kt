@@ -96,6 +96,13 @@ data class PewsInterventionDto(
     val outcome: String? = null,        // improved | unchanged | worsened
     @SerialName("opened_at") val openedAt: String,
     @SerialName("resolved_at") val resolvedAt: String? = null,
+    // PEWS 2.0 — managed casework fields
+    @SerialName("escalation_level") val escalationLevel: Int = 0,
+    @SerialName("sla_days") val slaDays: Int? = null,
+    @SerialName("follow_up_date") val followUpDate: String? = null,
+    val urgency: String? = null,       // low | medium | high
+    @SerialName("cause_family") val causeFamily: String? = null,
+    @SerialName("plan_json") val planJson: String? = null,
 )
 
 /** Body for PATCH .../interventions/{id} — all fields optional (partial update). */
@@ -152,4 +159,33 @@ data class PewsParentActionDto(
 @Serializable
 data class PewsRunResultDto(
     @SerialName("at_risk") val atRisk: Int = 0,
+)
+
+/** Response of GET /api/v1/school/pews/run/{jobId} — async job status. */
+@Serializable
+data class PewsJobStatusDto(
+    @SerialName("job_id") val jobId: String,
+    val status: String,        // queued|processing|completed|failed
+    @SerialName("total_items") val totalItems: Int = 0,
+    @SerialName("completed_items") val completedItems: Int = 0,
+    val result: String? = null,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("completed_at") val completedAt: String? = null,
+)
+
+/** Daily risk distribution entry for the cohort trend. */
+@Serializable
+data class PewsTrendPointDto(
+    @SerialName("run_date") val runDate: String,
+    val total: Int,
+    val high: Int,
+    val medium: Int,
+    val watch: Int,
+)
+
+/** Response of GET /api/v1/school/pews/trend — cohort risk distribution over time + effectiveness. */
+@Serializable
+data class PewsEffectivenessTrendDto(
+    val points: List<PewsTrendPointDto> = emptyList(),
+    val effectiveness: PewsEffectivenessDto = PewsEffectivenessDto(),
 )

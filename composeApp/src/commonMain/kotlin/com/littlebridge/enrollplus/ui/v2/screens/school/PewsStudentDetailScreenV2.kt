@@ -52,6 +52,13 @@ import com.littlebridge.enrollplus.ui.v2.components.VButtonSize
 import com.littlebridge.enrollplus.ui.v2.components.VButtonVariant
 import com.littlebridge.enrollplus.ui.v2.components.VCard
 import com.littlebridge.enrollplus.ui.v2.components.VIcons
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import com.littlebridge.enrollplus.ui.v2.screens.VStateHost
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
@@ -275,11 +282,83 @@ private fun InterventionCard(
             Text(iv.actionType.replace('_', ' '), style = VTheme.type.bodyStrong.colored(c.ink), modifier = Modifier.weight(1f))
             VBadge(text = iv.status.replace('_', ' '), tone = statusTone)
         }
+
+        // Urgency + escalation indicators
+        Row(
+            Modifier.fillMaxWidth().padding(top = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            iv.urgency?.let { urg ->
+                val urgTone = when (urg) {
+                    "high" -> VBadgeTone.Danger
+                    "medium" -> VBadgeTone.Warning
+                    else -> VBadgeTone.Neutral
+                }
+                VBadge(text = urg.replaceFirstChar { it.uppercase() }, tone = urgTone)
+            }
+            if (iv.escalationLevel > 0) {
+                val escLabel = when (iv.escalationLevel) {
+                    2 -> "ESCALATED"
+                    else -> "REMINDED"
+                }
+                val escTone = if (iv.escalationLevel >= 2) VBadgeTone.Danger else VBadgeTone.Warning
+                VBadge(text = escLabel, tone = escTone)
+            }
+            iv.causeFamily?.let { cf ->
+                VBadge(text = cf, tone = VBadgeTone.Neutral)
+            }
+        }
+
+        // SLA countdown
+        iv.slaDays?.let { sla ->
+            Spacer(Modifier.height(6.dp))
+            val slaText = if (iv.followUpDate != null) {
+                "SLA: $sla days · follow-up ${iv.followUpDate}"
+            } else {
+                "SLA: $sla days"
+            }
+            Text(
+                slaText,
+                style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp),
+            )
+        }
+
         val notes = iv.notes
         if (!notes.isNullOrBlank()) {
             Spacer(Modifier.height(6.dp))
             Text(notes, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 17.sp))
         }
+
+        // Plan steps from plan_json
+        iv.planJson?.let { planJson ->
+            val steps = parsePlanSteps(planJson)
+            if (steps.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "PLAN",
+                    style = VTheme.type.label.colored(c.ink3).copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
+                )
+                Spacer(Modifier.height(4.dp))
+                steps.forEachIndexed { i, step ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            "${i + 1}.",
+                            style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 12.sp),
+                        )
+                        Text(
+                            step,
+                            style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 17.sp),
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+        }
+
         Spacer(Modifier.height(4.dp))
         Text("Opened ${iv.openedAt}", style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))
 
@@ -315,6 +394,25 @@ private fun InterventionCard(
             Text("Outcome: $outcome", style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp))
         }
     }
+}
+
+/** Parse plan_json to extract step descriptions. */
+private fun parsePlanSteps(planJson: String): List<String> {
+    return runCatching {
+        val json = Json { ignoreUnknownKeys = true }
+        val obj = json.parseToJsonElement(planJson)
+        val steps = obj.jsonObject["steps"]?.jsonArray
+            ?: obj.jsonObject["plan"]?.jsonArray
+            ?: return emptyList()
+        steps.mapNotNull { step ->
+            when (step) {
+                is JsonObject -> step["description"]?.jsonPrimitive?.contentOrNull
+                    ?: step["action"]?.jsonPrimitive?.contentOrNull
+                    ?: step["text"]?.jsonPrimitive?.contentOrNull
+                else -> step.jsonPrimitive.contentOrNull
+            }
+        }
+    }.getOrDefault(emptyList())
 }
 
 @Composable

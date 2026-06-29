@@ -52,6 +52,12 @@ import com.littlebridge.enrollplus.ui.v2.components.VButtonSize
 import com.littlebridge.enrollplus.ui.v2.components.VButtonVariant
 import com.littlebridge.enrollplus.ui.v2.components.VCard
 import com.littlebridge.enrollplus.ui.v2.components.VIcons
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import com.littlebridge.enrollplus.ui.v2.screens.VStateHost
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
@@ -184,10 +190,37 @@ private fun TeacherStudentCard(
             Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(c.cream).padding(10.dp)) {
                 val notes = iv.notes
                 Column {
-                    Text(iv.actionType.replace('_', ' '), style = VTheme.type.label.colored(c.ink).copy(fontWeight = FontWeight.SemiBold, fontSize = 12.sp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(iv.actionType.replace('_', ' '), style = VTheme.type.label.colored(c.ink).copy(fontWeight = FontWeight.SemiBold, fontSize = 12.sp), modifier = Modifier.weight(1f))
+                        // Escalation badge
+                        if (iv.escalationLevel > 0) {
+                            val escLabel = if (iv.escalationLevel >= 2) "ESCALATED" else "REMINDED"
+                            val escTone = if (iv.escalationLevel >= 2) VBadgeTone.Danger else VBadgeTone.Warning
+                            VBadge(text = escLabel, tone = escTone)
+                        }
+                    }
+                    // Urgency + SLA
+                    iv.urgency?.let { urg ->
+                        Spacer(Modifier.height(4.dp))
+                        val urgColor = when (urg) { "high" -> c.dangerInk; "medium" -> c.warningInk; else -> c.ink3 }
+                        Text("Urgency: ${urg}", style = VTheme.type.caption.colored(urgColor).copy(fontSize = 11.sp))
+                    }
+                    iv.slaDays?.let { sla ->
+                        Text("SLA: $sla days${iv.followUpDate?.let { " · follow-up $it" } ?: ""}", style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))
+                    }
                     if (!notes.isNullOrBlank()) {
                         Spacer(Modifier.height(4.dp))
                         Text(notes, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 17.sp))
+                    }
+                    // Plan steps
+                    iv.planJson?.let { planJson ->
+                        val steps = parseTeacherPlanSteps(planJson)
+                        if (steps.isNotEmpty()) {
+                            Spacer(Modifier.height(6.dp))
+                            steps.forEachIndexed { i, step ->
+                                Text("${i + 1}. $step", style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp, lineHeight = 15.sp))
+                            }
+                        }
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -208,4 +241,23 @@ private fun MiniStat(label: String, value: String) {
         Text(value, style = VTheme.type.bodyStrong.colored(c.ink).copy(fontSize = 14.sp))
         Text(label, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 10.sp))
     }
+}
+
+/** Parse plan_json to extract step descriptions. */
+private fun parseTeacherPlanSteps(planJson: String): List<String> {
+    return runCatching {
+        val json = Json { ignoreUnknownKeys = true }
+        val obj = json.parseToJsonElement(planJson)
+        val steps = obj.jsonObject["steps"]?.jsonArray
+            ?: obj.jsonObject["plan"]?.jsonArray
+            ?: return emptyList()
+        steps.mapNotNull { step ->
+            when (step) {
+                is JsonObject -> step["description"]?.jsonPrimitive?.contentOrNull
+                    ?: step["action"]?.jsonPrimitive?.contentOrNull
+                    ?: step["text"]?.jsonPrimitive?.contentOrNull
+                else -> step.jsonPrimitive.contentOrNull
+            }
+        }
+    }.getOrDefault(emptyList())
 }

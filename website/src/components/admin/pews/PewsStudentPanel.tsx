@@ -323,7 +323,47 @@ function InterventionRow({
         <Badge tone={STATUS_TONE[iv.status]}>{STATUS_LABEL[iv.status]}</Badge>
       </div>
 
+      {/* PEWS 2.0 — urgency, escalation, cause family badges */}
+      {(iv.urgency || (iv.escalation_level && iv.escalation_level > 0) || iv.cause_family) && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {iv.urgency && (
+            <Badge tone={iv.urgency === "high" ? "danger" : iv.urgency === "medium" ? "warning" : "neutral"}>
+              {iv.urgency.charAt(0).toUpperCase() + iv.urgency.slice(1)} urgency
+            </Badge>
+          )}
+          {iv.escalation_level && iv.escalation_level > 0 && (
+            <Badge tone={iv.escalation_level >= 2 ? "danger" : "warning"}>
+              {iv.escalation_level >= 2 ? "Escalated" : "Reminded"}
+            </Badge>
+          )}
+          {iv.cause_family && (
+            <Badge tone="neutral">{iv.cause_family}</Badge>
+          )}
+        </div>
+      )}
+
+      {/* SLA + follow-up */}
+      {iv.sla_days != null && (
+        <p className="mt-1.5 text-[11.5px] text-ink-3">
+          SLA: {iv.sla_days} days{iv.follow_up_date ? ` · follow-up ${iv.follow_up_date}` : ""}
+        </p>
+      )}
+
       {iv.notes && <p className="mt-2 text-[12.5px] leading-relaxed text-ink-2">{iv.notes}</p>}
+
+      {/* Plan steps from plan_json */}
+      {iv.plan_json && parsePlanSteps(iv.plan_json).length > 0 && (
+        <div className="mt-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-ink-3">Plan</p>
+          <ol className="mt-1 space-y-1">
+            {parsePlanSteps(iv.plan_json).map((step, i) => (
+              <li key={i} className="text-[12px] leading-relaxed text-ink-2">
+                <span className="text-ink-3">{i + 1}.</span> {step}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
 
       {iv.outcome && (
         <p className="mt-2 text-[12px] text-ink-3">
@@ -356,6 +396,25 @@ function InterventionRow({
       )}
     </li>
   );
+}
+
+/** Parse plan_json to extract step descriptions. */
+function parsePlanSteps(planJson: string): string[] {
+  try {
+    const obj = JSON.parse(planJson);
+    const steps = obj.steps || obj.plan;
+    if (!Array.isArray(steps)) return [];
+    return steps.map((step: unknown) => {
+      if (typeof step === "string") return step;
+      if (typeof step === "object" && step !== null) {
+        const s = step as Record<string, unknown>;
+        return (s.description || s.action || s.text || "") as string;
+      }
+      return "";
+    }).filter(Boolean);
+  } catch {
+    return [];
+  }
 }
 
 function ActionBtn({

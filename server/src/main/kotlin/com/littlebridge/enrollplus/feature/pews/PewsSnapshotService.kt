@@ -612,6 +612,37 @@ class PewsSnapshotService {
             .limit(limit).map { toStored(it) }
     }
 
+    /** Cohort risk distribution per run date (last N days) for trend analytics. */
+    suspend fun cohortTrend(
+        schoolId: UUID, days: Int = 30,
+    ): List<TrendPoint> = dbQuery {
+        val since = java.time.LocalDate.now().minusDays(days.toLong())
+        val rows = PewsRiskSnapshotsTable.selectAll().where {
+            (PewsRiskSnapshotsTable.schoolId eq schoolId) and
+                (PewsRiskSnapshotsTable.runDate greaterEq since)
+        }.toList()
+
+        rows.groupBy { it[PewsRiskSnapshotsTable.runDate] }
+            .toSortedMap()
+            .map { (date, snaps) ->
+                TrendPoint(
+                    runDate = date.toString(),
+                    total = snaps.size,
+                    high = snaps.count { it[PewsRiskSnapshotsTable.riskLevel] == "high" },
+                    medium = snaps.count { it[PewsRiskSnapshotsTable.riskLevel] == "medium" },
+                    watch = snaps.count { it[PewsRiskSnapshotsTable.riskLevel] == "watch" },
+                )
+            }
+    }
+
+    data class TrendPoint(
+        val runDate: String,
+        val total: Int,
+        val high: Int,
+        val medium: Int,
+        val watch: Int,
+    )
+
     private fun toStored(r: org.jetbrains.exposed.sql.ResultRow): StoredSnapshot {
         val signals = runCatching {
             json.decodeFromString<List<PewsSignal>>(r[PewsRiskSnapshotsTable.signalsJson])

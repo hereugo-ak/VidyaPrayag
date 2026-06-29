@@ -603,6 +603,13 @@ export interface PewsIntervention {
   outcome: PewsOutcome | null;
   opened_at: string;
   resolved_at: string | null;
+  // PEWS 2.0 — managed casework fields
+  escalation_level?: number;
+  sla_days?: number | null;
+  follow_up_date?: string | null;
+  urgency?: string | null;
+  cause_family?: string | null;
+  plan_json?: string | null;
 }
 
 export interface UpdatePewsInterventionRequest {
@@ -634,4 +641,27 @@ export interface PewsConfig {
 
 export interface PewsRunResult {
   at_risk: number;
+}
+
+export interface PewsJobStatus {
+  job_id: string;
+  status: string; // queued|processing|completed|failed
+  total_items: number;
+  completed_items: number;
+  result: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface PewsTrendPoint {
+  run_date: string;
+  total: number;
+  high: number;
+  medium: number;
+  watch: number;
+}
+
+export interface PewsEffectivenessTrend {
+  points: PewsTrendPoint[];
+  effectiveness: PewsEffectiveness;
 }

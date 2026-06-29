@@ -50,6 +50,7 @@ package com.littlebridge.enrollplus.feature.notification.firebase
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
+import com.littlebridge.enrollplus.core.EnvConfig
 import java.io.File
 import java.io.FileInputStream
 import java.util.Properties
@@ -229,9 +230,10 @@ object FirebaseAdminInitializer {
     ): GoogleCredentials? {
 
         // --------------------------------------------------------------
-        // 1. Render / Railway / Fly.io  (inline JSON env var)
+        // 1. .env / Render / Railway / Fly.io  (inline JSON env var)
+        //    Uses EnvConfig so .env is checked (System.getenv alone misses .env).
         // --------------------------------------------------------------
-        System.getenv(envKeys.json)
+        EnvConfig.get(envKeys.json)
             ?.takeIf { it.isNotBlank() }
             ?.let { json ->
 
@@ -257,9 +259,10 @@ object FirebaseAdminInitializer {
             }
 
         // --------------------------------------------------------------
-        // 2. Explicit credentials file
+        // 2. Explicit credentials file (.env / env / local.properties)
+        //    Uses EnvConfig so .env is checked (System.getenv alone misses .env).
         // --------------------------------------------------------------
-        System.getenv(envKeys.file)
+        EnvConfig.get(envKeys.file)
             ?.takeIf { it.isNotBlank() }
             ?.let { path ->
 
@@ -286,9 +289,10 @@ object FirebaseAdminInitializer {
 
         // --------------------------------------------------------------
         // 3. Standard Google env var (primary app only; null for OTPSender)
+        //    Uses EnvConfig so .env is checked.
         // --------------------------------------------------------------
         envKeys.googleAppCreds
-            ?.let { System.getenv(it) }
+            ?.let { EnvConfig.get(it) }
             ?.takeIf { it.isNotBlank() }
             ?.let { path ->
 
@@ -314,14 +318,18 @@ object FirebaseAdminInitializer {
             }
 
         // --------------------------------------------------------------
-        // 4. local.properties
+        // 4. local.properties (.env fallback via EnvConfig, then raw local.properties)
+        //    EnvConfig already checks .env → env → local.properties, but the
+        //    localPropertyKey (e.g. "firebase.credentials.file") uses a
+        //    dotted notation that may differ from the env var names above,
+        //    so we also check it explicitly via EnvConfig for .env support.
         // --------------------------------------------------------------
-        localProperty(localPropertyKey)
+        EnvConfig.get(localPropertyKey)
             ?.takeIf { it.isNotBlank() }
             ?.let { path ->
 
                 println(
-                    "FIREBASE_INIT: Attempting local.properties credential ($localPropertyKey)"
+                    "FIREBASE_INIT: Attempting credential from .env/local.properties ($localPropertyKey)"
                 )
 
                 return runCatching {
@@ -329,10 +337,10 @@ object FirebaseAdminInitializer {
                         GoogleCredentials.fromStream(it)
                     }
                 }.onSuccess {
-                    onResolved("local.properties:$localPropertyKey")
+                    onResolved("env-config:$localPropertyKey")
 
                     println(
-                        "FIREBASE_INIT: Loaded credentials from local.properties ($path)"
+                        "FIREBASE_INIT: Loaded credentials from .env/local.properties ($path)"
                     )
                 }.onFailure {
                     println(

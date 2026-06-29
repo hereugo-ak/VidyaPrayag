@@ -49,7 +49,10 @@ import androidx.compose.ui.unit.sp
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsCohortDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsConfigDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsEffectivenessDto
+import com.littlebridge.enrollplus.feature.pews.domain.model.PewsEffectivenessTrendDto
+import com.littlebridge.enrollplus.feature.pews.domain.model.PewsInterventionDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsStudentDto
+import com.littlebridge.enrollplus.feature.pews.domain.model.PewsTrendPointDto
 import com.littlebridge.enrollplus.feature.pews.presentation.PewsCohortState
 import com.littlebridge.enrollplus.feature.pews.presentation.PewsCohortViewModel
 import com.littlebridge.enrollplus.ui.v2.components.VBadge
@@ -101,6 +104,7 @@ fun PewsCohortScreenV2(
             onSetMinLevel = viewModel::setMinLevel,
             onOpenStudent = onOpenStudent,
             onSaveConfig = viewModel::saveConfig,
+            onPollJob = viewModel::pollJobStatus,
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -113,6 +117,7 @@ private fun PewsCohortContent(
     onSetMinLevel: (String) -> Unit,
     onOpenStudent: (String) -> Unit,
     onSaveConfig: (PewsConfigDto) -> Unit,
+    onPollJob: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -143,6 +148,16 @@ private fun PewsCohortContent(
         ) {
             if (cohort != null) {
                 item { RiskBandSummary(cohort) }
+            }
+            // Async job status indicator
+            if (state.isRunning && state.jobStatus != null) {
+                item { JobStatusCard(status = state.jobStatus ?: "", jobId = state.jobId, onPoll = onPollJob) }
+            }
+            // Cohort trend chart
+            state.trend?.let { trend ->
+                if (trend.points.size > 1) {
+                    item { TrendCard(trend.points) }
+                }
             }
             item {
                 BandFilterRow(selected = state.minLevel, onSelect = onSetMinLevel)
@@ -507,6 +522,98 @@ private fun AllOnTrackNote() {
             "No students need attention in this band right now. Settings below still apply.",
             style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 12.sp, lineHeight = 17.sp),
         )
+    }
+}
+
+/** Async job status indicator — shows queued/processing/completed/failed with auto-poll. */
+@Composable
+private fun JobStatusCard(status: String, jobId: String?, onPoll: (String) -> Unit) {
+    val c = VTheme.colors
+    val (label, tone) = when (status) {
+        "queued" -> "Queued…" to c.ink3
+        "processing" -> "Running…" to c.warning
+        "completed" -> "Complete" to c.success
+        "failed" -> "Failed" to c.danger
+        else -> status to c.ink3
+    }
+    VCard {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(
+                Modifier.size(10.dp).clip(CircleShape).background(tone),
+            )
+            Text(
+                label,
+                style = VTheme.type.body.colored(c.ink).copy(fontWeight = FontWeight.SemiBold, fontSize = 13.sp),
+                modifier = Modifier.weight(1f),
+            )
+            if (jobId != null && (status == "queued" || status == "processing")) {
+                VButton(
+                    text = "Refresh",
+                    onClick = { onPoll(jobId) },
+                    variant = VButtonVariant.Ghost,
+                    size = VButtonSize.Sm,
+                )
+            }
+        }
+    }
+}
+
+/** Cohort risk distribution over time — a simple sparkline-style trend. */
+@Composable
+private fun TrendCard(points: List<PewsTrendPointDto>) {
+    val c = VTheme.colors
+    val maxTotal = points.maxOfOrNull { it.total } ?: 0
+    VCard {
+        Text(
+            "RISK TREND",
+            style = VTheme.type.label.colored(c.ink3).copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Cohort risk distribution (last 30 days)",
+            style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 12.sp),
+        )
+        Spacer(Modifier.height(12.dp))
+        // Stacked bar chart — one bar per run date
+        points.takeLast(15).forEach { p ->
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    p.runDate.takeLast(5),
+                    style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 10.sp),
+                    modifier = Modifier.weight(0.3f),
+                )
+                Box(
+                    Modifier.weight(0.7f).height(16.dp).clip(RoundedCornerShape(4.dp)).background(c.cream),
+                ) {
+                    Row(Modifier.fillMaxSize()) {
+                        val highFrac = if (maxTotal > 0) p.high.toFloat() / maxTotal else 0f
+                        val medFrac = if (maxTotal > 0) p.medium.toFloat() / maxTotal else 0f
+                        val watchFrac = if (maxTotal > 0) p.watch.toFloat() / maxTotal else 0f
+                        Box(Modifier.fillMaxWidth(highFrac).fillMaxSize().background(c.danger))
+                        Box(Modifier.fillMaxWidth(medFrac).fillMaxSize().background(c.warning))
+                        Box(Modifier.fillMaxWidth(watchFrac).fillMaxSize().background(c.success))
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            TrendLegend("High", c.danger)
+            TrendLegend("Medium", c.warning)
+            TrendLegend("Watch", c.success)
+        }
+    }
+}
+
+@Composable
+private fun TrendLegend(label: String, color: androidx.compose.ui.graphics.Color) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Box(Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(color))
+        Text(label, style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 10.sp))
     }
 }
 

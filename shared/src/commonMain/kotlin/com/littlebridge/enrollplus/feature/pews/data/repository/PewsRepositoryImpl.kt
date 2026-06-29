@@ -13,7 +13,9 @@ import com.littlebridge.enrollplus.feature.pews.data.remote.PewsApi
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsCohortDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsConfigDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsEffectivenessDto
+import com.littlebridge.enrollplus.feature.pews.domain.model.PewsEffectivenessTrendDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsInterventionDto
+import com.littlebridge.enrollplus.feature.pews.domain.model.PewsJobStatusDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsParentNudgeDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsRunResultDto
 import com.littlebridge.enrollplus.feature.pews.domain.model.PewsStudentDetailDto
@@ -48,6 +50,12 @@ class PewsRepositoryImpl(
 
     override suspend fun runNow(token: String): NetworkResult<ApiResponse<PewsRunResultDto>> =
         api.runNow(token)
+
+    override suspend fun getJobStatus(token: String, jobId: String): NetworkResult<ApiResponse<PewsJobStatusDto>> =
+        api.getJobStatus(token, jobId)
+
+    override suspend fun getTrend(token: String, days: Int): NetworkResult<ApiResponse<PewsEffectivenessTrendDto>> =
+        api.getTrend(token, days)
 
     override suspend fun getTeacherStudents(token: String): NetworkResult<ApiResponse<List<PewsStudentDto>>> =
         api.getTeacherStudents(token)

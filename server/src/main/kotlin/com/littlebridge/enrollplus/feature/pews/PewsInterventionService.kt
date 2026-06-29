@@ -198,6 +198,13 @@ class PewsInterventionService {
         val outcome: String?,
         val openedAt: String,
         val resolvedAt: String?,
+        // PEWS 2.0 — managed casework fields
+        val escalationLevel: Int = 0,
+        val slaDays: Int? = null,
+        val followUpDate: String? = null,
+        val urgency: String? = null,
+        val causeFamily: String? = null,
+        val planJson: String? = null,
     )
 
     /** Update status/notes; when status=done/dismissed, stamp resolvedAt + outcome. */
@@ -265,6 +272,12 @@ class PewsInterventionService {
             outcome = r[PewsInterventionsTable.outcome],
             openedAt = r[PewsInterventionsTable.openedAt].toString(),
             resolvedAt = r[PewsInterventionsTable.resolvedAt]?.toString(),
+            escalationLevel = r[PewsInterventionsTable.escalationLevel],
+            slaDays = r[PewsInterventionsTable.slaDays],
+            followUpDate = r[PewsInterventionsTable.followUpDate]?.toString(),
+            urgency = r[PewsInterventionsTable.urgency],
+            causeFamily = r[PewsInterventionsTable.causeFamily],
+            planJson = r[PewsInterventionsTable.planJson],
         )
     }
 
@@ -305,6 +318,12 @@ class PewsInterventionService {
                 outcome = r[PewsInterventionsTable.outcome],
                 openedAt = r[PewsInterventionsTable.openedAt].toString(),
                 resolvedAt = r[PewsInterventionsTable.resolvedAt]?.toString(),
+                escalationLevel = r[PewsInterventionsTable.escalationLevel],
+                slaDays = r[PewsInterventionsTable.slaDays],
+                followUpDate = r[PewsInterventionsTable.followUpDate]?.toString(),
+                urgency = r[PewsInterventionsTable.urgency],
+                causeFamily = r[PewsInterventionsTable.causeFamily],
+                planJson = r[PewsInterventionsTable.planJson],
             )
         }
     }

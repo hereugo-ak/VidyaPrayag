@@ -59,6 +59,8 @@ import type {
   PewsEffectiveness,
   PewsConfig,
   PewsRunResult,
+  PewsJobStatus,
+  PewsEffectivenessTrend,
   PewsRiskLevel,
   PewsInterventionStatus,
 } from "./types";
@@ -356,4 +358,10 @@ export const adminApi = {
   pewsUpdateConfig: (body: PewsConfig) =>
     authRequest<PewsConfig>("/api/v1/school/pews/config", { method: "PUT", body }),
   pewsRun: () => authRequest<PewsRunResult>("/api/v1/school/pews/run", { method: "POST" }),
+  pewsJobStatus: (jobId: string) =>
+    authRequest<PewsJobStatus>(`/api/v1/school/pews/run/${encodeURIComponent(jobId)}`),
+  pewsTrend: (days?: number) => {
+    const qs = days ? `?days=${days}` : "";
+    return authRequest<PewsEffectivenessTrend>(`/api/v1/school/pews/trend${qs}`);
+  },
 };
