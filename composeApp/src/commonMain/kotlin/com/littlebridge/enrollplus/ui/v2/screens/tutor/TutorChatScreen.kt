@@ -157,29 +157,27 @@ fun TutorChatScreen(
                     isLoading = state.isLoadingSubjects,
                     onSelect = viewModel::updateSubject,
                 )
-                if (state.subjectId.isNotBlank()) {
-                    OutlinedTextField(
-                        value = state.question,
-                        onValueChange = viewModel::updateQuestion,
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Type your doubt...", style = VTheme.type.caption.colored(c.placeholder)) },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = c.accent,
-                            unfocusedBorderColor = c.border2,
-                        ),
-                        maxLines = 3,
-                    )
-                    VButton(
-                        text = "Ask",
-                        modifier = Modifier.fillMaxWidth(),
-                        size = VButtonSize.Md,
-                        variant = VButtonVariant.Primary,
-                        tone = VButtonTone.Lavender,
-                        enabled = state.question.isNotBlank() && !state.isLoading,
-                        onClick = viewModel::askDoubt,
-                    )
-                }
+                OutlinedTextField(
+                    value = state.question,
+                    onValueChange = viewModel::updateQuestion,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Type your doubt...", style = VTheme.type.caption.colored(c.placeholder)) },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = c.accent,
+                        unfocusedBorderColor = c.border2,
+                    ),
+                    maxLines = 3,
+                )
+                VButton(
+                    text = "Ask",
+                    modifier = Modifier.fillMaxWidth(),
+                    size = VButtonSize.Md,
+                    variant = VButtonVariant.Primary,
+                    tone = VButtonTone.Lavender,
+                    enabled = state.question.isNotBlank() && !state.isLoading,
+                    onClick = viewModel::askDoubt,
+                )
             }
         }
     }

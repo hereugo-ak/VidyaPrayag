@@ -32,7 +32,7 @@ data class SubjectsResponse(
 @Serializable
 data class DoubtRequest(
     val childId: String,
-    val subjectId: String,
+    val subjectId: String = "",
     val question: String,
     val mode: String = "DOUBT",
 )

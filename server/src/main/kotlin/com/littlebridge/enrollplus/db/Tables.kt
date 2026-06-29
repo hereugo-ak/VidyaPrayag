@@ -2672,7 +2672,7 @@ object ReportCardTemplatesTable : UUIDTable("report_card_templates", "id") {
 object TutorSessionsTable : UUIDTable("tutor_sessions", "id") {
     val schoolId       = uuid("school_id")
     val childId        = uuid("child_id")
-    val subjectId      = uuid("subject_id")
+    val subjectId      = uuid("subject_id").nullable()
     val academicYearId = uuid("academic_year_id").nullable()
     val mode           = varchar("mode", 16).default("DOUBT")
     val intentClass    = varchar("intent_class", 64).nullable()

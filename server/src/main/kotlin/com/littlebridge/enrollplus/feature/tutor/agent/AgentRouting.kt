@@ -38,8 +38,9 @@ fun Route.agentRouting() {
 
         val childId = runCatching { UUID.fromString(body.childId) }.getOrNull()
             ?: return@post call.fail("Invalid childId", HttpStatusCode.BadRequest, "BAD_CHILD_ID")
-        val subjectId = runCatching { UUID.fromString(body.subjectId) }.getOrNull()
-            ?: return@post call.fail("Invalid subjectId", HttpStatusCode.BadRequest, "BAD_SUBJECT_ID")
+        val subjectId = body.subjectId.takeIf { it.isNotBlank() }?.let {
+            runCatching { UUID.fromString(it) }.getOrNull()
+        }
 
         if (body.question.isBlank()) {
             return@post call.fail("Question is required", HttpStatusCode.BadRequest, "BAD_QUESTION")

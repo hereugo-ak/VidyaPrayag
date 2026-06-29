@@ -76,7 +76,7 @@ class TutorChatViewModel(
 
     fun askDoubt() {
         val current = _state.value
-        if (current.question.isBlank() || current.subjectId.isBlank()) return
+        if (current.question.isBlank()) return
 
         val childId = selectedChildHolder.selectedChildId.value ?: return
 

@@ -56,13 +56,14 @@ class TutorAgentService(
     suspend fun resolveDoubt(
         schoolId: UUID,
         childId: UUID,
-        subjectId: UUID,
+        subjectId: UUID?,
         question: String,
     ): TutorResult {
         TutorKillSwitch.require(TutorConstants.MODULE_AGENT)
 
-        // Build the deterministic bundle (Tier 0)
-        val bundle = bundleBuilder.build(childId, subjectId)
+        // Build the deterministic bundle (Tier 0) — null subjectId is OK,
+        // bundle will be null and the agent runs in DIAGNOSTIC mode
+        val bundle = if (subjectId != null) bundleBuilder.build(childId, subjectId) else null
 
         // Try the agentic path (LLM + tools)
         val agentResult = runAgent(schoolId, childId, subjectId, question, bundle)
@@ -161,7 +162,7 @@ class TutorAgentService(
     private suspend fun runAgent(
         schoolId: UUID,
         childId: UUID,
-        subjectId: UUID,
+        subjectId: UUID?,
         question: String,
         bundle: com.littlebridge.enrollplus.feature.tutor.sense.LearnerBundle?,
     ): AiService.AgentResult? {
@@ -199,7 +200,7 @@ class TutorAgentService(
 
     private fun buildUserPrompt(
         childId: UUID,
-        subjectId: UUID,
+        subjectId: UUID?,
         question: String,
         bundle: com.littlebridge.enrollplus.feature.tutor.sense.LearnerBundle?,
     ): String = buildString {
@@ -230,7 +231,7 @@ class TutorAgentService(
     private suspend fun persistSession(
         schoolId: UUID,
         childId: UUID,
-        subjectId: UUID,
+        subjectId: UUID?,
         turn: TutorTurn,
         providerUsed: String?,
         toolCallsMade: Int,

@@ -22,7 +22,7 @@ class TutorSessionRepository {
         val id: UUID,
         val schoolId: UUID,
         val childId: UUID,
-        val subjectId: UUID,
+        val subjectId: UUID?,
         val academicYearId: UUID?,
         val mode: String,
         val intentClass: String?,
@@ -39,7 +39,7 @@ class TutorSessionRepository {
     suspend fun insert(
         schoolId: UUID,
         childId: UUID,
-        subjectId: UUID,
+        subjectId: UUID? = null,
         academicYearId: UUID? = null,
         mode: String = "DOUBT",
         intentClass: String? = null,
