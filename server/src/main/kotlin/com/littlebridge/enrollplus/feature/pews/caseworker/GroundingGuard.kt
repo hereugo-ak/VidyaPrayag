@@ -122,7 +122,7 @@ object GroundingGuard {
                 droppedCount, sentences.size, kept.size)
         }
 
-        if (kept.size < 2 || kept.joinToString(". ").length < 40) {
+        if (kept.isEmpty() || kept.joinToString(". ").length < 40) {
             log.warn("Grounding guard: too few grounded sentences remain ({}), falling back to deterministic", kept.size)
             return null
         }

@@ -24,6 +24,8 @@
  */
 package com.littlebridge.enrollplus.feature.pews
 
+import com.littlebridge.enrollplus.db.PewsRiskSnapshotsTable
+import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.feature.pews.act.ManagedCaseworkService
 import com.littlebridge.enrollplus.feature.pews.caseworker.CaseworkerService
 import com.littlebridge.enrollplus.feature.pews.learn.LearnService
@@ -32,6 +34,9 @@ import com.littlebridge.enrollplus.feature.pews.triage.TriageService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.update
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.time.LocalDate
@@ -156,6 +161,8 @@ object PewsDailyJob {
                     schoolId, caseResults.size,
                     caseResults.count { it.modelUsed },
                     caseResults.count { it.grounded })
+                // Write case file narrative back to snapshot for API/UI visibility
+                persistCaseFileNarratives(schoolId, caseResults, runDate)
             } else {
                 // Fallback to v1 reasoning service
                 runCatching { reasoningService.reasonForSchool(schoolId, reasonTargets) }
@@ -181,5 +188,41 @@ object PewsDailyJob {
             .onFailure { log.warn("[$TAG] learn stage failed for {}: {}", schoolId, it.message) }
 
         return snapshots.size
+    }
+
+    /**
+     * Write the caseworker's Case File narrative/cause/recommendation back to
+     * the snapshot rows so they're visible via the API (cohort, student detail).
+     * This mirrors what PewsReasoningService does in the v1 path.
+     */
+    private suspend fun persistCaseFileNarratives(
+        schoolId: UUID,
+        caseResults: List<CaseworkerService.CaseworkerResult>,
+        runDate: LocalDate,
+    ) {
+        for (result in caseResults) {
+            val cf = result.caseFile
+            val narrative = cf.narrative ?: continue
+            val cause = cf.hypotheses.firstOrNull()?.cause
+            val recommendation = cf.plan.firstOrNull()?.let { step ->
+                "${step.action}${step.rationale?.let { ": $it" } ?: ""}"
+            }
+            val provider = result.providerUsed
+
+            runCatching {
+                dbQuery {
+                    PewsRiskSnapshotsTable.update({
+                        (PewsRiskSnapshotsTable.schoolId eq schoolId) and
+                            (PewsRiskSnapshotsTable.studentCode eq result.studentCode) and
+                            (PewsRiskSnapshotsTable.runDate eq runDate)
+                    }) {
+                        it[PewsRiskSnapshotsTable.aiNarrative] = narrative
+                        it[PewsRiskSnapshotsTable.aiCause] = cause
+                        it[PewsRiskSnapshotsTable.aiRecommendation] = recommendation
+                        if (provider != null) it[PewsRiskSnapshotsTable.aiProviderUsed] = provider
+                    }
+                }
+            }.onFailure { log.warn("[$TAG] failed to persist narrative for {}: {}", result.studentCode, it.message) }
+        }
     }
 }
