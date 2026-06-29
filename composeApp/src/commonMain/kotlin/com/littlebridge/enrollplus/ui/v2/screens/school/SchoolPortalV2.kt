@@ -67,6 +67,8 @@ private enum class SchoolOverlay {
     TransportManagement,
     ReportPublish,
     ReportEffectiveness,
+    ScholarshipManagement,
+    BrandingKit,
 }
 
 /**
@@ -377,6 +379,20 @@ fun SchoolPortalV2(
                 )
                 return
             }
+            SchoolOverlay.ScholarshipManagement -> {
+                ScholarshipManagementScreenV2(
+                    onBack = { overlay = SchoolOverlay.None },
+                    modifier = modifier,
+                )
+                return
+            }
+            SchoolOverlay.BrandingKit -> {
+                BrandingSettingsScreen(
+                    onBack = { overlay = SchoolOverlay.None },
+                    modifier = modifier,
+                )
+                return
+            }
             SchoolOverlay.None -> Unit
         }
 
@@ -447,6 +463,12 @@ fun SchoolPortalV2(
                         onOpenProfile = { overlay = SchoolOverlay.EditProfile },
                         // VP-CAL — "Academic year" is now a real management screen.
                         onOpenAcademicYear = { overlay = SchoolOverlay.AcademicYear },
+                        // Transport Management — routes, vehicles & assignments.
+                        onOpenTransport = { overlay = SchoolOverlay.TransportManagement },
+                        // Scholarship Management — schemes, applications & renewals.
+                        onOpenScholarships = { overlay = SchoolOverlay.ScholarshipManagement },
+                        // School Branding Kit — colors, logo, subdomain.
+                        onOpenBranding = { overlay = SchoolOverlay.BrandingKit },
                     )
                 }
             }

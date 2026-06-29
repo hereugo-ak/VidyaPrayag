@@ -145,7 +145,9 @@ data class CreateAssignmentRequest(
     val studentId: String,
     val routeId: String,
     val stopId: String,
-    val vehicleId: String
+    val vehicleId: String,
+    val feeAmount: Double? = null,
+    val feeDueDate: String? = null
 )
 
 @Serializable

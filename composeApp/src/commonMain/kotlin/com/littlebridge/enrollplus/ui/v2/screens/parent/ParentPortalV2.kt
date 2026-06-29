@@ -140,7 +140,7 @@ fun ParentPortalV2(
             return
         }
         ParentOverlay.Scholarships -> {
-            ScholarshipsScreenV2(onBack = { overlay = ParentOverlay.None }, modifier = modifier)
+            ScholarshipWorkflowScreenV2(onBack = { overlay = ParentOverlay.None }, modifier = modifier)
             return
         }
         ParentOverlay.Profile -> {
@@ -310,6 +310,7 @@ fun ParentPortalV2(
                     onOpenTransport = { overlay = ParentOverlay.Transport },
                     onOpenTutor = { overlay = ParentOverlay.TutorChat },
                     onOpenTutorProgress = { overlay = ParentOverlay.TutorProgress },
+                    onOpenScholarships = { overlay = ParentOverlay.Scholarships },
                 )
                 "academics" -> ParentAcademicsScreenV2(onOpenLeave = { overlay = ParentOverlay.Leave }, onOpenHealth = { overlay = ParentOverlay.Health })
                 "fees" -> ParentFeesScreenV2()

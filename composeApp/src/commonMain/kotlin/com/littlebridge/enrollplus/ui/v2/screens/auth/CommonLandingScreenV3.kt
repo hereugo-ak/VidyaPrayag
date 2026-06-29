@@ -30,6 +30,8 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -798,6 +800,7 @@ private fun EcosystemSection(tab: Int, prevTab: Int) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun EcosystemCard(domain: EcosystemDomain, index: Int) {
     val c = VTheme.colors
@@ -852,7 +855,7 @@ private fun EcosystemCard(domain: EcosystemDomain, index: Int) {
             Spacer(Modifier.height(2.dp))
             Text(domain.subtitle, style = VTheme.type.caption.colored(c.ink3))
             Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 domain.metrics.forEach { metric ->
                     Row(
                         Modifier

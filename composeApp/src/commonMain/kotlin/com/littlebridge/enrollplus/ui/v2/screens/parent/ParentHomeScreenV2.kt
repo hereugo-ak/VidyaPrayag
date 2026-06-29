@@ -95,6 +95,7 @@ fun ParentHomeScreenV2(
     onOpenTransport: () -> Unit = {},
     onOpenTutor: () -> Unit = {},
     onOpenTutorProgress: () -> Unit = {},
+    onOpenScholarships: () -> Unit = {},
     viewModel: ParentDashboardViewModel = koinViewModel(),
     permissionVm: PermissionViewModel = koinViewModel(),
     nudgeViewModel: com.littlebridge.enrollplus.feature.pews.presentation.ParentNudgeViewModel = koinViewModel(),
@@ -143,6 +144,7 @@ fun ParentHomeScreenV2(
         onOpenTransport = onOpenTransport,
         onOpenTutor = onOpenTutor,
         onOpenTutorProgress = onOpenTutorProgress,
+        onOpenScholarships = onOpenScholarships,
         nudge = nudgeState.nudge?.takeIf { nudgeState.visible },
         onNudgeAction = { action ->
             // The server's deep-link targets map onto existing parent surfaces.
@@ -182,6 +184,7 @@ private fun ParentDashboardContent(
     onOpenTransport: () -> Unit = {},
     onOpenTutor: () -> Unit = {},
     onOpenTutorProgress: () -> Unit = {},
+    onOpenScholarships: () -> Unit = {},
     nudge: com.littlebridge.enrollplus.feature.pews.domain.model.PewsParentNudgeDto? = null,
     onNudgeAction: (com.littlebridge.enrollplus.feature.pews.domain.model.PewsParentActionDto) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -340,6 +343,15 @@ private fun ParentDashboardContent(
                         subtitle = "Live bus location & ETA for your child",
                         icon = VIcons.MapPin,
                         onClick = onOpenTransport,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    // ── Scholarships ───────────────────────────────────────────────
+                    VActionCard(
+                        title = "Scholarships",
+                        subtitle = "Browse & apply for scholarship opportunities",
+                        icon = VIcons.Sparkles,
+                        onClick = onOpenScholarships,
                         modifier = Modifier.fillMaxWidth(),
                     )
 

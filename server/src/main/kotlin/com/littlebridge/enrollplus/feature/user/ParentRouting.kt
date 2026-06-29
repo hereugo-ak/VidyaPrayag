@@ -9,6 +9,7 @@ import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.db.FeeRecordsTable
 import com.littlebridge.enrollplus.db.ScholarshipApplicationsTable
 import com.littlebridge.enrollplus.db.ScholarshipsTable
+import com.littlebridge.enrollplus.feature.scholarship.ScholarshipService
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.response.*
@@ -150,63 +151,42 @@ fun Route.parentRouting() {
     authenticate("jwt") {
         route("/api/v1/parent") {
             // -------- SCHOLARSHIPS (audit §4.2/§5.2 — now DB-backed) --------
-            // Reads real opportunity rows from ScholarshipsTable and the
-            // parent's own applications from ScholarshipApplicationsTable
-            // (scoped by parent uid). Replaces the hardcoded "$45,000 STEM"
-            // fiction. When operators haven't curated any rows yet the lists
-            // are honestly empty (never fabricated).
+            // Updated per SCHOLARSHIP_WORKFLOW_SPEC.md to delegate to ScholarshipService
+            // which returns the full workflow data (schemes, applications, gamification).
+            // Response format kept backward-compatible with existing ScholarshipsViewModel.
             get("/scholarships") {
                 val uid = call.principalUserUuid() ?: run {
                     call.respond(HttpStatusCode.Unauthorized); return@get
                 }
 
-                val data = dbQuery {
-                    val scholarships = ScholarshipsTable.selectAll()
-                        .where { ScholarshipsTable.isActive eq true }
-                        .orderBy(ScholarshipsTable.position, SortOrder.ASC)
-                        .map { row ->
-                            ScholarshipDto(
-                                id = row[ScholarshipsTable.id].value.toString(),
-                                title = row[ScholarshipsTable.title],
-                                description = row[ScholarshipsTable.description],
-                                amount = row[ScholarshipsTable.amount],
-                                timeLeft = row[ScholarshipsTable.timeLeft],
-                                category = row[ScholarshipsTable.category],
-                                isCritical = row[ScholarshipsTable.isCritical]
-                            )
-                        }
+                val serviceData = ScholarshipService().getParentScholarships(uid)
 
-                    val applications = ScholarshipApplicationsTable.selectAll()
-                        .where { ScholarshipApplicationsTable.parentId eq uid }
-                        .orderBy(ScholarshipApplicationsTable.position, SortOrder.ASC)
-                        .map { row ->
-                            ScholarshipApplicationDto(
-                                id = row[ScholarshipApplicationsTable.id].value.toString(),
-                                institution = row[ScholarshipApplicationsTable.institution],
-                                program = row[ScholarshipApplicationsTable.program],
-                                status = row[ScholarshipApplicationsTable.status],
-                                iconName = row[ScholarshipApplicationsTable.iconName]
-                            )
-                        }
-
-                    // Gamification fields derived from real signals (no fixed fiction):
-                    //  - profile_strength scales with how complete the parent's
-                    //    application footprint is (0 apps → 40, capped at 100).
-                    //  - current_level = highest child level the parent has.
-                    val childLevels = ChildrenTable.selectAll()
-                        .where { (ChildrenTable.parentId eq uid) and (ChildrenTable.isActive eq true) }
-                        .map { it[ChildrenTable.currentLevel] }
-                    val currentLevel = childLevels.maxOrNull() ?: 1
-                    val profileStrength = (40 + applications.size * 15).coerceAtMost(100)
-
-                    ScholarshipsDataDto(
-                        scholarships = scholarships,
-                        applications = applications,
-                        profileStrength = profileStrength,
-                        streakDays = 0,
-                        currentLevel = currentLevel
-                    )
-                }
+                // Map to legacy response format for backward compat with existing client
+                val data = ScholarshipsDataDto(
+                    scholarships = serviceData.scholarships.map { s ->
+                        ScholarshipDto(
+                            id = s.id,
+                            title = s.title,
+                            description = s.description,
+                            amount = s.amount,
+                            timeLeft = s.timeLeft,
+                            category = s.category,
+                            isCritical = s.isCritical
+                        )
+                    },
+                    applications = serviceData.applications.map { a ->
+                        ScholarshipApplicationDto(
+                            id = a.id,
+                            institution = a.institution,
+                            program = a.program,
+                            status = a.status,
+                            iconName = a.iconName
+                        )
+                    },
+                    profileStrength = serviceData.gamification.profileStrength,
+                    streakDays = serviceData.gamification.streakDays,
+                    currentLevel = serviceData.gamification.currentLevel
+                )
                 call.ok(data, message = "Scholarships data fetched")
             }
 
