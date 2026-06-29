@@ -72,6 +72,7 @@ fun TeacherHomeScreenV2(
     onOpenTransportAttendance: () -> Unit = {},
     onOpenPews: () -> Unit = {},
     onOpenReportReview: () -> Unit = {},
+    onOpenHeatmap: () -> Unit = {},
     modifier: Modifier = Modifier,
     todayViewModel: TeacherTodayViewModel = koinViewModel(),
     checkInViewModel: TeacherCheckInViewModel = koinViewModel(),

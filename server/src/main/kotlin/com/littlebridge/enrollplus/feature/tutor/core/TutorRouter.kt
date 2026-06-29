@@ -1,7 +1,14 @@
 // FILE: server/src/main/kotlin/com/littlebridge/enrollplus/feature/tutor/core/TutorRouter.kt
 package com.littlebridge.enrollplus.feature.tutor.core
 
+import com.littlebridge.enrollplus.feature.tutor.act.ActModule
+import com.littlebridge.enrollplus.feature.tutor.admin.AdminEfficacyModule
 import com.littlebridge.enrollplus.feature.tutor.agent.AgentModule
+import com.littlebridge.enrollplus.feature.tutor.heatmap.TeacherHeatmapModule
+import com.littlebridge.enrollplus.feature.tutor.ingest.IngestModule
+import com.littlebridge.enrollplus.feature.tutor.learn.LearnModule
+import com.littlebridge.enrollplus.feature.tutor.parent.ParentProgressModule
+import com.littlebridge.enrollplus.feature.tutor.rag.RagModule
 import com.littlebridge.enrollplus.feature.tutor.sense.SenseModule
 import com.littlebridge.enrollplus.feature.tutor.triage.TriageModule
 import io.ktor.server.routing.Route
@@ -28,23 +35,21 @@ private val log = LoggerFactory.getLogger("TutorRouter")
 /**
  * Register all AI Tutor 2.0 modules with the registry. Call at boot time.
  *
- * Modules are registered incrementally as ticks are completed. Currently
- * no modules are registered — they will be added in TICK 03+ as each
- * vertical slice is built. The router and registry are ready now.
+ * Modules are registered incrementally as ticks are completed. All 10
+ * modules are now registered (TICK 03–12 complete).
  */
 fun registerTutorModules() {
     log.info("Registering AI Tutor 2.0 modules…")
     TutorModuleRegistry.register(SenseModule)
     TutorModuleRegistry.register(TriageModule)
     TutorModuleRegistry.register(AgentModule)
-    // Modules will be registered here as they are built in TICK 06+:
-    //   TutorModuleRegistry.register(ActModule)
-    //   TutorModuleRegistry.register(LearnModule)
-    //   TutorModuleRegistry.register(IngestModule)
-    //   TutorModuleRegistry.register(TeacherHeatmapModule)
-    //   TutorModuleRegistry.register(ParentProgressModule)
-    //   TutorModuleRegistry.register(AdminEfficacyModule)
-    //   TutorModuleRegistry.register(RagModule)
+    TutorModuleRegistry.register(ActModule)
+    TutorModuleRegistry.register(LearnModule)
+    TutorModuleRegistry.register(IngestModule)
+    TutorModuleRegistry.register(TeacherHeatmapModule)
+    TutorModuleRegistry.register(ParentProgressModule)
+    TutorModuleRegistry.register(AdminEfficacyModule)
+    TutorModuleRegistry.register(RagModule)
     log.info("AI Tutor 2.0 modules registered: {}", TutorModuleRegistry.all().size)
 }
 
@@ -52,6 +57,7 @@ fun registerTutorModules() {
 fun Route.tutorRouting() {
     route("/api/v1") {
         TutorModuleRegistry.installRoutes(this)
+        moduleStatusRouting()
     }
     log.info("AI Tutor 2.0 routes mounted")
 }

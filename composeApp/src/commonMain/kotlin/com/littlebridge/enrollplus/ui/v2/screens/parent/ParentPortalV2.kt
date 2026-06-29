@@ -53,7 +53,7 @@ import com.littlebridge.enrollplus.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays a portal can push above its tab content (back returns to the tabs). */
-private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, Profile, Leave, Messages, LinkChild, Discovery, Health, Pulse, Transport }
+private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, Profile, Leave, Messages, LinkChild, Discovery, Health, Pulse, Transport, TutorChat, TutorProgress }
 
 /**
  * ParentPortalV2 — the 5-tab parent shell, a faithful copy of `Parent.tsx → ParentApp`.
@@ -208,6 +208,20 @@ fun ParentPortalV2(
             if (child == null) { overlay = ParentOverlay.None; return }
             BusTrackingScreenV2(
                 childId = child.id,
+                onBack = { overlay = ParentOverlay.None },
+                modifier = modifier,
+            )
+            return
+        }
+        ParentOverlay.TutorChat -> {
+            com.littlebridge.enrollplus.ui.v2.screens.tutor.TutorChatScreen(
+                onBack = { overlay = ParentOverlay.None },
+                modifier = modifier,
+            )
+            return
+        }
+        ParentOverlay.TutorProgress -> {
+            com.littlebridge.enrollplus.ui.v2.screens.tutor.ParentProgressScreen(
                 onBack = { overlay = ParentOverlay.None },
                 modifier = modifier,
             )

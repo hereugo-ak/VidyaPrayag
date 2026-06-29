@@ -542,6 +542,22 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.reportcard.presentation.AdminReportPublishViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.reportcard.presentation.AdminReportEffectivenessViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.reportcard.presentation.ParentReportViewModel(get(), get()) }
+
+    // AI Tutor 2.0 — API + repository + view models
+    single {
+        com.littlebridge.enrollplus.feature.tutor.data.remote.TutorApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single<com.littlebridge.enrollplus.feature.tutor.domain.repository.TutorRepository> {
+        com.littlebridge.enrollplus.feature.tutor.data.repository.TutorRepositoryImpl(get())
+    }
+    factory { com.littlebridge.enrollplus.feature.tutor.presentation.TutorChatViewModel(get(), get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.tutor.presentation.TutorPlanViewModel(get(), get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.tutor.presentation.TutorPracticeViewModel(get(), get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.tutor.presentation.TeacherHeatmapViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.tutor.presentation.ParentProgressViewModel(get(), get(), get()) }
 }
 
 fun initKoin(

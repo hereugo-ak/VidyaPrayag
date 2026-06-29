@@ -109,17 +109,17 @@ class ReportCardSmokeTest {
     }
 
     @Test
-    fun `movement improved when delta >= 5`() {
+    fun `movement improved when delta at least 5`() {
         assertEquals("improved", BoardRubric.movementFor(80.0, 70.0))
     }
 
     @Test
-    fun `movement slid when delta <= -5`() {
+    fun `movement slid when delta at most -5`() {
         assertEquals("slid", BoardRubric.movementFor(60.0, 70.0))
     }
 
     @Test
-    fun `movement steady when abs delta < 5`() {
+    fun `movement steady when abs delta under 5`() {
         assertEquals("steady", BoardRubric.movementFor(72.0, 70.0))
     }
 
