@@ -35,8 +35,6 @@ package com.littlebridge.enrollplus.core
 
 import io.github.cdimascio.dotenv.dotenv
 import java.io.File
-import java.util.Properties
-
 object EnvConfig {
 
     // dotenv is resilient: missing/malformed .env is fine (we fall through to
@@ -50,15 +48,36 @@ object EnvConfig {
         }.getOrNull()
     }
 
-    private val localProps: Properties by lazy {
-        val props = Properties()
+    // NOTE: We read local.properties manually instead of using Properties.load()
+    // because Properties.load() treats backslashes as escape characters — on
+    // Windows, a path like C:\Users\HP\firebase\creds.json becomes
+    // C:UsersHPirebasecreds.json (\f → form-feed, \U → stripped). Manual
+    // line-by-line parsing preserves backslashes in file paths.
+    private val localProps: Map<String, String> by lazy {
         val candidates = listOf(
             File("local.properties"),
             File("../local.properties"),
             File(System.getProperty("user.dir"), "local.properties"),
         )
+        val props = mutableMapOf<String, String>()
         candidates.firstOrNull { it.isFile }?.let { f ->
-            runCatching { f.inputStream().use(props::load) }
+            runCatching {
+                f.readLines().forEach { line ->
+                    val trimmed = line.trim()
+                    if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith("!")) return@forEach
+                    val eqIdx = trimmed.indexOf('=')
+                    val colonIdx = trimmed.indexOf(':')
+                    val sepIdx = when {
+                        eqIdx < 0 -> colonIdx
+                        colonIdx < 0 -> eqIdx
+                        else -> minOf(eqIdx, colonIdx)
+                    }
+                    if (sepIdx <= 0) return@forEach
+                    val key = trimmed.substring(0, sepIdx).trim()
+                    val value = trimmed.substring(sepIdx + 1).trim()
+                    if (key.isNotEmpty()) props[key] = value
+                }
+            }
         }
         props
     }
@@ -68,7 +87,7 @@ object EnvConfig {
      * Returns null when unset/blank in all three sources.
      */
     fun get(key: String): String? =
-        (dotenv?.get(key) ?: System.getenv(key) ?: localProps.getProperty(key))
+        (dotenv?.get(key) ?: System.getenv(key) ?: localProps[key])
             ?.let(::sanitize)
             ?.takeIf { it.isNotBlank() }
 

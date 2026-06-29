@@ -167,8 +167,9 @@ class ManagedCaseworkService {
         val admins = schoolAdminIds(schoolId)
         val ownerId = owner ?: admins.firstOrNull() ?: return false
 
-        val actionType = caseFile?.plan?.firstOrNull()?.action
+        val rawAction = caseFile?.plan?.firstOrNull()?.action
             ?: defaultActionFor(snap)
+        val actionType = rawAction.take(32)
         val urgency = caseFile?.urgency ?: when (snap.riskLevel) {
             "high" -> "high"
             "medium" -> "medium"
