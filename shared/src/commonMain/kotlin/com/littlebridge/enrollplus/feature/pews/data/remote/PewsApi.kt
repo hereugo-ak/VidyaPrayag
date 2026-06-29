@@ -159,7 +159,7 @@ class PewsApi(
     suspend fun generateParentDraft(
         token: String,
         interventionId: String,
-        lang: String = "hi",
+        lang: String = "en",
     ): NetworkResult<ApiResponse<ParentDraftDto>> = safeApiCall {
         client.post(getUrl("api/v1/teacher/pews/interventions/$interventionId/draft-message")) {
             parameter("lang", lang)

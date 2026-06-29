@@ -168,9 +168,16 @@ fun Route.assembleRouting(service: ReportAssemblyService) {
     get("/report-card/oversight") {
         val ctx = call.requireSchoolContext() ?: return@get
         val term = call.request.queryParameters["term"]
-            ?: return@get call.fail("term parameter required", HttpStatusCode.BadRequest)
+            ?: ReportCardConfig.currentTerm
         val academicYearId = call.request.queryParameters["academicYearId"]?.let {
             runCatching { UUID.fromString(it) }.getOrNull()
+        }
+        if (term == null) {
+            call.ok(
+                ReportAssemblyService.OversightSummary(ctx.schoolId, emptyList()),
+                "No current term configured"
+            )
+            return@get
         }
         val summary = service.getOversightSummary(ctx.schoolId, term, academicYearId)
         call.ok(summary, "Oversight summary (${summary.classes.size} classes)")

@@ -57,14 +57,14 @@ class ReportRollupService(
      * @param studentId Student UUID (students.id)
      * @param term      Term label (e.g. "Term 1")
      * @param academicYearId  Academic year UUID (nullable)
-     * @param language  Narrative language code (default "hi")
+     * @param language  Narrative language code (default "en")
      */
     suspend fun buildBundle(
         schoolId: UUID,
         studentId: UUID,
         term: String,
         academicYearId: UUID?,
-        language: String = "hi",
+        language: String = "en",
     ): ReportFactBundle {
         ReportCardKillSwitch.require(ReportCardConstants.MODULE_ROLLUP)
         log.info("Rollup: school={}, student={}, term={}", schoolId, studentId, term)

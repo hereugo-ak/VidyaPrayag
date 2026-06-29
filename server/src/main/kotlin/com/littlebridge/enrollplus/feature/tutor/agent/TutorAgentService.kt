@@ -86,6 +86,7 @@ class TutorAgentService(
                     schoolId, childId, subjectId, finalTurn,
                     agentResult.providerUsed, agentResult.toolCallsMade,
                     wasGrounded,
+                    tokensUsed = agentResult.totalInputTokens + agentResult.totalOutputTokens,
                 )
 
                 return TutorResult(
@@ -236,6 +237,7 @@ class TutorAgentService(
         providerUsed: String?,
         toolCallsMade: Int,
         grounded: Boolean,
+        tokensUsed: Int = 0,
     ): UUID? = runCatching {
         sessionRepo.insert(
             schoolId = schoolId,
@@ -243,9 +245,12 @@ class TutorAgentService(
             subjectId = subjectId,
             mode = "DOUBT",
             turns = TutorTurnCodec.encode(turn),
-            groundedRefs = turn.groundedRefs.joinToString(",") { "${it.source}:${it.value}" },
+            groundedRefs = kotlinx.serialization.json.Json.encodeToString(
+                kotlinx.serialization.builtins.ListSerializer(GroundedRef.serializer()),
+                turn.groundedRefs
+            ),
             providerUsed = providerUsed,
-            tokensUsed = 0,
+            tokensUsed = tokensUsed,
             cacheHit = false,
             safetyFlag = if (turn.mode == "ESCALATE") "repeated_answer_request" else null,
         )

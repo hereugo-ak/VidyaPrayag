@@ -52,7 +52,7 @@ data class PlanStep(
 
 @Serializable
 data class ParentDraft(
-    val language: String = "hi",            // ISO 639-1 code
+    val language: String = "en",            // ISO 639-1 code
     val tone: String = "warm, non-clinical",
     val body: String,
 )

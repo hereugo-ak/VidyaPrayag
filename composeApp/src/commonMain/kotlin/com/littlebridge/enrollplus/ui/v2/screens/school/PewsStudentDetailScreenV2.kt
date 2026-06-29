@@ -62,6 +62,11 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import com.littlebridge.enrollplus.ui.v2.screens.VStateHost
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
 import com.littlebridge.enrollplus.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
@@ -85,7 +90,7 @@ fun PewsStudentDetailScreenV2(
             onStart = { id -> viewModel.updateIntervention(id, status = "in_progress") },
             onMarkDone = { id, outcome -> viewModel.updateIntervention(id, status = "done", outcome = outcome) },
             onDismiss = { id -> viewModel.updateIntervention(id, status = "dismissed") },
-            onGenerateDraft = viewModel::generateParentDraft,
+            onGenerateDraft = { id, lang -> viewModel.generateParentDraft(id, lang) },
             onSendParentMessage = viewModel::sendParentMessage,
             onClearDraft = viewModel::clearDraft,
             onClearMessage = viewModel::clearMessages,
@@ -101,7 +106,7 @@ private fun PewsStudentDetailContent(
     onStart: (String) -> Unit,
     onMarkDone: (String, String) -> Unit,
     onDismiss: (String) -> Unit,
-    onGenerateDraft: (String) -> Unit,
+    onGenerateDraft: (String, String) -> Unit,
     onSendParentMessage: (String) -> Unit,
     onClearDraft: (String) -> Unit,
     onClearMessage: () -> Unit,
@@ -289,7 +294,7 @@ private fun InterventionCard(
     onStart: (String) -> Unit,
     onMarkDone: (String, String) -> Unit,
     onDismiss: (String) -> Unit,
-    onGenerateDraft: (String) -> Unit,
+    onGenerateDraft: (String, String) -> Unit,
     onSendParentMessage: (String) -> Unit,
     onClearDraft: (String) -> Unit,
 ) {
@@ -396,7 +401,7 @@ private fun InterventionCard(
                         Icon(VIcons.Sparkles, contentDescription = null, tint = c.tealDeep, modifier = Modifier.size(12.dp))
                         Spacer(Modifier.size(4.dp))
                         Text(
-                            "PARENT MESSAGE (${draftLang?.uppercase() ?: "HI"})",
+                            "PARENT MESSAGE (${draftLang?.uppercase() ?: "EN"})",
                             style = VTheme.type.label.colored(c.tealDeep).copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
                             modifier = Modifier.weight(1f),
                         )
@@ -448,13 +453,43 @@ private fun InterventionCard(
                                 enabled = !isUpdating,
                             )
                         } else {
-                            VButton(
-                                text = "Draft parent message",
-                                onClick = { onGenerateDraft(iv.id) },
-                                variant = VButtonVariant.Secondary,
-                                size = VButtonSize.Sm,
-                                enabled = !isDraftLoading,
-                            )
+                            var draftLang by remember { mutableStateOf("en") }
+                            var langDropdownOpen by remember { mutableStateOf(false) }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                VButton(
+                                    text = "Draft parent message",
+                                    onClick = { onGenerateDraft(iv.id, draftLang) },
+                                    variant = VButtonVariant.Secondary,
+                                    size = VButtonSize.Sm,
+                                    enabled = !isDraftLoading,
+                                )
+                                Box {
+                                    VButton(
+                                        text = draftLang.uppercase(),
+                                        onClick = { langDropdownOpen = true },
+                                        variant = VButtonVariant.Ghost,
+                                        size = VButtonSize.Sm,
+                                    )
+                                    DropdownMenu(
+                                        expanded = langDropdownOpen,
+                                        onDismissRequest = { langDropdownOpen = false },
+                                        containerColor = c.card,
+                                    ) {
+                                        listOf("en" to "English", "hi" to "हिन्दी", "mr" to "मराठी", "ta" to "தமிழ்", "te" to "తెలుగు", "bn" to "বাংলা").forEach { (code, label) ->
+                                            DropdownMenuItem(
+                                                text = { Text(label, style = VTheme.type.body.colored(c.ink)) },
+                                                onClick = {
+                                                    draftLang = code
+                                                    langDropdownOpen = false
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                         VButton(
                             text = "Dismiss",

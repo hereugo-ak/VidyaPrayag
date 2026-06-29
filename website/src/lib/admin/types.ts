@@ -665,3 +665,192 @@ export interface PewsEffectivenessTrend {
   points: PewsTrendPoint[];
   effectiveness: PewsEffectiveness;
 }
+
+export interface PewsDraftMessage {
+  language: string;
+  body: string;
+}
+
+export interface PewsSendParentResult {
+  sent_count: number;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// AI REPORT CARD 2.0
+// Mirrors server feature.reportcard.assemble.AssembleRouting.kt +
+// feature.reportcard.learn.LearnRouting.kt + EcosystemRouting.kt DTOs.
+// ──────────────────────────────────────────────────────────────────────────────
+
+export interface ReportCardDraft {
+  id: string;
+  studentId: string;
+  className: string;
+  section: string;
+  term: string;
+  academicYearId: string | null;
+  aiDraft: string | null;
+  classContext: string | null;
+  status: string;
+  aiProviderUsed: string | null;
+  tokensUsed: number;
+  language: string;
+  groundingFlags: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReportCardBatchResult {
+  jobId: string;
+  totalStudents: number;
+  completed: number;
+  failed: number;
+  grounded: number;
+  flagged: number;
+  fallbackUsed: number;
+  errors: string[];
+}
+
+export interface ReportCardJobStatus {
+  jobId: string;
+  status: string;
+  totalItems: number;
+  completedItems: number;
+  result: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface ReportCardOversightRow {
+  className: string;
+  section: string;
+  term: string;
+  totalDrafts: number;
+  draftCount: number;
+  flaggedCount: number;
+  approvedCount: number;
+  publishedCount: number;
+}
+
+export interface ReportCardOversightSummary {
+  schoolId: string;
+  classes: ReportCardOversightRow[];
+}
+
+export interface ReportCardPublishRequest {
+  className: string;
+  section: string;
+  term: string;
+  academicYearId?: string | null;
+}
+
+export interface ReportCardPublishResult {
+  published: number;
+}
+
+export interface ReportCardEffectivenessReport {
+  focusArea: string;
+  studentsTargeted: number;
+  studentsImproved: number;
+  effectivenessScore: number;
+  confidence: string;
+}
+
+export interface ReportCardTermConfig {
+  currentTerm: string | null;
+  termWindowDays: number;
+  enabled: boolean;
+  batchConcurrency: number;
+  fallbackOnAiFail: boolean;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// AI TUTOR 2.0
+// Mirrors server feature.tutor.heatmap.TeacherHeatmapRouting.kt +
+// feature.tutor.learn.LearnRouting.kt DTOs.
+// ──────────────────────────────────────────────────────────────────────────────
+
+export interface TutorHeatmapCell {
+  topicId: string;
+  misconceptionType: string;
+  affectedChildren: number;
+  avgMastery: number;
+  severity: string;
+}
+
+export interface TutorHeatmapResponse {
+  classId: string;
+  subjectId: string;
+  cells: TutorHeatmapCell[];
+  totalChildren: number;
+  totalMisconceptions: number;
+}
+
+export interface TutorTeacherScopeClass {
+  classId: string;
+  className: string;
+  section: string;
+  subjects: { subjectId: string; subjectName: string }[];
+}
+
+export interface TutorTeacherScopeResponse {
+  classes: TutorTeacherScopeClass[];
+}
+
+export interface TutorEfficacyTopic {
+  topicId: string;
+  mastery: number;
+  verdict: string;
+}
+
+export interface TutorEfficacyResponse {
+  childId: string;
+  subjectId: string;
+  topics: TutorEfficacyTopic[];
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// AI TOKEN MONITOR (Dev Tools — super admin only)
+// Mirrors server feature.ai.AiRouting.kt DTOs for rate-limiter, health, usage.
+// ──────────────────────────────────────────────────────────────────────────────
+
+export interface AiRateLimitEntry {
+  provider: string;
+  model: string;
+  rpm_current: number;
+  rpm_limit: number;
+  rpd_current: number;
+  rpd_limit: number;
+  tpm_current: number;
+  tpm_limit: number;
+  reserve_pct: number;
+}
+
+export interface AiHealthEntry {
+  provider: string;
+  model: string;
+  state: string;
+  total_requests: number;
+  total_failures: number;
+  rate_limit_hits: number;
+  avg_latency_ms: number;
+}
+
+export interface AiRecentUsageEntry {
+  id: string;
+  feature: string;
+  provider_used: string | null;
+  model_used: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  status: string;
+  routing_decision: string;
+  latency_ms: number;
+  error_message: string | null;
+  created_at: string;
+}
+
+export interface AiRecentUsageResponse {
+  entries: AiRecentUsageEntry[];
+  total: number;
+  window_min: number;
+}

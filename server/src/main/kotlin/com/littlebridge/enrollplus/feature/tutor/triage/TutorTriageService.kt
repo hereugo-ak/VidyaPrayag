@@ -65,13 +65,13 @@ class TutorTriageService(
     suspend fun classify(
         schoolId: UUID,
         childId: UUID,
-        subjectId: UUID,
+        subjectId: UUID?,
         question: String,
     ): TriageResult {
         TutorKillSwitch.require(TutorConstants.MODULE_TRIAGE)
 
         // 1. Build the deterministic bundle (Tier 0) for on-syllabus check
-        val bundle = bundleBuilder.build(childId, subjectId)
+        val bundle = if (subjectId != null) bundleBuilder.build(childId, subjectId) else null
 
         // 2. Deterministic on-syllabus check (no LLM needed)
         val coveredTopics = bundle?.syllabusPosition?.coveredTopicIds ?: emptyList()

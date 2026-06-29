@@ -230,6 +230,16 @@ fun parseDeepLink(path: String, currentRole: EntryRole): DeepLinkTarget {
                     DeepLinkTarget.ParentTab(EntryRole.Parent, "academics", "report-card")
             }
         }
+        "tutor" -> {
+            when (currentRole) {
+                EntryRole.Teacher ->
+                    DeepLinkTarget.TeacherScreen(currentRole, "tutor")
+                EntryRole.SchoolAdmin, EntryRole.SuperAdmin ->
+                    DeepLinkTarget.SchoolScreen(currentRole, "tutor")
+                else ->
+                    DeepLinkTarget.ParentTab(EntryRole.Parent, "academics", "tutor")
+            }
+        }
         else -> DeepLinkTarget.Generic(currentRole, path)
     }
 }
