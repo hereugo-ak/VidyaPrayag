@@ -112,14 +112,14 @@ fun TutorChatScreen(
                     title = "Error",
                     body = state.error!!,
                     icon = VIcons.AlertTriangle,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
                 )
             } else if (state.conversationHistory.isEmpty() && !state.isLoading) {
                 VEmptyState(
                     title = "Ask a question",
                     body = "Pick a subject and type your doubt below. The AI tutor will guide you step by step.",
                     icon = VIcons.BookOpen,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
                 )
             } else {
                 LazyColumn(
