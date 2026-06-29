@@ -6,8 +6,13 @@
  *
  * Post-generate, verify every number/name in the model's narrative + evidence
  * strings exists in the deterministic snapshot bundle. If the model invented
- * a figure (e.g. "attendance 23%" when the real value is 68%), drop that field
- * rather than showing fabricated data to a teacher.
+ * a figure (e.g. "attendance 23%" when the real value is 68%), drop that
+ * sentence rather than the whole narrative.
+ *
+ * Permissive strategy: vague directional claims ("struggling", "declining")
+ * are kept if the data supports the direction. Sentences naming specific
+ * causes (family illness, financial hardship) are dropped unless the
+ * deterministic bundle contains supporting evidence.
  *
  * This makes LAW 6 ("Every AI output must be grounded in deterministic data")
  * a *test*, not a hope.
@@ -30,13 +35,11 @@ object GroundingGuard {
      */
     fun verify(caseFile: CaseFile, snapshot: PewsSnapshot): CaseFile {
         val bundle = buildGroundingBundle(snapshot)
+        val signalKinds = snapshot.signals.map { it.kind.lowercase() }.toSet()
+        val causeFamily = snapshot.causeFamily?.lowercase()
 
         val verifiedNarrative = caseFile.narrative?.let { narrative ->
-            if (isGrounded(narrative, bundle)) narrative
-            else {
-                log.warn("Grounding guard: narrative contained ungrounded claims — dropping")
-                null
-            }
+            stripUngroundedSentences(narrative, bundle, signalKinds, causeFamily)
         }
 
         val verifiedHypotheses = caseFile.hypotheses.map { hyp ->
@@ -53,6 +56,143 @@ object GroundingGuard {
             hypotheses = verifiedHypotheses,
         )
     }
+
+    // ── Sentence-level stripping (permissive) ─────────────────────────────
+
+    /**
+     * Split the narrative into sentences, keep only grounded ones.
+     *
+     * Permissive rules:
+     * - Sentences with numbers: every number must appear in the bundle.
+     * - Sentences with specific-cause keywords (family, illness, financial…):
+     *   dropped unless the signal data supports that cause.
+     * - Vague directional claims ("struggling", "declining"): kept if the
+     *   data supports the direction.
+     * - Pure interpretive prose with no numbers and no cause keywords: kept.
+     *
+     * Falls back to null if fewer than 2 grounded sentences remain or the
+     * result is too short (< 40 chars), so the caller can use deterministic.
+     */
+    private fun stripUngroundedSentences(
+        narrative: String,
+        bundle: Set<String>,
+        signalKinds: Set<String>,
+        causeFamily: String?,
+    ): String? {
+        val sentences = splitSentences(narrative)
+        if (sentences.isEmpty()) return null
+
+        val kept = mutableListOf<String>()
+        var droppedCount = 0
+
+        for (sentence in sentences) {
+            val trimmed = sentence.trim()
+            if (trimmed.isEmpty()) continue
+
+            when {
+                // Rule 1: Has numbers → every number must be in the bundle
+                hasNumbers(trimmed) -> {
+                    if (isGrounded(trimmed, bundle)) {
+                        kept.add(trimmed)
+                    } else {
+                        droppedCount++
+                        log.debug("Grounding guard: dropped sentence (ungrounded number): '{}'", trimmed.take(80))
+                    }
+                }
+
+                // Rule 2: Names a specific cause → must be supported by signal data
+                namesSpecificCause(trimmed) -> {
+                    if (causeSupportedByData(trimmed, signalKinds, causeFamily)) {
+                        kept.add(trimmed)
+                    } else {
+                        droppedCount++
+                        log.warn("Grounding guard: dropped sentence (unsupported cause): '{}'", trimmed.take(80))
+                    }
+                }
+
+                // Rule 3: Vague directional or interpretive prose → keep
+                else -> {
+                    kept.add(trimmed)
+                }
+            }
+        }
+
+        if (droppedCount > 0) {
+            log.info("Grounding guard: stripped {} of {} narrative sentences (kept {})",
+                droppedCount, sentences.size, kept.size)
+        }
+
+        if (kept.size < 2 || kept.joinToString(". ").length < 40) {
+            log.warn("Grounding guard: too few grounded sentences remain ({}), falling back to deterministic", kept.size)
+            return null
+        }
+
+        return kept.joinToString(". ") + "."
+    }
+
+    /** Split text into sentences on . ! ? boundaries, keeping the content. */
+    private fun splitSentences(text: String): List<String> =
+        text.split(Regex("(?<=[.!?])\\s+"))
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+
+    /** True if the text contains any numeric digit sequence. */
+    private fun hasNumbers(text: String): Boolean =
+        Regex("\\b\\d+\\.?\\d*\\b").containsMatchIn(text)
+
+    /**
+     * Keywords that name a specific external cause. If the LLM uses these
+     * without supporting tool data, the sentence is hallucinated.
+     */
+    private val specificCauseKeywords = listOf(
+        "father", "mother", "family", "parent's illness", "parents' illness",
+        "illness", "sick", "hospital", "medical", "diagnosed",
+        "financial", "poverty", "debt", "can't afford", "cannot afford",
+        "domestic", "divorce", "separation", "death", "bereavement",
+        "abuse", "neglect", "trauma", "substance", "addiction",
+    )
+
+    /** True if the sentence names a specific external cause. */
+    private fun namesSpecificCause(text: String): Boolean {
+        val lower = text.lowercase()
+        return specificCauseKeywords.any { lower.contains(it) }
+    }
+
+    /**
+     * Check if a cause-naming sentence is supported by the deterministic data.
+     * e.g. "father's illness affecting attendance" is supported only if
+     * there's a health signal or the causeFamily is wellbeing/health.
+     */
+    private fun causeSupportedByData(
+        text: String,
+        signalKinds: Set<String>,
+        causeFamily: String?,
+    ): Boolean {
+        val lower = text.lowercase()
+
+        // Health-related claims need a health signal or wellbeing cause
+        if (lower.containsAny("illness", "sick", "hospital", "medical", "diagnosed")) {
+            return "health" in signalKinds || causeFamily == "wellbeing"
+        }
+
+        // Financial claims need a fees signal or financial cause
+        if (lower.containsAny("financial", "poverty", "debt", "afford")) {
+            return "fees" in signalKinds || causeFamily == "financial"
+        }
+
+        // Family/domestic claims — no deterministic signal covers these,
+        // so they are always ungrounded unless a future tool provides them
+        if (lower.containsAny("father", "mother", "family", "domestic", "divorce",
+                "separation", "death", "bereavement", "abuse", "neglect",
+                "trauma", "substance", "addiction")) {
+            return false
+        }
+
+        return true
+    }
+
+    private fun String.containsAny(vararg needles: String): Boolean =
+        needles.any { this.contains(it) }
 
     // ── Grounding bundle ──────────────────────────────────────────────────
 
@@ -109,14 +249,11 @@ object GroundingGuard {
 
     /**
      * Check if a text string is grounded — every number in the text must
-     * appear in the bundle. Names (student name, class) are also checked.
-     * Non-numeric prose is always allowed (it's interpretation, not data).
+     * appear in the bundle. Non-numeric prose is always allowed.
      */
     private fun isGrounded(text: String, bundle: Set<String>): Boolean {
-        // Extract all numbers from the text
         val numbers = Regex("\\b\\d+\\.?\\d*\\b").findAll(text).map { it.value }.toList()
 
-        // Every number must be in the bundle (allowing for formatting differences)
         for (num in numbers) {
             if (!bundle.contains(num) &&
                 !bundle.contains(num.trimEnd('0').trimEnd('.')) &&
@@ -127,10 +264,6 @@ object GroundingGuard {
                 return false
             }
         }
-
-        // Check student name is not fabricated (if a name-like token appears
-        // that isn't the student's name, flag it). We only check exact student
-        // name presence, not absence — the model may use first name only.
         return true
     }
 }

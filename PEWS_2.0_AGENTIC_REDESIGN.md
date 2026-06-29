@@ -457,4 +457,43 @@ PEWS v1 is a correct but generic early-warning *report*: 3 signals, one static L
 
 ---
 
+---
+
+## 15. Deferred: Per-step plan execution tracking
+
+**Status:** Deferred from initial PEWS 2.0 build. The caseworker generates a sequenced, conditional plan (2-4 steps with SLA, owner, rationale, and conditions), but the system currently stores it as a single `plan_json` blob on the intervention. There is no per-step status tracking, no automatic condition evaluation, and no auto-advancement through steps.
+
+**What works today:**
+- LLM generates branched, conditional, multi-step plans ✅
+- Plan persisted as `plan_json` in `pews_interventions` ✅
+- SLA, urgency, follow-up date extracted and enforced ✅
+- Escalation ladder (level 0 → 1 → 2) on SLA breach ✅
+- Learn measures outcomes and feeds priors ✅
+
+**What's deferred:**
+- `pews_intervention_steps` table — one row per step with `status` (pending/active/done/skipped), `started_at`, `completed_at`
+- Step advancement logic — evaluate condition, auto-advance to next step
+- Per-step push notifications — notify teacher when a step becomes active
+- Mid-plan re-planning — re-run caseworker with "step 1 failed, re-plan from here" (optional, token-cost)
+
+**Rationale for deferral:** The narrative already suggests what to do. The full workflow execution loop (per-step tracking, condition evaluation, auto-advancement) is a valuable future enhancement but not blocking for the initial PEWS 2.0 release. The current single-status intervention + SLA escalation provides sufficient accountability.
+
+---
+
+## 16. GroundingGuard: Permissive sentence-level stripping
+
+**Implemented:** The GroundingGuard now uses a permissive sentence-level stripping strategy instead of dropping the entire narrative when any ungrounded claim is found.
+
+**Rules:**
+1. **Sentences with numbers** — every number must appear in the deterministic bundle. If "attendance 23%" appears but the real value is 68%, that sentence is dropped.
+2. **Sentences naming specific causes** (family, illness, financial, domestic) — dropped unless the deterministic signal data supports that cause (e.g., health signal present → illness claim is grounded).
+3. **Vague directional claims** ("struggling", "declining", "needs support") — kept. These are interpretation, not fabricated data.
+4. **Pure interpretive prose** with no numbers and no cause keywords — kept.
+
+**Fallback:** If fewer than 2 grounded sentences remain or the result is too short (< 40 chars), the entire narrative is replaced with the deterministic fallback.
+
+**Token cost:** Zero. This is pure Kotlin string processing — regex sentence splitting, number extraction, and HashMap lookups against the deterministic bundle. No LLM call required.
+
+---
+
 *End of PEWS 2.0 redesign brief. Next session: start at §11 Phase 0 (operational fixes from the log) → Phase 1 (signal richness) → Phase 2 (async + tools).*
