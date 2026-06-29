@@ -10,6 +10,8 @@ import {
   IconBolt,
   IconAlumni,
   IconShield,
+  IconBook,
+  IconReport,
 } from "@/components/admin/icons";
 
 export interface NavItem {
@@ -26,6 +28,8 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/alumni", label: "Alumni", icon: IconAlumni },
   { href: "/admin/attendance", label: "Attendance", icon: IconAttendance },
   { href: "/admin/early-warning", label: "Early Warning", icon: IconShield },
+  { href: "/admin/report-card", label: "Report Cards", icon: IconReport },
+  { href: "/admin/tutor", label: "AI Tutor", icon: IconBook },
   { href: "/admin/marks", label: "Marks", icon: IconMarks },
   { href: "/admin/fees", label: "Fees", icon: IconFees },
   { href: "/admin/announcements", label: "Announcements", icon: IconAnnounce },

@@ -140,7 +140,7 @@ class ReportAssemblyService(
         section: String,
         term: String,
         academicYearId: UUID?,
-        language: String = "hi",
+        language: String = "en",
         createdBy: UUID,
     ): BatchResult {
         ReportCardKillSwitch.require(ReportCardConstants.MODULE_ASSEMBLE)
@@ -750,7 +750,7 @@ class ReportAssemblyService(
      */
     suspend fun resolveLanguagePref(userId: UUID): String = dbQuery {
         AppUsersTable.selectAll().where { AppUsersTable.id eq userId }
-            .singleOrNull()?.get(AppUsersTable.languagePref) ?: "hi"
+            .singleOrNull()?.get(AppUsersTable.languagePref) ?: "en"
     }
 
     /**

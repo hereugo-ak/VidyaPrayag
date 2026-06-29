@@ -88,6 +88,19 @@ data class AiHealthDto(
 )
 
 @Serializable
+data class AiRateLimitDto(
+    val provider: String,
+    val model: String,
+    @kotlinx.serialization.SerialName("rpm_current") val rpmCurrent: Int,
+    @kotlinx.serialization.SerialName("rpm_limit") val rpmLimit: Int,
+    @kotlinx.serialization.SerialName("rpd_current") val rpdCurrent: Long,
+    @kotlinx.serialization.SerialName("rpd_limit") val rpdLimit: Int,
+    @kotlinx.serialization.SerialName("tpm_current") val tpmCurrent: Int,
+    @kotlinx.serialization.SerialName("tpm_limit") val tpmLimit: Int,
+    @kotlinx.serialization.SerialName("reserve_pct") val reservePct: Int,
+)
+
+@Serializable
 data class RotateKeyRequest(
     @kotlinx.serialization.SerialName("api_key") val apiKey: String,
     val model: String? = null,
@@ -174,6 +187,25 @@ fun Route.aiRouting() {
                 )
             }
             call.ok(snap, "AI provider health")
+        }
+
+        // ---- PLATFORM ADMIN: live rate-limiter usage (RPM/RPD/TPM) ----
+        get("/api/v1/admin/ai/rate-limits") {
+            call.requirePlatformAdmin() ?: return@get
+            val snap = RateLimiter.snapshot().map {
+                AiRateLimitDto(
+                    provider = it.provider,
+                    model = it.model,
+                    rpmCurrent = it.rpmCurrent,
+                    rpmLimit = it.rpmLimit,
+                    rpdCurrent = it.rpdCurrent,
+                    rpdLimit = it.rpdLimit,
+                    tpmCurrent = it.tpmCurrent,
+                    tpmLimit = it.tpmLimit,
+                    reservePct = it.reservePct,
+                )
+            }
+            call.ok(snap, "AI rate-limiter status")
         }
 
         // ---- PLATFORM ADMIN: rotate a provider key (live, no redeploy) ----

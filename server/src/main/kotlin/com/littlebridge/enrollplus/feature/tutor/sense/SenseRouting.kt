@@ -71,10 +71,38 @@ fun Route.senseRouting() {
         } ?: ""
 
         val classId = dbQuery {
-            SchoolClassesTable.selectAll().where {
+            // 1. Try exact code match
+            var row = SchoolClassesTable.selectAll().where {
                 (SchoolClassesTable.schoolId eq schoolId) and
-                (SchoolClassesTable.code eq className)
-            }.singleOrNull()?.get(SchoolClassesTable.id)?.value
+                    (SchoolClassesTable.code eq className)
+            }.singleOrNull()
+
+            // 2. Try normalized match (strip "Class ", "Std ", "Grade " prefixes, trim, lowercase)
+            if (row == null) {
+                val normalizedClassName = className
+                    .replace(Regex("^(?i)(class|std|standard|grade)\\s*"), "")
+                    .trim()
+                row = SchoolClassesTable.selectAll().where {
+                    (SchoolClassesTable.schoolId eq schoolId)
+                }.toList().firstOrNull { r ->
+                    val normalizedCode = r[SchoolClassesTable.code]
+                        .replace(Regex("^(?i)(class|std|standard|grade)\\s*"), "")
+                        .trim()
+                    normalizedCode.equals(normalizedClassName, ignoreCase = true) ||
+                        r[SchoolClassesTable.code].equals(className, ignoreCase = true) ||
+                        r[SchoolClassesTable.name]?.equals(className, ignoreCase = true) == true
+                }
+            }
+
+            // 3. Try matching by class name field
+            if (row == null) {
+                row = SchoolClassesTable.selectAll().where {
+                    (SchoolClassesTable.schoolId eq schoolId) and
+                        (SchoolClassesTable.name eq className)
+                }.singleOrNull()
+            }
+
+            row?.get(SchoolClassesTable.id)?.value
         }
 
         val subjects = dbQuery {

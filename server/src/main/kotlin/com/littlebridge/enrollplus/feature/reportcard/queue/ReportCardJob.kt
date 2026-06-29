@@ -69,7 +69,7 @@ object ReportCardJob {
         section: String,
         term: String,
         academicYearId: UUID? = null,
-        language: String = "hi",
+        language: String = "en",
         createdBy: UUID? = null,
     ): UUID {
         val jobId = UUID.randomUUID()
@@ -291,7 +291,7 @@ object ReportCardJob {
         val section: String,
         val term: String,
         val academicYearId: UUID? = null,
-        val language: String = "hi",
+        val language: String = "en",
     )
 
     private fun parsePayload(payload: String): JobParams {
@@ -309,7 +309,7 @@ object ReportCardJob {
             section = map["section"] ?: "A",
             term = map["term"] ?: "Term 1",
             academicYearId = map["academicYearId"]?.let { runCatching { UUID.fromString(it) }.getOrNull() },
-            language = map["language"] ?: "hi",
+            language = map["language"] ?: "en",
         )
     }
 

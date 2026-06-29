@@ -48,7 +48,7 @@ object ActModule : PEWSModule {
                         runCatching { UUID.fromString(it) }.getOrNull()
                     } ?: run { call.fail("invalid intervention id"); return@post }
 
-                    val language = call.request.queryParameters["lang"] ?: "hi"
+                    val language = call.request.queryParameters["lang"] ?: "en"
 
                     val result = parentDraftService.generateDraft(ctx.schoolId, interventionId, language)
                     if (result.ok) {

@@ -22,8 +22,8 @@ open class ReportCardRepository(
     suspend fun getDraft(token: String, draftId: String) =
         api.getDraft(token, draftId)
 
-    suspend fun editDraft(token: String, draftId: String, editedDraft: String) =
-        api.editDraft(token, draftId, ReportCardModels.EditDraftRequest(editedDraft))
+    suspend fun editDraft(token: String, draftId: String, draftJson: String) =
+        api.editDraft(token, draftId, ReportCardModels.EditDraftRequest(draftJson))
 
     suspend fun approveDraft(token: String, draftId: String) =
         api.approveDraft(token, draftId)

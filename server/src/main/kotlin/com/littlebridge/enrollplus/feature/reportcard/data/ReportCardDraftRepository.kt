@@ -93,7 +93,7 @@ class ReportCardDraftRepository {
         academicYearId: UUID?,
         factBundle: String,
         factHash: String,
-        language: String = "hi",
+        language: String = "en",
         templateVersion: Int = 1,
     ): UUID = dbQuery {
         val now = Instant.now()

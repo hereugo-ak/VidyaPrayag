@@ -41,6 +41,9 @@ import com.littlebridge.enrollplus.feature.pews.queue.PewsJobQueue
 import com.littlebridge.enrollplus.db.ChildrenTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.db.PewsConfigTable
+import com.littlebridge.enrollplus.feature.pews.act.ActModule
+import com.littlebridge.enrollplus.feature.pews.act.DraftMessageResponse
+import com.littlebridge.enrollplus.feature.pews.act.SendParentMessageResponse
 import com.littlebridge.enrollplus.feature.pews.caseworker.CaseFileCodec
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -355,6 +358,44 @@ fun Route.pewsRouting() {
                 val updated = interventionService.getIntervention(ctx.schoolId, id)
                 if (updated == null) call.fail("Intervention not found after update", HttpStatusCode.NotFound)
                 else call.ok(updated.toDto(), "Intervention updated")
+            }
+        }
+
+        // School admin: generate parent draft message for an intervention
+        post("/api/v1/school/pews/interventions/{id}/draft-message") {
+            val ctx = call.requireSchoolAdmin() ?: return@post
+            val id = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                ?: run { call.fail("invalid intervention id"); return@post }
+            val language = call.request.queryParameters["lang"] ?: "en"
+            val result = ActModule.parentDraftService.generateDraft(ctx.schoolId, id, language)
+            if (result.ok) {
+                call.ok(
+                    DraftMessageResponse(language = result.language, body = result.body ?: ""),
+                    "Parent draft generated"
+                )
+            } else {
+                call.fail(result.errorMessage ?: "draft generation failed")
+            }
+        }
+
+        // School admin: send parent message + mark intervention done
+        post("/api/v1/school/pews/interventions/{id}/send-parent-message") {
+            val ctx = call.requireSchoolAdmin() ?: return@post
+            val id = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                ?: run { call.fail("invalid intervention id"); return@post }
+            val result = ActModule.parentDraftService.sendParentMessage(
+                schoolId = ctx.schoolId,
+                interventionId = id,
+                senderId = ctx.userId,
+                senderName = ctx.fullName,
+            )
+            if (result.ok) {
+                call.ok(
+                    SendParentMessageResponse(result.sentCount),
+                    "Message sent to ${result.sentCount} parent(s)"
+                )
+            } else {
+                call.fail(result.errorMessage ?: "failed to send message")
             }
         }
 

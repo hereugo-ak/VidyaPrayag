@@ -56,7 +56,7 @@ object ReportCardModels {
         val status: String,
         val aiProviderUsed: String? = null,
         val tokensUsed: Int = 0,
-        val language: String = "hi",
+        val language: String = "en",
         val groundingFlags: String? = null,
         val createdAt: String,
         val updatedAt: String,
@@ -64,7 +64,7 @@ object ReportCardModels {
 
     @Serializable
     data class EditDraftRequest(
-        val editedDraft: String,
+        val draftJson: String,
     )
 
     @Serializable
@@ -186,7 +186,7 @@ object ReportCardModels {
         val section: String,
         val aiDraft: String? = null,
         val classContext: String? = null,
-        val language: String = "hi",
+        val language: String = "en",
         val publishedAt: String? = null,
         val groundingFlags: String? = null,
     )
