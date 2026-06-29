@@ -969,6 +969,9 @@ object AssessmentsTable : UUIDTable("assessments", "id") {
     // two in sync (status='published' ⇔ is_published=true).
     val status          = varchar("status", 16).default("draft")
     val createdBy       = uuid("created_by").nullable()         // FK app_users.id (author audit)
+    // AI Tutor 2.0: optional FK to curriculum_units for per-topic score derivation.
+    // Nullable for backward compat — existing assessments have no topic mapping.
+    val topicId         = uuid("topic_id").nullable()           // FK curriculum_units.id
 }
 
 /**
@@ -2334,6 +2337,565 @@ object TransportAttendanceTable : UUIDTable("transport_attendance", "id") {
         uniqueIndex("ux_transport_attendance_unique", schoolId, studentId, date)
         index("idx_transport_attendance_route_date", false, routeId, date)
         index("idx_transport_attendance_school_date", false, schoolId, date)
+    }
+}
+
+// =====================================================================
+// AI GATEWAY (AI_FEATURES_PLAN.md §4 / AI_INFRASTRUCTURE_SPEC.md §6)
+//   The shared, multi-provider AI choke point every AI feature calls.
+//   Provider strategy: seven OpenAI-compatible free-tier providers
+//   (Cerebras / Groq / Groq-Fast / SambaNova / Mistral / OpenRouter / Gemini) — see KeyVault.
+//
+//   Applied by docs/db/migration_060_ai_gateway.sql (must run BEFORE the
+//   matching deploy; AUTO_CREATE_TABLES is OFF in prod and validateSchema()
+//   gates boot on table presence). Column names/types are kept in lock-step
+//   with that migration.
+//
+//   NOTE on money columns: cost is stored as `double` (USD) to stay
+//   dependency-free and consistent with fee_records.amount (also double).
+//   Free-tier providers are $0, so cost is informational only.
+// =====================================================================
+
+/**
+ * Provider registry. One row per (provider, model). `api_key_encrypted`
+ * holds the AES-256-GCM ciphertext of the provider key (IV-prefixed,
+ * base64). KeyVault seeds/refreshes these rows from the AI_<PROVIDER>_API_KEY
+ * env vars on boot and decrypts on demand (never logs the plaintext).
+ */
+object AiProviderConfigTable : UUIDTable("ai_provider_config", "id") {
+    val provider            = varchar("provider", 32)               // cerebras|groq|groq_fast|sambanova|mistral|openrouter|gemini
+    val model               = varchar("model", 96)                  // pinned model id (capability, not brand)
+    val apiKeyEncrypted     = text("api_key_encrypted")             // AES-256-GCM (empty = unconfigured)
+    val baseUrl             = text("base_url")                      // OpenAI-compatible /v1 base
+    val isActive            = bool("is_active").default(true)
+    val priority            = integer("priority").default(0)        // failover order within a lane (0 = primary)
+    val tier                = varchar("tier", 16).default("fast")   // fast|reason|batch|stt
+    val noTraining          = bool("no_training").default(true)     // false = training opt-in (PII-restricted)
+    val maxTokensPerRequest = integer("max_tokens_per_request").default(2048)
+    val temperature         = double("temperature").default(0.4)
+    val createdAt           = timestamp("created_at")
+    val updatedAt           = timestamp("updated_at")
+    init { uniqueIndex("ux_ai_provider_model", provider, model) }
+}
+
+/**
+ * Versioned prompt templates. `pii_allowed_providers` is a CSV allow-list that
+ * gates which providers a PII-bearing prompt may use (privacy routing rule).
+ */
+object AiPromptTemplatesTable : UUIDTable("ai_prompt_templates", "id") {
+    val feature             = varchar("feature", 48)                // pews|report_card|...
+    val name                = varchar("name", 128)
+    val version             = integer("version").default(1)
+    val systemPrompt        = text("system_prompt")
+    val userPromptTemplate  = text("user_prompt_template")          // with {{var}} placeholders
+    val variables           = text("variables").default("[]")       // JSON array of names
+    val piiAllowedProviders = text("pii_allowed_providers").default("") // CSV; empty = all no-training
+    val guardrailConfig     = text("guardrail_config").default("{}")
+    val trafficWeight       = integer("traffic_weight").default(100)
+    val isActive            = bool("is_active").default(true)
+    val createdAt           = timestamp("created_at")
+    init { uniqueIndex("ux_ai_prompt", feature, name, version) }
+}
+
+/** Per-school observability + quota source. Append-only. */
+object AiUsageLogTable : UUIDTable("ai_usage_log", "id") {
+    val schoolId            = uuid("school_id").nullable()          // null for platform/system calls
+    val userId              = uuid("user_id").nullable()
+    val feature             = varchar("feature", 48)
+    val provider            = varchar("provider", 32)               // requested lane primary
+    val model               = varchar("model", 96)
+    val providerUsed        = varchar("provider_used", 32).nullable() // actual (may differ on failover)
+    val modelUsed           = varchar("model_used", 96).nullable()
+    val inputTokens         = integer("input_tokens").default(0)
+    val outputTokens        = integer("output_tokens").default(0)
+    val costUsd             = double("cost_usd").default(0.0)
+    val latencyMs           = integer("latency_ms").default(0)
+    val status              = varchar("status", 16)                 // success|failed|cached|guardrail_blocked
+    val routingDecision     = varchar("routing_decision", 32).default("direct") // direct|cache_l1_hit|failed_over
+    val errorMessage        = text("error_message").nullable()
+    val createdAt           = timestamp("created_at")
+    init {
+        index("idx_ai_usage_school_date", false, schoolId, createdAt)
+        index("idx_ai_usage_feature", false, schoolId, feature, createdAt)
+    }
+}
+
+/** L1 exact-match response cache (SHA-256 of prompt+model+temp), school-scoped, TTL. */
+object AiResponseCacheTable : UUIDTable("ai_response_cache", "id") {
+    val cacheKey            = text("cache_key")
+    val schoolId            = uuid("school_id").nullable()
+    val feature             = varchar("feature", 48)
+    val response            = text("response")
+    val inputTokens         = integer("input_tokens").default(0)
+    val outputTokens        = integer("output_tokens").default(0)
+    val providerUsed        = varchar("provider_used", 32).nullable()
+    val modelUsed           = varchar("model_used", 96).nullable()
+    val expiresAt           = timestamp("expires_at")
+    val createdAt           = timestamp("created_at")
+    init {
+        uniqueIndex("ux_ai_cache_key", cacheKey)
+        index("idx_ai_cache_expiry", false, expiresAt)
+    }
+}
+
+/** Batch job queue for class/school-wide AI runs. */
+object AiJobsTable : UUIDTable("ai_jobs", "id") {
+    val schoolId            = uuid("school_id")
+    val feature             = varchar("feature", 48)
+    val status              = varchar("status", 16).default("queued") // queued|processing|completed|failed
+    val totalItems          = integer("total_items").default(0)
+    val completedItems      = integer("completed_items").default(0)
+    val result              = text("result").nullable()
+    val createdBy           = uuid("created_by").nullable()
+    val createdAt           = timestamp("created_at")
+    val updatedAt           = timestamp("updated_at")
+    val completedAt         = timestamp("completed_at").nullable()
+    init { index("idx_ai_jobs_status", false, schoolId, status, createdAt) }
+}
+
+/** Per-(provider,model) circuit-breaker state + rolling health for dual-home routing. */
+object AiProviderHealthTable : UUIDTable("ai_provider_health", "id") {
+    val provider            = varchar("provider", 32)
+    val model               = varchar("model", 96)
+    val circuitState        = varchar("circuit_state", 16).default("closed") // closed|open|half_open
+    val totalRequests       = integer("total_requests").default(0)
+    val totalFailures       = integer("total_failures").default(0)
+    val consecutiveFailures = integer("consecutive_failures").default(0)
+    val avgLatencyMs        = integer("avg_latency_ms").default(0)
+    val rateLimitHits       = integer("rate_limit_hits").default(0)
+    val lastFailureAt       = timestamp("last_failure_at").nullable()
+    val circuitOpenedAt     = timestamp("circuit_opened_at").nullable()
+    val lastUpdated         = timestamp("last_updated")
+    init { uniqueIndex("ux_ai_health_provider_model", provider, model) }
+}
+
+// =====================================================================
+// PEWS — Predictive Early Warning System (AI_FEATURES_PLAN.md Part A §A.3)
+//   The agent's memory: deterministic risk snapshots, the intervention
+//   Act+Learn loop, and per-school tuning. Inputs (attendance/marks/leave)
+//   come from EXISTING tables — no schema change there.
+//
+//   Applied by docs/db/migration_061_pews.sql (must run BEFORE the matching
+//   deploy; AUTO_CREATE_TABLES is OFF in prod).
+// =====================================================================
+
+/**
+ * One auditable, reproducible row per (school, student, run_date). The
+ * deterministic layer owns every number; the ai_* columns are nullable and
+ * filled only by the Reason stage (null = not yet reasoned). Every AI field
+ * therefore traces to a real snapshot (honesty LAW 6).
+ */
+object PewsRiskSnapshotsTable : UUIDTable("pews_risk_snapshots", "id") {
+    val schoolId          = uuid("school_id")
+    val studentCode       = text("student_code")
+    val runDate           = date("run_date")
+    val riskScore         = integer("risk_score")            // 0..100 composite (deterministic)
+    val riskLevel         = varchar("risk_level", 8)         // watch | medium | high
+    val attendancePct     = integer("attendance_pct").nullable()
+    val marksPct          = integer("marks_pct").nullable()
+    val leaveCount        = integer("leave_count").default(0)
+    val attendanceSlope   = double("attendance_slope").nullable() // negative = sliding
+    val marksSlope        = double("marks_slope").nullable()
+    val signalsJson       = text("signals_json")            // deterministic reasons array (JSON)
+    val signalHash        = varchar("signal_hash", 64)      // SHA-256 of the signal bundle (cache key)
+    val aiNarrative       = text("ai_narrative").nullable()
+    val aiCause           = text("ai_cause").nullable()
+    val aiRecommendation  = text("ai_recommendation").nullable()
+    val aiProviderUsed    = varchar("ai_provider_used", 32).nullable()
+    val createdAt         = timestamp("created_at")
+    // PEWS 2.0 — expanded feature vector columns
+    val confidence        = double("confidence").nullable()       // 0..1 — data completeness × signal agreement
+    val leadingScore      = integer("leading_score").nullable()   // weight leading indicators (predictive)
+    val causeFamily       = varchar("cause_family", 24).nullable() // attendance|academic|disengagement|wellbeing|financial|external
+    val deltasJson        = text("deltas_json").nullable()         // JSON of deltas vs last run (for auto-outcome)
+    init {
+        uniqueIndex("ux_pews_snap_unique", schoolId, studentCode, runDate)
+        index("idx_pews_snap", false, schoolId, runDate, riskLevel)
+        index("idx_pews_snap_cause", false, schoolId, causeFamily)
+    }
+}
+
+/** Intervention tasks — the Act + Learn loop. */
+object PewsInterventionsTable : UUIDTable("pews_interventions", "id") {
+    val schoolId      = uuid("school_id")
+    val studentCode   = text("student_code")
+    val snapshotId    = uuid("snapshot_id").nullable()      // FK pews_risk_snapshots.id
+    val ownerUserId   = uuid("owner_user_id")               // assigned teacher/admin
+    val actionType    = varchar("action_type", 32)          // parent_call|home_visit|counselling|remedial_class|parent_message|observe|mentor_pairing|fee_counselling
+    val status        = varchar("status", 16).default("open") // open|in_progress|done|dismissed
+    val notes         = text("notes").nullable()
+    val openedAt      = timestamp("opened_at")
+    val resolvedAt    = timestamp("resolved_at").nullable()
+    val outcome       = varchar("outcome", 16).nullable()   // improved|unchanged|worsened (Learn stage)
+    val createdAt     = timestamp("created_at")
+    // PEWS 2.0 — managed casework columns
+    val planJson      = text("plan_json").nullable()         // sequenced plan steps (JSON)
+    val slaDays       = integer("sla_days").nullable()       // SLA for this intervention
+    val escalationLevel = integer("escalation_level").default(0) // 0=normal, 1=reminded, 2=escalated to admin
+    val followUpDate  = date("follow_up_date").nullable()    // when to re-check this child
+    val caseFileId    = uuid("case_file_id").nullable()      // FK pews_case_files.id
+    val urgency       = varchar("urgency", 8).nullable()     // low|medium|high
+    val causeFamily   = varchar("cause_family", 24).nullable() // denormalized from snapshot for effectiveness queries
+    init { index("idx_pews_intv", false, schoolId, status, ownerUserId) }
+}
+
+/** Per-school tuning so thresholds aren't hardcoded. PK = school_id. */
+object PewsConfigTable : UUIDTable("pews_config", "id") {
+    // id is the school_id (one row per school); we still use UUIDTable for
+    // mapping uniformity but treat id as the school identity.
+    val useRelativeThresholds = bool("use_relative_thresholds").default(true)
+    val attendanceFloorPct    = integer("attendance_floor_pct").default(75)
+    val marksFloorPct         = integer("marks_floor_pct").default(40)
+    val leaveFloorCount       = integer("leave_floor_count").default(3)
+    val runFrequency          = varchar("run_frequency", 8).default("daily") // daily|weekly
+    val aiNarrativeEnabled    = bool("ai_narrative_enabled").default(true)
+    val parentShareEnabled    = bool("parent_share_enabled").default(false)
+    val updatedAt             = timestamp("updated_at")
+}
+
+// =====================================================================
+// PEWS 2.0 — Feature flags / kill switch (hot-reloadable via polling).
+// One row per module name. "global" = entire PEWS kill switch.
+// =====================================================================
+
+object PewsFeatureFlagsTable : UUIDTable("pews_feature_flags", "id") {
+    val moduleName    = varchar("module_name", 48)   // "global" | "sense" | "triage" | "caseworker" | "act" | "learn"
+    val isKilled      = bool("is_killed").default(false)
+    val updatedAt     = timestamp("updated_at")
+    val updatedBy     = uuid("updated_by").nullable()
+    init {
+        uniqueIndex("ux_pews_flags_module", moduleName)
+    }
+}
+
+// =====================================================================
+// PEWS 2.0 — Case files (structured output from the Caseworker Agent).
+// One row per caseworker run. Stores the full structured JSON plus
+// extracted fields for querying (urgency, narrative, parent draft).
+// =====================================================================
+
+object PewsCaseFilesTable : UUIDTable("pews_case_files", "id") {
+    val schoolId        = uuid("school_id")
+    val snapshotId      = uuid("snapshot_id").nullable()    // FK pews_risk_snapshots.id
+    val studentCode     = text("student_code")
+    val caseFileJson    = text("case_file_json")            // full structured case file (JSON)
+    val narrative       = text("narrative").nullable()      // extracted for querying
+    val urgency         = varchar("urgency", 8).nullable()   // low|medium|high
+    val skipReason      = text("skip_reason").nullable()     // e.g. "exam week — defer"
+    val parentDraftJson = text("parent_draft_json").nullable() // vernacular draft (JSON)
+    val parentDraftLang = varchar("parent_draft_lang", 8).nullable() // hi|en|...
+    val providerUsed    = varchar("provider_used", 32).nullable()
+    val modelUsed       = varchar("model_used", 64).nullable()
+    val groundingPassed = bool("grounding_passed").default(true)
+    val createdAt       = timestamp("created_at")
+    init {
+        index("idx_pews_case_files", false, schoolId, studentCode)
+    }
+}
+
+// =====================================================================
+// PEWS 2.0 — Effectiveness priors (the flywheel's policy memory).
+// Per-school, per-cause-family, per-action-type: how often does this
+// action improve outcomes for this cause? This is what
+// get_similar_resolved_cases() reads and what the LEARN stage updates.
+// =====================================================================
+
+object PewsEffectivenessPriorsTable : UUIDTable("pews_effectiveness_priors", "id") {
+    val schoolId        = uuid("school_id")
+    val causeFamily     = varchar("cause_family", 24)       // attendance|academic|disengagement|wellbeing|financial|external
+    val actionType      = varchar("action_type", 32)        // parent_call|home_visit|counselling|...
+    val nTried          = integer("n_tried").default(0)
+    val nImproved       = integer("n_improved").default(0)
+    val improveRate     = double("improve_rate").default(0.0)
+    val avgDaysToImprove = double("avg_days_to_improve").default(0.0)
+    val updatedAt       = timestamp("updated_at")
+    init {
+        uniqueIndex("ux_pews_priors", schoolId, causeFamily, actionType)
+    }
+}
+
+// =====================================================================
+// AI Report Card 2.0 (AI_REPORT_CARD_2.0_AGENTIC_REDESIGN.md)
+//   5 new tables for the 5-tier agentic report card system.
+//   Applied by docs/db/migration_062_report_card.sql (must run before deploy;
+//   AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates boot on it).
+// =====================================================================
+
+/**
+ * Per-student AI-generated report card draft. One row per
+ * (school, student, term, academic_year). Status state machine:
+ * draft → flagged_for_review → approved → published → archived.
+ */
+object ReportCardDraftsTable : UUIDTable("report_card_drafts", "id") {
+    val schoolId           = uuid("school_id")
+    val studentId          = uuid("student_id")
+    val classId            = uuid("class_id").nullable()
+    val className          = text("class_name")
+    val section            = varchar("section", 8).default("A")
+    val term               = varchar("term", 16)
+    val academicYearId     = uuid("academic_year_id").nullable()
+    val factBundle         = text("fact_bundle")
+    val factHash           = varchar("fact_hash", 64)
+    val aiDraft            = text("ai_draft").nullable()
+    val classContext       = text("class_context").nullable()
+    val aiProviderUsed     = varchar("ai_provider_used", 32).nullable()
+    val aiModelUsed        = varchar("ai_model_used", 96).nullable()
+    val tokensUsed         = integer("tokens_used").default(0)
+    val templateVersion    = integer("template_version").default(1)
+    val language           = varchar("language", 8).default("hi")
+    val status             = varchar("status", 24).default("draft")
+    val groundingFlags     = text("grounding_flags").nullable()
+    val editedBy           = uuid("edited_by").nullable()
+    val editedAt           = timestamp("edited_at").nullable()
+    val approvedBy         = uuid("approved_by").nullable()
+    val approvedAt         = timestamp("approved_at").nullable()
+    val publishedBy        = uuid("published_by").nullable()
+    val publishedAt        = timestamp("published_at").nullable()
+    val createdAt          = timestamp("created_at")
+    val updatedAt          = timestamp("updated_at")
+    init {
+        index("idx_rcd_school_class_term", false, schoolId, classId, term, academicYearId)
+        index("idx_rcd_status", false, schoolId, status)
+        index("idx_rcd_student", false, studentId, academicYearId)
+        uniqueIndex("ux_rcd_student_term_year", schoolId, studentId, term, academicYearId)
+    }
+}
+
+/**
+ * Tier 4 flywheel: tracks how effective focus-area recommendations were.
+ * One row per (school, focus_area, term, academic_year).
+ */
+object ReportFocusEffectivenessTable : UUIDTable("report_focus_effectiveness", "id") {
+    val schoolId           = uuid("school_id")
+    val focusArea          = varchar("focus_area", 64)
+    val term               = varchar("term", 16)
+    val academicYearId     = uuid("academic_year_id").nullable()
+    val studentsTargeted   = integer("students_targeted").default(0)
+    val studentsImproved   = integer("students_improved").default(0)
+    val avgDelta           = double("avg_delta").default(0.0)
+    val effectivenessScore = double("effectiveness_score").default(0.0)
+    val sampleSize         = integer("sample_size").default(0)
+    val confidence         = varchar("confidence", 16).default("low")
+    val metadata           = text("metadata").nullable()
+    val createdAt          = timestamp("created_at")
+    val updatedAt          = timestamp("updated_at")
+    init {
+        uniqueIndex("ux_rfe_school_focus_term", schoolId, focusArea, term, academicYearId)
+    }
+}
+
+/**
+ * NEP 2020 360-degree holistic assessment. Graceful when empty —
+ * Tier-0 treats absence as "no holistic data" (no crash).
+ */
+object HolisticAssessmentsTable : UUIDTable("holistic_assessments", "id") {
+    val schoolId           = uuid("school_id")
+    val studentId          = uuid("student_id")
+    val classId            = uuid("class_id").nullable()
+    val term               = varchar("term", 16)
+    val academicYearId     = uuid("academic_year_id").nullable()
+    val assessorType       = varchar("assessor_type", 16)  // self|peer|teacher|parent
+    val assessorId         = uuid("assessor_id").nullable()
+    val criticalThinking   = integer("critical_thinking").nullable()
+    val creativity          = integer("creativity").nullable()
+    val communication      = integer("communication").nullable()
+    val collaboration      = integer("collaboration").nullable()
+    val selfAwareness      = integer("self_awareness").nullable()
+    val socialEmotional    = integer("social_emotional").nullable()
+    val remarks            = text("remarks").nullable()
+    val createdAt          = timestamp("created_at")
+    val updatedAt          = timestamp("updated_at")
+    init {
+        index("idx_ha_student_term", false, schoolId, studentId, term, academicYearId)
+    }
+}
+
+/**
+ * NEP co-scholastic records: arts, sports, life skills, values.
+ * Graceful when empty — Tier-0 treats absence as "no co-scholastic data".
+ */
+object CoScholasticRecordsTable : UUIDTable("co_scholastic_records", "id") {
+    val schoolId           = uuid("school_id")
+    val studentId          = uuid("student_id")
+    val classId            = uuid("class_id").nullable()
+    val term               = varchar("term", 16)
+    val academicYearId     = uuid("academic_year_id").nullable()
+    val category           = varchar("category", 32)  // arts|sports|life_skills|values|work_education
+    val activityName       = text("activity_name")
+    val grade              = varchar("grade", 4).nullable()
+    val descriptor         = text("descriptor").nullable()
+    val teacherRemarks     = text("teacher_remarks").nullable()
+    val recordedBy         = uuid("recorded_by").nullable()
+    val createdAt          = timestamp("created_at")
+    val updatedAt          = timestamp("updated_at")
+    init {
+        index("idx_csr_student_term", false, schoolId, studentId, term, academicYearId)
+    }
+}
+
+/**
+ * Board-specific report card layout templates (CBSE, ICSE, IB, State, NEP HPC).
+ * Used by Tier-0 for grading scale and by Tier-3 for layout.
+ */
+object ReportCardTemplatesTable : UUIDTable("report_card_templates", "id") {
+    val schoolId               = uuid("school_id").nullable()  // null = global template
+    val board                  = varchar("board", 32)
+    val gradeRange             = varchar("grade_range", 16)
+    val templateName           = text("template_name")
+    val version                = integer("version").default(1)
+    val gradingScale           = text("grading_scale")
+    val layout                 = text("layout").nullable()
+    val includesHolistic       = bool("includes_holistic").default(true)
+    val includesCoScholastic   = bool("includes_co_scholastic").default(true)
+    val includesAttendance     = bool("includes_attendance").default(true)
+    val includesAiNarrative    = bool("includes_ai_narrative").default(true)
+    val isActive               = bool("is_active").default(true)
+    val createdAt              = timestamp("created_at")
+    val updatedAt              = timestamp("updated_at")
+    init {
+        index("idx_rct_board_grade", false, board, gradeRange, isActive)
+    }
+}
+
+// =====================================================================
+// AI Tutor 2.0 (AI_TUTOR_2.0_AGENTIC_REDESIGN.md §12)
+//   Created/applied by docs/db/migration_064_tutor_2.sql (must run before
+//   deploy; AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates
+//   boot on it). Reuses pews_feature_flags for kill-switch flags.
+// =====================================================================
+
+/**
+ * Per-child per-subject AI Tutor agent session. Stores the full conversation
+ * as an array of grounded [TutorTurn] objects plus an audit trail of every
+ * fact and its source. Supersedes the v1 `ai_tutor_sessions` table.
+ *
+ * Spec: §12.2
+ */
+object TutorSessionsTable : UUIDTable("tutor_sessions", "id") {
+    val schoolId       = uuid("school_id")
+    val childId        = uuid("child_id")
+    val subjectId      = uuid("subject_id").nullable()
+    val academicYearId = uuid("academic_year_id").nullable()
+    val mode           = varchar("mode", 16).default("DOUBT")
+    val intentClass    = varchar("intent_class", 64).nullable()
+    val turns          = text("turns").default("[]")       // JSONB — array of TutorTurn
+    val groundedRefs   = text("grounded_refs").default("[]") // JSONB — audit: fact + source
+    val providerUsed   = varchar("provider_used", 64).nullable()
+    val tokensUsed     = integer("tokens_used").default(0)
+    val cacheHit       = bool("cache_hit").default(false)
+    val safetyFlag     = varchar("safety_flag", 32).nullable()
+    val createdAt      = timestamp("created_at")
+    val updatedAt      = timestamp("updated_at")
+    init {
+        index("idx_tutor_sessions_child_subject", false, childId, subjectId)
+        index("idx_tutor_sessions_school", false, schoolId)
+        index("idx_tutor_sessions_mode", false, mode)
+    }
+}
+
+/**
+ * FSRS spaced-repetition state per child per topic. The [FsrsScheduler] owns
+ * this table — it reads/writes stability, difficulty, due_at, reps, lapses
+ * using the FSRS v6 algorithm.
+ *
+ * Spec: §12.3
+ */
+object TutorReviewStateTable : UUIDTable("tutor_review_state", "id") {
+    val schoolId       = uuid("school_id")
+    val childId        = uuid("child_id")
+    val topicId        = uuid("topic_id")
+    val stability      = double("stability").default(0.0)
+    val difficulty     = double("difficulty").default(0.0)
+    val dueAt          = timestamp("due_at")
+    val reps           = integer("reps").default(0)
+    val lapses         = integer("lapses").default(0)
+    val lastGrade      = integer("last_grade").default(0)
+    val lastReviewedAt = timestamp("last_reviewed_at").nullable()
+    val createdAt      = timestamp("created_at")
+    val updatedAt      = timestamp("updated_at")
+    init {
+        uniqueIndex("ux_tutor_review_state_unique", childId, topicId)
+        index("idx_tutor_review_due", false, childId, dueAt)
+    }
+}
+
+/**
+ * Grounded mastery per child per topic. Mastery is derived from real marks
+ * (AssessmentMarksTable) and/or practice outcomes — NEVER model-invented
+ * (LAW 6). Source field records whether it came from MARKS, PRACTICE, or
+ * BLENDED.
+ *
+ * Spec: §12.4
+ */
+object TutorMasteryTable : UUIDTable("tutor_mastery", "id") {
+    val schoolId   = uuid("school_id")
+    val childId    = uuid("child_id")
+    val subjectId  = uuid("subject_id")
+    val topicId    = uuid("topic_id")
+    val mastery    = double("mastery").default(0.0)
+    val masterySource = varchar("source", 16).default("MARKS")
+    val attempts   = integer("attempts").default(0)
+    val correct    = integer("correct").default(0)
+    val updatedAt  = timestamp("updated_at")
+    val createdAt  = timestamp("created_at")
+    init {
+        uniqueIndex("ux_tutor_mastery_unique", childId, topicId)
+        index("idx_tutor_mastery_child_subject", false, childId, subjectId)
+    }
+}
+
+/**
+ * Class-wide misconception library. The agent's [logMisconception] tool writes
+ * here; the Teacher Heatmap reads from here. Misconceptions are surfaced to
+ * teachers and tracked to resolution — this is the shared flywheel that makes
+ * every AI feature smarter.
+ *
+ * Spec: §12.5
+ */
+object TutorMisconceptionsTable : UUIDTable("tutor_misconceptions", "id") {
+    val schoolId           = uuid("school_id")
+    val classId            = uuid("class_id")
+    val subjectId          = uuid("subject_id")
+    val topicId            = uuid("topic_id")
+    val childId            = uuid("child_id")
+    val misconceptionType = varchar("misconception_type", 128)
+    val evidence           = text("evidence").default("")
+    val resolved           = bool("resolved").default(false)
+    val surfacedToTeacher  = bool("surfaced_to_teacher").default(false)
+    val createdAt          = timestamp("created_at")
+    init {
+        index("idx_tutor_misconceptions_class_subject", false, classId, subjectId)
+        index("idx_tutor_misconceptions_child", false, childId)
+        index("idx_tutor_misconceptions_topic", false, topicId)
+    }
+}
+
+/**
+ * RAG knowledge chunks for curriculum-grounded retrieval. INERT until Phase 5.
+ * The [RetrieveKnowledgeTool] reads this table; it will be empty until the
+ * NCERT corpus ingestion pipeline lands. The embedding column uses pgvector;
+ * on SQLite (local dev) it falls back to a text/blob column.
+ *
+ * Spec: §12.6
+ *
+ * Created/applied by docs/db/migration_065_tutor_rag.sql.
+ */
+object TutorKnowledgeChunksTable : UUIDTable("tutor_knowledge_chunks", "id") {
+    val schoolId   = uuid("school_id").nullable()   // null = shared NCERT corpus
+    val chunkSource = varchar("source", 128).default("NCERT")
+    val board      = varchar("board", 32).default("CBSE")
+    val classLabel = varchar("class_label", 16)
+    val subject    = varchar("subject", 64)
+    val topicId    = uuid("topic_id").nullable()
+    val chunkText  = text("chunk_text").default("")
+    // embedding: pgvector vector(768) in Postgres — stored as text on SQLite.
+    // On Postgres with pgvector, the migration creates the column as vector(768).
+    // Exposed reads/writes it as text; the repository layer handles serialization.
+    val embedding  = text("embedding").nullable()
+    val createdAt  = timestamp("created_at")
+    init {
+        index("idx_tutor_kc_school_board_class", false, schoolId, board, classLabel, subject)
+        index("idx_tutor_kc_topic", false, topicId)
     }
 }
 

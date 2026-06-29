@@ -136,3 +136,42 @@ suspend fun ApplicationCall.requireSchoolAdmin(): SchoolContext? {
     }
     return ctx
 }
+
+/** Roles permitted to operate the PLATFORM surface (cross-tenant config). */
+val PLATFORM_ADMIN_ROLES = setOf("super_admin", "admin")
+
+/**
+ * Guard for PLATFORM-level operations that are NOT school-scoped — e.g. managing
+ * the AI provider registry / rotating provider keys. Distinct from
+ * [requireSchoolAdmin] (which is per-tenant): a school_admin must NOT be able to
+ * read/rotate the platform's shared AI provider keys, so this requires a
+ * platform role (`super_admin` / `admin`). Role is read from the DB (not the JWT
+ * claim) so a forged/stale claim cannot widen access.
+ *
+ *   401 – no/invalid token
+ *   403 – authenticated but not a platform admin
+ *
+ * Returns the caller's user id on success.
+ */
+suspend fun ApplicationCall.requirePlatformAdmin(): UUID? {
+    val uid = principalUserUuid() ?: run {
+        fail("Invalid token", HttpStatusCode.Unauthorized, "UNAUTHORIZED")
+        return null
+    }
+    val row = dbQuery {
+        AppUsersTable.selectAll().where { AppUsersTable.id eq uid }.singleOrNull()
+    } ?: run {
+        fail("User not found", HttpStatusCode.NotFound, "USER_NOT_FOUND")
+        return null
+    }
+    if (!row[AppUsersTable.isActive]) {
+        fail("This account has been deactivated. Contact your administrator.", HttpStatusCode.Forbidden, "ACCOUNT_DEACTIVATED")
+        return null
+    }
+    val role = row[AppUsersTable.role]
+    if (role !in PLATFORM_ADMIN_ROLES) {
+        fail("This action requires a platform administrator.", HttpStatusCode.Forbidden, "PLATFORM_ADMIN_REQUIRED")
+        return null
+    }
+    return uid
+}

@@ -27,8 +27,10 @@ import com.littlebridge.enrollplus.core.fail
 import com.littlebridge.enrollplus.core.ok
 import com.littlebridge.enrollplus.core.okMessage
 import com.littlebridge.enrollplus.core.requireSchoolContext
+import com.littlebridge.enrollplus.db.ChildrenTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.db.LeaveRequestsTable
+import com.littlebridge.enrollplus.db.StudentsTable
 import com.littlebridge.enrollplus.feature.notifications.Notify
 import io.ktor.http.*
 import io.ktor.server.auth.*
@@ -188,6 +190,35 @@ fun Route.leaveRequestsRouting() {
                 val schoolId = ctx.schoolId
                 val newId = UUID.randomUUID()
                 val now = Instant.now()
+
+                // Leave FK fix: when the requester is a student, resolve and
+                // set childId + class fields so PEWS Sense can join leave rows
+                // without falling back to name matching.
+                var resolvedChildId: UUID? = null
+                var resolvedClassName: String? = null
+                var resolvedSection: String? = null
+                if (req.requesterRole.lowercase() == "student") {
+                    // Resolve student by name to get class/section
+                    val student = dbQuery {
+                        StudentsTable.selectAll().where {
+                            (StudentsTable.schoolId eq schoolId) and
+                                (StudentsTable.fullName eq req.requesterName)
+                        }.singleOrNull()
+                    }
+                    if (student != null) {
+                        resolvedClassName = student[StudentsTable.className]
+                        resolvedSection = student[StudentsTable.section]
+                        // Look up childId via studentCode
+                        val code = student[StudentsTable.studentCode]
+                        resolvedChildId = dbQuery {
+                            ChildrenTable.selectAll().where {
+                                (ChildrenTable.schoolId eq schoolId) and
+                                    (ChildrenTable.studentCode eq code)
+                            }.singleOrNull()?.get(ChildrenTable.id)?.value
+                        }
+                    }
+                }
+
                 dbQuery {
                     LeaveRequestsTable.insert {
                         it[LeaveRequestsTable.id] = newId
@@ -202,6 +233,12 @@ fun Route.leaveRequestsRouting() {
                         it[status] = "Pending"
                         it[createdAt] = now
                         it[updatedAt] = now
+                        // FK fix: populate child linkage for student leaves
+                        if (resolvedChildId != null) {
+                            it[LeaveRequestsTable.childId] = resolvedChildId
+                            it[LeaveRequestsTable.className] = resolvedClassName
+                            it[LeaveRequestsTable.section] = resolvedSection
+                        }
                     }
                 }
                 call.created(

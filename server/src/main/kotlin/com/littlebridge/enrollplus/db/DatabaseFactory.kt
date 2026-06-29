@@ -231,6 +231,39 @@ object DatabaseFactory {
         TransportAssignmentsTable,        // FK to routes + stops + vehicles
         TransportTrackingTable,           // FK to vehicles
         TransportAttendanceTable,
+        // AI Gateway (AI_FEATURES_PLAN.md §4 / AI_INFRASTRUCTURE_SPEC.md §6)
+        // Applied by docs/db/migration_060_ai_gateway.sql (must run before deploy;
+        // AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates boot on it).
+        AiProviderConfigTable,
+        AiPromptTemplatesTable,
+        AiUsageLogTable,
+        AiResponseCacheTable,
+        AiJobsTable,
+        AiProviderHealthTable,
+        // PEWS — Predictive Early Warning System (AI_FEATURES_PLAN.md Part A)
+        // Applied by docs/db/migration_061_pews.sql (must run before deploy).
+        PewsRiskSnapshotsTable,
+        PewsInterventionsTable,
+        PewsConfigTable,
+        PewsFeatureFlagsTable,
+        PewsCaseFilesTable,
+        PewsEffectivenessPriorsTable,
+        // AI Report Card 2.0 (AI_REPORT_CARD_2.0_AGENTIC_REDESIGN.md)
+        // Applied by docs/db/migration_062_report_card.sql (must run before deploy;
+        // AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates boot on it).
+        ReportCardDraftsTable,
+        ReportFocusEffectivenessTable,
+        HolisticAssessmentsTable,
+        CoScholasticRecordsTable,
+        ReportCardTemplatesTable,
+        // AI Tutor 2.0 (AI_TUTOR_2.0_AGENTIC_REDESIGN.md §12)
+        // Applied by docs/db/migration_064_tutor_2.sql + migration_065_tutor_rag.sql
+        // (must run before deploy; AUTO_CREATE_TABLES is OFF in prod).
+        TutorSessionsTable,
+        TutorReviewStateTable,
+        TutorMasteryTable,
+        TutorMisconceptionsTable,
+        TutorKnowledgeChunksTable,
         // School Branding Kit (SCHOOL_BRANDING_KIT_SPEC.md — per-school branding)
         // Applied by docs/db/migration_101_school_branding.sql (must run before
         // deploy; AUTO_CREATE_TABLES is OFF in prod).

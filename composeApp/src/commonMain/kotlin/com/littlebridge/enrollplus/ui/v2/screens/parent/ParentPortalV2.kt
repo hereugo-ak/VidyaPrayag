@@ -53,7 +53,7 @@ import com.littlebridge.enrollplus.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays a portal can push above its tab content (back returns to the tabs). */
-private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, Profile, Leave, Messages, LinkChild, Discovery, Health, Pulse, Transport }
+private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, Profile, Leave, Messages, LinkChild, Discovery, Health, Pulse, Transport, TutorChat, TutorProgress }
 
 /**
  * ParentPortalV2 — the 5-tab parent shell, a faithful copy of `Parent.tsx → ParentApp`.
@@ -213,6 +213,20 @@ fun ParentPortalV2(
             )
             return
         }
+        ParentOverlay.TutorChat -> {
+            com.littlebridge.enrollplus.ui.v2.screens.tutor.TutorChatScreen(
+                onBack = { overlay = ParentOverlay.None },
+                modifier = modifier,
+            )
+            return
+        }
+        ParentOverlay.TutorProgress -> {
+            com.littlebridge.enrollplus.ui.v2.screens.tutor.ParentProgressScreen(
+                onBack = { overlay = ParentOverlay.None },
+                modifier = modifier,
+            )
+            return
+        }
         ParentOverlay.None -> Unit
     }
 
@@ -291,8 +305,11 @@ fun ParentPortalV2(
                     onOpenNotifications = { overlay = ParentOverlay.Notifications },
                     onOpenFees = { tab = "fees" },
                     onOpenAcademics = { tab = "academics" },
+                    onOpenMessages = { overlay = ParentOverlay.Messages },
                     onOpenPulse = { overlay = ParentOverlay.Pulse },
                     onOpenTransport = { overlay = ParentOverlay.Transport },
+                    onOpenTutor = { overlay = ParentOverlay.TutorChat },
+                    onOpenTutorProgress = { overlay = ParentOverlay.TutorProgress },
                     onOpenScholarships = { overlay = ParentOverlay.Scholarships },
                 )
                 "academics" -> ParentAcademicsScreenV2(onOpenLeave = { overlay = ParentOverlay.Leave }, onOpenHealth = { overlay = ParentOverlay.Health })

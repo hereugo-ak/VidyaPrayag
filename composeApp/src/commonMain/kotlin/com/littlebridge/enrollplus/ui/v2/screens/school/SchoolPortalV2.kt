@@ -54,6 +54,9 @@ private enum class SchoolOverlay {
     EditProfile,
     StudentRoster,
     StudentProfile,
+    // PEWS (Predictive Early Warning System) — live at-risk cohort + per-student signal.
+    PewsCohort,
+    PewsStudentDetail,
     TeacherProfile,
     TeacherAssignments,
     Staff,
@@ -62,6 +65,8 @@ private enum class SchoolOverlay {
     AlumniDetail,
     AlumniCampaign,
     TransportManagement,
+    ReportPublish,
+    ReportEffectiveness,
     ScholarshipManagement,
     BrandingKit,
 }
@@ -108,6 +113,8 @@ fun SchoolPortalV2(
             is DeepLinkTarget.SchoolScreen -> {
                 if (deepLinkTarget.screen == "transport") {
                     overlay = SchoolOverlay.TransportManagement
+                } else if (deepLinkTarget.screen == "report-card" || deepLinkTarget.screen == "report-review") {
+                    overlay = SchoolOverlay.ReportPublish
                 } else {
                     tab = deepLinkTarget.screen
                 }
@@ -118,6 +125,8 @@ fun SchoolPortalV2(
     // RA-45 — id carried into the student/teacher profile overlays.
     var selectedStudentId by remember { mutableStateOf<String?>(null) }
     var selectedTeacherId by remember { mutableStateOf<String?>(null) }
+    // PEWS — student code carried into the early-warning detail overlay.
+    var selectedPewsStudentCode by remember { mutableStateOf<String?>(null) }
     // RA-S17 — id carried into the non-teaching-staff profile overlay.
     var selectedStaffId by remember { mutableStateOf<String?>(null) }
     // Health Records — student id + name carried into the health records overlay.
@@ -248,6 +257,29 @@ fun SchoolPortalV2(
                 )
                 return
             }
+            SchoolOverlay.PewsCohort -> {
+                // PEWS — the live at-risk cohort; rows open the per-student signal.
+                PewsCohortScreenV2(
+                    onBack = { overlay = SchoolOverlay.None },
+                    onOpenStudent = { code ->
+                        selectedPewsStudentCode = code
+                        overlay = SchoolOverlay.PewsStudentDetail
+                    },
+                    modifier = modifier,
+                )
+                return
+            }
+            SchoolOverlay.PewsStudentDetail -> {
+                // PEWS — one student's deterministic signal bundle + AI explanation.
+                val code = selectedPewsStudentCode
+                if (code == null) { overlay = SchoolOverlay.PewsCohort; return }
+                PewsStudentDetailScreenV2(
+                    studentCode = code,
+                    onBack = { overlay = SchoolOverlay.PewsCohort },
+                    modifier = modifier,
+                )
+                return
+            }
             SchoolOverlay.TeacherProfile -> {
                 // RA-45 — single teacher detail (assignments/coverage).
                 val id = selectedTeacherId
@@ -335,6 +367,18 @@ fun SchoolPortalV2(
                 )
                 return
             }
+            SchoolOverlay.ReportPublish -> {
+                AdminReportPublishScreen(
+                    onBack = { overlay = SchoolOverlay.None },
+                )
+                return
+            }
+            SchoolOverlay.ReportEffectiveness -> {
+                AdminReportingEffectivenessScreen(
+                    onBack = { overlay = SchoolOverlay.None },
+                )
+                return
+            }
             SchoolOverlay.ScholarshipManagement -> {
                 ScholarshipManagementScreenV2(
                     onBack = { overlay = SchoolOverlay.None },
@@ -376,8 +420,10 @@ fun SchoolPortalV2(
                         // real analytics dashboard and the at-risk cohort (People
                         // tab) instead of dead Coming-Soon placeholders.
                         onOpenAnalytics = { overlay = SchoolOverlay.AnalyticsDashboard },
-                        onOpenPews = { tab = "people" },
+                        onOpenPews = { overlay = SchoolOverlay.PewsCohort },
                         onOpenTransport = { overlay = SchoolOverlay.TransportManagement },
+                        onOpenReportPublish = { overlay = SchoolOverlay.ReportPublish },
+                        onOpenReportEffectiveness = { overlay = SchoolOverlay.ReportEffectiveness },
                         // §7 finding K — tapping the avatar opens the Settings tab (where logout
                         // lives), instead of logging the admin out outright.
                         onExit = { tab = "settings" },

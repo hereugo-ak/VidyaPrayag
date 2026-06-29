@@ -283,6 +283,13 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    // PEWS (Predictive Early Warning System) — cross-role (admin / teacher / parent).
+    single {
+        com.littlebridge.enrollplus.feature.pews.data.remote.PewsApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
 
     // Repositories
     single<SchoolRepository> { SchoolRepositoryImpl(get(), get()) }
@@ -376,6 +383,21 @@ val commonModule = module {
     // Health Records repository (P1-12)
     single<com.littlebridge.enrollplus.feature.health.domain.repository.HealthRepository> {
         com.littlebridge.enrollplus.feature.health.data.repository.HealthRepositoryImpl(get())
+    }
+    // PEWS repository
+    single<com.littlebridge.enrollplus.feature.pews.domain.repository.PewsRepository> {
+        com.littlebridge.enrollplus.feature.pews.data.repository.PewsRepositoryImpl(get())
+    }
+
+    // AI Report Card 2.0 — cross-role (teacher / admin / parent)
+    single {
+        com.littlebridge.enrollplus.feature.reportcard.data.remote.ReportCardApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single<com.littlebridge.enrollplus.feature.reportcard.domain.repository.ReportCardRepository> {
+        com.littlebridge.enrollplus.feature.reportcard.data.repository.ReportCardRepositoryImpl(get())
     }
 
     // Alumni Management (ALUMNI_MANAGEMENT_SPEC.md)
@@ -525,6 +547,12 @@ val viewModelModule = module {
     // AuthRepository, theme pref) — (TeacherRepository, PreferenceRepository, AuthRepository).
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherProfileActionsViewModel(get(), get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherLeaveViewModel(get(), get()) }
+    // PEWS (Predictive Early Warning System) view models
+    factory { com.littlebridge.enrollplus.feature.pews.presentation.PewsCohortViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.pews.presentation.PewsStudentDetailViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.pews.presentation.TeacherPewsViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.pews.presentation.ParentNudgeViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.pews.presentation.PewsEffectivenessViewModel(get(), get()) }
     // Health Records (P1-12) — admin/nurse + teacher + parent view models
     factory { com.littlebridge.enrollplus.feature.health.presentation.AdminHealthViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.health.presentation.TeacherHealthAlertsViewModel(get(), get()) }
@@ -533,6 +561,29 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.alumni.presentation.AlumniViewModel(get(), get()) }
     // Transport Tracking (TRANSPORT_TRACKING_SPEC.md)
     factory { com.littlebridge.enrollplus.feature.transport.presentation.TransportViewModel(get(), get()) }
+
+    // AI Report Card 2.0 — cross-role view models
+    factory { com.littlebridge.enrollplus.feature.reportcard.presentation.TeacherReportReviewViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.reportcard.presentation.TeacherReportDraftEditorViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.reportcard.presentation.AdminReportPublishViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.reportcard.presentation.AdminReportEffectivenessViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.reportcard.presentation.ParentReportViewModel(get(), get()) }
+
+    // AI Tutor 2.0 — API + repository + view models
+    single {
+        com.littlebridge.enrollplus.feature.tutor.data.remote.TutorApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single<com.littlebridge.enrollplus.feature.tutor.domain.repository.TutorRepository> {
+        com.littlebridge.enrollplus.feature.tutor.data.repository.TutorRepositoryImpl(get())
+    }
+    factory { com.littlebridge.enrollplus.feature.tutor.presentation.TutorChatViewModel(get(), get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.tutor.presentation.TutorPlanViewModel(get(), get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.tutor.presentation.TutorPracticeViewModel(get(), get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.tutor.presentation.TeacherHeatmapViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.tutor.presentation.ParentProgressViewModel(get(), get(), get()) }
     // Scholarship Workflow (SCHOLARSHIP_WORKFLOW_SPEC.md)
     factory { com.littlebridge.enrollplus.feature.scholarship.presentation.ScholarshipViewModel(get(), get()) }
     // School Branding Kit (SCHOOL_BRANDING_KIT_SPEC.md)

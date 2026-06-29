@@ -104,3 +104,6 @@ export const IconSparkle = (p: P) => (
 export const IconAlumni = (p: P) => (
   <svg {...base(p)}><path d="M12 4 2 9l10 5 10-5-10-5Z" /><path d="M6 11v4c0 1 3 3 6 3s6-2 6-3v-4" /><path d="M22 9v5" /></svg>
 );
+export const IconShield = (p: P) => (
+  <svg {...base(p)}><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z" /><path d="M9.5 12l1.8 1.8L15 10" /></svg>
+);
