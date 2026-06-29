@@ -245,7 +245,10 @@ class TutorAgentService(
             subjectId = subjectId,
             mode = "DOUBT",
             turns = TutorTurnCodec.encode(turn),
-            groundedRefs = turn.groundedRefs.joinToString(",") { "${it.source}:${it.value}" },
+            groundedRefs = kotlinx.serialization.json.Json.encodeToString(
+                kotlinx.serialization.builtins.ListSerializer(GroundedRef.serializer()),
+                turn.groundedRefs
+            ),
             providerUsed = providerUsed,
             tokensUsed = tokensUsed,
             cacheHit = false,
