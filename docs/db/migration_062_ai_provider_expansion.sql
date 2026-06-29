@@ -1,0 +1,89 @@
+-- =============================================================================
+-- Migration 062 — AI Provider Expansion (June 2026)
+--                Adds Groq-Fast and Gemini providers to the AI gateway.
+--
+-- WHY THIS EXISTS
+--   Provider audit (June 2026) revealed that the original 5-provider setup
+--   had suboptimal lane ordering for free-tier rate limits:
+--     - SambaNova free tier: only 20 RPD (was #1 REASON provider)
+--     - Cerebras free tier: only 5 RPM (was #1 FAST_CHAT provider)
+--     - No Google Gemini integration despite 1,500 RPD free tier
+--     - Groq 8B model (llama-3.1-8b-instant) has ~14,400 RPM on free tier
+--       but wasn't used — only the 70B model (30 RPM) was configured
+--
+--   This migration:
+--   1. Documents the two new provider codes added to ai_provider_config:
+--      - groq_fast  (Groq llama-3.1-8b-instant, shares AI_GROQ_API_KEY)
+--      - gemini     (Google Gemini 2.5 Flash, OpenAI-compatible endpoint)
+--   2. No schema changes needed — the provider column is VARCHAR(32) and
+--      the table uses provider+model as a unique key, so new providers
+--      are just new rows inserted by KeyVault.bootstrapFromEnv() on boot.
+--   3. Updates the comment on the original migration_060 for documentation.
+--
+-- NEW PROVIDER DETAILS (June 2026 free tier)
+--   ┌──────────────┬────────────────────────────┬──────────┬──────────┬───────────┐
+--   │ Provider     │ Model                      │ RPM      │ RPD      │ noTraining│
+--   ├──────────────┼────────────────────────────┼──────────┼──────────┼───────────┤
+--   │ groq_fast    │ llama-3.1-8b-instant       │ ~14,400  │ ~500K TPM│ true      │
+--   │ gemini       │ gemini-2.5-flash           │ 10-15    │ 250-1,500│ false*    │
+--   └──────────────┴────────────────────────────┴──────────┴──────────┴───────────┘
+--   * Google may use free-tier prompts for training → PII-restricted.
+--     Use gemini-2.5-flash-lite for 1,500 RPD (lower quality, higher volume).
+--
+-- LANE ORDERING (after this change)
+--   FAST_CHAT: groq_fast → cerebras → groq → openrouter
+--   CLASSIFY:  groq_fast → groq → cerebras → openrouter
+--   REASON:    groq → gemini → sambanova → cerebras → openrouter → mistral
+--   BATCH:     groq → gemini → mistral → openrouter
+--
+--   PII-safe REASON subset: groq → cerebras → openrouter
+--   (Gemini, SambaNova, Mistral are noTraining=false → dropped for PII prompts)
+--
+-- ENV VARS REQUIRED
+--   AI_GROQ_API_KEY     — already set (shared by GROQ and GROQ_FAST)
+--   AI_GEMINI_API_KEY   — new; get from https://aistudio.google.com/app/apikey
+--   AI_MODEL_GROQ_FAST  — optional override (default: llama-3.1-8b-instant)
+--   AI_MODEL_GEMINI     — optional override (default: gemini-2.5-flash)
+--
+-- HOW TO RUN
+--   Supabase -> SQL Editor -> paste this whole file -> Run.
+--   Safe to re-run: only comments + documentation, no schema changes.
+--
+-- RUN ORDER (appended to the existing chain):
+--   ...
+--   61. docs/db/migration_061_pews.sql
+--   62. docs/db/migration_062_ai_provider_expansion.sql   <-- this file
+--
+-- =============================================================================
+
+BEGIN;
+
+-- No schema changes needed — the ai_provider_config table already supports
+-- new providers via INSERT. KeyVault.bootstrapFromEnv() will insert rows for
+-- groq_fast and gemini automatically when the env vars are present.
+
+-- Verification: after boot with AI_GEMINI_API_KEY set, check:
+-- SELECT provider, model, is_active, tier, no_training
+--   FROM ai_provider_config
+--   WHERE provider IN ('groq_fast', 'gemini')
+--   ORDER BY provider;
+-- Expected: 2 rows (if both env vars are set)
+
+-- Provider rate limit reference (June 2026 free tiers):
+-- ┌──────────────┬────────────────────────────┬───────┬───────┬────────────┬──────────┐
+-- │ Provider     │ Model                      │ RPM   │ RPD   │ TPM        │ noTrain  │
+-- ├──────────────┼────────────────────────────┼───────┼───────┼────────────┼──────────┤
+-- │ cerebras     │ gpt-oss-120b               │ 5     │ 1M TP │ 30K        │ true     │
+-- │ groq         │ llama-3.3-70b-versatile    │ 30    │ 14,400│ 12K        │ true     │
+-- │ groq_fast    │ llama-3.1-8b-instant       │ 14,400│ N/A   │ 500K       │ true     │
+-- │ sambanova    │ DeepSeek-V3.1              │ 20    │ 20    │ 200K TP    │ false    │
+-- │ mistral      │ mistral-small-latest       │ ~60   │ N/A   │ ~1B/mo     │ false    │
+-- │ openrouter   │ llama-3.3-70b:free         │ 20    │ 50*   │ N/A        │ true     │
+-- │ gemini       │ gemini-2.5-flash           │ 10    │ 250   │ 250K       │ false    │
+-- │ gemini       │ gemini-2.5-flash-lite      │ 15    │ 1,500 │ 1M         │ false    │
+-- └──────────────┴────────────────────────────┴───────┴───────┴────────────┴──────────┘
+-- * OpenRouter: 50 RPD with $0 balance; 1,000 RPD after one-time $10 credit purchase.
+--   The $10 is NOT consumed by free models — it just unlocks the higher daily cap.
+--   Free models (IDs ending in :free) cost $0 per token regardless of credit balance.
+
+COMMIT;

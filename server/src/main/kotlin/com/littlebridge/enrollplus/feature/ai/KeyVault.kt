@@ -52,11 +52,16 @@ enum class AiProvider(
     val tier: String,
     /** false ⇒ provider trains on inputs (PII-restricted): Mistral/SambaNova. */
     val noTraining: Boolean,
+    /** Optional override for providers that share an API key with another entry. */
+    private val sharedApiKeyEnv: String? = null,
+    private val sharedBaseUrlEnv: String? = null,
 ) {
     CEREBRAS(
         code = "cerebras",
         defaultBaseUrl = "https://api.cerebras.ai/v1",
         defaultModelEnv = "AI_MODEL_CEREBRAS",
+        // June 2026: free tier = 1M tokens/day, 5 RPM, 30K TPM, 8K context.
+        // gpt-oss-120b is the primary free model; zai-glm-4.7 also available.
         defaultModel = "gpt-oss-120b",
         tier = "fast",
         noTraining = true,
@@ -65,14 +70,31 @@ enum class AiProvider(
         code = "groq",
         defaultBaseUrl = "https://api.groq.com/openai/v1",
         defaultModelEnv = "AI_MODEL_GROQ_REASON",
+        // June 2026: free tier = ~30 RPM, ~14,400 RPD, ~12K TPM on 70B.
+        // Best free-tier throughput of all providers. 70B for REASON/BATCH.
         defaultModel = "llama-3.3-70b-versatile",
         tier = "reason",
         noTraining = true,
+    ),
+    GROQ_FAST(
+        code = "groq_fast",
+        defaultBaseUrl = "https://api.groq.com/openai/v1",
+        defaultModelEnv = "AI_MODEL_GROQ_FAST",
+        // June 2026: llama-3.1-8b-instant on Groq free tier = ~14,400 RPM,
+        // ~500K TPM — massively higher limits than 70B. Ideal for FAST_CHAT.
+        // Shares the same API key and base URL as GROQ.
+        defaultModel = "llama-3.1-8b-instant",
+        tier = "fast",
+        noTraining = true,
+        sharedApiKeyEnv = "AI_GROQ_API_KEY",
+        sharedBaseUrlEnv = "AI_GROQ_BASE_URL",
     ),
     SAMBANOVA(
         code = "sambanova",
         defaultBaseUrl = "https://api.sambanova.ai/v1",
         defaultModelEnv = "AI_MODEL_SAMBANOVA",
+        // June 2026: free tier = 20 RPM, 20 RPD, 200K TPD — very low RPD.
+        // Use as secondary REASON, not primary. DeepSeek-V3.1 is current.
         defaultModel = "DeepSeek-V3.1",
         tier = "reason",
         // SambaNova free tier may use inputs for product improvement → treat as
@@ -83,25 +105,43 @@ enum class AiProvider(
         code = "mistral",
         defaultBaseUrl = "https://api.mistral.ai/v1",
         defaultModelEnv = "AI_MODEL_MISTRAL",
-        defaultModel = "mistral-large-latest",
+        // June 2026: free Experiment tier = ~1B tokens/month, ~1 RPS.
+        // mistral-small-latest for BATCH (cheaper, higher RPM than large).
+        // Free tier trains on data → PII-restricted.
+        defaultModel = "mistral-small-latest",
         tier = "batch",
-        // Mistral "La Plateforme" free Experiment plan trains on data → opt-in.
         noTraining = false,
     ),
     OPENROUTER(
         code = "openrouter",
         defaultBaseUrl = "https://openrouter.ai/api/v1",
         defaultModelEnv = "AI_MODEL_OPENROUTER",
+        // June 2026: free tier = 20 RPM, 50 RPD (1,000 RPD with $10 credit).
+        // 28+ free models. Used as last-resort fallback.
         defaultModel = "meta-llama/llama-3.3-70b-instruct:free",
         tier = "reason",
         noTraining = true,
+    ),
+    GEMINI(
+        code = "gemini",
+        defaultBaseUrl = "https://generativelanguage.googleapis.com/v1beta/openai",
+        defaultModelEnv = "AI_MODEL_GEMINI",
+        // June 2026: free tier = 15 RPM, 1M TPM, 1,500 RPD on Flash-Lite;
+        // 10 RPM, 250K TPM, 250 RPD on Flash. OpenAI-compatible endpoint.
+        // No credit card, no expiration. BUT: Google may use free-tier prompts
+        // for training → noTraining = false (PII-restricted).
+        defaultModel = "gemini-2.5-flash",
+        tier = "reason",
+        noTraining = false,
     );
 
     /** env var holding the raw API key for this provider. */
-    val apiKeyEnv: String get() = "AI_${name}_API_KEY"
+    val apiKeyEnv: String
+        get() = sharedApiKeyEnv ?: "AI_${name}_API_KEY"
 
     /** env var optionally overriding the OpenAI-compatible base URL. */
-    val baseUrlEnv: String get() = "AI_${name}_BASE_URL"
+    val baseUrlEnv: String
+        get() = sharedBaseUrlEnv ?: "AI_${name}_BASE_URL"
 
     companion object {
         fun fromCode(code: String): AiProvider? =

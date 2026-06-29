@@ -14,7 +14,8 @@
  *   GET   /api/v1/school/pews/effectiveness          outcome rollup (Learn)
  *   GET   /api/v1/school/pews/config                 read per-school tuning
  *   PUT   /api/v1/school/pews/config                 update tuning (thresholds, flags)
- *   POST  /api/v1/school/pews/run                    manual recompute for THIS school
+ *   POST  /api/v1/school/pews/run                    async recompute — returns job_id immediately
+ *   GET   /api/v1/school/pews/run/{jobId}            poll job status
  *
  * TEACHER (requireTeacherContext)
  *   GET   /api/v1/teacher/pews/students              own-class at-risk students (+AI)
@@ -36,6 +37,7 @@ import com.littlebridge.enrollplus.core.principalUserUuid
 import com.littlebridge.enrollplus.core.requireSchoolAdmin
 import com.littlebridge.enrollplus.core.requireTeacherContext
 import com.littlebridge.enrollplus.core.teacherAssignmentsFor
+import com.littlebridge.enrollplus.feature.pews.queue.PewsJobQueue
 import com.littlebridge.enrollplus.db.ChildrenTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.db.PewsConfigTable
@@ -58,7 +60,13 @@ import java.util.UUID
 // ── DTOs ────────────────────────────────────────────────────────────────────
 
 @Serializable
-data class PewsSignalDto(val kind: String, val label: String, val severity: Int)
+data class PewsSignalDto(
+    val kind: String,
+    val label: String,
+    val severity: Int,
+    @SerialName("is_leading") val isLeading: Boolean = false,
+    @SerialName("evidence_ref") val evidenceRef: String? = null,
+)
 
 @Serializable
 data class PewsStudentDto(
@@ -79,6 +87,11 @@ data class PewsStudentDto(
     @SerialName("ai_cause") val aiCause: String?,
     @SerialName("ai_recommendation") val aiRecommendation: String?,
     @SerialName("ai_provider_used") val aiProviderUsed: String?,
+    // PEWS 2.0 expanded fields
+    val confidence: Double? = null,
+    @SerialName("leading_score") val leadingScore: Int? = null,
+    @SerialName("cause_family") val causeFamily: String? = null,
+    @SerialName("deltas_json") val deltasJson: String? = null,
 )
 
 @Serializable
@@ -163,9 +176,11 @@ private fun PewsSnapshotService.StoredSnapshot.toDto() = PewsStudentDto(
     runDate = runDate, riskScore = riskScore, riskLevel = riskLevel,
     attendancePct = attendancePct, marksPct = marksPct, leaveCount = leaveCount,
     attendanceSlope = attendanceSlope, marksSlope = marksSlope,
-    signals = signals.map { PewsSignalDto(it.kind, it.label, it.severity) },
+    signals = signals.map { PewsSignalDto(it.kind, it.label, it.severity, it.isLeading, it.evidenceRef) },
     aiNarrative = aiNarrative, aiCause = aiCause, aiRecommendation = aiRecommendation,
     aiProviderUsed = aiProviderUsed,
+    confidence = confidence, leadingScore = leadingScore,
+    causeFamily = causeFamily, deltasJson = deltasJson,
 )
 
 private fun PewsInterventionService.InterventionView.toDto() = PewsInterventionDto(
@@ -329,8 +344,25 @@ fun Route.pewsRouting() {
 
         post("/api/v1/school/pews/run") {
             val ctx = call.requireSchoolAdmin() ?: return@post
-            val count = PewsDailyJob.runSchool(ctx.schoolId)
-            call.ok(mapOf("at_risk" to count), "PEWS recompute complete")
+            val jobId = PewsJobQueue.enqueue(ctx.schoolId, ctx.userId)
+            call.ok(
+                mapOf("job_id" to jobId.toString(), "status" to "queued"),
+                "PEWS recompute queued"
+            )
+        }
+
+        get("/api/v1/school/pews/run/{jobId}") {
+            val ctx = call.requireSchoolAdmin() ?: return@get
+            val jobId = call.parameters["jobId"]?.let {
+                runCatching { java.util.UUID.fromString(it) }.getOrNull()
+            } ?: run { call.fail("invalid job id"); return@get }
+
+            val status = PewsJobQueue.status(jobId)
+            if (status == null) {
+                call.fail("job not found", io.ktor.http.HttpStatusCode.NotFound)
+            } else {
+                call.ok(status, "Job status")
+            }
         }
 
         // ============================== TEACHER ===============================

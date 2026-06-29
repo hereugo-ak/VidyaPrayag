@@ -4,8 +4,8 @@
  *
  * ONE OpenAI-compatible chat-completions client, with a swappable
  * (baseUrl, apiKey, model) per call. Every free-tier provider we use
- * (Cerebras, Groq, SambaNova, Mistral, OpenRouter) speaks the same
- * `POST {baseUrl}/chat/completions` shape, so a single client covers all five
+ * (Cerebras, Groq, Groq-Fast, SambaNova, Mistral, OpenRouter, Gemini) speaks the same
+ * `POST {baseUrl}/chat/completions` shape, so a single client covers all seven
  * — the gateway picks the lane and hands this client the right triple.
  *
  * Mirrors the codebase's HTTP-client-per-concern pattern (OtpHttpClient,
@@ -47,10 +47,40 @@ import org.slf4j.LoggerFactory
 // Wire DTOs (OpenAI chat-completions shape)
 // ──────────────────────────────────────────────────────────────────────────
 
+/** OpenAI-style function tool definition sent in the request. */
+@Serializable
+data class ToolDefinition(
+    val type: String = "function",
+    val function: ToolFunction,
+)
+
+@Serializable
+data class ToolFunction(
+    val name: String,
+    val description: String,
+    val parameters: kotlinx.serialization.json.JsonElement,
+)
+
+/** A tool call returned by the model in the response. */
+@Serializable
+data class ToolCall(
+    val id: String,
+    val type: String = "function",
+    val function: ToolCallFunction,
+)
+
+@Serializable
+data class ToolCallFunction(
+    val name: String,
+    val arguments: String,  // JSON string of arguments
+)
+
 @Serializable
 data class LlmMessage(
-    val role: String,        // system | user | assistant
-    val content: String,
+    val role: String,        // system | user | assistant | tool
+    val content: String? = null,
+    @SerialName("tool_calls") val toolCalls: List<ToolCall>? = null,
+    @SerialName("tool_call_id") val toolCallId: String? = null,
 )
 
 @Serializable
@@ -60,6 +90,8 @@ private data class ChatCompletionRequest(
     val temperature: Double = 0.4,
     @SerialName("max_tokens") val maxTokens: Int = 1024,
     val stream: Boolean = false,
+    val tools: List<ToolDefinition>? = null,
+    @SerialName("tool_choice") val toolChoice: String? = null,
 )
 
 @Serializable
@@ -97,10 +129,17 @@ data class LlmResult(
     val errorKind: LlmErrorKind? = null,
     val httpStatus: Int? = null,
     val errorMessage: String? = null,
+    val toolCalls: List<ToolCall>? = null,
+    val finishReason: String? = null,
 ) {
     companion object {
-        fun success(content: String, inTok: Int, outTok: Int, model: String?) =
-            LlmResult(ok = true, content = content, inputTokens = inTok, outputTokens = outTok, modelUsed = model)
+        fun success(
+            content: String?, inTok: Int, outTok: Int, model: String?,
+            toolCalls: List<ToolCall>? = null, finishReason: String? = null,
+        ) = LlmResult(
+            ok = true, content = content, inputTokens = inTok, outputTokens = outTok,
+            modelUsed = model, toolCalls = toolCalls, finishReason = finishReason,
+        )
 
         fun failure(kind: LlmErrorKind, status: Int? = null, message: String? = null) =
             LlmResult(ok = false, errorKind = kind, httpStatus = status, errorMessage = message)
@@ -141,6 +180,8 @@ class LlmClient(
         temperature: Double = 0.4,
         maxTokens: Int = 1024,
         extraHeaders: Map<String, String> = emptyMap(),
+        tools: List<ToolDefinition>? = null,
+        toolChoice: String? = null,
     ): LlmResult {
         val url = "${baseUrl.trimEnd('/')}/chat/completions"
         val payload = ChatCompletionRequest(
@@ -148,6 +189,8 @@ class LlmClient(
             messages = messages,
             temperature = temperature,
             maxTokens = maxTokens,
+            tools = tools,
+            toolChoice = toolChoice,
         )
 
         val resp: HttpResponse = try {
@@ -183,10 +226,15 @@ class LlmClient(
             return LlmResult.failure(LlmErrorKind.EMPTY_RESPONSE, message = "parse failed")
         }
 
-        val content = parsed.choices.firstOrNull()?.message?.content?.trim()
-        if (content.isNullOrBlank()) {
+        val choice = parsed.choices.firstOrNull()
+        val message = choice?.message
+        val content = message?.content?.trim()
+        val toolCalls = message?.toolCalls
+        val finishReason = choice?.finishReason
+
+        if (content.isNullOrBlank() && toolCalls.isNullOrEmpty()) {
             return LlmResult.failure(LlmErrorKind.EMPTY_RESPONSE, status = 200,
-                message = "no content in choices")
+                message = "no content or tool_calls in choices")
         }
 
         val usage = parsed.usage
@@ -195,6 +243,8 @@ class LlmClient(
             inTok = usage?.promptTokens ?: 0,
             outTok = usage?.completionTokens ?: 0,
             model = parsed.model ?: model,
+            toolCalls = toolCalls,
+            finishReason = finishReason,
         )
     }
 

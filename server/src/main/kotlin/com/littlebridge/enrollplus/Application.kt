@@ -86,6 +86,9 @@ import com.littlebridge.enrollplus.feature.pulse.PulseWeeklyJob
 import com.littlebridge.enrollplus.feature.ai.KeyVault
 import com.littlebridge.enrollplus.feature.ai.aiRouting
 import com.littlebridge.enrollplus.feature.pews.PewsDailyJob
+import com.littlebridge.enrollplus.feature.pews.core.KillSwitchConfig
+import com.littlebridge.enrollplus.feature.pews.core.pewsModuleRouting
+import com.littlebridge.enrollplus.feature.pews.core.registerPewsModules
 import com.littlebridge.enrollplus.feature.pews.pewsRouting
 import com.littlebridge.enrollplus.feature.school.adminDashboardRouting
 import com.littlebridge.enrollplus.feature.school.adminDashboardOverviewRouting
@@ -184,6 +187,10 @@ fun main() {
 
     // Start the PEWS daily job (Sense → Reason → Act pipeline; hourly tick).
     PewsDailyJob.start(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default))
+
+    // PEWS 2.0 — load kill-switch flags from DB and start hot-reload polling.
+    kotlinx.coroutines.runBlocking { runCatching { KillSwitchConfig.reload() } }
+    KillSwitchConfig.startPolling(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default))
 
     embeddedServer(
         Netty,
@@ -335,7 +342,9 @@ fun Application.module() {
 
         // AI gateway + PEWS (AI_FEATURES_PLAN.md feature #1)
         aiRouting()                  // /api/v1/school/ai/usage (school-admin) + /api/v1/admin/ai/{providers,health,rotate} (platform-admin)
-        pewsRouting()                // /api/v1/{school,teacher,parent}/pews/… — Predictive Early Warning System (Sense→Reason→Act→Learn)
+        pewsRouting()                // /api/v1/{school,teacher,parent}/pews/… — v1 PEWS endpoints (still in use)
+        registerPewsModules()        // PEWS 2.0: register all modules with ModuleRegistry
+        pewsModuleRouting()          // PEWS 2.0: mount module routes (act, learn, insights, …)
         schoolAnalyticsRouting()     // /api/v1/school/analytics/{overview,class-performance,teacher-performance,student/{id},syllabus-coverage}
         leaveRequestsRouting()       // /api/v1/school/leave-requests[…]
         ptmRouting()                 // /api/v1/school/ptm

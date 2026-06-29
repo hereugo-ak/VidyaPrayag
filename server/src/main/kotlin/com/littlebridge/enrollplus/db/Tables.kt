@@ -2238,8 +2238,8 @@ object TransportAttendanceTable : UUIDTable("transport_attendance", "id") {
 // =====================================================================
 // AI GATEWAY (AI_FEATURES_PLAN.md §4 / AI_INFRASTRUCTURE_SPEC.md §6)
 //   The shared, multi-provider AI choke point every AI feature calls.
-//   Provider strategy: five OpenAI-compatible free-tier providers
-//   (Cerebras / Groq / SambaNova / Mistral / OpenRouter) — see KeyVault.
+//   Provider strategy: seven OpenAI-compatible free-tier providers
+//   (Cerebras / Groq / Groq-Fast / SambaNova / Mistral / OpenRouter / Gemini) — see KeyVault.
 //
 //   Applied by docs/db/migration_060_ai_gateway.sql (must run BEFORE the
 //   matching deploy; AUTO_CREATE_TABLES is OFF in prod and validateSchema()
@@ -2258,7 +2258,7 @@ object TransportAttendanceTable : UUIDTable("transport_attendance", "id") {
  * env vars on boot and decrypts on demand (never logs the plaintext).
  */
 object AiProviderConfigTable : UUIDTable("ai_provider_config", "id") {
-    val provider            = varchar("provider", 32)               // cerebras|groq|sambanova|mistral|openrouter
+    val provider            = varchar("provider", 32)               // cerebras|groq|groq_fast|sambanova|mistral|openrouter|gemini
     val model               = varchar("model", 96)                  // pinned model id (capability, not brand)
     val apiKeyEncrypted     = text("api_key_encrypted")             // AES-256-GCM (empty = unconfigured)
     val baseUrl             = text("base_url")                      // OpenAI-compatible /v1 base
@@ -2398,9 +2398,15 @@ object PewsRiskSnapshotsTable : UUIDTable("pews_risk_snapshots", "id") {
     val aiRecommendation  = text("ai_recommendation").nullable()
     val aiProviderUsed    = varchar("ai_provider_used", 32).nullable()
     val createdAt         = timestamp("created_at")
+    // PEWS 2.0 — expanded feature vector columns
+    val confidence        = double("confidence").nullable()       // 0..1 — data completeness × signal agreement
+    val leadingScore      = integer("leading_score").nullable()   // weight leading indicators (predictive)
+    val causeFamily       = varchar("cause_family", 24).nullable() // attendance|academic|disengagement|wellbeing|financial|external
+    val deltasJson        = text("deltas_json").nullable()         // JSON of deltas vs last run (for auto-outcome)
     init {
         uniqueIndex("ux_pews_snap_unique", schoolId, studentCode, runDate)
         index("idx_pews_snap", false, schoolId, runDate, riskLevel)
+        index("idx_pews_snap_cause", false, schoolId, causeFamily)
     }
 }
 
@@ -2410,13 +2416,21 @@ object PewsInterventionsTable : UUIDTable("pews_interventions", "id") {
     val studentCode   = text("student_code")
     val snapshotId    = uuid("snapshot_id").nullable()      // FK pews_risk_snapshots.id
     val ownerUserId   = uuid("owner_user_id")               // assigned teacher/admin
-    val actionType    = varchar("action_type", 32)          // parent_call|home_visit|counselling|remedial_class|parent_message|observe
+    val actionType    = varchar("action_type", 32)          // parent_call|home_visit|counselling|remedial_class|parent_message|observe|mentor_pairing|fee_counselling
     val status        = varchar("status", 16).default("open") // open|in_progress|done|dismissed
     val notes         = text("notes").nullable()
     val openedAt      = timestamp("opened_at")
     val resolvedAt    = timestamp("resolved_at").nullable()
     val outcome       = varchar("outcome", 16).nullable()   // improved|unchanged|worsened (Learn stage)
     val createdAt     = timestamp("created_at")
+    // PEWS 2.0 — managed casework columns
+    val planJson      = text("plan_json").nullable()         // sequenced plan steps (JSON)
+    val slaDays       = integer("sla_days").nullable()       // SLA for this intervention
+    val escalationLevel = integer("escalation_level").default(0) // 0=normal, 1=reminded, 2=escalated to admin
+    val followUpDate  = date("follow_up_date").nullable()    // when to re-check this child
+    val caseFileId    = uuid("case_file_id").nullable()      // FK pews_case_files.id
+    val urgency       = varchar("urgency", 8).nullable()     // low|medium|high
+    val causeFamily   = varchar("cause_family", 24).nullable() // denormalized from snapshot for effectiveness queries
     init { index("idx_pews_intv", false, schoolId, status, ownerUserId) }
 }
 
@@ -2432,4 +2446,65 @@ object PewsConfigTable : UUIDTable("pews_config", "id") {
     val aiNarrativeEnabled    = bool("ai_narrative_enabled").default(true)
     val parentShareEnabled    = bool("parent_share_enabled").default(false)
     val updatedAt             = timestamp("updated_at")
+}
+
+// =====================================================================
+// PEWS 2.0 — Feature flags / kill switch (hot-reloadable via polling).
+// One row per module name. "global" = entire PEWS kill switch.
+// =====================================================================
+
+object PewsFeatureFlagsTable : UUIDTable("pews_feature_flags", "id") {
+    val moduleName    = varchar("module_name", 48)   // "global" | "sense" | "triage" | "caseworker" | "act" | "learn"
+    val isKilled      = bool("is_killed").default(false)
+    val updatedAt     = timestamp("updated_at")
+    val updatedBy     = uuid("updated_by").nullable()
+    init {
+        uniqueIndex("ux_pews_flags_module", moduleName)
+    }
+}
+
+// =====================================================================
+// PEWS 2.0 — Case files (structured output from the Caseworker Agent).
+// One row per caseworker run. Stores the full structured JSON plus
+// extracted fields for querying (urgency, narrative, parent draft).
+// =====================================================================
+
+object PewsCaseFilesTable : UUIDTable("pews_case_files", "id") {
+    val schoolId        = uuid("school_id")
+    val snapshotId      = uuid("snapshot_id").nullable()    // FK pews_risk_snapshots.id
+    val studentCode     = text("student_code")
+    val caseFileJson    = text("case_file_json")            // full structured case file (JSON)
+    val narrative       = text("narrative").nullable()      // extracted for querying
+    val urgency         = varchar("urgency", 8).nullable()   // low|medium|high
+    val skipReason      = text("skip_reason").nullable()     // e.g. "exam week — defer"
+    val parentDraftJson = text("parent_draft_json").nullable() // vernacular draft (JSON)
+    val parentDraftLang = varchar("parent_draft_lang", 8).nullable() // hi|en|...
+    val providerUsed    = varchar("provider_used", 32).nullable()
+    val modelUsed       = varchar("model_used", 64).nullable()
+    val groundingPassed = bool("grounding_passed").default(true)
+    val createdAt       = timestamp("created_at")
+    init {
+        index("idx_pews_case_files", false, schoolId, studentCode)
+    }
+}
+
+// =====================================================================
+// PEWS 2.0 — Effectiveness priors (the flywheel's policy memory).
+// Per-school, per-cause-family, per-action-type: how often does this
+// action improve outcomes for this cause? This is what
+// get_similar_resolved_cases() reads and what the LEARN stage updates.
+// =====================================================================
+
+object PewsEffectivenessPriorsTable : UUIDTable("pews_effectiveness_priors", "id") {
+    val schoolId        = uuid("school_id")
+    val causeFamily     = varchar("cause_family", 24)       // attendance|academic|disengagement|wellbeing|financial|external
+    val actionType      = varchar("action_type", 32)        // parent_call|home_visit|counselling|...
+    val nTried          = integer("n_tried").default(0)
+    val nImproved       = integer("n_improved").default(0)
+    val improveRate     = double("improve_rate").default(0.0)
+    val avgDaysToImprove = double("avg_days_to_improve").default(0.0)
+    val updatedAt       = timestamp("updated_at")
+    init {
+        uniqueIndex("ux_pews_priors", schoolId, causeFamily, actionType)
+    }
 }

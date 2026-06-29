@@ -99,7 +99,9 @@ object FirebaseAdminInitializer {
 
             if (cachedApp == null) {
                 println(
-                    "FIREBASE_INIT: No credentials resolved — push dispatch DISABLED."
+                    "FIREBASE_INIT: No credentials resolved — push dispatch DISABLED. " +
+                    "Set FIREBASE_CREDENTIALS_JSON or FIREBASE_CREDENTIALS_FILE env var. " +
+                    "PEWS ACT (intervention notifications, escalation alerts) will be non-functional."
                 )
             } else {
                 println(

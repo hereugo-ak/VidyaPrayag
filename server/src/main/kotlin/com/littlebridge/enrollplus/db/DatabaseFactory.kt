@@ -240,7 +240,10 @@ object DatabaseFactory {
         // Applied by docs/db/migration_061_pews.sql (must run before deploy).
         PewsRiskSnapshotsTable,
         PewsInterventionsTable,
-        PewsConfigTable
+        PewsConfigTable,
+        PewsFeatureFlagsTable,
+        PewsCaseFilesTable,
+        PewsEffectivenessPriorsTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */
