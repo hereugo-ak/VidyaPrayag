@@ -27,7 +27,7 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays the teacher portal can push above its tab content. */
-private enum class TeacherOverlay { None, Notifications, HealthAlerts, TransportAttendance, Pews, ReportReview, ReportDraftEditor, Heatmap }
+private enum class TeacherOverlay { None, Notifications, HealthAlerts, TransportAttendance, Pews, ReportReview, ReportDraftEditor, Heatmap, DigitalIdCard }
 
 /**
  * TeacherPortalV2 — the teacher shell, rebuilt FROM SCRATCH on the Parents-Portal
@@ -168,6 +168,14 @@ fun TeacherPortalV2(
             )
             return
         }
+        TeacherOverlay.DigitalIdCard -> {
+            com.littlebridge.enrollplus.ui.v2.screens.parent.DigitalIdCardScreen(
+                isTeacher = true,
+                onBack = { overlay = TeacherOverlay.None },
+                modifier = modifier,
+            )
+            return
+        }
         TeacherOverlay.None -> Unit
     }
 
@@ -241,6 +249,7 @@ fun TeacherPortalV2(
                     onOpenPews = { overlay = TeacherOverlay.Pews },
                     onOpenReportReview = { overlay = TeacherOverlay.ReportReview },
                     onOpenHeatmap = { overlay = TeacherOverlay.Heatmap },
+                    onOpenIdCard = { overlay = TeacherOverlay.DigitalIdCard },
                 )
 
                 "update" -> key(updateScopeNonce) {

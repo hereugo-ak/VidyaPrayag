@@ -172,6 +172,13 @@ dependencies {
     // -----------------------------------------------------------------
     implementation("io.github.open-spaced-repetition:fsrs:1.0.0")
 
+    // -----------------------------------------------------------------
+    // ZXing — QR code generation for ID cards (ID_CARD_GENERATION_SPEC.md).
+    // Apache-2.0, pure-Java, core + javase for image rendering.
+    // -----------------------------------------------------------------
+    implementation("com.google.zxing:core:3.5.3")
+    implementation("com.google.zxing:javase:3.5.3")
+
     testImplementation(libs.ktor.serverTestHost)
     testImplementation(libs.kotlin.testJunit)
 }

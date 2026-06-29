@@ -1,8 +1,9 @@
 # Library Management — Technical Specification
 
 > **Document status:** Implementation-ready blueprint
-> **Last updated:** 2026-06-27
-> **Prerequisites:** None
+> **Last updated:** 2026-06-30
+> **Prerequisites:** `FESTIVAL_CALENDAR_SPEC.md` (holiday-aware due dates)
+> **Related specs:** `STUDENT_APP_SPEC.md`, `FEE_PAYMENT_SPEC.md`
 > **Template:** `_SPEC_TEMPLATE.md` v1 (25 mandatory + 6 optional sections)
 
 ---
@@ -13,31 +14,48 @@ School library management: book catalog, issue/return tracking, reservations, fi
 
 ### Goals
 
-- Admin/librarian manages book catalog (title, author, ISBN, copies, category)
+- Admin/librarian manages book catalog (title, author, ISBN, copies, category, replacement cost)
+- Individual copy tracking with barcode, condition, and status per copy
 - Issue/return books to students/teachers with due dates
-- Reservations for unavailable books
-- Fine calculation for overdue returns
+- Book renewal/extend (max 2 renewals)
+- Borrowing limit enforcement (max books per student, configurable)
+- Reservations for unavailable books (with optional teacher priority)
+- Fine calculation for overdue returns with fine cap at replacement cost
+- Fine lifecycle: pending → paid / waived
+- Lost book handling with replacement cost recovery
+- Bulk CSV import for initial catalog setup
 - Student reading history
-- Search by title, author, ISBN, category
+- Student self-service: view own issued books, due dates, and history
+- Search by title, author, ISBN, category with pagination
+- Book condition recording on return (damage tracking)
+- Holiday-aware due date calculation (skip non-school days)
 
 ### Non-goals
 
 - [ ] E-book / digital library management
 - [ ] Inter-library loan system
-- [ ] Automated ISBN lookup / book metadata enrichment
-- [ ] Barcode/RFID scanning for physical books
+- [ ] Automated ISBN lookup / book metadata enrichment (future enhancement)
+- [ ] RFID scanning for physical books (future enhancement; barcode field is stored but scanning not implemented)
+- [ ] Online fine payment via payment gateway (fines marked manually; gateway integration is future enhancement)
+- [ ] Book reviews and ratings (future enhancement)
+- [ ] Reading challenges / gamification (future enhancement)
 
 ### Dependencies
 
 - `StudentsTable` — student lookup for borrowing
-- `AppUsersTable` — teacher/admin lookup for borrowing
-- `NotificationService` — reservation availability notifications
+- `AppUsersTable` — teacher/admin lookup for borrowing (add `librarian` role)
+- `NotificationService` — reservation availability, overdue, due reminder notifications
+- `FESTIVAL_CALENDAR_SPEC.md` — school calendar for holiday-aware due date calculation
+- `STUDENT_APP_SPEC.md` — student self-service library access via student app
+- `FeeRecordsTable` — optional linkage for fine payment tracking (future)
 
 ### Related Modules
 
 - `server/.../feature/students/` — student management
 - `server/.../feature/notifications/` — notification service
+- `server/.../feature/calendar/` — school calendar (holiday-aware due dates)
 - `server/.../db/Tables.kt` — database tables
+- `server/.../feature/auth/` — role management (librarian role)
 
 ---
 

@@ -218,7 +218,7 @@ class MessagesViewModel(
                 threadId = threadId,
                 recipientUserId = recipientUserId,
                 body = body,
-                clientMsgId = java.util.UUID.randomUUID().toString(),
+                clientMsgId = kotlin.random.Random.nextLong().toString(),
             )
             when (val result = messagesRepository.sendMessage(token, request)) {
                 is NetworkResult.Success -> {
@@ -345,7 +345,7 @@ class MessagesViewModel(
         }
 
         // P1-3: Optimistic send — insert a temp message immediately for instant UI feedback.
-        val tempId = "optimistic-${System.currentTimeMillis()}"
+        val tempId = "optimistic-${kotlin.random.Random.nextLong()}"
         val optimisticMsg = Message(
             id = tempId,
             body = body,
@@ -370,7 +370,7 @@ class MessagesViewModel(
                 return@launch
             }
 
-            val clientMsgId = java.util.UUID.randomUUID().toString()
+            val clientMsgId = kotlin.random.Random.nextLong().toString()
             val request = SendMessageRequest(
                 threadId = threadId,
                 body = body,

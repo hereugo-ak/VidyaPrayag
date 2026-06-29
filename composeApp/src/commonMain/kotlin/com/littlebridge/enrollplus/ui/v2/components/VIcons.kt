@@ -79,6 +79,7 @@ object VIcons {
     val ArrowLeft get() = Icons.AutoMirrored.Filled.ArrowBack    // ArrowLeft
     val ArrowRight get() = Icons.AutoMirrored.Filled.ArrowForward // ArrowRight
     val Chat get() = Icons.AutoMirrored.Filled.Chat          // MessageSquare
+    val IdCard get() = Icons.Filled.Person                   // ID Card (fallback to Person)
 
     // ── Hand-authored Material-style vectors (no safe core equivalent) ──────────
 
