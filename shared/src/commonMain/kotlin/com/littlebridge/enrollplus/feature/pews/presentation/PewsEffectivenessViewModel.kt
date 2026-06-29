@@ -60,5 +60,5 @@ class PewsEffectivenessViewModel(
     }
 
     private suspend fun token(): String? =
-        preferenceRepository.authToken.first()
+        preferenceRepository.getUserToken().first()
 }
