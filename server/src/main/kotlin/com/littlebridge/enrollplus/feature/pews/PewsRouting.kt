@@ -387,7 +387,7 @@ fun Route.pewsRouting() {
                 schoolId = ctx.schoolId,
                 interventionId = id,
                 senderId = ctx.userId,
-                senderName = ctx.fullName,
+                senderName = "",
             )
             if (result.ok) {
                 call.ok(
