@@ -623,7 +623,7 @@ function InterventionRow({
               </div>
             ))}
           </div>
-          {/* Rule-based outcome buttons as last resort */
+          {/* Rule-based outcome buttons as last resort */}
           <div className="mt-2 flex flex-wrap gap-2 border-t border-navy/[0.06] pt-2">
             <ActionBtn
               label="Mark improved"

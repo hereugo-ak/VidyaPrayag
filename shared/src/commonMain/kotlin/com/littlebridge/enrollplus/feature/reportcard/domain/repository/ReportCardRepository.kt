@@ -43,6 +43,9 @@ open class ReportCardRepository(
     suspend fun getTermConfig(token: String) =
         api.getTermConfig(token)
 
+    suspend fun updateTermConfig(token: String, request: ReportCardModels.UpdateTermConfigRequest) =
+        api.updateTermConfig(token, request)
+
     suspend fun runFlywheel(token: String, currentTerm: String, previousTerm: String, academicYearId: String? = null) =
         api.runFlywheel(token, currentTerm, previousTerm, academicYearId)
 

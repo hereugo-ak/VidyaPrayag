@@ -89,6 +89,8 @@ fun TeacherPortalV2(
                     deepLinkTarget.params["section"]?.let { reportSection = it }
                     deepLinkTarget.params["term"]?.let { reportTerm = it }
                     overlay = TeacherOverlay.ReportReview
+                } else if (deepLinkTarget.screen == "tutor") {
+                    overlay = TeacherOverlay.Heatmap
                 } else {
                     tab = deepLinkTarget.screen
                 }

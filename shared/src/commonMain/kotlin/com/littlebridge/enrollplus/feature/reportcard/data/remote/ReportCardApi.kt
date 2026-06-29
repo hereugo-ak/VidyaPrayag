@@ -157,6 +157,16 @@ class ReportCardApi(
         client.get(getUrl("api/v1/report-card/term-config"))
     }
 
+    suspend fun updateTermConfig(
+        token: String,
+        request: ReportCardModels.UpdateTermConfigRequest,
+    ): NetworkResult<ApiResponse<ReportCardModels.TermConfig>> = safeApiCall {
+        client.put(getUrl("api/v1/report-card/term-config")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
     // ── Admin: learn flywheel ────────────────────────────────────────────
 
     suspend fun runFlywheel(

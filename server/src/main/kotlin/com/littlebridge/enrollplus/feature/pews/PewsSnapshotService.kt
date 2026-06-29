@@ -50,6 +50,8 @@ import com.littlebridge.enrollplus.db.SchoolsTable
 import com.littlebridge.enrollplus.db.StudentHealthIncidentsTable
 import com.littlebridge.enrollplus.db.StudentsTable
 import com.littlebridge.enrollplus.db.TransportAssignmentsTable
+import com.littlebridge.enrollplus.db.TutorMasteryTable
+import com.littlebridge.enrollplus.db.TutorMisconceptionsTable
 import com.littlebridge.enrollplus.feature.pews.core.KillSwitchGuard
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -73,7 +75,7 @@ import java.util.UUID
 /** A deterministic reason behind a risk score (mirrors the shipped RiskSignalDto). */
 @kotlinx.serialization.Serializable
 data class PewsSignal(
-    val kind: String,        // attendance | marks | leave | trend | homework | fees | health | exam | engagement | transport
+    val kind: String,        // attendance | marks | leave | trend | homework | fees | health | exam | engagement | transport | mastery | misconception
     val label: String,       // human reason
     val severity: Int,       // 1..3
     val isLeading: Boolean = false,   // PEWS 2.0: leading indicator flag
@@ -333,6 +335,39 @@ class PewsSnapshotService {
             transportActiveByCode[code] = true
         }
 
+        // ── NEW signal: Tutor mastery (leading — academic disengagement) ────
+        // Average mastery per child across all subjects/topics from tutor_mastery.
+        val avgMasteryByCode = HashMap<String, Double>()
+        val masteryAccumByChild = HashMap<UUID, MutableList<Double>>()
+        TutorMasteryTable.selectAll().where {
+            TutorMasteryTable.schoolId eq schoolId
+        }.forEach { row ->
+            val childId = row[TutorMasteryTable.childId]
+            masteryAccumByChild.getOrPut(childId) { mutableListOf() }
+                .add(row[TutorMasteryTable.mastery])
+        }
+        masteryAccumByChild.forEach { (childId, values) ->
+            val code = childCodeByChildId[childId] ?: return@forEach
+            if (code.isNotEmpty() && values.isNotEmpty()) {
+                avgMasteryByCode[code] = values.average()
+            }
+        }
+
+        // ── NEW signal: unresolved misconceptions (leading — academic risk) ─
+        // Count of unresolved misconceptions per child from tutor_misconceptions.
+        val unresolvedMisconceptionsByCode = HashMap<String, Int>()
+        TutorMisconceptionsTable.selectAll().where {
+            (TutorMisconceptionsTable.schoolId eq schoolId) and
+                (TutorMisconceptionsTable.resolved eq false)
+        }.forEach { row ->
+            val childId = row[TutorMisconceptionsTable.childId]
+            val code = childCodeByChildId[childId] ?: return@forEach
+            if (code.isNotEmpty()) {
+                unresolvedMisconceptionsByCode[code] =
+                    (unresolvedMisconceptionsByCode[code] ?: 0) + 1
+            }
+        }
+
         // ── school-mean baselines for relative thresholds ───────────────────
         val allAttPct = students.mapNotNull { st ->
             attPoints[st.code]?.takeIf { it.isNotEmpty() }?.let { pts ->
@@ -380,6 +415,8 @@ class PewsSnapshotService {
             val examTrend = examTrendByCode[st.code]
             val ptmTurnout = ptmTurnoutByClass[st.cls]
             val transportOk = transportActiveByCode[st.code] ?: true  // no assignment = not flagged
+            val avgMastery = avgMasteryByCode[st.code]
+            val unresolvedMisconceptions = unresolvedMisconceptionsByCode[st.code] ?: 0
 
             val signals = buildList {
                 // v1: absolute floors
@@ -450,6 +487,18 @@ class PewsSnapshotService {
                     add(PewsSignal("transport", "No active transport assignment",
                         1, isLeading = false, evidenceRef = "transport_assignments/inactive"))
                 }
+                // NEW: low Tutor mastery (leading — academic disengagement signal)
+                if (avgMastery != null && avgMastery < 40.0) {
+                    add(PewsSignal("mastery", "Average tutor mastery ${avgMastery.toInt()}% (below 40%)",
+                        if (avgMastery < 20.0) 3 else 2,
+                        isLeading = true, evidenceRef = "tutor_mastery/avg=${avgMastery.toInt()}%"))
+                }
+                // NEW: unresolved misconceptions (leading — persistent learning gaps)
+                if (unresolvedMisconceptions >= 2) {
+                    add(PewsSignal("misconception", "$unresolvedMisconceptions unresolved misconceptions from AI Tutor",
+                        if (unresolvedMisconceptions >= 5) 3 else 2,
+                        isLeading = true, evidenceRef = "tutor_misconceptions/unresolved=$unresolvedMisconceptions"))
+                }
             }
             if (signals.isEmpty()) return@mapNotNull null
 
@@ -461,13 +510,14 @@ class PewsSnapshotService {
                 else -> "watch"
             }
             val score = computeScore(attPct, marksPct, leaveCount, attSlope, marksSlope,
-                hwMissed, feeOverdue, healthFlag, examTrend, signals, cfg)
+                hwMissed, feeOverdue, healthFlag, examTrend, avgMastery,
+                unresolvedMisconceptions, signals, cfg)
             val hash = signalHash(st.code, runDate, attPct, marksPct, leaveCount, signals)
 
             // PEWS 2.0: confidence = data completeness × signal agreement
             val dataFields = listOf(attPct, marksPct, leaveCount.takeIf { it > 0 },
                 hwMissed.takeIf { it > 0 }, feeOverdue, healthFlag, examTrend,
-                ptmTurnout, transportOk)
+                ptmTurnout, transportOk, avgMastery, unresolvedMisconceptions.takeIf { it > 0 })
             val completeness = dataFields.count { it != null && it != false && it != 0 } / dataFields.size.toDouble()
             val agreement = signals.map { it.severity }.distinct().size.coerceAtMost(3) / 3.0
             val confidence = (completeness * 0.6 + agreement * 0.4).coerceIn(0.0, 1.0)
@@ -518,6 +568,7 @@ class PewsSnapshotService {
             "health" in kinds -> "wellbeing"
             "transport" in kinds -> "external"
             "homework" in kinds && "attendance" in kinds -> "disengagement"
+            "mastery" in kinds || "misconception" in kinds -> "academic"
             "attendance" in kinds || "leave" in kinds -> "attendance"
             "marks" in kinds || "exam" in kinds || "trend" in kinds -> "academic"
             "engagement" in kinds -> "disengagement"
@@ -730,6 +781,7 @@ class PewsSnapshotService {
         attPct: Int?, marksPct: Int?, leaveCount: Int,
         attSlope: Double?, marksSlope: Double?,
         hwMissed: Int, feeOverdue: Boolean, healthFlag: Boolean, examTrend: Double?,
+        avgMastery: Double?, unresolvedMisconceptions: Int,
         signals: List<PewsSignal>, cfg: Config,
     ): Int {
         var score = 0.0
@@ -754,6 +806,14 @@ class PewsSnapshotService {
         if (healthFlag) score += 6.0
         // PEWS 2.0: exam trajectory decline (max ~8)
         if (examTrend != null && examTrend < 0) score += (-examTrend).coerceAtMost(8.0)
+        // PEWS 2.0: low Tutor mastery (max ~10)
+        if (avgMastery != null && avgMastery < 40.0) {
+            score += ((40.0 - avgMastery).coerceIn(0.0, 40.0)) * 0.25
+        }
+        // PEWS 2.0: unresolved misconceptions (max ~10)
+        if (unresolvedMisconceptions >= 2) {
+            score += (unresolvedMisconceptions * 2.0).coerceAtMost(10.0)
+        }
         // multi-signal bonus
         if (signals.map { it.kind }.distinct().size >= 2) score += 8
         return score.coerceIn(0.0, 100.0).toInt()

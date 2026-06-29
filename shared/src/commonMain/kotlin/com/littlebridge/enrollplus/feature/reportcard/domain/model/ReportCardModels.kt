@@ -128,6 +128,14 @@ object ReportCardModels {
     )
 
     @Serializable
+    data class UpdateTermConfigRequest(
+        val currentTerm: String? = null,
+        val termWindowDays: Int? = null,
+        val enabled: Boolean? = null,
+        val fallbackOnAiFail: Boolean? = null,
+    )
+
+    @Serializable
     data class EffectivenessReport(
         val focusArea: String,
         val studentsTargeted: Int,

@@ -38,6 +38,7 @@ import com.littlebridge.enrollplus.core.requireSchoolAdmin
 import com.littlebridge.enrollplus.core.requireTeacherContext
 import com.littlebridge.enrollplus.core.teacherAssignmentsFor
 import com.littlebridge.enrollplus.feature.pews.queue.PewsJobQueue
+import com.littlebridge.enrollplus.db.AppUsersTable
 import com.littlebridge.enrollplus.db.ChildrenTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.db.PewsConfigTable
@@ -383,11 +384,15 @@ fun Route.pewsRouting() {
             val ctx = call.requireSchoolAdmin() ?: return@post
             val id = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                 ?: run { call.fail("invalid intervention id"); return@post }
+            val adminName = dbQuery {
+                AppUsersTable.selectAll().where { AppUsersTable.id eq ctx.userId }
+                    .firstOrNull()?.get(AppUsersTable.fullName)
+            } ?: "School Admin"
             val result = ActModule.parentDraftService.sendParentMessage(
                 schoolId = ctx.schoolId,
                 interventionId = id,
                 senderId = ctx.userId,
-                senderName = "",
+                senderName = adminName,
             )
             if (result.ok) {
                 call.ok(

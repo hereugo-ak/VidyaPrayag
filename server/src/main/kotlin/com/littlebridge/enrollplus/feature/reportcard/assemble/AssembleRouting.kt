@@ -168,7 +168,8 @@ fun Route.assembleRouting(service: ReportAssemblyService) {
     get("/report-card/oversight") {
         val ctx = call.requireSchoolContext() ?: return@get
         val term = call.request.queryParameters["term"]
-            ?: return@get call.fail("term parameter required", HttpStatusCode.BadRequest)
+            ?: ReportCardConfig.currentTerm
+            ?: return@get call.fail("term parameter required (and no currentTerm configured)", HttpStatusCode.BadRequest)
         val academicYearId = call.request.queryParameters["academicYearId"]?.let {
             runCatching { UUID.fromString(it) }.getOrNull()
         }

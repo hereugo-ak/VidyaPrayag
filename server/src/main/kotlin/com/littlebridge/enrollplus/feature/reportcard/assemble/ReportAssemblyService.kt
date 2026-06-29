@@ -476,16 +476,17 @@ class ReportAssemblyService(
     ): Int {
         ReportCardKillSwitch.require(ReportCardConstants.MODULE_ASSEMBLE)
 
-        // Find the classId from students
-        val classId = dbQuery {
-            StudentsTable.selectAll().where {
-                (StudentsTable.schoolId eq schoolId) and
-                (StudentsTable.className eq className) and
-                (StudentsTable.section eq section)
-            }.firstOrNull()?.get(StudentsTable.id)?.value
-        }
-
-        val count = draftRepo.publishByClass(schoolId, classId, term, academicYearId, publishedBy)
+        // Drafts are stored with classId=null and identified by className/section.
+        // Publish by matching className/section directly (not by classId).
+        val count = draftRepo.publishByClass(
+            schoolId = schoolId,
+            classId = null,
+            term = term,
+            academicYearId = academicYearId,
+            publishedBy = publishedBy,
+            className = className,
+            section = section,
+        )
 
         if (count > 0) {
             AuditLogger.log(
@@ -498,9 +499,10 @@ class ReportAssemblyService(
                 details = mapOf("term" to term, "count" to count),
             )
 
-            // Notify parents
+            // Notify parents — fetch drafts matching this class/section that are now published
             runCatching {
-                val publishedDrafts = draftRepo.findByStatus(schoolId, "published", classId)
+                val publishedDrafts = draftRepo.findByClassAndTerm(schoolId, null, term, academicYearId)
+                    .filter { it.className == className && it.section == section && it.status == "published" }
                 for (draft in publishedDrafts) {
                     // Best-effort notification — never fails the publish
                     runCatching {
