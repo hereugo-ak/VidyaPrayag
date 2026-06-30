@@ -51,6 +51,51 @@ const CIRCUIT_TONE: Record<string, "success" | "warning" | "danger"> = {
   half_open: "warning",
 };
 
+// ── Budget Tile ──────────────────────────────────────────────────────────────
+
+function BudgetTile({
+  label,
+  current,
+  limit,
+  unit,
+  formatTokens,
+  raw,
+}: {
+  label: string;
+  current: number;
+  limit: number;
+  unit: string;
+  formatTokens?: boolean;
+  raw?: boolean;
+}) {
+  const pct = limit > 0 ? Math.min(100, Math.round((current / limit) * 100)) : 0;
+  const tone = pct >= 90 ? "peach" : pct >= 70 ? "sky" : "accent";
+  const fmtVal = (n: number) => (formatTokens ? fmtTokens(n) : String(n));
+  return (
+    <div className="rounded-2xl border border-navy/8 bg-navy/[0.02] p-4">
+      <p className="text-[11px] font-semibold text-ink-3">{label}</p>
+      <div className="mt-1.5 flex items-baseline gap-1">
+        <span className="text-[20px] font-bold text-navy-deep">
+          {raw ? current : fmtVal(current)}
+        </span>
+        {!raw && (
+          <span className="text-[12px] text-ink-3">
+            / {limit > 0 ? fmtVal(limit) : "∞"} {unit}
+          </span>
+        )}
+        {raw && (
+          <span className="text-[12px] text-ink-3">/ {limit} {unit}</span>
+        )}
+      </div>
+      {!raw && limit > 0 && (
+        <div className="mt-2">
+          <ProgressBar value={pct} tone={tone} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function AiTokenMonitor() {
@@ -58,14 +103,86 @@ export function AiTokenMonitor() {
   const { data: health, isLoading: hLoading } = useAiHealth();
   const { data: usage, isLoading: uLoading } = useAiRecentUsage(50, 60);
 
+  // Aggregate budget summary across all providers
+  const budgetSummary = useMemo(() => {
+    if (!rateLimits) return null;
+    const totalRpmLimit = rateLimits.reduce((s, r) => s + (r.rpm_limit > 0 ? r.rpm_limit : 0), 0);
+    const totalRpmCurrent = rateLimits.reduce((s, r) => s + r.rpm_current, 0);
+    const totalRpdLimit = rateLimits.reduce((s, r) => s + (r.rpd_limit > 0 ? r.rpd_limit : 0), 0);
+    const totalRpdCurrent = rateLimits.reduce((s, r) => s + r.rpd_current, 0);
+    const totalTpmLimit = rateLimits.reduce((s, r) => s + (r.tpm_limit > 0 ? r.tpm_limit : 0), 0);
+    const totalTpmCurrent = rateLimits.reduce((s, r) => s + r.tpm_current, 0);
+    const activeProviders = rateLimits.filter(r => r.rpm_current > 0 || r.rpd_current > 0).length;
+    return { totalRpmLimit, totalRpmCurrent, totalRpdLimit, totalRpdCurrent, totalTpmLimit, totalTpmCurrent, activeProviders, totalProviders: rateLimits.length };
+  }, [rateLimits]);
+
   return (
     <div className="space-y-5">
-      {/* Provider Rate-Limit Gauges */}
+      {/* Budget Summary Tiles */
       <FadeIn>
         <Card>
           <CardHeader
+            title="AI Budget Overview"
+            subtitle="Aggregate daily & per-minute budget across all providers — 10% reserve held back."
+            action={
+              <Badge tone="accent">
+                {budgetSummary ? `${budgetSummary.activeProviders}/${budgetSummary.totalProviders} active` : "—"}
+              </Badge>
+            }
+          />
+          <div className="px-6 pb-6 pt-4">
+            {rlLoading ? (
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <Skeleton key={i} className="h-20 rounded-2xl" />
+                ))}
+              </div>
+            ) : budgetSummary ? (
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <BudgetTile
+                  label="Per-Minute Requests"
+                  current={budgetSummary.totalRpmCurrent}
+                  limit={budgetSummary.totalRpmLimit}
+                  unit="RPM"
+                />
+                <BudgetTile
+                  label="Daily Requests"
+                  current={budgetSummary.totalRpdCurrent}
+                  limit={budgetSummary.totalRpdLimit}
+                  unit="RPD"
+                />
+                <BudgetTile
+                  label="Per-Minute Tokens"
+                  current={budgetSummary.totalTpmCurrent}
+                  limit={budgetSummary.totalTpmLimit}
+                  unit="TPM"
+                  formatTokens
+                />
+                <BudgetTile
+                  label="Active Providers"
+                  current={budgetSummary.activeProviders}
+                  limit={budgetSummary.totalProviders}
+                  unit="providers"
+                  raw
+                />
+              </div>
+            ) : (
+              <EmptyState
+                title="No budget data yet"
+                hint="Budget data appears once the server is running."
+                icon={<span className="text-[20px]">📊</span>}
+              />
+            )}
+          </div>
+        </Card>
+      </FadeIn>
+
+      {/* Provider Rate-Limit Gauges */}
+      <FadeIn delay={0.03}>
+        <Card>
+          <CardHeader
             title="AI Provider Rate Limits"
-            subtitle="Real-time RPM / RPD / TPM usage per provider — 10% reserve held back. Updates every 10s."
+            subtitle="Per-provider RPM / RPD / TPM usage — 10% reserve held back. Updates every 10s."
             action={
               <Badge tone="accent">
                 {rateLimits?.length ?? 0} providers
@@ -75,7 +192,7 @@ export function AiTokenMonitor() {
           <div className="px-6 pb-6 pt-4">
             {rlLoading ? (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {[1, 2, 3].map((i) => (
+                {[1, 2, 3, 4, 5, 6, 7].map((i) => (
                   <Skeleton key={i} className="h-36 rounded-2xl" />
                 ))}
               </div>
@@ -110,7 +227,11 @@ export function AiTokenMonitor() {
           />
           <div className="px-6 pb-6 pt-4">
             {hLoading ? (
-              <Skeleton className="h-20 rounded-2xl" />
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                  <Skeleton key={i} className="h-20 rounded-2xl" />
+                ))}
+              </div>
             ) : health && health.length > 0 ? (
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {health.map((h) => (
@@ -215,7 +336,11 @@ function ProviderGauge({ entry }: { entry: AiRateLimitEntry }) {
           <div className="mb-1 flex items-center justify-between text-[11px]">
             <span className="font-semibold text-ink-2">RPD (daily)</span>
             <span className="text-ink-3">
-              {entry.rpd_current} / {hasRpd ? entry.rpd_limit : "∞"}
+              {hasRpd
+                ? `${entry.rpd_current} / ${entry.rpd_limit}`
+                : entry.rpd_current > 0
+                  ? `${entry.rpd_current} reqs (TPD-based)`
+                  : "TPD-based"}
             </span>
           </div>
           {hasRpd && <ProgressBar value={rpdPct} tone={barTone(rpdPct)} />}

@@ -246,31 +246,44 @@ object RateLimiter {
         val reservePct: Int,
     )
 
-    fun snapshot(): List<UsageSnapshot> = states.map { (k, state) ->
-        val (p, m) = k.split("::", limit = 2).let { it[0] to (it.getOrNull(1) ?: "") }
-        val aiProvider = AiProvider.fromCode(p)
+    fun snapshot(): List<UsageSnapshot> {
         val now = System.currentTimeMillis()
         val windowStart = now - 60_000L
 
-        synchronized(lockFor(k)) {
-            state.rpmWindow.removeAll { it < windowStart }
-            state.tpmWindow.removeAll { it.timestamp < windowStart }
-        }
+        return AiProvider.entries.map { provider ->
+            val model = provider.defaultModel
+            val k = key(provider.code, model)
+            val state = states[k]
 
-        if (aiProvider != null) {
-            UsageSnapshot(
-                provider = p,
-                model = m,
-                rpmCurrent = state.rpmWindow.size,
-                rpmLimit = effectiveRpm(rawRpm(aiProvider)),
-                rpdCurrent = state.rpdCounter.get(),
-                rpdLimit = effectiveRpd(rawRpd(aiProvider)),
-                tpmCurrent = state.tpmWindow.sumOf { it.tokens },
-                tpmLimit = effectiveTpm(rawTpm(aiProvider)),
-                reservePct = reservePct,
-            )
-        } else {
-            UsageSnapshot(p, m, 0, 0, 0, 0, 0, 0, reservePct)
+            if (state != null) {
+                synchronized(lockFor(k)) {
+                    state.rpmWindow.removeAll { it < windowStart }
+                    state.tpmWindow.removeAll { it.timestamp < windowStart }
+                }
+                UsageSnapshot(
+                    provider = provider.code,
+                    model = model,
+                    rpmCurrent = state.rpmWindow.size,
+                    rpmLimit = effectiveRpm(rawRpm(provider)),
+                    rpdCurrent = state.rpdCounter.get(),
+                    rpdLimit = effectiveRpd(rawRpd(provider)),
+                    tpmCurrent = state.tpmWindow.sumOf { it.tokens },
+                    tpmLimit = effectiveTpm(rawTpm(provider)),
+                    reservePct = reservePct,
+                )
+            } else {
+                UsageSnapshot(
+                    provider = provider.code,
+                    model = model,
+                    rpmCurrent = 0,
+                    rpmLimit = effectiveRpm(rawRpm(provider)),
+                    rpdCurrent = 0,
+                    rpdLimit = effectiveRpd(rawRpd(provider)),
+                    tpmCurrent = 0,
+                    tpmLimit = effectiveTpm(rawTpm(provider)),
+                    reservePct = reservePct,
+                )
+            }
         }
     }
 
