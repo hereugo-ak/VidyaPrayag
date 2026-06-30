@@ -63,9 +63,12 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.dao.id.EntityID
+import com.littlebridge.enrollplus.feature.calendar.EventType
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -396,7 +399,7 @@ fun Route.eventRegistrationRouting() {
                 }
                 val rows = dbQuery {
                     EventRegistrationsTable
-                        .innerJoin(CalendarEventsTable, { EventRegistrationsTable.eventId eq CalendarEventsTable.id })
+                        .join(CalendarEventsTable, JoinType.INNER, EventRegistrationsTable.eventId, CalendarEventsTable.id)
                         .selectAll()
                         .where {
                             (EventRegistrationsTable.parentUserId eq uid) and
@@ -471,7 +474,7 @@ fun Route.eventRegistrationRouting() {
                 val eventDate = event[CalendarEventsTable.startDate]
                 val conflicting = dbQuery {
                     EventRegistrationsTable
-                        .innerJoin(CalendarEventsTable, { EventRegistrationsTable.eventId eq CalendarEventsTable.id })
+                        .join(CalendarEventsTable, JoinType.INNER, EventRegistrationsTable.eventId, CalendarEventsTable.id)
                         .selectAll()
                         .where {
                             (EventRegistrationsTable.parentUserId eq uid) and
@@ -1035,7 +1038,7 @@ fun Route.eventRegistrationRouting() {
                     val slotId = sRow[EventSlotsTable.id].value
                     val bookings = dbQuery {
                         EventRegistrationsTable
-                            .innerJoin(AppUsersTable, { EventRegistrationsTable.parentUserId eq AppUsersTable.id })
+                            .join(AppUsersTable, JoinType.INNER, EventRegistrationsTable.parentUserId, AppUsersTable.id)
                             .selectAll()
                             .where {
                                 (EventRegistrationsTable.slotId eq slotId) and
@@ -1181,8 +1184,8 @@ fun Route.eventRegistrationRouting() {
 
                 val rows = dbQuery {
                     EventRegistrationsTable
-                        .innerJoin(CalendarEventsTable, { EventRegistrationsTable.eventId eq CalendarEventsTable.id })
-                        .innerJoin(AppUsersTable, { EventRegistrationsTable.parentUserId eq AppUsersTable.id })
+                        .join(CalendarEventsTable, JoinType.INNER, EventRegistrationsTable.eventId, CalendarEventsTable.id)
+                        .join(AppUsersTable, JoinType.INNER, EventRegistrationsTable.parentUserId, AppUsersTable.id)
                         .selectAll()
                         .where {
                             (EventRegistrationsTable.schoolId eq schoolId) and
@@ -1246,7 +1249,7 @@ fun Route.eventRegistrationRouting() {
 
                 val rows = dbQuery {
                     EventRegistrationsTable
-                        .innerJoin(AppUsersTable, { EventRegistrationsTable.parentUserId eq AppUsersTable.id })
+                        .join(AppUsersTable, JoinType.INNER, EventRegistrationsTable.parentUserId, AppUsersTable.id)
                         .selectAll()
                         .where {
                             (EventRegistrationsTable.eventId eq eventId) and
@@ -1611,7 +1614,7 @@ fun Route.eventRegistrationRouting() {
 
                 val rows = dbQuery {
                     EventRegistrationsTable
-                        .innerJoin(AppUsersTable, { EventRegistrationsTable.parentUserId eq AppUsersTable.id })
+                        .join(AppUsersTable, JoinType.INNER, EventRegistrationsTable.parentUserId, AppUsersTable.id)
                         .selectAll()
                         .where {
                             (EventRegistrationsTable.eventId eq eventId) and

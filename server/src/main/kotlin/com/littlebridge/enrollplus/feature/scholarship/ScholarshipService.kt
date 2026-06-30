@@ -709,7 +709,7 @@ class ScholarshipService(
     suspend fun getParentScholarships(parentId: UUID): ParentScholarshipsResponse = dbQuery {
         // Get all active scholarships (school-scoped via parent's children)
         val childSchoolIds = ChildrenTable
-            .innerJoin(ParentChildLinksTable, { ChildrenTable.parentId eq ParentChildLinksTable.parentId })
+            .join(ParentChildLinksTable, org.jetbrains.exposed.sql.JoinType.INNER, ChildrenTable.parentId, ParentChildLinksTable.parentId)
             .selectAll()
             .where { ParentChildLinksTable.parentId eq parentId }
             .map { it[ChildrenTable.schoolId] }
