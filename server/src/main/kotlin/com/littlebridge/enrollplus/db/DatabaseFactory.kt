@@ -184,6 +184,10 @@ object DatabaseFactory {
         // Academic Calendar platform (VP-CAL — centralized planning & scheduling)
         CalendarEventsTable,
         AcademicYearsTable,
+        // Event Registration System (EVENT_REGISTRATION_PLAN.md §3) — slots + registrations.
+        // event_slots has soft FK to calendar_events; event_registrations has soft FK to event_slots.
+        EventSlotsTable,
+        EventRegistrationsTable,
         // Teacher Portal Rebuild — Doc 11 T-001: typed class membership (enrollments).
         // Applied by docs/db/migration_008_enrollments.sql (must run before deploy;
         // AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates boot on it).

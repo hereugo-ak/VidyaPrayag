@@ -1724,6 +1724,14 @@ object CalendarEventsTable : UUIDTable("calendar_events", "id") {
     val updatedAt       = timestamp("updated_at")
     // Notification scheduler: marks whether a reminder has been sent for this event.
     val reminderSent    = bool("reminder_sent").default(false)
+    // Event Registration system (EVENT_REGISTRATION_PLAN.md §3.2) — additive columns
+    // so calendar_events can act as the single source of truth for events with
+    // optional registration / RSVP. All nullable or defaulted so existing rows
+    // and non-registration event types are unaffected.
+    val registrationEnabled  = bool("registration_enabled").default(false)
+    val registrationDeadline = varchar("registration_deadline", 12).nullable()   // YYYY-MM-DD
+    val maxAttendees         = integer("max_attendees").nullable()                // overall cap (null = unlimited)
+    val venue                = text("venue").nullable()                          // location text
 }
 
 /**
@@ -1747,6 +1755,53 @@ object AcademicYearsTable : UUIDTable("academic_years", "id") {
     val holidayDays   = integer("holiday_days").nullable()
     val createdAt     = timestamp("created_at")
     val updatedAt     = timestamp("updated_at")
+}
+
+// =====================================================================
+// event_slots  (Event Registration System — EVENT_REGISTRATION_PLAN.md §3.1)
+//   Structured time slots for a calendar event that has registration enabled.
+//   Each slot has a capacity (default 1 for PTM, higher for workshops) and
+//   active flag so admins can deactivate without deleting. FK to calendar_events
+//   via event_id (soft FK — no Exposed FK constraint, enforced in routing).
+//   UNIQUE(event_id, start_time) prevents duplicate slots for the same event.
+// =====================================================================
+object EventSlotsTable : UUIDTable("event_slots", "id") {
+    val eventId     = uuid("event_id")                       // FK calendar_events.id
+    val startTime   = varchar("start_time", 8)               // HH:mm (24h)
+    val endTime     = varchar("end_time", 8)                 // HH:mm (24h)
+    val capacity    = integer("capacity").default(1)         // max registrations per slot
+    val isActive    = bool("is_active").default(true)
+    val createdAt   = timestamp("created_at")
+    val updatedAt   = timestamp("updated_at")
+    init {
+        uniqueIndex("ux_event_slots_event_start", eventId, startTime)
+    }
+}
+
+// =====================================================================
+// event_registrations  (Event Registration System — EVENT_REGISTRATION_PLAN.md §3.1)
+//   Parent registrations for events. slot_id is nullable for open (non-slotted)
+//   events. student_id is nullable for school-wide events. school_id is the
+//   tenant scope. status: REGISTERED | CANCELLED | WAITLISTED | CHECKED_IN.
+//   client_request_id enables idempotent registration (offline sync retries).
+//   UNIQUE(event_id, parent_user_id, student_id) prevents duplicate registrations.
+// =====================================================================
+object EventRegistrationsTable : UUIDTable("event_registrations", "id") {
+    val eventId         = uuid("event_id")                   // FK calendar_events.id
+    val slotId          = uuid("slot_id").nullable()         // FK event_slots.id (null for open events)
+    val parentUserId    = uuid("parent_user_id")            // FK app_users.id
+    val studentId       = uuid("student_id").nullable()     // FK students.id (for class-specific events)
+    val schoolId        = uuid("school_id")                 // FK schools.id — tenant scope
+    val attendeeCount   = integer("attendee_count").default(1)
+    val status          = varchar("status", 16).default("REGISTERED")  // REGISTERED | CANCELLED | WAITLISTED | CHECKED_IN
+    val cancelReason    = text("cancel_reason").nullable()
+    val registeredAt    = timestamp("registered_at")
+    val cancelledAt     = timestamp("cancelled_at").nullable()
+    val updatedAt       = timestamp("updated_at")
+    val clientRequestId = varchar("client_request_id", 64).nullable()  // idempotency key (X-Client-Request-Id)
+    init {
+        uniqueIndex("ux_event_registrations_unique", eventId, parentUserId, studentId)
+    }
 }
 
 // =====================================================================

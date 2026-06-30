@@ -27,7 +27,7 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays the teacher portal can push above its tab content. */
-private enum class TeacherOverlay { None, Notifications, HealthAlerts, TransportAttendance, Pews, ReportReview, ReportDraftEditor, Heatmap, DigitalIdCard, ScheduledMessages }
+private enum class TeacherOverlay { None, Notifications, HealthAlerts, TransportAttendance, Pews, ReportReview, ReportDraftEditor, Heatmap, DigitalIdCard, ScheduledMessages, EventRegistration }
 
 /**
  * TeacherPortalV2 — the teacher shell, rebuilt FROM SCRATCH on the Parents-Portal
@@ -91,6 +91,8 @@ fun TeacherPortalV2(
                     overlay = TeacherOverlay.ReportReview
                 } else if (deepLinkTarget.screen == "tutor") {
                     overlay = TeacherOverlay.Heatmap
+                } else if (deepLinkTarget.screen == "events") {
+                    overlay = TeacherOverlay.EventRegistration
                 } else {
                     tab = deepLinkTarget.screen
                 }
@@ -180,6 +182,13 @@ fun TeacherPortalV2(
         }
         TeacherOverlay.ScheduledMessages -> {
             com.littlebridge.enrollplus.ui.v2.screens.school.ScheduledMessagesScreenV2(
+                onBack = { overlay = TeacherOverlay.None },
+                modifier = modifier,
+            )
+            return
+        }
+        TeacherOverlay.EventRegistration -> {
+            TeacherPtmEventRegistrationScreenV2(
                 onBack = { overlay = TeacherOverlay.None },
                 modifier = modifier,
             )
