@@ -74,6 +74,7 @@ fun TeacherHomeScreenV2(
     onOpenReportReview: () -> Unit = {},
     onOpenHeatmap: () -> Unit = {},
     onOpenIdCard: () -> Unit = {},
+    onOpenScheduledMessages: () -> Unit = {},
     modifier: Modifier = Modifier,
     todayViewModel: TeacherTodayViewModel = koinViewModel(),
     checkInViewModel: TeacherCheckInViewModel = koinViewModel(),
@@ -157,6 +158,13 @@ fun TeacherHomeScreenV2(
                 subtitle = "View your digital school ID card",
                 icon = VIcons.IdCard,
                 onClick = onOpenIdCard,
+            )
+
+            VActionCard(
+                title = "Scheduled Messages",
+                subtitle = "View and manage your scheduled announcements and broadcasts",
+                icon = VIcons.Clock,
+                onClick = onOpenScheduledMessages,
             )
         }
 

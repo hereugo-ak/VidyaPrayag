@@ -273,6 +273,10 @@ object DatabaseFactory {
         // AUTO_CREATE_TABLES is OFF in prod).
         IdCardTemplatesTable,
         IdCardsTable,                    // FK to templates
+        // Scheduled Messages (MESSAGE_SCHEDULING_PLAN.md §4)
+        // Applied by docs/db/migration-104-scheduled-messages.sql (must run before
+        // deploy; AUTO_CREATE_TABLES is OFF in prod).
+        ScheduledMessagesTable,
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

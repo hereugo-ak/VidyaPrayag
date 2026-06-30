@@ -70,6 +70,7 @@ private enum class SchoolOverlay {
     ScholarshipManagement,
     BrandingKit,
     IdCards,
+    ScheduledMessages,
 }
 
 /**
@@ -401,6 +402,13 @@ fun SchoolPortalV2(
                 )
                 return
             }
+            SchoolOverlay.ScheduledMessages -> {
+                ScheduledMessagesScreenV2(
+                    onBack = { overlay = SchoolOverlay.None },
+                    modifier = modifier,
+                )
+                return
+            }
             SchoolOverlay.None -> Unit
         }
 
@@ -461,6 +469,7 @@ fun SchoolPortalV2(
                         // screens as overlays instead of Coming-Soon cards.
                         onOpenMessages = { overlay = SchoolOverlay.Messages },
                         onOpenPtm = { overlay = SchoolOverlay.SchedulePTM },
+                        onOpenScheduledMessages = { overlay = SchoolOverlay.ScheduledMessages },
                     )
                     "settings" -> SchoolSettingsScreenV2(
                         onLogout = onLogout,

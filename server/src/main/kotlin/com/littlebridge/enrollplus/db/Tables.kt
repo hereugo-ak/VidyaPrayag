@@ -2965,3 +2965,64 @@ object IdCardsTable : UUIDTable("id_cards", "id") {
         index("idx_id_cards_school", false, schoolId, createdAt)
     }
 }
+
+// =====================================================================
+// Scheduled Messages (MESSAGE_SCHEDULING_PLAN.md §4)
+//   Unified scheduling table for all schedulable message types
+//   (announcements, admin broadcasts, teacher class broadcasts).
+//   The MessageDispatchScheduler polls this table every 1 min for
+//   status='SCHEDULED' AND scheduled_at <= now(), dispatches via the
+//   existing Notify.toUsers / sendInConversation / createCalendarEvent
+//   primitives, and marks rows DISPATCHED or FAILED.
+//
+//   Status state machine: DRAFT → SCHEDULED → DISPATCHED → FAILED | CANCELLED
+//
+//   Applied by docs/db/migration-104-scheduled-messages.sql (must run before
+//   deploy; AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates boot).
+// =====================================================================
+object ScheduledMessagesTable : UUIDTable("scheduled_messages", "id") {
+    val schoolId          = uuid("school_id")
+    val messageType       = varchar("message_type", 24)
+    val status            = varchar("status", 16).default("SCHEDULED")
+    val scheduledAt       = timestamp("scheduled_at")
+    val dispatchedAt      = timestamp("dispatched_at").nullable()
+    val payload           = text("payload")
+    val createdBy         = uuid("created_by")
+    val authorRole        = varchar("author_role", 16)
+    val authorName        = varchar("author_name", 128).nullable()
+    val audienceType      = varchar("audience_type", 16).default("ALL_SCHOOL")
+    val audienceLabel     = varchar("audience_label", 256).nullable()
+    val title             = varchar("title", 256).nullable()
+    val bodyPreview       = varchar("body_preview", 256).nullable()
+    val addToCalendar     = bool("add_to_calendar").default(false)
+    val calendarEventCode = varchar("calendar_event_code", 20).nullable()
+    val retryCount        = integer("retry_count").default(0)
+    val maxRetries        = integer("max_retries").default(3)
+    val lastError         = text("last_error").nullable()
+    val clientMsgId       = uuid("client_msg_id").nullable()
+    val createdAt         = timestamp("created_at")
+    val updatedAt         = timestamp("updated_at")
+
+    init {
+        index("idx_scheduled_messages_school_status", false, schoolId, status)
+        index("idx_scheduled_messages_scheduled_at", false, scheduledAt)
+        index("idx_scheduled_messages_created_by", false, createdBy)
+        index("idx_scheduled_messages_client_msg_id", false, clientMsgId)
+    }
+}
+
+object ScheduledMessageStatus {
+    const val DRAFT      = "DRAFT"
+    const val SCHEDULED  = "SCHEDULED"
+    const val DISPATCHED = "DISPATCHED"
+    const val FAILED     = "FAILED"
+    const val CANCELLED  = "CANCELLED"
+    val ALL      = setOf(DRAFT, SCHEDULED, DISPATCHED, FAILED, CANCELLED)
+    val PENDING  = setOf(DRAFT, SCHEDULED)
+}
+
+object ScheduledMessageType {
+    const val ANNOUNCEMENT      = "ANNOUNCEMENT"
+    const val ADMIN_BROADCAST   = "ADMIN_BROADCAST"
+    const val TEACHER_BROADCAST = "TEACHER_BROADCAST"
+}
