@@ -118,7 +118,7 @@ export function AiTokenMonitor() {
 
   return (
     <div className="space-y-5">
-      {/* Budget Summary Tiles */
+      {/* Budget Summary Tiles */}
       <FadeIn>
         <Card>
           <CardHeader
