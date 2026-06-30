@@ -63,6 +63,18 @@ import type {
   PewsEffectivenessTrend,
   PewsRiskLevel,
   PewsInterventionStatus,
+  PewsDraftMessage,
+  PewsSendParentResult,
+  ReportCardOversightSummary,
+  ReportCardPublishRequest,
+  ReportCardPublishResult,
+  ReportCardEffectivenessReport,
+  ReportCardTermConfig,
+  TutorTeacherScopeResponse,
+  TutorHeatmapResponse,
+  AiRateLimitEntry,
+  AiHealthEntry,
+  AiRecentUsageResponse,
 } from "./types";
 
 interface Opts {
@@ -364,4 +376,39 @@ export const adminApi = {
     const qs = days ? `?days=${days}` : "";
     return authRequest<PewsEffectivenessTrend>(`/api/v1/school/pews/trend${qs}`);
   },
+  pewsDraftMessage: (interventionId: string, lang: string = "en") =>
+    authRequest<PewsDraftMessage>(`/api/v1/school/pews/interventions/${encodeURIComponent(interventionId)}/draft-message?lang=${encodeURIComponent(lang)}`, { method: "POST" }),
+  pewsSendParentMessage: (interventionId: string) =>
+    authRequest<PewsSendParentResult>(`/api/v1/school/pews/interventions/${encodeURIComponent(interventionId)}/send-parent-message`, { method: "POST" }),
+
+  // ── AI Report Card 2.0 ─────────────────────────────────────────────────────
+  // Admin (school-scoped) endpoints for oversight, publishing, and effectiveness.
+  reportCardOversight: (term: string, academicYearId?: string) => {
+    const qs = new URLSearchParams({ term });
+    if (academicYearId) qs.set("academicYearId", academicYearId);
+    return authRequest<ReportCardOversightSummary>(`/api/v1/report-card/oversight?${qs.toString()}`);
+  },
+  reportCardPublish: (body: ReportCardPublishRequest) =>
+    authRequest<ReportCardPublishResult>("/api/v1/report-card/publish", { method: "POST", body }),
+  reportCardEffectiveness: () =>
+    authRequest<ReportCardEffectivenessReport[]>("/api/v1/report-card/learn/effectiveness"),
+  reportCardTermConfig: () =>
+    authRequest<ReportCardTermConfig>("/api/v1/report-card/term-config"),
+
+  // ── AI Tutor 2.0 ───────────────────────────────────────────────────────────
+  // Teacher/admin heatmap scope + heatmap data. The server routes are JWT-scoped
+  // (teacher context), so the admin sees the same data as a teacher for their
+  // assigned classes.
+  tutorTeacherScope: () =>
+    authRequest<TutorTeacherScopeResponse>("/api/v1/tutor/heatmap/scope"),
+  tutorHeatmap: (classId: string, subjectId: string) =>
+    authRequest<TutorHeatmapResponse>(`/api/v1/tutor/heatmap/${encodeURIComponent(classId)}/${encodeURIComponent(subjectId)}`),
+
+  // ── AI Token Monitor (Dev Tools — super admin only) ────────────────────────
+  aiRateLimits: () =>
+    authRequest<AiRateLimitEntry[]>("/api/v1/admin/ai/rate-limits"),
+  aiHealth: () =>
+    authRequest<AiHealthEntry[]>("/api/v1/admin/ai/health"),
+  aiRecentUsage: (limit: number = 50, windowMin: number = 60) =>
+    authRequest<AiRecentUsageResponse>(`/api/v1/admin/ai/recent-usage?limit=${limit}&window=${windowMin}`),
 };

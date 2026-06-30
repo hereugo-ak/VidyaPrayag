@@ -471,13 +471,14 @@ object DatabaseFactory {
             maximumPoolSize = poolSize
             minimumIdle = 1
             isAutoCommit = false
-            transactionIsolation = "TRANSACTION_REPEATABLE_READ"
-            // Sensible defaults for Supabase (pooled, IPv4 PgBouncer port 6543).
+            // Don't set transactionIsolation — Supabase PgBouncer doesn't support
+            // session-level isolation; PostgreSQL defaults to READ_COMMITTED which is fine.
             addDataSourceProperty("ApplicationName", "vidyaprayag-ktor")
             addDataSourceProperty("reWriteBatchedInserts", "true")
             connectionTimeout = 30_000
             validationTimeout = 5_000
             maxLifetime = 30 * 60 * 1000L
+            connectionTestQuery = "SELECT 1"
             validate()
         }
         return HikariDataSource(config)

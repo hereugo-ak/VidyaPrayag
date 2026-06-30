@@ -107,3 +107,9 @@ export const IconAlumni = (p: P) => (
 export const IconShield = (p: P) => (
   <svg {...base(p)}><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z" /><path d="M9.5 12l1.8 1.8L15 10" /></svg>
 );
+export const IconBook = (p: P) => (
+  <svg {...base(p)}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" /><path d="M9 7h7M9 11h5" /></svg>
+);
+export const IconReport = (p: P) => (
+  <svg {...base(p)}><path d="M4 4h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z" /><path d="M7 8h6M7 12h10M7 16h7" /><path d="M15 4v4h2" /></svg>
+);

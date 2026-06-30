@@ -40,7 +40,7 @@ interface PewsRepository {
     suspend fun getTeacherStudents(token: String): NetworkResult<ApiResponse<List<PewsStudentDto>>>
     suspend fun getTeacherInterventions(token: String, status: String? = null): NetworkResult<ApiResponse<List<PewsInterventionDto>>>
     suspend fun updateTeacherIntervention(token: String, interventionId: String, request: UpdateInterventionRequest): NetworkResult<ApiResponse<Map<String, Boolean>>>
-    suspend fun generateParentDraft(token: String, interventionId: String, lang: String = "hi"): NetworkResult<ApiResponse<ParentDraftDto>>
+    suspend fun generateParentDraft(token: String, interventionId: String, lang: String = "en"): NetworkResult<ApiResponse<ParentDraftDto>>
     suspend fun sendParentMessage(token: String, interventionId: String): NetworkResult<ApiResponse<SendParentMessageDto>>
 
     // parent

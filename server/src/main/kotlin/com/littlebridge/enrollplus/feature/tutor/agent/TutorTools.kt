@@ -2,6 +2,8 @@
 package com.littlebridge.enrollplus.feature.tutor.agent
 
 import com.littlebridge.enrollplus.feature.ai.AiService
+import com.littlebridge.enrollplus.feature.notifications.Notify
+import com.littlebridge.enrollplus.feature.notifications.NotifyRecipients
 import com.littlebridge.enrollplus.feature.tutor.data.TutorMisconceptionRepository
 import com.littlebridge.enrollplus.feature.tutor.sense.LearnerBundleBuilder
 import kotlinx.serialization.json.Json
@@ -404,6 +406,25 @@ object TutorTools {
 
             log.info("TutorTools: logged misconception {} for child {} on topic {}",
                 misconceptionType, childId, topicId)
+
+            // Notify teachers about the new misconception so they can
+            // review it in the heatmap and plan remediation.
+            runCatching {
+                val teacherIds = NotifyRecipients.teachersInSchool(schoolId)
+                if (teacherIds.isNotEmpty()) {
+                    Notify.toUsers(
+                        userIds = teacherIds,
+                        category = "tutor_misconception",
+                        title = "New Misconception Logged: $misconceptionType",
+                        body = "A student demonstrated '$misconceptionType' in a tutor session. " +
+                            "Review the misconception heatmap for class/subject patterns.",
+                        schoolId = schoolId,
+                        deepLink = "/teacher/tutor",
+                        refType = "tutor_misconception",
+                        refId = id.toString(),
+                    )
+                }
+            }.onFailure { log.warn("TutorTools: failed to notify teachers of misconception: {}", it.message) }
 
             return buildJsonObject {
                 put("logged", true)

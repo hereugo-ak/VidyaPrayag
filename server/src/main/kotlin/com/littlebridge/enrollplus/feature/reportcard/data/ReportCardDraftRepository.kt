@@ -3,6 +3,7 @@ package com.littlebridge.enrollplus.feature.reportcard.data
 
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.db.ReportCardDraftsTable
+import org.jetbrains.exposed.sql.Op
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
@@ -93,7 +94,7 @@ class ReportCardDraftRepository {
         academicYearId: UUID?,
         factBundle: String,
         factHash: String,
-        language: String = "hi",
+        language: String = "en",
         templateVersion: Int = 1,
     ): UUID = dbQuery {
         val now = Instant.now()
@@ -133,7 +134,7 @@ class ReportCardDraftRepository {
             (if (academicYearId != null)
                 ReportCardDraftsTable.academicYearId eq academicYearId
             else
-                ReportCardDraftsTable.academicYearId.isNull())
+                Op.TRUE)
         }.singleOrNull()?.let(::mapRow)
     }
 
@@ -149,11 +150,11 @@ class ReportCardDraftRepository {
             (if (classId != null)
                 ReportCardDraftsTable.classId eq classId
             else
-                ReportCardDraftsTable.classId.isNull()) and
+                Op.TRUE) and
             (if (academicYearId != null)
                 ReportCardDraftsTable.academicYearId eq academicYearId
             else
-                ReportCardDraftsTable.academicYearId.isNull())
+                Op.TRUE)
         }.map(::mapRow)
     }
 
@@ -266,6 +267,8 @@ class ReportCardDraftRepository {
         term: String,
         academicYearId: UUID?,
         publishedBy: UUID,
+        className: String? = null,
+        section: String? = null,
     ): Int = dbQuery {
         val now = Instant.now()
         var count = 0
@@ -276,11 +279,19 @@ class ReportCardDraftRepository {
             (if (classId != null)
                 ReportCardDraftsTable.classId eq classId
             else
-                ReportCardDraftsTable.classId.isNull()) and
+                Op.TRUE) and
             (if (academicYearId != null)
                 ReportCardDraftsTable.academicYearId eq academicYearId
             else
-                ReportCardDraftsTable.academicYearId.isNull())
+                Op.TRUE) and
+            (if (className != null)
+                ReportCardDraftsTable.className eq className
+            else
+                Op.TRUE) and
+            (if (section != null)
+                ReportCardDraftsTable.section eq section
+            else
+                Op.TRUE)
         }.map { it[ReportCardDraftsTable.id].value }
 
         for (rowId in rows) {

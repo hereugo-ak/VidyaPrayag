@@ -188,6 +188,15 @@ object AiService {
         // 5) try candidates in order
         var failedOver = false
         var lastError: String? = null
+
+        // BATCH lane deprioritization: if this is a BATCH call, yield to let
+        // any pending real-time (FAST_CHAT/CLASSIFY/REASON) requests go first.
+        // This prevents a 40-student report card batch from starving a student's
+        // tutor chat that needs < 3s response time.
+        if (lane == AiLane.BATCH) {
+            kotlinx.coroutines.delay(50L)
+        }
+
         for ((idx, provider) in candidates.withIndex()) {
             val model = KeyVault.modelFor(provider)
 
@@ -200,6 +209,18 @@ object AiService {
             if (apiKey == null) {
                 log.debug("Skipping {}: no key configured", provider.code)
                 failedOver = true
+                continue
+            }
+
+            // Proactive rate-limit check: skip this provider if we're near its
+            // free-tier RPM/RPD/TPM limits (at 90% capacity, 10% reserve).
+            // This prevents burning requests that are doomed to get 429.
+            val estTokens = maxTokens + messages.sumOf { (it.content?.length ?: 0) / 4 }
+            val rlCheck = RateLimiter.check(provider.code, model, estTokens, provider)
+            if (!rlCheck.allowed) {
+                log.debug("Skipping {} ({}): rate-limited ({})", provider.code, model, rlCheck.reason)
+                failedOver = true
+                lastError = "rate_limited: ${rlCheck.reason}"
                 continue
             }
 
@@ -222,6 +243,8 @@ object AiService {
             // Tool-call response: return as success with toolCalls in the result
             if (result.ok && !result.toolCalls.isNullOrEmpty()) {
                 CircuitBreaker.recordSuccess(provider.code, model, latency)
+                RateLimiter.record(provider.code, model,
+                    result.inputTokens + result.outputTokens, provider)
                 val routing = if (idx == 0 && !failedOver) "direct" else "failed_over"
                 logUsage(feature, schoolId, userId, lane, provider.code, result.modelUsed ?: model,
                     result.inputTokens, result.outputTokens, 0.0, latency, "success", routing, null)
@@ -243,6 +266,8 @@ object AiService {
                     continue
                 }
                 CircuitBreaker.recordSuccess(provider.code, model, latency)
+                RateLimiter.record(provider.code, model,
+                    result.inputTokens + result.outputTokens, provider)
                 val routing = if (idx == 0 && !failedOver) "direct" else "failed_over"
                 if (cache) {
                     writeCache(cacheKey, schoolId, feature, validated, result, provider.code,
@@ -257,6 +282,11 @@ object AiService {
                 )
             } else {
                 val rl = result.errorKind == LlmErrorKind.RATE_LIMITED
+                // Record the attempt against the rate limiter even on failure,
+                // so a 429 from the provider updates our counters.
+                if (rl) {
+                    RateLimiter.record(provider.code, model, estTokens, provider)
+                }
                 CircuitBreaker.recordFailure(provider.code, model, rateLimited = rl)
                 lastError = result.errorMessage ?: result.errorKind?.name
                 failedOver = true

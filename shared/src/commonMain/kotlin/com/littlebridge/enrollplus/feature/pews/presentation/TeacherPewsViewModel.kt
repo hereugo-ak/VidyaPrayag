@@ -119,7 +119,7 @@ class TeacherPewsViewModel(
         _state.value = _state.value.copy(infoMessage = null)
     }
 
-    fun generateParentDraft(interventionId: String, lang: String = "hi") {
+    fun generateParentDraft(interventionId: String, lang: String = "en") {
         viewModelScope.launch {
             val t = token() ?: run {
                 _state.value = _state.value.copy(error = "You are not signed in. Please log in again.")

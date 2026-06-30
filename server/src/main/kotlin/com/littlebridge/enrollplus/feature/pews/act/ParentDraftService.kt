@@ -39,7 +39,7 @@ class ParentDraftService {
 
     data class DraftResult(
         val ok: Boolean,
-        val language: String = "hi",
+        val language: String = "en",
         val body: String? = null,
         val errorMessage: String? = null,
     )
@@ -47,13 +47,13 @@ class ParentDraftService {
     private val systemPrompt = """
         You write short, warm messages from teachers to parents about their child.
         Rules:
-        - Write in the parent's vernacular language (Hindi by default, unless specified).
+        - Write in the specified language (English by default, unless another language is specified).
         - Tone: warm, caring, non-clinical. You are a teacher who cares, not a system.
         - NEVER mention "risk", "score", "PEWS", "early warning", or any system term.
         - NEVER share numbers like attendance percentage or test scores.
         - Keep it to 2-3 sentences. Include one concrete next step (e.g. "please call me",
           "let's meet at PTM", "please ensure homework is done").
-        - Address the parent respectfully (e.g. "नमस्ते" / "प्रणाम").
+        - Address the parent respectfully (e.g. "Hello" / "नमस्ते" depending on language).
         - Use the child's first name, not their roll number or code.
         - Output ONLY the message body, nothing else. No JSON, no quotes, no preamble.
     """.trimIndent()
@@ -65,7 +65,7 @@ class ParentDraftService {
     suspend fun generateDraft(
         schoolId: UUID,
         interventionId: UUID,
-        language: String = "hi",
+        language: String = "en",
     ): DraftResult {
         KillSwitchGuard.require("act")
 
@@ -193,7 +193,7 @@ class ParentDraftService {
         val caseFile = planJson?.let { CaseFileCodec.parse(it) }
         val draftBody = caseFile?.parentDraft?.body
             ?: run {
-                val generated = generateDraft(schoolId, interventionId, caseFile?.parentDraft?.language ?: "hi")
+                val generated = generateDraft(schoolId, interventionId, caseFile?.parentDraft?.language ?: "en")
                 if (!generated.ok || generated.body.isNullOrBlank()) {
                     return SendResult(ok = false, errorMessage = "no parent draft available")
                 }
@@ -264,6 +264,34 @@ class ParentDraftService {
                 "home_visit" -> "नमस्ते, $firstName के बारे में चर्चा के लिए मैं आपसे मिलना चाहता/चाहती हूँ। समय बताएँ।"
                 "remedial_class" -> "नमस्ते, $firstName को अतिरिक्त सहायता देने के लिए हम विशेष कक्षा का आयोजन कर रहे हैं। कृपया सहयोग दें।"
                 else -> "नमस्ते, $firstName के बारे में बात करनी है। कृपया संपर्क करें। धन्यवाद।"
+            }
+            "mr" -> when (actionType) {
+                "parent_call" -> "नमस्कार, $firstName बद्दल बोलायचे आहे. कृपया सोयीनुसार कॉल करा. धन्यवाद."
+                "parent_message" -> "नमस्कार, $firstName च्या प्रगतीबद्दल बोलायचे आहे. कृपया संदेशाचे उत्तर द्या."
+                "home_visit" -> "नमस्कार, $firstName बद्दल चर्चा करण्यासाठी भेटायचे आहे. वेळ सांगा."
+                "remedial_class" -> "नमस्कार, $firstName ला अतिरिक्त मदतीसाठी विशेष वर्ग आयोजित करत आहोत. सहकार्य करा."
+                else -> "नमस्कार, $firstName बद्दल बोलायचे आहे. कृपया संपर्क करा. धन्यवाद."
+            }
+            "ta" -> when (actionType) {
+                "parent_call" -> "வணக்கம், $firstName பற்றி பேச விரும்புகிறேன். தயவுசெய்து அழைக்கவும். நன்றி."
+                "parent_message" -> "வணக்கம், $firstName முன்னேற்றம் பற்றி பேச விரும்புகிறேன். தயவுசெய்து பதிலளிக்கவும்."
+                "home_visit" -> "வணக்கம், $firstName பற்றி விவாதிக்க சந்திக்க விரும்புகிறேன். நேரம் தெரிவிக்கவும்."
+                "remedial_class" -> "வணக்கம், $firstName க்கு கூடுதல் உதவி வகுப்பு ஏற்பாடு செய்கிறோம். ஒத்துழைக்கவும்."
+                else -> "வணக்கம், $firstName பற்றி பேச விரும்புகிறேன். தயவுசெய்து தொடர்பு கொள்ளவும். நன்றி."
+            }
+            "te" -> when (actionType) {
+                "parent_call" -> "నమస్తే, $firstName గురించి మాట్లాడాలనుకుంటున్నాను. దయచేసి కాల్ చేయండి. ధన్యవాదాలు."
+                "parent_message" -> "నమస్తే, $firstName పురోగతి గురించి మాట్లాడాలనుకుంటున్నాను. దయచేసి ప్రత్యుత్తరం ఇవ్వండి."
+                "home_visit" -> "నమస్తే, $firstName గురించి చర్చించడానికి కలవాలనుకుంటున్నాను. సమయం చెప్పండి."
+                "remedial_class" -> "నమస్తే, $firstName కోసం అదనపు సహాయ తరగతులు ఏర్పాటు చేస్తున్నాము. సహకరించండి."
+                else -> "నమస్తే, $firstName గురించి మాట్లాడాలనుకుంటున్నాను. దయచేసి సంప్రదించండి. ధన్యవాదాలు."
+            }
+            "bn" -> when (actionType) {
+                "parent_call" -> "নমস্কার, $firstName সম্পর্কে কথা বলতে চাই। অনুগ্রহ করে কল করুন। ধন্যবাদ।"
+                "parent_message" -> "নমস্কার, $firstName এর অগ্রগতি সম্পর্কে কথা বলতে চাই। অনুগ্রহ করে উত্তর দিন।"
+                "home_visit" -> "নমস্কার, $firstName সম্পর্কে আলোচনার জন্য দেখা করতে চাই। সময় জানান।"
+                "remedial_class" -> "নমস্কার, $firstName এর জন্য অতিরিক্ত সহায়তা ক্লাসের ব্যবস্থা করছি। সহযোগিতা করুন।"
+                else -> "নমস্কার, $firstName সম্পর্কে কথা বলতে চাই। অনুগ্রহ করে যোগাযোগ করুন। ধন্যবাদ।"
             }
             else -> when (actionType) {
                 "parent_call" -> "Hello, I'd like to discuss $firstName. Please call at your convenience. Thank you."

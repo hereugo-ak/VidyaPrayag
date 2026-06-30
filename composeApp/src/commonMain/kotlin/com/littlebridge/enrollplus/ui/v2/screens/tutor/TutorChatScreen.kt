@@ -117,7 +117,7 @@ fun TutorChatScreen(
             } else if (state.conversationHistory.isEmpty() && !state.isLoading) {
                 VEmptyState(
                     title = "Ask a question",
-                    body = "Pick a subject and type your doubt below. The AI tutor will guide you step by step.",
+                    body = "Type your doubt below. The AI tutor will guide you step by step. You can pick a subject for more specific help, or ask a general question.",
                     icon = VIcons.BookOpen,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                 )
@@ -245,9 +245,9 @@ private fun SubjectPicker(
     val selected = subjects.find { it.subjectId == selectedSubjectId }
     val label = when {
         isLoading -> "Loading subjects..."
-        subjects.isEmpty() -> "No subjects available"
+        selectedSubjectId.isEmpty() -> "General (no subject)"
         selected != null -> selected.subjectName
-        else -> "Select a subject"
+        else -> "General (no subject)"
     }
 
     Box {
@@ -256,7 +256,7 @@ private fun SubjectPicker(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
                 .background(c.cream)
-                .clickable(enabled = subjects.isNotEmpty()) { dropdownOpen = true }
+                .clickable { dropdownOpen = true }
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -280,6 +280,18 @@ private fun SubjectPicker(
             onDismissRequest = { dropdownOpen = false },
             containerColor = c.card,
         ) {
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        "General (no subject)",
+                        style = VTheme.type.body.colored(c.ink),
+                    )
+                },
+                onClick = {
+                    onSelect("")
+                    dropdownOpen = false
+                },
+            )
             subjects.forEach { subject ->
                 DropdownMenuItem(
                     text = {

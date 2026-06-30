@@ -146,13 +146,13 @@ class CaseworkerService {
           "narrative": "1-2 grounded sentences explaining the situation",
           "hypotheses": [{"cause": "...", "confidence": 0.0-1.0, "evidence": ["..."]}],
           "plan": [{"step": 1, "action": "...", "owner": "class_teacher", "sla_days": N, "rationale": "...", "condition": "optional"}],
-          "parent_draft": {"language": "hi", "tone": "warm, non-clinical", "body": "vernacular message to parent"},
+          "parent_draft": {"language": "en", "tone": "warm, non-clinical", "body": "message to parent in specified language"},
           "urgency": "low|medium|high",
           "skip_reason": null or "reason to defer"
         }
         - The plan must be a SEQUENCE (2-4 steps), not one action. Each step
           should have a clear owner and SLA.
-        - The parent_draft body must be in vernacular (Hindi by default), warm
+        - The parent_draft body must be in the specified language (English by default), warm
           and non-clinical. Never mention "risk", "score", or "PEWS". Include
           a concrete next step.
         - If calendar context shows exam week or holiday, set skip_reason

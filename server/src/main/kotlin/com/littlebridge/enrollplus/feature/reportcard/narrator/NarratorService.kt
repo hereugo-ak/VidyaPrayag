@@ -61,13 +61,13 @@ class NarratorService(
      * @param schoolId     School UUID
      * @param bundle       Tier-0 deterministic fact bundle
      * @param classContext  Tier-1 class-context paragraph (nullable)
-     * @param language     Narrative language (default "hi")
+     * @param language     Narrative language (default "en")
      */
     suspend fun narrate(
         schoolId: UUID,
         bundle: ReportFactBundle,
         classContext: String?,
-        language: String = "hi",
+        language: String = "en",
     ): NarrationResult {
         ReportCardKillSwitch.require(ReportCardConstants.MODULE_NARRATOR)
         log.info("Narrator: student={}, term={}, confidence={}", bundle.studentName, bundle.term, bundle.dataConfidence)

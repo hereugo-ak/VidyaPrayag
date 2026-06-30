@@ -6,6 +6,7 @@ import com.littlebridge.enrollplus.core.ok
 import com.littlebridge.enrollplus.core.principalUserUuid
 import com.littlebridge.enrollplus.db.ChildrenTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
+import com.littlebridge.enrollplus.feature.notifications.Notify
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.request.receive
@@ -85,6 +86,25 @@ fun Route.agentRouting() {
             ),
             if (result.modelUsed) "Doubt resolved" else "Doubt resolved (deterministic fallback)"
         )
+
+        // Notify parent if the tutor session was escalated (safety flag).
+        // This happens when the child repeatedly asks for answers or shows
+        // distress — the parent should be aware.
+        if (result.safetyFlag != null) {
+            runCatching {
+                Notify.toUser(
+                    userId = uid,
+                    category = "tutor_escalation",
+                    title = "Tutor Session Update",
+                    body = "Your child's tutor session flagged a safety concern: ${result.safetyFlag}. " +
+                        "A teacher may reach out to discuss next steps.",
+                    schoolId = schoolId,
+                    deepLink = "/parent/academics",
+                    refType = "tutor_session",
+                    refId = result.sessionId?.toString(),
+                )
+            }.onFailure { /* best-effort */ }
+        }
     }
 }
 
