@@ -330,6 +330,7 @@ fun ParentPortalV2(
                     onOpenTutorProgress = { overlay = ParentOverlay.TutorProgress },
                     onOpenScholarships = { overlay = ParentOverlay.Scholarships },
                     onOpenIdCard = { overlay = ParentOverlay.DigitalIdCard },
+                    onOpenEvents = { overlay = ParentOverlay.EventRegistration },
                 )
                 "academics" -> ParentAcademicsScreenV2(onOpenLeave = { overlay = ParentOverlay.Leave }, onOpenHealth = { overlay = ParentOverlay.Health })
                 "fees" -> ParentFeesScreenV2()

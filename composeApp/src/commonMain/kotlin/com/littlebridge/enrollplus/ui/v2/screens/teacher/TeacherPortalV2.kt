@@ -269,6 +269,7 @@ fun TeacherPortalV2(
                     onOpenHeatmap = { overlay = TeacherOverlay.Heatmap },
                     onOpenIdCard = { overlay = TeacherOverlay.DigitalIdCard },
                     onOpenScheduledMessages = { overlay = TeacherOverlay.ScheduledMessages },
+                    onOpenEvents = { overlay = TeacherOverlay.EventRegistration },
                 )
 
                 "update" -> key(updateScopeNonce) {
