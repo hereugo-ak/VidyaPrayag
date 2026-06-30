@@ -367,6 +367,7 @@ fun Route.scheduledMessageRouting() {
                     if (row[ScheduledMessagesTable.status] !in ScheduledMessageStatus.PENDING) return@dbQuery false
 
                     ScheduledMessagesTable.update({ ScheduledMessagesTable.id eq id }) {
+                        it[ScheduledMessagesTable.status] = ScheduledMessageStatus.SCHEDULED
                         it[ScheduledMessagesTable.scheduledAt] = now
                         it[ScheduledMessagesTable.updatedAt] = now
                     }

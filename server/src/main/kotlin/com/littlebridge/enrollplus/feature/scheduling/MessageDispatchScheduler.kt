@@ -94,7 +94,7 @@ object MessageDispatchScheduler {
                     (ScheduledMessagesTable.id eq id) and
                         (ScheduledMessagesTable.status eq ScheduledMessageStatus.SCHEDULED)
                 }) {
-                    it[ScheduledMessagesTable.status] = "DISPATCHING"
+                    it[ScheduledMessagesTable.status] = ScheduledMessageStatus.DISPATCHING
                 }
                 updated > 0
             }
