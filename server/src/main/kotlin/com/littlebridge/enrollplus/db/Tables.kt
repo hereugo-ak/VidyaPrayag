@@ -3012,12 +3012,13 @@ object ScheduledMessagesTable : UUIDTable("scheduled_messages", "id") {
 }
 
 object ScheduledMessageStatus {
-    const val DRAFT      = "DRAFT"
-    const val SCHEDULED  = "SCHEDULED"
-    const val DISPATCHED = "DISPATCHED"
-    const val FAILED     = "FAILED"
-    const val CANCELLED  = "CANCELLED"
-    val ALL      = setOf(DRAFT, SCHEDULED, DISPATCHED, FAILED, CANCELLED)
+    const val DRAFT       = "DRAFT"
+    const val SCHEDULED   = "SCHEDULED"
+    const val DISPATCHING = "DISPATCHING"
+    const val DISPATCHED  = "DISPATCHED"
+    const val FAILED      = "FAILED"
+    const val CANCELLED   = "CANCELLED"
+    val ALL      = setOf(DRAFT, SCHEDULED, DISPATCHING, DISPATCHED, FAILED, CANCELLED)
     val PENDING  = setOf(DRAFT, SCHEDULED)
 }
 
