@@ -201,12 +201,12 @@ class ScheduledMessagesIntegrationTest {
                 (TestScheduledMessagesTable.id eq id) and
                     (TestScheduledMessagesTable.status eq ScheduledMessageStatus.SCHEDULED)
             }) {
-                it[TestScheduledMessagesTable.status] = "DISPATCHING"
+                it[TestScheduledMessagesTable.status] = ScheduledMessageStatus.DISPATCHING
             }
             updated > 0
         }
         assertTrue(claimed, "Atomic claim should succeed for SCHEDULED message")
-        assertEquals("DISPATCHING", getStatus(id))
+        assertEquals(ScheduledMessageStatus.DISPATCHING, getStatus(id))
     }
 
     @Test
@@ -217,7 +217,7 @@ class ScheduledMessagesIntegrationTest {
                 (TestScheduledMessagesTable.id eq id) and
                     (TestScheduledMessagesTable.status eq ScheduledMessageStatus.SCHEDULED)
             }) {
-                it[TestScheduledMessagesTable.status] = "DISPATCHING"
+                it[TestScheduledMessagesTable.status] = ScheduledMessageStatus.DISPATCHING
             }
             updated > 0
         }
@@ -233,7 +233,7 @@ class ScheduledMessagesIntegrationTest {
                 (TestScheduledMessagesTable.id eq id) and
                     (TestScheduledMessagesTable.status eq ScheduledMessageStatus.SCHEDULED)
             }) {
-                it[TestScheduledMessagesTable.status] = "DISPATCHING"
+                it[TestScheduledMessagesTable.status] = ScheduledMessageStatus.DISPATCHING
             } > 0
         }
         assertTrue(claim1, "First claim should succeed")
@@ -243,7 +243,7 @@ class ScheduledMessagesIntegrationTest {
                 (TestScheduledMessagesTable.id eq id) and
                     (TestScheduledMessagesTable.status eq ScheduledMessageStatus.SCHEDULED)
             }) {
-                it[TestScheduledMessagesTable.status] = "DISPATCHING"
+                it[TestScheduledMessagesTable.status] = ScheduledMessageStatus.DISPATCHING
             } > 0
         }
         assertFalse(claim2, "Second claim should fail — status is DISPATCHING")
@@ -531,11 +531,11 @@ class ScheduledMessagesIntegrationTest {
                 (TestScheduledMessagesTable.id eq id) and
                     (TestScheduledMessagesTable.status eq ScheduledMessageStatus.SCHEDULED)
             }) {
-                it[TestScheduledMessagesTable.status] = "DISPATCHING"
+                it[TestScheduledMessagesTable.status] = ScheduledMessageStatus.DISPATCHING
             } > 0
         }
         assertTrue(claimed)
-        assertEquals("DISPATCHING", getStatus(id))
+        assertEquals(ScheduledMessageStatus.DISPATCHING, getStatus(id))
 
         val now = Instant.now()
         transaction {

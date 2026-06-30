@@ -12,14 +12,14 @@
 --   sendInConversation / createCalendarEvent primitives, and marks them
 --   DISPATCHED or FAILED.
 --
---   Status state machine: DRAFT → SCHEDULED → DISPATCHED → FAILED | CANCELLED
+--   Status state machine: DRAFT → SCHEDULED → DISPATCHING → DISPATCHED → FAILED | CANCELLED
 --
 -- WHAT THIS DOES
 --   Creates `public.scheduled_messages` with the §4.1 shape:
 --     • id                   uuid PK default gen_random_uuid()
 --     • school_id            uuid NOT NULL                    (tenant scope)
 --     • message_type         varchar(24) NOT NULL             (ANNOUNCEMENT|ADMIN_BROADCAST|TEACHER_BROADCAST)
---     • status               varchar(16) NOT NULL DEFAULT 'SCHEDULED' (DRAFT|SCHEDULED|DISPATCHED|FAILED|CANCELLED)
+--     • status               varchar(16) NOT NULL DEFAULT 'SCHEDULED' (DRAFT|SCHEDULED|DISPATCHING|DISPATCHED|FAILED|CANCELLED)
 --     • scheduled_at         timestamptz NOT NULL             (when to dispatch, UTC)
 --     • dispatched_at        timestamptz NULL                 (actual dispatch time)
 --     • payload              text NOT NULL                    (JSON: full original request body)
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS public.scheduled_messages (
     message_type         varchar(24) NOT NULL
                              CHECK (message_type IN ('ANNOUNCEMENT','ADMIN_BROADCAST','TEACHER_BROADCAST')),
     status               varchar(16) NOT NULL DEFAULT 'SCHEDULED'
-                             CHECK (status IN ('DRAFT','SCHEDULED','DISPATCHED','FAILED','CANCELLED')),
+                             CHECK (status IN ('DRAFT','SCHEDULED','DISPATCHING','DISPATCHED','FAILED','CANCELLED')),
     scheduled_at         timestamptz NOT NULL,
     dispatched_at        timestamptz NULL,
     payload              text NOT NULL,
