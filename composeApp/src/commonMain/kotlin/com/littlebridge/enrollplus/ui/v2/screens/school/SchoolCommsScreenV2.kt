@@ -45,6 +45,9 @@ import com.littlebridge.enrollplus.ui.v2.components.VComingSoon
 import com.littlebridge.enrollplus.ui.v2.components.VIcons
 import com.littlebridge.enrollplus.ui.v2.components.VDatePicker
 import com.littlebridge.enrollplus.ui.v2.components.VInput
+import com.littlebridge.enrollplus.ui.v2.components.VScheduleToggle
+import com.littlebridge.enrollplus.ui.v2.components.ScheduleSelection
+import com.littlebridge.enrollplus.ui.v2.components.toIso8601
 import com.littlebridge.enrollplus.ui.v2.components.VPullRefresh
 import com.littlebridge.enrollplus.ui.v2.components.VTopTabs
 import com.littlebridge.enrollplus.ui.v2.screens.VStateHost
@@ -52,6 +55,7 @@ import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
 import com.littlebridge.enrollplus.ui.v2.theme.colored
 import com.littlebridge.enrollplus.ui.v2.theme.shakeOnError
+import com.littlebridge.enrollplus.util.todayIso
 import com.littlebridge.enrollplus.ui.v2.theme.staggeredItemEntrance
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -70,6 +74,7 @@ fun SchoolCommsScreenV2(
     modifier: Modifier = Modifier,
     onOpenMessages: () -> Unit = {},
     onOpenPtm: () -> Unit = {},
+    onOpenScheduledMessages: () -> Unit = {},
     viewModel: SchoolAnnouncementsViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
@@ -77,20 +82,35 @@ fun SchoolCommsScreenV2(
         state = state,
         onRetry = viewModel::loadAnnouncements,
         onSelectCategory = viewModel::setCategoryFilter,
-        onCreate = { type, title, description, date, audienceType, audienceValues, addToCalendar, onCreated ->
-            viewModel.createAnnouncement(
-                type = type,
-                title = title,
-                description = description,
-                date = date,
-                audienceType = audienceType,
-                audienceValues = audienceValues,
-                addToCalendar = addToCalendar,
-                onCreated = onCreated,
-            )
+        onCreate = { type, title, description, date, audienceType, audienceValues, addToCalendar, scheduledAt, onCreated ->
+            if (scheduledAt != null) {
+                viewModel.scheduleAnnouncement(
+                    type = type,
+                    title = title,
+                    description = description,
+                    date = date,
+                    scheduledAt = scheduledAt,
+                    audienceType = audienceType,
+                    audienceValues = audienceValues,
+                    addToCalendar = addToCalendar,
+                    onCreated = onCreated,
+                )
+            } else {
+                viewModel.createAnnouncement(
+                    type = type,
+                    title = title,
+                    description = description,
+                    date = date,
+                    audienceType = audienceType,
+                    audienceValues = audienceValues,
+                    addToCalendar = addToCalendar,
+                    onCreated = onCreated,
+                )
+            }
         },
         onOpenMessages = onOpenMessages,
         onOpenPtm = onOpenPtm,
+        onOpenScheduledMessages = onOpenScheduledMessages,
         modifier = modifier.statusBarsPadding()
             .imePadding()
             .navigationBarsPadding(),
@@ -102,9 +122,10 @@ private fun SchoolCommsContent(
     state: SchoolAnnouncementsState,
     onRetry: () -> Unit,
     onSelectCategory: (String?) -> Unit,
-    onCreate: (type: String, title: String, description: String, date: String, audienceType: String, audienceValues: List<String>, addToCalendar: Boolean, onCreated: (() -> Unit)?) -> Unit,
+    onCreate: (type: String, title: String, description: String, date: String, audienceType: String, audienceValues: List<String>, addToCalendar: Boolean, scheduledAt: String?, onCreated: (() -> Unit)?) -> Unit,
     onOpenMessages: () -> Unit,
     onOpenPtm: () -> Unit,
+    onOpenScheduledMessages: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -153,6 +174,7 @@ private fun SchoolCommsContent(
                     onSelectCategory = onSelectCategory,
                     onOpen = { openAnnouncement = it },
                     onCreate = onCreate,
+                    onOpenScheduledMessages = onOpenScheduledMessages,
                 )
                 // RA-24: Messages and PTM have real backends (MessagesRouting,
                 // PtmRouting) and real screens — open them instead of showing a
@@ -185,7 +207,8 @@ private fun AnnouncementsTab(
     onRetry: () -> Unit,
     onSelectCategory: (String?) -> Unit,
     onOpen: (String) -> Unit,
-    onCreate: (type: String, title: String, description: String, date: String, audienceType: String, audienceValues: List<String>, addToCalendar: Boolean, onCreated: (() -> Unit)?) -> Unit,
+    onCreate: (type: String, title: String, description: String, date: String, audienceType: String, audienceValues: List<String>, addToCalendar: Boolean, scheduledAt: String?, onCreated: (() -> Unit)?) -> Unit,
+    onOpenScheduledMessages: () -> Unit,
 ) {
     val c = VTheme.colors
     var showCompose by remember { mutableStateOf(false) }
@@ -198,14 +221,23 @@ private fun AnnouncementsTab(
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text("Announcements", style = VTheme.type.h3.colored(c.ink))
-        VButton(
-            text = "New announcement",
-            onClick = { showCompose = true },
-            variant = VButtonVariant.Primary,
-            size = VButtonSize.Sm,
-            leading = { Icon(VIcons.Plus, contentDescription = null, modifier = Modifier.size(14.dp)) },
-            enabled = !state.isCreating,
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            VButton(
+                text = "Scheduled",
+                onClick = onOpenScheduledMessages,
+                variant = VButtonVariant.Ghost,
+                size = VButtonSize.Sm,
+                leading = { Icon(VIcons.Clock, contentDescription = null, modifier = Modifier.size(14.dp)) },
+            )
+            VButton(
+                text = "New announcement",
+                onClick = { showCompose = true },
+                variant = VButtonVariant.Primary,
+                size = VButtonSize.Sm,
+                leading = { Icon(VIcons.Plus, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                enabled = !state.isCreating,
+            )
+        }
     }
     Spacer(Modifier.height(12.dp))
 
@@ -213,8 +245,8 @@ private fun AnnouncementsTab(
         ComposeAnnouncementDialog(
             isCreating = state.isCreating,
             onDismiss = { showCompose = false },
-            onSubmit = { type, title, description, date, audienceType, audienceValues, addToCalendar ->
-                onCreate(type, title, description, date, audienceType, audienceValues, addToCalendar) { showCompose = false }
+            onSubmit = { type, title, description, date, audienceType, audienceValues, addToCalendar, scheduledAt ->
+                onCreate(type, title, description, date, audienceType, audienceValues, addToCalendar, scheduledAt) { showCompose = false }
             },
         )
     }
@@ -289,6 +321,7 @@ private fun ComposeAnnouncementDialog(
         audienceType: String,
         audienceValues: List<String>,
         addToCalendar: Boolean,
+        scheduledAt: String?,
     ) -> Unit,
 ) {
     val c = VTheme.colors
@@ -317,6 +350,15 @@ private fun ComposeAnnouncementDialog(
         category.equals("PTM", ignoreCase = true) ||
         category.equals("Events", ignoreCase = true)
     var addToCalendar by remember { mutableStateOf(true) }
+
+    var scheduleSelection by remember {
+        mutableStateOf(ScheduleSelection(
+            isScheduled = false,
+            dateIso = todayIso(),
+            hour = 9,
+            minute = "00",
+        ))
+    }
 
     // Feature 7 — error-shake triggers. Each flips true for one frame on a failed
     // submit attempt of a blank field, then resets, so shakeOnError fires once per
@@ -413,9 +455,14 @@ private fun ComposeAnnouncementDialog(
                     )
                 }
 
+                VScheduleToggle(
+                    selection = scheduleSelection,
+                    onSelectionChange = { scheduleSelection = it },
+                )
+
                 Spacer(Modifier.height(4.dp))
                 VButton(
-                    text = "Publish announcement",
+                    text = if (scheduleSelection.isScheduled) "Schedule announcement" else "Publish announcement",
                     onClick = {
                         // Validate on tap; shake the blank field(s) via Feature 7.
                         titleError = title.isBlank()
@@ -426,7 +473,8 @@ private fun ComposeAnnouncementDialog(
                             // Only request a calendar sync when the category is
                             // eligible AND the admin left the toggle enabled.
                             val syncCalendar = calendarEligible && addToCalendar
-                            onSubmit(category, title, description, date, audienceType, targetList, syncCalendar)
+                            val scheduledAt = scheduleSelection.toIso8601()
+                            onSubmit(category, title, description, date, audienceType, targetList, syncCalendar, scheduledAt)
                         }
                     },
                     variant = VButtonVariant.Primary,

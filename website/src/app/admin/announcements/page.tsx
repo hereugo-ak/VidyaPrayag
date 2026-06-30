@@ -108,10 +108,16 @@ function CreateAnnouncementModal({
   const [audience_type, setAudience] = useState("all");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [scheduleTime, setScheduleTime] = useState("09:00");
 
   function reset() {
     setType("announcement"); setTitle(""); setSub(""); setDesc("");
     setDate(new Date().toISOString().slice(0, 10)); setAudience("all"); setErr(null);
+    setScheduleEnabled(false);
+    setScheduleDate(new Date().toISOString().slice(0, 10));
+    setScheduleTime("09:00");
   }
 
   async function submit() {
@@ -122,6 +128,9 @@ function CreateAnnouncementModal({
     }
     setBusy(true);
     try {
+      const scheduled_at = scheduleEnabled
+        ? `${scheduleDate}T${scheduleTime}:00Z`
+        : null;
       await adminApi.createAnnouncement({
         type,
         title: title.trim(),
@@ -129,6 +138,7 @@ function CreateAnnouncementModal({
         description: description.trim(),
         date,
         audience_type,
+        scheduled_at,
       });
       onDone();
       reset();
@@ -145,12 +155,14 @@ function CreateAnnouncementModal({
       open={open}
       onClose={onClose}
       title="New announcement"
-      description="Posts immediately to your selected audience."
+      description={scheduleEnabled ? "Schedule this announcement for a future date and time." : "Posts immediately to your selected audience."}
       size="lg"
       footer={
         <>
           <AdminButton variant="ghost" onClick={onClose}>Cancel</AdminButton>
-          <AdminButton onClick={submit} disabled={busy}>{busy ? "Posting…" : "Post"}</AdminButton>
+          <AdminButton onClick={submit} disabled={busy}>
+            {busy ? "Sending…" : scheduleEnabled ? "Schedule" : "Post"}
+          </AdminButton>
         </>
       }
     >
@@ -181,6 +193,23 @@ function CreateAnnouncementModal({
           ]}
         />
         {err && <p className="text-[13px] font-medium text-danger">{err}</p>}
+        <div className="rounded-xl border border-navy/12 bg-white/60 p-3.5">
+          <label className="flex items-center gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={scheduleEnabled}
+              onChange={(e) => setScheduleEnabled(e.target.checked)}
+              className="h-4 w-4 rounded accent-[#6C5CE0]"
+            />
+            <span className="text-[13px] font-semibold text-navy-deep">Schedule for later</span>
+          </label>
+          {scheduleEnabled && (
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <Field label="Schedule date" value={scheduleDate} onChange={setScheduleDate} type="date" />
+              <Field label="Schedule time" value={scheduleTime} onChange={setScheduleTime} type="time" />
+            </div>
+          )}
+        </div>
       </div>
     </Modal>
   );

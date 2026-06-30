@@ -8,12 +8,16 @@ import com.littlebridge.enrollplus.feature.teacher.domain.model.ClassDetailData
 import com.littlebridge.enrollplus.feature.teacher.domain.model.TeacherClassBroadcastRequest
 import com.littlebridge.enrollplus.feature.teacher.domain.model.TeacherClassSummaryDto
 import com.littlebridge.enrollplus.feature.teacher.domain.repository.TeacherRepository
+import com.littlebridge.enrollplus.feature.scheduling.domain.repository.ScheduledMessageRepository
+import com.littlebridge.enrollplus.feature.scheduling.domain.model.CreateScheduledMessageRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * T-504 — Classes presentation. Wired to the rebuilt typed Classes plane:
@@ -59,6 +63,7 @@ data class TeacherClassesState(
 class TeacherClassesViewModel(
     private val repository: TeacherRepository,
     private val preferenceRepository: PreferenceRepository,
+    private val scheduledMessageRepository: ScheduledMessageRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(TeacherClassesState())
     val state: StateFlow<TeacherClassesState> = _state.asStateFlow()
@@ -174,6 +179,44 @@ class TeacherClassesViewModel(
                     _state.update {
                         it.copy(broadcasting = false, broadcastResultCount = r.data.data?.recipients ?: 0)
                     }
+                is NetworkResult.Error -> _state.update { it.copy(broadcasting = false, broadcastError = r.message) }
+                is NetworkResult.ConnectionError -> _state.update { it.copy(broadcasting = false, broadcastError = "Connection error") }
+            }
+        }
+    }
+
+    fun scheduleBroadcast(
+        className: String,
+        body: String,
+        scheduledAt: String,
+        onCreated: (() -> Unit)? = null,
+    ) {
+        if (body.isBlank() || scheduledAt.isBlank()) return
+        viewModelScope.launch {
+            _state.update { it.copy(broadcasting = true, broadcastError = null) }
+            val token = preferenceRepository.getUserToken().first()
+            if (token == null) {
+                _state.update { it.copy(broadcasting = false, broadcastError = "Not authenticated") }
+                return@launch
+            }
+            val payload = buildJsonObject {
+                put("class_name", className)
+                put("body", body.trim())
+            }
+            val request = CreateScheduledMessageRequest(
+                messageType = "TEACHER_BROADCAST",
+                scheduledAt = scheduledAt,
+                payload = payload,
+                audienceType = "CLASS",
+                audienceLabel = className,
+                title = "Broadcast to $className",
+                bodyPreview = body.trim().take(140),
+            )
+            when (val r = scheduledMessageRepository.createScheduledMessage(token, request)) {
+                is NetworkResult.Success -> {
+                    _state.update { it.copy(broadcasting = false, broadcastResultCount = null) }
+                    onCreated?.invoke()
+                }
                 is NetworkResult.Error -> _state.update { it.copy(broadcasting = false, broadcastError = r.message) }
                 is NetworkResult.ConnectionError -> _state.update { it.copy(broadcasting = false, broadcastError = "Connection error") }
             }
