@@ -21,6 +21,7 @@ import com.littlebridge.enrollplus.feature.admin.domain.model.SendMessageRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.SendMessageResponse
 import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolRecipientsResponse
 import com.littlebridge.enrollplus.feature.admin.domain.model.ThreadMessagesResponse
+import com.littlebridge.enrollplus.feature.admin.domain.model.UnreadCountDto
 import io.ktor.client.HttpClient
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
@@ -79,6 +80,13 @@ class MessagesApi(
         threadId: String
     ): NetworkResult<ApiResponse<Unit>> = safeApiCall {
         client.post(getUrl("api/v1/school/messages/threads/$threadId/read"))
+    }
+
+    /** Read Receipts Phase 2: GET /api/v1/school/messages/unread-count */
+    suspend fun getUnreadCount(
+        token: String
+    ): NetworkResult<ApiResponse<UnreadCountDto>> = safeApiCall {
+        client.get(getUrl("api/v1/school/messages/unread-count"))
     }
 
     suspend fun sendMessage(

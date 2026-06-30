@@ -450,7 +450,6 @@ fun SchoolPortalV2(
                         onOpenTransport = { overlay = SchoolOverlay.TransportManagement },
                         onOpenReportPublish = { overlay = SchoolOverlay.ReportPublish },
                         onOpenReportEffectiveness = { overlay = SchoolOverlay.ReportEffectiveness },
-                        onOpenEvents = { overlay = SchoolOverlay.EventRegistration },
                         // §7 finding K — tapping the avatar opens the Settings tab (where logout
                         // lives), instead of logging the admin out outright.
                         onExit = { tab = "settings" },

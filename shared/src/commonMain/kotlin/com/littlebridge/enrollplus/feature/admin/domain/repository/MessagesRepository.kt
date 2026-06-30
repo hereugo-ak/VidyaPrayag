@@ -15,6 +15,7 @@ import com.littlebridge.enrollplus.feature.admin.domain.model.SendMessageRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.SendMessageResponse
 import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolRecipient
 import com.littlebridge.enrollplus.feature.admin.domain.model.ThreadMessagesResponse
+import com.littlebridge.enrollplus.feature.admin.domain.model.UnreadCountDto
 
 interface MessagesRepository {
 
@@ -44,6 +45,13 @@ interface MessagesRepository {
      * Server replies with just `{ success, message }`, hence [Unit].
      */
     suspend fun markThreadRead(token: String, threadId: String): NetworkResult<Unit>
+
+    /**
+     * Read Receipts Phase 2: GET /api/v1/school/messages/unread-count
+     *
+     * Returns the total unread message count across all threads for the calling user.
+     */
+    suspend fun getUnreadCount(token: String): NetworkResult<Int>
 
     /**
      * POST /api/v1/school/messages

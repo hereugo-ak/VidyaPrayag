@@ -108,6 +108,9 @@ class MessagesViewModel(
     private val _conversation = MutableStateFlow(ConversationState())
     val conversation: StateFlow<ConversationState> = _conversation.asStateFlow()
 
+    private val _unreadCount = MutableStateFlow(0)
+    val unreadCount: StateFlow<Int> = _unreadCount.asStateFlow()
+
     private var pollJob: Job? = null
 
     init {
@@ -170,6 +173,12 @@ class MessagesViewModel(
             when (val result = messagesRepository.markThreadRead(token, threadId)) {
                 is NetworkResult.Success -> {
                     AppLogger.d("MessagesVM", "Marked thread $threadId as read")
+                    // Read Receipts: re-fetch conversation to update status ticks on own messages
+                    if (_conversation.value.threadId == threadId) {
+                        reloadConversation()
+                    }
+                    // Read Receipts: update unread count badge
+                    refreshUnreadCount(token)
                 }
                 is NetworkResult.Error -> {
                     AppLogger.e("MessagesVM", "markThreadRead failed: ${result.message}")
@@ -466,6 +475,17 @@ class MessagesViewModel(
     /** Lets the screen dismiss the inline error banner. */
     fun clearError() {
         _errorMessage.value = null
+    }
+
+    /** Read Receipts Phase 2: fetch the total unread count from the server. */
+    private fun refreshUnreadCount(token: String) {
+        viewModelScope.launch {
+            when (val result = messagesRepository.getUnreadCount(token)) {
+                is NetworkResult.Success -> _unreadCount.value = result.data
+                is NetworkResult.Error -> AppLogger.e("MessagesVM", "getUnreadCount failed: ${result.message}")
+                is NetworkResult.ConnectionError -> AppLogger.e("MessagesVM", "getUnreadCount connection error")
+            }
+        }
     }
 
     /**

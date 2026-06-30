@@ -80,6 +80,22 @@ class ParentRepositoryImpl(
         return api.getThreadMessages(token, threadId)
     }
 
+    override suspend fun markThreadRead(token: String, threadId: String): NetworkResult<Unit> {
+        return api.markThreadRead(token, threadId)
+    }
+
+    override suspend fun getUnreadCount(token: String): NetworkResult<Int> {
+        return when (val result = api.getUnreadCount(token)) {
+            is NetworkResult.Success -> {
+                val dto = result.data
+                if (!dto.success) NetworkResult.Error("Failed to fetch unread count")
+                else NetworkResult.Success(dto.data?.unreadCount ?: 0)
+            }
+            is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)
+            is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
+        }
+    }
+
     override suspend fun sendMessage(token: String, request: ParentSendMessageRequest): NetworkResult<ParentSendMessageResponse> {
         return api.sendMessage(token, request)
     }

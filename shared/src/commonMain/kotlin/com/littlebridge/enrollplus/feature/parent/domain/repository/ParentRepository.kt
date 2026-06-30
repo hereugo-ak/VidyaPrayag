@@ -27,6 +27,10 @@ interface ParentRepository {
     // RA-51: parent ↔ teacher/admin messaging.
     suspend fun getMessageThreads(token: String): NetworkResult<ParentMessageThreadsResponse>
     suspend fun getThreadMessages(token: String, threadId: String): NetworkResult<ParentThreadMessagesResponse>
+    /** Read Receipts Phase 1: POST /api/v1/parent/messages/threads/{id}/read */
+    suspend fun markThreadRead(token: String, threadId: String): NetworkResult<Unit>
+    /** Read Receipts Phase 2: GET /api/v1/parent/messages/unread-count */
+    suspend fun getUnreadCount(token: String): NetworkResult<Int>
     suspend fun sendMessage(token: String, request: ParentSendMessageRequest): NetworkResult<ParentSendMessageResponse>
     // RA-S07: compose-new — who the parent can start a conversation with.
     suspend fun getMessageRecipients(token: String): NetworkResult<ParentRecipientsResponse>

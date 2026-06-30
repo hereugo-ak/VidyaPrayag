@@ -349,7 +349,7 @@ fun Route.eventRegistrationRouting() {
                 val events = dbQuery {
                     CalendarEventsTable.selectAll().where {
                         (CalendarEventsTable.schoolId inList schoolIds) and
-                            (CalendarEventsTable.registrationEnabled eq true) and
+                            ((CalendarEventsTable.registrationEnabled eq true) or (CalendarEventsTable.type eq EventType.PTM)) and
                             (CalendarEventsTable.status eq "PUBLISHED") and
                             (CalendarEventsTable.isActive eq true) and
                             (CalendarEventsTable.startDate greaterEq today)
@@ -395,7 +395,8 @@ fun Route.eventRegistrationRouting() {
                     call.fail("Invalid token", HttpStatusCode.Unauthorized, "UNAUTHORIZED"); return@get
                 }
                 val rows = dbQuery {
-                    (EventRegistrationsTable innerJoin CalendarEventsTable)
+                    EventRegistrationsTable
+                        .innerJoin(CalendarEventsTable, { EventRegistrationsTable.eventId eq CalendarEventsTable.id })
                         .selectAll()
                         .where {
                             (EventRegistrationsTable.parentUserId eq uid) and
@@ -469,7 +470,8 @@ fun Route.eventRegistrationRouting() {
                 // Conflict detection: another registered event on the same date
                 val eventDate = event[CalendarEventsTable.startDate]
                 val conflicting = dbQuery {
-                    (EventRegistrationsTable innerJoin CalendarEventsTable)
+                    EventRegistrationsTable
+                        .innerJoin(CalendarEventsTable, { EventRegistrationsTable.eventId eq CalendarEventsTable.id })
                         .selectAll()
                         .where {
                             (EventRegistrationsTable.parentUserId eq uid) and
@@ -1032,7 +1034,8 @@ fun Route.eventRegistrationRouting() {
                 val slotDtos = slots.map { sRow ->
                     val slotId = sRow[EventSlotsTable.id].value
                     val bookings = dbQuery {
-                        (EventRegistrationsTable innerJoin AppUsersTable)
+                        EventRegistrationsTable
+                            .innerJoin(AppUsersTable, { EventRegistrationsTable.parentUserId eq AppUsersTable.id })
                             .selectAll()
                             .where {
                                 (EventRegistrationsTable.slotId eq slotId) and
@@ -1177,7 +1180,9 @@ fun Route.eventRegistrationRouting() {
                 val eventIdFilter = call.request.queryParameters["eventId"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
 
                 val rows = dbQuery {
-                    (EventRegistrationsTable innerJoin CalendarEventsTable innerJoin AppUsersTable)
+                    EventRegistrationsTable
+                        .innerJoin(CalendarEventsTable, { EventRegistrationsTable.eventId eq CalendarEventsTable.id })
+                        .innerJoin(AppUsersTable, { EventRegistrationsTable.parentUserId eq AppUsersTable.id })
                         .selectAll()
                         .where {
                             (EventRegistrationsTable.schoolId eq schoolId) and
@@ -1240,7 +1245,8 @@ fun Route.eventRegistrationRouting() {
                 } ?: run { call.fail("Event not found", HttpStatusCode.NotFound, "EVENT_NOT_FOUND"); return@get }
 
                 val rows = dbQuery {
-                    (EventRegistrationsTable innerJoin AppUsersTable)
+                    EventRegistrationsTable
+                        .innerJoin(AppUsersTable, { EventRegistrationsTable.parentUserId eq AppUsersTable.id })
                         .selectAll()
                         .where {
                             (EventRegistrationsTable.eventId eq eventId) and
@@ -1604,7 +1610,8 @@ fun Route.eventRegistrationRouting() {
                 } ?: run { call.fail("Event not found", HttpStatusCode.NotFound, "EVENT_NOT_FOUND"); return@get }
 
                 val rows = dbQuery {
-                    (EventRegistrationsTable innerJoin AppUsersTable)
+                    EventRegistrationsTable
+                        .innerJoin(AppUsersTable, { EventRegistrationsTable.parentUserId eq AppUsersTable.id })
                         .selectAll()
                         .where {
                             (EventRegistrationsTable.eventId eq eventId) and
