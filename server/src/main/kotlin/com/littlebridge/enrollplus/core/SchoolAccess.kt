@@ -175,3 +175,44 @@ suspend fun ApplicationCall.requirePlatformAdmin(): UUID? {
     }
     return uid
 }
+
+/** Roles permitted on the combined school + teacher surface. */
+private val SCHOOL_OR_TEACHER_ROLES = SCHOOL_ROLES + "teacher"
+
+/**
+ * Guard for endpoints that serve BOTH school roles AND teachers — e.g. the
+ * Message Scheduling surface where school_admins schedule announcements /
+ * admin broadcasts and teachers schedule class broadcasts on the same path.
+ *
+ * Same DB-read / is_active / onboarding checks as [requireSchoolContext] but
+ * accepts the union of [SCHOOL_ROLES] and "teacher".
+ *
+ *   401 – no/invalid token
+ *   403 – authenticated but not a school or teacher role
+ *   404 – role but no school yet
+ */
+suspend fun ApplicationCall.requireSchoolOrTeacherContext(): SchoolContext? {
+    val uid = principalUserUuid() ?: run {
+        fail("Invalid token", HttpStatusCode.Unauthorized, "UNAUTHORIZED")
+        return null
+    }
+    val userRow = dbQuery {
+        AppUsersTable.selectAll().where { AppUsersTable.id eq uid }.singleOrNull()
+    }
+    if (userRow != null && !userRow[AppUsersTable.isActive]) {
+        fail("This account has been deactivated. Contact your administrator.", HttpStatusCode.Forbidden, "ACCOUNT_DEACTIVATED")
+        return null
+    }
+    val schoolId = userRow?.get(AppUsersTable.schoolId)
+    val role = userRow?.get(AppUsersTable.role)
+    val effectiveRole = role ?: "parent"
+    if (effectiveRole !in SCHOOL_OR_TEACHER_ROLES) {
+        fail("You do not have access to this resource", HttpStatusCode.Forbidden, "FORBIDDEN")
+        return null
+    }
+    if (schoolId == null) {
+        fail("Complete school onboarding first", HttpStatusCode.NotFound, "NO_SCHOOL")
+        return null
+    }
+    return SchoolContext(uid, schoolId, effectiveRole)
+}

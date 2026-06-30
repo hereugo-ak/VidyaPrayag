@@ -184,6 +184,7 @@ export interface CreateAnnouncementRequest {
   date: string;
   audience_type?: string;
   audience_filter?: unknown;
+  scheduled_at?: string | null;
 }
 
 // ── Leave requests (GET/PATCH /api/v1/school/leave-requests) ─────────────────

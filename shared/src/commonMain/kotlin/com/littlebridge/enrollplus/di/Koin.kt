@@ -459,6 +459,17 @@ val commonModule = module {
         com.littlebridge.enrollplus.feature.idcard.data.repository.IdCardRepositoryImpl(get())
     }
 
+    // Message Scheduling (MESSAGE_SCHEDULING_PLAN.md §7)
+    single {
+        com.littlebridge.enrollplus.feature.scheduling.data.remote.ScheduledMessageApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single<com.littlebridge.enrollplus.feature.scheduling.domain.repository.ScheduledMessageRepository> {
+        com.littlebridge.enrollplus.feature.scheduling.data.repository.ScheduledMessageRepositoryImpl(get())
+    }
+
     // UseCases
     factory { GetSchoolsUseCase(get()) }
 }
@@ -515,7 +526,7 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.admin.presentation.TeacherAssignmentViewModel(get(), get()) } // RA-TAM: reusable assignment module
     factory { com.littlebridge.enrollplus.feature.admin.presentation.SchoolRecordsViewModel(get(), get()) } // RA-52
     factory { AdmissionCRMViewModel(get(), get()) }
-    factory { SchoolAnnouncementsViewModel(get(), get()) }
+    factory { SchoolAnnouncementsViewModel(get(), get(), get()) }
     factory { com.littlebridge.enrollplus.feature.admin.presentation.SchoolTeachersViewModel(get(), get()) }
     factory { MessagesViewModel(get(), get(), get()) }
     factory { SchedulePTMViewModel(get(), get()) }
@@ -544,7 +555,7 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherCheckInViewModel(get(), get()) }
     // T-107: real obligations strip (Doc 04 §5.5) — backs the Today "what needs me" strip.
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherObligationsViewModel(get(), get()) }
-    factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherClassesViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherClassesViewModel(get(), get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherStudentProfileViewModel(get(), get()) } // T-505
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherAttendanceViewModel(get(), get()) }
     // T-305: the rebuilt gradebook state holder (replaces the legacy split of
@@ -601,6 +612,8 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.branding.presentation.BrandingViewModel(get(), get()) }
     // ID Card Generation (ID_CARD_GENERATION_SPEC.md)
     factory { com.littlebridge.enrollplus.feature.idcard.presentation.IdCardViewModel(get(), get()) }
+    // Message Scheduling (MESSAGE_SCHEDULING_PLAN.md §8)
+    factory { com.littlebridge.enrollplus.feature.scheduling.presentation.ScheduledMessagesViewModel(get(), get()) }
 }
 
 fun initKoin(
