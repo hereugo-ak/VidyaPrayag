@@ -33,6 +33,8 @@ class LocalStoragePreferenceManager : PreferenceRepository {
     private val refreshToken = MutableStateFlow(read(KEY_REFRESH))
     private val profileCompleted = MutableStateFlow(read(KEY_PROFILE)?.toBooleanStrictOrNull())
     private val userName = MutableStateFlow(read(KEY_USER_NAME))
+    private val fcmToken = MutableStateFlow(read(KEY_FCM_TOKEN))
+    private val notificationsDeclined = MutableStateFlow(read(KEY_NOTIF_DECLINED)?.toBooleanStrictOrNull() ?: false)
 
     override fun getThemeName(): Flow<String> = themeName
     override suspend fun setThemeName(name: String) {
@@ -89,6 +91,18 @@ class LocalStoragePreferenceManager : PreferenceRepository {
         write(KEY_USER_NAME, v)
     }
 
+    override fun getFcmToken(): Flow<String?> = fcmToken
+    override suspend fun setFcmToken(token: String?) {
+        fcmToken.value = token
+        write(KEY_FCM_TOKEN, token)
+    }
+
+    override fun getNotificationsDeclined(): Flow<Boolean> = notificationsDeclined
+    override suspend fun setNotificationsDeclined(declined: Boolean) {
+        notificationsDeclined.value = declined
+        write(KEY_NOTIF_DECLINED, declined.toString())
+    }
+
     override suspend fun clearSession() {
         userRole.value = "GUEST"
         userToken.value = null
@@ -114,6 +128,8 @@ class LocalStoragePreferenceManager : PreferenceRepository {
         const val KEY_REFRESH = "vp.refreshToken"
         const val KEY_PROFILE = "vp.profileCompleted"
         const val KEY_USER_NAME = "vp.userName"
+        const val KEY_FCM_TOKEN = "vp.fcmToken"
+        const val KEY_NOTIF_DECLINED = "vp.notificationsDeclined"
     }
 }
 

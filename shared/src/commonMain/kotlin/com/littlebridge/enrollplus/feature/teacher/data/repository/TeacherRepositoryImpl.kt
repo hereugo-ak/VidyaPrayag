@@ -2,12 +2,21 @@ package com.littlebridge.enrollplus.feature.teacher.data.repository
 
 import com.littlebridge.enrollplus.core.model.ApiResponse
 import com.littlebridge.enrollplus.core.network.NetworkResult
+import com.littlebridge.enrollplus.core.offline.outbox.OutboxRepository
+import com.littlebridge.enrollplus.core.offline.sync.SyncEngine
+import com.littlebridge.enrollplus.feature.teacher.data.local.TeacherDayLocalDataSource
+import com.littlebridge.enrollplus.feature.teacher.data.offline.AttendanceOutboxOps
+import com.littlebridge.enrollplus.feature.teacher.data.offline.OutboxOps
 import com.littlebridge.enrollplus.feature.teacher.data.remote.TeacherApi
 import com.littlebridge.enrollplus.feature.teacher.domain.model.*
 import com.littlebridge.enrollplus.feature.teacher.domain.repository.TeacherRepository
+import com.littlebridge.enrollplus.util.todayIso
 
 class TeacherRepositoryImpl(
     private val api: TeacherApi,
+    private val dayLocalDataSource: TeacherDayLocalDataSource,
+    private val outboxRepository: OutboxRepository? = null,
+    private val syncEngine: SyncEngine? = null,
 ) : TeacherRepository {
     // T-601 (DELETE-don't-patch): getHome override removed — Today tab (getDay/getWeek)
     // replaces the legacy Home tab (Doc 04 §4).
@@ -21,8 +30,24 @@ class TeacherRepositoryImpl(
     override suspend fun getStudentProfileV2(token: String, studentId: String): NetworkResult<StudentProfileResponse> =
         api.getStudentProfileV2(token, studentId)
 
-    override suspend fun getDay(token: String, date: String?): NetworkResult<ResolvedDayResponse> =
-        api.getDay(token, date)
+    override suspend fun getDay(token: String, date: String?): NetworkResult<ResolvedDayResponse> {
+        val result = api.getDay(token, date)
+        return when (result) {
+            is NetworkResult.Success -> {
+                dayLocalDataSource.save(result.data.data)
+                result
+            }
+            is NetworkResult.ConnectionError -> {
+                val cached = dayLocalDataSource.getByDate(date ?: todayIso())
+                if (cached != null) {
+                    NetworkResult.Success(ResolvedDayResponse(success = true, data = cached))
+                } else {
+                    result
+                }
+            }
+            is NetworkResult.Error -> result
+        }
+    }
 
     override suspend fun getWeek(token: String, date: String?): NetworkResult<ResolvedWeekResponse> =
         api.getWeek(token, date)
@@ -79,8 +104,31 @@ class TeacherRepositoryImpl(
     override suspend fun getObligations(token: String): NetworkResult<TeacherObligationsResponse> =
         api.getObligations(token)
 
-    override suspend fun saveAttendance(token: String, request: AttendanceSaveRequest): NetworkResult<AttendanceSaveResponse> =
-        api.saveAttendance(token, request)
+    override suspend fun saveAttendance(token: String, request: AttendanceSaveRequest): NetworkResult<AttendanceSaveResponse> {
+        val result = api.saveAttendance(token, request)
+        return when (result) {
+            is NetworkResult.Success -> result
+            is NetworkResult.ConnectionError -> {
+                if (outboxRepository != null) {
+                    val now = com.littlebridge.enrollplus.core.offline.sync.currentTimeMillis()
+                    val idempotencyKey = "att-${request.assignmentId}-${request.date}"
+                    val op = AttendanceOutboxOps.create(request, idempotencyKey, now)
+                    outboxRepository.enqueue(op)
+                    syncEngine?.syncNow()
+                    NetworkResult.Success(AttendanceSaveResponse(
+                        success = true,
+                        data = AttendanceSaveResultDto(
+                            saved = request.marks.size,
+                            date = request.date,
+                        ),
+                    ))
+                } else {
+                    result
+                }
+            }
+            is NetworkResult.Error -> result
+        }
+    }
 
     // T-406: legacy createHomework override removed (assignHomework replaces it).
 
@@ -88,36 +136,127 @@ class TeacherRepositoryImpl(
     override suspend fun listHomework(token: String, assignmentId: String): NetworkResult<HomeworkListResponse> =
         api.listHomework(token, assignmentId)
 
-    override suspend fun assignHomework(token: String, request: AssignHomeworkRequest): NetworkResult<AssignHomeworkResponse> =
-        api.assignHomework(token, request)
+    override suspend fun assignHomework(token: String, request: AssignHomeworkRequest): NetworkResult<AssignHomeworkResponse> {
+        val result = api.assignHomework(token, request)
+        return when (result) {
+            is NetworkResult.Success -> result
+            is NetworkResult.ConnectionError -> {
+                if (outboxRepository != null) {
+                    val now = com.littlebridge.enrollplus.core.offline.sync.currentTimeMillis()
+                    outboxRepository.enqueue(OutboxOps.homeworkAssign(request, now))
+                    syncEngine?.syncNow()
+                    NetworkResult.Success(AssignHomeworkResponse(success = true))
+                } else result
+            }
+            is NetworkResult.Error -> result
+        }
+    }
 
     override suspend fun getHomeworkBoard(token: String, homeworkId: String, assignmentId: String): NetworkResult<HomeworkBoardResponse> =
         api.getHomeworkBoard(token, homeworkId, assignmentId)
 
-    override suspend fun grantHomeworkExtension(token: String, homeworkId: String, request: GrantExtensionRequest): NetworkResult<HomeworkMutationResponse> =
-        api.grantHomeworkExtension(token, homeworkId, request)
+    override suspend fun grantHomeworkExtension(token: String, homeworkId: String, request: GrantExtensionRequest): NetworkResult<HomeworkMutationResponse> {
+        val result = api.grantHomeworkExtension(token, homeworkId, request)
+        return when (result) {
+            is NetworkResult.Success -> result
+            is NetworkResult.ConnectionError -> {
+                if (outboxRepository != null) {
+                    val now = com.littlebridge.enrollplus.core.offline.sync.currentTimeMillis()
+                    outboxRepository.enqueue(OutboxOps.homeworkExtend(homeworkId, request, now))
+                    syncEngine?.syncNow()
+                    NetworkResult.Success(HomeworkMutationResponse(success = true))
+                } else result
+            }
+            is NetworkResult.Error -> result
+        }
+    }
 
-    override suspend fun reviewHomeworkSubmission(token: String, homeworkId: String, studentId: String, request: ReviewSubmissionRequest): NetworkResult<HomeworkMutationResponse> =
-        api.reviewHomeworkSubmission(token, homeworkId, studentId, request)
+    override suspend fun reviewHomeworkSubmission(token: String, homeworkId: String, studentId: String, request: ReviewSubmissionRequest): NetworkResult<HomeworkMutationResponse> {
+        val result = api.reviewHomeworkSubmission(token, homeworkId, studentId, request)
+        return when (result) {
+            is NetworkResult.Success -> result
+            is NetworkResult.ConnectionError -> {
+                if (outboxRepository != null) {
+                    val now = com.littlebridge.enrollplus.core.offline.sync.currentTimeMillis()
+                    outboxRepository.enqueue(OutboxOps.homeworkReview(homeworkId, studentId, request, now))
+                    syncEngine?.syncNow()
+                    NetworkResult.Success(HomeworkMutationResponse(success = true))
+                } else result
+            }
+            is NetworkResult.Error -> result
+        }
+    }
 
-    override suspend fun closeHomework(token: String, homeworkId: String, assignmentId: String): NetworkResult<HomeworkMutationResponse> =
-        api.closeHomework(token, homeworkId, assignmentId)
+    override suspend fun closeHomework(token: String, homeworkId: String, assignmentId: String): NetworkResult<HomeworkMutationResponse> {
+        val result = api.closeHomework(token, homeworkId, assignmentId)
+        return when (result) {
+            is NetworkResult.Success -> result
+            is NetworkResult.ConnectionError -> {
+                if (outboxRepository != null) {
+                    val now = com.littlebridge.enrollplus.core.offline.sync.currentTimeMillis()
+                    outboxRepository.enqueue(OutboxOps.homeworkClose(homeworkId, assignmentId, now))
+                    syncEngine?.syncNow()
+                    NetworkResult.Success(HomeworkMutationResponse(success = true))
+                } else result
+            }
+            is NetworkResult.Error -> result
+        }
+    }
 
     override suspend fun getLeaveRequests(token: String, status: String?): NetworkResult<TeacherLeaveListResponse> =
         api.getLeaveRequests(token, status)
 
-    override suspend fun decideLeaveRequest(token: String, id: String, request: TeacherLeaveDecisionRequest): NetworkResult<ApiResponse<Unit>> =
-        api.decideLeaveRequest(token, id, request)
+    override suspend fun decideLeaveRequest(token: String, id: String, request: TeacherLeaveDecisionRequest): NetworkResult<ApiResponse<Unit>> {
+        val result = api.decideLeaveRequest(token, id, request)
+        return when (result) {
+            is NetworkResult.Success -> result
+            is NetworkResult.ConnectionError -> {
+                if (outboxRepository != null) {
+                    val now = com.littlebridge.enrollplus.core.offline.sync.currentTimeMillis()
+                    outboxRepository.enqueue(OutboxOps.leaveDecide(id, request, now))
+                    syncEngine?.syncNow()
+                    NetworkResult.Success(ApiResponse(success = true))
+                } else result
+            }
+            is NetworkResult.Error -> result
+        }
+    }
 
     // T-602a: the teacher's OWN leave (apply + status list).
     override suspend fun getMyLeave(token: String, status: String?): NetworkResult<TeacherSelfLeaveListResponse> =
         api.getMyLeave(token, status)
 
-    override suspend fun applyMyLeave(token: String, request: CreateTeacherLeaveRequest): NetworkResult<TeacherSelfLeaveResponse> =
-        api.applyMyLeave(token, request)
+    override suspend fun applyMyLeave(token: String, request: CreateTeacherLeaveRequest): NetworkResult<TeacherSelfLeaveResponse> {
+        val result = api.applyMyLeave(token, request)
+        return when (result) {
+            is NetworkResult.Success -> result
+            is NetworkResult.ConnectionError -> {
+                if (outboxRepository != null) {
+                    val now = com.littlebridge.enrollplus.core.offline.sync.currentTimeMillis()
+                    outboxRepository.enqueue(OutboxOps.leaveApply(request, now))
+                    syncEngine?.syncNow()
+                    NetworkResult.Success(TeacherSelfLeaveResponse(success = true))
+                } else result
+            }
+            is NetworkResult.Error -> result
+        }
+    }
 
-    override suspend fun broadcastToClass(token: String, request: TeacherClassBroadcastRequest): NetworkResult<TeacherClassBroadcastResponse> =
-        api.broadcastToClass(token, request)
+    override suspend fun broadcastToClass(token: String, request: TeacherClassBroadcastRequest): NetworkResult<TeacherClassBroadcastResponse> {
+        val result = api.broadcastToClass(token, request)
+        return when (result) {
+            is NetworkResult.Success -> result
+            is NetworkResult.ConnectionError -> {
+                if (outboxRepository != null) {
+                    val now = com.littlebridge.enrollplus.core.offline.sync.currentTimeMillis()
+                    outboxRepository.enqueue(OutboxOps.broadcastClass(request, now))
+                    syncEngine?.syncNow()
+                    NetworkResult.Success(TeacherClassBroadcastResponse(success = true))
+                } else result
+            }
+            is NetworkResult.Error -> result
+        }
+    }
 
     // Lesson Planning (LESSON_PLANNING_SPEC.md — P1-20)
     override suspend fun listLessonPlans(

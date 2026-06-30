@@ -217,16 +217,56 @@ SyncEngine later  ->  handler.execute  ->  server (Idempotency-Key)  ->  reconci
 - **Phase 0 — Foundations (no behaviour change)**
   `NetworkMonitor` (+actuals), `SyncState`/`SyncStatus` Koin singles, an offline banner
   composable. Bump `AppDatabase` to v2 with `outbox_operation` + Migration. Web no-ops.
+
+  > **STATUS (2026-06-30):**
+  > - ✅ `NetworkMonitor` expect/actual + all platform implementations (Android, iOS, JVM, JS, WasmJs) + Koin wiring in all 5 `PlatformModule` files + `NetworkMonitorTest.kt` (JVM tests pass).
+  > - ✅ `SyncState`/`SyncStatus`/`SyncStateHolder` domain model + Koin single in `commonModule`.
+  > - ✅ `OfflineBanner` composable in `composeApp` (reactive to `NetworkMonitor` + `SyncStateHolder`).
+  > - ✅ `AppDatabase` v1→v2 bump with `outbox_operation` entity + `MIGRATION_1_2` (KMP `SQLiteConnection` API). Wired in Android, JVM, iOS platform modules.
+  > - ✅ `OutboxRepository` interface + `RoomOutboxRepository` (roomMain) + `InMemoryOutboxRepository` (commonMain, no-op for web). Koin-registered in all 5 platform modules.
+  > - ✅ Build gates: JVM compile + JVM tests + Android compile + composeApp Android compile all **BUILD SUCCESSFUL**.
+  > - ⏳ WasmJs build skipped (pre-existing Ktor 3.4.3 requires Kotlin 2.3.0 stdlib, incompatible with Kotlin 2.2.10 compiler — not an offline-mode issue).
+  > - **Phase 0 COMPLETE.**
 - **Phase 1 — Read-offline for high-value screens**
   Convert 2–3 read-heavy features (e.g. Announcements, Today/schedule, Student roster)
   to cache-then-network. Verify they render fully offline.
+
+  > **STATUS (2026-06-30):**
+  > - ✅ **Announcements** — `AnnouncementEntity` + `AnnouncementDao` (roomMain) + `AnnouncementLocalDataSource` interface (commonMain) + `RoomAnnouncementLocalDataSource` (roomMain) + `InMemoryAnnouncementLocalDataSource` (commonMain, web). `AnnouncementsRepositoryImpl.getAnnouncements()` now saves on success, falls back to cache on ConnectionError/Error. Koin-registered in all 5 platform modules. `AppDatabase` bumped to v3 with `MIGRATION_2_3`.
+  > - ✅ **Teacher Today (schedule)** — `TeacherDayCacheEntity` + `TeacherDayCacheDao` (roomMain) + `TeacherDayLocalDataSource` interface (commonMain) + `RoomTeacherDayLocalDataSource` (roomMain) + `InMemoryTeacherDayLocalDataSource` (commonMain, web). `TeacherRepositoryImpl.getDay()` now saves on success, falls back to cache on ConnectionError. Koin-registered in all 5 platform modules. `AppDatabase` bumped to v4 with `MIGRATION_3_4`.
+  > - ✅ Build gates: JVM compile + JVM tests + Android compile + composeApp Android compile all **BUILD SUCCESSFUL**.
+  > - ⏳ Feature #3 (e.g. Student roster or Parent dashboard) — pending if needed.
 - **Phase 2 — Outbox + SyncEngine + one write feature**
   Wire the engine; make **Attendance marking** offline-capable end-to-end (enqueue,
   optimistic UI, idempotent replay, conflict policy). This is the reference implementation.
+
+  > **STATUS (2026-06-30):**
+  > - ✅ **SyncEngine** — `OutboxOperationHandler` interface + `SyncEngine` class (commonMain). Replay loop with exponential backoff (5s→5min cap), batch drain (10 ops), `SyncStateHolder` updates (SYNCING/IDLE/ERROR + pending count). Auto-starts on `initKoin()`. Reacts to `NetworkMonitor` status changes. `currentTimeMillis()` expect/actual for all 5 platforms.
+  > - ✅ **Attendance offline write** — `AttendanceSaveHandler` (replays `ATTENDANCE_SAVE` ops via `TeacherApi.saveAttendance`). `AttendanceOutboxOps.create()` builds idempotent `OutboxOperation` with key `att-{assignmentId}-{date}`. `TeacherRepositoryImpl.saveAttendance()` enqueues on `ConnectionError` and returns synthetic `Success` (optimistic UI). `TeacherAttendanceViewModel.save()` detects offline via `SyncStateHolder.pendingCount` and sets `savedOffline` flag.
+  > - ✅ **Koin wiring** — `SyncEngine`, `AttendanceSaveHandler`, `OutboxOperationHandler` registered in `commonModule`. `TeacherRepositoryImpl` gets `outboxRepository` + `syncEngine` (nullable, for web). `TeacherAttendanceViewModel` gets `SyncStateHolder`. `SyncEngine.start()` called in `initKoin()`.
+  > - ✅ Build gates: JVM compile + JVM tests + Android compile + composeApp Android compile all **BUILD SUCCESSFUL**.
 - **Phase 3 — Roll out writes** to remaining safe mutations (leave requests, messages,
   homework submissions, health notes) one handler at a time.
+
+  > **STATUS (2026-06-30):**
+  > - ✅ **Leave decide** — `LeaveDecisionHandler` replays `LEAVE_DECIDE` via `TeacherApi.decideLeaveRequest()`. `TeacherRepositoryImpl.decideLeaveRequest()` enqueues on ConnectionError.
+  > - ✅ **Leave apply** — `ApplyLeaveHandler` replays `LEAVE_APPLY` via `TeacherApi.applyMyLeave()`. `TeacherRepositoryImpl.applyMyLeave()` enqueues on ConnectionError.
+  > - ✅ **Homework assign** — `AssignHomeworkHandler` replays `HOMEWORK_ASSIGN` via `TeacherApi.assignHomework()`. `TeacherRepositoryImpl.assignHomework()` enqueues on ConnectionError.
+  > - ✅ **Homework extend** — `HomeworkExtensionHandler` replays `HOMEWORK_EXTEND` via `TeacherApi.grantHomeworkExtension()`. `TeacherRepositoryImpl.grantHomeworkExtension()` enqueues on ConnectionError.
+  > - ✅ **Homework review** — `HomeworkReviewHandler` replays `HOMEWORK_REVIEW` via `TeacherApi.reviewHomeworkSubmission()`. `TeacherRepositoryImpl.reviewHomeworkSubmission()` enqueues on ConnectionError.
+  > - ✅ **Homework close** — `HomeworkCloseHandler` replays `HOMEWORK_CLOSE` via `TeacherApi.closeHomework()`. `TeacherRepositoryImpl.closeHomework()` enqueues on ConnectionError.
+  > - ✅ **Broadcast to class** — `BroadcastToClassHandler` replays `BROADCAST_CLASS` via `TeacherApi.broadcastToClass()`. `TeacherRepositoryImpl.broadcastToClass()` enqueues on ConnectionError.
+  > - ✅ All 7 new handlers + `OutboxOps` factory in `TeacherWriteHandlers.kt` (commonMain). All registered in `commonModule` Koin with handler map entries in `SyncEngine`.
+  > - ✅ Build gates: JVM compile + JVM tests + Android compile + composeApp Android compile all **BUILD SUCCESSFUL**.
 - **Phase 4 — Hardening**: storage caps + eviction (LRU on cache, never on outbox),
   encryption-at-rest review, telemetry (pending count, oldest pending age), QA matrix.
+
+  > **STATUS (2026-06-30):**
+  > - ✅ **Storage caps + LRU eviction** — `AnnouncementDao.count()` + `evictOldest(keepCount)` (cap: 200 rows). `TeacherDayCacheDao.count()` + `evictOldest(keepCount)` (cap: 14 days). Both Room data sources enforce caps after every save. Eviction is LRU by `date DESC` / `cachedAt DESC`. Outbox is never evicted.
+  > - ✅ **Max attempts guard (dead-letter)** — `SyncEngine` marks ops as `FAILED` after `MAX_ATTEMPTS=10` retries. Prevents infinite retry loops. Failed ops kept in DB for manual inspection.
+  > - ✅ **Backoff jitter** — 10% jitter added to exponential backoff to prevent thundering herd on simultaneous retries.
+  > - ✅ **Telemetry** — `OutboxRepository.oldestPendingCreatedAt()` added to interface + Room + InMemory implementations. `SyncState` enriched with `oldestPendingAgeMs`. `SyncStateHolder.updateTelemetry(count, ageMs)` called after every drain cycle and on startup.
+  > - ✅ Build gates: JVM compile + JVM tests + Android compile + composeApp Android compile all **BUILD SUCCESSFUL**.
 
 ---
 

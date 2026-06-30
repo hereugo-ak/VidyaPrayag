@@ -163,6 +163,13 @@ private fun AttendanceBody(
                 Text(state.saveError ?: "", style = VTheme.type.caption.colored(c.dangerInk).copy(fontSize = 12.sp))
                 Spacer(Modifier.height(8.dp))
             }
+            if (state.savedOffline) {
+                Text(
+                    "Saved offline — will sync when reconnected",
+                    style = VTheme.type.caption.colored(c.warningInk).copy(fontSize = 12.sp),
+                )
+                Spacer(Modifier.height(8.dp))
+            }
             VButton(
                 text = if (state.alreadyMarked) "Update attendance" else "Save attendance",
                 onClick = { viewModel.save() },
@@ -171,7 +178,7 @@ private fun AttendanceBody(
                 size = VButtonSize.Lg,
                 loading = state.isSaving,
                 success = state.saveSuccess,
-                successLabel = "Saved",
+                successLabel = if (state.savedOffline) "Saved offline" else "Saved",
                 stateful = true,
                 enabled = students.isNotEmpty() && !state.isHoliday,
             )

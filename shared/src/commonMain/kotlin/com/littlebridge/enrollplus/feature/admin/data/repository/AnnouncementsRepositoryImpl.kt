@@ -2,6 +2,7 @@ package com.littlebridge.enrollplus.feature.admin.data.repository
 
 import com.littlebridge.enrollplus.core.model.ApiResponse
 import com.littlebridge.enrollplus.core.network.NetworkResult
+import com.littlebridge.enrollplus.feature.admin.data.local.AnnouncementLocalDataSource
 import com.littlebridge.enrollplus.feature.admin.data.remote.AnnouncementsApi
 import com.littlebridge.enrollplus.feature.admin.domain.model.AnnouncementDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.AnnouncementListResponse
@@ -10,11 +11,36 @@ import com.littlebridge.enrollplus.feature.admin.domain.model.SyncWhatsAppRespon
 import com.littlebridge.enrollplus.feature.admin.domain.repository.AnnouncementsRepository
 
 class AnnouncementsRepositoryImpl(
-    private val api: AnnouncementsApi
+    private val api: AnnouncementsApi,
+    private val localDataSource: AnnouncementLocalDataSource,
 ) : AnnouncementsRepository {
 
-    override suspend fun getAnnouncements(token: String): NetworkResult<ApiResponse<AnnouncementListResponse>> =
-        api.getAnnouncements(token)
+    override suspend fun getAnnouncements(token: String): NetworkResult<ApiResponse<AnnouncementListResponse>> {
+        val result = api.getAnnouncements(token)
+        return when (result) {
+            is NetworkResult.Success -> {
+                val announcements = result.data.data?.announcements.orEmpty()
+                localDataSource.saveAll(announcements)
+                result
+            }
+            is NetworkResult.ConnectionError -> {
+                val cached = localDataSource.getAll()
+                if (cached.isNotEmpty()) {
+                    NetworkResult.Success(ApiResponse(success = true, data = AnnouncementListResponse(announcements = cached)))
+                } else {
+                    result
+                }
+            }
+            is NetworkResult.Error -> {
+                val cached = localDataSource.getAll()
+                if (cached.isNotEmpty()) {
+                    NetworkResult.Success(ApiResponse(success = true, data = AnnouncementListResponse(announcements = cached)))
+                } else {
+                    result
+                }
+            }
+        }
+    }
 
     override suspend fun searchAnnouncements(token: String, query: String): NetworkResult<ApiResponse<AnnouncementListResponse>> =
         api.searchAnnouncements(token, query)
