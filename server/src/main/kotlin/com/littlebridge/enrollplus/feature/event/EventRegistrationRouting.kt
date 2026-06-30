@@ -370,7 +370,7 @@ fun Route.eventRegistrationRouting() {
                         EventRegistrationsTable.selectAll().where {
                             (EventRegistrationsTable.eventId inList eventIds) and
                                 (EventRegistrationsTable.parentUserId eq uid) and
-                                (EventRegistrationsTable.status inList listOf("REGISTERED", "CHECKED_IN"))
+                                (EventRegistrationsTable.status inList listOf("REGISTERED", "CHECKED_IN", "WAITLISTED"))
                         }.associate { it[EventRegistrationsTable.eventId] to it }
                     }
                 } else emptyMap()
@@ -532,8 +532,8 @@ fun Route.eventRegistrationRouting() {
                 }
 
                 // Past event check
-                val eventDate = event[CalendarEventsTable.startDate]
-                if (eventDate.isBefore(LocalDate.now())) {
+                val eventStartDate = event[CalendarEventsTable.startDate]
+                if (eventStartDate.isBefore(LocalDate.now())) {
                     call.fail("Cannot register for a past event", HttpStatusCode.BadRequest, "EVENT_PAST"); return@post
                 }
 
@@ -579,13 +579,13 @@ fun Route.eventRegistrationRouting() {
                     }
                 }
 
-                // Duplicate check (same event + parent + student, active status)
+                // Duplicate check (same event + parent + student, active or waitlisted status)
                 val studentUuid = req.studentId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                 val duplicate = dbQuery {
                     EventRegistrationsTable.selectAll().where {
                         (EventRegistrationsTable.eventId eq eventId) and
                             (EventRegistrationsTable.parentUserId eq uid) and
-                            (EventRegistrationsTable.status inList listOf("REGISTERED", "CHECKED_IN")) and
+                            (EventRegistrationsTable.status inList listOf("REGISTERED", "CHECKED_IN", "WAITLISTED")) and
                             (if (studentUuid != null)
                                 EventRegistrationsTable.studentId eq studentUuid
                             else
@@ -593,7 +593,7 @@ fun Route.eventRegistrationRouting() {
                     }.firstOrNull()
                 }
                 if (duplicate != null) {
-                    call.fail("You are already registered for this event", HttpStatusCode.Conflict, "ALREADY_REGISTERED"); return@post
+                    call.fail("You are already registered or waitlisted for this event", HttpStatusCode.Conflict, "ALREADY_REGISTERED"); return@post
                 }
 
                 // Slot validation
@@ -612,7 +612,8 @@ fun Route.eventRegistrationRouting() {
 
                     val booked = countSlotBookings(slotUuid)
                     if (booked >= slot[EventSlotsTable.capacity]) {
-                        call.fail("Slot is full", HttpStatusCode.Conflict, "SLOT_FULL"); return@post
+                        // Slot is full — allow waitlisting
+                        // (continue with WAITLISTED status instead of rejecting)
                     }
                 }
 
@@ -620,12 +621,23 @@ fun Route.eventRegistrationRouting() {
                     call.fail("attendee_count must be at least 1", HttpStatusCode.BadRequest); return@post
                 }
 
-                // Max attendees check (overall cap)
-                val maxAttendees = event[CalendarEventsTable.maxAttendees]
-                if (maxAttendees != null) {
-                    val total = countEventActiveRegistrations(eventId)
-                    if (total + req.attendeeCount > maxAttendees) {
-                        call.fail("Event is at maximum capacity", HttpStatusCode.Conflict, "EVENT_FULL"); return@post
+                // Determine registration status: REGISTERED if space available, WAITLISTED if full
+                val regStatus = when {
+                    slotUuid != null -> {
+                        val slot = dbQuery {
+                            EventSlotsTable.selectAll().where {
+                                (EventSlotsTable.id eq slotUuid) and (EventSlotsTable.isActive eq true)
+                            }.firstOrNull()
+                        }
+                        val booked = countSlotBookings(slotUuid)
+                        if (slot != null && booked >= slot[EventSlotsTable.capacity]) "WAITLISTED" else "REGISTERED"
+                    }
+                    else -> {
+                        val maxAttendees = event[CalendarEventsTable.maxAttendees]
+                        if (maxAttendees != null) {
+                            val total = countEventActiveRegistrations(eventId)
+                            if (total + req.attendeeCount > maxAttendees) "WAITLISTED" else "REGISTERED"
+                        } else "REGISTERED"
                     }
                 }
 
@@ -640,16 +652,33 @@ fun Route.eventRegistrationRouting() {
                         it[EventRegistrationsTable.studentId] = studentUuid
                         it[EventRegistrationsTable.schoolId] = schoolId
                         it[EventRegistrationsTable.attendeeCount] = req.attendeeCount
-                        it[EventRegistrationsTable.status] = "REGISTERED"
+                        it[EventRegistrationsTable.status] = regStatus
                         it[EventRegistrationsTable.registeredAt] = now
                         it[EventRegistrationsTable.updatedAt] = now
                         it[EventRegistrationsTable.clientRequestId] = clientRequestId
                     }
                 }
 
-                // Notify class teachers + admins
+                // Notify parent (confirmation) + class teachers + admins
                 val eventTitle = event[CalendarEventsTable.title]
+                val eventDateStr = event[CalendarEventsTable.startDate].toString()
+                val isWaitlisted = regStatus == "WAITLISTED"
                 runCatching {
+                    // Parent confirmation
+                    Notify.toUser(
+                        userId = uid,
+                        category = "event_registration",
+                        title = if (isWaitlisted) "Waitlisted: $eventTitle" else "Registered: $eventTitle",
+                        body = if (isWaitlisted)
+                            "You've been added to the waitlist for '$eventTitle' on $eventDateStr. You'll be notified if a slot opens up."
+                        else
+                            "You're registered for '$eventTitle' on $eventDateStr.",
+                        schoolId = schoolId,
+                        deepLink = "/parent/home",
+                        refType = "event_registration",
+                        refId = regId.toString(),
+                    )
+                    // Teachers
                     val teacherIds = NotifyRecipients.teachersInSchool(schoolId)
                     if (teacherIds.isNotEmpty()) {
                         Notify.toUsers(
@@ -672,10 +701,10 @@ fun Route.eventRegistrationRouting() {
                         eventTitle = eventTitle,
                         eventDate = event[CalendarEventsTable.startDate].toString(),
                         attendeeCount = req.attendeeCount,
-                        status = "REGISTERED",
+                        status = regStatus,
                         registeredAt = ISO_FMT.format(now),
                     ),
-                    message = "Registered successfully"
+                    message = if (regStatus == "WAITLISTED") "Added to waitlist" else "Registered successfully"
                 )
             }
 
@@ -694,7 +723,7 @@ fun Route.eventRegistrationRouting() {
                     EventRegistrationsTable.selectAll().where {
                         (EventRegistrationsTable.eventId eq eventId) and
                             (EventRegistrationsTable.parentUserId eq uid) and
-                            (EventRegistrationsTable.status inList listOf("REGISTERED", "CHECKED_IN")) and
+                            (EventRegistrationsTable.status inList listOf("REGISTERED", "CHECKED_IN", "WAITLISTED")) and
                             (if (studentUuid != null)
                                 EventRegistrationsTable.studentId eq studentUuid
                             else
@@ -711,8 +740,59 @@ fun Route.eventRegistrationRouting() {
                     }
                 }
 
-                // Notify teachers
+                // Auto-promote first waitlisted registration for the same slot/event
+                val cancelledSlotId = reg[EventRegistrationsTable.slotId]
+                val cancelledEventId = reg[EventRegistrationsTable.eventId]
+                val promotedReg = dbQuery {
+                    EventRegistrationsTable.selectAll().where {
+                        (EventRegistrationsTable.eventId eq cancelledEventId) and
+                            (EventRegistrationsTable.status eq "WAITLISTED") and
+                            (if (cancelledSlotId != null)
+                                EventRegistrationsTable.slotId eq cancelledSlotId
+                            else
+                                EventRegistrationsTable.slotId.isNull())
+                    }.orderBy(EventRegistrationsTable.registeredAt, SortOrder.ASC).firstOrNull()
+                }
+                if (promotedReg != null) {
+                    dbQuery {
+                        EventRegistrationsTable.update({ EventRegistrationsTable.id eq promotedReg[EventRegistrationsTable.id].value }) {
+                            it[status] = "REGISTERED"
+                            it[updatedAt] = now
+                        }
+                    }
+                    // Notify promoted parent
+                    runCatching {
+                        val promotedEventTitle = dbQuery {
+                            CalendarEventsTable.selectAll().where { CalendarEventsTable.id eq cancelledEventId }
+                                .firstOrNull()?.get(CalendarEventsTable.title)
+                        } ?: "Event"
+                        Notify.toUser(
+                            userId = promotedReg[EventRegistrationsTable.parentUserId],
+                            category = "event_registration",
+                            title = "Slot available: $promotedEventTitle",
+                            body = "You've been promoted from the waitlist! You're now registered for '$promotedEventTitle'.",
+                            schoolId = reg[EventRegistrationsTable.schoolId],
+                            deepLink = "/parent/home",
+                            refType = "event_registration",
+                            refId = promotedReg[EventRegistrationsTable.id].value.toString(),
+                        )
+                    }
+                }
+
+                // Notify parent (cancellation confirmation) + teachers
                 runCatching {
+                    // Parent
+                    Notify.toUser(
+                        userId = uid,
+                        category = "event_registration",
+                        title = "Registration cancelled",
+                        body = "Your registration has been cancelled.",
+                        schoolId = reg[EventRegistrationsTable.schoolId],
+                        deepLink = "/parent/home",
+                        refType = "event_registration",
+                        refId = reg[EventRegistrationsTable.id].value.toString(),
+                    )
+                    // Teachers
                     val teacherIds = NotifyRecipients.teachersInSchool(reg[EventRegistrationsTable.schoolId])
                     if (teacherIds.isNotEmpty()) {
                         Notify.toUsers(
@@ -799,8 +879,20 @@ fun Route.eventRegistrationRouting() {
                     }
                 }
 
-                // Notify teachers
+                // Notify parent (confirmation) + teachers
                 runCatching {
+                    // Parent
+                    Notify.toUser(
+                        userId = uid,
+                        category = "event_registration",
+                        title = "Slot changed: ${event[CalendarEventsTable.title]}",
+                        body = "Your slot has been changed to ${newSlot[EventSlotsTable.startTime]} - ${newSlot[EventSlotsTable.endTime]}.",
+                        schoolId = event[CalendarEventsTable.schoolId],
+                        deepLink = "/parent/home",
+                        refType = "event_registration",
+                        refId = reg[EventRegistrationsTable.id].value.toString(),
+                    )
+                    // Teachers
                     val teacherIds = NotifyRecipients.teachersInSchool(event[CalendarEventsTable.schoolId])
                     if (teacherIds.isNotEmpty()) {
                         Notify.toUsers(
@@ -1459,17 +1551,17 @@ fun Route.eventRegistrationRouting() {
                     }
                 }
 
-                // Auto-cancel all active registrations
+                // Auto-cancel all active + waitlisted registrations
                 val activeRegs = dbQuery {
                     EventRegistrationsTable.selectAll().where {
                         (EventRegistrationsTable.eventId eq eventId) and
-                            (EventRegistrationsTable.status inList listOf("REGISTERED", "CHECKED_IN"))
+                            (EventRegistrationsTable.status inList listOf("REGISTERED", "CHECKED_IN", "WAITLISTED"))
                     }.toList()
                 }
                 dbQuery {
                     EventRegistrationsTable.update({
                         (EventRegistrationsTable.eventId eq eventId) and
-                            (EventRegistrationsTable.status inList listOf("REGISTERED", "CHECKED_IN"))
+                            (EventRegistrationsTable.status inList listOf("REGISTERED", "CHECKED_IN", "WAITLISTED"))
                     }) {
                         it[status] = "CANCELLED"
                         it[cancelReason] = "Event cancelled by school"

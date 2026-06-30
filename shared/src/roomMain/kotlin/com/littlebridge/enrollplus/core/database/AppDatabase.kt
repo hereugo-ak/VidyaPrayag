@@ -2,12 +2,22 @@ package com.littlebridge.enrollplus.core.database
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import com.littlebridge.enrollplus.feature.event.data.local.EventCacheDao
+import com.littlebridge.enrollplus.feature.event.data.local.EventCacheEntity
+import com.littlebridge.enrollplus.feature.event.data.local.EventOutboxDao
+import com.littlebridge.enrollplus.feature.event.data.local.EventOutboxEntity
 import com.littlebridge.enrollplus.feature.schools.data.local.SchoolDao
 import com.littlebridge.enrollplus.feature.schools.data.local.SchoolEntity
 
-@Database(entities = [SchoolEntity::class], version = 1)
+@Database(
+    entities = [SchoolEntity::class, EventCacheEntity::class, EventOutboxEntity::class],
+    version = 2,
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun schoolDao(): SchoolDao
+    abstract fun eventCacheDao(): EventCacheDao
+    abstract fun eventOutboxDao(): EventOutboxDao
+
     companion object
 }
 
