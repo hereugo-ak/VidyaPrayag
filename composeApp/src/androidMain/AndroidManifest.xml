@@ -6,6 +6,13 @@
     <!-- Real "use current location" in school onboarding (report §11.2). -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Transport Tracking — foreground service for background GPS polling. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <!-- Required on API 33+ (Tiramisu) to post foreground/local notifications.
+         Requested at runtime; NotificationManagerHelper gates posting on
+         NotificationManagerCompat.areNotificationsEnabled() as well. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".EnRollPlusApp"
@@ -19,6 +26,7 @@
         <activity
             android:exported="true"
             android:name=".MainActivity"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.VidyaPrayag.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -26,6 +34,45 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          Firebase Cloud Messaging receiver. The MESSAGING_EVENT intent-filter
+          is required for FCM to route incoming pushes + token-rotation
+          callbacks to VidyaPrayagFirebaseMessagingService. exported=false —
+          only the Firebase system components may bind/start it; it is never
+          exposed to other apps.
+        -->
+        <service
+            android:name=".notification.VidyaPrayagFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!--
+          Transport Tracking — foreground service that polls GPS every 30s
+          and POSTs to /api/v1/transport/location for driver-mode bus
+          tracking. foregroundServiceType=location requires
+          ACCESS_FINE_LOCATION (already declared above).
+        -->
+        <service
+            android:name=".platform.transport.TransportLocationService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
+        <!--
+          Notification action button receiver. Handles inline actions from
+          notification action buttons (e.g. Mark Read, Approve, Reject).
+          exported=false — only the system notification framework may invoke it.
+        -->
+        <receiver
+            android:name=".notification.NotificationActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.littlebridge.enrollplus.notification.MARK_READ" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

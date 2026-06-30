@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { EarlyWarningStudent } from "@/lib/admin/types";
 import { Avatar, Badge, Card, CardHeader, EmptyState, Skeleton } from "./Primitives";
 import { SidePanel } from "./SidePanel";
@@ -139,11 +140,19 @@ export function EarlyWarning({
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="mx-3 mb-2 mt-1 rounded-2xl px-3 py-2.5 text-[12.5px] font-bold text-accent-deep transition-colors hover:bg-accent/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+            className="mx-3 mb-1 mt-1 rounded-2xl px-3 py-2.5 text-[12.5px] font-bold text-accent-deep transition-colors hover:bg-accent/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
           >
             {expanded ? "Show less" : `View all ${all.length} flagged →`}
           </button>
         )}
+        {/* Bridge into the full PEWS loop (risk bands, AI explanation,
+            interventions, effectiveness, config) instead of dead-ending here. */}
+        <Link
+          href="/admin/early-warning"
+          className="mx-3 mb-2 mt-1 rounded-2xl px-3 py-2.5 text-center text-[12.5px] font-bold text-navy-deep transition-colors hover:bg-navy/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+        >
+          Open Early Warning →
+        </Link>
       </Card>
 
       <SidePanel

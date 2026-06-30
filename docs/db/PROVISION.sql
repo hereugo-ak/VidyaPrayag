@@ -38,6 +38,11 @@
 --        two-party conversation_id/peer_user_id columns on message_threads /
 --        messages (RA-51).
 --
+--   4b. docs/db/migration_004_parent_link_guardian_metadata.sql
+--        Guardian relationship metadata on parent_child_links (RA-SP):
+--        relation + is_primary_guardian (enforces one primary guardian per
+--        student) powering the redesigned Student Profile parent connections.
+--
 --   5. docs/backend/sql/02_teacher_schema.sql
 --        Teacher-vertical tables: assessments, assessment_marks,
 --        syllabus_units, homework, homework_submissions, teacher_periods.
@@ -48,6 +53,13 @@
 --   7. docs/db/schema-patch-school-onboarding.sql
 --        schools.onboarding_status + richer onboarding identity/academic
 --        columns the setup wizard collects (all ADD COLUMN IF NOT EXISTS).
+--
+-- OPTIONAL (Parents Portal Profile tab — "Missions & Achievements"):
+--   8. docs/db/migration_004_parent_achievements.sql
+--        parent_achievements — OPTIONAL per-child achievement store. The
+--        /parent/track-progress endpoint works WITHOUT it (CMS fallback), so
+--        run this only if you want real per-child achievements. Fully guarded
+--        with IF NOT EXISTS — 100% safe to re-run, never errors.
 --
 -- ALL CREATE TABLE statements use IF NOT EXISTS, so it is safe to re-run.
 --
@@ -60,16 +72,32 @@
 --     \i docs/db/migration_001_faculty_and_holiday_list.sql
 --     \i docs/db/migration_002_segmentation_geo_assignments.sql
 --     \i docs/db/migration_003_leave_workflow_and_two_party_messaging.sql
+--     \i docs/db/migration_004_parent_link_guardian_metadata.sql
 --     \i docs/backend/sql/02_teacher_schema.sql
 --     \i scripts/schema-patch-2026-06-07.sql
 --     \i docs/db/schema-patch-school-onboarding.sql
+--     \i docs/db/migration_005_class_normalization_and_student_code_standard.sql
+--     \i docs/db/migration_006_parent_link_review_fields.sql
+--     \i docs/db/migration_007_child_link_robustness.sql
+--     \i docs/db/migration_008_enrollments.sql
+--     \i docs/db/migration_009_tsa_fks.sql
+--     \i docs/db/migration_010_typed_dates.sql
+--     \i docs/db/migration_011_periods.sql
+--     \i docs/db/migration_012_holidays_merge.sql
+--     \i docs/db/migration_013_teacher_checkins.sql
+--     \i docs/db/migration_014_attendance.sql
+--     \i docs/db/migration_015_assessments.sql
+--     \i docs/db/migration_016_syllabus.sql
+--     \i docs/db/migration_017_homework.sql
+--     \i docs/db/migration_025_lesson_planning.sql
+--     \i docs/db/migration_050_health_records.sql
 --     \i scripts/seed-2026-06-07.sql
 --
 -- ----------------------------------------------------------------------------
 -- ALTERNATIVE: let the backend self-create everything
 -- ----------------------------------------------------------------------------
 -- Set AUTO_CREATE_TABLES=true on first boot and Exposed will run
--- createMissingTablesAndColumns() for the 38 registered tables. After it
+-- createMissingTablesAndColumns() for all registered tables. After it
 -- succeeds you can flip the env var back to false.
 -- ============================================================================
 

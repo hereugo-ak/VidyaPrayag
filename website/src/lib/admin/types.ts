@@ -381,3 +381,476 @@ export interface OnboardingStatusResponse {
   total_step_count: number;
   steps: { step: string; current_step_count: number; is_done: boolean }[];
 }
+
+// ── Dev Tools (super_admin only) ─────────────────────────────────────────────
+export interface OtpProviderInfo {
+  name: string;
+  channel: string;
+  configured: boolean;
+}
+export interface OtpProvidersResponse {
+  providers: OtpProviderInfo[];
+  envPinnedProvider: string;
+  runtimeOverride: string | null;
+  effectiveProvider: string;
+}
+export interface UpdateOtpProviderResponse {
+  provider: string;
+  isOverride: boolean;
+}
+export interface TriggerPulseResponse {
+  weekStart: string;
+  pulsesGenerated: number;
+}
+export interface DevSendNotificationResponse {
+  sent: boolean;
+}
+
+// ── Alumni Management (ALUMNI_MANAGEMENT_SPEC.md) ───────────────────────────
+export interface AlumniDto {
+  id: string;
+  schoolId: string;
+  studentId: string | null;
+  userId: string | null;
+  name: string;
+  graduationYear: number;
+  lastClass: string | null;
+  currentProfession: string | null;
+  company: string | null;
+  city: string | null;
+  email: string | null;
+  phone: string | null;
+  linkedinUrl: string | null;
+  photoUrl: string | null;
+  skills: string | null;
+  achievements: string | null;
+  isMentor: boolean;
+  mentorExpertise: string | null;
+  isFeatured: boolean;
+  verificationStatus: string;
+  verifiedAt: string | null;
+  showPhone: boolean;
+  showEmail: boolean;
+  showLinkedin: boolean;
+  visibilityLevel: string;
+  profileCompleteness: number;
+  lastActiveAt: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  careerHistory: CareerHistoryDto[];
+}
+export interface CareerHistoryDto {
+  id: string;
+  alumniId: string;
+  jobTitle: string;
+  company: string;
+  industry: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  isCurrent: boolean;
+  createdAt: string;
+}
+export interface AlumniListResponse {
+  alumni: AlumniDto[];
+  page: number;
+  limit: number;
+  total: number;
+}
+export interface AlumniCampaignDto {
+  id: string;
+  schoolId: string;
+  title: string;
+  description: string | null;
+  cause: string | null;
+  targetAmount: number;
+  amountRaised: number;
+  targetBatchYear: number | null;
+  startDate: string;
+  endDate: string | null;
+  status: string;
+  isActive: boolean;
+  donorCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface AlumniDonationDto {
+  id: string;
+  schoolId: string;
+  alumniId: string;
+  alumniName: string;
+  campaignId: string | null;
+  campaignTitle: string | null;
+  amount: number;
+  purpose: string | null;
+  donationDate: string;
+  paymentMode: string | null;
+  referenceNumber: string | null;
+  receiptNumber: string | null;
+  receiptIssued: boolean;
+  is80gEligible: boolean;
+  createdAt: string;
+}
+export interface AlumniAnalyticsDto {
+  totalAlumni: number;
+  activeAlumni: number;
+  pendingVerifications: number;
+  byGraduationYear: Record<string, number>;
+  byProfession: Record<string, number>;
+  byCity: Record<string, number>;
+  totalDonations: number;
+  donationCount: number;
+  activeCampaigns: number;
+  activeMentorships: number;
+  mentorshipRequestsPending: number;
+  engagementRate: number;
+}
+
+export interface AlumniMentorshipDto {
+  id: string;
+  schoolId: string;
+  alumniId: string;
+  alumniName: string;
+  studentId: string;
+  studentName: string;
+  requestId: string | null;
+  status: string;
+  startDate: string;
+  endDate: string | null;
+  notes: string | null;
+  sessionCount: number;
+  createdAt: string;
+}
+
+export interface AlumniMentorshipRequestDto {
+  id: string;
+  schoolId: string;
+  alumniId: string;
+  alumniName: string;
+  studentId: string;
+  studentName: string;
+  requestedBy: string;
+  requestedByName: string;
+  expertiseArea: string | null;
+  message: string | null;
+  status: string;
+  respondedAt: string | null;
+  createdAt: string;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// PEWS — Predictive Early Warning System
+// Mirrors server feature.pews.PewsRouting.kt DTOs (snake_case JSON) exactly, so
+// the same envelope (.data) decodes here. AI fields are nullable; the UI shows
+// them only when present and never fabricates a reason/number (LAW 6).
+// ──────────────────────────────────────────────────────────────────────────────
+
+export type PewsRiskLevel = "watch" | "medium" | "high";
+export type PewsInterventionStatus = "open" | "in_progress" | "done" | "dismissed";
+export type PewsOutcome = "improved" | "unchanged" | "worsened";
+
+export interface PewsSignal {
+  kind: string;
+  label: string;
+  severity: number; // 1..3
+}
+
+export interface PewsStudent {
+  student_code: string;
+  name: string;
+  class_name: string;
+  section: string;
+  run_date: string;
+  risk_score: number;
+  risk_level: PewsRiskLevel;
+  attendance_pct: number | null;
+  marks_pct: number | null;
+  leave_count: number;
+  attendance_slope: number | null;
+  marks_slope: number | null;
+  signals: PewsSignal[];
+  ai_narrative: string | null;
+  ai_cause: string | null;
+  ai_recommendation: string | null;
+  ai_provider_used: string | null;
+}
+
+export interface PewsCohort {
+  run_date: string | null;
+  total: number;
+  high: number;
+  medium: number;
+  watch: number;
+  students: PewsStudent[];
+  ai_enabled: boolean;
+}
+
+export interface PewsStudentDetail {
+  current: PewsStudent | null;
+  history: PewsStudent[];
+}
+
+export interface PewsIntervention {
+  id: string;
+  student_code: string;
+  name: string;
+  class_name: string;
+  section: string;
+  owner_user_id: string;
+  action_type: string;
+  status: PewsInterventionStatus;
+  notes: string | null;
+  outcome: PewsOutcome | null;
+  opened_at: string;
+  resolved_at: string | null;
+  // PEWS 2.0 — managed casework fields
+  escalation_level?: number;
+  sla_days?: number | null;
+  follow_up_date?: string | null;
+  urgency?: string | null;
+  cause_family?: string | null;
+  plan_json?: string | null;
+}
+
+export interface UpdatePewsInterventionRequest {
+  status?: PewsInterventionStatus;
+  notes?: string;
+  outcome?: PewsOutcome;
+  action_type?: string;
+}
+
+export interface PewsEffectiveness {
+  total: number;
+  open: number;
+  done: number;
+  dismissed: number;
+  improved: number;
+  unchanged: number;
+  worsened: number;
+}
+
+export interface PewsConfig {
+  use_relative_thresholds: boolean;
+  attendance_floor_pct: number;
+  marks_floor_pct: number;
+  leave_floor_count: number;
+  run_frequency: string; // "daily" | "weekly"
+  ai_narrative_enabled: boolean;
+  parent_share_enabled: boolean;
+}
+
+export interface PewsRunResult {
+  at_risk: number;
+}
+
+export interface PewsJobStatus {
+  job_id: string;
+  status: string; // queued|processing|completed|failed
+  total_items: number;
+  completed_items: number;
+  result: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface PewsTrendPoint {
+  run_date: string;
+  total: number;
+  high: number;
+  medium: number;
+  watch: number;
+}
+
+export interface PewsEffectivenessTrend {
+  points: PewsTrendPoint[];
+  effectiveness: PewsEffectiveness;
+}
+
+export interface PewsDraftMessage {
+  language: string;
+  body: string;
+}
+
+export interface PewsSendParentResult {
+  sent_count: number;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// AI REPORT CARD 2.0
+// Mirrors server feature.reportcard.assemble.AssembleRouting.kt +
+// feature.reportcard.learn.LearnRouting.kt + EcosystemRouting.kt DTOs.
+// ──────────────────────────────────────────────────────────────────────────────
+
+export interface ReportCardDraft {
+  id: string;
+  studentId: string;
+  className: string;
+  section: string;
+  term: string;
+  academicYearId: string | null;
+  aiDraft: string | null;
+  classContext: string | null;
+  status: string;
+  aiProviderUsed: string | null;
+  tokensUsed: number;
+  language: string;
+  groundingFlags: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReportCardBatchResult {
+  jobId: string;
+  totalStudents: number;
+  completed: number;
+  failed: number;
+  grounded: number;
+  flagged: number;
+  fallbackUsed: number;
+  errors: string[];
+}
+
+export interface ReportCardJobStatus {
+  jobId: string;
+  status: string;
+  totalItems: number;
+  completedItems: number;
+  result: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface ReportCardOversightRow {
+  className: string;
+  section: string;
+  term: string;
+  totalDrafts: number;
+  draftCount: number;
+  flaggedCount: number;
+  approvedCount: number;
+  publishedCount: number;
+}
+
+export interface ReportCardOversightSummary {
+  schoolId: string;
+  classes: ReportCardOversightRow[];
+}
+
+export interface ReportCardPublishRequest {
+  className: string;
+  section: string;
+  term: string;
+  academicYearId?: string | null;
+}
+
+export interface ReportCardPublishResult {
+  published: number;
+}
+
+export interface ReportCardEffectivenessReport {
+  focusArea: string;
+  studentsTargeted: number;
+  studentsImproved: number;
+  effectivenessScore: number;
+  confidence: string;
+}
+
+export interface ReportCardTermConfig {
+  currentTerm: string | null;
+  termWindowDays: number;
+  enabled: boolean;
+  batchConcurrency: number;
+  fallbackOnAiFail: boolean;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// AI TUTOR 2.0
+// Mirrors server feature.tutor.heatmap.TeacherHeatmapRouting.kt +
+// feature.tutor.learn.LearnRouting.kt DTOs.
+// ──────────────────────────────────────────────────────────────────────────────
+
+export interface TutorHeatmapCell {
+  topicId: string;
+  misconceptionType: string;
+  affectedChildren: number;
+  avgMastery: number;
+  severity: string;
+}
+
+export interface TutorHeatmapResponse {
+  classId: string;
+  subjectId: string;
+  cells: TutorHeatmapCell[];
+  totalChildren: number;
+  totalMisconceptions: number;
+}
+
+export interface TutorTeacherScopeClass {
+  classId: string;
+  className: string;
+  section: string;
+  subjects: { subjectId: string; subjectName: string }[];
+}
+
+export interface TutorTeacherScopeResponse {
+  classes: TutorTeacherScopeClass[];
+}
+
+export interface TutorEfficacyTopic {
+  topicId: string;
+  mastery: number;
+  verdict: string;
+}
+
+export interface TutorEfficacyResponse {
+  childId: string;
+  subjectId: string;
+  topics: TutorEfficacyTopic[];
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// AI TOKEN MONITOR (Dev Tools — super admin only)
+// Mirrors server feature.ai.AiRouting.kt DTOs for rate-limiter, health, usage.
+// ──────────────────────────────────────────────────────────────────────────────
+
+export interface AiRateLimitEntry {
+  provider: string;
+  model: string;
+  rpm_current: number;
+  rpm_limit: number;
+  rpd_current: number;
+  rpd_limit: number;
+  tpm_current: number;
+  tpm_limit: number;
+  reserve_pct: number;
+}
+
+export interface AiHealthEntry {
+  provider: string;
+  model: string;
+  state: string;
+  total_requests: number;
+  total_failures: number;
+  rate_limit_hits: number;
+  avg_latency_ms: number;
+}
+
+export interface AiRecentUsageEntry {
+  id: string;
+  feature: string;
+  provider_used: string | null;
+  model_used: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  status: string;
+  routing_decision: string;
+  latency_ms: number;
+  error_message: string | null;
+  created_at: string;
+}
+
+export interface AiRecentUsageResponse {
+  entries: AiRecentUsageEntry[];
+  total: number;
+  window_min: number;
+}
