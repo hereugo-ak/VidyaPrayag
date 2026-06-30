@@ -2,6 +2,7 @@ package com.littlebridge.enrollplus.feature.notifications
 
 import com.littlebridge.enrollplus.db.CalendarEventsTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
+import com.littlebridge.enrollplus.db.EventRegistrationsTable
 import com.littlebridge.enrollplus.db.FeeRecordsTable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -26,6 +27,8 @@ object NotificationScheduler {
                     .onFailure { println("[$TAG] checkFeeReminders failed: ${it.message}") }
                 runCatching { checkCalendarReminders() }
                     .onFailure { println("[$TAG] checkCalendarReminders failed: ${it.message}") }
+                runCatching { checkEventRegistrationReminders() }
+                    .onFailure { println("[$TAG] checkEventRegistrationReminders failed: ${it.message}") }
             }
         }
     }
@@ -121,5 +124,57 @@ object NotificationScheduler {
         }
 
         println("[$TAG] checkCalendarReminders: sent ${upcomingEvents.size} reminders")
+    }
+
+    suspend fun checkEventRegistrationReminders() {
+        val tomorrow = LocalDate.now().plusDays(1)
+
+        val upcomingEvents = dbQuery {
+            CalendarEventsTable.selectAll()
+                .where {
+                    (CalendarEventsTable.status eq "PUBLISHED") and
+                    (CalendarEventsTable.registrationEnabled eq true) and
+                    (CalendarEventsTable.startDate eq tomorrow) and
+                    (CalendarEventsTable.reminderSent eq false)
+                }.toList()
+        }
+
+        if (upcomingEvents.isEmpty()) return
+
+        for (row in upcomingEvents) {
+            val schoolId = row[CalendarEventsTable.schoolId]
+            val eventId = row[CalendarEventsTable.id].value
+            val eventTitle = row[CalendarEventsTable.title]
+            val eventDate = row[CalendarEventsTable.startDate]
+
+            val registeredParentIds = dbQuery {
+                EventRegistrationsTable.selectAll()
+                    .where {
+                        (EventRegistrationsTable.eventId eq eventId) and
+                        (EventRegistrationsTable.status eq "REGISTERED")
+                    }.map { it[EventRegistrationsTable.parentUserId] }.distinct()
+            }
+
+            if (registeredParentIds.isNotEmpty()) {
+                Notify.toUsers(
+                    userIds = registeredParentIds,
+                    category = "event_registration",
+                    title = "Event tomorrow: $eventTitle",
+                    body = "Don't forget! $eventTitle is tomorrow on $eventDate",
+                    schoolId = schoolId,
+                    deepLink = "/parent/home",
+                    refType = "calendar_event",
+                    refId = eventId.toString(),
+                )
+            }
+
+            dbQuery {
+                CalendarEventsTable.update({ CalendarEventsTable.id eq eventId }) {
+                    it[reminderSent] = true
+                }
+            }
+        }
+
+        println("[$TAG] checkEventRegistrationReminders: sent reminders for ${upcomingEvents.size} events")
     }
 }

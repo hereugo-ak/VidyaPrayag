@@ -71,6 +71,7 @@ private enum class SchoolOverlay {
     BrandingKit,
     IdCards,
     ScheduledMessages,
+    EventRegistration,
 }
 
 /**
@@ -117,6 +118,8 @@ fun SchoolPortalV2(
                     overlay = SchoolOverlay.TransportManagement
                 } else if (deepLinkTarget.screen == "report-card" || deepLinkTarget.screen == "report-review") {
                     overlay = SchoolOverlay.ReportPublish
+                } else if (deepLinkTarget.screen == "events") {
+                    overlay = SchoolOverlay.EventRegistration
                 } else {
                     tab = deepLinkTarget.screen
                 }
@@ -404,6 +407,13 @@ fun SchoolPortalV2(
             }
             SchoolOverlay.ScheduledMessages -> {
                 ScheduledMessagesScreenV2(
+                    onBack = { overlay = SchoolOverlay.None },
+                    modifier = modifier,
+                )
+                return
+            }
+            SchoolOverlay.EventRegistration -> {
+                AdminEventRegistrationScreenV2(
                     onBack = { overlay = SchoolOverlay.None },
                     modifier = modifier,
                 )

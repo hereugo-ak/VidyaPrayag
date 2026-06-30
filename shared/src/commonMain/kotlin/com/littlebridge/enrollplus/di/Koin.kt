@@ -470,6 +470,17 @@ val commonModule = module {
         com.littlebridge.enrollplus.feature.scheduling.data.repository.ScheduledMessageRepositoryImpl(get())
     }
 
+    // Event Registration & RSVP System (EVENT_REGISTRATION_PLAN.md §4)
+    single {
+        com.littlebridge.enrollplus.feature.event.data.remote.EventRegistrationApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single<com.littlebridge.enrollplus.feature.event.domain.repository.EventRegistrationRepository> {
+        com.littlebridge.enrollplus.feature.event.data.repository.EventRegistrationRepositoryImpl(get())
+    }
+
     // UseCases
     factory { GetSchoolsUseCase(get()) }
 }
@@ -614,6 +625,10 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.idcard.presentation.IdCardViewModel(get(), get()) }
     // Message Scheduling (MESSAGE_SCHEDULING_PLAN.md §8)
     factory { com.littlebridge.enrollplus.feature.scheduling.presentation.ScheduledMessagesViewModel(get(), get()) }
+    // Event Registration & RSVP System (EVENT_REGISTRATION_PLAN.md §4)
+    factory { com.littlebridge.enrollplus.feature.event.presentation.ParentEventRegistrationViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.event.presentation.TeacherEventRegistrationViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.event.presentation.AdminEventRegistrationViewModel(get(), get()) }
 }
 
 fun initKoin(
