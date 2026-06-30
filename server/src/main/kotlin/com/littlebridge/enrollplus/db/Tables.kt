@@ -2779,8 +2779,8 @@ object TutorSessionsTable : UUIDTable("tutor_sessions", "id") {
     val academicYearId = uuid("academic_year_id").nullable()
     val mode           = varchar("mode", 16).default("DOUBT")
     val intentClass    = varchar("intent_class", 64).nullable()
-    val turns          = text("turns").default("[]")       // JSONB — array of TutorTurn
-    val groundedRefs   = text("grounded_refs").default("[]") // JSONB — audit: fact + source
+    val turns          = text("turns").default("[]")         // JSON array of TutorTurn
+    val groundedRefs   = text("grounded_refs").default("[]") // JSON array — audit: fact + source
     val providerUsed   = varchar("provider_used", 64).nullable()
     val tokensUsed     = integer("tokens_used").default(0)
     val cacheHit       = bool("cache_hit").default(false)

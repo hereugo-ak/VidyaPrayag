@@ -143,11 +143,18 @@ object CircuitBreaker {
         val avgLatencyMs: Long,
     )
 
-    fun snapshot(): List<HealthSnapshot> = states.map { (k, h) ->
-        val (p, m) = k.split("::", limit = 2).let { it[0] to (it.getOrNull(1) ?: "") }
-        HealthSnapshot(p, m, h.state.name, h.totalRequests, h.totalFailures,
-            h.consecutiveFailures, h.rateLimitHits, h.avgLatencyMs)
-    }
+    fun snapshot(): List<HealthSnapshot> =
+        AiProvider.entries.map { provider ->
+            val model = provider.defaultModel
+            val k = key(provider.code, model)
+            val h = states[k]
+            if (h != null) {
+                HealthSnapshot(provider.code, model, h.state.name, h.totalRequests, h.totalFailures,
+                    h.consecutiveFailures, h.rateLimitHits, h.avgLatencyMs)
+            } else {
+                HealthSnapshot(provider.code, model, State.CLOSED.name, 0, 0, 0, 0, 0)
+            }
+        }
 
     // ── DB mirror (best-effort; never blocks routing) ────────────────────────
     private suspend fun persist(provider: String, model: String, h: Health) {
