@@ -67,6 +67,7 @@ fun VScreenScaffold(
         ) {
             Column(Modifier.fillMaxSize()) {
                 topBar?.invoke()
+                OfflineBanner()
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     content(
                         PaddingValues(

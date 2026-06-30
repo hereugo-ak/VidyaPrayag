@@ -3,6 +3,7 @@ package com.littlebridge.enrollplus.feature.teacher.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.littlebridge.enrollplus.core.network.NetworkResult
+import com.littlebridge.enrollplus.core.offline.sync.SyncStateHolder
 import com.littlebridge.enrollplus.core.prefs.PreferenceRepository
 import com.littlebridge.enrollplus.feature.teacher.domain.model.AttendanceSaveMarkDto
 import com.littlebridge.enrollplus.feature.teacher.domain.model.AttendanceSaveRequest
@@ -85,6 +86,7 @@ data class TeacherAttendanceState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val saveSuccess: Boolean = false,
+    val savedOffline: Boolean = false,
     // RA-S18: load errors drive VStateHost (full-screen retry); save errors are surfaced
     // inline so a failed save never wipes the roster the teacher is mid-way through.
     val error: String? = null,      // load-path error (VStateHost)
@@ -104,6 +106,7 @@ data class TeacherAttendanceState(
 class TeacherAttendanceViewModel(
     private val repository: TeacherRepository,
     private val preferenceRepository: PreferenceRepository,
+    private val syncStateHolder: SyncStateHolder,
 ) : ViewModel() {
     private val _state = MutableStateFlow(TeacherAttendanceState())
     val state: StateFlow<TeacherAttendanceState> = _state.asStateFlow()
@@ -231,8 +234,10 @@ class TeacherAttendanceViewModel(
                 marks = current.students.map { AttendanceSaveMarkDto(it.studentId, it.status) },
             )
             when (val result = repository.saveAttendance(token, request)) {
-                is NetworkResult.Success ->
-                    _state.update { it.copy(isSaving = false, saveSuccess = true, alreadyMarked = true) }
+                is NetworkResult.Success -> {
+                    val wasOffline = syncStateHolder.state.value.pendingCount > 0
+                    _state.update { it.copy(isSaving = false, saveSuccess = true, savedOffline = wasOffline, alreadyMarked = true) }
+                }
                 is NetworkResult.Error ->
                     _state.update { it.copy(isSaving = false, saveError = result.message) }
                 is NetworkResult.ConnectionError ->

@@ -49,6 +49,54 @@ import org.koin.dsl.KoinAppDeclaration
 import org.koin.dsl.module
 
 val commonModule = module {
+    // Offline sync state — app-lifecycle singleton observed by the offline banner
+    // and any ViewModel that needs to show pending-sync status.
+    single { com.littlebridge.enrollplus.core.offline.sync.SyncStateHolder() }
+
+    // Offline sync engine — replays outbox operations when network is available.
+    single<com.littlebridge.enrollplus.core.offline.sync.OutboxOperationHandler> {
+        com.littlebridge.enrollplus.feature.teacher.data.offline.AttendanceSaveHandler(get(), get())
+    }
+    single<com.littlebridge.enrollplus.feature.teacher.data.offline.LeaveDecisionHandler> {
+        com.littlebridge.enrollplus.feature.teacher.data.offline.LeaveDecisionHandler(get(), get())
+    }
+    single<com.littlebridge.enrollplus.feature.teacher.data.offline.ApplyLeaveHandler> {
+        com.littlebridge.enrollplus.feature.teacher.data.offline.ApplyLeaveHandler(get(), get())
+    }
+    single<com.littlebridge.enrollplus.feature.teacher.data.offline.AssignHomeworkHandler> {
+        com.littlebridge.enrollplus.feature.teacher.data.offline.AssignHomeworkHandler(get(), get())
+    }
+    single<com.littlebridge.enrollplus.feature.teacher.data.offline.HomeworkExtensionHandler> {
+        com.littlebridge.enrollplus.feature.teacher.data.offline.HomeworkExtensionHandler(get(), get())
+    }
+    single<com.littlebridge.enrollplus.feature.teacher.data.offline.HomeworkReviewHandler> {
+        com.littlebridge.enrollplus.feature.teacher.data.offline.HomeworkReviewHandler(get(), get())
+    }
+    single<com.littlebridge.enrollplus.feature.teacher.data.offline.HomeworkCloseHandler> {
+        com.littlebridge.enrollplus.feature.teacher.data.offline.HomeworkCloseHandler(get(), get())
+    }
+    single<com.littlebridge.enrollplus.feature.teacher.data.offline.BroadcastToClassHandler> {
+        com.littlebridge.enrollplus.feature.teacher.data.offline.BroadcastToClassHandler(get(), get())
+    }
+    single {
+        com.littlebridge.enrollplus.core.offline.sync.SyncEngine(
+            get(),
+            get(),
+            get(),
+            get(),
+            mapOf(
+                com.littlebridge.enrollplus.feature.teacher.data.offline.AttendanceOutboxOps.TYPE to get<com.littlebridge.enrollplus.core.offline.sync.OutboxOperationHandler>(),
+                com.littlebridge.enrollplus.feature.teacher.data.offline.OutboxOps.LEAVE_DECIDE to get<com.littlebridge.enrollplus.feature.teacher.data.offline.LeaveDecisionHandler>(),
+                com.littlebridge.enrollplus.feature.teacher.data.offline.OutboxOps.LEAVE_APPLY to get<com.littlebridge.enrollplus.feature.teacher.data.offline.ApplyLeaveHandler>(),
+                com.littlebridge.enrollplus.feature.teacher.data.offline.OutboxOps.HOMEWORK_ASSIGN to get<com.littlebridge.enrollplus.feature.teacher.data.offline.AssignHomeworkHandler>(),
+                com.littlebridge.enrollplus.feature.teacher.data.offline.OutboxOps.HOMEWORK_EXTEND to get<com.littlebridge.enrollplus.feature.teacher.data.offline.HomeworkExtensionHandler>(),
+                com.littlebridge.enrollplus.feature.teacher.data.offline.OutboxOps.HOMEWORK_REVIEW to get<com.littlebridge.enrollplus.feature.teacher.data.offline.HomeworkReviewHandler>(),
+                com.littlebridge.enrollplus.feature.teacher.data.offline.OutboxOps.HOMEWORK_CLOSE to get<com.littlebridge.enrollplus.feature.teacher.data.offline.HomeworkCloseHandler>(),
+                com.littlebridge.enrollplus.feature.teacher.data.offline.OutboxOps.BROADCAST_CLASS to get<com.littlebridge.enrollplus.feature.teacher.data.offline.BroadcastToClassHandler>(),
+            ),
+        )
+    }
+
     // Remote
     single {
         val prefs: PreferenceRepository = get()
@@ -313,7 +361,7 @@ val commonModule = module {
         com.littlebridge.enrollplus.feature.admin.data.repository.MessagesRepositoryImpl(get())
     }
     single<com.littlebridge.enrollplus.feature.admin.domain.repository.AnnouncementsRepository> {
-        com.littlebridge.enrollplus.feature.admin.data.repository.AnnouncementsRepositoryImpl(get())
+        com.littlebridge.enrollplus.feature.admin.data.repository.AnnouncementsRepositoryImpl(get(), get())
     }
     single<com.littlebridge.enrollplus.feature.admin.domain.repository.TeachersRepository> {
         com.littlebridge.enrollplus.feature.admin.data.repository.TeachersRepositoryImpl(get())
@@ -374,7 +422,7 @@ val commonModule = module {
         com.littlebridge.enrollplus.feature.admin.data.repository.UserProfileRepositoryImpl(get())
     }
     single<com.littlebridge.enrollplus.feature.teacher.domain.repository.TeacherRepository> {
-        com.littlebridge.enrollplus.feature.teacher.data.repository.TeacherRepositoryImpl(get())
+        com.littlebridge.enrollplus.feature.teacher.data.repository.TeacherRepositoryImpl(get(), get(), get(), get())
     }
     // Notification FOUNDATION repository — delegates to NotificationApi.
     single<com.littlebridge.enrollplus.feature.notification.domain.repository.NotificationRepository> {
@@ -546,7 +594,7 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherObligationsViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherClassesViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherStudentProfileViewModel(get(), get()) } // T-505
-    factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherAttendanceViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherAttendanceViewModel(get(), get(), get()) }
     // T-305: the rebuilt gradebook state holder (replaces the legacy split of
     // TeacherMarksViewModel + TeacherAssessmentsViewModel, both deleted in T-305).
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherGradebookViewModel(get(), get()) }
@@ -608,6 +656,8 @@ fun initKoin(
 ) = startKoin {
     appDeclaration()
     modules(commonModule, viewModelModule, platformModule())
+    // Start the offline sync engine to monitor network and replay outbox ops
+    koin.get<com.littlebridge.enrollplus.core.offline.sync.SyncEngine>().start()
 }
 
 // For iOS
