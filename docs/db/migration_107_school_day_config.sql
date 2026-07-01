@@ -62,22 +62,26 @@ ALTER TABLE school_day_slots ENABLE ROW LEVEL SECURITY;
 
 -- Service role bypasses RLS (used by Ktor backend). Authenticated users can
 -- read the system template; school-scoped reads go through the backend.
-CREATE POLICY IF NOT EXISTS sdc_read_own_school
+DROP POLICY IF EXISTS sdc_read_own_school ON school_day_config;
+CREATE POLICY sdc_read_own_school
   ON school_day_config FOR SELECT
   TO authenticated
   USING (school_id = '00000000-0000-0000-0000-000000000000'::uuid);
 
-CREATE POLICY IF NOT EXISTS sdc_write_service_only
+DROP POLICY IF EXISTS sdc_write_service_only ON school_day_config;
+CREATE POLICY sdc_write_service_only
   ON school_day_config FOR ALL
   TO service_role
   USING (true) WITH CHECK (true);
 
-CREATE POLICY IF NOT EXISTS sds_read_own_school
+DROP POLICY IF EXISTS sds_read_own_school ON school_day_slots;
+CREATE POLICY sds_read_own_school
   ON school_day_slots FOR SELECT
   TO authenticated
   USING (school_id = '00000000-0000-0000-0000-000000000000'::uuid);
 
-CREATE POLICY IF NOT EXISTS sds_write_service_only
+DROP POLICY IF EXISTS sds_write_service_only ON school_day_slots;
+CREATE POLICY sds_write_service_only
   ON school_day_slots FOR ALL
   TO service_role
   USING (true) WITH CHECK (true);

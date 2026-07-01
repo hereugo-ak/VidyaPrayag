@@ -15,7 +15,8 @@ ALTER TABLE school_day_slots ENABLE ROW LEVEL SECURITY;
 -- auth'd clients). The backend always goes through the service role.
 
 -- Read: any authenticated user can read configs for their school
-CREATE POLICY IF NOT EXISTS sdc_read_own_school
+DROP POLICY IF EXISTS sdc_read_own_school ON school_day_config;
+CREATE POLICY sdc_read_own_school
   ON school_day_config FOR SELECT
   TO authenticated
   USING (school_id = '00000000-0000-0000-0000-000000000000'::uuid);
@@ -26,18 +27,21 @@ CREATE POLICY IF NOT EXISTS sdc_read_own_school
 -- rely on the backend for strict scoping. Write is restricted to service_role.
 
 -- Write: only service role can insert/update/delete
-CREATE POLICY IF NOT EXISTS sdc_write_service_only
+DROP POLICY IF EXISTS sdc_write_service_only ON school_day_config;
+CREATE POLICY sdc_write_service_only
   ON school_day_config FOR ALL
   TO service_role
   USING (true) WITH CHECK (true);
 
 -- 3. RLS policies for school_day_slots
-CREATE POLICY IF NOT EXISTS sds_read_own_school
+DROP POLICY IF EXISTS sds_read_own_school ON school_day_slots;
+CREATE POLICY sds_read_own_school
   ON school_day_slots FOR SELECT
   TO authenticated
   USING (school_id = '00000000-0000-0000-0000-000000000000'::uuid);
 
-CREATE POLICY IF NOT EXISTS sds_write_service_only
+DROP POLICY IF EXISTS sds_write_service_only ON school_day_slots;
+CREATE POLICY sds_write_service_only
   ON school_day_slots FOR ALL
   TO service_role
   USING (true) WITH CHECK (true);
