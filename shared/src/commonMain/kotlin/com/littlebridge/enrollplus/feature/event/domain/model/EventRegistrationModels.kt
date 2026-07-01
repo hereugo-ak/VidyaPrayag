@@ -193,3 +193,24 @@ data class UpdateRegistrationConfigRequest(
     @SerialName("max_attendees") val maxAttendees: Int? = null,
     val venue: String? = null,
 )
+
+@Serializable
+data class AdminEventDto(
+    val id: String,
+    val title: String = "",
+    val type: String = "",
+    val startDate: String = "",
+    val status: String = "PUBLISHED",
+    val registrationEnabled: Boolean = false,
+    val registrationDeadline: String? = null,
+    val maxAttendees: Int? = null,
+    val venue: String? = null,
+    val hasSlots: Boolean = false,
+    val slotCount: Int = 0,
+    val totalRegistrations: Int = 0,
+)
+
+@Serializable
+data class AdminEventListResponse(
+    val events: List<AdminEventDto> = emptyList(),
+)

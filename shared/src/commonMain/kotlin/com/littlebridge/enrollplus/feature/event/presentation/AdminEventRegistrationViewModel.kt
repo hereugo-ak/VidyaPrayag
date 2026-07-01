@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 data class AdminEventRegistrationState(
+    val events: List<AdminEventDto> = emptyList(),
     val registrations: List<AdminRegistrationDto> = emptyList(),
     val slots: List<SlotResponse> = emptyList(),
     val isLoading: Boolean = false,
@@ -39,7 +40,33 @@ class AdminEventRegistrationViewModel(
     private val _state = MutableStateFlow(AdminEventRegistrationState())
     val state: StateFlow<AdminEventRegistrationState> = _state.asStateFlow()
 
-    init { loadRegistrations() }
+    init { loadEvents() }
+
+    fun loadEvents() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isLoading = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isLoading = false)
+                return@launch
+            }
+            when (val result = repository.listAdminEvents(token)) {
+                is NetworkResult.Success -> {
+                    _state.value = _state.value.copy(
+                        events = result.data.data?.events ?: emptyList(),
+                        isLoading = false,
+                    )
+                }
+                is NetworkResult.Error -> {
+                    AppLogger.e("AdminEventVM", "loadEvents error: ${result.message}")
+                    _state.value = _state.value.copy(isLoading = false, errorMessage = result.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(isLoading = false, errorMessage = "Connection error. Check your internet.")
+                }
+            }
+        }
+    }
 
     fun loadRegistrations(status: String? = null, eventId: String? = null) {
         viewModelScope.launch {
