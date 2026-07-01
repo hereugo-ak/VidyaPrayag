@@ -72,6 +72,7 @@ private enum class SchoolOverlay {
     IdCards,
     ScheduledMessages,
     EventRegistration,
+    SchoolDayConfig,
 }
 
 /**
@@ -424,6 +425,13 @@ fun SchoolPortalV2(
                 )
                 return
             }
+            SchoolOverlay.SchoolDayConfig -> {
+                SchoolDayConfigScreenV2(
+                    onBack = { overlay = SchoolOverlay.None },
+                    modifier = modifier,
+                )
+                return
+            }
             SchoolOverlay.None -> Unit
         }
 
@@ -514,6 +522,8 @@ fun SchoolPortalV2(
                         onOpenBranding = { overlay = SchoolOverlay.BrandingKit },
                         // ID Card Generation — templates, card generation, PDF export.
                         onOpenIdCards = { overlay = SchoolOverlay.IdCards },
+                        // School Day Configuration — bell schedules & period slots.
+                        onOpenSchoolDayConfig = { overlay = SchoolOverlay.SchoolDayConfig },
                     )
                 }
             }

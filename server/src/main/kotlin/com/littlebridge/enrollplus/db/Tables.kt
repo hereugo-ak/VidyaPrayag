@@ -47,6 +47,7 @@ import org.jetbrains.exposed.dao.id.UUIDTable
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.date
 import org.jetbrains.exposed.sql.javatime.time
+import java.util.UUID
 import org.jetbrains.exposed.sql.javatime.timestamp
 
 // =====================================================================
@@ -3122,3 +3123,5 @@ object SchoolDaySlotType {
     const val FREE      = "FREE"
     const val ZERO      = "ZERO"
 }
+
+val SYSTEM_SCHOOL_ID: UUID = UUID(0, 0)

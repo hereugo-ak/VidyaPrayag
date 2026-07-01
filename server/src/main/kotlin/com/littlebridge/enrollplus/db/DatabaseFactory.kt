@@ -281,6 +281,8 @@ object DatabaseFactory {
         // Applied by docs/db/migration-104-scheduled-messages.sql (must run before
         // deploy; AUTO_CREATE_TABLES is OFF in prod).
         ScheduledMessagesTable,
+        SchoolDayConfigTable,
+        SchoolDaySlotsTable,
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

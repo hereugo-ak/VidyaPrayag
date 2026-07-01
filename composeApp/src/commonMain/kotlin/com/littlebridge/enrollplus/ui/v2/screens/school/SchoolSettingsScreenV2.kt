@@ -79,6 +79,8 @@ fun SchoolSettingsScreenV2(
     onOpenBranding: () -> Unit = {},
     // ID Card Generation — templates, card generation, PDF export.
     onOpenIdCards: () -> Unit = {},
+    // School Day Configuration — bell schedules & period slots.
+    onOpenSchoolDayConfig: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: InstitutionalProfileViewModel = koinViewModel(),
     preferenceRepository: PreferenceRepository = koinInject(),
@@ -105,6 +107,7 @@ fun SchoolSettingsScreenV2(
         onOpenScholarships = onOpenScholarships,
         onOpenBranding = onOpenBranding,
         onOpenIdCards = onOpenIdCards,
+        onOpenSchoolDayConfig = onOpenSchoolDayConfig,
         onRetry = viewModel::load,
         modifier = modifier.statusBarsPadding()
             .imePadding()
@@ -126,6 +129,7 @@ private fun SchoolSettingsContent(
     onOpenScholarships: () -> Unit,
     onOpenBranding: () -> Unit,
     onOpenIdCards: () -> Unit,
+    onOpenSchoolDayConfig: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -180,6 +184,7 @@ private fun SchoolSettingsContent(
                 //SettingRow(VIcons.School, "Edit institutional profile", "Name, board, contact, principal & address",false, onClick = onOpenProfile),
                 SettingRow(VIcons.Calendar, "Academic year", "Manage term dates & holidays", false, onClick = onOpenAcademicYear),
                 SettingRow(VIcons.BookOpen, "Classes & subjects", "Class & subject setup", true),
+                SettingRow(VIcons.Clock, "School day config", "Bell schedules & period slots", false, onClick = onOpenSchoolDayConfig),
                 SettingRow(VIcons.Users, "Teacher management", "Add, view & remove teachers",false, onClick = onOpenTeachers),
                 SettingRow(VIcons.MapPin, "Transport Management", "Routes, vehicles & student assignments", false, onClick = onOpenTransport),
                 SettingRow(VIcons.Sparkles, "Scholarship Management", "Schemes, applications & renewals", false, onClick = onOpenScholarships),

@@ -78,6 +78,7 @@ import type {
   SchoolDayConfigDto,
   SchoolDayConfigListResponse,
   CreateSchoolDayConfigRequest,
+  UpdateSchoolDayConfigRequest,
 } from "./types";
 
 interface Opts {
@@ -420,6 +421,8 @@ export const adminApi = {
     authRequest<SchoolDayConfigListResponse>("/api/v1/school/day-config"),
   schoolDayConfigCreate: (body: CreateSchoolDayConfigRequest) =>
     authRequest<SchoolDayConfigDto>("/api/v1/school/day-config", { method: "POST", body }),
+  schoolDayConfigUpdate: (id: string, body: UpdateSchoolDayConfigRequest) =>
+    authRequest<SchoolDayConfigDto>(`/api/v1/school/day-config/${id}`, { method: "PUT", body }),
   schoolDayConfigDeactivate: (id: string) =>
     authRequest<unknown>(`/api/v1/school/day-config/${id}`, { method: "DELETE" }),
 };

@@ -55,3 +55,45 @@ INSERT INTO school_day_slots (config_id, school_id, slot_index, slot_type, label
 ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000000', 9,  'TEACHING', 'Period 7',     '14:15', '15:00', false, 0),
 ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000000', 10, 'TEACHING', 'Period 8',     '15:00', '15:45', false, 0)
 ON CONFLICT DO NOTHING;
+
+-- ── RLS policies (H-2) ─────────────────────────────────────────────────
+ALTER TABLE school_day_config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE school_day_slots ENABLE ROW LEVEL SECURITY;
+
+-- Service role bypasses RLS (used by Ktor backend). Authenticated users can
+-- read the system template; school-scoped reads go through the backend.
+CREATE POLICY IF NOT EXISTS sdc_read_own_school
+  ON school_day_config FOR SELECT
+  TO authenticated
+  USING (school_id = '00000000-0000-0000-0000-000000000000'::uuid);
+
+CREATE POLICY IF NOT EXISTS sdc_write_service_only
+  ON school_day_config FOR ALL
+  TO service_role
+  USING (true) WITH CHECK (true);
+
+CREATE POLICY IF NOT EXISTS sds_read_own_school
+  ON school_day_slots FOR SELECT
+  TO authenticated
+  USING (school_id = '00000000-0000-0000-0000-000000000000'::uuid);
+
+CREATE POLICY IF NOT EXISTS sds_write_service_only
+  ON school_day_slots FOR ALL
+  TO service_role
+  USING (true) WITH CHECK (true);
+
+-- ── updated_at auto-update trigger (H-3) ───────────────────────────────
+CREATE OR REPLACE FUNCTION fn_sdc_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_sdc_updated_at ON school_day_config;
+
+CREATE TRIGGER trg_sdc_updated_at
+  BEFORE UPDATE ON school_day_config
+  FOR EACH ROW
+  EXECUTE FUNCTION fn_sdc_updated_at();

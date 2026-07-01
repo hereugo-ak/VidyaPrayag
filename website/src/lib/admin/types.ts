@@ -855,3 +855,43 @@ export interface AiRecentUsageResponse {
   total: number;
   window_min: number;
 }
+
+// ── School Day Configuration (GET/POST/PUT/DELETE /api/v1/school/day-config) ──
+
+export interface SchoolDaySlotDto {
+  slot_index: number;
+  slot_type: string;
+  label: string;
+  start_time: string;
+  end_time: string;
+  is_double: boolean;
+  double_group: number;
+}
+
+export interface SchoolDayConfigDto {
+  id: string;
+  name: string;
+  applicable_days: string;
+  class_level: string;
+  slots: SchoolDaySlotDto[];
+  is_active: boolean;
+}
+
+export interface SchoolDayConfigListResponse {
+  configs: SchoolDayConfigDto[];
+}
+
+export interface CreateSchoolDayConfigRequest {
+  name: string;
+  applicable_days: string;
+  class_level: string;
+  slots: SchoolDaySlotDto[];
+}
+
+export interface UpdateSchoolDayConfigRequest {
+  name: string;
+  applicable_days: string;
+  class_level: string;
+  slots: SchoolDaySlotDto[];
+  is_active: boolean;
+}

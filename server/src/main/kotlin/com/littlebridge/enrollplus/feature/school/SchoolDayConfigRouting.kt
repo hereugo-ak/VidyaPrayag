@@ -10,6 +10,7 @@ import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.db.SchoolDayConfigTable
 import com.littlebridge.enrollplus.db.SchoolDaySlotType
 import com.littlebridge.enrollplus.db.SchoolDaySlotsTable
+import com.littlebridge.enrollplus.db.SYSTEM_SCHOOL_ID
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
@@ -84,8 +85,6 @@ private val VALID_SLOT_TYPES = setOf(
 )
 
 private val VALID_CLASS_LEVELS = setOf("ALL", "PRIMARY", "SECONDARY")
-
-private val SYSTEM_SCHOOL_ID: JUUID = JUUID(0, 0)
 
 private fun parseTime(hhmm: String): LocalTime =
     LocalTime.parse(hhmm, SDC_HHMM)
@@ -203,8 +202,16 @@ fun Route.schoolDayConfigRouting() {
             get("/for-class") {
                 val ctx = call.requireSchoolContext() ?: return@get
                 val classLevel = call.request.queryParameters["class_level"] ?: "ALL"
+                if (classLevel !in VALID_CLASS_LEVELS) {
+                    call.fail("class_level must be one of: ${VALID_CLASS_LEVELS.joinToString()}", HttpStatusCode.BadRequest, "VALIDATION")
+                    return@get
+                }
                 val weekdayStr = call.request.queryParameters["weekday"]
                 val weekday = weekdayStr?.toIntOrNull() ?: java.time.LocalDate.now().dayOfWeek.value
+                if (weekday !in 1..7) {
+                    call.fail("weekday must be between 1 and 7", HttpStatusCode.BadRequest, "VALIDATION")
+                    return@get
+                }
 
                 val dto = dbQuery {
                     fun resolveForSchool(schoolId: JUUID): SchoolDayConfigDto? {
@@ -293,7 +300,7 @@ fun Route.schoolDayConfigRouting() {
                 }
                 val now = Instant.now()
                 val newId = JUUID.randomUUID()
-                dbQuery {
+                val dto = dbQuery {
                     SchoolDayConfigTable.insert {
                         it[SchoolDayConfigTable.id] = newId
                         it[SchoolDayConfigTable.schoolId] = ctx.schoolId
@@ -318,8 +325,8 @@ fun Route.schoolDayConfigRouting() {
                             it[SchoolDaySlotsTable.createdAt] = now
                         }
                     }
+                    rowToConfigDtoOrNull(newId, ctx.schoolId)
                 }
-                val dto = dbQuery { rowToConfigDtoOrNull(newId, ctx.schoolId) }
                 if (dto != null) {
                     call.created(dto, "School day config created")
                 } else {
@@ -353,7 +360,7 @@ fun Route.schoolDayConfigRouting() {
                     call.fail(it, HttpStatusCode.BadRequest, "VALIDATION"); return@put
                 }
                 val now = Instant.now()
-                val updated = dbQuery {
+                val dto = dbQuery {
                     val count = SchoolDayConfigTable.update(
                         { (SchoolDayConfigTable.id eq uuid) and (SchoolDayConfigTable.schoolId eq ctx.schoolId) }
                     ) {
@@ -363,7 +370,7 @@ fun Route.schoolDayConfigRouting() {
                         it[SchoolDayConfigTable.isActive] = req.isActive
                         it[SchoolDayConfigTable.updatedAt] = now
                     }
-                    if (count == 0) return@dbQuery false
+                    if (count == 0) return@dbQuery null
                     SchoolDaySlotsTable.deleteWhere {
                         (SchoolDaySlotsTable.configId eq uuid) and (SchoolDaySlotsTable.schoolId eq ctx.schoolId)
                     }
@@ -381,17 +388,12 @@ fun Route.schoolDayConfigRouting() {
                             it[SchoolDaySlotsTable.createdAt] = now
                         }
                     }
-                    true
+                    rowToConfigDtoOrNull(uuid, ctx.schoolId)
                 }
-                if (!updated) {
-                    call.fail("School day config not found", HttpStatusCode.NotFound, "NOT_FOUND")
-                    return@put
-                }
-                val dto = dbQuery { rowToConfigDtoOrNull(uuid, ctx.schoolId) }
                 if (dto != null) {
                     call.ok(dto, message = "School day config updated")
                 } else {
-                    call.fail("Failed to fetch updated config", HttpStatusCode.InternalServerError, "INTERNAL")
+                    call.fail("School day config not found", HttpStatusCode.NotFound, "NOT_FOUND")
                 }
             }
 

@@ -115,6 +115,7 @@ import com.littlebridge.enrollplus.feature.school.schoolProfileRouting
 import com.littlebridge.enrollplus.feature.school.schoolRecordsRouting
 import com.littlebridge.enrollplus.feature.school.schoolStudentsRouting
 import com.littlebridge.enrollplus.feature.school.schoolTimetableRouting
+import com.littlebridge.enrollplus.feature.school.schoolDayConfigRouting
 import com.littlebridge.enrollplus.feature.school.nonTeachingStaffRouting
 import com.littlebridge.enrollplus.feature.school.schoolLessonPlanRouting
 import com.littlebridge.enrollplus.feature.school.schoolRouting
@@ -479,5 +480,9 @@ fun Application.module() {
         // Message Scheduling (MESSAGE_SCHEDULING_PLAN.md §5)
         //   /api/v1/school/scheduled-messages          — admin, teacher
         scheduledMessageRouting()
+
+        // School Day Configuration (TIMETABLE_CLASS_TEACHER_PLAN.md Phase 0)
+        //   /api/v1/school/day-config          — admin, school-scoped CRUD
+        schoolDayConfigRouting()
     }
 }
