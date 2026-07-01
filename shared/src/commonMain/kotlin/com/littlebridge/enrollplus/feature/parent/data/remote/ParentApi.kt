@@ -152,6 +152,20 @@ class ParentApi(
         }
     }
 
+    /** Read Receipts Phase 1: POST /api/v1/parent/messages/threads/{id}/read */
+    suspend fun markThreadRead(token: String, threadId: String): NetworkResult<Unit> {
+        return safeApiCall {
+            client.post(getUrl("api/v1/parent/messages/threads/$threadId/read"))
+        }
+    }
+
+    /** Read Receipts Phase 2: GET /api/v1/parent/messages/unread-count */
+    suspend fun getUnreadCount(token: String): NetworkResult<ParentUnreadCountDto> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/messages/unread-count"))
+        }
+    }
+
     suspend fun sendMessage(token: String, request: ParentSendMessageRequest): NetworkResult<ParentSendMessageResponse> {
         return safeApiCall {
             client.post(getUrl("api/v1/parent/messages")) {

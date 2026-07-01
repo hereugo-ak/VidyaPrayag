@@ -76,6 +76,7 @@ fun TeacherHomeScreenV2(
     onOpenIdCard: () -> Unit = {},
     onOpenScheduledMessages: () -> Unit = {},
     onOpenEvents: () -> Unit = {},
+    onOpenMessages: () -> Unit = {},
     modifier: Modifier = Modifier,
     todayViewModel: TeacherTodayViewModel = koinViewModel(),
     checkInViewModel: TeacherCheckInViewModel = koinViewModel(),
@@ -159,6 +160,13 @@ fun TeacherHomeScreenV2(
                 subtitle = "View your digital school ID card",
                 icon = VIcons.IdCard,
                 onClick = onOpenIdCard,
+            )
+
+            VActionCard(
+                title = "Messages",
+                subtitle = "Chat with parents and school admin",
+                icon = VIcons.Chat,
+                onClick = onOpenMessages,
             )
 
             VActionCard(

@@ -823,6 +823,7 @@ object MessageStatusTable : UUIDTable("message_status", "id") {
     val userId         = uuid("user_id")                               // the recipient whose status this tracks
     val status         = varchar("status", 16)                         // SENT | DELIVERED | READ
     val createdAt      = timestamp("created_at")
+    val readAt         = timestamp("read_at").nullable()
 
     init {
         uniqueIndex("ux_message_status_msg_user", messageId, userId)

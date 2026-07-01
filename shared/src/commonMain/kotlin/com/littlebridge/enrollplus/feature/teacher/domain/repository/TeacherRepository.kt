@@ -77,6 +77,13 @@ interface TeacherRepository {
     // RA-51: message all parents of an owned class.
     suspend fun broadcastToClass(token: String, request: TeacherClassBroadcastRequest): NetworkResult<TeacherClassBroadcastResponse>
 
+    // Read Receipts: teacher 1:1 messaging.
+    suspend fun getMessageThreads(token: String): NetworkResult<TeacherMessageThreadsResponse>
+    suspend fun getThreadMessages(token: String, threadId: String): NetworkResult<TeacherThreadMessagesResponse>
+    suspend fun markThreadRead(token: String, threadId: String): NetworkResult<Unit>
+    suspend fun getUnreadCount(token: String): NetworkResult<Int>
+    suspend fun sendMessage(token: String, request: TeacherSendMessageRequest): NetworkResult<TeacherSendMessageResponse>
+
     // Lesson Planning (LESSON_PLANNING_SPEC.md — P1-20)
     suspend fun listLessonPlans(
         token: String, assignmentId: String, status: String? = null,
