@@ -7,8 +7,6 @@ import com.littlebridge.enrollplus.db.AppConfigTable
 import com.littlebridge.enrollplus.db.ChildrenTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.db.FeeRecordsTable
-import com.littlebridge.enrollplus.db.ScholarshipApplicationsTable
-import com.littlebridge.enrollplus.db.ScholarshipsTable
 import com.littlebridge.enrollplus.feature.scholarship.ScholarshipService
 import io.ktor.http.*
 import io.ktor.server.auth.*
@@ -75,36 +73,6 @@ data class TrackProgressResponse(
 // `FeeDataDto`/`FeeAnnouncementDto` that used to live here were never registered by
 // any route in this file, so they were removed to kill the duplicate/dead contract.
 
-// --- Scholarships ---
-@Serializable
-data class ScholarshipDto(
-    val id: String,
-    val title: String,
-    val description: String,
-    val amount: String,
-    @SerialName("time_left") val timeLeft: String,
-    val category: String,
-    @SerialName("is_critical") val isCritical: Boolean = false
-)
-
-@Serializable
-data class ScholarshipApplicationDto(
-    val id: String,
-    val institution: String,
-    val program: String,
-    val status: String,
-    @SerialName("icon_name") val iconName: String
-)
-
-@Serializable
-data class ScholarshipsDataDto(
-    val scholarships: List<ScholarshipDto>,
-    val applications: List<ScholarshipApplicationDto>,
-    @SerialName("profile_strength") val profileStrength: Int,
-    @SerialName("streak_days") val streakDays: Int,
-    @SerialName("current_level") val currentLevel: Int
-)
-
 // --- Announcements ---
 @Serializable
 data class ParentAnnouncementDto(
@@ -153,41 +121,14 @@ fun Route.parentRouting() {
             // -------- SCHOLARSHIPS (audit §4.2/§5.2 — now DB-backed) --------
             // Updated per SCHOLARSHIP_WORKFLOW_SPEC.md to delegate to ScholarshipService
             // which returns the full workflow data (schemes, applications, gamification).
-            // Response format kept backward-compatible with existing ScholarshipsViewModel.
+            // Response matches ParentScholarshipsData on the client (shared models).
             get("/scholarships") {
                 val uid = call.principalUserUuid() ?: run {
                     call.respond(HttpStatusCode.Unauthorized); return@get
                 }
 
                 val serviceData = ScholarshipService().getParentScholarships(uid)
-
-                // Map to legacy response format for backward compat with existing client
-                val data = ScholarshipsDataDto(
-                    scholarships = serviceData.scholarships.map { s ->
-                        ScholarshipDto(
-                            id = s.id,
-                            title = s.title,
-                            description = s.description,
-                            amount = s.amount,
-                            timeLeft = s.timeLeft,
-                            category = s.category,
-                            isCritical = s.isCritical
-                        )
-                    },
-                    applications = serviceData.applications.map { a ->
-                        ScholarshipApplicationDto(
-                            id = a.id,
-                            institution = a.institution,
-                            program = a.program,
-                            status = a.status,
-                            iconName = a.iconName
-                        )
-                    },
-                    profileStrength = serviceData.gamification.profileStrength,
-                    streakDays = serviceData.gamification.streakDays,
-                    currentLevel = serviceData.gamification.currentLevel
-                )
-                call.ok(data, message = "Scholarships data fetched")
+                call.ok(serviceData, message = "Scholarships data fetched")
             }
 
             // -------- ANNOUNCEMENTS (parent-school harmony, report §9.1) --------
