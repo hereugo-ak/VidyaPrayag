@@ -114,6 +114,7 @@ import com.littlebridge.enrollplus.feature.school.schoolIntelligenceRouting
 import com.littlebridge.enrollplus.feature.school.schoolProfileRouting
 import com.littlebridge.enrollplus.feature.school.schoolRecordsRouting
 import com.littlebridge.enrollplus.feature.school.schoolStudentsRouting
+import com.littlebridge.enrollplus.feature.school.schoolClassesRouting
 import com.littlebridge.enrollplus.feature.school.schoolTimetableRouting
 import com.littlebridge.enrollplus.feature.school.schoolDayConfigRouting
 import com.littlebridge.enrollplus.feature.school.nonTeachingStaffRouting
@@ -386,6 +387,7 @@ fun Application.module() {
         schoolStudentsRouting()      // /api/v1/school/students[…] + teachers/{id} — RA-45 student roster + student/teacher profile (school-scoped)
         nonTeachingStaffRouting()    // /api/v1/school/staff[…] — RA-S17 non-teaching-staff vertical (school-scoped CRUD)
         schoolRecordsRouting()       // /api/v1/school/{attendance/summary,marks/summary,fees/ledger} — RA-52 admin Records rollups (school-scoped reads)
+        schoolClassesRouting()       // /api/v1/school/classes[…] + /api/v1/school/subjects[…] — class + subject CRUD (admin)
         schoolTimetableRouting()     // /api/v1/school/timetable — school-wide weekly schedule (all classes) from teacher_periods, for the Command Center calendar (read-only, additive)
         schoolLessonPlanRouting()    // /api/v1/school/lesson-plans — admin review of teacher lesson plans (read-only, school-scoped, filterable)
         mediaRouting()               // /api/v1/school/media/upload[…] — REAL binary uploads → Supabase Storage (kills URL placeholders)

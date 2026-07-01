@@ -491,6 +491,17 @@ val commonModule = module {
         com.littlebridge.enrollplus.feature.admin.data.repository.SchoolDayConfigRepositoryImpl(get())
     }
 
+    // Classes & Subjects management (consolidated admin screen)
+    single {
+        com.littlebridge.enrollplus.feature.admin.data.remote.SchoolClassesApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single<com.littlebridge.enrollplus.feature.admin.domain.repository.SchoolClassesRepository> {
+        com.littlebridge.enrollplus.feature.admin.data.repository.SchoolClassesRepositoryImpl(get())
+    }
+
     // UseCases
     factory { GetSchoolsUseCase(get()) }
 }
@@ -642,6 +653,8 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.event.presentation.AdminEventRegistrationViewModel(get(), get()) }
     // School Day Configuration (TIMETABLE_CLASS_TEACHER_PLAN.md Phase 0)
     factory { com.littlebridge.enrollplus.feature.admin.presentation.SchoolDayConfigViewModel(get(), get()) }
+    // Classes & Subjects consolidated management screen
+    factory { com.littlebridge.enrollplus.feature.admin.presentation.ClassesSubjectsViewModel(get(), get()) }
 }
 
 fun initKoin(
