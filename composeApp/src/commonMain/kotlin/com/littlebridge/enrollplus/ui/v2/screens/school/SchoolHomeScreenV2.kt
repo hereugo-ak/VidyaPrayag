@@ -117,6 +117,7 @@ fun SchoolHomeScreenV2(
     onOpenReportPublish: () -> Unit = {},
     onOpenReportEffectiveness: () -> Unit = {},
     onOpenEvents: () -> Unit = {},
+    onCreateEvent: () -> Unit = {},
     onExit: () -> Unit = {},
     viewModel: SchoolDashboardViewModel = koinViewModel(),
     notificationsViewModel: NotificationsViewModel = koinViewModel(),
@@ -173,6 +174,7 @@ fun SchoolHomeScreenV2(
         onOpenReportPublish = onOpenReportPublish,
         onOpenReportEffectiveness = onOpenReportEffectiveness,
         onOpenEvents = onOpenEvents,
+        onCreateEvent = onCreateEvent,
         onExit = onExit,
     )
     VConfirmDialog(
@@ -208,6 +210,7 @@ private fun SchoolDashboardContent(
     onOpenReportPublish: () -> Unit,
     onOpenReportEffectiveness: () -> Unit,
     onOpenEvents: () -> Unit,
+    onCreateEvent: () -> Unit,
     onExit: () -> Unit,
 ) {
     // Pull-to-refresh: swipe down anywhere on the dashboard to re-sync the
@@ -252,7 +255,7 @@ private fun SchoolDashboardContent(
                 // Quick actions row
                 QuickActionsRow(
                     onAnnouncement = onOpenNotifications,
-                    onEvent = onOpenCalendar,
+                    onEvent = onCreateEvent,
                     onNotice = onOpenNotifications,
                     onReports = onOpenAnalytics,
                     onTransport = onOpenTransport,
@@ -472,7 +475,7 @@ private fun QuickActionsRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         QuickActionChip("Announcement", VIcons.Megaphone, onAnnouncement)
-        QuickActionChip("Add Event", VIcons.Calendar, onEvent)
+        QuickActionChip("Create Event", VIcons.Calendar, onEvent)
         QuickActionChip("Send Notice", VIcons.Send, onNotice)
         QuickActionChip("Reports", VIcons.TrendingUp, onReports)
         QuickActionChip("Transport", VIcons.MapPin, onTransport)

@@ -23,7 +23,8 @@ data class AnnouncementDto(
     // RA-49: audience segmentation echoed back by the server so the list/detail
     // can surface who a post was targeted at. Defaults keep older posts working.
     @SerialName("audience_type") val audienceType: String = "ALL_SCHOOL",
-    @SerialName("audience_filter") val audienceFilter: JsonElement? = null
+    @SerialName("audience_filter") val audienceFilter: JsonElement? = null,
+    @SerialName("is_calendar_only") val isCalendarOnly: Boolean = false
 )
 
 @Serializable
@@ -48,7 +49,8 @@ data class CreateAnnouncementRequest(
     // VP-CAL: when the UI's "Add To Academic Calendar" toggle is enabled (the
     // default) and the type is Holiday/PTM/Event, the server also creates a
     // matching calendar event (source = ANNOUNCEMENT). No-op for Update/Reminder.
-    @SerialName("add_to_calendar") val addToCalendar: Boolean = true
+    @SerialName("add_to_calendar") val addToCalendar: Boolean = true,
+    @SerialName("is_calendar_only") val isCalendarOnly: Boolean = false
 )
 
 @Serializable

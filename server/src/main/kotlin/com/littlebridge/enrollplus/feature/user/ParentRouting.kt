@@ -159,7 +159,7 @@ fun Route.parentRouting() {
                             .reduce { acc, op -> acc or op }
 
                         AnnouncementsTable.selectAll()
-                            .where { schoolFilter }
+                            .where { schoolFilter and (AnnouncementsTable.isCalendarOnly eq false) }
                             .orderBy(AnnouncementsTable.createdAt, SortOrder.DESC)
                             .map { row ->
                                 ParentAnnouncementDto(
@@ -222,7 +222,7 @@ fun Route.parentRouting() {
                             .reduce { acc, op -> acc or op }
 
                         AnnouncementsTable.selectAll()
-                            .where { schoolFilter }
+                            .where { schoolFilter and (AnnouncementsTable.isCalendarOnly eq false) }
                             .orderBy(AnnouncementsTable.createdAt, SortOrder.DESC)
                             .forEach { row ->
                                 val createdAt = row[AnnouncementsTable.createdAt]

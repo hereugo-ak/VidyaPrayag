@@ -29,6 +29,7 @@ data class Announcement(
     val date: String,
     val imageUrl: String? = null,
     val isFeatured: Boolean = false,
+    val isCalendarOnly: Boolean = false,
     val participants: List<String> = emptyList()
 )
 
@@ -171,6 +172,7 @@ class SchoolAnnouncementsViewModel(
         // VP-CAL: mirror Holiday/PTM/Event posts into the Academic Calendar.
         // Default enabled; ignored by the server for Update/Reminder types.
         addToCalendar: Boolean = true,
+        isCalendarOnly: Boolean = false,
         onCreated: (() -> Unit)? = null
     ) {
         if (title.isBlank() || description.isBlank() || date.isBlank()) {
@@ -202,7 +204,8 @@ class SchoolAnnouncementsViewModel(
                 date = date.trim(),
                 audienceType = normalizedAudience,
                 audienceFilter = filter,
-                addToCalendar = addToCalendar
+                addToCalendar = addToCalendar,
+                isCalendarOnly = isCalendarOnly
             )
             when (val r = announcementsRepository.createAnnouncement(token, body)) {
                 is NetworkResult.Success -> {
@@ -238,6 +241,7 @@ class SchoolAnnouncementsViewModel(
         audienceType: String = "ALL_SCHOOL",
         audienceValues: List<String> = emptyList(),
         addToCalendar: Boolean = true,
+        isCalendarOnly: Boolean = false,
         onCreated: (() -> Unit)? = null
     ) {
         if (title.isBlank() || description.isBlank() || date.isBlank() || scheduledAt.isBlank()) {
@@ -263,6 +267,7 @@ class SchoolAnnouncementsViewModel(
                 put("date", date.trim())
                 put("audience_type", normalizedAudience)
                 filter?.let { put("audience_filter", it) }
+                put("is_calendar_only", isCalendarOnly)
             }
             val request = CreateScheduledMessageRequest(
                 messageType = "ANNOUNCEMENT",
@@ -333,6 +338,7 @@ class SchoolAnnouncementsViewModel(
         category = type,
         date = date,
         imageUrl = eventImage,
-        isFeatured = false
+        isFeatured = false,
+        isCalendarOnly = isCalendarOnly
     )
 }

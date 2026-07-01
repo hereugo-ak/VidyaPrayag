@@ -30,7 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.littlebridge.enrollplus.feature.admin.presentation.Announcement
 import com.littlebridge.enrollplus.feature.admin.presentation.SchoolAnnouncementsState
 import com.littlebridge.enrollplus.feature.admin.presentation.SchoolAnnouncementsViewModel
@@ -43,19 +42,12 @@ import com.littlebridge.enrollplus.ui.v2.components.VButtonVariant
 import com.littlebridge.enrollplus.ui.v2.components.VCard
 import com.littlebridge.enrollplus.ui.v2.components.VComingSoon
 import com.littlebridge.enrollplus.ui.v2.components.VIcons
-import com.littlebridge.enrollplus.ui.v2.components.VDatePicker
-import com.littlebridge.enrollplus.ui.v2.components.VInput
-import com.littlebridge.enrollplus.ui.v2.components.VScheduleToggle
-import com.littlebridge.enrollplus.ui.v2.components.ScheduleSelection
-import com.littlebridge.enrollplus.ui.v2.components.toIso8601
 import com.littlebridge.enrollplus.ui.v2.components.VPullRefresh
 import com.littlebridge.enrollplus.ui.v2.components.VTopTabs
 import com.littlebridge.enrollplus.ui.v2.screens.VStateHost
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
 import com.littlebridge.enrollplus.ui.v2.theme.colored
-import com.littlebridge.enrollplus.ui.v2.theme.shakeOnError
-import com.littlebridge.enrollplus.util.todayIso
 import com.littlebridge.enrollplus.ui.v2.theme.staggeredItemEntrance
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -75,6 +67,7 @@ fun SchoolCommsScreenV2(
     onOpenMessages: () -> Unit = {},
     onOpenPtm: () -> Unit = {},
     onOpenScheduledMessages: () -> Unit = {},
+    onCreateEvent: () -> Unit = {},
     viewModel: SchoolAnnouncementsViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
@@ -82,32 +75,7 @@ fun SchoolCommsScreenV2(
         state = state,
         onRetry = viewModel::loadAnnouncements,
         onSelectCategory = viewModel::setCategoryFilter,
-        onCreate = { type, title, description, date, audienceType, audienceValues, addToCalendar, scheduledAt, onCreated ->
-            if (scheduledAt != null) {
-                viewModel.scheduleAnnouncement(
-                    type = type,
-                    title = title,
-                    description = description,
-                    date = date,
-                    scheduledAt = scheduledAt,
-                    audienceType = audienceType,
-                    audienceValues = audienceValues,
-                    addToCalendar = addToCalendar,
-                    onCreated = onCreated,
-                )
-            } else {
-                viewModel.createAnnouncement(
-                    type = type,
-                    title = title,
-                    description = description,
-                    date = date,
-                    audienceType = audienceType,
-                    audienceValues = audienceValues,
-                    addToCalendar = addToCalendar,
-                    onCreated = onCreated,
-                )
-            }
-        },
+        onCreateEvent = onCreateEvent,
         onOpenMessages = onOpenMessages,
         onOpenPtm = onOpenPtm,
         onOpenScheduledMessages = onOpenScheduledMessages,
@@ -122,7 +90,7 @@ private fun SchoolCommsContent(
     state: SchoolAnnouncementsState,
     onRetry: () -> Unit,
     onSelectCategory: (String?) -> Unit,
-    onCreate: (type: String, title: String, description: String, date: String, audienceType: String, audienceValues: List<String>, addToCalendar: Boolean, scheduledAt: String?, onCreated: (() -> Unit)?) -> Unit,
+    onCreateEvent: () -> Unit,
     onOpenMessages: () -> Unit,
     onOpenPtm: () -> Unit,
     onOpenScheduledMessages: () -> Unit,
@@ -173,7 +141,7 @@ private fun SchoolCommsContent(
                     onRetry = onRetry,
                     onSelectCategory = onSelectCategory,
                     onOpen = { openAnnouncement = it },
-                    onCreate = onCreate,
+                    onCreateEvent = onCreateEvent,
                     onOpenScheduledMessages = onOpenScheduledMessages,
                 )
                 // RA-24: Messages and PTM have real backends (MessagesRouting,
@@ -207,11 +175,10 @@ private fun AnnouncementsTab(
     onRetry: () -> Unit,
     onSelectCategory: (String?) -> Unit,
     onOpen: (String) -> Unit,
-    onCreate: (type: String, title: String, description: String, date: String, audienceType: String, audienceValues: List<String>, addToCalendar: Boolean, scheduledAt: String?, onCreated: (() -> Unit)?) -> Unit,
+    onCreateEvent: () -> Unit,
     onOpenScheduledMessages: () -> Unit,
 ) {
     val c = VTheme.colors
-    var showCompose by remember { mutableStateOf(false) }
 
     // Compose button lives ABOVE the state host so an admin can post the very
     // first announcement even when the list is empty (RA-23). Frozen primitives.
@@ -230,8 +197,8 @@ private fun AnnouncementsTab(
                 leading = { Icon(VIcons.Clock, contentDescription = null, modifier = Modifier.size(14.dp)) },
             )
             VButton(
-                text = "New announcement",
-                onClick = { showCompose = true },
+                text = "New",
+                onClick = onCreateEvent,
                 variant = VButtonVariant.Primary,
                 size = VButtonSize.Sm,
                 leading = { Icon(VIcons.Plus, contentDescription = null, modifier = Modifier.size(14.dp)) },
@@ -240,16 +207,6 @@ private fun AnnouncementsTab(
         }
     }
     Spacer(Modifier.height(12.dp))
-
-    if (showCompose) {
-        ComposeAnnouncementDialog(
-            isCreating = state.isCreating,
-            onDismiss = { showCompose = false },
-            onSubmit = { type, title, description, date, audienceType, audienceValues, addToCalendar, scheduledAt ->
-                onCreate(type, title, description, date, audienceType, audienceValues, addToCalendar, scheduledAt) { showCompose = false }
-            },
-        )
-    }
 
     VStateHost(
         loading = state.isLoading,
@@ -284,7 +241,11 @@ private fun AnnouncementsTab(
                     VCard(onClick = { onOpen(a.id) }) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(a.title, style = VTheme.type.bodyStrong.colored(c.ink), modifier = Modifier.weight(1f))
-                            if (a.category.isNotBlank()) VBadge(text = a.category, tone = VBadgeTone.Arctic)
+                            if (a.isCalendarOnly) {
+                                VBadge(text = "Calendar Only", tone = VBadgeTone.Warning)
+                            } else if (a.category.isNotBlank()) {
+                                VBadge(text = a.category, tone = VBadgeTone.Arctic)
+                            }
                         }
                         if (a.date.isNotBlank()) {
                             Text(a.date, style = VTheme.type.caption.colored(c.ink2), modifier = Modifier.padding(top = 2.dp))
@@ -298,197 +259,6 @@ private fun AnnouncementsTab(
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-/**
- * RA-23: compose-and-send dialog for school announcements. Posts to
- * `POST /api/v1/announcements` via [SchoolAnnouncementsViewModel.createAnnouncement].
- * Uses only frozen V* primitives + theme tokens (no Material defaults, no new tokens).
- * The dialog dismisses only after the server round-trip succeeds.
- */
-@Composable
-private fun ComposeAnnouncementDialog(
-    isCreating: Boolean,
-    onDismiss: () -> Unit,
-    onSubmit: (
-        type: String,
-        title: String,
-        description: String,
-        date: String,
-        audienceType: String,
-        audienceValues: List<String>,
-        addToCalendar: Boolean,
-        scheduledAt: String?,
-    ) -> Unit,
-) {
-    val c = VTheme.colors
-    val categories = listOf("Update", "Holidays", "PTM", "Events", "Reminder")
-    // RA-49 — audience targeting. Labels map to the server's audience_type
-    // contract (ALL_SCHOOL / CLASS / SUBJECT / STUDENT). The free-text targets
-    // field is split on commas into the audience_filter list.
-    val audienceOptions = listOf(
-        "Everyone" to "ALL_SCHOOL",
-        "Class" to "CLASS",
-        "Subject" to "SUBJECT",
-        "Students" to "STUDENT",
-    )
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf(categories.first()) }
-    var audienceType by remember { mutableStateOf("ALL_SCHOOL") }
-    var audienceTargets by remember { mutableStateOf("") }
-
-    // VP-CAL — "Add To Academic Calendar". Only Holiday / PTM / Event categories
-    // map to a calendar event (Update / Reminder stay feed-only). The toggle is
-    // ENABLED by default so admins create the announcement + calendar event in a
-    // single step and never have to author the same thing twice.
-    val calendarEligible = category.equals("Holidays", ignoreCase = true) ||
-        category.equals("PTM", ignoreCase = true) ||
-        category.equals("Events", ignoreCase = true)
-    var addToCalendar by remember { mutableStateOf(true) }
-
-    var scheduleSelection by remember {
-        mutableStateOf(ScheduleSelection(
-            isScheduled = false,
-            dateIso = todayIso(),
-            hour = 9,
-            minute = "00",
-        ))
-    }
-
-    // Feature 7 — error-shake triggers. Each flips true for one frame on a failed
-    // submit attempt of a blank field, then resets, so shakeOnError fires once per
-    // attempt. Validating on tap (rather than disabling the button) lets the user
-    // see WHICH field is missing via the shake.
-    var titleError by remember { mutableStateOf(false) }
-    var dateError by remember { mutableStateOf(false) }
-    var descriptionError by remember { mutableStateOf(false) }
-    var targetsError by remember { mutableStateOf(false) }
-
-    val needsTargets = audienceType != "ALL_SCHOOL"
-    val targetList = audienceTargets.split(",").map { it.trim() }.filter { it.isNotBlank() }
-    val allValid = title.isNotBlank() && description.isNotBlank() && date.isNotBlank() &&
-        (!needsTargets || targetList.isNotEmpty())
-
-    val targetsHint = when (audienceType) {
-        "CLASS" -> "e.g. Grade 4-A, Grade 5-B"
-        "SUBJECT" -> "e.g. Mathematics, Science"
-        "STUDENT" -> "e.g. DEMO-S001, S-2024-017"
-        else -> ""
-    }
-
-    Dialog(onDismissRequest = onDismiss) {
-        VCard(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text("New announcement", style = VTheme.type.h3.colored(c.ink))
-
-                // Category chips (reuse the existing FilterChip primitive).
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    categories.forEach { cat ->
-                        FilterChip(cat, category.equals(cat, ignoreCase = true)) { category = cat }
-                    }
-                }
-
-                // RA-49 — audience selector. Choosing anything other than
-                // "Everyone" reveals the targets field. The chosen scope + the
-                // comma-separated targets become the server audience_filter.
-                Text("Send to", style = VTheme.type.caption.colored(c.ink2))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    audienceOptions.forEach { (label, value) ->
-                        FilterChip(label, audienceType == value) {
-                            audienceType = value
-                            targetsError = false
-                        }
-                    }
-                }
-                if (needsTargets) {
-                    VInput(
-                        value = audienceTargets,
-                        onValueChange = { audienceTargets = it; targetsError = false },
-                        label = "Targets (comma-separated)",
-                        placeholder = targetsHint,
-                        leadingIcon = VIcons.ListChecks,
-                        modifier = Modifier.shakeOnError(targetsError),
-                    )
-                }
-
-                VInput(
-                    value = title,
-                    onValueChange = { title = it; titleError = false },
-                    label = "Title",
-                    placeholder = "e.g. Annual Sports Day",
-                    leadingIcon = VIcons.Megaphone,
-                    modifier = Modifier.shakeOnError(titleError),
-                )
-                VDatePicker(
-                    value = date,
-                    onValueChange = { date = it; dateError = false },
-                    label = "Date",
-                    placeholder = "Select date",
-                    isError = dateError,
-                    modifier = Modifier.shakeOnError(dateError),
-                )
-                VInput(
-                    value = description,
-                    onValueChange = { description = it; descriptionError = false },
-                    label = "Message",
-                    placeholder = "What do parents and staff need to know?",
-                    singleLine = false,
-                    modifier = Modifier.shakeOnError(descriptionError),
-                )
-
-                // VP-CAL — Add To Academic Calendar toggle. Visible only for
-                // calendar-eligible categories (Holiday / PTM / Event); when on,
-                // the server auto-creates a synced ANNOUNCEMENT-source calendar
-                // event so the admin never duplicates the work.
-                if (calendarEligible) {
-                    AddToCalendarToggleRow(
-                        checked = addToCalendar,
-                        onToggle = { addToCalendar = it },
-                    )
-                }
-
-                VScheduleToggle(
-                    selection = scheduleSelection,
-                    onSelectionChange = { scheduleSelection = it },
-                )
-
-                Spacer(Modifier.height(4.dp))
-                VButton(
-                    text = if (scheduleSelection.isScheduled) "Schedule announcement" else "Publish announcement",
-                    onClick = {
-                        // Validate on tap; shake the blank field(s) via Feature 7.
-                        titleError = title.isBlank()
-                        dateError = date.isBlank()
-                        descriptionError = description.isBlank()
-                        targetsError = needsTargets && targetList.isEmpty()
-                        if (allValid) {
-                            // Only request a calendar sync when the category is
-                            // eligible AND the admin left the toggle enabled.
-                            val syncCalendar = calendarEligible && addToCalendar
-                            val scheduledAt = scheduleSelection.toIso8601()
-                            onSubmit(category, title, description, date, audienceType, targetList, syncCalendar, scheduledAt)
-                        }
-                    },
-                    variant = VButtonVariant.Primary,
-                    full = true,
-                    enabled = !isCreating,
-                    loading = isCreating,
-                )
-                VButton(
-                    text = "Cancel",
-                    onClick = onDismiss,
-                    variant = VButtonVariant.Ghost,
-                    full = true,
-                    enabled = !isCreating,
-                )
             }
         }
     }
@@ -519,58 +289,6 @@ private fun CommsEntryCard(
                 Text(description, style = VTheme.type.caption.colored(c.ink2))
             }
             Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
-        }
-    }
-}
-
-/**
- * VP-CAL — the "Add To Academic Calendar" toggle row shown in the compose
- * announcement dialog for Holiday / PTM / Event categories. A custom pill switch
- * built from V* primitives (no raw Material Switch), defaulting to ON.
- */
-@Composable
-private fun AddToCalendarToggleRow(checked: Boolean, onToggle: (Boolean) -> Unit) {
-    val c = VTheme.colors
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(c.teal.copy(alpha = 0.08f))
-            .clickable { onToggle(!checked) }
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Icon(
-            VIcons.Calendar,
-            contentDescription = null,
-            tint = c.tealDeep,
-            modifier = Modifier.size(20.dp),
-        )
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Add to Academic Calendar", style = VTheme.type.bodyStrong.colored(c.ink))
-            Text(
-                "We'll create a synced calendar event automatically.",
-                style = VTheme.type.caption.colored(c.ink2),
-            )
-        }
-        // Pill switch — track + knob, animated, V* tokens only.
-        val trackColor = if (checked) c.tealDeep else c.ink.copy(alpha = 0.18f)
-        Box(
-            modifier = Modifier
-                .size(width = 44.dp, height = 26.dp)
-                .clip(RoundedCornerShape(999.dp))
-                .background(trackColor)
-                .clickable { onToggle(!checked) }
-                .padding(3.dp),
-            contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(20.dp)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(c.card),
-            )
         }
     }
 }

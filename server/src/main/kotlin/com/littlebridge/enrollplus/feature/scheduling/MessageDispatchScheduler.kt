@@ -152,11 +152,12 @@ object MessageDispatchScheduler {
         val bodyPreview = row[ScheduledMessagesTable.bodyPreview] ?: payload["description"]?.jsonPrimitive?.contentOrNull ?: ""
         val audienceType = row[ScheduledMessagesTable.audienceType]
         val addToCalendar = row[ScheduledMessagesTable.addToCalendar]
+        val isCalendarOnly = payload["is_calendar_only"]?.jsonPrimitive?.contentOrNull?.toBooleanStrictOrNull() ?: false
 
         when (msgType) {
             ScheduledMessageType.ANNOUNCEMENT -> dispatchAnnouncement(
                 schoolId, createdBy, authorRole, payload, title, bodyPreview,
-                audienceType, addToCalendar, row
+                audienceType, addToCalendar, isCalendarOnly, row
             )
             ScheduledMessageType.TEACHER_BROADCAST -> dispatchTeacherBroadcast(
                 schoolId, createdBy, authorName, payload, title, bodyPreview
@@ -176,6 +177,7 @@ object MessageDispatchScheduler {
         bodyPreview: String,
         audienceType: String,
         addToCalendar: Boolean,
+        isCalendarOnly: Boolean,
         row: org.jetbrains.exposed.sql.ResultRow
     ) {
         val now = Instant.now()
@@ -200,6 +202,7 @@ object MessageDispatchScheduler {
                 it[AnnouncementsTable.audienceType] = audienceType
                 it[AnnouncementsTable.audienceFilter] = audienceFilter
                 it[AnnouncementsTable.authorRole] = authorRole
+                it[AnnouncementsTable.isCalendarOnly] = isCalendarOnly
                 it[AnnouncementsTable.syncedToWa] = false
                 it[AnnouncementsTable.createdBy] = createdBy
                 it[AnnouncementsTable.createdAt] = now
@@ -211,6 +214,7 @@ object MessageDispatchScheduler {
         val subjects = audienceStrList(payload, "subjects") + audienceStr(payload, "subject")
         val studentCodes = audienceStrList(payload, "student_codes") + audienceStr(payload, "student_code")
 
+        if (!isCalendarOnly) {
         val audienceParents = NotifyRecipients.parentsForAudience(
             schoolId = schoolId,
             audienceType = audienceType,
@@ -235,6 +239,7 @@ object MessageDispatchScheduler {
                 refType = "announcement",
                 refId = eventId,
             )
+        }
         }
 
         if (addToCalendar) {
