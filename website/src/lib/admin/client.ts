@@ -75,6 +75,9 @@ import type {
   AiRateLimitEntry,
   AiHealthEntry,
   AiRecentUsageResponse,
+  SchoolDayConfigDto,
+  SchoolDayConfigListResponse,
+  CreateSchoolDayConfigRequest,
 } from "./types";
 
 interface Opts {
@@ -411,4 +414,12 @@ export const adminApi = {
     authRequest<AiHealthEntry[]>("/api/v1/admin/ai/health"),
   aiRecentUsage: (limit: number = 50, windowMin: number = 60) =>
     authRequest<AiRecentUsageResponse>(`/api/v1/admin/ai/recent-usage?limit=${limit}&window=${windowMin}`),
+
+  // ── School Day Configuration (TIMETABLE_CLASS_TEACHER_PLAN.md Phase 0) ──────
+  schoolDayConfigs: () =>
+    authRequest<SchoolDayConfigListResponse>("/api/v1/school/day-config"),
+  schoolDayConfigCreate: (body: CreateSchoolDayConfigRequest) =>
+    authRequest<SchoolDayConfigDto>("/api/v1/school/day-config", { method: "POST", body }),
+  schoolDayConfigDeactivate: (id: string) =>
+    authRequest<unknown>(`/api/v1/school/day-config/${id}`, { method: "DELETE" }),
 };

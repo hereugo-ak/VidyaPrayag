@@ -3084,3 +3084,41 @@ object ScheduledMessageType {
     const val ADMIN_BROADCAST   = "ADMIN_BROADCAST"
     const val TEACHER_BROADCAST = "TEACHER_BROADCAST"
 }
+
+object SchoolDayConfigTable : UUIDTable("school_day_config", "id") {
+    val schoolId       = uuid("school_id")
+    val name           = text("name")
+    val applicableDays = varchar("applicable_days", 20)
+    val classLevel     = varchar("class_level", 20).default("ALL")
+    val isActive       = bool("is_active").default(true)
+    val createdAt      = timestamp("created_at")
+    val updatedAt      = timestamp("updated_at")
+    init {
+        index("idx_sdc_school", false, schoolId)
+    }
+}
+
+object SchoolDaySlotsTable : UUIDTable("school_day_slots", "id") {
+    val configId    = uuid("config_id")
+    val schoolId    = uuid("school_id")
+    val slotIndex   = integer("slot_index")
+    val slotType    = varchar("slot_type", 16)
+    val label       = text("label").default("")
+    val startTime   = time("start_time")
+    val endTime     = time("end_time")
+    val isDouble    = bool("is_double").default(false)
+    val doubleGroup = integer("double_group").default(0)
+    val createdAt   = timestamp("created_at")
+    init {
+        uniqueIndex("idx_sds_config", configId, slotIndex)
+    }
+}
+
+object SchoolDaySlotType {
+    const val TEACHING  = "TEACHING"
+    const val BREAK     = "BREAK"
+    const val ASSEMBLY  = "ASSEMBLY"
+    const val LAB       = "LAB"
+    const val FREE      = "FREE"
+    const val ZERO      = "ZERO"
+}
