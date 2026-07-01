@@ -37,6 +37,9 @@ import com.littlebridge.enrollplus.feature.school.AttachmentInput
 import com.littlebridge.enrollplus.feature.school.conversationMessagesFor
 import com.littlebridge.enrollplus.feature.school.deleteMessage
 import com.littlebridge.enrollplus.feature.school.editMessage
+import com.littlebridge.enrollplus.feature.school.getUnreadCount
+import com.littlebridge.enrollplus.feature.school.markConversationRead
+import com.littlebridge.enrollplus.feature.school.UnreadCountDto
 import com.littlebridge.enrollplus.feature.school.handleAttachmentUpload
 import com.littlebridge.enrollplus.feature.school.loadAttachmentsForMessages
 import com.littlebridge.enrollplus.feature.school.loadMessageStatus
@@ -379,6 +382,13 @@ fun Route.parentMessagesRouting() {
                 }
             }
 
+            // -------- UNREAD COUNT --------
+            get("/unread-count") {
+                val uid = call.principalUserUuid() ?: run { call.fail("Unauthorized", HttpStatusCode.Unauthorized); return@get }
+                val count = dbQuery { getUnreadCount(uid) }
+                call.ok(UnreadCountDto(count))
+            }
+
             // -------- MARK READ --------
             post("/threads/{id}/read") {
                 val uid = call.principalUserUuid() ?: run { call.fail("Unauthorized", HttpStatusCode.Unauthorized); return@post }
@@ -392,6 +402,11 @@ fun Route.parentMessagesRouting() {
                         it[isRead] = true
                         it[updatedAt] = Instant.now()
                     }
+                    // Read Receipts Phase 1: also bulk-update per-message status rows to READ
+                    val convId = MessageThreadsTable.selectAll()
+                        .where { (MessageThreadsTable.id eq id) and (MessageThreadsTable.ownerUserId eq uid) }
+                        .singleOrNull()?.get(MessageThreadsTable.conversationId) ?: id
+                    markConversationRead(uid, convId)
                 }
                 if (n == 0) call.fail("Thread not found", HttpStatusCode.NotFound)
                 else call.okMessage("Thread marked as read")

@@ -26,6 +26,8 @@ interface EventRegistrationRepository {
     suspend fun checkinParent(token: String, eventId: String, registrationId: String): NetworkResult<ApiResponse<Unit>>
 
     // ── Admin ──
+    suspend fun listAdminEvents(token: String): NetworkResult<ApiResponse<AdminEventListResponse>>
+    suspend fun listEventSlots(token: String, eventId: String): NetworkResult<ApiResponse<List<SlotResponse>>>
     suspend fun listAllRegistrations(token: String, status: String? = null, eventId: String? = null): NetworkResult<ApiResponse<AdminRegistrationListResponse>>
     suspend fun listEventRegistrations(token: String, eventId: String): NetworkResult<ApiResponse<AdminRegistrationListResponse>>
     suspend fun createSlot(token: String, eventId: String, request: CreateSlotRequest): NetworkResult<ApiResponse<SlotResponse>>

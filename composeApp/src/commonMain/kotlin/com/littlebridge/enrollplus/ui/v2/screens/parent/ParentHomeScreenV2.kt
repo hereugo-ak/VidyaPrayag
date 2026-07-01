@@ -97,6 +97,7 @@ fun ParentHomeScreenV2(
     onOpenTutorProgress: () -> Unit = {},
     onOpenScholarships: () -> Unit = {},
     onOpenIdCard: () -> Unit = {},
+    onOpenEvents: () -> Unit = {},
     viewModel: ParentDashboardViewModel = koinViewModel(),
     permissionVm: PermissionViewModel = koinViewModel(),
     nudgeViewModel: com.littlebridge.enrollplus.feature.pews.presentation.ParentNudgeViewModel = koinViewModel(),
@@ -147,6 +148,7 @@ fun ParentHomeScreenV2(
         onOpenTutorProgress = onOpenTutorProgress,
         onOpenScholarships = onOpenScholarships,
         onOpenIdCard = onOpenIdCard,
+        onOpenEvents = onOpenEvents,
         nudge = nudgeState.nudge?.takeIf { nudgeState.visible },
         onNudgeAction = { action ->
             // The server's deep-link targets map onto existing parent surfaces.
@@ -188,6 +190,7 @@ private fun ParentDashboardContent(
     onOpenTutorProgress: () -> Unit = {},
     onOpenScholarships: () -> Unit = {},
     onOpenIdCard: () -> Unit = {},
+    onOpenEvents: () -> Unit = {},
     nudge: com.littlebridge.enrollplus.feature.pews.domain.model.PewsParentNudgeDto? = null,
     onNudgeAction: (com.littlebridge.enrollplus.feature.pews.domain.model.PewsParentActionDto) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -364,6 +367,15 @@ private fun ParentDashboardContent(
                         subtitle = "View your child's digital school ID card",
                         icon = VIcons.IdCard,
                         onClick = onOpenIdCard,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    // ── Event Registration ────────────────────────────────────────
+                    VActionCard(
+                        title = "School Events",
+                        subtitle = "Register for PTM, events & book time slots",
+                        icon = VIcons.Calendar,
+                        onClick = onOpenEvents,
                         modifier = Modifier.fillMaxWidth(),
                     )
 

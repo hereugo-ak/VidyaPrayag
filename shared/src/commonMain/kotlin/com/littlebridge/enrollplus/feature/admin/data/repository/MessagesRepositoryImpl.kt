@@ -15,6 +15,7 @@ import com.littlebridge.enrollplus.feature.admin.domain.model.SendMessageRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.SendMessageResponse
 import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolRecipient
 import com.littlebridge.enrollplus.feature.admin.domain.model.ThreadMessagesResponse
+import com.littlebridge.enrollplus.feature.admin.domain.model.UnreadCountDto
 import com.littlebridge.enrollplus.feature.admin.domain.repository.MessagesRepository
 
 class MessagesRepositoryImpl(
@@ -73,6 +74,21 @@ class MessagesRepositoryImpl(
                     )
                 } else {
                     NetworkResult.Success(Unit)
+                }
+            }
+            is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)
+            is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
+        }
+    }
+
+    override suspend fun getUnreadCount(token: String): NetworkResult<Int> {
+        return when (val result = api.getUnreadCount(token)) {
+            is NetworkResult.Success -> {
+                val envelope = result.data
+                if (!envelope.success) {
+                    NetworkResult.Error(envelope.message.ifBlank { "Failed to fetch unread count" })
+                } else {
+                    NetworkResult.Success(envelope.data?.unreadCount ?: 0)
                 }
             }
             is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)

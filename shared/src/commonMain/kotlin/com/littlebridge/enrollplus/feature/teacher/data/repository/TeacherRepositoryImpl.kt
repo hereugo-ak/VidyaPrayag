@@ -119,6 +119,38 @@ class TeacherRepositoryImpl(
     override suspend fun broadcastToClass(token: String, request: TeacherClassBroadcastRequest): NetworkResult<TeacherClassBroadcastResponse> =
         api.broadcastToClass(token, request)
 
+    // Read Receipts: teacher 1:1 messaging.
+    override suspend fun getMessageThreads(token: String): NetworkResult<TeacherMessageThreadsResponse> =
+        api.getMessageThreads(token)
+
+    override suspend fun getThreadMessages(token: String, threadId: String): NetworkResult<TeacherThreadMessagesResponse> =
+        api.getThreadMessages(token, threadId)
+
+    override suspend fun markThreadRead(token: String, threadId: String): NetworkResult<Unit> =
+        when (val r = api.markThreadRead(token, threadId)) {
+            is NetworkResult.Success -> {
+                val envelope = r.data
+                if (!envelope.success) NetworkResult.Error(envelope.message.ifBlank { "Failed to mark thread as read" })
+                else NetworkResult.Success(Unit)
+            }
+            is NetworkResult.Error -> NetworkResult.Error(r.message, r.code)
+            is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
+        }
+
+    override suspend fun getUnreadCount(token: String): NetworkResult<Int> =
+        when (val r = api.getUnreadCount(token)) {
+            is NetworkResult.Success -> {
+                val dto = r.data
+                if (!dto.success) NetworkResult.Error("Failed to fetch unread count")
+                else NetworkResult.Success(dto.data?.unreadCount ?: 0)
+            }
+            is NetworkResult.Error -> NetworkResult.Error(r.message, r.code)
+            is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
+        }
+
+    override suspend fun sendMessage(token: String, request: TeacherSendMessageRequest): NetworkResult<TeacherSendMessageResponse> =
+        api.sendMessage(token, request)
+
     // Lesson Planning (LESSON_PLANNING_SPEC.md — P1-20)
     override suspend fun listLessonPlans(
         token: String, assignmentId: String, status: String?,

@@ -239,6 +239,12 @@ private fun BookingRow(
                 text = "Student: ${booking.studentName} • ${booking.attendeeCount} attendee(s)",
                 style = VTheme.type.caption.colored(c.ink3),
             )
+            if (booking.parentMobile.isNotBlank()) {
+                Text(
+                    text = "📞 ${booking.parentMobile}",
+                    style = VTheme.type.caption.colored(c.ink3),
+                )
+            }
         }
         if (booking.status == "CHECKED_IN") {
             VBadge(text = "Checked In", tone = VBadgeTone.Success)

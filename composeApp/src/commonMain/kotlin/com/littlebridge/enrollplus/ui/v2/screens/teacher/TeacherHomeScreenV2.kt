@@ -75,6 +75,8 @@ fun TeacherHomeScreenV2(
     onOpenHeatmap: () -> Unit = {},
     onOpenIdCard: () -> Unit = {},
     onOpenScheduledMessages: () -> Unit = {},
+    onOpenEvents: () -> Unit = {},
+    onOpenMessages: () -> Unit = {},
     modifier: Modifier = Modifier,
     todayViewModel: TeacherTodayViewModel = koinViewModel(),
     checkInViewModel: TeacherCheckInViewModel = koinViewModel(),
@@ -161,10 +163,24 @@ fun TeacherHomeScreenV2(
             )
 
             VActionCard(
+                title = "Messages",
+                subtitle = "Chat with parents and school admin",
+                icon = VIcons.Chat,
+                onClick = onOpenMessages,
+            )
+
+            VActionCard(
                 title = "Scheduled Messages",
                 subtitle = "View and manage your scheduled announcements and broadcasts",
                 icon = VIcons.Clock,
                 onClick = onOpenScheduledMessages,
+            )
+
+            VActionCard(
+                title = "PTM & Events",
+                subtitle = "View your PTM slots and event registrations",
+                icon = VIcons.Calendar,
+                onClick = onOpenEvents,
             )
         }
 

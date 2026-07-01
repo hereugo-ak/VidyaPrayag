@@ -19,6 +19,7 @@
  *     GET    /api/v1/teacher/events/ptm/{eventId}/slots
  *     PATCH  /api/v1/teacher/events/ptm/{eventId}/checkin/{registrationId}
  *   Admin:
+ *     GET    /api/v1/school/events                              — list all events for management
  *     GET    /api/v1/school/events/registrations
  *     GET    /api/v1/school/events/{eventId}/registrations
  *     POST   /api/v1/school/events/{eventId}/slots
@@ -117,6 +118,12 @@ class EventRegistrationApi(
         safeApiCall { client.patch(url("api/v1/teacher/events/ptm/$eventId/checkin/$registrationId")) }
 
     // ── Admin ──
+
+    suspend fun listAdminEvents(token: String): NetworkResult<ApiResponse<AdminEventListResponse>> =
+        safeApiCall { client.get(url("api/v1/school/events")) }
+
+    suspend fun listEventSlots(token: String, eventId: String): NetworkResult<ApiResponse<List<SlotResponse>>> =
+        safeApiCall { client.get(url("api/v1/school/events/$eventId/slots")) }
 
     suspend fun listAllRegistrations(
         token: String,

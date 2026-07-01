@@ -128,6 +128,7 @@ data class TeacherSlotDto(
 data class SlotBookingDto(
     @SerialName("registration_id") val registrationId: String,
     @SerialName("parent_name") val parentName: String,
+    @SerialName("parent_mobile") val parentMobile: String = "",
     @SerialName("student_name") val studentName: String,
     @SerialName("attendee_count") val attendeeCount: Int,
     val status: String,
@@ -192,4 +193,25 @@ data class UpdateRegistrationConfigRequest(
     @SerialName("registration_deadline") val registrationDeadline: String? = null,
     @SerialName("max_attendees") val maxAttendees: Int? = null,
     val venue: String? = null,
+)
+
+@Serializable
+data class AdminEventDto(
+    val id: String,
+    val title: String = "",
+    val type: String = "",
+    val startDate: String = "",
+    val status: String = "PUBLISHED",
+    val registrationEnabled: Boolean = false,
+    val registrationDeadline: String? = null,
+    val maxAttendees: Int? = null,
+    val venue: String? = null,
+    val hasSlots: Boolean = false,
+    val slotCount: Int = 0,
+    val totalRegistrations: Int = 0,
+)
+
+@Serializable
+data class AdminEventListResponse(
+    val events: List<AdminEventDto> = emptyList(),
 )

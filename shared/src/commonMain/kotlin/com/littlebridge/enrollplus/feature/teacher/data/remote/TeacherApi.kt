@@ -431,6 +431,36 @@ class TeacherApi(
         }
     }
 
+    // ── Read Receipts: teacher 1:1 messaging ──────────────────────────────────
+
+    /** GET /api/v1/teacher/messages/threads */
+    suspend fun getMessageThreads(token: String): NetworkResult<TeacherMessageThreadsResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/messages/threads"))
+    }
+
+    /** GET /api/v1/teacher/messages/threads/{id}/messages */
+    suspend fun getThreadMessages(token: String, threadId: String): NetworkResult<TeacherThreadMessagesResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/messages/threads/$threadId/messages"))
+    }
+
+    /** POST /api/v1/teacher/messages/threads/{id}/read */
+    suspend fun markThreadRead(token: String, threadId: String): NetworkResult<ApiResponse<Unit>> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/messages/threads/$threadId/read"))
+    }
+
+    /** GET /api/v1/teacher/messages/unread-count */
+    suspend fun getUnreadCount(token: String): NetworkResult<TeacherUnreadCountDto> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/messages/unread-count"))
+    }
+
+    /** POST /api/v1/teacher/messages */
+    suspend fun sendMessage(token: String, request: TeacherSendMessageRequest): NetworkResult<TeacherSendMessageResponse> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/messages")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
     // ── Lesson Planning (LESSON_PLANNING_SPEC.md — P1-20) ──────────────────────
 
     suspend fun listLessonPlans(

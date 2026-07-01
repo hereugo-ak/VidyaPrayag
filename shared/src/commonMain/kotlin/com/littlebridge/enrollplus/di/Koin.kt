@@ -542,9 +542,9 @@ val viewModelModule = module {
     factory { MessagesViewModel(get(), get(), get()) }
     factory { SchedulePTMViewModel(get(), get()) }
     factory { AcademicCalendarViewModel(get(), get()) }
-    // VP-CAL: premium Academic Calendar platform + 7-step create-event wizard + Academic Year mgmt
+    // VP-CAL: premium Academic Calendar platform + unified create-event + Academic Year mgmt
     factory { com.littlebridge.enrollplus.feature.admin.presentation.AcademicCalendarPlatformViewModel(get(), get()) }
-    factory { com.littlebridge.enrollplus.feature.admin.presentation.CreateCalendarEventViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.admin.presentation.UnifiedCreateEventViewModel(get()) }
     factory { com.littlebridge.enrollplus.feature.admin.presentation.AcademicYearViewModel(get(), get()) }
     factory { LeaveRequestsViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.admin.presentation.LinkRequestsViewModel(get(), get()) }
@@ -574,6 +574,7 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherGradebookViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherSyllabusViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherHomeworkViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherMessageViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherLessonPlanViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherProfileViewModel(get(), get()) }
     // T-602b: the actionable Profile VM (own-leave list/apply, password change via

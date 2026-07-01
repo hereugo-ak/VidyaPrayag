@@ -1,4 +1,4 @@
-package com.littlebridge.enrollplus.ui.v2.screens.parent
+package com.littlebridge.enrollplus.ui.v2.screens.teacher
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -51,10 +51,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.littlebridge.enrollplus.feature.parent.domain.model.ParentMessageDto
-import com.littlebridge.enrollplus.feature.parent.domain.model.ParentMessageThreadDto
-import com.littlebridge.enrollplus.feature.parent.domain.model.ParentRecipientDto
-import com.littlebridge.enrollplus.feature.parent.presentation.ParentMessageViewModel
+import com.littlebridge.enrollplus.feature.teacher.domain.model.TeacherMessageDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.TeacherMessageThreadDto
+import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherMessageViewModel
+import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherMessageState
 import com.littlebridge.enrollplus.ui.v2.components.VAvatar
 import com.littlebridge.enrollplus.ui.v2.components.VBackHeader
 import com.littlebridge.enrollplus.ui.v2.components.VIcons
@@ -64,35 +64,21 @@ import com.littlebridge.enrollplus.ui.v2.theme.VTheme
 import com.littlebridge.enrollplus.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
-/**
- * RA-51: parent Messages inbox + conversation detail. Mirror of the admin
- * [com.littlebridge.enrollplus.ui.v2.screens.school.MessagesScreenV2] but on
- * the parent endpoints. Wired to the real [ParentMessageViewModel]
- * (`GET /api/v1/parent/messages/threads`, `…/{id}/messages`, `POST /parent/messages`).
- *
- * No MockV2 — replaces the old hardcoded fake-thread stub. Three states via
- * [VStateHost] (LAW 3) for both the list and the open conversation.
- */
 @Composable
-fun ParentMessagesScreenV2(
+fun TeacherMessagesScreenV2(
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
-    viewModel: ParentMessageViewModel = koinViewModel(),
+    viewModel: TeacherMessageViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateV2()
 
-    LaunchedEffect(Unit) { viewModel.loadThreads() }
-
-    // Back peels layers in order: compose-new → open conversation → exit.
     val backHandler: () -> Unit = {
         when {
-            state.composeOpen -> viewModel.closeCompose()
             state.openThreadId != null -> viewModel.closeThread()
             else -> onBack()
         }
     }
     val title = when {
-        state.composeOpen -> "New message"
         state.openThreadId != null -> state.openThreadName.ifBlank { "Conversation" }
         else -> "Messages"
     }
@@ -101,157 +87,97 @@ fun ParentMessagesScreenV2(
         .imePadding()
         .navigationBarsPadding()) {
         VBackHeader(title = title, onBack = backHandler)
-
-        ParentMessagesBody(viewModel = viewModel, modifier = Modifier.weight(1f).fillMaxWidth())
-    }
-}
-
-/**
- * Phase 3 (commit 9) — the chrome-less messaging body, hosted *inside* the Conversations tab.
- *
- * Identical messaging surface as [ParentMessagesScreenV2] (inbox → conversation → compose-new
- * layers driven by the SAME [ParentMessageViewModel]), but WITHOUT the standalone status-bar
- * padding + [VBackHeader] — the Conversations hub owns that chrome. Drilling into a thread or
- * compose-new is handled by the shared VM state, so the segmented hub's back is layered by the
- * caller via [ParentMessageViewModel.composeOpen]/[ParentMessageViewModel.openThreadId].
- */
-@Composable
-fun ParentMessagesBody(
-    viewModel: ParentMessageViewModel,
-    modifier: Modifier = Modifier,
-) {
-    val state by viewModel.state.collectAsStateV2()
-
-    // P3-1: Only load if not already loaded (prevents double-fetch flash when
-    // hosted inside ParentMessagesScreenV2 which also calls loadThreads).
-    LaunchedEffect(Unit) {
-        if (state.threads.isEmpty() && !state.loading) {
-            viewModel.loadThreads()
-        }
-    }
-
-    Column(modifier) {
-        when {
-            // RA-S07: compose-new is the topmost layer (back closes it first).
-            state.composeOpen -> {
-                Column(Modifier.fillMaxSize()) {
-                    VBackHeader(
-                        title = "New message",
-                        onBack = viewModel::closeCompose,
-                    )
-                    ParentComposeNewContent(
-                        recipients = state.composeRecipients,
-                        loading = state.composeLoadingRecipients,
-                        error = state.composeError,
-                        isEmpty = state.composeEmpty,
-                        sending = state.sending,
-                        onSend = viewModel::composeNew,
-                        onRetry = viewModel::openCompose,
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                    )
-                }
-            }
-            state.openThreadId != null -> {
-                Column(Modifier.fillMaxSize()) {
-                    VBackHeader(
-                        title = state.openThreadName.ifBlank { "Conversation" },
-                        onBack = viewModel::closeThread,
-                    )
-                    ParentConversationContent(
-                        messages = state.messages,
-                        loading = state.conversationLoading,
-                        error = state.conversationError,
-                        isEmpty = state.conversationEmpty,
-                        sending = state.sending,
-                        replyError = state.replyError,
-                        onSend = viewModel::reply,
-                        onDismissReplyError = viewModel::clearReplyError,
-                        onRetry = { state.openThreadId?.let { viewModel.openThread(it, state.openThreadName) } },
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                    )
-                }
-            }
-            else -> {
-                ParentThreadListContent(
-                    threads = state.threads,
-                    loading = state.loading,
-                    error = state.error,
-                    isEmpty = state.isEmpty,
-                    onOpenThread = { t ->
-                        viewModel.markAsRead(t.id)
-                        viewModel.openThread(t.id, t.senderName)
-                    },
-                    onCompose = viewModel::openCompose,
-                    onRetry = viewModel::loadThreads,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-        }
+        TeacherMessagesContent(
+            state = state,
+            onOpenThread = { t ->
+                viewModel.markAsRead(t.id)
+                viewModel.openThread(t.id, t.senderName)
+            },
+            onSend = viewModel::reply,
+            onDismissReplyError = viewModel::clearReplyError,
+            onRetry = { state.openThreadId?.let { viewModel.openThread(it, state.openThreadName) } },
+            onRetryThreads = viewModel::loadThreads,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        )
     }
 }
 
 @Composable
-private fun ParentThreadListContent(
-    threads: List<ParentMessageThreadDto>,
-    loading: Boolean,
-    error: String?,
-    isEmpty: Boolean,
-    onOpenThread: (ParentMessageThreadDto) -> Unit,
-    onCompose: () -> Unit,
+private fun TeacherMessagesContent(
+    state: TeacherMessageState,
+    onOpenThread: (TeacherMessageThreadDto) -> Unit,
+    onSend: (String) -> Unit,
+    onDismissReplyError: () -> Unit,
     onRetry: () -> Unit,
+    onRetryThreads: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val c = VTheme.colors
-    Box(modifier) {
-        VStateHost(
-            loading = loading,
-            error = error,
-            isEmpty = isEmpty,
-            emptyTitle = "No messages yet",
-            emptyBody = "Messages from your child's teachers and the school office will appear here.",
-            emptyIcon = VIcons.Chat,
-            onRetry = onRetry,
-        ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    horizontal = 0.dp,
-                    vertical = 8.dp,
-                ),
-            ) {
-                items(threads, key = { it.id }) { thread ->
-                    ParentThreadRow(
-                        thread = thread,
-                        onClick = { onOpenThread(thread) },
-                    )
-                }
-            }
+    when {
+        state.openThreadId != null -> {
+            TeacherConversationContent(
+                messages = state.messages,
+                loading = state.conversationLoading,
+                error = state.conversationError,
+                isEmpty = state.conversationEmpty,
+                sending = state.sending,
+                replyError = state.replyError,
+                onSend = onSend,
+                onDismissReplyError = onDismissReplyError,
+                onRetry = onRetry,
+                modifier = modifier,
+            )
         }
-
-        // Floating compose-new FAB — WhatsApp-style
-        val interaction = remember { MutableInteractionSource() }
-        Box(
-            Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 20.dp, bottom = 20.dp)
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(c.accent)
-                .clickable(interactionSource = interaction, indication = null, onClick = onCompose),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                VIcons.Edit3,
-                contentDescription = "New message",
-                tint = Color.White,
-                modifier = Modifier.size(24.dp),
+        else -> {
+            TeacherThreadListContent(
+                threads = state.threads,
+                loading = state.loading,
+                error = state.error,
+                isEmpty = state.isEmpty,
+                onOpenThread = onOpenThread,
+                onRetry = onRetryThreads,
+                modifier = modifier,
             )
         }
     }
 }
 
 @Composable
-private fun ParentThreadRow(thread: ParentMessageThreadDto, onClick: () -> Unit) {
+private fun TeacherThreadListContent(
+    threads: List<TeacherMessageThreadDto>,
+    loading: Boolean,
+    error: String?,
+    isEmpty: Boolean,
+    onOpenThread: (TeacherMessageThreadDto) -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier) {
+        VStateHost(
+            loading = loading,
+            error = error,
+            isEmpty = isEmpty,
+            emptyTitle = "No messages yet",
+            emptyBody = "Messages from parents and school admin will appear here.",
+            emptyIcon = VIcons.Chat,
+            onRetry = onRetry,
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 8.dp),
+            ) {
+                items(threads, key = { it.id }) { thread ->
+                    TeacherThreadRow(
+                        thread = thread,
+                        onClick = { onOpenThread(thread) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TeacherThreadRow(thread: TeacherMessageThreadDto, onClick: () -> Unit) {
     val c = VTheme.colors
     val interaction = remember { MutableInteractionSource() }
     Row(
@@ -262,7 +188,6 @@ private fun ParentThreadRow(thread: ParentMessageThreadDto, onClick: () -> Unit)
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        // Avatar with online-style ring for unread
         Box(contentAlignment = Alignment.Center) {
             VAvatar(
                 name = thread.senderName.ifBlank { "?" },
@@ -319,133 +244,9 @@ private fun ParentThreadRow(thread: ParentMessageThreadDto, onClick: () -> Unit)
     }
 }
 
-/**
- * RA-S07 — parent compose-NEW: pick a recipient (the child's class teacher / school office),
- * type a message, send. `onSend(recipientUserId, body)` starts a real 1:1 conversation.
- */
 @Composable
-private fun ParentComposeNewContent(
-    recipients: List<ParentRecipientDto>,
-    loading: Boolean,
-    error: String?,
-    isEmpty: Boolean,
-    sending: Boolean,
-    onSend: (String, String) -> Unit,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val c = VTheme.colors
-    var selected by remember { mutableStateOf<ParentRecipientDto?>(null) }
-    var body by remember { mutableStateOf("") }
-    val keyboard = LocalSoftwareKeyboardController.current
-
-    Column(modifier) {
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            VStateHost(
-                loading = loading,
-                error = error,
-                isEmpty = isEmpty,
-                emptyTitle = "No one to message yet",
-                emptyBody = "Link your child to a school to message their teachers and the office.",
-                emptyIcon = VIcons.Chat,
-                onRetry = onRetry,
-            ) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        horizontal = 20.dp,
-                        vertical = 16.dp,
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    item {
-                        Text(
-                            "Select recipient",
-                            style = VTheme.type.label.colored(c.ink3),
-                            modifier = Modifier.padding(bottom = 8.dp),
-                        )
-                    }
-                    items(recipients, key = { it.id }) { recipient ->
-                        ParentRecipientRow(
-                            recipient = recipient,
-                            isSelected = selected?.id == recipient.id,
-                            onClick = { selected = recipient },
-                        )
-                    }
-                }
-            }
-        }
-
-        ParentComposeBar(
-            text = body,
-            onTextChange = { body = it },
-            placeholder = if (selected == null) "Pick a recipient above…" else "Message ${selected!!.name}…",
-            enabled = selected != null && !sending,
-            sending = sending,
-            onSend = {
-                val r = selected
-                if (r != null && body.isNotBlank()) {
-                    onSend(r.id, body.trim())
-                    body = ""
-                    keyboard?.hide()
-                }
-            },
-        )
-    }
-}
-
-@Composable
-private fun ParentRecipientRow(recipient: ParentRecipientDto, isSelected: Boolean, onClick: () -> Unit) {
-    val c = VTheme.colors
-    val interaction = remember { MutableInteractionSource() }
-    val bg = if (isSelected) c.accentTint else Color.Transparent
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(bg)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        VAvatar(name = recipient.name.ifBlank { "?" }, src = recipient.imageUrl, size = 48.dp)
-        Column(Modifier.weight(1f)) {
-            Text(
-                recipient.name,
-                style = VTheme.type.bodyStrong.colored(c.ink),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                recipient.subtitle,
-                style = VTheme.type.caption.colored(c.ink3),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        if (isSelected) {
-            Box(
-                Modifier
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .background(c.accent),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    VIcons.Check,
-                    contentDescription = "Selected",
-                    tint = Color.White,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ParentConversationContent(
-    messages: List<ParentMessageDto>,
+private fun TeacherConversationContent(
+    messages: List<TeacherMessageDto>,
     loading: Boolean,
     error: String?,
     isEmpty: Boolean,
@@ -461,7 +262,6 @@ private fun ParentConversationContent(
     val keyboard = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
 
-    // Auto-scroll to bottom when new messages arrive
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.lastIndex)
@@ -469,7 +269,6 @@ private fun ParentConversationContent(
     }
 
     Column(modifier) {
-        // Chat surface — WhatsApp-style patterned background
         Box(
             Modifier
                 .weight(1f)
@@ -488,20 +287,16 @@ private fun ParentConversationContent(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        horizontal = 16.dp,
-                        vertical = 12.dp,
-                    ),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     items(messages, key = { it.id }) { msg ->
-                        ParentMessageBubble(msg)
+                        TeacherMessageBubble(msg)
                     }
                 }
             }
         }
 
-        // Inline reply error banner
         AnimatedVisibility(
             visible = replyError != null,
             enter = slideInVertically() + fadeIn(),
@@ -541,8 +336,7 @@ private fun ParentConversationContent(
             }
         }
 
-        // WhatsApp-style compose bar
-        ParentComposeBar(
+        TeacherComposeBar(
             text = reply,
             onTextChange = { reply = it },
             placeholder = "Type a message…",
@@ -560,7 +354,7 @@ private fun ParentConversationContent(
 }
 
 @Composable
-private fun ParentMessageBubble(msg: ParentMessageDto) {
+private fun TeacherMessageBubble(msg: TeacherMessageDto) {
     val c = VTheme.colors
     val isMine = msg.isMine
     val isDeleted = msg.deletedAt != null
@@ -605,7 +399,6 @@ private fun ParentMessageBubble(msg: ParentMessageDto) {
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                // P2-5: Status ticks for own messages
                 if (isMine && !isDeleted) {
                     when (msg.status?.uppercase()) {
                         "READ" -> {
@@ -653,7 +446,6 @@ private fun ParentMessageBubble(msg: ParentMessageDto) {
                     msg.time,
                     style = VTheme.type.caption.colored(timeColor).copy(fontSize = 10.sp),
                 )
-                // P2-10: Edited label
                 if (msg.editedAt != null && !isDeleted) {
                     Spacer(Modifier.size(4.dp))
                     Text(
@@ -666,12 +458,8 @@ private fun ParentMessageBubble(msg: ParentMessageDto) {
     }
 }
 
-/**
- * Shared WhatsApp-style compose bar used by both the conversation and compose-new screens.
- * Rounded pill input with an embedded send button — no separate Send button row.
- */
 @Composable
-private fun ParentComposeBar(
+private fun TeacherComposeBar(
     text: String,
     onTextChange: (String) -> Unit,
     placeholder: String,
@@ -688,7 +476,6 @@ private fun ParentComposeBar(
             .fillMaxWidth()
             .background(c.card),
     ) {
-        // Subtle top hairline
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))
 
         Row(
@@ -698,7 +485,6 @@ private fun ParentComposeBar(
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // Text input in a rounded pill
             Box(
                 Modifier
                     .weight(1f)
@@ -735,7 +521,6 @@ private fun ParentComposeBar(
                 )
             }
 
-            // Circular send button — WhatsApp-style
             val sendInteraction = remember { MutableInteractionSource() }
             Box(
                 Modifier

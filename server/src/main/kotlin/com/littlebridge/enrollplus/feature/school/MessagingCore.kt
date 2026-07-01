@@ -30,9 +30,12 @@ import com.littlebridge.enrollplus.db.MessageStatusTable
 import com.littlebridge.enrollplus.db.MessageThreadsTable
 import com.littlebridge.enrollplus.db.MessagesTable
 import com.littlebridge.enrollplus.feature.notifications.Notify
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
@@ -698,3 +701,38 @@ internal fun loadMessageStatus(messageId: UUID, userId: UUID): String? {
         }
         .singleOrNull()?.get(MessageStatusTable.status)
 }
+
+/**
+ * Read Receipts Phase 1 (READ_RECEIPTS_PLAN §6.1.2): bulk-update all SENT/DELIVERED
+ * status rows for a user in a conversation to READ. Called by the /threads/{id}/read
+ * endpoints after the thread-level unreadCount/isRead update.
+ *
+ * @return number of status rows updated
+ */
+internal fun markConversationRead(userId: UUID, conversationId: UUID): Int {
+    val now = Instant.now()
+    return MessageStatusTable.update({
+        (MessageStatusTable.conversationId eq conversationId) and
+            (MessageStatusTable.userId eq userId) and
+            (MessageStatusTable.status inList listOf("SENT", "DELIVERED"))
+    }) {
+        it[status] = "READ"
+        it[readAt] = now
+    }
+}
+
+/**
+ * Read Receipts Phase 2 (READ_RECEIPTS_PLAN §6.2): total unread messages across
+ * all threads owned by a user. Used by the /messages/unread-count endpoints.
+ */
+internal fun getUnreadCount(userId: UUID): Int {
+    return MessageThreadsTable.selectAll()
+        .where {
+            (MessageThreadsTable.ownerUserId eq userId) and
+                (MessageThreadsTable.unreadCount greater 0)
+        }
+        .sumOf { it[MessageThreadsTable.unreadCount] }
+}
+
+@Serializable
+data class UnreadCountDto(@SerialName("unread_count") val unreadCount: Int)

@@ -1271,3 +1271,94 @@ data class InstantiateFromTemplateRequest(
     @SerialName("assignment_id") val assignmentId: String,
     @SerialName("planned_date") val plannedDate: String,
 )
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Read Receipts — teacher 1:1 messaging (mirrors admin/parent message models).
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class TeacherMessageThreadDto(
+    val id: String,
+    @SerialName("sender_name") val senderName: String,
+    @SerialName("sender_role") val senderRole: String,
+    @SerialName("last_message") val lastMessage: String,
+    val time: String,
+    @SerialName("unread_count") val unreadCount: Int = 0,
+    @SerialName("sender_image_url") val senderImageUrl: String? = null,
+    @SerialName("icon_name") val iconName: String? = null,
+    @SerialName("is_read") val isRead: Boolean = true,
+)
+
+@Serializable
+data class TeacherMessageThreadsData(val threads: List<TeacherMessageThreadDto> = emptyList())
+
+@Serializable
+data class TeacherMessageThreadsResponse(
+    val success: Boolean = false,
+    val data: TeacherMessageThreadsData = TeacherMessageThreadsData(),
+)
+
+@Serializable
+data class TeacherMessageDto(
+    val id: String,
+    val body: String,
+    @SerialName("is_mine") val isMine: Boolean = false,
+    @SerialName("sender_id") val senderId: String? = null,
+    @SerialName("created_at") val createdAt: String,
+    val time: String,
+    val seq: Int? = null,
+    val status: String? = null,
+    @SerialName("edited_at") val editedAt: String? = null,
+    @SerialName("deleted_at") val deletedAt: String? = null,
+    @SerialName("reply_to_id") val replyToId: String? = null,
+)
+
+@Serializable
+data class TeacherThreadMessagesData(
+    @SerialName("thread_id") val threadId: String,
+    @SerialName("sender_name") val senderName: String,
+    val messages: List<TeacherMessageDto> = emptyList(),
+    @SerialName("has_more") val hasMore: Boolean = false,
+    @SerialName("total_count") val totalCount: Long = 0,
+)
+
+@Serializable
+data class TeacherThreadMessagesResponse(
+    val success: Boolean = false,
+    val data: TeacherThreadMessagesData? = null,
+)
+
+@Serializable
+data class TeacherSendMessageRequest(
+    @SerialName("thread_id") val threadId: String? = null,
+    @SerialName("recipient_user_id") val recipientUserId: String? = null,
+    @SerialName("client_msg_id") val clientMsgId: String? = null,
+    @SerialName("reply_to_id") val replyToId: String? = null,
+    val body: String,
+)
+
+@Serializable
+data class TeacherSendMessageData(
+    @SerialName("thread_id") val threadId: String,
+    @SerialName("message_id") val messageId: String,
+    val seq: Int? = null,
+    @SerialName("server_timestamp") val serverTimestamp: String? = null,
+)
+
+@Serializable
+data class TeacherSendMessageResponse(
+    val success: Boolean = false,
+    val message: String? = null,
+    val data: TeacherSendMessageData? = null,
+)
+
+@Serializable
+data class TeacherUnreadCountDto(
+    val success: Boolean = false,
+    val data: TeacherUnreadCountData? = null,
+)
+
+@Serializable
+data class TeacherUnreadCountData(
+    @SerialName("unread_count") val unreadCount: Int = 0,
+)

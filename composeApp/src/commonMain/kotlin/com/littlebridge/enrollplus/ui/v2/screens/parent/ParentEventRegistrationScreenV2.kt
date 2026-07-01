@@ -20,7 +20,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.littlebridge.enrollplus.feature.event.domain.model.EventSlotDto
 import com.littlebridge.enrollplus.feature.event.domain.model.ParentEventDto
@@ -39,6 +42,7 @@ import com.littlebridge.enrollplus.ui.v2.components.VBadgeTone
 import com.littlebridge.enrollplus.ui.v2.components.VButton
 import com.littlebridge.enrollplus.ui.v2.components.VButtonVariant
 import com.littlebridge.enrollplus.ui.v2.components.VCard
+import com.littlebridge.enrollplus.ui.v2.components.VInput
 import com.littlebridge.enrollplus.ui.v2.screens.VStateHost
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
@@ -92,12 +96,12 @@ fun ParentEventRegistrationScreenV2(
             EventDetailContent(
                 eventDetail = state.eventDetail!!,
                 isLoading = state.isRegistering || state.isCancelling || state.isRescheduling,
-                onRegister = { slotId ->
+                onRegister = { slotId, attendeeCount ->
                     viewModel.register(
                         eventId = selectedEventId!!,
                         slotId = slotId,
                         studentId = null,
-                        attendeeCount = 1,
+                        attendeeCount = attendeeCount,
                     )
                 },
                 onCancel = {
@@ -167,13 +171,32 @@ fun ParentEventRegistrationScreenV2(
 private fun EventDetailContent(
     eventDetail: com.littlebridge.enrollplus.feature.event.domain.model.ParentEventDetailResponse,
     isLoading: Boolean,
-    onRegister: (String?) -> Unit,
+    onRegister: (String?, Int) -> Unit,
     onCancel: () -> Unit,
     onReschedule: (String) -> Unit,
 ) {
     val c = VTheme.colors
     val event = eventDetail.event
     var selectedSlotId by remember { mutableStateOf<String?>(null) }
+    var attendeeCount by remember { mutableStateOf("1") }
+    var showCancelDialog by remember { mutableStateOf(false) }
+
+    if (showCancelDialog) {
+        AlertDialog(
+            onDismissRequest = { showCancelDialog = false },
+            title = { Text("Cancel Registration") },
+            text = { Text("Are you sure you want to cancel your registration for ${event.title}?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showCancelDialog = false
+                    onCancel()
+                }) { Text("Yes, Cancel") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCancelDialog = false }) { Text("Keep") }
+            },
+        )
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
@@ -193,12 +216,15 @@ private fun EventDetailContent(
                         Text(text = event.description, style = VTheme.type.body.colored(c.ink2))
                     }
                     Spacer(Modifier.height(8.dp))
+                    if (event.registrationDeadline != null) {
+                        Text(text = "Register by: ${event.registrationDeadline}", style = VTheme.type.caption.colored(c.ink3))
+                    }
                     if (event.myRegistrationStatus != null) {
                         VBadge(
                             text = "Registered: ${event.myRegistrationStatus}",
                             tone = VBadgeTone.Success,
                         )
-                    } else if (event.registrationEnabled) {
+                    } else if (event.registrationEnabled || event.type == "PTM") {
                         VBadge(text = "Registration open", tone = VBadgeTone.Accent)
                     }
                     if (event.conflictingEventTitle != null) {
@@ -247,18 +273,34 @@ private fun EventDetailContent(
                 Spacer(Modifier.height(8.dp))
                 VButton(
                     text = "Cancel Registration",
-                    onClick = onCancel,
+                    onClick = { showCancelDialog = true },
                     variant = VButtonVariant.Destructive,
                     enabled = !isLoading,
                     loading = isLoading,
                     full = true,
                 )
             } else {
+                if (eventDetail.slots.isEmpty()) {
+                    VInput(
+                        value = attendeeCount,
+                        onValueChange = { attendeeCount = it },
+                        label = "Number of attendees",
+                        placeholder = "1",
+                        keyboardType = KeyboardType.Number,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                val canRegister = if (eventDetail.slots.isNotEmpty()) {
+                    selectedSlotId != null && !isLoading
+                } else {
+                    !isLoading
+                }
                 VButton(
                     text = "Register",
-                    onClick = { onRegister(selectedSlotId) },
+                    onClick = { onRegister(selectedSlotId, attendeeCount.toIntOrNull()?.coerceAtLeast(1) ?: 1) },
                     variant = VButtonVariant.Primary,
-                    enabled = !isLoading,
+                    enabled = canRegister,
                     loading = isLoading,
                     full = true,
                 )
@@ -387,7 +429,7 @@ private fun EventCard(
             ) {
                 if (event.myRegistrationStatus != null) {
                     VBadge(text = event.myRegistrationStatus!!, tone = VBadgeTone.Success)
-                } else if (event.registrationEnabled) {
+                } else if (event.registrationEnabled || event.type == "PTM") {
                     VBadge(text = "Registration open", tone = VBadgeTone.Accent)
                 }
                 if (event.hasSlots) {

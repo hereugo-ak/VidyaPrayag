@@ -27,7 +27,7 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays the teacher portal can push above its tab content. */
-private enum class TeacherOverlay { None, Notifications, HealthAlerts, TransportAttendance, Pews, ReportReview, ReportDraftEditor, Heatmap, DigitalIdCard, ScheduledMessages, EventRegistration }
+private enum class TeacherOverlay { None, Notifications, HealthAlerts, TransportAttendance, Pews, ReportReview, ReportDraftEditor, Heatmap, DigitalIdCard, ScheduledMessages, EventRegistration, Messages }
 
 /**
  * TeacherPortalV2 — the teacher shell, rebuilt FROM SCRATCH on the Parents-Portal
@@ -194,6 +194,13 @@ fun TeacherPortalV2(
             )
             return
         }
+        TeacherOverlay.Messages -> {
+            TeacherMessagesScreenV2(
+                onBack = { overlay = TeacherOverlay.None },
+                modifier = modifier,
+            )
+            return
+        }
         TeacherOverlay.None -> Unit
     }
 
@@ -269,6 +276,8 @@ fun TeacherPortalV2(
                     onOpenHeatmap = { overlay = TeacherOverlay.Heatmap },
                     onOpenIdCard = { overlay = TeacherOverlay.DigitalIdCard },
                     onOpenScheduledMessages = { overlay = TeacherOverlay.ScheduledMessages },
+                    onOpenEvents = { overlay = TeacherOverlay.EventRegistration },
+                    onOpenMessages = { overlay = TeacherOverlay.Messages },
                 )
 
                 "update" -> key(updateScopeNonce) {

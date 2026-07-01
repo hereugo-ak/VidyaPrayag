@@ -384,6 +384,13 @@ fun Route.messagesRouting() {
                 }
             }
 
+            // -------- UNREAD COUNT --------
+            get("/unread-count") {
+                val ctx = call.requireSchoolContext() ?: return@get
+                val count = dbQuery { getUnreadCount(ctx.userId) }
+                call.ok(UnreadCountDto(count))
+            }
+
             // -------- MARK READ --------
             post("/threads/{id}/read") {
                 val ctx = call.requireSchoolContext() ?: return@post
@@ -399,6 +406,11 @@ fun Route.messagesRouting() {
                         it[isRead] = true
                         it[updatedAt] = Instant.now()
                     }
+                    // Read Receipts Phase 1: also bulk-update per-message status rows to READ
+                    val convId = MessageThreadsTable.selectAll()
+                        .where { (MessageThreadsTable.id eq id) and (MessageThreadsTable.ownerUserId eq uid) }
+                        .singleOrNull()?.get(MessageThreadsTable.conversationId) ?: id
+                    markConversationRead(uid, convId)
                 }
                 if (n == 0) call.fail("Thread not found", HttpStatusCode.NotFound)
                 else call.okMessage("Thread marked as read")

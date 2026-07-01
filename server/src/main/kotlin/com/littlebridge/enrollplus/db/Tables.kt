@@ -347,6 +347,7 @@ object AnnouncementsTable : UUIDTable("announcements", "id") {
     // The teacher/admin user that owns this broadcast. For teacher broadcasts the
     // recipient expansion is constrained to the classes/subjects they teach.
     val authorRole     = varchar("author_role", 16).default("school_admin")
+    val isCalendarOnly = bool("is_calendar_only").default(false)
     val syncedToWa  = bool("synced_to_wa").default(false)
     val createdBy   = uuid("created_by").nullable()
     val createdAt   = timestamp("created_at")
@@ -823,6 +824,7 @@ object MessageStatusTable : UUIDTable("message_status", "id") {
     val userId         = uuid("user_id")                               // the recipient whose status this tracks
     val status         = varchar("status", 16)                         // SENT | DELIVERED | READ
     val createdAt      = timestamp("created_at")
+    val readAt         = timestamp("read_at").nullable()
 
     init {
         uniqueIndex("ux_message_status_msg_user", messageId, userId)

@@ -24,8 +24,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +55,7 @@ import com.littlebridge.enrollplus.ui.v2.screens.VStateHost
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
 import com.littlebridge.enrollplus.ui.v2.theme.colored
+import com.littlebridge.enrollplus.util.todayIso
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -81,6 +85,8 @@ fun AcademicCalendarPlatformScreenV2(
 ) {
     val state by viewModel.state.collectAsStateV2()
     val c = VTheme.colors
+
+    LaunchedEffect(Unit) { viewModel.refresh() }
 
     Column(modifier.fillMaxSize().background(c.background).statusBarsPadding().navigationBarsPadding()) {
         VBackHeader(
@@ -305,26 +311,52 @@ private fun ViewSwitcher(mode: CalendarViewMode, onSelect: (CalendarViewMode) ->
 @Composable
 private fun InteractiveCalendar(events: List<AcademicCalendarEventDto>, onOpenEvent: (String) -> Unit) {
     val c = VTheme.colors
-    // Pick the month from the first event (or "current" if events empty).
-    val anchor = events.firstOrNull()?.startDate
-    val parsed = anchor?.let { parseIso3(it) }
-    val year = parsed?.first ?: 2026
-    val month = parsed?.second ?: 6
-    val days = daysIn(year, month)
+    // Start from current month, not stuck on June.
+    val today = remember { parseIso3(todayIso()) ?: Triple(2026, 7, 1) }
+    var navYear by remember { mutableStateOf(today.first) }
+    var navMonth by remember { mutableStateOf(today.second) }
 
-    val eventsByDay = remember(events, year, month) {
+    fun prevMonth() {
+        if (navMonth == 1) { navMonth = 12; navYear-- } else navMonth--
+    }
+    fun nextMonth() {
+        if (navMonth == 12) { navMonth = 1; navYear++ } else navMonth++
+    }
+
+    val days = daysIn(navYear, navMonth)
+
+    val eventsByDay = remember(events, navYear, navMonth) {
         events.filter {
             val p = parseIso3(it.startDate)
-            p != null && p.first == year && p.second == month
+            p != null && p.first == navYear && p.second == navMonth
         }.groupBy { parseIso3(it.startDate)!!.third }
     }
 
     VCard {
-        Text(
-            "${MONTHS[month - 1]} $year",
-            style = VTheme.type.bodyStrong.colored(c.ink),
-            modifier = Modifier.padding(bottom = 8.dp),
-        )
+        Row(
+            Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "${MONTHS[navMonth - 1]} $navYear",
+                style = VTheme.type.bodyStrong.colored(c.ink),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Box(
+                    Modifier.clip(RoundedCornerShape(8.dp)).clickable { prevMonth() }
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text("‹", style = VTheme.type.bodyStrong.colored(c.tealDeep))
+                }
+                Box(
+                    Modifier.clip(RoundedCornerShape(8.dp)).clickable { nextMonth() }
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text("›", style = VTheme.type.bodyStrong.colored(c.tealDeep))
+                }
+            }
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             listOf("S", "M", "T", "W", "T", "F", "S").forEach {
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
