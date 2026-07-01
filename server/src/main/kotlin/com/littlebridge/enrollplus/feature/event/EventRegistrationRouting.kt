@@ -253,6 +253,25 @@ data class UpdateRegistrationConfigRequest(
     val venue: String? = null,
 )
 
+@Serializable
+data class AdminEventDto(
+    val id: String,
+    val title: String = "",
+    val type: String = "",
+    @SerialName("start_date") val startDate: String = "",
+    val status: String = "PUBLISHED",
+    @SerialName("registration_enabled") val registrationEnabled: Boolean = false,
+    @SerialName("registration_deadline") val registrationDeadline: String? = null,
+    @SerialName("max_attendees") val maxAttendees: Int? = null,
+    val venue: String? = null,
+    @SerialName("has_slots") val hasSlots: Boolean = false,
+    @SerialName("slot_count") val slotCount: Int = 0,
+    @SerialName("total_registrations") val totalRegistrations: Int = 0,
+)
+
+@Serializable
+data class AdminEventListResponse(val events: List<AdminEventDto> = emptyList())
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════
@@ -529,7 +548,7 @@ fun Route.eventRegistrationRouting() {
                     }.firstOrNull()
                 } ?: run { call.fail("Event not found", HttpStatusCode.NotFound, "EVENT_NOT_FOUND"); return@post }
 
-                if (!event[CalendarEventsTable.registrationEnabled]) {
+                if (!event[CalendarEventsTable.registrationEnabled] && event[CalendarEventsTable.type] != EventType.PTM) {
                     call.fail("Registration is not enabled for this event", HttpStatusCode.BadRequest, "REGISTRATION_DISABLED"); return@post
                 }
                 if (event[CalendarEventsTable.status] == "CANCELLED") {
@@ -953,7 +972,7 @@ fun Route.eventRegistrationRouting() {
                     CalendarEventsTable.selectAll().where {
                         (CalendarEventsTable.schoolId eq schoolId) and
                             (CalendarEventsTable.type eq "PTM") and
-                            (CalendarEventsTable.registrationEnabled eq true) and
+                            ((CalendarEventsTable.registrationEnabled eq true) or (CalendarEventsTable.type eq "PTM")) and
                             (CalendarEventsTable.status eq "PUBLISHED") and
                             (CalendarEventsTable.isActive eq true) and
                             (CalendarEventsTable.startDate greaterEq today)
@@ -1174,6 +1193,62 @@ fun Route.eventRegistrationRouting() {
         // Admin Endpoints
         // ───────────────────────────────────────────────────────────────────
         route("/api/v1/school/events") {
+
+            // ── LIST all events for admin management ──
+            get {
+                val ctx = call.requireSchoolContext() ?: return@get
+                val schoolId = ctx.schoolId
+                val today = LocalDate.now()
+
+                val events = dbQuery {
+                    CalendarEventsTable.selectAll().where {
+                        (CalendarEventsTable.schoolId eq schoolId) and
+                            (CalendarEventsTable.isActive eq true) and
+                            ((CalendarEventsTable.registrationEnabled eq true) or (CalendarEventsTable.type eq EventType.PTM)) and
+                            (CalendarEventsTable.startDate greaterEq today)
+                    }.orderBy(CalendarEventsTable.startDate, SortOrder.ASC).toList()
+                }
+
+                val eventIds = events.map { it[CalendarEventsTable.id].value }
+
+                val slotCounts: Map<UUID, Int> = if (eventIds.isNotEmpty()) {
+                    dbQuery {
+                        EventSlotsTable.selectAll().where {
+                            (EventSlotsTable.eventId inList eventIds) and (EventSlotsTable.isActive eq true)
+                        }.groupBy { it[EventSlotsTable.eventId] }
+                            .mapValues { it.value.size }
+                    }
+                } else emptyMap()
+
+                val regCounts: Map<UUID, Int> = if (eventIds.isNotEmpty()) {
+                    dbQuery {
+                        EventRegistrationsTable.selectAll().where {
+                            (EventRegistrationsTable.eventId inList eventIds) and
+                                (EventRegistrationsTable.status inList listOf("REGISTERED", "CHECKED_IN", "WAITLISTED"))
+                        }.groupBy { it[EventRegistrationsTable.eventId] }
+                            .mapValues { it.value.size }
+                    }
+                } else emptyMap()
+
+                val dtos = events.map { row ->
+                    val eid = row[CalendarEventsTable.id].value
+                    AdminEventDto(
+                        id = eid.toString(),
+                        title = row[CalendarEventsTable.title],
+                        type = row[CalendarEventsTable.type],
+                        startDate = row[CalendarEventsTable.startDate].toString(),
+                        status = row[CalendarEventsTable.status],
+                        registrationEnabled = row[CalendarEventsTable.registrationEnabled],
+                        registrationDeadline = row[CalendarEventsTable.registrationDeadline],
+                        maxAttendees = row[CalendarEventsTable.maxAttendees],
+                        venue = row[CalendarEventsTable.venue],
+                        hasSlots = (slotCounts[eid] ?: 0) > 0,
+                        slotCount = slotCounts[eid] ?: 0,
+                        totalRegistrations = regCounts[eid] ?: 0,
+                    )
+                }
+                call.ok(AdminEventListResponse(events = dtos), message = "Events loaded")
+            }
 
             // ── LIST all registrations (filterable) ──
             get("/registrations") {

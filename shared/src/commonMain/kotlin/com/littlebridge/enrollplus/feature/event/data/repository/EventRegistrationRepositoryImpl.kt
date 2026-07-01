@@ -28,6 +28,7 @@ class EventRegistrationRepositoryImpl(
     override suspend fun getTeacherPtmSlots(token: String, eventId: String) = api.getTeacherPtmSlots(token, eventId)
     override suspend fun checkinParent(token: String, eventId: String, registrationId: String) = api.checkinParent(token, eventId, registrationId)
 
+    override suspend fun listAdminEvents(token: String) = api.listAdminEvents(token)
     override suspend fun listAllRegistrations(token: String, status: String?, eventId: String?) = api.listAllRegistrations(token, status, eventId)
     override suspend fun listEventRegistrations(token: String, eventId: String) = api.listEventRegistrations(token, eventId)
     override suspend fun createSlot(token: String, eventId: String, request: CreateSlotRequest) = api.createSlot(token, eventId, request)
