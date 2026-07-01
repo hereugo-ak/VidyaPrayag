@@ -544,7 +544,7 @@ val viewModelModule = module {
     factory { AcademicCalendarViewModel(get(), get()) }
     // VP-CAL: premium Academic Calendar platform + unified create-event + Academic Year mgmt
     factory { com.littlebridge.enrollplus.feature.admin.presentation.AcademicCalendarPlatformViewModel(get(), get()) }
-    factory { com.littlebridge.enrollplus.feature.admin.presentation.UnifiedCreateEventViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.admin.presentation.UnifiedCreateEventViewModel(get()) }
     factory { com.littlebridge.enrollplus.feature.admin.presentation.AcademicYearViewModel(get(), get()) }
     factory { LeaveRequestsViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.admin.presentation.LinkRequestsViewModel(get(), get()) }

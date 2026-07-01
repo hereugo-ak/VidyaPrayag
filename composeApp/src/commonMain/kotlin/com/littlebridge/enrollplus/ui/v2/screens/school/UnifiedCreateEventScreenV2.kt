@@ -317,31 +317,33 @@ private fun StepWho(
 
     Spacer(Modifier.height(8.dp))
 
-    // Post as announcement toggle
-    VLabel("Announcement visibility")
-    TogglePill(
-        label = "Post as announcement",
-        subtitle = if (state.form.postAsAnnouncement)
-            "Parents will see this in their announcement feed"
-        else
-            "Calendar only — parents won't see this in announcements",
-        checked = state.form.postAsAnnouncement,
-        onToggle = { viewModel.setPostAsAnnouncement(it) },
-    )
+    // Post as announcement toggle — only for calendar-eligible types.
+    // Update/Reminder are always announcements (no calendar sync anyway).
+    if (state.calendarEligible) {
+        VLabel("Announcement visibility")
+        TogglePill(
+            label = "Post as announcement",
+            subtitle = if (state.form.postAsAnnouncement)
+                "Parents will see this in their announcement feed"
+            else
+                "Calendar only — parents won't see this in announcements",
+            checked = state.form.postAsAnnouncement,
+            onToggle = { viewModel.setPostAsAnnouncement(it) },
+        )
 
-    if (state.calendarEligible && state.form.postAsAnnouncement) {
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "This event will also sync to the Academic Calendar automatically.",
-            style = VTheme.type.caption.colored(c.tealDeep),
-        )
-    }
-    if (state.calendarEligible && !state.form.postAsAnnouncement) {
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "This event will appear in the Academic Calendar with a \"Calendar Only\" badge.",
-            style = VTheme.type.caption.colored(c.ink3),
-        )
+        if (state.form.postAsAnnouncement) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "This event will also sync to the Academic Calendar automatically.",
+                style = VTheme.type.caption.colored(c.tealDeep),
+            )
+        } else {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "This event will appear in the Academic Calendar with a \"Calendar Only\" badge.",
+                style = VTheme.type.caption.colored(c.ink3),
+            )
+        }
     }
 }
 

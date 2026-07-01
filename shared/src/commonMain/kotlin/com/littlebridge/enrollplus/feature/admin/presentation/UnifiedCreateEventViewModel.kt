@@ -18,8 +18,6 @@ package com.littlebridge.enrollplus.feature.admin.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.littlebridge.enrollplus.core.prefs.PreferenceRepository
-import com.littlebridge.enrollplus.util.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -68,13 +66,21 @@ data class UnifiedCreateEventState(
 
 class UnifiedCreateEventViewModel(
     private val announcementsViewModel: SchoolAnnouncementsViewModel,
-    private val preferenceRepository: PreferenceRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(UnifiedCreateEventState())
     val state: StateFlow<UnifiedCreateEventState> = _state.asStateFlow()
 
-    private val tag = "UnifiedCreateEventVM"
+    init {
+        viewModelScope.launch {
+            announcementsViewModel.state.collect { annState ->
+                if (annState.errorMessage != null && _state.value.isSaving) {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = annState.errorMessage)
+                    announcementsViewModel.clearMessages()
+                }
+            }
+        }
+    }
 
     fun next() {
         val s = _state.value
@@ -152,15 +158,6 @@ class UnifiedCreateEventViewModel(
             )
         }
 
-        // Observe error from announcementsViewModel
-        viewModelScope.launch {
-            announcementsViewModel.state.collect { annState ->
-                if (annState.errorMessage != null && _state.value.isSaving) {
-                    _state.value = _state.value.copy(isSaving = false, errorMessage = annState.errorMessage)
-                    announcementsViewModel.clearMessages()
-                }
-            }
-        }
     }
 
     fun reset() {
