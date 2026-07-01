@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.littlebridge.enrollplus.feature.teacher.domain.model.ObligationItemDto
+import com.littlebridge.enrollplus.feature.teacher.presentation.BellSlotUi
 import com.littlebridge.enrollplus.feature.teacher.presentation.ResolvedDayUi
 import com.littlebridge.enrollplus.feature.teacher.presentation.ResolvedPeriodUi
 import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherCheckInState
@@ -432,6 +433,10 @@ private fun ScheduleCard(today: TeacherTodayState, onOpenLessonPlan: (assignment
                             onOpenLessonPlan = onOpenLessonPlan,
                         )
                     }
+                    if (day.bellSchedule.isNotEmpty()) {
+                        Spacer(Modifier.height(4.dp))
+                        BellScheduleSection(slots = day.bellSchedule)
+                    }
                 }
             }
         }
@@ -602,5 +607,77 @@ private fun ReminderRow(item: ObligationItemDto, onOpenUpdate: () -> Unit, onOpe
         }
         if (item.count > 0) TPill(item.count.toString(), bg = tint.copy(alpha = 0.14f), fg = tint)
         Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bell schedule section — renders the school day config slots (breaks, assembly, etc.)
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun BellScheduleSection(slots: List<BellSlotUi>) {
+    val c = VTheme.colors
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(c.navy.copy(alpha = 0.04f))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(VIcons.Clock, contentDescription = null, tint = c.ink3, modifier = Modifier.size(12.dp))
+            Text(
+                "BELL SCHEDULE",
+                style = VTheme.type.label.colored(c.ink3).copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp),
+            )
+        }
+        slots.forEach { slot ->
+            BellSlotRow(slot)
+        }
+    }
+}
+
+@Composable
+private fun BellSlotRow(slot: BellSlotUi) {
+    val c = VTheme.colors
+    val typeColor = when (slot.slotType) {
+        "TEACHING" -> c.accent
+        "BREAK" -> c.warning
+        "ASSEMBLY" -> c.teal
+        "LAB" -> c.lavenderLight
+        "FREE" -> c.ink3
+        "ZERO" -> c.ink3
+        else -> c.ink3
+    }
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(typeColor.copy(alpha = 0.12f))
+                .padding(horizontal = 6.dp, vertical = 2.dp),
+        ) {
+            Text(
+                slot.slotType.take(4),
+                style = VTheme.type.label.colored(typeColor).copy(fontWeight = FontWeight.Bold, fontSize = 8.5.sp),
+            )
+        }
+        Column(Modifier.weight(1f)) {
+            if (slot.label.isNotBlank()) {
+                Text(slot.label, style = VTheme.type.caption.colored(c.ink).copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold))
+            }
+            Text(
+                "${slot.startTime} – ${slot.endTime}",
+                style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 10.sp),
+            )
+        }
+        Text(
+            "#${slot.slotIndex}",
+            style = VTheme.type.label.colored(c.ink3).copy(fontSize = 9.sp),
+        )
     }
 }
