@@ -703,19 +703,6 @@ internal fun loadMessageStatus(messageId: UUID, userId: UUID): String? {
 }
 
 /**
- * Read Receipts: load the peer's (recipient's) status for a message I sent.
- * Used to show read-receipt ticks on the sender's own messages.
- * Returns the status string (SENT/DELIVERED/READ) or null if no status row exists.
- */
-internal fun loadPeerMessageStatus(messageId: UUID, senderUserId: UUID): String? {
-    return MessageStatusTable.selectAll()
-        .where {
-            (MessageStatusTable.messageId eq messageId) and (MessageStatusTable.userId neq senderUserId)
-        }
-        .singleOrNull()?.get(MessageStatusTable.status)
-}
-
-/**
  * Read Receipts Phase 1 (READ_RECEIPTS_PLAN §6.1.2): bulk-update all SENT/DELIVERED
  * status rows for a user in a conversation to READ. Called by the /threads/{id}/read
  * endpoints after the thread-level unreadCount/isRead update.

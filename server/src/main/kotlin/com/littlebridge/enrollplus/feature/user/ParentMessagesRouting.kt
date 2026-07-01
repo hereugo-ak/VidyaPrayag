@@ -43,7 +43,6 @@ import com.littlebridge.enrollplus.feature.school.UnreadCountDto
 import com.littlebridge.enrollplus.feature.school.handleAttachmentUpload
 import com.littlebridge.enrollplus.feature.school.loadAttachmentsForMessages
 import com.littlebridge.enrollplus.feature.school.loadMessageStatus
-import com.littlebridge.enrollplus.feature.school.loadPeerMessageStatus
 import com.littlebridge.enrollplus.feature.school.notifyMessageRecipient
 import com.littlebridge.enrollplus.feature.school.resolveMessagingUser
 import com.littlebridge.enrollplus.feature.school.sendInConversation
@@ -342,12 +341,8 @@ fun Route.parentMessagesRouting() {
                         val sid = row[MessagesTable.senderId]
                         val created = row[MessagesTable.createdAt]
                         val msgId = row[MessagesTable.id].value
-                        val status = if (paged.conversationId != null) {
-                            if (sid != uid) {
-                                loadMessageStatus(msgId, uid)
-                            } else {
-                                loadPeerMessageStatus(msgId, uid)
-                            }
+                        val status = if (sid != uid && paged.conversationId != null) {
+                            loadMessageStatus(msgId, uid)
                         } else null
                         ParentMessageDto(
                             id = msgId.toString(),
