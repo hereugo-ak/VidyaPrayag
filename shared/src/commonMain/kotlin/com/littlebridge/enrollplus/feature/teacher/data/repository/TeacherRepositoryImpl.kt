@@ -127,7 +127,15 @@ class TeacherRepositoryImpl(
         api.getThreadMessages(token, threadId)
 
     override suspend fun markThreadRead(token: String, threadId: String): NetworkResult<Unit> =
-        api.markThreadRead(token, threadId)
+        when (val r = api.markThreadRead(token, threadId)) {
+            is NetworkResult.Success -> {
+                val envelope = r.data
+                if (!envelope.success) NetworkResult.Error(envelope.message.ifBlank { "Failed to mark thread as read" })
+                else NetworkResult.Success(Unit)
+            }
+            is NetworkResult.Error -> NetworkResult.Error(r.message, r.code)
+            is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
+        }
 
     override suspend fun getUnreadCount(token: String): NetworkResult<Int> =
         when (val r = api.getUnreadCount(token)) {

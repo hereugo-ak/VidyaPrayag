@@ -31,6 +31,7 @@ import com.littlebridge.enrollplus.db.MessageThreadsTable
 import com.littlebridge.enrollplus.db.MessagesTable
 import com.littlebridge.enrollplus.feature.notifications.Notify
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -734,4 +735,4 @@ internal fun getUnreadCount(userId: UUID): Int {
 }
 
 @Serializable
-data class UnreadCountDto(val unreadCount: Int)
+data class UnreadCountDto(@SerialName("unread_count") val unreadCount: Int)

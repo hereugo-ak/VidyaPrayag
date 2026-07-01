@@ -444,7 +444,7 @@ class TeacherApi(
     }
 
     /** POST /api/v1/teacher/messages/threads/{id}/read */
-    suspend fun markThreadRead(token: String, threadId: String): NetworkResult<Unit> = safeApiCall {
+    suspend fun markThreadRead(token: String, threadId: String): NetworkResult<ApiResponse<Unit>> = safeApiCall {
         client.post(getUrl("api/v1/teacher/messages/threads/$threadId/read"))
     }
 
