@@ -27,7 +27,4 @@ class SchoolDayConfigRepositoryImpl(
 
     override suspend fun deactivate(token: String, id: String): NetworkResult<ApiResponse<Unit>> =
         api.deactivate(token, id)
-
-    override suspend fun forClass(token: String, classLevel: String, weekday: Int): NetworkResult<ApiResponse<SchoolDayConfigDto>> =
-        api.forClass(token, classLevel, weekday)
 }

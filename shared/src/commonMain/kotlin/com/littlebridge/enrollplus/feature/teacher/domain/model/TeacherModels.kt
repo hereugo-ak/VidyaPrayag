@@ -33,6 +33,15 @@ data class ResolvedDayResponse(
 )
 
 @Serializable
+data class BellSlotDto(
+    @SerialName("slot_index") val slotIndex: Int,
+    @SerialName("slot_type") val slotType: String,
+    val label: String,
+    @SerialName("start_time") val startTime: String,
+    @SerialName("end_time") val endTime: String,
+)
+
+@Serializable
 data class ResolvedDayDto(
     val date: String,                                   // ISO YYYY-MM-DD (server-authoritative)
     val weekday: Int,                                   // 1=Mon … 7=Sun (ISO)
@@ -44,6 +53,8 @@ data class ResolvedDayDto(
     // null when there is no current/next period (before first / after last / holiday).
     @SerialName("now_index") val nowIndex: Int? = null,
     @SerialName("next_index") val nextIndex: Int? = null,
+    // C-2: bell schedule from school_day_config for this weekday (empty when no config).
+    @SerialName("bell_schedule") val bellSchedule: List<BellSlotDto> = emptyList(),
 )
 
 @Serializable

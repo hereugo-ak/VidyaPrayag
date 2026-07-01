@@ -13,5 +13,4 @@ interface SchoolDayConfigRepository {
     suspend fun create(token: String, request: CreateSchoolDayConfigRequest): NetworkResult<ApiResponse<SchoolDayConfigDto>>
     suspend fun update(token: String, id: String, request: UpdateSchoolDayConfigRequest): NetworkResult<ApiResponse<SchoolDayConfigDto>>
     suspend fun deactivate(token: String, id: String): NetworkResult<ApiResponse<Unit>>
-    suspend fun forClass(token: String, classLevel: String, weekday: Int): NetworkResult<ApiResponse<SchoolDayConfigDto>>
 }

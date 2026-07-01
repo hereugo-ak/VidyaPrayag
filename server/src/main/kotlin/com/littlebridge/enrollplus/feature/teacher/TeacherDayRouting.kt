@@ -62,6 +62,9 @@ import com.littlebridge.enrollplus.db.LessonPlansTable
 import com.littlebridge.enrollplus.db.LeaveRequestsTable
 import com.littlebridge.enrollplus.db.PeriodExceptionsTable
 import com.littlebridge.enrollplus.db.TeacherPeriodsTable
+import com.littlebridge.enrollplus.db.SchoolDayConfigTable
+import com.littlebridge.enrollplus.db.SchoolDaySlotsTable
+import com.littlebridge.enrollplus.db.SYSTEM_SCHOOL_ID
 import com.littlebridge.enrollplus.db.TeacherSubjectAssignmentsTable
 import com.littlebridge.enrollplus.db.TeacherCheckInsTable
 import com.littlebridge.enrollplus.feature.calendar.EventStatus
@@ -125,6 +128,15 @@ data class CalendarOverlayDto(
 )
 
 @Serializable
+data class BellSlotDto(
+    @SerialName("slot_index") val slotIndex: Int,
+    @SerialName("slot_type") val slotType: String,
+    val label: String,
+    @SerialName("start_time") val startTime: String,
+    @SerialName("end_time") val endTime: String,
+)
+
+@Serializable
 data class ResolvedDayDto(
     val date: String,
     val weekday: Int,
@@ -134,6 +146,7 @@ data class ResolvedDayDto(
     val calendar: List<CalendarOverlayDto> = emptyList(),
     @SerialName("now_index") val nowIndex: Int? = null,
     @SerialName("next_index") val nextIndex: Int? = null,
+    @SerialName("bell_schedule") val bellSchedule: List<BellSlotDto> = emptyList(),
 )
 
 @Serializable
@@ -241,6 +254,50 @@ private data class PeriodScope(
  * @param nowProvider server clock for nowIndex/nextIndex; null for days other
  *        than "today" so a non-today resolved day carries no spurious "now".
  */
+private data class BellScheduleResult(
+    val slots: List<BellSlotDto>,
+    val hasConfig: Boolean,
+    val isSchoolDay: Boolean,
+)
+
+private fun resolveBellSchedule(schoolId: UUID, weekday: Int): BellScheduleResult {
+    fun fetchForSchool(sid: UUID): Pair<List<BellSlotDto>, Boolean>? {
+        val configs = SchoolDayConfigTable.selectAll()
+            .where {
+                (SchoolDayConfigTable.schoolId eq sid) and
+                    (SchoolDayConfigTable.isActive eq true)
+            }
+            .toList()
+        if (configs.isEmpty()) return null
+        val matching = configs.firstOrNull { r ->
+            val days = r[SchoolDayConfigTable.applicableDays]
+                .split(",").map { it.trim().toIntOrNull() }.filterNotNull()
+            weekday in days
+        }
+        if (matching == null) return emptyList<BellSlotDto>() to false
+        val cid = matching[SchoolDayConfigTable.id].value
+        val slots = SchoolDaySlotsTable.selectAll()
+            .where { (SchoolDaySlotsTable.configId eq cid) and (SchoolDaySlotsTable.schoolId eq sid) }
+            .orderBy(SchoolDaySlotsTable.slotIndex)
+            .map { s ->
+                BellSlotDto(
+                    slotIndex = s[SchoolDaySlotsTable.slotIndex],
+                    slotType = s[SchoolDaySlotsTable.slotType],
+                    label = s[SchoolDaySlotsTable.label],
+                    startTime = s[SchoolDaySlotsTable.startTime].format(HHMM_DAY),
+                    endTime = s[SchoolDaySlotsTable.endTime].format(HHMM_DAY),
+                )
+            }
+        return slots to true
+    }
+    val result = fetchForSchool(schoolId) ?: fetchForSchool(SYSTEM_SCHOOL_ID)
+    return if (result != null) {
+        BellScheduleResult(slots = result.first, hasConfig = true, isSchoolDay = result.second)
+    } else {
+        BellScheduleResult(slots = emptyList(), hasConfig = false, isSchoolDay = true)
+    }
+}
+
 private fun resolveDayInTxn(
     ctx: TeacherContext,
     date: LocalDate,
@@ -289,6 +346,22 @@ private fun resolveDayInTxn(
             calendar = overlay,
             nowIndex = null,
             nextIndex = null,
+        )
+    }
+
+    // ── 1b. School day config — bell schedule + applicable-day check (C-2) ────
+    val bellResult = resolveBellSchedule(ctx.schoolId, weekday)
+    if (bellResult.hasConfig && !bellResult.isSchoolDay) {
+        return ResolvedDayDto(
+            date = date.toString(),
+            weekday = weekday,
+            isHoliday = false,
+            holidayName = null,
+            periods = emptyList(),
+            calendar = overlay,
+            nowIndex = null,
+            nextIndex = null,
+            bellSchedule = emptyList(),
         )
     }
 
@@ -550,6 +623,7 @@ private fun resolveDayInTxn(
         calendar = overlay,
         nowIndex = nowIndex,
         nextIndex = nextIndex,
+        bellSchedule = bellResult.slots,
     )
 }
 

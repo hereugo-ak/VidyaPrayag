@@ -75,14 +75,4 @@ class SchoolDayConfigApi(
             bearerAuth(token)
         }
     }
-
-    suspend fun forClass(
-        token: String,
-        classLevel: String,
-        weekday: Int,
-    ): NetworkResult<ApiResponse<SchoolDayConfigDto>> = safeApiCall {
-        client.get(getUrl("api/v1/school/day-config/for-class?class_level=$classLevel&weekday=$weekday")) {
-            bearerAuth(token)
-        }
-    }
 }
