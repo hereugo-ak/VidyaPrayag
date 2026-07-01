@@ -391,4 +391,31 @@ class MessagingPhase1Test {
         assertTrue(src.contains("markConversationRead("), "Parent MessagesRouting must call markConversationRead")
         assertTrue(src.contains("\"/unread-count\""), "Parent MessagesRouting must have GET /unread-count endpoint")
     }
+
+    // ── Read Receipts: loadPeerMessageStatus for sender read receipts ─────────
+
+    @Test
+    fun messagingCore_hasLoadPeerMessageStatus() {
+        val src = source("feature/school/MessagingCore.kt")
+        assertTrue(src.contains("fun loadPeerMessageStatus("), "MessagingCore must have loadPeerMessageStatus function")
+        assertTrue(src.contains("neq"), "loadPeerMessageStatus must query for userId != sender")
+    }
+
+    @Test
+    fun adminRouting_callsLoadPeerMessageStatus() {
+        val src = source("feature/school/MessagesRouting.kt")
+        assertTrue(src.contains("loadPeerMessageStatus("), "Admin MessagesRouting must call loadPeerMessageStatus for sent messages")
+    }
+
+    @Test
+    fun teacherRouting_callsLoadPeerMessageStatus() {
+        val src = source("feature/teacher/TeacherMessagesRouting.kt")
+        assertTrue(src.contains("loadPeerMessageStatus("), "Teacher MessagesRouting must call loadPeerMessageStatus for sent messages")
+    }
+
+    @Test
+    fun parentRouting_callsLoadPeerMessageStatus() {
+        val src = source("feature/user/ParentMessagesRouting.kt")
+        assertTrue(src.contains("loadPeerMessageStatus("), "Parent MessagesRouting must call loadPeerMessageStatus for sent messages")
+    }
 }
