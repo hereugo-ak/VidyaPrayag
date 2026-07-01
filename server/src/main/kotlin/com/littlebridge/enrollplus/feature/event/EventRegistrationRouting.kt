@@ -191,6 +191,7 @@ data class TeacherSlotDto(
 data class SlotBookingDto(
     @SerialName("registration_id") val registrationId: String,
     @SerialName("parent_name") val parentName: String,
+    @SerialName("parent_mobile") val parentMobile: String = "",
     @SerialName("student_name") val studentName: String,
     @SerialName("attendee_count") val attendeeCount: Int,
     val status: String,
@@ -1072,6 +1073,7 @@ fun Route.eventRegistrationRouting() {
                         SlotBookingDto(
                             registrationId = bRow[EventRegistrationsTable.id].value.toString(),
                             parentName = bRow[AppUsersTable.fullName],
+                            parentMobile = bRow[AppUsersTable.phone] ?: "",
                             studentName = studentName,
                             attendeeCount = bRow[EventRegistrationsTable.attendeeCount],
                             status = bRow[EventRegistrationsTable.status],
@@ -1248,6 +1250,42 @@ fun Route.eventRegistrationRouting() {
                     )
                 }
                 call.ok(AdminEventListResponse(events = dtos), message = "Events loaded")
+            }
+
+            // ── LIST slots for a specific event ──
+            get("/{eventId}/slots") {
+                val ctx = call.requireSchoolContext() ?: return@get
+                val eventId = call.parameters["eventId"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                    ?: run { call.fail("Invalid eventId", HttpStatusCode.BadRequest); return@get }
+
+                val eventOwned = dbQuery {
+                    CalendarEventsTable.selectAll().where {
+                        (CalendarEventsTable.id eq eventId) and
+                            (CalendarEventsTable.schoolId eq ctx.schoolId)
+                    }.any()
+                }
+                if (!eventOwned) {
+                    call.fail("Event not found", HttpStatusCode.NotFound, "EVENT_NOT_FOUND"); return@get
+                }
+
+                val slots = dbQuery {
+                    EventSlotsTable.selectAll().where {
+                        (EventSlotsTable.eventId eq eventId) and (EventSlotsTable.isActive eq true)
+                    }.orderBy(EventSlotsTable.startTime, SortOrder.ASC).toList()
+                }
+
+                val dtos = slots.map { sRow ->
+                    val slotId = sRow[EventSlotsTable.id].value
+                    val booked = countSlotBookings(slotId)
+                    SlotResponse(
+                        id = slotId.toString(),
+                        startTime = sRow[EventSlotsTable.startTime],
+                        endTime = sRow[EventSlotsTable.endTime],
+                        capacity = sRow[EventSlotsTable.capacity],
+                        isActive = sRow[EventSlotsTable.isActive],
+                    )
+                }
+                call.ok(dtos, message = "Slots loaded")
             }
 
             // ── LIST all registrations (filterable) ──

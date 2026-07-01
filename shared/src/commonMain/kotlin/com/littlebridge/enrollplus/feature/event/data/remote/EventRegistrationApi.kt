@@ -122,6 +122,9 @@ class EventRegistrationApi(
     suspend fun listAdminEvents(token: String): NetworkResult<ApiResponse<AdminEventListResponse>> =
         safeApiCall { client.get(url("api/v1/school/events")) }
 
+    suspend fun listEventSlots(token: String, eventId: String): NetworkResult<ApiResponse<List<SlotResponse>>> =
+        safeApiCall { client.get(url("api/v1/school/events/$eventId/slots")) }
+
     suspend fun listAllRegistrations(
         token: String,
         status: String? = null,

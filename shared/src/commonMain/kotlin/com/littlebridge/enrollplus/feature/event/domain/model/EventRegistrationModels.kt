@@ -128,6 +128,7 @@ data class TeacherSlotDto(
 data class SlotBookingDto(
     @SerialName("registration_id") val registrationId: String,
     @SerialName("parent_name") val parentName: String,
+    @SerialName("parent_mobile") val parentMobile: String = "",
     @SerialName("student_name") val studentName: String,
     @SerialName("attendee_count") val attendeeCount: Int,
     val status: String,

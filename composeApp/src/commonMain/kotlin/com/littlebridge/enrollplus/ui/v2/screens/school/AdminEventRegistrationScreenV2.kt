@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,6 +32,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.littlebridge.enrollplus.feature.event.domain.model.AdminEventDto
 import com.littlebridge.enrollplus.feature.event.domain.model.AdminRegistrationDto
+import com.littlebridge.enrollplus.feature.event.domain.model.AutoGenerateSlotsRequest
+import com.littlebridge.enrollplus.feature.event.domain.model.UpdateRegistrationConfigRequest
 import com.littlebridge.enrollplus.feature.event.presentation.AdminEventRegistrationState
 import com.littlebridge.enrollplus.feature.event.presentation.AdminEventRegistrationViewModel
 import com.littlebridge.enrollplus.ui.v2.components.VBackHeader
@@ -105,6 +108,9 @@ fun AdminEventRegistrationScreenV2(
         }
 
         if (selectedEventId != null && selectedEvent != null) {
+            LaunchedEffect(selectedEventId) {
+                viewModel.loadSlots(selectedEventId!!)
+            }
             EventManageContent(
                 event = selectedEvent,
                 state = state,
@@ -124,6 +130,12 @@ fun AdminEventRegistrationScreenV2(
                     slotStart = ""
                     slotEnd = ""
                 },
+                onAutoGenerate = { rangeStart, rangeEnd, duration, capacity, breakAfter, breakDuration ->
+                    viewModel.autoGenerateSlots(
+                        selectedEventId!!,
+                        AutoGenerateSlotsRequest(rangeStart, rangeEnd, duration, capacity, breakAfter, breakDuration),
+                    )
+                },
                 onDeleteSlot = { slotId ->
                     viewModel.deleteSlot(selectedEventId!!, slotId)
                 },
@@ -136,6 +148,12 @@ fun AdminEventRegistrationScreenV2(
                 },
                 onViewRegistrations = {
                     viewModel.loadEventRegistrations(selectedEventId!!)
+                },
+                onToggleRegistration = { enabled ->
+                    viewModel.updateRegistrationConfig(
+                        selectedEventId!!,
+                        UpdateRegistrationConfigRequest(registrationEnabled = enabled),
+                    )
                 },
             )
         } else if (showAllRegistrations) {
@@ -249,12 +267,21 @@ private fun EventManageContent(
     onSlotEndChange: (String) -> Unit,
     onSlotCapacityChange: (String) -> Unit,
     onCreateSlot: () -> Unit,
+    onAutoGenerate: (String, String, Int, Int, Int, Int) -> Unit,
     onDeleteSlot: (String) -> Unit,
     onCancelEvent: () -> Unit,
     onExportCsv: () -> Unit,
     onViewRegistrations: () -> Unit,
+    onToggleRegistration: (Boolean) -> Unit,
 ) {
     val c = VTheme.colors
+    var showAutoGen by remember { mutableStateOf(false) }
+    var autoRangeStart by remember { mutableStateOf("09:00") }
+    var autoRangeEnd by remember { mutableStateOf("12:00") }
+    var autoDuration by remember { mutableStateOf("15") }
+    var autoCapacity by remember { mutableStateOf("1") }
+    var autoBreakAfter by remember { mutableStateOf("0") }
+    var autoBreakDuration by remember { mutableStateOf("5") }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -281,6 +308,13 @@ private fun EventManageContent(
                         VBadge(text = "${event.slotCount} slots", tone = VBadgeTone.Accent)
                         VBadge(text = "${event.totalRegistrations} regs", tone = VBadgeTone.Accent)
                     }
+                    Spacer(Modifier.height(8.dp))
+                    VButton(
+                        text = if (event.registrationEnabled) "Close Registration" else "Open Registration",
+                        onClick = { onToggleRegistration(!event.registrationEnabled) },
+                        variant = VButtonVariant.Secondary,
+                        full = true,
+                    )
                 }
             }
         }
@@ -324,6 +358,89 @@ private fun EventManageContent(
                         loading = state.isCreating,
                         full = true,
                     )
+                    Spacer(Modifier.height(8.dp))
+                    VButton(
+                        text = if (showAutoGen) "Hide Auto-Generate" else "Auto-Generate Slots",
+                        onClick = { showAutoGen = !showAutoGen },
+                        variant = VButtonVariant.Ghost,
+                        full = true,
+                    )
+                    if (showAutoGen) {
+                        Spacer(Modifier.height(8.dp))
+                        VInput(
+                            value = autoRangeStart,
+                            onValueChange = { autoRangeStart = it },
+                            label = "Range start (HH:mm)",
+                            placeholder = "09:00",
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        VInput(
+                            value = autoRangeEnd,
+                            onValueChange = { autoRangeEnd = it },
+                            label = "Range end (HH:mm)",
+                            placeholder = "12:00",
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        VInput(
+                            value = autoDuration,
+                            onValueChange = { autoDuration = it },
+                            label = "Slot duration (minutes)",
+                            placeholder = "15",
+                            keyboardType = KeyboardType.Number,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        VInput(
+                            value = autoCapacity,
+                            onValueChange = { autoCapacity = it },
+                            label = "Capacity per slot",
+                            placeholder = "1",
+                            keyboardType = KeyboardType.Number,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            VInput(
+                                value = autoBreakAfter,
+                                onValueChange = { autoBreakAfter = it },
+                                label = "Break after N slots",
+                                placeholder = "0",
+                                keyboardType = KeyboardType.Number,
+                                modifier = Modifier.weight(1f),
+                            )
+                            VInput(
+                                value = autoBreakDuration,
+                                onValueChange = { autoBreakDuration = it },
+                                label = "Break (min)",
+                                placeholder = "5",
+                                keyboardType = KeyboardType.Number,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        VButton(
+                            text = "Generate",
+                            onClick = {
+                                onAutoGenerate(
+                                    autoRangeStart,
+                                    autoRangeEnd,
+                                    autoDuration.toIntOrNull() ?: 15,
+                                    autoCapacity.toIntOrNull() ?: 1,
+                                    autoBreakAfter.toIntOrNull() ?: 0,
+                                    autoBreakDuration.toIntOrNull() ?: 5,
+                                )
+                            },
+                            variant = VButtonVariant.Primary,
+                            enabled = !state.isCreating,
+                            loading = state.isCreating,
+                            full = true,
+                        )
+                    }
                     if (state.slots.isNotEmpty()) {
                         Spacer(Modifier.height(8.dp))
                         state.slots.forEach { slot ->

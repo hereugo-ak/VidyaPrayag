@@ -119,6 +119,26 @@ class AdminEventRegistrationViewModel(
         }
     }
 
+    fun loadSlots(eventId: String) {
+        viewModelScope.launch {
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) return@launch
+            when (val result = repository.listEventSlots(token, eventId)) {
+                is NetworkResult.Success -> {
+                    _state.value = _state.value.copy(
+                        slots = result.data.data ?: emptyList(),
+                    )
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(errorMessage = result.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(errorMessage = "Connection error. Check your internet.")
+                }
+            }
+        }
+    }
+
     fun createSlot(eventId: String, startTime: String, endTime: String, capacity: Int) {
         viewModelScope.launch {
             _state.value = _state.value.copy(isCreating = true, errorMessage = null)
