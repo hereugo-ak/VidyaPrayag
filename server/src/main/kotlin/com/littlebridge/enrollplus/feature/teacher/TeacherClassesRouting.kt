@@ -656,7 +656,7 @@ internal fun nextPeriodForInTxn(
     today: LocalDate,
     todayWeekday: Int,
 ): NextPeriodDto? {
-    val now = LocalTime.now()
+    val now = LocalTime.now(IST_ZONE)
     val periods = TeacherPeriodsTable.selectAll().where {
         (TeacherPeriodsTable.schoolId eq ctx.schoolId) and
             (TeacherPeriodsTable.teacherId eq ctx.userId) and

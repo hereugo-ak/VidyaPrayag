@@ -260,7 +260,7 @@ private fun ResultRow.isHomeworkPastDue(): Boolean {
         dueDate.isBefore(today) -> true
         dueDate.isAfter(today) -> false
         // Same day: past only if a cutoff time exists and has elapsed.
-        else -> dueTime != null && LocalTime.now().isAfter(dueTime)
+        else -> dueTime != null && LocalTime.now(IST_ZONE).isAfter(dueTime)
     }
 }
 
