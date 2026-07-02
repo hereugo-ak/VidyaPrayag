@@ -3,6 +3,9 @@ package com.littlebridge.enrollplus.feature.teacher.data.remote
 import com.littlebridge.enrollplus.core.model.ApiResponse
 import com.littlebridge.enrollplus.core.network.NetworkResult
 import com.littlebridge.enrollplus.core.network.safeApiCall
+import com.littlebridge.enrollplus.feature.admin.domain.model.ChangeRequestListResponse
+import com.littlebridge.enrollplus.feature.admin.domain.model.CreateChangeRequestRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.TimetableChangeRequestDto
 import com.littlebridge.enrollplus.feature.teacher.domain.model.*
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -574,6 +577,24 @@ class TeacherApi(
         request: InstantiateFromTemplateRequest,
     ): NetworkResult<LessonPlanSingleResponse> = safeApiCall {
         client.post(getUrl("api/v1/teacher/lesson-plans/from-template/$templateId")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    // ── Timetable change requests (teacher → admin approval) ────────────────
+
+    suspend fun getTimetableChangeRequests(
+        token: String,
+    ): NetworkResult<ChangeRequestListResponse> = safeApiCall {
+        client.get(getUrl("api/v1/teacher/timetable-requests"))
+    }
+
+    suspend fun submitTimetableChangeRequest(
+        token: String,
+        request: CreateChangeRequestRequest,
+    ): NetworkResult<ApiResponse<TimetableChangeRequestDto>> = safeApiCall {
+        client.post(getUrl("api/v1/teacher/timetable-requests")) {
             contentType(ContentType.Application.Json)
             setBody(request)
         }

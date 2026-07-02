@@ -65,6 +65,7 @@ import com.littlebridge.enrollplus.db.AttendanceRecordsTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.db.HomeworkSubmissionsTable
 import com.littlebridge.enrollplus.db.HomeworkTable
+import com.littlebridge.enrollplus.db.SchoolClassesTable
 import com.littlebridge.enrollplus.db.StudentsTable
 import com.littlebridge.enrollplus.db.TeacherPeriodsTable
 import io.ktor.server.application.*
@@ -222,7 +223,7 @@ fun Route.teacherClassesRouting() {
                     return@get
                 }
 
-                val today = LocalDate.now()
+                val today = todayIst()
                 val weekday = today.dayOfWeek.value
                 val monthStart = today.minusDays(30)
 
@@ -248,7 +249,7 @@ fun Route.teacherClassesRouting() {
                 val ctx = call.requireTeacherContext() ?: return@get
                 val a = call.requireOwnedAssignment(ctx, call.parameters["assignmentId"]) ?: return@get
 
-                val today = LocalDate.now()
+                val today = todayIst()
                 val weekday = today.dayOfWeek.value
                 val monthStart = today.minusDays(30)
                 val weekStart = today.minusDays(6)
@@ -445,15 +446,21 @@ private fun buildClassSummaryInTxn(
 // Shared in-transaction query helpers (reused by T-501/T-502/T-503).
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Typed roster (active enrollments) for an owned assignment, roll-ordered. */
+/** Typed roster (active enrollments) for an owned assignment, roll-ordered.
+ *
+ * Primary path: EnrollmentsTable by classId + section (typed FK lookup).
+ * Fallback when classId is null (unmigrated TSA row): resolve classId from
+ * SchoolClassesTable by school + class name, then query enrollments.
+ * Final fallback: StudentsTable + ClassNaming match (same as studentCountFor).
+ */
 internal fun rosterForInTxn(a: OwnedAssignment): List<EnrolledStudent> {
-    val classId = a.classId ?: return emptyList()
+    val resolvedClassId = a.classId ?: resolveClassIdByName(a) ?: return fallbackRosterByClassNaming(a)
     val enrollments = com.littlebridge.enrollplus.db.EnrollmentsTable.selectAll().where {
-        (com.littlebridge.enrollplus.db.EnrollmentsTable.classId eq classId) and
+        (com.littlebridge.enrollplus.db.EnrollmentsTable.classId eq resolvedClassId) and
             (com.littlebridge.enrollplus.db.EnrollmentsTable.section eq a.section) and
             (com.littlebridge.enrollplus.db.EnrollmentsTable.status eq "active")
     }.toList()
-    if (enrollments.isEmpty()) return emptyList()
+    if (enrollments.isEmpty()) return fallbackRosterByClassNaming(a)
     val sids = enrollments.map { it[com.littlebridge.enrollplus.db.EnrollmentsTable.studentId] }.distinct()
     val studentsById = com.littlebridge.enrollplus.db.StudentsTable.selectAll().where {
         com.littlebridge.enrollplus.db.StudentsTable.id inList
@@ -469,6 +476,36 @@ internal fun rosterForInTxn(a: OwnedAssignment): List<EnrolledStudent> {
             rollNumber = e[com.littlebridge.enrollplus.db.EnrollmentsTable.rollNumber],
             section = e[com.littlebridge.enrollplus.db.EnrollmentsTable.section],
             enrollmentId = e[com.littlebridge.enrollplus.db.EnrollmentsTable.id].value,
+        )
+    }.sortedWith(compareBy({ it.rollNumber ?: Int.MAX_VALUE }, { it.fullName }))
+}
+
+/** Look up classId from SchoolClassesTable by school + class name (case-insensitive). */
+private fun resolveClassIdByName(a: OwnedAssignment): java.util.UUID? {
+    return SchoolClassesTable.selectAll().where {
+        (SchoolClassesTable.schoolId eq a.schoolId)
+    }.firstOrNull {
+        com.littlebridge.enrollplus.core.ClassNaming.classKey(it[SchoolClassesTable.name]) ==
+            com.littlebridge.enrollplus.core.ClassNaming.classKey(a.className)
+    }?.get(SchoolClassesTable.id)?.value
+}
+
+/** Fallback: match students by ClassNaming on className + section (no enrollments needed). */
+private fun fallbackRosterByClassNaming(a: OwnedAssignment): List<EnrolledStudent> {
+    return StudentsTable.selectAll().where {
+        (StudentsTable.schoolId eq a.schoolId) and (StudentsTable.isActive eq true)
+    }.filter {
+        com.littlebridge.enrollplus.core.ClassNaming.sameClassSection(
+            it[StudentsTable.className], it[StudentsTable.section], a.className, a.section
+        )
+    }.map { s ->
+        EnrolledStudent(
+            studentId = s[StudentsTable.id].value,
+            studentCode = s[StudentsTable.studentCode],
+            fullName = s[StudentsTable.fullName],
+            rollNumber = s[StudentsTable.rollNumber]?.toIntOrNull(),
+            section = a.section,
+            enrollmentId = s[StudentsTable.id].value,
         )
     }.sortedWith(compareBy({ it.rollNumber ?: Int.MAX_VALUE }, { it.fullName }))
 }
@@ -656,7 +693,7 @@ internal fun nextPeriodForInTxn(
     today: LocalDate,
     todayWeekday: Int,
 ): NextPeriodDto? {
-    val now = LocalTime.now()
+    val now = LocalTime.now(IST_ZONE)
     val periods = TeacherPeriodsTable.selectAll().where {
         (TeacherPeriodsTable.schoolId eq ctx.schoolId) and
             (TeacherPeriodsTable.teacherId eq ctx.userId) and

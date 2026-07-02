@@ -481,6 +481,35 @@ val commonModule = module {
         com.littlebridge.enrollplus.feature.event.data.repository.EventRegistrationRepositoryImpl(get())
     }
 
+    single {
+        com.littlebridge.enrollplus.feature.admin.data.remote.SchoolDayConfigApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single<com.littlebridge.enrollplus.feature.admin.domain.repository.SchoolDayConfigRepository> {
+        com.littlebridge.enrollplus.feature.admin.data.repository.SchoolDayConfigRepositoryImpl(get())
+    }
+
+    // Timetable AI Import (OCR + text parsing)
+    single {
+        com.littlebridge.enrollplus.feature.admin.data.remote.TimetableImportApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+
+    // Classes & Subjects management (consolidated admin screen)
+    single {
+        com.littlebridge.enrollplus.feature.admin.data.remote.SchoolClassesApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single<com.littlebridge.enrollplus.feature.admin.domain.repository.SchoolClassesRepository> {
+        com.littlebridge.enrollplus.feature.admin.data.repository.SchoolClassesRepositoryImpl(get())
+    }
+
     // UseCases
     factory { GetSchoolsUseCase(get()) }
 }
@@ -581,6 +610,7 @@ val viewModelModule = module {
     // AuthRepository, theme pref) — (TeacherRepository, PreferenceRepository, AuthRepository).
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherProfileActionsViewModel(get(), get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherLeaveViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherTimetableViewModel(get(), get()) }
     // PEWS (Predictive Early Warning System) view models
     factory { com.littlebridge.enrollplus.feature.pews.presentation.PewsCohortViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.pews.presentation.PewsStudentDetailViewModel(get(), get()) }
@@ -643,6 +673,10 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.event.presentation.ParentEventRegistrationViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.event.presentation.TeacherEventRegistrationViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.event.presentation.AdminEventRegistrationViewModel(get(), get()) }
+    // School Day Configuration (TIMETABLE_CLASS_TEACHER_PLAN.md Phase 0)
+    factory { com.littlebridge.enrollplus.feature.admin.presentation.SchoolDayConfigViewModel(get(), get(), get()) }
+    // Classes & Subjects consolidated management screen
+    factory { com.littlebridge.enrollplus.feature.admin.presentation.ClassesSubjectsViewModel(get(), get(), get()) }
 }
 
 fun initKoin(

@@ -200,10 +200,16 @@ class ParentDashboardViewModel(
     fun refreshLiveClock() {
         val tt = _state.value.timetable
         val syl = _state.value.syllabus
+        val todayState = _state.value.attendance?.let { resolveToday(it) } ?: TodayAttendance(AttendanceDayState.NoData)
+        val isNonSchoolDay = todayState.state in setOf(
+            AttendanceDayState.Holiday,
+            AttendanceDayState.Vacation,
+            AttendanceDayState.Sunday,
+        )
         _state.update {
             it.copy(
-                todayPeriods = computeTodayPeriods(tt),
-                schoolDayEnded = computeSchoolDayEnded(tt),
+                todayPeriods = if (isNonSchoolDay) emptyList() else computeTodayPeriods(tt),
+                schoolDayEnded = if (isNonSchoolDay) true else computeSchoolDayEnded(tt),
                 coveredToday = computeCoveredToday(syl),
             )
         }
@@ -253,11 +259,17 @@ class ParentDashboardViewModel(
             when (val r = repository.getChildTimetable(token, childId)) {
                 is NetworkResult.Success -> _state.update {
                     val data = r.data.data
+                    val todayState = it.attendance?.let { att -> resolveToday(att) } ?: TodayAttendance(AttendanceDayState.NoData)
+                    val isNonSchoolDay = todayState.state in setOf(
+                        AttendanceDayState.Holiday,
+                        AttendanceDayState.Vacation,
+                        AttendanceDayState.Sunday,
+                    )
                     it.copy(
                         timetableLoading = false,
                         timetable = data,
-                        todayPeriods = computeTodayPeriods(data),
-                        schoolDayEnded = computeSchoolDayEnded(data),
+                        todayPeriods = if (isNonSchoolDay) emptyList() else computeTodayPeriods(data),
+                        schoolDayEnded = if (isNonSchoolDay) true else computeSchoolDayEnded(data),
                     )
                 }
                 else -> _state.update { it.copy(timetableLoading = false) }

@@ -255,12 +255,12 @@ private suspend fun ApplicationCall.requireOwnedHomework(
 private fun ResultRow.isHomeworkPastDue(): Boolean {
     val dueDate = this[HomeworkTable.dueDate]
     val dueTime = this[HomeworkTable.dueTime]
-    val today = LocalDate.now()
+    val today = todayIst()
     return when {
         dueDate.isBefore(today) -> true
         dueDate.isAfter(today) -> false
         // Same day: past only if a cutoff time exists and has elapsed.
-        else -> dueTime != null && LocalTime.now().isAfter(dueTime)
+        else -> dueTime != null && LocalTime.now(IST_ZONE).isAfter(dueTime)
     }
 }
 
@@ -484,7 +484,7 @@ private fun Route.homeworkListAndAssign() {
             call.fail("due_date is required", HttpStatusCode.BadRequest, "BAD_DATE"); return@post
         }
         // H1: due date in the past is blocked at create.
-        if (dueDate.isBefore(LocalDate.now())) {
+        if (dueDate.isBefore(todayIst())) {
             call.fail("Due date cannot be in the past", HttpStatusCode.BadRequest, "DUE_IN_PAST"); return@post
         }
         val dueTime: LocalTime? = req.dueTime?.takeIf { it.isNotBlank() }?.let {
@@ -617,7 +617,7 @@ private fun Route.homeworkExtend() {
         } ?: run {
             call.fail("new_due_date is required", HttpStatusCode.BadRequest, "BAD_DATE"); return@post
         }
-        if (newDueDate.isBefore(LocalDate.now())) {
+        if (newDueDate.isBefore(todayIst())) {
             call.fail("Extension date cannot be in the past", HttpStatusCode.BadRequest, "EXT_IN_PAST"); return@post
         }
         val newDueTime: LocalTime? = req.newDueTime?.takeIf { it.isNotBlank() }?.let {

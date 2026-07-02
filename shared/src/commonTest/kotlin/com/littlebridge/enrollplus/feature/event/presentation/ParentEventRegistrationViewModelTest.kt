@@ -175,6 +175,12 @@ private class FakeEventRepository(
     override suspend fun checkinParent(token: String, eventId: String, registrationId: String) =
         NetworkResult.Success(ApiResponse(success = true, data = Unit))
 
+    override suspend fun listAdminEvents(token: String) =
+        NetworkResult.Success(ApiResponse(success = true, data = AdminEventListResponse()))
+
+    override suspend fun listEventSlots(token: String, eventId: String) =
+        NetworkResult.Success(ApiResponse(success = true, data = emptyList<SlotResponse>()))
+
     override suspend fun listAllRegistrations(token: String, status: String?, eventId: String?) =
         NetworkResult.Success(ApiResponse(success = true, data = AdminRegistrationListResponse()))
 

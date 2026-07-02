@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.littlebridge.enrollplus.feature.teacher.domain.model.ObligationItemDto
+import com.littlebridge.enrollplus.feature.teacher.presentation.BellSlotUi
 import com.littlebridge.enrollplus.feature.teacher.presentation.ResolvedDayUi
 import com.littlebridge.enrollplus.feature.teacher.presentation.ResolvedPeriodUi
 import com.littlebridge.enrollplus.feature.teacher.presentation.TeacherCheckInState
@@ -49,6 +51,7 @@ import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
 import com.littlebridge.enrollplus.ui.v2.theme.colored
 import com.littlebridge.enrollplus.util.todayIso
+import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -85,6 +88,19 @@ fun TeacherHomeScreenV2(
     val today by todayViewModel.state.collectAsStateV2()
     val checkIn by checkInViewModel.state.collectAsStateV2()
     val obligations by obligationsViewModel.state.collectAsStateV2()
+
+    // Refresh obligations + today's schedule on appear + periodically (every 60s)
+    // so the attendance card and reminders stay in sync after marking attendance
+    // or returning from another tab.
+    LaunchedEffect(Unit) {
+        obligationsViewModel.load()
+        todayViewModel.load()
+        while (true) {
+            delay(60_000L)
+            obligationsViewModel.load()
+            todayViewModel.load()
+        }
+    }
 
     // First-login-of-day popup gate: show once per day, tracked in saveable state. It pops only when
     // the status has resolved as "not checked in" and the teacher hasn't dismissed it this session.
@@ -410,11 +426,18 @@ private fun AttendanceClassRow(p: ResolvedPeriodUi, onOpen: (assignmentId: Strin
 private fun ScheduleCard(today: TeacherTodayState, onOpenLessonPlan: (assignmentId: String, scope: String) -> Unit = { _, _ -> }) {
     val c = VTheme.colors
     val day = today.day
-    TCard(padding = 18.dp) {
+    val periods = day?.periods.orEmpty()
+    val hasPeriods = periods.isNotEmpty()
+    var face by remember { mutableStateOf(0) }
+    val maxFace = if (hasPeriods) 1 else 0
+
+    SwipeExpandCard(face = face, faceCount = maxFace + 1, onFaceChange = { face = it }, padding = 18.dp) { f ->
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TEyebrow("TODAY'S SCHEDULE", dot = c.accent)
                 Spacer(Modifier.weight(1f))
+                if (maxFace > 0) FaceDots(f, maxFace + 1)
+                Spacer(Modifier.width(8.dp))
                 Text(prettyDate(day?.date), style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))
             }
             Spacer(Modifier.height(12.dp))
@@ -423,14 +446,52 @@ private fun ScheduleCard(today: TeacherTodayState, onOpenLessonPlan: (assignment
                 day == null -> Text("Couldn't load your schedule.", style = VTheme.type.body.colored(c.ink2).copy(fontSize = 13.sp))
                 day.isHoliday -> HolidayRow(day)
                 day.periods.isEmpty() -> Text("No periods scheduled today.", style = VTheme.type.body.colored(c.ink2).copy(fontSize = 13.sp))
-                else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    day.periods.forEachIndexed { i, p ->
-                        SchedulePeriodRow(
-                            p,
-                            isNow = i == day.nowIndex,
-                            isNext = i == day.nextIndex,
-                            onOpenLessonPlan = onOpenLessonPlan,
-                        )
+                else -> when (f) {
+                    0 -> {
+                        // Compact face: current or next class only
+                        val currentPeriod = periods.getOrNull(day.nowIndex)
+                        val nextPeriod = periods.getOrNull(day.nextIndex)
+                        if (currentPeriod != null) {
+                            SchedulePeriodRow(
+                                currentPeriod,
+                                isNow = true,
+                                isNext = false,
+                                onOpenLessonPlan = onOpenLessonPlan,
+                            )
+                        } else if (nextPeriod != null) {
+                            SchedulePeriodRow(
+                                nextPeriod,
+                                isNow = false,
+                                isNext = true,
+                                onOpenLessonPlan = onOpenLessonPlan,
+                            )
+                        } else {
+                            // No current or next — show first period
+                            periods.firstOrNull()?.let {
+                                SchedulePeriodRow(it, isNow = false, isNext = false, onOpenLessonPlan = onOpenLessonPlan)
+                            } ?: Text("No periods scheduled today.", style = VTheme.type.body.colored(c.ink2).copy(fontSize = 13.sp))
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        TSwipeHint("Swipe to see full schedule →")
+                    }
+                    else -> {
+                        // Expanded face: all periods
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            periods.forEachIndexed { i, p ->
+                                SchedulePeriodRow(
+                                    p,
+                                    isNow = i == day.nowIndex,
+                                    isNext = i == day.nextIndex,
+                                    onOpenLessonPlan = onOpenLessonPlan,
+                                )
+                            }
+                            if (day.bellSchedule.isNotEmpty()) {
+                                Spacer(Modifier.height(4.dp))
+                                BellScheduleSection(slots = day.bellSchedule)
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        TSwipeHint("← Swipe back to current class")
                     }
                 }
             }
@@ -602,5 +663,77 @@ private fun ReminderRow(item: ObligationItemDto, onOpenUpdate: () -> Unit, onOpe
         }
         if (item.count > 0) TPill(item.count.toString(), bg = tint.copy(alpha = 0.14f), fg = tint)
         Icon(VIcons.ChevronRight, contentDescription = null, tint = c.ink3, modifier = Modifier.size(18.dp))
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bell schedule section — renders the school day config slots (breaks, assembly, etc.)
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun BellScheduleSection(slots: List<BellSlotUi>) {
+    val c = VTheme.colors
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(c.navy.copy(alpha = 0.04f))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(VIcons.Clock, contentDescription = null, tint = c.ink3, modifier = Modifier.size(12.dp))
+            Text(
+                "BELL SCHEDULE",
+                style = VTheme.type.label.colored(c.ink3).copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp),
+            )
+        }
+        slots.forEach { slot ->
+            BellSlotRow(slot)
+        }
+    }
+}
+
+@Composable
+private fun BellSlotRow(slot: BellSlotUi) {
+    val c = VTheme.colors
+    val typeColor = when (slot.slotType) {
+        "TEACHING" -> c.accent
+        "BREAK" -> c.warning
+        "ASSEMBLY" -> c.teal
+        "LAB" -> c.lavenderLight
+        "FREE" -> c.ink3
+        "ZERO" -> c.ink3
+        else -> c.ink3
+    }
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(typeColor.copy(alpha = 0.12f))
+                .padding(horizontal = 6.dp, vertical = 2.dp),
+        ) {
+            Text(
+                slot.slotType.take(4),
+                style = VTheme.type.label.colored(typeColor).copy(fontWeight = FontWeight.Bold, fontSize = 8.5.sp),
+            )
+        }
+        Column(Modifier.weight(1f)) {
+            if (slot.label.isNotBlank()) {
+                Text(slot.label, style = VTheme.type.caption.colored(c.ink).copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold))
+            }
+            Text(
+                "${slot.startTime} – ${slot.endTime}",
+                style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 10.sp),
+            )
+        }
+        Text(
+            "#${slot.slotIndex}",
+            style = VTheme.type.label.colored(c.ink3).copy(fontSize = 9.sp),
+        )
     }
 }

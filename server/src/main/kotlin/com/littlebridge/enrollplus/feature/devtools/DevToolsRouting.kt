@@ -27,6 +27,11 @@
  *   POST /api/v1/admin/dev/send-notification
  *     body: { "user_id": "...", "title": "...", "body": "...", "deep_link"?: "...", "category"?: "..." }
  *     → sends an in-app + push notification to a single user via Notify.toUser.
+ *
+ *   POST /api/v1/admin/dev/trigger-pews
+ *     → immediately runs the PEWS pipeline (Sense → Reason → Act) for all
+ *       active schools and returns the count of schools processed + at-risk
+ *       snapshots found.
  */
 package com.littlebridge.enrollplus.feature.devtools
 
@@ -41,6 +46,8 @@ import com.littlebridge.enrollplus.feature.auth.delivery.OtpEnv
 import com.littlebridge.enrollplus.feature.notifications.Notify
 import com.littlebridge.enrollplus.feature.pulse.ParentPulseService
 import com.littlebridge.enrollplus.feature.pulse.PulseWeeklyJob
+import com.littlebridge.enrollplus.feature.pews.PewsDailyJob
+import com.littlebridge.enrollplus.feature.pews.PewsSnapshotService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -102,6 +109,12 @@ data class DevSendNotificationRequest(
 @Serializable
 data class DevSendNotificationResponse(
     val sent: Boolean,
+)
+
+@Serializable
+data class TriggerPewsResponse(
+    val schools_processed: Int,
+    val at_risk_count: Int,
 )
 
 // ── Guard ──────────────────────────────────────────────────────────────────
@@ -288,6 +301,23 @@ fun Route.devToolsRouting() {
             call.ok(
                 DevSendNotificationResponse(sent = true),
                 message = "Notification sent to user $userId",
+            )
+        }
+
+        // ----- Manually trigger PEWS pipeline for all schools -----
+        post("/trigger-pews") {
+            if (call.requireSuperAdmin() == null) return@post
+
+            val runDate = java.time.LocalDate.now()
+            val schoolIds = PewsSnapshotService().activeSchoolIds()
+            val atRiskCount = PewsDailyJob.runAll(runDate)
+
+            call.ok(
+                TriggerPewsResponse(
+                    schools_processed = schoolIds.size,
+                    at_risk_count = atRiskCount,
+                ),
+                message = "PEWS pipeline triggered — $atRiskCount at-risk snapshots across ${schoolIds.size} schools",
             )
         }
         }

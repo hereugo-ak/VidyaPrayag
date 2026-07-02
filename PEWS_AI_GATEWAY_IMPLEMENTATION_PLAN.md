@@ -240,8 +240,8 @@ AI_OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 ```bash
 # Model pins per lane (pin by capability; update without redeploy via admin API)
 AI_MODEL_CEREBRAS=gpt-oss-120b
-AI_MODEL_GROQ_FAST=llama-3.1-8b-instant
-AI_MODEL_GROQ_REASON=llama-3.3-70b-versatile
+AI_MODEL_GROQ_FAST=openai/gpt-oss-20b
+AI_MODEL_GROQ_REASON=openai/gpt-oss-120b
 AI_MODEL_SAMBANOVA=DeepSeek-V3.1
 AI_MODEL_MISTRAL=mistral-large-latest
 AI_MODEL_OPENROUTER=meta-llama/llama-3.3-70b-instruct:free

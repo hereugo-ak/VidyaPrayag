@@ -406,6 +406,10 @@ export interface TriggerPulseResponse {
 export interface DevSendNotificationResponse {
   sent: boolean;
 }
+export interface TriggerPewsResponse {
+  schools_processed: number;
+  at_risk_count: number;
+}
 
 // ── Alumni Management (ALUMNI_MANAGEMENT_SPEC.md) ───────────────────────────
 export interface AlumniDto {
@@ -854,4 +858,145 @@ export interface AiRecentUsageResponse {
   entries: AiRecentUsageEntry[];
   total: number;
   window_min: number;
+}
+
+// ── School Day Configuration (GET/POST/PUT/DELETE /api/v1/school/day-config) ──
+
+export interface SchoolDaySlotDto {
+  slot_index: number;
+  slot_type: string;
+  label: string;
+  start_time: string;
+  end_time: string;
+  is_double: boolean;
+  double_group: number;
+}
+
+export interface SchoolDayConfigDto {
+  id: string;
+  name: string;
+  applicable_days: string;
+  class_level: string;
+  slots: SchoolDaySlotDto[];
+  is_active: boolean;
+}
+
+export interface SchoolDayConfigListResponse {
+  configs: SchoolDayConfigDto[];
+}
+
+export interface CreateSchoolDayConfigRequest {
+  name: string;
+  applicable_days: string;
+  class_level: string;
+  slots: SchoolDaySlotDto[];
+}
+
+export interface UpdateSchoolDayConfigRequest {
+  name: string;
+  applicable_days: string;
+  class_level: string;
+  slots: SchoolDaySlotDto[];
+  is_active: boolean;
+}
+
+// ── School Classes & Subjects (SchoolClassesRouting.kt) ──────────────────────
+export interface SchoolClassDto {
+  id: string;
+  code: string;
+  name: string;
+  sections: string[];
+  subject_count: number;
+}
+export interface SchoolClassListResponse {
+  classes: SchoolClassDto[];
+}
+export interface CreateSchoolClassRequest {
+  code: string;
+  name: string;
+  sections: string[];
+}
+export interface UpdateSchoolClassRequest {
+  code: string;
+  name: string;
+  sections: string[];
+}
+export interface SchoolSubjectDto {
+  id: string;
+  class_id: string;
+  name: string;
+  code: string;
+}
+export interface SchoolSubjectListResponse {
+  subjects: SchoolSubjectDto[];
+}
+export interface CreateSchoolSubjectRequest {
+  name: string;
+  code: string;
+}
+export interface UpdateSchoolSubjectRequest {
+  name: string;
+  code: string;
+}
+
+// ── Timetable Periods (SchoolTimetableRouting.kt) ────────────────────────────
+export interface PeriodDetailDto {
+  id: string;
+  teacher_id: string;
+  assignment_id: string | null;
+  weekday: number;
+  start_time: string;
+  end_time: string;
+  class_name: string;
+  section: string;
+  subject: string;
+  room: string;
+  is_active: boolean;
+  valid_from?: string | null;
+  valid_to?: string | null;
+}
+export interface CreatePeriodRequest {
+  teacher_id: string;
+  class_name: string;
+  section: string;
+  subject: string;
+  weekday: number;
+  start_time: string;
+  end_time: string;
+  room?: string;
+  valid_from?: string | null;
+  valid_to?: string | null;
+}
+export interface UpdatePeriodRequest {
+  weekday?: number;
+  start_time?: string;
+  end_time?: string;
+  room?: string;
+  is_active?: boolean;
+  valid_from?: string | null;
+  valid_to?: string | null;
+}
+export interface BulkPeriodItem {
+  teacher_id: string;
+  class_name: string;
+  section: string;
+  subject: string;
+  start_time: string;
+  end_time: string;
+  room?: string;
+}
+export interface BulkCreatePeriodsRequest {
+  weekday: number;
+  periods: BulkPeriodItem[];
+}
+export interface BulkCreatePeriodsResponse {
+  created: PeriodDetailDto[];
+  errors: string[];
+  created_count: number;
+  error_count: number;
+}
+export interface CopySectionRequest {
+  class_name: string;
+  from_section: string;
+  to_section: string;
 }

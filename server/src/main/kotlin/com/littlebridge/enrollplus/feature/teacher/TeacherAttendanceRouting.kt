@@ -202,7 +202,7 @@ fun Route.teacherAttendanceRouting() {
                 val assignment = call.requireOwnedAssignment(ctx, assignmentParam) ?: return@get
                 val date = call.request.queryParameters["date"]?.takeIf { it.isNotBlank() }
                     ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-                    ?: LocalDate.now()
+                    ?: todayIst()
 
                 // Roster from enrollments active for this assignment's class+section
                 // (E4/E5 honored by enrollmentsFor — withdrawn/transferred excluded).
@@ -310,7 +310,7 @@ fun Route.teacherAttendanceRouting() {
                 }
 
                 // E9: window guard. Future dates blocked; back-dating limited.
-                val today = LocalDate.now()
+                val today = todayIst()
                 if (date.isAfter(today)) {
                     call.fail("Cannot mark attendance for a future date", HttpStatusCode.BadRequest, "FUTURE_DATE")
                     return@post

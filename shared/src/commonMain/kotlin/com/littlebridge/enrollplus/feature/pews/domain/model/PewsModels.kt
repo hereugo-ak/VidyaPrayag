@@ -60,6 +60,7 @@ data class PewsStudentDto(
     @SerialName("ai_cause") val aiCause: String? = null,
     @SerialName("ai_recommendation") val aiRecommendation: String? = null,
     @SerialName("ai_provider_used") val aiProviderUsed: String? = null,
+    @SerialName("has_open_intervention") val hasOpenIntervention: Boolean = false,
 )
 
 /** The whole at-risk cohort for a school plus band counts. */
@@ -105,6 +106,8 @@ data class PewsInterventionDto(
     @SerialName("plan_json") val planJson: String? = null,
     @SerialName("parent_draft_body") val parentDraftBody: String? = null,
     @SerialName("parent_draft_lang") val parentDraftLang: String? = null,
+    @SerialName("initiated_by_name") val initiatedByName: String? = null,
+    @SerialName("initiated_by_role") val initiatedByRole: String? = null,
 )
 
 /** Body for PATCH .../interventions/{id} — all fields optional (partial update). */

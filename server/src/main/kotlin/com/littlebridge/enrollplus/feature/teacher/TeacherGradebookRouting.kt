@@ -478,7 +478,7 @@ private fun Route.assessmentListAndCreate() {
             // Initial status (Doc 07 §4): a future-dated scheduled test waits in
             // `scheduled`; a surprise test (or any test for today/past) opens
             // straight into `marks_pending`. Everything else starts `draft`.
-            val today = LocalDate.now()
+            val today = todayIst()
             val initialStatus = when {
                 type == "scheduled" && examDate != null && examDate.isAfter(today) -> GbStatus.SCHEDULED
                 type == "surprise" -> GbStatus.MARKS_PENDING

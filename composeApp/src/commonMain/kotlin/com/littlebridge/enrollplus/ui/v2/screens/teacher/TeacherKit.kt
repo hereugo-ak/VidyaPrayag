@@ -166,7 +166,7 @@ fun SwipeExpandCard(
     content: @Composable (Int) -> Unit,
 ) {
     val c = VTheme.colors
-    val swipe = Modifier.pointerInput(faceCount) {
+    val swipe = Modifier.pointerInput(face) {
         var dx = 0f
         detectHorizontalDragGestures(
             onDragStart = { dx = 0f },

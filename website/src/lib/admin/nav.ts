@@ -35,5 +35,6 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/announcements", label: "Announcements", icon: IconAnnounce },
   { href: "/admin/leave", label: "Leave", icon: IconLeave },
   { href: "/admin/settings", label: "Settings", icon: IconSettings },
+  { href: "/admin/academics", label: "Academics", icon: IconBook },
   { href: "/admin/dev-tools", label: "Dev Tools", icon: IconBolt, superAdminOnly: true },
 ];

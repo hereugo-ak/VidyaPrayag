@@ -153,6 +153,8 @@ fun ParentHomeScreenV2(
         onOpenEvents = onOpenEvents,
         nudge = nudgeState.nudge?.takeIf { nudgeState.visible },
         onNudgeAction = { action ->
+            // Acknowledge the nudge so it doesn't reappear, then route.
+            nudgeViewModel.acknowledgeNudge(activeChildId)
             // The server's deep-link targets map onto existing parent surfaces.
             // We route by intent: anything mentioning "message"/"teacher" → the
             // conversations surface; everything else (attendance) → academics.
@@ -162,6 +164,9 @@ fun ParentHomeScreenV2(
             } else {
                 onOpenAcademics()
             }
+        },
+        onNudgeDismiss = {
+            nudgeViewModel.acknowledgeNudge(activeChildId)
         },
         modifier = modifier,
     )
@@ -196,6 +201,7 @@ private fun ParentDashboardContent(
     onOpenEvents: () -> Unit = {},
     nudge: com.littlebridge.enrollplus.feature.pews.domain.model.PewsParentNudgeDto? = null,
     onNudgeAction: (com.littlebridge.enrollplus.feature.pews.domain.model.PewsParentActionDto) -> Unit = {},
+    onNudgeDismiss: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -296,7 +302,7 @@ private fun ParentDashboardContent(
                     // real concern (server returns show=true). The card is supportive,
                     // never alarming, and deep-links into attendance / message teacher.
                     if (nudge != null) {
-                        ParentNudgeCard(nudge = nudge, onAction = onNudgeAction)
+                        ParentNudgeCard(nudge = nudge, onAction = onNudgeAction, onDismiss = onNudgeDismiss)
                     }
 
                     // ── Weekly Pulse entry point ────────────────────────────────────
