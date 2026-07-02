@@ -71,6 +71,8 @@ private enum class SchoolOverlay {
     BrandingKit,
     IdCards,
     Library,
+    ScheduledMessages,
+    EventRegistration,
 }
 
 /**
@@ -97,6 +99,8 @@ fun SchoolPortalV2(
     // Theme is now applied globally at the NavGraphV2 level from user preference.
     var tab by remember { mutableStateOf("home") }
     var overlay by remember { mutableStateOf(SchoolOverlay.None) }
+    // Track which screen launched the create-event wizard so onCreated returns there.
+    var createEventOrigin by remember { mutableStateOf(SchoolOverlay.AcademicCalendarPlatform) }
 
     val scope = rememberCoroutineScope()
     val alumniRepo = koinInject<AlumniRepository>()
@@ -119,6 +123,8 @@ fun SchoolPortalV2(
                     overlay = SchoolOverlay.ReportPublish
                 } else if (deepLinkTarget.screen == "library") {
                     overlay = SchoolOverlay.Library
+                } else if (deepLinkTarget.screen == "events") {
+                    overlay = SchoolOverlay.EventRegistration
                 } else {
                     tab = deepLinkTarget.screen
                 }
@@ -166,17 +172,20 @@ fun SchoolPortalV2(
                 // VP-CAL — the premium centralized planning & scheduling platform.
                 AcademicCalendarPlatformScreenV2(
                     onBack = { overlay = SchoolOverlay.None },
-                    onCreateEvent = { overlay = SchoolOverlay.CreateEvent },
+                    onCreateEvent = {
+                        createEventOrigin = SchoolOverlay.AcademicCalendarPlatform
+                        overlay = SchoolOverlay.CreateEvent
+                    },
                     onOpenEvent = { /* event detail handled in-screen via overflow actions */ },
                     modifier = modifier,
                 )
                 return
             }
             SchoolOverlay.CreateEvent -> {
-                // 7-step create-event wizard; pops back to the platform on success.
-                CreateEventScreenV2(
-                    onBack = { overlay = SchoolOverlay.AcademicCalendarPlatform },
-                    onCreated = { overlay = SchoolOverlay.AcademicCalendarPlatform },
+                // Unified 3-step create-event/announcement screen.
+                UnifiedCreateEventScreenV2(
+                    onBack = { overlay = createEventOrigin },
+                    onCreated = { overlay = createEventOrigin },
                     modifier = modifier,
                 )
                 return
@@ -406,6 +415,15 @@ fun SchoolPortalV2(
             }
             SchoolOverlay.Library -> {
                 SchoolLibraryScreen(
+            SchoolOverlay.ScheduledMessages -> {
+                ScheduledMessagesScreenV2(
+                    onBack = { overlay = SchoolOverlay.None },
+                    modifier = modifier,
+                )
+                return
+            }
+            SchoolOverlay.EventRegistration -> {
+                AdminEventRegistrationScreenV2(
                     onBack = { overlay = SchoolOverlay.None },
                     modifier = modifier,
                 )
@@ -442,6 +460,12 @@ fun SchoolPortalV2(
                         onOpenTransport = { overlay = SchoolOverlay.TransportManagement },
                         onOpenReportPublish = { overlay = SchoolOverlay.ReportPublish },
                         onOpenReportEffectiveness = { overlay = SchoolOverlay.ReportEffectiveness },
+                        onOpenEvents = { overlay = SchoolOverlay.EventRegistration },
+                        // Unified create-event entry from Home quick action.
+                        onCreateEvent = {
+                            createEventOrigin = SchoolOverlay.None
+                            overlay = SchoolOverlay.CreateEvent
+                        },
                         // §7 finding K — tapping the avatar opens the Settings tab (where logout
                         // lives), instead of logging the admin out outright.
                         onExit = { tab = "settings" },
@@ -471,6 +495,12 @@ fun SchoolPortalV2(
                         // screens as overlays instead of Coming-Soon cards.
                         onOpenMessages = { overlay = SchoolOverlay.Messages },
                         onOpenPtm = { overlay = SchoolOverlay.SchedulePTM },
+                        onOpenScheduledMessages = { overlay = SchoolOverlay.ScheduledMessages },
+                        // Unified create-event entry from Announcements tab.
+                        onCreateEvent = {
+                            createEventOrigin = SchoolOverlay.None
+                            overlay = SchoolOverlay.CreateEvent
+                        },
                     )
                     "settings" -> SchoolSettingsScreenV2(
                         onLogout = onLogout,

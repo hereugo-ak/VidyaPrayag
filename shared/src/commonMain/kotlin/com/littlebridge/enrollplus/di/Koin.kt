@@ -459,6 +459,28 @@ val commonModule = module {
         com.littlebridge.enrollplus.feature.idcard.data.repository.IdCardRepositoryImpl(get())
     }
 
+    // Message Scheduling (MESSAGE_SCHEDULING_PLAN.md §7)
+    single {
+        com.littlebridge.enrollplus.feature.scheduling.data.remote.ScheduledMessageApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single<com.littlebridge.enrollplus.feature.scheduling.domain.repository.ScheduledMessageRepository> {
+        com.littlebridge.enrollplus.feature.scheduling.data.repository.ScheduledMessageRepositoryImpl(get())
+    }
+
+    // Event Registration & RSVP System (EVENT_REGISTRATION_PLAN.md §4)
+    single {
+        com.littlebridge.enrollplus.feature.event.data.remote.EventRegistrationApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single<com.littlebridge.enrollplus.feature.event.domain.repository.EventRegistrationRepository> {
+        com.littlebridge.enrollplus.feature.event.data.repository.EventRegistrationRepositoryImpl(get())
+    }
+
     // UseCases
     factory { GetSchoolsUseCase(get()) }
 }
@@ -515,14 +537,14 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.admin.presentation.TeacherAssignmentViewModel(get(), get()) } // RA-TAM: reusable assignment module
     factory { com.littlebridge.enrollplus.feature.admin.presentation.SchoolRecordsViewModel(get(), get()) } // RA-52
     factory { AdmissionCRMViewModel(get(), get()) }
-    factory { SchoolAnnouncementsViewModel(get(), get()) }
+    factory { SchoolAnnouncementsViewModel(get(), get(), get()) }
     factory { com.littlebridge.enrollplus.feature.admin.presentation.SchoolTeachersViewModel(get(), get()) }
     factory { MessagesViewModel(get(), get(), get()) }
     factory { SchedulePTMViewModel(get(), get()) }
     factory { AcademicCalendarViewModel(get(), get()) }
-    // VP-CAL: premium Academic Calendar platform + 7-step create-event wizard + Academic Year mgmt
+    // VP-CAL: premium Academic Calendar platform + unified create-event + Academic Year mgmt
     factory { com.littlebridge.enrollplus.feature.admin.presentation.AcademicCalendarPlatformViewModel(get(), get()) }
-    factory { com.littlebridge.enrollplus.feature.admin.presentation.CreateCalendarEventViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.admin.presentation.UnifiedCreateEventViewModel(get()) }
     factory { com.littlebridge.enrollplus.feature.admin.presentation.AcademicYearViewModel(get(), get()) }
     factory { LeaveRequestsViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.admin.presentation.LinkRequestsViewModel(get(), get()) }
@@ -544,7 +566,7 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherCheckInViewModel(get(), get()) }
     // T-107: real obligations strip (Doc 04 §5.5) — backs the Today "what needs me" strip.
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherObligationsViewModel(get(), get()) }
-    factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherClassesViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherClassesViewModel(get(), get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherStudentProfileViewModel(get(), get()) } // T-505
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherAttendanceViewModel(get(), get()) }
     // T-305: the rebuilt gradebook state holder (replaces the legacy split of
@@ -552,6 +574,7 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherGradebookViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherSyllabusViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherHomeworkViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherMessageViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherLessonPlanViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherProfileViewModel(get(), get()) }
     // T-602b: the actionable Profile VM (own-leave list/apply, password change via
@@ -614,6 +637,12 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.library.presentation.SchoolLibraryViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.library.presentation.StudentLibraryViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.library.presentation.ParentLibraryViewModel(get(), get()) }
+    // Message Scheduling (MESSAGE_SCHEDULING_PLAN.md §8)
+    factory { com.littlebridge.enrollplus.feature.scheduling.presentation.ScheduledMessagesViewModel(get(), get()) }
+    // Event Registration & RSVP System (EVENT_REGISTRATION_PLAN.md §4)
+    factory { com.littlebridge.enrollplus.feature.event.presentation.ParentEventRegistrationViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.event.presentation.TeacherEventRegistrationViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.event.presentation.AdminEventRegistrationViewModel(get(), get()) }
 }
 
 fun initKoin(

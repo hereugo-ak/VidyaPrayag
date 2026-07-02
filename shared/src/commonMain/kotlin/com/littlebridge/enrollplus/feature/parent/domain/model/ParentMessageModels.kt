@@ -157,3 +157,15 @@ data class ParentMessageAttachment(
     val height: Int? = null,
     @SerialName("duration_ms") val durationMs: Int? = null,
 )
+
+/** Read Receipts Phase 2: GET /api/v1/parent/messages/unread-count response payload. */
+@Serializable
+data class ParentUnreadCountDto(
+    val success: Boolean = false,
+    val data: ParentUnreadCountData? = null,
+)
+
+@Serializable
+data class ParentUnreadCountData(
+    @SerialName("unread_count") val unreadCount: Int = 0,
+)

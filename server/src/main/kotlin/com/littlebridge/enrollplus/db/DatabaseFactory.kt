@@ -184,6 +184,10 @@ object DatabaseFactory {
         // Academic Calendar platform (VP-CAL — centralized planning & scheduling)
         CalendarEventsTable,
         AcademicYearsTable,
+        // Event Registration System (EVENT_REGISTRATION_PLAN.md §3) — slots + registrations.
+        // event_slots has soft FK to calendar_events; event_registrations has soft FK to event_slots.
+        EventSlotsTable,
+        EventRegistrationsTable,
         // Teacher Portal Rebuild — Doc 11 T-001: typed class membership (enrollments).
         // Applied by docs/db/migration_008_enrollments.sql (must run before deploy;
         // AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates boot on it).
@@ -290,6 +294,10 @@ object DatabaseFactory {
         LibraryAcquisitionRequestsTable,
         LibraryReadingBadgesTable,
         LibraryBookDiscussionsTable,     // FK to books
+        // Scheduled Messages (MESSAGE_SCHEDULING_PLAN.md §4)
+        // Applied by docs/db/migration-104-scheduled-messages.sql (must run before
+        // deploy; AUTO_CREATE_TABLES is OFF in prod).
+        ScheduledMessagesTable,
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */
@@ -513,13 +521,14 @@ object DatabaseFactory {
             maximumPoolSize = poolSize
             minimumIdle = 1
             isAutoCommit = false
-            transactionIsolation = "TRANSACTION_REPEATABLE_READ"
-            // Sensible defaults for Supabase (pooled, IPv4 PgBouncer port 6543).
+            // Don't set transactionIsolation — Supabase PgBouncer doesn't support
+            // session-level isolation; PostgreSQL defaults to READ_COMMITTED which is fine.
             addDataSourceProperty("ApplicationName", "vidyaprayag-ktor")
             addDataSourceProperty("reWriteBatchedInserts", "true")
             connectionTimeout = 30_000
             validationTimeout = 5_000
             maxLifetime = 30 * 60 * 1000L
+            connectionTestQuery = "SELECT 1"
             validate()
         }
         return HikariDataSource(config)

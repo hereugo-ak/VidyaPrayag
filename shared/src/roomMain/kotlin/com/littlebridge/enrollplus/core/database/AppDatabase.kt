@@ -8,6 +8,10 @@ import com.littlebridge.enrollplus.feature.library.data.local.LibraryCacheDao
 import com.littlebridge.enrollplus.feature.library.data.local.LibraryCacheEntity
 import com.littlebridge.enrollplus.feature.library.data.local.LibraryPendingActionDao
 import com.littlebridge.enrollplus.feature.library.data.local.LibraryPendingActionEntity
+import com.littlebridge.enrollplus.feature.event.data.local.EventCacheDao
+import com.littlebridge.enrollplus.feature.event.data.local.EventCacheEntity
+import com.littlebridge.enrollplus.feature.event.data.local.EventOutboxDao
+import com.littlebridge.enrollplus.feature.event.data.local.EventOutboxEntity
 import com.littlebridge.enrollplus.feature.schools.data.local.SchoolDao
 import com.littlebridge.enrollplus.feature.schools.data.local.SchoolEntity
 
@@ -18,6 +22,7 @@ import com.littlebridge.enrollplus.feature.schools.data.local.SchoolEntity
         LibraryCacheEntity::class,
         LibraryPendingActionEntity::class,
     ],
+    entities = [SchoolEntity::class, EventCacheEntity::class, EventOutboxEntity::class],
     version = 2,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -25,6 +30,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun libraryBookDao(): LibraryBookDao
     abstract fun libraryCacheDao(): LibraryCacheDao
     abstract fun libraryPendingActionDao(): LibraryPendingActionDao
+    abstract fun eventCacheDao(): EventCacheDao
+    abstract fun eventOutboxDao(): EventOutboxDao
+
     companion object
 }
 

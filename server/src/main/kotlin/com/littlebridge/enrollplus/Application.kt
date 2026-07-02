@@ -100,7 +100,10 @@ import com.littlebridge.enrollplus.feature.reportcard.core.reportCardRouting
 import com.littlebridge.enrollplus.feature.tutor.core.registerTutorModules
 import com.littlebridge.enrollplus.feature.tutor.core.tutorRouting
 import com.littlebridge.enrollplus.feature.pews.pewsRouting
+import com.littlebridge.enrollplus.feature.scheduling.scheduledMessageRouting
+import com.littlebridge.enrollplus.feature.scheduling.MessageDispatchScheduler
 import com.littlebridge.enrollplus.feature.school.adminDashboardRouting
+import com.littlebridge.enrollplus.feature.event.eventRegistrationRouting
 import com.littlebridge.enrollplus.feature.school.adminDashboardOverviewRouting
 import com.littlebridge.enrollplus.feature.school.leaveRequestsRouting
 import com.littlebridge.enrollplus.feature.school.messagesRouting
@@ -182,6 +185,9 @@ fun main() {
 
     // Start the notification scheduler (fee reminders, calendar reminders).
     NotificationScheduler.start(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default))
+
+    // Start the Message Scheduling dispatch engine (1-min poll for due scheduled messages).
+    MessageDispatchScheduler.start(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default))
 
     // Start the Parent Pulse weekly job (Sunday 6 PM IST pulse generation).
     PulseWeeklyJob.start(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default))
@@ -380,6 +386,7 @@ fun Application.module() {
         schoolAnalyticsRouting()     // /api/v1/school/analytics/{overview,class-performance,teacher-performance,student/{id},syllabus-coverage}
         leaveRequestsRouting()       // /api/v1/school/leave-requests[…]
         ptmRouting()                 // /api/v1/school/ptm
+        eventRegistrationRouting()  // /api/v1/{parent,teacher,school}/events/… — Event Registration & RSVP
         messagesRouting()            // /api/v1/school/messages[…]
         resultsRouting()             // /api/v1/school/results
         teacherAssignmentRouting()   // /api/v1/school/teacher-assignments[…] — structured teacher⇄class⇄subject model (report §5.5)
@@ -484,5 +491,9 @@ fun Application.module() {
         //   /api/v1/parent/library/*   — parent (search, reserve, reservations)
         //   /api/v1/student/library/*  — student (search, wishlist, goals, badges, discussions, acquisitions, reserve)
         libraryRouting()
+
+        // Message Scheduling (MESSAGE_SCHEDULING_PLAN.md §5)
+        //   /api/v1/school/scheduled-messages          — admin, teacher
+        scheduledMessageRouting()
     }
 }

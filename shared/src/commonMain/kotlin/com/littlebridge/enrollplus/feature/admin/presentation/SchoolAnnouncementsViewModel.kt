@@ -7,6 +7,8 @@ import com.littlebridge.enrollplus.core.prefs.PreferenceRepository
 import com.littlebridge.enrollplus.feature.admin.domain.model.AnnouncementDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreateAnnouncementRequest
 import com.littlebridge.enrollplus.feature.admin.domain.repository.AnnouncementsRepository
+import com.littlebridge.enrollplus.feature.scheduling.domain.repository.ScheduledMessageRepository
+import com.littlebridge.enrollplus.feature.scheduling.domain.model.CreateScheduledMessageRequest
 import com.littlebridge.enrollplus.util.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +29,7 @@ data class Announcement(
     val date: String,
     val imageUrl: String? = null,
     val isFeatured: Boolean = false,
+    val isCalendarOnly: Boolean = false,
     val participants: List<String> = emptyList()
 )
 
@@ -49,7 +52,8 @@ data class SchoolAnnouncementsState(
 
 class SchoolAnnouncementsViewModel(
     private val announcementsRepository: AnnouncementsRepository,
-    private val preferenceRepository: PreferenceRepository
+    private val preferenceRepository: PreferenceRepository,
+    private val scheduledMessageRepository: ScheduledMessageRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SchoolAnnouncementsState())
@@ -168,6 +172,7 @@ class SchoolAnnouncementsViewModel(
         // VP-CAL: mirror Holiday/PTM/Event posts into the Academic Calendar.
         // Default enabled; ignored by the server for Update/Reminder types.
         addToCalendar: Boolean = true,
+        isCalendarOnly: Boolean = false,
         onCreated: (() -> Unit)? = null
     ) {
         if (title.isBlank() || description.isBlank() || date.isBlank()) {
@@ -199,7 +204,8 @@ class SchoolAnnouncementsViewModel(
                 date = date.trim(),
                 audienceType = normalizedAudience,
                 audienceFilter = filter,
-                addToCalendar = addToCalendar
+                addToCalendar = addToCalendar,
+                isCalendarOnly = isCalendarOnly
             )
             when (val r = announcementsRepository.createAnnouncement(token, body)) {
                 is NetworkResult.Success -> {
@@ -219,6 +225,70 @@ class SchoolAnnouncementsViewModel(
                         isCreating = false,
                         errorMessage = "Connection error. Check your internet."
                     )
+                }
+            }
+        }
+    }
+
+    fun scheduleAnnouncement(
+        type: String,
+        title: String,
+        description: String,
+        date: String,
+        scheduledAt: String,
+        subTitle: String? = null,
+        eventImage: String? = null,
+        audienceType: String = "ALL_SCHOOL",
+        audienceValues: List<String> = emptyList(),
+        addToCalendar: Boolean = true,
+        isCalendarOnly: Boolean = false,
+        onCreated: (() -> Unit)? = null
+    ) {
+        if (title.isBlank() || description.isBlank() || date.isBlank() || scheduledAt.isBlank()) {
+            _state.value = _state.value.copy(errorMessage = "Title, description, date and scheduled time are required.")
+            return
+        }
+        val normalizedAudience = audienceType.trim().uppercase().ifBlank { "ALL_SCHOOL" }
+        val cleanValues = audienceValues.map { it.trim() }.filter { it.isNotBlank() }
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isCreating = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isCreating = false, errorMessage = "Not signed in")
+                return@launch
+            }
+            val filter = buildAudienceFilter(normalizedAudience, cleanValues)
+            val payload = buildJsonObject {
+                put("type", type.ifBlank { "Update" })
+                put("title", title.trim())
+                subTitle?.trim()?.takeIf { it.isNotBlank() }?.let { put("sub_title", it) }
+                put("description", description.trim())
+                eventImage?.trim()?.takeIf { it.isNotBlank() }?.let { put("event_image", it) }
+                put("date", date.trim())
+                put("audience_type", normalizedAudience)
+                filter?.let { put("audience_filter", it) }
+                put("is_calendar_only", isCalendarOnly)
+            }
+            val request = CreateScheduledMessageRequest(
+                messageType = "ANNOUNCEMENT",
+                scheduledAt = scheduledAt,
+                payload = payload,
+                addToCalendar = addToCalendar,
+                audienceType = normalizedAudience,
+                title = title.trim(),
+                bodyPreview = description.trim().take(140),
+            )
+            when (val r = scheduledMessageRepository.createScheduledMessage(token, request)) {
+                is NetworkResult.Success -> {
+                    _state.value = _state.value.copy(isCreating = false, infoMessage = "Announcement scheduled")
+                    onCreated?.invoke()
+                }
+                is NetworkResult.Error -> {
+                    AppLogger.e("SchoolAnnouncementsVM", "scheduleAnnouncement error: ${r.message}")
+                    _state.value = _state.value.copy(isCreating = false, errorMessage = r.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(isCreating = false, errorMessage = "Connection error. Check your internet.")
                 }
             }
         }
@@ -268,6 +338,7 @@ class SchoolAnnouncementsViewModel(
         category = type,
         date = date,
         imageUrl = eventImage,
-        isFeatured = false
+        isFeatured = false,
+        isCalendarOnly = isCalendarOnly
     )
 }

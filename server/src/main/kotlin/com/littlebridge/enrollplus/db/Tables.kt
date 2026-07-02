@@ -347,6 +347,7 @@ object AnnouncementsTable : UUIDTable("announcements", "id") {
     // The teacher/admin user that owns this broadcast. For teacher broadcasts the
     // recipient expansion is constrained to the classes/subjects they teach.
     val authorRole     = varchar("author_role", 16).default("school_admin")
+    val isCalendarOnly = bool("is_calendar_only").default(false)
     val syncedToWa  = bool("synced_to_wa").default(false)
     val createdBy   = uuid("created_by").nullable()
     val createdAt   = timestamp("created_at")
@@ -823,6 +824,7 @@ object MessageStatusTable : UUIDTable("message_status", "id") {
     val userId         = uuid("user_id")                               // the recipient whose status this tracks
     val status         = varchar("status", 16)                         // SENT | DELIVERED | READ
     val createdAt      = timestamp("created_at")
+    val readAt         = timestamp("read_at").nullable()
 
     init {
         uniqueIndex("ux_message_status_msg_user", messageId, userId)
@@ -1724,6 +1726,14 @@ object CalendarEventsTable : UUIDTable("calendar_events", "id") {
     val updatedAt       = timestamp("updated_at")
     // Notification scheduler: marks whether a reminder has been sent for this event.
     val reminderSent    = bool("reminder_sent").default(false)
+    // Event Registration system (EVENT_REGISTRATION_PLAN.md §3.2) — additive columns
+    // so calendar_events can act as the single source of truth for events with
+    // optional registration / RSVP. All nullable or defaulted so existing rows
+    // and non-registration event types are unaffected.
+    val registrationEnabled  = bool("registration_enabled").default(false)
+    val registrationDeadline = varchar("registration_deadline", 12).nullable()   // YYYY-MM-DD
+    val maxAttendees         = integer("max_attendees").nullable()                // overall cap (null = unlimited)
+    val venue                = text("venue").nullable()                          // location text
 }
 
 /**
@@ -1747,6 +1757,53 @@ object AcademicYearsTable : UUIDTable("academic_years", "id") {
     val holidayDays   = integer("holiday_days").nullable()
     val createdAt     = timestamp("created_at")
     val updatedAt     = timestamp("updated_at")
+}
+
+// =====================================================================
+// event_slots  (Event Registration System — EVENT_REGISTRATION_PLAN.md §3.1)
+//   Structured time slots for a calendar event that has registration enabled.
+//   Each slot has a capacity (default 1 for PTM, higher for workshops) and
+//   active flag so admins can deactivate without deleting. FK to calendar_events
+//   via event_id (soft FK — no Exposed FK constraint, enforced in routing).
+//   UNIQUE(event_id, start_time) prevents duplicate slots for the same event.
+// =====================================================================
+object EventSlotsTable : UUIDTable("event_slots", "id") {
+    val eventId     = uuid("event_id")                       // FK calendar_events.id
+    val startTime   = varchar("start_time", 8)               // HH:mm (24h)
+    val endTime     = varchar("end_time", 8)                 // HH:mm (24h)
+    val capacity    = integer("capacity").default(1)         // max registrations per slot
+    val isActive    = bool("is_active").default(true)
+    val createdAt   = timestamp("created_at")
+    val updatedAt   = timestamp("updated_at")
+    init {
+        uniqueIndex("ux_event_slots_event_start", eventId, startTime)
+    }
+}
+
+// =====================================================================
+// event_registrations  (Event Registration System — EVENT_REGISTRATION_PLAN.md §3.1)
+//   Parent registrations for events. slot_id is nullable for open (non-slotted)
+//   events. student_id is nullable for school-wide events. school_id is the
+//   tenant scope. status: REGISTERED | CANCELLED | WAITLISTED | CHECKED_IN.
+//   client_request_id enables idempotent registration (offline sync retries).
+//   UNIQUE(event_id, parent_user_id, student_id) prevents duplicate registrations.
+// =====================================================================
+object EventRegistrationsTable : UUIDTable("event_registrations", "id") {
+    val eventId         = uuid("event_id")                   // FK calendar_events.id
+    val slotId          = uuid("slot_id").nullable()         // FK event_slots.id (null for open events)
+    val parentUserId    = uuid("parent_user_id")            // FK app_users.id
+    val studentId       = uuid("student_id").nullable()     // FK students.id (for class-specific events)
+    val schoolId        = uuid("school_id")                 // FK schools.id — tenant scope
+    val attendeeCount   = integer("attendee_count").default(1)
+    val status          = varchar("status", 16).default("REGISTERED")  // REGISTERED | CANCELLED | WAITLISTED | CHECKED_IN
+    val cancelReason    = text("cancel_reason").nullable()
+    val registeredAt    = timestamp("registered_at")
+    val cancelledAt     = timestamp("cancelled_at").nullable()
+    val updatedAt       = timestamp("updated_at")
+    val clientRequestId = varchar("client_request_id", 64).nullable()  // idempotency key (X-Client-Request-Id)
+    init {
+        uniqueIndex("ux_event_registrations_unique", eventId, parentUserId, studentId)
+    }
 }
 
 // =====================================================================
@@ -2785,8 +2842,8 @@ object TutorSessionsTable : UUIDTable("tutor_sessions", "id") {
     val academicYearId = uuid("academic_year_id").nullable()
     val mode           = varchar("mode", 16).default("DOUBT")
     val intentClass    = varchar("intent_class", 64).nullable()
-    val turns          = text("turns").default("[]")       // JSONB — array of TutorTurn
-    val groundedRefs   = text("grounded_refs").default("[]") // JSONB — audit: fact + source
+    val turns          = text("turns").default("[]")         // JSON array of TutorTurn
+    val groundedRefs   = text("grounded_refs").default("[]") // JSON array — audit: fact + source
     val providerUsed   = varchar("provider_used", 64).nullable()
     val tokensUsed     = integer("tokens_used").default(0)
     val cacheHit       = bool("cache_hit").default(false)
@@ -2979,8 +3036,7 @@ object IdCardsTable : UUIDTable("id_cards", "id") {
 // acquisition requests, reading badges, book discussions.
 // Applied by docs/db/migration_104_library.sql (must run before deploy;
 // AUTO_CREATE_TABLES is OFF in prod).
-// =====================================================================
-
+// ==============================================================
 object LibraryBooksTable : UUIDTable("library_books", "id") {
     val schoolId        = uuid("school_id")
     val isbn            = varchar("isbn", 20).nullable()
@@ -3230,4 +3286,65 @@ object LibraryBookDiscussionsTable : UUIDTable("library_book_discussions", "id")
         index("idx_library_discussions_book", false, bookId, createdAt)
         index("idx_library_discussions_school", false, schoolId)
     }
+}
+
+// Scheduled Messages (MESSAGE_SCHEDULING_PLAN.md §4)
+//   Unified scheduling table for all schedulable message types
+//   (announcements, admin broadcasts, teacher class broadcasts).
+//   The MessageDispatchScheduler polls this table every 1 min for
+//   status='SCHEDULED' AND scheduled_at <= now(), dispatches via the
+//   existing Notify.toUsers / sendInConversation / createCalendarEvent
+//   primitives, and marks rows DISPATCHED or FAILED.
+//
+//   Status state machine: DRAFT → SCHEDULED → DISPATCHED → FAILED | CANCELLED
+//
+//   Applied by docs/db/migration-104-scheduled-messages.sql (must run before
+//   deploy; AUTO_CREATE_TABLES is OFF in prod and validateSchema() gates boot).
+// =====================================================================
+object ScheduledMessagesTable : UUIDTable("scheduled_messages", "id") {
+    val schoolId          = uuid("school_id")
+    val messageType       = varchar("message_type", 24)
+    val status            = varchar("status", 16).default("SCHEDULED")
+    val scheduledAt       = timestamp("scheduled_at")
+    val dispatchedAt      = timestamp("dispatched_at").nullable()
+    val payload           = text("payload")
+    val createdBy         = uuid("created_by")
+    val authorRole        = varchar("author_role", 16)
+    val authorName        = varchar("author_name", 128).nullable()
+    val audienceType      = varchar("audience_type", 16).default("ALL_SCHOOL")
+    val audienceLabel     = varchar("audience_label", 256).nullable()
+    val title             = varchar("title", 256).nullable()
+    val bodyPreview       = varchar("body_preview", 256).nullable()
+    val addToCalendar     = bool("add_to_calendar").default(false)
+    val calendarEventCode = varchar("calendar_event_code", 20).nullable()
+    val retryCount        = integer("retry_count").default(0)
+    val maxRetries        = integer("max_retries").default(3)
+    val lastError         = text("last_error").nullable()
+    val clientMsgId       = uuid("client_msg_id").nullable()
+    val createdAt         = timestamp("created_at")
+    val updatedAt         = timestamp("updated_at")
+
+    init {
+        index("idx_scheduled_messages_school_status", false, schoolId, status)
+        index("idx_scheduled_messages_scheduled_at", false, scheduledAt)
+        index("idx_scheduled_messages_created_by", false, createdBy)
+        index("idx_scheduled_messages_client_msg_id", false, clientMsgId)
+    }
+}
+
+object ScheduledMessageStatus {
+    const val DRAFT       = "DRAFT"
+    const val SCHEDULED   = "SCHEDULED"
+    const val DISPATCHING = "DISPATCHING"
+    const val DISPATCHED  = "DISPATCHED"
+    const val FAILED      = "FAILED"
+    const val CANCELLED   = "CANCELLED"
+    val ALL      = setOf(DRAFT, SCHEDULED, DISPATCHING, DISPATCHED, FAILED, CANCELLED)
+    val PENDING  = setOf(DRAFT, SCHEDULED)
+}
+
+object ScheduledMessageType {
+    const val ANNOUNCEMENT      = "ANNOUNCEMENT"
+    const val ADMIN_BROADCAST   = "ADMIN_BROADCAST"
+    const val TEACHER_BROADCAST = "TEACHER_BROADCAST"
 }

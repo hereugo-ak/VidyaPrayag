@@ -1,5 +1,6 @@
 package com.littlebridge.enrollplus.feature.parent.data.remote
 
+import com.littlebridge.enrollplus.core.model.ApiResponse
 import com.littlebridge.enrollplus.core.network.NetworkResult
 import com.littlebridge.enrollplus.core.network.safeApiCall
 import com.littlebridge.enrollplus.feature.parent.domain.model.*
@@ -149,6 +150,20 @@ class ParentApi(
     suspend fun getThreadMessages(token: String, threadId: String): NetworkResult<ParentThreadMessagesResponse> {
         return safeApiCall {
             client.get(getUrl("api/v1/parent/messages/threads/$threadId/messages"))
+        }
+    }
+
+    /** Read Receipts Phase 1: POST /api/v1/parent/messages/threads/{id}/read */
+    suspend fun markThreadRead(token: String, threadId: String): NetworkResult<ApiResponse<Unit>> {
+        return safeApiCall {
+            client.post(getUrl("api/v1/parent/messages/threads/$threadId/read"))
+        }
+    }
+
+    /** Read Receipts Phase 2: GET /api/v1/parent/messages/unread-count */
+    suspend fun getUnreadCount(token: String): NetworkResult<ParentUnreadCountDto> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/parent/messages/unread-count"))
         }
     }
 

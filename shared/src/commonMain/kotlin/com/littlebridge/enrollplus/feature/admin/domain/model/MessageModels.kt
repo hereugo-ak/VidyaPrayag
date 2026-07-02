@@ -161,3 +161,9 @@ data class MessageAttachment(
     val height: Int? = null,
     @SerialName("duration_ms") val durationMs: Int? = null,
 )
+
+/** Read Receipts Phase 2: GET /api/v1/school/messages/unread-count response payload. */
+@Serializable
+data class UnreadCountDto(
+    @SerialName("unread_count") val unreadCount: Int = 0,
+)

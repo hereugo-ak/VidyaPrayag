@@ -79,7 +79,8 @@ data class AnnouncementDto(
     @SerialName("event_image") val eventImage: String? = null,
     val date: String,
     @SerialName("audience_type") val audienceType: String = "ALL_SCHOOL",
-    @SerialName("audience_filter") val audienceFilter: JsonElement? = null
+    @SerialName("audience_filter") val audienceFilter: JsonElement? = null,
+    @SerialName("is_calendar_only") val isCalendarOnly: Boolean = false
 )
 
 @Serializable
@@ -102,7 +103,8 @@ data class CreateAnnouncementDto(
     // this flag enabled (the default), the platform also mirrors it into a
     // calendar event tagged source = ANNOUNCEMENT so the admin never has to
     // create the same thing twice. Plain "Update"/"Reminder" types ignore this.
-    @SerialName("add_to_calendar") val addToCalendar: Boolean = true
+    @SerialName("add_to_calendar") val addToCalendar: Boolean = true,
+    @SerialName("is_calendar_only") val isCalendarOnly: Boolean = false
 )
 
 /** Audience scopes a broadcast can target. */
@@ -219,12 +221,17 @@ fun Route.announcementRouting() {
                         it[AnnouncementsTable.audienceType] = audienceType
                         it[audienceFilter] = filterText
                         it[authorRole] = ctx.role
+                        it[AnnouncementsTable.isCalendarOnly] = req.isCalendarOnly
                         it[syncedToWa] = false
                         it[createdBy] = uid
                         it[createdAt] = now
                         it[updatedAt] = now
                     }
                 }
+                // Calendar-only announcements skip parent notification fan-out
+                // entirely — they exist only for the academic calendar. Teachers
+                // still receive school-wide ones so they're aware of the event.
+                if (!req.isCalendarOnly) {
                 // RA-41 + RA-49: an announcement reaches parents + teachers
                 // in-app, not just the WhatsApp sync. The IN-APP fan-out now
                 // honours the audience scope (no blasting the whole school when
@@ -260,6 +267,7 @@ fun Route.announcementRouting() {
                         refId = eventId,
                     )
                 }
+                }
                 // VP-CAL: mirror Holiday/PTM/Event announcements into the Academic
                 // Calendar when "Add To Academic Calendar" is enabled. Idempotent
                 // and a no-op for Update/Reminder types. Best-effort: a calendar
@@ -282,7 +290,8 @@ fun Route.announcementRouting() {
                 call.created(
                     AnnouncementDto(
                         req.type, eventId, req.title, req.subTitle, req.description,
-                        req.eventImage, req.date, audienceType, req.audienceFilter
+                        req.eventImage, req.date, audienceType, req.audienceFilter,
+                        req.isCalendarOnly
                     ),
                     message = "Announcement created"
                 )
@@ -435,7 +444,8 @@ private fun org.jetbrains.exposed.sql.ResultRow.toDto(): AnnouncementDto {
         eventImage = this[AnnouncementsTable.eventImage],
         date = this[AnnouncementsTable.date],
         audienceType = this[AnnouncementsTable.audienceType],
-        audienceFilter = filter
+        audienceFilter = filter,
+        isCalendarOnly = this[AnnouncementsTable.isCalendarOnly]
     )
 }
 

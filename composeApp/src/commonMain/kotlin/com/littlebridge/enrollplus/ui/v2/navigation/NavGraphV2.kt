@@ -190,6 +190,7 @@ fun parseDeepLink(path: String, currentRole: EntryRole): DeepLinkTarget {
                 "messages" -> "messages"
                 "notifications" -> "notifications"
                 "calendar" -> "calendar"
+                "events" -> "events"
                 else -> null
             }
             DeepLinkTarget.ParentTab(EntryRole.Parent, tab, overlay)
@@ -250,6 +251,18 @@ fun parseDeepLink(path: String, currentRole: EntryRole): DeepLinkTarget {
                     DeepLinkTarget.TeacherScreen(currentRole, "library")
                 else ->
                     DeepLinkTarget.ParentTab(EntryRole.Parent, "home", "library")
+            }
+        }
+        "events" -> {
+            when (currentRole) {
+                EntryRole.Parent ->
+                    DeepLinkTarget.ParentTab(EntryRole.Parent, "home", "events")
+                EntryRole.Teacher ->
+                    DeepLinkTarget.TeacherScreen(currentRole, "events")
+                EntryRole.SchoolAdmin, EntryRole.SuperAdmin ->
+                    DeepLinkTarget.SchoolScreen(currentRole, "events")
+                else ->
+                    DeepLinkTarget.Generic(currentRole, path)
             }
         }
         else -> DeepLinkTarget.Generic(currentRole, path)

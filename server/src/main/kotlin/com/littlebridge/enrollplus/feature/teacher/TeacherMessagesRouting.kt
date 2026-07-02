@@ -38,9 +38,13 @@ import com.littlebridge.enrollplus.feature.school.AttachmentInput
 import com.littlebridge.enrollplus.feature.school.conversationMessagesFor
 import com.littlebridge.enrollplus.feature.school.deleteMessage
 import com.littlebridge.enrollplus.feature.school.editMessage
+import com.littlebridge.enrollplus.feature.school.getUnreadCount
+import com.littlebridge.enrollplus.feature.school.markConversationRead
+import com.littlebridge.enrollplus.feature.school.UnreadCountDto
 import com.littlebridge.enrollplus.feature.school.handleAttachmentUpload
 import com.littlebridge.enrollplus.feature.school.loadAttachmentsForMessages
 import com.littlebridge.enrollplus.feature.school.loadMessageStatus
+import com.littlebridge.enrollplus.feature.school.loadPeerMessageStatus
 import com.littlebridge.enrollplus.feature.school.notifyMessageRecipient
 import com.littlebridge.enrollplus.feature.school.resolveMessagingUser
 import com.littlebridge.enrollplus.feature.school.sendInConversation
@@ -276,8 +280,12 @@ fun Route.teacherMessagesRouting() {
                         val sid = row[MessagesTable.senderId]
                         val created = row[MessagesTable.createdAt]
                         val msgId = row[MessagesTable.id].value
-                        val status = if (sid != ctx.userId && paged.conversationId != null) {
-                            loadMessageStatus(msgId, ctx.userId)
+                        val status = if (paged.conversationId != null) {
+                            if (sid != ctx.userId) {
+                                loadMessageStatus(msgId, ctx.userId)
+                            } else {
+                                loadPeerMessageStatus(msgId, ctx.userId)
+                            }
                         } else null
                         TeacherMessageDto(
                             id = msgId.toString(),
@@ -317,6 +325,13 @@ fun Route.teacherMessagesRouting() {
                 }
             }
 
+            // -------- UNREAD COUNT --------
+            get("/unread-count") {
+                val ctx = call.requireTeacherContext() ?: return@get
+                val count = dbQuery { getUnreadCount(ctx.userId) }
+                call.ok(UnreadCountDto(count))
+            }
+
             // -------- MARK READ --------
             post("/threads/{id}/read") {
                 val ctx = call.requireTeacherContext() ?: return@post
@@ -330,6 +345,11 @@ fun Route.teacherMessagesRouting() {
                         it[isRead] = true
                         it[updatedAt] = Instant.now()
                     }
+                    // Read Receipts Phase 1: also bulk-update per-message status rows to READ
+                    val convId = MessageThreadsTable.selectAll()
+                        .where { (MessageThreadsTable.id eq id) and (MessageThreadsTable.ownerUserId eq ctx.userId) }
+                        .singleOrNull()?.get(MessageThreadsTable.conversationId) ?: id
+                    markConversationRead(ctx.userId, convId)
                 }
                 if (n == 0) call.fail("Thread not found", HttpStatusCode.NotFound)
                 else call.okMessage("Thread marked as read")

@@ -177,7 +177,10 @@ fun ParentMessagesBody(
                     loading = state.loading,
                     error = state.error,
                     isEmpty = state.isEmpty,
-                    onOpenThread = { t -> viewModel.openThread(t.id, t.senderName) },
+                    onOpenThread = { t ->
+                        viewModel.markAsRead(t.id)
+                        viewModel.openThread(t.id, t.senderName)
+                    },
                     onCompose = viewModel::openCompose,
                     onRetry = viewModel::loadThreads,
                     modifier = Modifier.fillMaxSize(),
