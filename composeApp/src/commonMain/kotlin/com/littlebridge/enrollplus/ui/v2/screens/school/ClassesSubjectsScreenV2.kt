@@ -39,6 +39,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import com.littlebridge.enrollplus.feature.admin.domain.model.BulkPeriodItem
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreateExceptionRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.PeriodExceptionDto
@@ -52,6 +54,7 @@ import com.littlebridge.enrollplus.feature.admin.domain.model.TimetablePeriodDto
 import com.littlebridge.enrollplus.feature.admin.presentation.ClassesSubjectsState
 import com.littlebridge.enrollplus.feature.admin.presentation.ClassesSubjectsViewModel
 import com.littlebridge.enrollplus.feature.admin.presentation.SchoolDayConfigViewModel
+import com.littlebridge.enrollplus.platform.rememberMediaPicker
 import com.littlebridge.enrollplus.ui.v2.components.VBackHeader
 import com.littlebridge.enrollplus.ui.v2.components.VBadge
 import com.littlebridge.enrollplus.ui.v2.components.VBadgeTone
@@ -73,6 +76,9 @@ import com.littlebridge.enrollplus.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
 private val TABS = listOf("Classes", "Subjects", "Schedule", "Exceptions & Requests")
+
+@OptIn(ExperimentalEncodingApi::class)
+private fun ByteArray.encodeToBase64(): String = Base64.encode(this)
 
 @Composable
 fun ClassesSubjectsScreenV2(
@@ -852,6 +858,34 @@ private fun ImportDialog(
                 // Photo / PDF — AI OCR via server
                 if (importMode == "photo" || importMode == "pdf") {
                     val label = if (importMode == "photo") "Photo OCR" else "PDF Import"
+                    val mediaPicker = rememberMediaPicker(
+                        onPicked = { bytes, mimeType, fileName ->
+                            isImporting = true
+                            parseError = null
+                            val base64 = bytes.encodeToBase64()
+                            val isPdf = mimeType == "application/pdf"
+                            if (isPdf) {
+                                parseError = "PDF text extraction is not yet available. Please copy the timetable text from your PDF and use 'Paste Text' mode."
+                                isImporting = false
+                            } else {
+                                dayConfigViewModel.importOcr(
+                                    imageBase64 = base64,
+                                    mimeType = mimeType,
+                                    onResult = { slots, name ->
+                                        isImporting = false
+                                        onParsed(slots, name)
+                                    },
+                                    onError = { msg ->
+                                        isImporting = false
+                                        parseError = msg
+                                    },
+                                )
+                            }
+                        },
+                        onUnsupported = { message ->
+                            parseError = message
+                        },
+                    )
                     if (isImporting) {
                         Column(
                             Modifier.fillMaxWidth().padding(24.dp),
@@ -866,7 +900,10 @@ private fun ImportDialog(
                         VEmptyState(
                             title = "$label — AI Vision OCR",
                             icon = VIcons.FileText,
-                            body = "Take a photo or pick an image of a printed timetable. Our AI will extract the schedule automatically.",
+                            body = if (importMode == "photo")
+                                "Take a photo or pick an image of a printed timetable. Our AI will extract the schedule automatically."
+                            else
+                                "Pick a PDF file — timetable text will be extracted.",
                         )
                         parseError?.let {
                             Text(it, style = VTheme.type.caption.colored(VTheme.colors.dangerInk))
@@ -876,7 +913,8 @@ private fun ImportDialog(
                             VButton(
                                 text = if (importMode == "photo") "Pick Photo" else "Pick PDF",
                                 onClick = {
-                                    parseError = "File picker integration requires platform-specific code. Please use 'Paste Text' mode for now — copy text from your photo/PDF and paste it."
+                                    parseError = null
+                                    if (importMode == "photo") mediaPicker.launchImage() else mediaPicker.launchPdf()
                                 },
                                 variant = VButtonVariant.Primary,
                                 tone = VButtonTone.Teal,
