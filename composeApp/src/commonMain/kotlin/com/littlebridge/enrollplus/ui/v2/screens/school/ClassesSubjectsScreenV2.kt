@@ -613,6 +613,7 @@ private fun ScheduleTab(
                 state = state,
                 onLoadTimetable = onLoadTimetable,
                 onBack = { currentStep = 1 },
+                onDone = { currentStep = 0 },
             )
         }
     }
@@ -2179,6 +2180,7 @@ private fun ScheduleStepReview(
     state: ClassesSubjectsState,
     onLoadTimetable: (String?) -> Unit,
     onBack: () -> Unit,
+    onDone: () -> Unit,
 ) {
     val tt = state.timetable
     LaunchedEffect(Unit) { if (tt == null) onLoadTimetable(null) }
@@ -2252,9 +2254,11 @@ private fun ScheduleStepReview(
         }
 
         // Conflict detection
+        var hasConflicts = false
         if (tt != null) {
             val allPeriods = tt.weekdays.flatMap { it.periods }
             val conflicts = detectConflicts(allPeriods)
+            hasConflicts = conflicts.isNotEmpty()
             if (conflicts.isNotEmpty()) {
                 VSectionHeader("⚠ Conflicts Detected")
                 conflicts.forEach { conflict ->
@@ -2276,6 +2280,15 @@ private fun ScheduleStepReview(
                     full = true,
                     variant = VButtonVariant.Secondary,
                     tone = VButtonTone.Navy,
+                )
+            }
+            Box(Modifier.weight(1f)) {
+                VButton(
+                    text = if (hasConflicts) "Done (Review Conflicts)" else "✓ Done",
+                    onClick = onDone,
+                    full = true,
+                    variant = VButtonVariant.Primary,
+                    tone = VButtonTone.Teal,
                 )
             }
         }
