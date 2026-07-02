@@ -577,6 +577,7 @@ private fun ScheduleStepStructure(
     var templateName by remember { mutableStateOf("Standard Day") }
     var slots by remember { mutableStateOf(DEFAULT_TEMPLATE_SLOTS.toMutableList()) }
     var selectedDays by remember { mutableStateOf(setOf(1, 2, 3, 4, 5)) }
+    var showImportDialog by remember { mutableStateOf(false) }
 
     Column(
         Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -584,6 +585,15 @@ private fun ScheduleStepStructure(
     ) {
         VSectionHeader("Day Structure Template")
         Text("Customize every element below — add, remove, reorder, edit times and labels.", style = VTheme.type.caption.colored(VTheme.colors.ink2))
+
+        // Import button
+        VButton(
+            text = "📥 Import from Photo / PDF / Text",
+            onClick = { showImportDialog = true },
+            full = true,
+            variant = VButtonVariant.Secondary,
+            tone = VButtonTone.Navy,
+        )
 
         // Template name
         VInput(
@@ -689,6 +699,227 @@ private fun ScheduleStepStructure(
 
         Spacer(Modifier.height(80.dp))
     }
+
+    if (showImportDialog) {
+        ImportDialog(
+            onDismiss = { showImportDialog = false },
+            onParsed = { parsedSlots, parsedName ->
+                if (parsedSlots.isNotEmpty()) {
+                    slots = parsedSlots.toMutableList()
+                    if (parsedName.isNotBlank()) templateName = parsedName
+                }
+                showImportDialog = false
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ImportDialog(
+    onDismiss: () -> Unit,
+    onParsed: (List<SchoolDaySlotDto>, String) -> Unit,
+) {
+    var importMode by remember { mutableStateOf<String?>(null) }
+    var pastedText by remember { mutableStateOf("") }
+    var parseError by remember { mutableStateOf<String?>(null) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        VCard(Modifier.fillMaxWidth().padding(16.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Import Schedule", style = VTheme.type.h3, fontWeight = FontWeight.Bold, color = VTheme.colors.ink)
+
+                if (importMode == null) {
+                    Text("Choose an import source:", style = VTheme.type.caption.colored(VTheme.colors.ink2))
+
+                    // Photo (OCR)
+                    VCard(Modifier.fillMaxWidth().clickable { importMode = "photo" }) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Box(
+                                Modifier.size(40.dp).clip(CircleShape)
+                                    .background(VTheme.colors.teal.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text("📷", style = VTheme.type.body)
+                            }
+                            Column(Modifier.weight(1f)) {
+                                Text("Photo (OCR)", style = VTheme.type.bodyStrong.colored(VTheme.colors.ink))
+                                Text("Take a photo or pick from gallery — text will be extracted automatically.", style = VTheme.type.caption.colored(VTheme.colors.ink2))
+                            }
+                        }
+                    }
+
+                    // PDF
+                    VCard(Modifier.fillMaxWidth().clickable { importMode = "pdf" }) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Box(
+                                Modifier.size(40.dp).clip(CircleShape)
+                                    .background(VTheme.colors.accent.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text("📄", style = VTheme.type.body)
+                            }
+                            Column(Modifier.weight(1f)) {
+                                Text("PDF Document", style = VTheme.type.bodyStrong.colored(VTheme.colors.ink))
+                                Text("Pick a PDF file — timetable text will be extracted.", style = VTheme.type.caption.colored(VTheme.colors.ink2))
+                            }
+                        }
+                    }
+
+                    // Paste Text
+                    VCard(Modifier.fillMaxWidth().clickable { importMode = "text" }) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Box(
+                                Modifier.size(40.dp).clip(CircleShape)
+                                    .background(VTheme.colors.warning.copy(alpha = 0.3f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text("📋", style = VTheme.type.body)
+                            }
+                            Column(Modifier.weight(1f)) {
+                                Text("Paste Text", style = VTheme.type.bodyStrong.colored(VTheme.colors.ink))
+                                Text("Paste timetable text from any source — we'll parse it into slots.", style = VTheme.type.caption.colored(VTheme.colors.ink2))
+                            }
+                        }
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        VButton(text = "Cancel", onClick = onDismiss, variant = VButtonVariant.Ghost)
+                    }
+                }
+
+                // Photo / PDF — coming soon
+                if (importMode == "photo" || importMode == "pdf") {
+                    val label = if (importMode == "photo") "Photo OCR" else "PDF Import"
+                    VEmptyState(
+                        title = "$label — Coming Soon",
+                        icon = VIcons.FileText,
+                        body = "Platform-specific OCR integration is in development. For now, use 'Paste Text' to import your timetable — copy from any document, photo, or PDF and paste the text here.",
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        VButton(text = "← Back", onClick = { importMode = null }, variant = VButtonVariant.Ghost)
+                        VButton(
+                            text = "Use Paste Text Instead",
+                            onClick = { importMode = "text" },
+                            variant = VButtonVariant.Primary,
+                            tone = VButtonTone.Teal,
+                        )
+                    }
+                }
+
+                // Paste Text mode
+                if (importMode == "text") {
+                    Text("Paste your timetable text below.", style = VTheme.type.caption.colored(VTheme.colors.ink2))
+                    Text("Supported formats: '08:00-08:40 Period 1' or '08:00 08:40 English' (one slot per line)", style = VTheme.type.caption.colored(VTheme.colors.ink3))
+                    VInput(
+                        value = pastedText,
+                        onValueChange = { pastedText = it; parseError = null },
+                        label = "Timetable Text",
+                        hint = "One slot per line, e.g.\n08:00-08:40 Period 1\n08:40-09:20 Period 2\n09:20-09:35 Short Break",
+                        placeholder = "08:00-08:40 Period 1\n08:40-09:20 Period 2...",
+                    )
+
+                    parseError?.let {
+                        Text(it, style = VTheme.type.caption.colored(VTheme.colors.dangerInk))
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        VButton(text = "← Back", onClick = { importMode = null }, variant = VButtonVariant.Ghost)
+                        VButton(
+                            text = "Parse & Fill",
+                            onClick = {
+                                val result = parseTimetableText(pastedText)
+                                if (result.first.isEmpty()) {
+                                    parseError = "Could not parse any slots. Make sure each line has a time range (e.g. 08:00-08:40) and a label."
+                                } else {
+                                    onParsed(result.first, result.second)
+                                }
+                            },
+                            variant = VButtonVariant.Primary,
+                            tone = VButtonTone.Teal,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private val TIME_REGEX = Regex("(\\d{1,2}[:.]\\d{2})\\s*[-–to ]+\\s*(\\d{1,2}[:.]\\d{2})")
+private val BREAK_KEYWORDS = setOf("break", "recess", "lunch", "interval", "assembly", "prayer")
+
+private fun parseTimetableText(text: String): Pair<List<SchoolDaySlotDto>, String> {
+    val lines = text.lines().map { it.trim() }.filter { it.isNotBlank() }
+    val slots = mutableListOf<SchoolDaySlotDto>()
+    var name = ""
+
+    for ((idx, line) in lines.withIndex()) {
+        val match = TIME_REGEX.find(line)
+        if (match != null) {
+            val startRaw = match.groupValues[1].replace('.', ':')
+            val endRaw = match.groupValues[2].replace('.', ':')
+            val startTime = normalizeTime(startRaw)
+            val endTime = normalizeTime(endRaw)
+
+            // Extract label: everything after the time match
+            val afterMatch = line.substring(match.range.last + 1).trim()
+                .removePrefix("-").removePrefix("–").trim()
+            // Also try before the match (some formats: "Period 1 08:00-08:40")
+            val beforeMatch = line.substring(0, match.range.first).trim()
+                .removeSuffix("-").removeSuffix("–").trim()
+
+            val label = when {
+                afterMatch.isNotBlank() -> afterMatch
+                beforeMatch.isNotBlank() -> beforeMatch
+                else -> "Slot ${idx + 1}"
+            }
+
+            val lowerLabel = label.lowercase()
+            val slotType = when {
+                BREAK_KEYWORDS.any { lowerLabel.contains(it) } -> {
+                    if (lowerLabel.contains("lunch")) "BREAK"
+                    else if (lowerLabel.contains("assembly") || lowerLabel.contains("prayer")) "ASSEMBLY"
+                    else "BREAK"
+                }
+                lowerLabel.contains("lab") -> "LAB"
+                else -> "TEACHING"
+            }
+
+            slots.add(SchoolDaySlotDto(idx, slotType, label, startTime, endTime))
+        }
+    }
+
+    // Try to detect a name from the first non-time line
+    for (line in lines) {
+        if (TIME_REGEX.find(line) == null && line.length in 3..40) {
+            name = line
+            break
+        }
+    }
+
+    return slots to name
+}
+
+private fun normalizeTime(time: String): String {
+    val parts = time.split(":")
+    if (parts.size == 2) {
+        val h = parts[0].padStart(2, '0')
+        val m = parts[1].padStart(2, '0')
+        return "$h:$m"
+    }
+    return time
 }
 
 @OptIn(ExperimentalLayoutApi::class)
