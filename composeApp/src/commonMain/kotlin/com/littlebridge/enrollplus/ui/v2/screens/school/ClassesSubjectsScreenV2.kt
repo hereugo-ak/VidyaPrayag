@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreateExceptionRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreatePeriodRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.PeriodExceptionDto
@@ -247,6 +248,7 @@ private fun ClassEditDialog(
     var name by remember { mutableStateOf(initialName) }
     var sectionsText by remember { mutableStateOf(initialSections.joinToString(", ")) }
 
+    Dialog(onDismissRequest = onDismiss) {
     VCard(Modifier.fillMaxWidth().padding(16.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(title, style = VTheme.type.h3, fontWeight = FontWeight.Bold, color = VTheme.colors.ink)
@@ -274,6 +276,7 @@ private fun ClassEditDialog(
                 )
             }
         }
+    }
     }
 }
 
@@ -425,6 +428,7 @@ private fun SubjectEditDialog(
     var name by remember { mutableStateOf(initialName) }
     var code by remember { mutableStateOf(initialCode) }
 
+    Dialog(onDismissRequest = onDismiss) {
     VCard(Modifier.fillMaxWidth().padding(16.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(title, style = VTheme.type.h3, fontWeight = FontWeight.Bold, color = VTheme.colors.ink)
@@ -441,6 +445,7 @@ private fun SubjectEditDialog(
                 )
             }
         }
+    }
     }
 }
 
@@ -623,6 +628,7 @@ private fun PeriodEditDialog(
     var endTime by remember { mutableStateOf("10:00") }
     var room by remember { mutableStateOf("") }
 
+    Dialog(onDismissRequest = onDismiss) {
     VCard(Modifier.fillMaxWidth().padding(16.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Add Period", style = VTheme.type.h3, fontWeight = FontWeight.Bold, color = VTheme.colors.ink)
@@ -657,6 +663,7 @@ private fun PeriodEditDialog(
                 )
             }
         }
+    }
     }
 }
 
@@ -797,6 +804,7 @@ private fun ExceptionEditDialog(
 
     val kinds = listOf("CANCELLED", "RESCHEDULED", "ROOM_CHANGE", "SUBSTITUTION", "EXTRA")
 
+    Dialog(onDismissRequest = onDismiss) {
     VCard(Modifier.fillMaxWidth().padding(16.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Add Exception", style = VTheme.type.h3, fontWeight = FontWeight.Bold, color = VTheme.colors.ink)
@@ -843,6 +851,7 @@ private fun ExceptionEditDialog(
                 )
             }
         }
+    }
     }
 }
 

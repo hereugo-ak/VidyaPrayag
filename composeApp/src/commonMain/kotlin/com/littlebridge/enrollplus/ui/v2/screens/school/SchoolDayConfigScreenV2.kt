@@ -154,6 +154,48 @@ private fun SchoolDayConfigContent(
             .padding(top = 16.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (showForm) {
+            ConfigFormCard(
+                title = if (isEditing) "Edit Day Config" else "New Day Config",
+                name = name, onNameChange = { name = it },
+                days = days, onDaysChange = { days = it },
+                daysValid = daysValid,
+                level = level, onLevelChange = { level = it },
+                levelValid = levelValid,
+                slots = slots, onSlotsChange = { slots = it },
+                isSaving = state.isSaving,
+                formValid = formValid,
+                onSubmit = {
+                    if (isEditing) {
+                        onUpdate(editingId!!, name, days, level, slots) {
+                            editingId = null
+                            name = ""; days = "1,2,3,4,5"; level = "ALL"; slots = emptyList()
+                        }
+                    } else {
+                        onCreate(name, days, level, slots) {
+                            composerOpen = false
+                            name = ""; days = "1,2,3,4,5"; level = "ALL"; slots = emptyList()
+                        }
+                    }
+                },
+                onCancel = {
+                    composerOpen = false
+                    editingId = null
+                    name = ""; days = "1,2,3,4,5"; level = "ALL"; slots = emptyList()
+                    onClearMessages()
+                },
+                infoMessage = state.infoMessage,
+            )
+        } else {
+            VButton(
+                text = "New Day Config",
+                onClick = { composerOpen = true },
+                full = true,
+                variant = VButtonVariant.Primary,
+                tone = VButtonTone.Teal,
+            )
+        }
+
         VStateHost(
             loading = state.isLoading,
             error = state.errorMessage,
@@ -163,48 +205,6 @@ private fun SchoolDayConfigContent(
             emptyIcon = VIcons.Calendar,
             onRetry = onRetry,
         ) {
-            if (showForm) {
-                ConfigFormCard(
-                    title = if (isEditing) "Edit Day Config" else "New Day Config",
-                    name = name, onNameChange = { name = it },
-                    days = days, onDaysChange = { days = it },
-                    daysValid = daysValid,
-                    level = level, onLevelChange = { level = it },
-                    levelValid = levelValid,
-                    slots = slots, onSlotsChange = { slots = it },
-                    isSaving = state.isSaving,
-                    formValid = formValid,
-                    onSubmit = {
-                        if (isEditing) {
-                            onUpdate(editingId!!, name, days, level, slots) {
-                                editingId = null
-                                name = ""; days = "1,2,3,4,5"; level = "ALL"; slots = emptyList()
-                            }
-                        } else {
-                            onCreate(name, days, level, slots) {
-                                composerOpen = false
-                                name = ""; days = "1,2,3,4,5"; level = "ALL"; slots = emptyList()
-                            }
-                        }
-                    },
-                    onCancel = {
-                        composerOpen = false
-                        editingId = null
-                        name = ""; days = "1,2,3,4,5"; level = "ALL"; slots = emptyList()
-                        onClearMessages()
-                    },
-                    infoMessage = state.infoMessage,
-                )
-            } else {
-                VButton(
-                    text = "New Day Config",
-                    onClick = { composerOpen = true },
-                    full = true,
-                    variant = VButtonVariant.Primary,
-                    tone = VButtonTone.Teal,
-                )
-            }
-
             if (state.configs.isNotEmpty()) {
                 VSectionHeader(title = "CONFIGURATIONS")
                 state.configs.forEach { config ->
