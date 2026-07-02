@@ -45,4 +45,5 @@ interface PewsRepository {
 
     // parent
     suspend fun getParentNudge(token: String, childId: String): NetworkResult<ApiResponse<PewsParentNudgeDto>>
+    suspend fun acknowledgeNudge(token: String, childId: String): NetworkResult<ApiResponse<Map<String, Boolean>>>
 }

@@ -8,12 +8,12 @@
 --     - SambaNova free tier: only 20 RPD (was #1 REASON provider)
 --     - Cerebras free tier: only 5 RPM (was #1 FAST_CHAT provider)
 --     - No Google Gemini integration despite 1,500 RPD free tier
---     - Groq 8B model (llama-3.1-8b-instant) has ~14,400 RPM on free tier
+--     - Groq 8B model (openai/gpt-oss-20b) has ~14,400 RPM on free tier
 --       but wasn't used — only the 70B model (30 RPM) was configured
 --
 --   This migration:
 --   1. Documents the two new provider codes added to ai_provider_config:
---      - groq_fast  (Groq llama-3.1-8b-instant, shares AI_GROQ_API_KEY)
+--      - groq_fast  (Groq openai/gpt-oss-20b, shares AI_GROQ_API_KEY)
 --      - gemini     (Google Gemini 2.5 Flash, OpenAI-compatible endpoint)
 --   2. No schema changes needed — the provider column is VARCHAR(32) and
 --      the table uses provider+model as a unique key, so new providers
@@ -24,7 +24,7 @@
 --   ┌──────────────┬────────────────────────────┬──────────┬──────────┬───────────┐
 --   │ Provider     │ Model                      │ RPM      │ RPD      │ noTraining│
 --   ├──────────────┼────────────────────────────┼──────────┼──────────┼───────────┤
---   │ groq_fast    │ llama-3.1-8b-instant       │ ~14,400  │ ~500K TPM│ true      │
+--   │ groq_fast    │ openai/gpt-oss-20b         │ ~14,400  │ ~500K TPM│ true      │
 --   │ gemini       │ gemini-2.5-flash           │ 10-15    │ 250-1,500│ false*    │
 --   └──────────────┴────────────────────────────┴──────────┴──────────┴───────────┘
 --   * Google may use free-tier prompts for training → PII-restricted.
@@ -42,7 +42,7 @@
 -- ENV VARS REQUIRED
 --   AI_GROQ_API_KEY     — already set (shared by GROQ and GROQ_FAST)
 --   AI_GEMINI_API_KEY   — new; get from https://aistudio.google.com/app/apikey
---   AI_MODEL_GROQ_FAST  — optional override (default: llama-3.1-8b-instant)
+--   AI_MODEL_GROQ_FAST  — optional override (default: openai/gpt-oss-20b)
 --   AI_MODEL_GEMINI     — optional override (default: gemini-2.5-flash)
 --
 -- HOW TO RUN
@@ -74,8 +74,8 @@ BEGIN;
 -- │ Provider     │ Model                      │ RPM   │ RPD   │ TPM        │ noTrain  │
 -- ├──────────────┼────────────────────────────┼───────┼───────┼────────────┼──────────┤
 -- │ cerebras     │ gpt-oss-120b               │ 5     │ 1M TP │ 30K        │ true     │
--- │ groq         │ llama-3.3-70b-versatile    │ 30    │ 14,400│ 12K        │ true     │
--- │ groq_fast    │ llama-3.1-8b-instant       │ 14,400│ N/A   │ 500K       │ true     │
+-- │ groq         │ openai/gpt-oss-120b        │ 30    │ 14,400│ 12K        │ true     │
+-- │ groq_fast    │ openai/gpt-oss-20b         │ 14,400│ N/A   │ 500K       │ true     │
 -- │ sambanova    │ DeepSeek-V3.1              │ 20    │ 20    │ 200K TP    │ false    │
 -- │ mistral      │ mistral-small-latest       │ ~60   │ N/A   │ ~1B/mo     │ false    │
 -- │ openrouter   │ llama-3.3-70b:free         │ 20    │ 50*   │ N/A        │ true     │

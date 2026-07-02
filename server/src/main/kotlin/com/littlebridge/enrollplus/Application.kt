@@ -114,7 +114,12 @@ import com.littlebridge.enrollplus.feature.school.schoolIntelligenceRouting
 import com.littlebridge.enrollplus.feature.school.schoolProfileRouting
 import com.littlebridge.enrollplus.feature.school.schoolRecordsRouting
 import com.littlebridge.enrollplus.feature.school.schoolStudentsRouting
+import com.littlebridge.enrollplus.feature.school.schoolClassesRouting
 import com.littlebridge.enrollplus.feature.school.schoolTimetableRouting
+import com.littlebridge.enrollplus.feature.school.periodExceptionRouting
+import com.littlebridge.enrollplus.feature.school.timetableChangeRequestRouting
+import com.littlebridge.enrollplus.feature.school.schoolDayConfigRouting
+import com.littlebridge.enrollplus.feature.school.timetableImportRouting
 import com.littlebridge.enrollplus.feature.school.nonTeachingStaffRouting
 import com.littlebridge.enrollplus.feature.school.schoolLessonPlanRouting
 import com.littlebridge.enrollplus.feature.school.schoolRouting
@@ -385,7 +390,10 @@ fun Application.module() {
         schoolStudentsRouting()      // /api/v1/school/students[…] + teachers/{id} — RA-45 student roster + student/teacher profile (school-scoped)
         nonTeachingStaffRouting()    // /api/v1/school/staff[…] — RA-S17 non-teaching-staff vertical (school-scoped CRUD)
         schoolRecordsRouting()       // /api/v1/school/{attendance/summary,marks/summary,fees/ledger} — RA-52 admin Records rollups (school-scoped reads)
-        schoolTimetableRouting()     // /api/v1/school/timetable — school-wide weekly schedule (all classes) from teacher_periods, for the Command Center calendar (read-only, additive)
+        schoolClassesRouting()       // /api/v1/school/classes[…] + /api/v1/school/subjects[…] — class + subject CRUD (admin)
+        schoolTimetableRouting()     // /api/v1/school/timetable[…] — school-wide weekly schedule + admin period CRUD (POST/PUT/DELETE)
+        periodExceptionRouting()     // /api/v1/school/timetable/exceptions[…] + /api/v1/teacher/timetable/exceptions[…] — one-off period overrides
+        timetableChangeRequestRouting() // /api/v1/school/timetable-requests[…] + /api/v1/teacher/timetable-requests[…] — teacher→admin approval workflow
         schoolLessonPlanRouting()    // /api/v1/school/lesson-plans — admin review of teacher lesson plans (read-only, school-scoped, filterable)
         mediaRouting()               // /api/v1/school/media/upload[…] — REAL binary uploads → Supabase Storage (kills URL placeholders)
 
@@ -479,5 +487,10 @@ fun Application.module() {
         // Message Scheduling (MESSAGE_SCHEDULING_PLAN.md §5)
         //   /api/v1/school/scheduled-messages          — admin, teacher
         scheduledMessageRouting()
+
+        // School Day Configuration (TIMETABLE_CLASS_TEACHER_PLAN.md Phase 0)
+        //   /api/v1/school/day-config          — admin, school-scoped CRUD
+        schoolDayConfigRouting()
+        timetableImportRouting()
     }
 }

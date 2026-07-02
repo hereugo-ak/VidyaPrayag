@@ -29,6 +29,9 @@ import com.littlebridge.enrollplus.db.ChildrenTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.db.HolidayListTable
 import com.littlebridge.enrollplus.db.StudentsTable
+import com.littlebridge.enrollplus.db.SchoolDayConfigTable
+import com.littlebridge.enrollplus.db.SchoolDaySlotsTable
+import com.littlebridge.enrollplus.db.SYSTEM_SCHOOL_ID
 import com.littlebridge.enrollplus.db.SyllabusUnitsTable
 import com.littlebridge.enrollplus.db.TeacherPeriodsTable
 import io.ktor.http.*
@@ -40,6 +43,8 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
+import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
@@ -97,9 +102,20 @@ data class ParentPeriodDto(
 )
 
 @Serializable
+data class ParentBellSlotDto(
+    @SerialName("slot_index") val slotIndex: Int,
+    @SerialName("slot_type") val slotType: String,
+    val label: String,
+    @SerialName("start_time") val startTime: String,
+    @SerialName("end_time") val endTime: String,
+)
+
+@Serializable
 data class ParentTimetableDayDto(
     val weekday: Int,                              // 1=Mon … 7=Sun
     val periods: List<ParentPeriodDto>,
+    @SerialName("now_index") val nowIndex: Int? = null,
+    @SerialName("next_index") val nextIndex: Int? = null,
 )
 
 @Serializable
@@ -107,6 +123,7 @@ data class ParentTimetableData(
     @SerialName("child_name") val childName: String,
     @SerialName("class_name") val className: String,
     val weekdays: List<ParentTimetableDayDto> = emptyList(),
+    @SerialName("bell_schedule") val bellSchedule: List<ParentBellSlotDto> = emptyList(),
 )
 
 @Serializable
@@ -196,6 +213,37 @@ private suspend fun ApplicationCall.requireOwnedChild(): ResolvedChild? {
         section = linkedSection ?: "A",
         sectionResolved = linkedSection != null,
     )
+}
+
+private fun resolveParentBellSchedule(schoolId: UUID, weekday: Int): List<ParentBellSlotDto> {
+    fun fetchForSchool(sid: UUID): List<ParentBellSlotDto>? {
+        val configs = SchoolDayConfigTable.selectAll()
+            .where {
+                (SchoolDayConfigTable.schoolId eq sid) and
+                    (SchoolDayConfigTable.isActive eq true)
+            }
+            .toList()
+        if (configs.isEmpty()) return null
+        val matching = configs.firstOrNull { r ->
+            val days = r[SchoolDayConfigTable.applicableDays]
+                .split(",").map { it.trim().toIntOrNull() }.filterNotNull()
+            weekday in days
+        } ?: return null
+        val cid = matching[SchoolDayConfigTable.id].value
+        return SchoolDaySlotsTable.selectAll()
+            .where { (SchoolDaySlotsTable.configId eq cid) and (SchoolDaySlotsTable.schoolId eq sid) }
+            .orderBy(SchoolDaySlotsTable.slotIndex)
+            .map { s ->
+                ParentBellSlotDto(
+                    slotIndex = s[SchoolDaySlotsTable.slotIndex],
+                    slotType = s[SchoolDaySlotsTable.slotType],
+                    label = s[SchoolDaySlotsTable.label],
+                    startTime = s[SchoolDaySlotsTable.startTime].format(PARENT_HHMM),
+                    endTime = s[SchoolDaySlotsTable.endTime].format(PARENT_HHMM),
+                )
+            }
+    }
+    return fetchForSchool(schoolId) ?: fetchForSchool(SYSTEM_SCHOOL_ID) ?: emptyList()
 }
 
 fun Route.parentAcademicsRouting() {
@@ -362,6 +410,10 @@ fun Route.parentAcademicsRouting() {
                     )
                     return@get
                 }
+                val today = LocalDate.now()
+                val todayWeekday = today.dayOfWeek.value
+                val now = LocalTime.now()
+
                 val data = dbQuery {
                     // Teacher display names for this school (id → full name).
                     val teacherNames = AppUsersTable.selectAll()
@@ -392,12 +444,37 @@ fun Route.parentAcademicsRouting() {
                         )
                     }
 
+                    // C-3: bell schedule from school_day_config
+                    val bellSchedule = resolveParentBellSchedule(child.schoolId, todayWeekday)
+
                     val weekdays = rows.groupBy { it.first }
                         .map { (weekday, list) ->
+                            val sortedPeriods = list.sortedWith(compareBy({ it.second }, { it.third.endTime }))
+                                .map { it.third }
+
+                            // H-1: server-authoritative now/next for today's weekday
+                            val nowIdx: Int?
+                            val nextIdx: Int?
+                            if (weekday == todayWeekday) {
+                                nowIdx = sortedPeriods.indexOfFirst { p ->
+                                    val start = LocalTime.parse(p.startTime, PARENT_HHMM)
+                                    val end = LocalTime.parse(p.endTime, PARENT_HHMM)
+                                    !now.isBefore(start) && now.isBefore(end)
+                                }.takeIf { it >= 0 }
+                                nextIdx = sortedPeriods.indexOfFirst { p ->
+                                    val start = LocalTime.parse(p.startTime, PARENT_HHMM)
+                                    now.isBefore(start)
+                                }.takeIf { it >= 0 }
+                            } else {
+                                nowIdx = null
+                                nextIdx = null
+                            }
+
                             ParentTimetableDayDto(
                                 weekday = weekday,
-                                periods = list.sortedWith(compareBy({ it.second }, { it.third.endTime }))
-                                    .map { it.third },
+                                periods = sortedPeriods,
+                                nowIndex = nowIdx,
+                                nextIndex = nextIdx,
                             )
                         }
                         .sortedBy { it.weekday }
@@ -406,6 +483,7 @@ fun Route.parentAcademicsRouting() {
                         childName = child.childName,
                         className = child.grade,
                         weekdays = weekdays,
+                        bellSchedule = bellSchedule,
                     )
                 }
                 call.ok(data, message = "Timetable loaded")

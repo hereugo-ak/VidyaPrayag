@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -179,6 +180,10 @@ private fun TeacherStudentCard(
                 )
             }
             VBadge(text = levelLabel, tone = tone)
+            if (s.hasOpenIntervention) {
+                Spacer(Modifier.width(4.dp))
+                VBadge(text = "Under intervention", tone = VBadgeTone.Neutral)
+            }
         }
 
         // deterministic metrics
@@ -288,7 +293,21 @@ private fun TeacherStudentCard(
                             VButton("Dismiss", { onDismiss(iv.id) }, variant = VButtonVariant.Ghost, size = VButtonSize.Sm, enabled = !isUpdating)
                         }
                     } else if (iv.status == "in_progress") {
-                        // In-progress: action-type-specific workflow
+                        // In-progress: show who initiated it
+                        val initiatorLabel = iv.initiatedByName?.let { name ->
+                            val role = iv.initiatedByRole?.let { r ->
+                                if (r in listOf("school_admin", "admin")) "Admin" else "Teacher"
+                            } ?: ""
+                            "✓ Initiated by $name${if (role.isNotBlank()) " ($role)" else ""}"
+                        }
+                        if (initiatorLabel != null) {
+                            Spacer(Modifier.height(6.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(VIcons.Check, contentDescription = null, tint = c.success, modifier = Modifier.size(13.dp))
+                                Text(initiatorLabel, style = VTheme.type.caption.colored(c.ink2).copy(fontSize = 11.sp))
+                            }
+                        }
+                        // action-type-specific workflow
                         if (isParentAction) {
                             // Parent-contact action: Send the message
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

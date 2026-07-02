@@ -8,6 +8,7 @@ import { ApiError } from "@/lib/api";
 import type { SchoolProfileDto, UpdateSchoolProfileRequest } from "@/lib/admin/types";
 import { Card, CardHeader, FadeIn, Skeleton } from "@/components/admin/Primitives";
 import { AdminButton } from "@/components/admin/Toolbar";
+import { SchoolDayConfigPanel } from "@/components/admin/SchoolDayConfigPanel";
 
 /** Only these fields are editable from the web settings surface. */
 type EditableKey =
@@ -165,6 +166,11 @@ export default function SettingsPage() {
           </Card>
         </FadeIn>
       )}
+
+      {/* School Day Configuration — bell schedules & period slots */}
+      <FadeIn delay={0.08}>
+        <SchoolDayConfigPanel />
+      </FadeIn>
     </div>
   );
 }

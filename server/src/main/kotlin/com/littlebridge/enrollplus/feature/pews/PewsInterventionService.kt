@@ -205,6 +205,8 @@ class PewsInterventionService {
         val urgency: String? = null,
         val causeFamily: String? = null,
         val planJson: String? = null,
+        val initiatedByName: String? = null,
+        val initiatedByRole: String? = null,
     )
 
     /** Update status/notes; when status=done/dismissed, stamp resolvedAt + outcome. */
@@ -259,6 +261,10 @@ class PewsInterventionService {
             (StudentsTable.schoolId eq schoolId) and (StudentsTable.studentCode eq code)
         }.singleOrNull()
 
+        val owner = AppUsersTable.selectAll().where {
+            AppUsersTable.id eq r[PewsInterventionsTable.ownerUserId]
+        }.singleOrNull()
+
         InterventionView(
             id = r[PewsInterventionsTable.id].value,
             studentCode = code,
@@ -278,6 +284,8 @@ class PewsInterventionService {
             urgency = r[PewsInterventionsTable.urgency],
             causeFamily = r[PewsInterventionsTable.causeFamily],
             planJson = r[PewsInterventionsTable.planJson],
+            initiatedByName = owner?.get(AppUsersTable.fullName),
+            initiatedByRole = owner?.get(AppUsersTable.role),
         )
     }
 
@@ -302,9 +310,16 @@ class PewsInterventionService {
             (StudentsTable.schoolId eq schoolId) and (StudentsTable.studentCode inList codes)
         }.associateBy { it[StudentsTable.studentCode] }
 
+        // batch-load owner identity
+        val ownerIds = rows.map { it[PewsInterventionsTable.ownerUserId] }.distinct()
+        val ownerById = AppUsersTable.selectAll().where {
+            AppUsersTable.id inList ownerIds.map { org.jetbrains.exposed.dao.id.EntityID(it, AppUsersTable) }
+        }.associateBy { it[AppUsersTable.id].value }
+
         rows.map { r ->
             val code = r[PewsInterventionsTable.studentCode]
             val s = studentByCode[code]
+            val owner = ownerById[r[PewsInterventionsTable.ownerUserId]]
             InterventionView(
                 id = r[PewsInterventionsTable.id].value,
                 studentCode = code,
@@ -324,6 +339,8 @@ class PewsInterventionService {
                 urgency = r[PewsInterventionsTable.urgency],
                 causeFamily = r[PewsInterventionsTable.causeFamily],
                 planJson = r[PewsInterventionsTable.planJson],
+                initiatedByName = owner?.get(AppUsersTable.fullName),
+                initiatedByRole = owner?.get(AppUsersTable.role),
             )
         }
     }

@@ -42,6 +42,7 @@ import com.littlebridge.enrollplus.db.AppUsersTable
 import com.littlebridge.enrollplus.db.ChildrenTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.db.PewsConfigTable
+import com.littlebridge.enrollplus.db.PewsNudgeSeenTable
 import com.littlebridge.enrollplus.feature.pews.act.ActModule
 import com.littlebridge.enrollplus.feature.pews.act.DraftMessageResponse
 import com.littlebridge.enrollplus.feature.pews.act.SendParentMessageResponse
@@ -60,6 +61,7 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 // ── DTOs ────────────────────────────────────────────────────────────────────
@@ -97,6 +99,7 @@ data class PewsStudentDto(
     @SerialName("leading_score") val leadingScore: Int? = null,
     @SerialName("cause_family") val causeFamily: String? = null,
     @SerialName("deltas_json") val deltasJson: String? = null,
+    @SerialName("has_open_intervention") val hasOpenIntervention: Boolean = false,
 )
 
 @Serializable
@@ -139,6 +142,8 @@ data class PewsInterventionDto(
     @SerialName("plan_json") val planJson: String? = null,
     @SerialName("parent_draft_body") val parentDraftBody: String? = null,
     @SerialName("parent_draft_lang") val parentDraftLang: String? = null,
+    @SerialName("initiated_by_name") val initiatedByName: String? = null,
+    @SerialName("initiated_by_role") val initiatedByRole: String? = null,
 )
 
 @Serializable
@@ -224,6 +229,7 @@ private fun PewsSnapshotService.StoredSnapshot.toDto() = PewsStudentDto(
     aiProviderUsed = aiProviderUsed,
     confidence = confidence, leadingScore = leadingScore,
     causeFamily = causeFamily, deltasJson = deltasJson,
+    hasOpenIntervention = hasOpenIntervention,
 )
 
 private fun PewsInterventionService.InterventionView.toDto(): PewsInterventionDto {
@@ -237,6 +243,8 @@ private fun PewsInterventionService.InterventionView.toDto(): PewsInterventionDt
         urgency = urgency, causeFamily = causeFamily, planJson = planJson,
         parentDraftBody = caseFile?.parentDraft?.body,
         parentDraftLang = caseFile?.parentDraft?.language,
+        initiatedByName = initiatedByName,
+        initiatedByRole = initiatedByRole,
     )
 }
 
@@ -578,6 +586,25 @@ fun Route.pewsRouting() {
                 return@get
             }
 
+            // Check if parent already saw this nudge for the current run date
+            val runDate = LocalDate.parse(snap.runDate)
+            val alreadySeen = dbQuery {
+                PewsNudgeSeenTable.selectAll().where {
+                    (PewsNudgeSeenTable.childId eq childId) and
+                        (PewsNudgeSeenTable.parentId eq uid) and
+                        (PewsNudgeSeenTable.snapshotRunDate eq runDate)
+                }.limit(1).any()
+            }
+            if (alreadySeen) {
+                call.ok(
+                    PewsParentNudgeDto(
+                        childName = childName, show = false, headline = "", message = "",
+                        attendancePct = snap.attendancePct, actions = emptyList()),
+                    "Nudge already seen"
+                )
+                return@get
+            }
+
             val message = buildParentMessage(childName, snap)
             call.ok(
                 PewsParentNudgeDto(
@@ -593,6 +620,55 @@ fun Route.pewsRouting() {
                 ),
                 "Parent nudge"
             )
+        }
+
+        // Parent: acknowledge nudge (dismiss after viewing)
+        post("/api/v1/parent/pews/{childId}/ack") {
+            val uid = call.principalUserUuid()
+                ?: run { call.fail("invalid token", HttpStatusCode.Unauthorized); return@post }
+            val childId = call.parameters["childId"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                ?: run { call.fail("invalid child id"); return@post }
+
+            // validate child belongs to this parent
+            val child = dbQuery {
+                ChildrenTable.selectAll().where {
+                    (ChildrenTable.id eq EntityID(childId, ChildrenTable)) and
+                        (ChildrenTable.parentId eq uid)
+                }.singleOrNull()
+            } ?: run { call.fail("Child not found", HttpStatusCode.NotFound, "CHILD_NOT_FOUND"); return@post }
+
+            val schoolId = child[ChildrenTable.schoolId]
+            val studentCode = child[ChildrenTable.studentCode]
+            if (schoolId == null || studentCode.isNullOrBlank()) {
+                call.ok(mapOf("acknowledged" to true), "No nudge to ack")
+                return@post
+            }
+
+            // Get the latest snapshot run date for this school
+            val runDate = snapshotService.latestRunDate(schoolId)
+            if (runDate == null) {
+                call.ok(mapOf("acknowledged" to true), "No snapshot to ack")
+                return@post
+            }
+
+            // Upsert the seen record
+            val now = Instant.now()
+            dbQuery {
+                val existing = PewsNudgeSeenTable.selectAll().where {
+                    (PewsNudgeSeenTable.childId eq childId) and
+                        (PewsNudgeSeenTable.parentId eq uid) and
+                        (PewsNudgeSeenTable.snapshotRunDate eq runDate)
+                }.singleOrNull()
+                if (existing == null) {
+                    PewsNudgeSeenTable.insert {
+                        it[PewsNudgeSeenTable.childId] = childId
+                        it[PewsNudgeSeenTable.parentId] = uid
+                        it[PewsNudgeSeenTable.snapshotRunDate] = runDate
+                        it[PewsNudgeSeenTable.seenAt] = now
+                    }
+                }
+            }
+            call.ok(mapOf("acknowledged" to true), "Nudge acknowledged")
         }
     }
 }

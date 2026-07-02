@@ -62,6 +62,9 @@ import com.littlebridge.enrollplus.db.LessonPlansTable
 import com.littlebridge.enrollplus.db.LeaveRequestsTable
 import com.littlebridge.enrollplus.db.PeriodExceptionsTable
 import com.littlebridge.enrollplus.db.TeacherPeriodsTable
+import com.littlebridge.enrollplus.db.SchoolDayConfigTable
+import com.littlebridge.enrollplus.db.SchoolDaySlotsTable
+import com.littlebridge.enrollplus.db.SYSTEM_SCHOOL_ID
 import com.littlebridge.enrollplus.db.TeacherSubjectAssignmentsTable
 import com.littlebridge.enrollplus.db.TeacherCheckInsTable
 import com.littlebridge.enrollplus.feature.calendar.EventStatus
@@ -85,6 +88,7 @@ import org.jetbrains.exposed.sql.selectAll
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
@@ -125,6 +129,15 @@ data class CalendarOverlayDto(
 )
 
 @Serializable
+data class BellSlotDto(
+    @SerialName("slot_index") val slotIndex: Int,
+    @SerialName("slot_type") val slotType: String,
+    val label: String,
+    @SerialName("start_time") val startTime: String,
+    @SerialName("end_time") val endTime: String,
+)
+
+@Serializable
 data class ResolvedDayDto(
     val date: String,
     val weekday: Int,
@@ -134,6 +147,7 @@ data class ResolvedDayDto(
     val calendar: List<CalendarOverlayDto> = emptyList(),
     @SerialName("now_index") val nowIndex: Int? = null,
     @SerialName("next_index") val nextIndex: Int? = null,
+    @SerialName("bell_schedule") val bellSchedule: List<BellSlotDto> = emptyList(),
 )
 
 @Serializable
@@ -241,6 +255,50 @@ private data class PeriodScope(
  * @param nowProvider server clock for nowIndex/nextIndex; null for days other
  *        than "today" so a non-today resolved day carries no spurious "now".
  */
+private data class BellScheduleResult(
+    val slots: List<BellSlotDto>,
+    val hasConfig: Boolean,
+    val isSchoolDay: Boolean,
+)
+
+private fun resolveBellSchedule(schoolId: UUID, weekday: Int): BellScheduleResult {
+    fun fetchForSchool(sid: UUID): Pair<List<BellSlotDto>, Boolean>? {
+        val configs = SchoolDayConfigTable.selectAll()
+            .where {
+                (SchoolDayConfigTable.schoolId eq sid) and
+                    (SchoolDayConfigTable.isActive eq true)
+            }
+            .toList()
+        if (configs.isEmpty()) return null
+        val matching = configs.firstOrNull { r ->
+            val days = r[SchoolDayConfigTable.applicableDays]
+                .split(",").map { it.trim().toIntOrNull() }.filterNotNull()
+            weekday in days
+        }
+        if (matching == null) return emptyList<BellSlotDto>() to false
+        val cid = matching[SchoolDayConfigTable.id].value
+        val slots = SchoolDaySlotsTable.selectAll()
+            .where { (SchoolDaySlotsTable.configId eq cid) and (SchoolDaySlotsTable.schoolId eq sid) }
+            .orderBy(SchoolDaySlotsTable.slotIndex)
+            .map { s ->
+                BellSlotDto(
+                    slotIndex = s[SchoolDaySlotsTable.slotIndex],
+                    slotType = s[SchoolDaySlotsTable.slotType],
+                    label = s[SchoolDaySlotsTable.label],
+                    startTime = s[SchoolDaySlotsTable.startTime].format(HHMM_DAY),
+                    endTime = s[SchoolDaySlotsTable.endTime].format(HHMM_DAY),
+                )
+            }
+        return slots to true
+    }
+    val result = fetchForSchool(schoolId) ?: fetchForSchool(SYSTEM_SCHOOL_ID)
+    return if (result != null) {
+        BellScheduleResult(slots = result.first, hasConfig = true, isSchoolDay = result.second)
+    } else {
+        BellScheduleResult(slots = emptyList(), hasConfig = false, isSchoolDay = true)
+    }
+}
+
 private fun resolveDayInTxn(
     ctx: TeacherContext,
     date: LocalDate,
@@ -289,6 +347,22 @@ private fun resolveDayInTxn(
             calendar = overlay,
             nowIndex = null,
             nextIndex = null,
+        )
+    }
+
+    // ── 1b. School day config — bell schedule + applicable-day check (C-2) ────
+    val bellResult = resolveBellSchedule(ctx.schoolId, weekday)
+    if (bellResult.hasConfig && !bellResult.isSchoolDay) {
+        return ResolvedDayDto(
+            date = date.toString(),
+            weekday = weekday,
+            isHoliday = false,
+            holidayName = null,
+            periods = emptyList(),
+            calendar = overlay,
+            nowIndex = null,
+            nextIndex = null,
+            bellSchedule = emptyList(),
         )
     }
 
@@ -456,13 +530,29 @@ private fun resolveDayInTxn(
     resolved.sortWith(compareBy({ it.start }, { it.end }))
 
     // ── 7. attendanceMarked — ONE batched query (kills B-HOME-1 N+1) ────────────
-    // attendance_records.grade is "<className>-<section>" (TeacherRoutingTasks).
-    // A class counts as "marked" for the date if ANY student row exists for that
-    // grade. CANCELLED periods never solicit attendance, so they aren't marked.
+    // Attendance is saved with assignment_id (the typed FK). A class counts as
+    // "marked" for the date if ANY student row exists for that assignment_id.
+    // Fallback: also check the legacy grade column ("<className>-<section>") for
+    // rows written before the typed migration.
+    // CANCELLED periods never solicit attendance, so they aren't marked.
+    val assignmentIdsNeeded = resolved
+        .filter { it.status != KIND_CANCELLED && it.assignmentId != null }
+        .mapNotNull { it.assignmentId }
+        .toSet()
     val gradesNeeded = resolved
         .filter { it.status != KIND_CANCELLED && it.className.isNotBlank() }
         .map { "${it.className}-${it.section}" }
         .toSet()
+    val markedAssignmentIds: Set<UUID> = if (assignmentIdsNeeded.isEmpty()) {
+        emptySet()
+    } else {
+        AttendanceRecordsTable.selectAll().where {
+            (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
+                (AttendanceRecordsTable.date eq date) and
+                (AttendanceRecordsTable.type eq "student") and
+                (AttendanceRecordsTable.assignmentId inList assignmentIdsNeeded.toList())
+        }.mapNotNull { it[AttendanceRecordsTable.assignmentId] }.toSet()
+    }
     val markedGrades: Set<String> = if (gradesNeeded.isEmpty()) {
         emptySet()
     } else {
@@ -517,7 +607,10 @@ private fun resolveDayInTxn(
             startTime = p.start.format(HHMM_DAY),
             endTime = p.end.format(HHMM_DAY),
             status = p.status,
-            attendanceMarked = p.status != KIND_CANCELLED && grade in markedGrades,
+            attendanceMarked = p.status != KIND_CANCELLED && (
+                (p.assignmentId != null && p.assignmentId in markedAssignmentIds) ||
+                grade in markedGrades
+            ),
             substituteTeacherName = p.substituteName,
             isSubstituteForMe = p.isSubstituteForMe,
             hasOverlap = idx in overlapped,
@@ -550,6 +643,7 @@ private fun resolveDayInTxn(
         calendar = overlay,
         nowIndex = nowIndex,
         nextIndex = nextIndex,
+        bellSchedule = bellResult.slots,
     )
 }
 
@@ -562,10 +656,10 @@ fun Route.teacherDayRouting() {
                 val ctx = call.requireTeacherContext() ?: return@get
                 val date = call.request.queryParameters["date"]?.takeIf { it.isNotBlank() }
                     ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-                    ?: LocalDate.now()
+                    ?: todayIst()
 
                 val ownedIds = teacherAssignmentsFor(ctx).map { it.assignmentId }.toSet()
-                val isToday = date == LocalDate.now()
+                val isToday = date == todayIst()
 
                 val data = dbQuery {
                     resolveDayInTxn(
@@ -573,7 +667,7 @@ fun Route.teacherDayRouting() {
                         date = date,
                         ownedAssignmentIds = ownedIds,
                         assignmentScopes = HashMap(),
-                        nowProvider = if (isToday) LocalTime.now() else null,
+                        nowProvider = if (isToday) LocalTime.now(IST_ZONE) else null,
                     )
                 }
                 call.ok(data, message = "Resolved day loaded")
@@ -586,10 +680,10 @@ fun Route.teacherDayRouting() {
                 val ctx = call.requireTeacherContext() ?: return@get
                 val anchor = call.request.queryParameters["date"]?.takeIf { it.isNotBlank() }
                     ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-                    ?: LocalDate.now()
+                    ?: todayIst()
                 // Monday of the anchor's ISO week.
                 val weekStart = anchor.minusDays((anchor.dayOfWeek.value - 1).toLong())
-                val today = LocalDate.now()
+                val today = todayIst()
 
                 val ownedIds = teacherAssignmentsFor(ctx).map { it.assignmentId }.toSet()
 
@@ -602,7 +696,7 @@ fun Route.teacherDayRouting() {
                             date = d,
                             ownedAssignmentIds = ownedIds,
                             assignmentScopes = scopes,
-                            nowProvider = if (d == today) LocalTime.now() else null,
+                            nowProvider = if (d == today) LocalTime.now(IST_ZONE) else null,
                         )
                     }
                 }
@@ -636,7 +730,7 @@ fun Route.teacherDayRouting() {
                     )
                     return@post
                 }
-                val date = LocalDate.now() // server date — check-in is for "today"
+                val date = todayIst() // server date (IST) — check-in is for "today"
 
                 val data = dbQuery {
                     // Idempotency: return existing row if already checked in today.
@@ -685,7 +779,7 @@ fun Route.teacherDayRouting() {
                 val ctx = call.requireTeacherContext() ?: return@get
                 val date = call.request.queryParameters["date"]?.takeIf { it.isNotBlank() }
                     ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-                    ?: LocalDate.now()
+                    ?: todayIst()
 
                 val data = dbQuery {
                     val row = TeacherCheckInsTable
@@ -727,7 +821,7 @@ fun Route.teacherDayRouting() {
             // pre-scoped (assignmentId / refId) so taps land on the scoped tool.
             get("/obligations") {
                 val ctx = call.requireTeacherContext() ?: return@get
-                val today = LocalDate.now()
+                val today = todayIst()
                 val owned = teacherAssignmentsFor(ctx)
                 val ownedIds = owned.map { it.assignmentId }.toSet()
                 val ownedPairs = owned.map { it.className to it.section }.toSet()
@@ -740,7 +834,7 @@ fun Route.teacherDayRouting() {
                         date = today,
                         ownedAssignmentIds = ownedIds,
                         assignmentScopes = HashMap(),
-                        nowProvider = LocalTime.now(),
+                        nowProvider = LocalTime.now(IST_ZONE),
                     )
                     // Attendance-bearing periods = scheduled/active, not cancelled,
                     // with a real class scope. A holiday yields no periods → zero.

@@ -83,4 +83,21 @@ class ParentNudgeViewModel(
             }
         }
     }
+
+    /**
+     * Acknowledge (dismiss) the nudge for the active child. Called when the parent
+     * taps an action or dismisses the card. The server records the seen state so
+     * the nudge won't reappear for the current PEWS run date.
+     */
+    fun acknowledgeNudge(childId: String?) {
+        if (childId.isNullOrBlank()) return
+        viewModelScope.launch {
+            val t = token()
+            if (t.isNullOrBlank()) return@launch
+            runCatching { repository.acknowledgeNudge(t, childId) }
+                .onFailure { AppLogger.e("ParentNudgeVM", "ackNudge error: ${it.message}") }
+            // Hide the card immediately regardless of ack result — it's a soft dismissal.
+            _state.value = _state.value.copy(nudge = null)
+        }
+    }
 }

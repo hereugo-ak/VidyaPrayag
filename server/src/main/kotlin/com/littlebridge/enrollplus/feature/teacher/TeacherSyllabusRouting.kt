@@ -461,10 +461,10 @@ private fun Route.syllabusToggleProgress() {
                     call.fail("covered_on must be YYYY-MM-DD", HttpStatusCode.BadRequest, "BAD_DATE")
                     return@patch
                 }
-            } ?: LocalDate.now()
+            } ?: todayIst()
         }
         // A future covered_on is nonsensical (you can't have covered it tomorrow).
-        if (coveredOn != null && coveredOn.isAfter(LocalDate.now())) {
+        if (coveredOn != null && coveredOn.isAfter(todayIst())) {
             call.fail("covered_on cannot be in the future", HttpStatusCode.BadRequest, "DATE_FUTURE")
             return@patch
         }

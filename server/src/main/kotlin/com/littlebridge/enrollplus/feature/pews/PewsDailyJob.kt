@@ -24,6 +24,7 @@
  */
 package com.littlebridge.enrollplus.feature.pews
 
+import com.littlebridge.enrollplus.db.PewsConfigTable
 import com.littlebridge.enrollplus.db.PewsRiskSnapshotsTable
 import com.littlebridge.enrollplus.db.DatabaseFactory.dbQuery
 import com.littlebridge.enrollplus.feature.pews.act.ManagedCaseworkService
@@ -36,9 +37,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
@@ -74,6 +77,9 @@ object PewsDailyJob {
 
     private val targetHourUtc: Int get() = env("PEWS_RUN_HOUR_UTC")?.toIntOrNull() ?: 0
     private val enabled: Boolean get() = env("PEWS_ENABLED")?.lowercase() != "false"
+    private val targetDayOfWeek: DayOfWeek get() =
+        env("PEWS_RUN_DAY_OF_WEEK")?.let { runCatching { DayOfWeek.valueOf(it.uppercase()) }.getOrNull() }
+            ?: DayOfWeek.MONDAY
 
     fun start(scope: CoroutineScope) {
         if (!enabled) {
@@ -110,6 +116,21 @@ object PewsDailyJob {
         log.info("[$TAG] Running PEWS pipeline for {} schools (runDate={})", schoolIds.size, runDate)
         var totalAtRisk = 0
         for (schoolId in schoolIds) {
+            // Per-school frequency check: weekly schools only run on the target day of week
+            val freq = runCatching {
+                dbQuery {
+                    PewsConfigTable.selectAll().where {
+                        PewsConfigTable.id eq org.jetbrains.exposed.dao.id.EntityID(schoolId, PewsConfigTable)
+                    }.firstOrNull()?.get(PewsConfigTable.runFrequency)
+                }
+            }.getOrDefault("daily") ?: "daily"
+
+            if (freq == "weekly" && runDate.dayOfWeek != targetDayOfWeek) {
+                log.info("[$TAG] school {} skipped — weekly schedule, today is {} (target {})",
+                    schoolId, runDate.dayOfWeek, targetDayOfWeek)
+                continue
+            }
+
             runCatching { runSchool(schoolId, runDate) }
                 .onSuccess { totalAtRisk += it }
                 .onFailure { log.warn("[$TAG] school {} pipeline failed: {}", schoolId, it.message) }

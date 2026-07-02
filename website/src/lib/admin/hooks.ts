@@ -182,3 +182,19 @@ export const useAiHealth = () =>
 export const useAiRecentUsage = (limit: number = 50, windowMin: number = 60) =>
   useSWR(["ai/recent-usage", limit, windowMin],
     () => adminApi.aiRecentUsage(limit, windowMin), AI_LIVE);
+
+// ── School Day Configuration hooks ───────────────────────────────────────────
+// Bell-schedule configs change rarely (term-level), so SLOW (300s) is the right cadence.
+
+export const useSchoolDayConfigs = () =>
+  useSWR("school-day-configs", adminApi.schoolDayConfigs, SLOW);
+
+// ── Academics: Classes, Subjects, Timetable hooks ─────────────────────────────
+// Classes and subjects change rarely (term-level), so SLOW (300s) is the right cadence.
+
+export const useSchoolClasses = () =>
+  useSWR("school-classes", adminApi.schoolClasses, SLOW);
+
+export const useSchoolSubjects = (classId: string | null) =>
+  useSWR(classId ? ["school-subjects", classId] : null,
+    () => adminApi.schoolSubjects(classId as string), SLOW);

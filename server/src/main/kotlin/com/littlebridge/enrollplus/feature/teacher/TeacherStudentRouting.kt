@@ -116,7 +116,7 @@ fun Route.teacherStudentRouting() {
                     // 4) Attendance — across the assignments the caller can see for
                     //    this student (their own subjects). One batched query.
                     val visibleAssignmentIds = matching.map { it.assignmentId }
-                    val today = LocalDate.now()
+                    val today = todayIst()
                     val monthStart = today.minusDays(30)
 
                     val attRows = AttendanceRecordsTable.selectAll().where {

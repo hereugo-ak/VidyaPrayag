@@ -59,6 +59,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -89,8 +90,14 @@ data class TeacherProfileData(
 
 private val HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
-/** Today's date in YYYY-MM-DD, matching the varchar(12) date columns. */
-internal fun todayIso(): String = LocalDate.now().toString()
+/** IST timezone — all school date logic uses this to avoid UTC/off-by-one errors. */
+internal val IST_ZONE: ZoneId = ZoneId.of("Asia/Kolkata")
+
+/** Today's date in YYYY-MM-DD (IST), matching the varchar(12) date columns. */
+internal fun todayIso(): String = LocalDate.now(IST_ZONE).toString()
+
+/** Today's date as LocalDate in IST. Replaces raw LocalDate.now() which uses JVM default tz. */
+internal fun todayIst(): LocalDate = LocalDate.now(IST_ZONE)
 
 /**
  * Count of distinct active students in a class+section, used for student_count /

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.littlebridge.enrollplus.core.network.NetworkResult
 import com.littlebridge.enrollplus.core.prefs.PreferenceRepository
 import com.littlebridge.enrollplus.feature.teacher.domain.model.CalendarOverlayDto
+import com.littlebridge.enrollplus.feature.teacher.domain.model.BellSlotDto
 import com.littlebridge.enrollplus.feature.teacher.domain.model.ResolvedDayDto
 import com.littlebridge.enrollplus.feature.teacher.domain.model.ResolvedPeriodDto
 import com.littlebridge.enrollplus.feature.teacher.domain.repository.TeacherRepository
@@ -47,6 +48,14 @@ data class TeacherTodayState(
 }
 
 /** A single resolved day for the UI (mirrors the server ResolvedDayDto). */
+data class BellSlotUi(
+    val slotIndex: Int,
+    val slotType: String,
+    val label: String,
+    val startTime: String,
+    val endTime: String,
+)
+
 data class ResolvedDayUi(
     val date: String,
     val weekday: Int,
@@ -57,6 +66,7 @@ data class ResolvedDayUi(
     // Authoritative indices into [periods]; -1 when none (mapped from null).
     val nowIndex: Int,
     val nextIndex: Int,
+    val bellSchedule: List<BellSlotUi> = emptyList(),
 )
 
 /** A single resolved period for the UI. Carries the pre-authorized assignmentId. */
@@ -171,6 +181,15 @@ private fun ResolvedDayDto.toUi() = ResolvedDayUi(
     calendar = calendar.map { it.toUi() },
     nowIndex = nowIndex ?: -1,
     nextIndex = nextIndex ?: -1,
+    bellSchedule = bellSchedule.map { it.toUi() },
+)
+
+private fun BellSlotDto.toUi() = BellSlotUi(
+    slotIndex = slotIndex,
+    slotType = slotType,
+    label = label,
+    startTime = startTime,
+    endTime = endTime,
 )
 
 private fun ResolvedPeriodDto.toUi() = ResolvedPeriodUi(

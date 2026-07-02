@@ -47,6 +47,7 @@ import org.jetbrains.exposed.dao.id.UUIDTable
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.date
 import org.jetbrains.exposed.sql.javatime.time
+import java.util.UUID
 import org.jetbrains.exposed.sql.javatime.timestamp
 
 // =====================================================================
@@ -1250,6 +1251,10 @@ object PeriodExceptionsTable : UUIDTable("period_exceptions", "id") {
     // assignment binding + display fallback (same demotion rule as periods).
     val assignmentId        = uuid("assignment_id").nullable()          // FK teacher_subject_assignments.id
     val note                = text("note").default("")
+    // Denormalised display columns (same pattern as TeacherPeriodsTable)
+    val className           = text("class_name").default("")
+    val section             = varchar("section", 8).default("A")
+    val subject             = text("subject").default("")
     val createdAt           = timestamp("created_at")
     val updatedAt           = timestamp("updated_at")
     init {
@@ -2611,6 +2616,15 @@ object PewsConfigTable : UUIDTable("pews_config", "id") {
     val updatedAt             = timestamp("updated_at")
 }
 
+/** Tracks when a parent has viewed the PEWS nudge for a child on a given run date. */
+object PewsNudgeSeenTable : UUIDTable("pews_nudge_seen", "id") {
+    val childId          = uuid("child_id")
+    val parentId         = uuid("parent_id")
+    val snapshotRunDate  = date("snapshot_run_date")
+    val seenAt           = timestamp("seen_at")
+    init { index("idx_pews_nudge_seen", false, childId, parentId, snapshotRunDate) }
+}
+
 // =====================================================================
 // PEWS 2.0 — Feature flags / kill switch (hot-reloadable via polling).
 // One row per module name. "global" = entire PEWS kill switch.
@@ -3084,3 +3098,70 @@ object ScheduledMessageType {
     const val ADMIN_BROADCAST   = "ADMIN_BROADCAST"
     const val TEACHER_BROADCAST = "TEACHER_BROADCAST"
 }
+
+object SchoolDayConfigTable : UUIDTable("school_day_config", "id") {
+    val schoolId       = uuid("school_id")
+    val name           = text("name")
+    val applicableDays = varchar("applicable_days", 20)
+    val classLevel     = varchar("class_level", 20).default("ALL")
+    val isActive       = bool("is_active").default(true)
+    val createdAt      = timestamp("created_at")
+    val updatedAt      = timestamp("updated_at")
+    init {
+        index("idx_sdc_school", false, schoolId)
+    }
+}
+
+object SchoolDaySlotsTable : UUIDTable("school_day_slots", "id") {
+    val configId    = uuid("config_id")
+    val schoolId    = uuid("school_id")
+    val slotIndex   = integer("slot_index")
+    val slotType    = varchar("slot_type", 16)
+    val label       = text("label").default("")
+    val startTime   = time("start_time")
+    val endTime     = time("end_time")
+    val isDouble    = bool("is_double").default(false)
+    val doubleGroup = integer("double_group").default(0)
+    val createdAt   = timestamp("created_at")
+    init {
+        uniqueIndex("idx_sds_config", configId, slotIndex)
+    }
+}
+
+object SchoolDaySlotType {
+    const val TEACHING  = "TEACHING"
+    const val BREAK     = "BREAK"
+    const val ASSEMBLY  = "ASSEMBLY"
+    const val LAB       = "LAB"
+    const val FREE      = "FREE"
+    const val ZERO      = "ZERO"
+}
+
+// =====================================================================
+// timetable_change_requests
+//   Teacher-initiated requests to create/update/delete a recurring period.
+//   Admin reviews and approves/rejects. On approval the period is written
+//   to teacher_periods and the requesting teacher is notified.
+// =====================================================================
+object TimetableChangeRequestsTable : UUIDTable("timetable_change_requests", "id") {
+    val schoolId      = uuid("school_id")
+    val teacherId     = uuid("teacher_id")               // FK app_users.id (requester)
+    val assignmentId  = uuid("assignment_id").nullable() // FK teacher_subject_assignments.id
+    val periodId      = uuid("period_id").nullable()     // FK teacher_periods.id (for UPDATE/DELETE)
+    val kind          = varchar("kind", 16)              // NEW_PERIOD | UPDATE_PERIOD | DELETE_PERIOD
+    val weekday       = integer("weekday")               // 1=Mon … 7=Sun
+    val startTime     = time("start_time").nullable()    // null for DELETE
+    val endTime       = time("end_time").nullable()      // null for DELETE
+    val room          = text("room").default("")
+    val reason        = text("reason").default("")       // teacher's note
+    val status        = varchar("status", 16).default("PENDING") // PENDING | APPROVED | REJECTED
+    val adminNote     = text("admin_note").default("")
+    val reviewedBy    = uuid("reviewed_by").nullable()
+    val createdAt     = timestamp("created_at")
+    val reviewedAt    = timestamp("reviewed_at").nullable()
+    val className     = text("class_name").default("")   // denormalised for display
+    val section       = varchar("section", 8).default("A")
+    val subject       = text("subject").default("")
+}
+
+val SYSTEM_SCHOOL_ID: UUID = UUID(0, 0)

@@ -542,7 +542,7 @@ private fun Route.lessonPlanComplete() {
         val (row, asg) = call.requireOwnedLessonPlan(ctx, call.parameters["id"]) ?: return@post
         val planId = row[LessonPlansTable.id].value
         val now = Instant.now()
-        val today = LocalDate.now()
+        val today = todayIst()
 
         // If a curriculum unit is linked, upsert SyllabusProgressTable.
         val unitId = row[LessonPlansTable.curriculumUnitId]
@@ -630,7 +630,7 @@ private fun Route.lessonPlanCalendar() {
         val asg = call.requireOwnedAssignment(ctx, assignmentParam) ?: return@get
 
         val monthStr = call.request.queryParameters["month"]
-            ?: LocalDate.now().let { "${it.year}-${it.monthValue.toString().padStart(2, '0')}" }
+            ?: todayIst().let { "${it.year}-${it.monthValue.toString().padStart(2, '0')}" }
 
         val ym = runCatching { YearMonth.parse(monthStr) }.getOrNull() ?: run {
             call.fail("month must be YYYY-MM", HttpStatusCode.BadRequest, "BAD_MONTH"); return@get

@@ -54,16 +54,28 @@ data class ParentTimetableResponse(
 )
 
 @Serializable
+data class ParentBellSlotDto(
+    @SerialName("slot_index") val slotIndex: Int,
+    @SerialName("slot_type") val slotType: String,
+    val label: String,
+    @SerialName("start_time") val startTime: String,
+    @SerialName("end_time") val endTime: String,
+)
+
+@Serializable
 data class ParentTimetableData(
     @SerialName("child_name") val childName: String = "",
     @SerialName("class_name") val className: String = "",
     val weekdays: List<ParentTimetableDayDto> = emptyList(),
+    @SerialName("bell_schedule") val bellSchedule: List<ParentBellSlotDto> = emptyList(),
 )
 
 @Serializable
 data class ParentTimetableDayDto(
     val weekday: Int, // 1=Mon … 7=Sun
     val periods: List<ParentPeriodDto> = emptyList(),
+    @SerialName("now_index") val nowIndex: Int? = null,
+    @SerialName("next_index") val nextIndex: Int? = null,
 )
 
 @Serializable

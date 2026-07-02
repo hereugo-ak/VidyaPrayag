@@ -249,6 +249,7 @@ object DatabaseFactory {
         PewsRiskSnapshotsTable,
         PewsInterventionsTable,
         PewsConfigTable,
+        PewsNudgeSeenTable,
         PewsFeatureFlagsTable,
         PewsCaseFilesTable,
         PewsEffectivenessPriorsTable,
@@ -281,6 +282,11 @@ object DatabaseFactory {
         // Applied by docs/db/migration-104-scheduled-messages.sql (must run before
         // deploy; AUTO_CREATE_TABLES is OFF in prod).
         ScheduledMessagesTable,
+        SchoolDayConfigTable,
+        SchoolDaySlotsTable,
+        // Timetable Change Requests (migration_108_timetable_management.sql)
+        // Teacher-initiated timetable change requests with admin review workflow.
+        TimetableChangeRequestsTable,
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

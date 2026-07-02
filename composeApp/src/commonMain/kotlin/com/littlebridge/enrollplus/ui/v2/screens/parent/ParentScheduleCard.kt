@@ -45,6 +45,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.littlebridge.enrollplus.feature.parent.domain.model.ParentBellSlotDto
 import com.littlebridge.enrollplus.feature.parent.domain.model.ParentTimetableData
 import com.littlebridge.enrollplus.feature.parent.presentation.LivePeriod
 import com.littlebridge.enrollplus.ui.v2.components.VCard
@@ -134,6 +135,7 @@ fun ParentScheduleCard(
                 1 -> if (hasToday) {
                     TodayTimelineFace(
                         periods = todayPeriods,
+                        bellSchedule = timetable?.bellSchedule.orEmpty(),
                         onCollapse = { face = 0 },
                         onExpand = if (hasWeek) ({ face = 2 }) else null,
                     )
@@ -323,6 +325,7 @@ private fun DayProgress(done: Int, total: Int) {
 @Composable
 private fun TodayTimelineFace(
     periods: List<LivePeriod>,
+    bellSchedule: List<ParentBellSlotDto>,
     onCollapse: () -> Unit,
     onExpand: (() -> Unit)?,
 ) {
@@ -363,6 +366,11 @@ private fun TodayTimelineFace(
         // The connected timeline rail — each row a live-marked node + the period detail.
         periods.forEachIndexed { index, p ->
             TimelineRow(period = p, isFirst = index == 0, isLast = index == periods.lastIndex)
+        }
+
+        if (bellSchedule.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            ParentBellScheduleSection(slots = bellSchedule)
         }
 
         if (onExpand != null) {
@@ -614,4 +622,76 @@ private fun formatClockSafe(hm: String): String =
 private fun weekdayName(weekday: Int): String = when (weekday) {
     1 -> "Monday"; 2 -> "Tuesday"; 3 -> "Wednesday"; 4 -> "Thursday"
     5 -> "Friday"; 6 -> "Saturday"; 7 -> "Sunday"; else -> "—"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bell schedule section — renders the school day config slots (breaks, assembly, etc.)
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun ParentBellScheduleSection(slots: List<ParentBellSlotDto>) {
+    val c = VTheme.colors
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(c.navy.copy(alpha = 0.04f))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(VIcons.Clock, contentDescription = null, tint = c.ink3, modifier = Modifier.size(12.dp))
+            Text(
+                "BELL SCHEDULE",
+                style = VTheme.type.label.colored(c.ink3).copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp),
+            )
+        }
+        slots.forEach { slot ->
+            ParentBellSlotRow(slot)
+        }
+    }
+}
+
+@Composable
+private fun ParentBellSlotRow(slot: ParentBellSlotDto) {
+    val c = VTheme.colors
+    val typeColor = when (slot.slotType) {
+        "TEACHING" -> c.accent
+        "BREAK" -> c.warning
+        "ASSEMBLY" -> c.teal
+        "LAB" -> c.lavenderLight
+        "FREE" -> c.ink3
+        "ZERO" -> c.ink3
+        else -> c.ink3
+    }
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(typeColor.copy(alpha = 0.12f))
+                .padding(horizontal = 6.dp, vertical = 2.dp),
+        ) {
+            Text(
+                slot.slotType.take(4),
+                style = VTheme.type.label.colored(typeColor).copy(fontWeight = FontWeight.Bold, fontSize = 8.5.sp),
+            )
+        }
+        Column(Modifier.weight(1f)) {
+            if (slot.label.isNotBlank()) {
+                Text(slot.label, style = VTheme.type.caption.colored(c.ink).copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold))
+            }
+            Text(
+                "${formatClockSafe(slot.startTime)} – ${formatClockSafe(slot.endTime)}",
+                style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 10.sp),
+            )
+        }
+        Text(
+            "#${slot.slotIndex}",
+            style = VTheme.type.label.colored(c.ink3).copy(fontSize = 9.sp),
+        )
+    }
 }

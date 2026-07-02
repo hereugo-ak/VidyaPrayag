@@ -19,8 +19,8 @@ The platform uses a multi-provider, dual-homed AI gateway with automatic failove
 | Provider | Model | RPM | RPD | TPM/TPD | Context | PII-Safe | Cost |
 |----------|-------|-----|-----|---------|---------|----------|------|
 | Cerebras | gpt-oss-120b | 5 | — | 1M TPD | 8K | Yes | $0 |
-| Groq | llama-3.3-70b-versatile | 30 | 14,400 | 12K TPM | 32K | Yes | $0 |
-| Groq Fast | llama-3.1-8b-instant | 14,400 | — | 500K TPM | 8K | Yes | $0 |
+| Groq | openai/gpt-oss-120b | 30 | 14,400 | 12K TPM | 32K | Yes | $0 |
+| Groq Fast | openai/gpt-oss-20b | 14,400 | — | 500K TPM | 8K | Yes | $0 |
 | SambaNova | DeepSeek-V3.1 | 20 | 20 | 200K TPD | 64K | No | $0 |
 | Mistral | mistral-small-latest | ~1 RPS | — | ~1B TPM | 32K | No | $0 |
 | OpenRouter | llama-3.3-70b-instruct:free | 20 | 50 (1K w/$10) | — | 32K | Yes | $0 |
@@ -34,7 +34,7 @@ The platform uses a multi-provider, dual-homed AI gateway with automatic failove
 |-------|-------|
 | **AI Driver** | AiService.complete (REASON lane) |
 | **Provider Chain** | Groq 70B → Gemini → SambaNova → Cerebras → OpenRouter → Mistral |
-| **Model** | llama-3.3-70b-versatile (primary) |
+| **Model** | openai/gpt-oss-120b (primary) |
 | **Free Tier** | 30 RPM, 14,400 RPD, 12K TPM |
 | **Cost per call** | $0 (free tier) |
 | **Tokens per call** | ~500 input, ~300 output |
@@ -49,7 +49,7 @@ The platform uses a multi-provider, dual-homed AI gateway with automatic failove
 |-------|-------|
 | **AI Driver** | AiService.runAgent (REASON lane, tool-calling) |
 | **Provider Chain** | Groq 70B → Gemini → SambaNova → Cerebras → OpenRouter |
-| **Model** | llama-3.3-70b-versatile (primary) |
+| **Model** | openai/gpt-oss-120b (primary) |
 | **Free Tier** | 30 RPM, 14,400 RPD |
 | **Cost per call** | $0 (free tier) |
 | **Tokens per call** | ~1,500 input, ~800 output (multi-step agent) |
@@ -64,7 +64,7 @@ The platform uses a multi-provider, dual-homed AI gateway with automatic failove
 |-------|-------|
 | **AI Driver** | AiService.complete (REASON lane) |
 | **Provider Chain** | Groq 70B → Gemini → SambaNova → Cerebras → OpenRouter |
-| **Model** | llama-3.3-70b-versatile (primary) |
+| **Model** | openai/gpt-oss-120b (primary) |
 | **Free Tier** | 30 RPM, 14,400 RPD |
 | **Cost per call** | $0 |
 | **Tokens per call** | ~400 input, ~200 output |
@@ -79,7 +79,7 @@ The platform uses a multi-provider, dual-homed AI gateway with automatic failove
 |-------|-------|
 | **AI Driver** | AiService.complete (CLASSIFY lane) |
 | **Provider Chain** | Groq Fast (8B) → Groq (70B) → Cerebras → OpenRouter |
-| **Model** | llama-3.1-8b-instant (primary) |
+| **Model** | openai/gpt-oss-20b (primary) |
 | **Free Tier** | 14,400 RPM, 500K TPM |
 | **Cost per call** | $0 |
 | **Tokens per call** | ~200 input, ~100 output |
@@ -94,7 +94,7 @@ The platform uses a multi-provider, dual-homed AI gateway with automatic failove
 |-------|-------|
 | **AI Driver** | AiService.runAgent (REASON lane, tool-calling) |
 | **Provider Chain** | Groq 70B → Gemini → SambaNova → Cerebras → OpenRouter |
-| **Model** | llama-3.3-70b-versatile (primary) |
+| **Model** | openai/gpt-oss-120b (primary) |
 | **Free Tier** | 30 RPM, 14,400 RPD |
 | **Cost per call** | $0 |
 | **Tokens per call** | ~1,200 input, ~600 output (multi-step) |
@@ -109,7 +109,7 @@ The platform uses a multi-provider, dual-homed AI gateway with automatic failove
 |-------|-------|
 | **AI Driver** | AiService.complete (CLASSIFY lane) |
 | **Provider Chain** | Groq Fast → Groq → Cerebras → OpenRouter |
-| **Model** | llama-3.1-8b-instant (primary) |
+| **Model** | openai/gpt-oss-20b (primary) |
 | **Free Tier** | 14,400 RPM, 500K TPM |
 | **Cost per call** | $0 |
 | **Tokens per call** | ~300 input, ~150 output |
@@ -136,7 +136,7 @@ The platform uses a multi-provider, dual-homed AI gateway with automatic failove
 |-------|-------|
 | **AI Driver** | AiService.complete (BATCH lane) |
 | **Provider Chain** | Groq 70B → Gemini → Mistral → OpenRouter |
-| **Model** | llama-3.3-70b-versatile (primary) |
+| **Model** | openai/gpt-oss-120b (primary) |
 | **Free Tier** | 30 RPM, 14,400 RPD (Groq); 1,500 RPD (Gemini) |
 | **Cost per call** | $0 |
 | **Tokens per call** | ~800 input, ~500 output per student |
@@ -151,7 +151,7 @@ The platform uses a multi-provider, dual-homed AI gateway with automatic failove
 |-------|-------|
 | **AI Driver** | AiService.complete (BATCH lane) |
 | **Provider Chain** | Groq 70B → Gemini → Mistral → OpenRouter |
-| **Model** | llama-3.3-70b-versatile (primary) |
+| **Model** | openai/gpt-oss-120b (primary) |
 | **Free Tier** | 30 RPM, 14,400 RPD |
 | **Cost per call** | $0 |
 | **Tokens per call** | ~600 input, ~300 output per class |
@@ -166,7 +166,7 @@ The platform uses a multi-provider, dual-homed AI gateway with automatic failove
 |-------|-------|
 | **AI Driver** | AiService.complete (BATCH lane) |
 | **Provider Chain** | Groq 70B → Gemini → Mistral → OpenRouter |
-| **Model** | llama-3.3-70b-versatile (primary) |
+| **Model** | openai/gpt-oss-120b (primary) |
 | **Free Tier** | 30 RPM, 14,400 RPD |
 | **Cost per call** | $0 |
 | **Tokens per call** | ~500 input, ~300 output |
