@@ -9,6 +9,8 @@ import type {
   SchoolClassDto,
   SchoolSubjectDto,
   CreatePeriodRequest,
+  UpdatePeriodRequest,
+  BulkPeriodItem,
 } from "@/lib/admin/types";
 import { Card, EmptyState, FadeIn, Badge } from "@/components/admin/Primitives";
 import { DataTable, type Column } from "@/components/admin/DataTable";
@@ -596,6 +598,8 @@ function TimetableTab() {
   const teachers = useMemo(() => teacherData?.teachers ?? [], [teacherData]);
   const [classFilter, setClassFilter] = useState("");
   const [addOpen, setAddOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<{ id: string; weekday: number; start_time: string; end_time: string; room: string } | null>(null);
 
   const weekdays = useMemo(() => ttData?.weekdays ?? [], [ttData]);
   const classes = useMemo(() => ttData?.classes ?? [], [ttData]);
@@ -638,6 +642,9 @@ function TimetableTab() {
             </select>
             <AdminButton onClick={() => setAddOpen(true)}>
               <IconPlus width={16} height={16} /> Add period
+            </AdminButton>
+            <AdminButton variant="ghost" onClick={() => setBulkOpen(true)}>
+              <IconCalendar width={16} height={16} /> Bulk add
             </AdminButton>
           </div>
         </div>
@@ -689,14 +696,30 @@ function TimetableTab() {
                               <p className="text-[11px] text-ink-3">Room: {p.room}</p>
                             )}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => deletePeriod(p.id, `${p.subject} (${p.class_name})`)}
-                            className="shrink-0 rounded-lg p-1.5 text-ink-3 transition-colors hover:bg-danger/10 hover:text-danger"
-                            aria-label="Delete period"
-                          >
-                            <IconTrash width={14} height={14} />
-                          </button>
+                          <div className="flex shrink-0 flex-col gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setEditTarget({
+                                id: p.id,
+                                weekday: wd.weekday,
+                                start_time: p.start_time,
+                                end_time: p.end_time,
+                                room: p.room,
+                              })}
+                              className="rounded-lg p-1.5 text-ink-3 transition-colors hover:bg-navy/5 hover:text-navy-deep"
+                              aria-label="Edit period"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deletePeriod(p.id, `${p.subject} (${p.class_name})`)}
+                              className="rounded-lg p-1.5 text-ink-3 transition-colors hover:bg-danger/10 hover:text-danger"
+                              aria-label="Delete period"
+                            >
+                              <IconTrash width={14} height={14} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -715,6 +738,20 @@ function TimetableTab() {
         teachers={teachers}
         classes={classes}
       />
+      <BulkCreateModal
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        onDone={refresh}
+        teachers={teachers}
+        classes={classes}
+      />
+      {editTarget && (
+        <EditPeriodModal
+          target={editTarget}
+          onClose={() => setEditTarget(null)}
+          onDone={refresh}
+        />
+      )}
     </FadeIn>
   );
 }
@@ -842,6 +879,280 @@ function AddPeriodModal({
           <ModalField label="Start time" value={startTime} onChange={setStartTime} placeholder="09:00" />
           <ModalField label="End time" value={endTime} onChange={setEndTime} placeholder="09:45" />
         </div>
+        {err && <p className="text-[13px] font-medium text-danger">{err}</p>}
+      </div>
+    </Modal>
+  );
+}
+
+// ─────────────────────────── Edit Period ───────────────────────────
+
+function EditPeriodModal({
+  target,
+  onClose,
+  onDone,
+}: {
+  target: { id: string; weekday: number; start_time: string; end_time: string; room: string };
+  onClose: () => void;
+  onDone: () => Promise<void>;
+}) {
+  const [weekday, setWeekday] = useState(String(target.weekday));
+  const [startTime, setStartTime] = useState(target.start_time);
+  const [endTime, setEndTime] = useState(target.end_time);
+  const [room, setRoom] = useState(target.room);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function submit() {
+    setErr(null);
+    if (!startTime.trim() || !endTime.trim()) {
+      setErr("Start and end time are required.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await adminApi.updatePeriod(target.id, {
+        weekday: parseInt(weekday, 10),
+        start_time: startTime,
+        end_time: endTime,
+        room: room.trim(),
+      } as UpdatePeriodRequest);
+      await onDone();
+      onClose();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : "Could not update period.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal
+      open={true}
+      onClose={onClose}
+      title="Edit period"
+      description="Update the time, weekday, or room for this period."
+      footer={
+        <>
+          <AdminButton variant="ghost" onClick={onClose}>Cancel</AdminButton>
+          <AdminButton onClick={submit} disabled={busy}>
+            {busy ? "Saving…" : "Save changes"}
+          </AdminButton>
+        </>
+      }
+    >
+      <div className="grid gap-3.5">
+        <label className="block">
+          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-ink-3">Weekday</span>
+          <select
+            value={weekday}
+            onChange={(e) => setWeekday(e.target.value)}
+            className="w-full rounded-xl border border-navy/12 bg-white/80 px-3.5 py-2.5 text-[14px] text-ink outline-none focus:border-accent"
+          >
+            {WEEKDAYS.slice(1).map((d, i) => (
+              <option key={i + 1} value={i + 1}>{d}</option>
+            ))}
+          </select>
+        </label>
+        <div className="grid grid-cols-2 gap-3.5">
+          <ModalField label="Start time" value={startTime} onChange={setStartTime} placeholder="09:00" />
+          <ModalField label="End time" value={endTime} onChange={setEndTime} placeholder="09:45" />
+        </div>
+        <ModalField label="Room" value={room} onChange={setRoom} placeholder="101" />
+        {err && <p className="text-[13px] font-medium text-danger">{err}</p>}
+      </div>
+    </Modal>
+  );
+}
+
+// ─────────────────────────── Bulk Create Periods ───────────────────────────
+
+function BulkCreateModal({
+  open,
+  onClose,
+  onDone,
+  teachers,
+  classes,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onDone: () => Promise<void>;
+  teachers: { id: string; name: string }[];
+  classes: string[];
+}) {
+  const [weekday, setWeekday] = useState("1");
+  const [rows, setRows] = useState<BulkPeriodItem[]>([
+    { teacher_id: "", class_name: "", section: "A", subject: "", start_time: "09:00", end_time: "09:45", room: "" },
+  ]);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  function reset() {
+    setWeekday("1");
+    setRows([{ teacher_id: "", class_name: "", section: "A", subject: "", start_time: "09:00", end_time: "09:45", room: "" }]);
+    setResult(null);
+    setErr(null);
+  }
+
+  function updateRow(idx: number, patch: Partial<BulkPeriodItem>) {
+    setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  }
+
+  function addRow() {
+    setRows((prev) => [...prev, { teacher_id: "", class_name: "", section: "A", subject: "", start_time: "09:00", end_time: "09:45", room: "" }]);
+  }
+
+  function removeRow(idx: number) {
+    setRows((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  async function submit() {
+    setErr(null);
+    setResult(null);
+    if (rows.length === 0) {
+      setErr("Add at least one period.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await adminApi.bulkCreatePeriods({
+        weekday: parseInt(weekday, 10),
+        periods: rows,
+      });
+      setResult(`Created ${res.created_count} of ${res.created_count + res.error_count} periods${res.errors.length ? `. Errors: ${res.errors.join("; ")}` : ""}`);
+      await onDone();
+      if (res.error_count === 0) {
+        reset();
+        onClose();
+      }
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : "Bulk create failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Bulk add periods"
+      description="Add multiple periods for a single weekday at once."
+      footer={
+        <>
+          <AdminButton variant="ghost" onClick={onClose}>Cancel</AdminButton>
+          <AdminButton onClick={submit} disabled={busy}>
+            {busy ? "Creating…" : `Create ${rows.length} period${rows.length !== 1 ? "s" : ""}`}
+          </AdminButton>
+        </>
+      }
+    >
+      <div className="grid gap-3.5">
+        <label className="block">
+          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-ink-3">Weekday</span>
+          <select
+            value={weekday}
+            onChange={(e) => setWeekday(e.target.value)}
+            className="w-full rounded-xl border border-navy/12 bg-white/80 px-3.5 py-2.5 text-[14px] text-ink outline-none focus:border-accent"
+          >
+            {WEEKDAYS.slice(1).map((d, i) => (
+              <option key={i + 1} value={i + 1}>{d}</option>
+            ))}
+          </select>
+        </label>
+
+        <div className="space-y-2">
+          {rows.map((row, idx) => (
+            <div key={idx} className="rounded-xl border border-navy/8 bg-navy/2 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">Period {idx + 1}</span>
+                {rows.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeRow(idx)}
+                    className="rounded-lg p-1 text-ink-3 transition-colors hover:bg-danger/10 hover:text-danger"
+                  >
+                    <IconTrash width={14} height={14} />
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-semibold uppercase text-ink-3">Teacher</span>
+                  <select
+                    value={row.teacher_id}
+                    onChange={(e) => updateRow(idx, { teacher_id: e.target.value })}
+                    className="w-full rounded-lg border border-navy/12 bg-white px-2.5 py-2 text-[13px] outline-none focus:border-accent"
+                  >
+                    <option value="">Select…</option>
+                    {teachers.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-semibold uppercase text-ink-3">Class</span>
+                  <select
+                    value={row.class_name}
+                    onChange={(e) => updateRow(idx, { class_name: e.target.value })}
+                    className="w-full rounded-lg border border-navy/12 bg-white px-2.5 py-2 text-[13px] outline-none focus:border-accent"
+                  >
+                    <option value="">Select…</option>
+                    {classes.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <input
+                  type="text"
+                  value={row.section}
+                  onChange={(e) => updateRow(idx, { section: e.target.value })}
+                  placeholder="Sec"
+                  className="rounded-lg border border-navy/12 bg-white px-2.5 py-2 text-[13px] outline-none focus:border-accent"
+                />
+                <input
+                  type="text"
+                  value={row.subject}
+                  onChange={(e) => updateRow(idx, { subject: e.target.value })}
+                  placeholder="Subject"
+                  className="rounded-lg border border-navy/12 bg-white px-2.5 py-2 text-[13px] outline-none focus:border-accent"
+                />
+                <input
+                  type="text"
+                  value={row.room}
+                  onChange={(e) => updateRow(idx, { room: e.target.value })}
+                  placeholder="Room"
+                  className="rounded-lg border border-navy/12 bg-white px-2.5 py-2 text-[13px] outline-none focus:border-accent"
+                />
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  value={row.start_time}
+                  onChange={(e) => updateRow(idx, { start_time: e.target.value })}
+                  placeholder="09:00"
+                  className="rounded-lg border border-navy/12 bg-white px-2.5 py-2 text-[13px] outline-none focus:border-accent"
+                />
+                <input
+                  type="text"
+                  value={row.end_time}
+                  onChange={(e) => updateRow(idx, { end_time: e.target.value })}
+                  placeholder="09:45"
+                  className="rounded-lg border border-navy/12 bg-white px-2.5 py-2 text-[13px] outline-none focus:border-accent"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <AdminButton variant="ghost" onClick={addRow}>
+          <IconPlus width={14} height={14} /> Add another period
+        </AdminButton>
+
+        {result && <p className="text-[13px] font-medium text-accent-deep">{result}</p>}
         {err && <p className="text-[13px] font-medium text-danger">{err}</p>}
       </div>
     </Modal>
