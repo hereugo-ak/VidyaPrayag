@@ -428,8 +428,7 @@ private fun SubjectEditDialog(
 
 @Composable
 private fun BellScheduleTab() {
-    SchoolDayConfigScreenV2(
-        onBack = {},
+    SchoolDayConfigEmbeddedV2(
         modifier = Modifier.fillMaxSize(),
     )
 }

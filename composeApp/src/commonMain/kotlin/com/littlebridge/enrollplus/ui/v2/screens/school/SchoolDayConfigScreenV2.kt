@@ -89,6 +89,27 @@ fun SchoolDayConfigScreenV2(
 }
 
 @Composable
+fun SchoolDayConfigEmbeddedV2(
+    modifier: Modifier = Modifier,
+    viewModel: SchoolDayConfigViewModel = koinViewModel(),
+) {
+    val state by viewModel.state.collectAsStateV2()
+    SchoolDayConfigContent(
+        state = state,
+        onRetry = viewModel::loadConfigs,
+        onClearMessages = viewModel::clearMessages,
+        onCreate = { name, days, level, slots, onDone ->
+            viewModel.createConfig(name, days, level, slots, onDone)
+        },
+        onUpdate = { id, name, days, level, slots, onDone ->
+            viewModel.updateConfig(id, name, days, level, slots, true, onDone)
+        },
+        onDeactivate = viewModel::deactivateConfig,
+        modifier = modifier,
+    )
+}
+
+@Composable
 private fun SchoolDayConfigContent(
     state: SchoolDayConfigState,
     onRetry: () -> Unit,
