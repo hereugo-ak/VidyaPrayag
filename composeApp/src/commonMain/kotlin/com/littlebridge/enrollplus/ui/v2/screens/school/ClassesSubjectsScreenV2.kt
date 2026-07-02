@@ -1734,53 +1734,88 @@ private fun ManualPeriodEditorDialog(
                     }
                 }
 
-                // Teacher selection
+                // Teacher dropdown
                 Text("Teacher", style = VTheme.type.caption.colored(VTheme.colors.ink2))
-                if (teachers.isEmpty()) {
-                    Text("No teachers yet. Add one below.", style = VTheme.type.caption.colored(VTheme.colors.ink3))
-                } else {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        teachers.forEach { teacher ->
-                            VBadge(
-                                text = teacher.profile.name.ifBlank { teacher.id.take(8) },
-                                tone = if (selectedTeacherId == teacher.id) VBadgeTone.Arctic else VBadgeTone.Neutral,
-                                modifier = Modifier.clickable { selectedTeacherId = teacher.id },
+                var teacherMenuExpanded by remember { mutableStateOf(false) }
+                Box {
+                    OutlinedTextField(
+                        value = teachers.find { it.id == selectedTeacherId }?.let { t -> t.profile.name.ifBlank { t.id.take(8) } } ?: "",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Select Teacher") },
+                        modifier = Modifier.fillMaxWidth().clickable { teacherMenuExpanded = true },
+                    )
+                    DropdownMenu(
+                        expanded = teacherMenuExpanded,
+                        onDismissRequest = { teacherMenuExpanded = false },
+                    ) {
+                        if (teachers.isEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text("No teachers yet", color = VTheme.colors.ink3) },
+                                onClick = { teacherMenuExpanded = false },
+                            )
+                        } else {
+                            teachers.forEach { teacher ->
+                                DropdownMenuItem(
+                                    text = { Text(teacher.profile.name.ifBlank { teacher.id.take(8) }) },
+                                    onClick = {
+                                        selectedTeacherId = teacher.id
+                                        teacherMenuExpanded = false
+                                    },
+                                )
+                            }
+                        }
+                        DropdownMenuItem(
+                            text = { Text("+ Add New Teacher", color = VTheme.colors.tealDeep, fontWeight = FontWeight.Bold) },
+                            onClick = {
+                                teacherMenuExpanded = false
+                                showNewTeacher = true
+                            },
+                        )
+                    }
+                }
+
+                // Subject dropdown
+                Text("Subject", style = VTheme.type.caption.colored(VTheme.colors.ink2))
+                var subjectMenuExpanded by remember { mutableStateOf(false) }
+                Box {
+                    OutlinedTextField(
+                        value = subjectName,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Select Subject") },
+                        modifier = Modifier.fillMaxWidth().clickable { subjectMenuExpanded = true },
+                    )
+                    DropdownMenu(
+                        expanded = subjectMenuExpanded,
+                        onDismissRequest = { subjectMenuExpanded = false },
+                    ) {
+                        if (subjectsForClass.isEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text("No subjects for this class yet", color = VTheme.colors.ink3) },
+                                onClick = { subjectMenuExpanded = false },
+                            )
+                        } else {
+                            subjectsForClass.forEach { sub ->
+                                DropdownMenuItem(
+                                    text = { Text(sub.name) },
+                                    onClick = {
+                                        subjectName = sub.name
+                                        subjectMenuExpanded = false
+                                    },
+                                )
+                            }
+                        }
+                        if (selectedClass != null) {
+                            DropdownMenuItem(
+                                text = { Text("+ Add New Subject", color = VTheme.colors.tealDeep, fontWeight = FontWeight.Bold) },
+                                onClick = {
+                                    subjectMenuExpanded = false
+                                    showNewSubject = true
+                                },
                             )
                         }
                     }
-                }
-                VBadge(
-                    text = "+ New Teacher",
-                    tone = VBadgeTone.Success,
-                    modifier = Modifier.clickable { showNewTeacher = true },
-                )
-
-                // Subject selection
-                Text("Subject", style = VTheme.type.caption.colored(VTheme.colors.ink2))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    subjectsForClass.forEach { sub ->
-                        VBadge(
-                            text = sub.name,
-                            tone = if (subjectName == sub.name) VBadgeTone.Arctic else VBadgeTone.Neutral,
-                            modifier = Modifier.clickable { subjectName = sub.name },
-                        )
-                    }
-                    if (selectedClass != null) {
-                        VBadge(
-                            text = "+ New",
-                            tone = VBadgeTone.Success,
-                            modifier = Modifier.clickable { showNewSubject = true },
-                        )
-                    }
-                }
-                if (subjectName.isBlank() && subjectsForClass.isEmpty() && selectedClass != null) {
-                    VInput(
-                        value = subjectName,
-                        onValueChange = { subjectName = it },
-                        label = "Subject Name",
-                        hint = "Type subject name",
-                        placeholder = "e.g. Mathematics",
-                    )
                 }
 
                 // Room
@@ -1896,14 +1931,21 @@ private fun SlotAssignmentEditorDialog(
                         expanded = teacherMenuExpanded,
                         onDismissRequest = { teacherMenuExpanded = false },
                     ) {
-                        teachers.forEach { teacher ->
+                        if (teachers.isEmpty()) {
                             DropdownMenuItem(
-                                text = { Text(teacher.profile.name.ifBlank { teacher.id.take(8) }) },
-                                onClick = {
-                                    selectedTeacherId = teacher.id
-                                    teacherMenuExpanded = false
-                                },
+                                text = { Text("No teachers yet", color = VTheme.colors.ink3) },
+                                onClick = { teacherMenuExpanded = false },
                             )
+                        } else {
+                            teachers.forEach { teacher ->
+                                DropdownMenuItem(
+                                    text = { Text(teacher.profile.name.ifBlank { teacher.id.take(8) }) },
+                                    onClick = {
+                                        selectedTeacherId = teacher.id
+                                        teacherMenuExpanded = false
+                                    },
+                                )
+                            }
                         }
                         DropdownMenuItem(
                             text = { Text("+ Add New Teacher", color = VTheme.colors.tealDeep, fontWeight = FontWeight.Bold) },
@@ -1930,14 +1972,21 @@ private fun SlotAssignmentEditorDialog(
                         expanded = subjectMenuExpanded,
                         onDismissRequest = { subjectMenuExpanded = false },
                     ) {
-                        subjectsForClass.forEach { sub ->
+                        if (subjectsForClass.isEmpty()) {
                             DropdownMenuItem(
-                                text = { Text(sub.name) },
-                                onClick = {
-                                    subjectName = sub.name
-                                    subjectMenuExpanded = false
-                                },
+                                text = { Text("No subjects for this class yet", color = VTheme.colors.ink3) },
+                                onClick = { subjectMenuExpanded = false },
                             )
+                        } else {
+                            subjectsForClass.forEach { sub ->
+                                DropdownMenuItem(
+                                    text = { Text(sub.name) },
+                                    onClick = {
+                                        subjectName = sub.name
+                                        subjectMenuExpanded = false
+                                    },
+                                )
+                            }
                         }
                         if (selectedClass != null) {
                             DropdownMenuItem(
