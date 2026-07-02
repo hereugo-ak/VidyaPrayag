@@ -9,7 +9,17 @@ import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolClassDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolClassListResponse
 import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolSubjectDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolSubjectListResponse
+import com.littlebridge.enrollplus.feature.admin.domain.model.ChangeRequestListResponse
+import com.littlebridge.enrollplus.feature.admin.domain.model.CreateChangeRequestRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.CreateExceptionRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.CreatePeriodRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.PeriodDetailDto
+import com.littlebridge.enrollplus.feature.admin.domain.model.PeriodExceptionDto
+import com.littlebridge.enrollplus.feature.admin.domain.model.PeriodExceptionListResponse
+import com.littlebridge.enrollplus.feature.admin.domain.model.ReviewRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.TimetableChangeRequestDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.TimetableDto
+import com.littlebridge.enrollplus.feature.admin.domain.model.UpdatePeriodRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.UpdateSchoolClassRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.UpdateSchoolSubjectRequest
 import io.ktor.client.HttpClient
@@ -85,12 +95,80 @@ class SchoolClassesApi(
         client.delete(getUrl("api/v1/school/subjects/$id")) { bearerAuth(token) }
     }
 
-    // ── Timetable (read-only) ──────────────────────────────────────────────────
+    // ── Timetable (read) ──────────────────────────────────────────────────────
 
     suspend fun getTimetable(token: String, classFilter: String? = null): NetworkResult<ApiResponse<TimetableDto>> = safeApiCall {
         client.get(getUrl("api/v1/school/timetable")) {
             bearerAuth(token)
             if (!classFilter.isNullOrBlank()) parameter("class", classFilter)
+        }
+    }
+
+    // ── Period CRUD (admin) ───────────────────────────────────────────────────
+
+    suspend fun createPeriod(token: String, req: CreatePeriodRequest): NetworkResult<ApiResponse<PeriodDetailDto>> = safeApiCall {
+        client.post(getUrl("api/v1/school/timetable/periods")) {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(req)
+        }
+    }
+
+    suspend fun updatePeriod(token: String, id: String, req: UpdatePeriodRequest): NetworkResult<ApiResponse<PeriodDetailDto>> = safeApiCall {
+        client.put(getUrl("api/v1/school/timetable/periods/$id")) {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(req)
+        }
+    }
+
+    suspend fun deletePeriod(token: String, id: String): NetworkResult<ApiResponse<Unit>> = safeApiCall {
+        client.delete(getUrl("api/v1/school/timetable/periods/$id")) { bearerAuth(token) }
+    }
+
+    // ── Period Exceptions ─────────────────────────────────────────────────────
+
+    suspend fun listExceptions(token: String, date: String? = null): NetworkResult<ApiResponse<PeriodExceptionListResponse>> = safeApiCall {
+        client.get(getUrl("api/v1/school/timetable/exceptions")) {
+            bearerAuth(token)
+            if (!date.isNullOrBlank()) parameter("date", date)
+        }
+    }
+
+    suspend fun createException(token: String, req: CreateExceptionRequest): NetworkResult<ApiResponse<PeriodExceptionDto>> = safeApiCall {
+        client.post(getUrl("api/v1/school/timetable/exceptions")) {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(req)
+        }
+    }
+
+    suspend fun deleteException(token: String, id: String): NetworkResult<ApiResponse<Unit>> = safeApiCall {
+        client.delete(getUrl("api/v1/school/timetable/exceptions/$id")) { bearerAuth(token) }
+    }
+
+    // ── Timetable Change Requests ─────────────────────────────────────────────
+
+    suspend fun listChangeRequests(token: String, status: String? = null): NetworkResult<ApiResponse<ChangeRequestListResponse>> = safeApiCall {
+        client.get(getUrl("api/v1/school/timetable-requests")) {
+            bearerAuth(token)
+            if (!status.isNullOrBlank()) parameter("status", status)
+        }
+    }
+
+    suspend fun approveChangeRequest(token: String, id: String, req: ReviewRequest): NetworkResult<ApiResponse<Unit>> = safeApiCall {
+        client.post(getUrl("api/v1/school/timetable-requests/$id/approve")) {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(req)
+        }
+    }
+
+    suspend fun rejectChangeRequest(token: String, id: String, req: ReviewRequest): NetworkResult<ApiResponse<Unit>> = safeApiCall {
+        client.post(getUrl("api/v1/school/timetable-requests/$id/reject")) {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(req)
         }
     }
 }

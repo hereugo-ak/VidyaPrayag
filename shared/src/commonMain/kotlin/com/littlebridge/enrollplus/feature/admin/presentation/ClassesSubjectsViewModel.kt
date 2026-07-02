@@ -8,7 +8,17 @@ import com.littlebridge.enrollplus.feature.admin.domain.model.CreateSchoolClassR
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreateSchoolSubjectRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolClassDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolSubjectDto
+import com.littlebridge.enrollplus.feature.admin.domain.model.ChangeRequestListResponse
+import com.littlebridge.enrollplus.feature.admin.domain.model.CreateChangeRequestRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.CreateExceptionRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.CreatePeriodRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.PeriodDetailDto
+import com.littlebridge.enrollplus.feature.admin.domain.model.PeriodExceptionDto
+import com.littlebridge.enrollplus.feature.admin.domain.model.PeriodExceptionListResponse
+import com.littlebridge.enrollplus.feature.admin.domain.model.ReviewRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.TimetableChangeRequestDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.TimetableDto
+import com.littlebridge.enrollplus.feature.admin.domain.model.UpdatePeriodRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.UpdateSchoolClassRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.UpdateSchoolSubjectRequest
 import com.littlebridge.enrollplus.feature.admin.domain.repository.SchoolClassesRepository
@@ -24,6 +34,8 @@ data class ClassesSubjectsState(
     val subjectsByClass: Map<String, List<SchoolSubjectDto>> = emptyMap(),
     val timetable: TimetableDto? = null,
     val selectedClassId: String? = null,
+    val exceptions: List<PeriodExceptionDto> = emptyList(),
+    val changeRequests: List<TimetableChangeRequestDto> = emptyList(),
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val errorMessage: String? = null,
@@ -281,6 +293,213 @@ class ClassesSubjectsViewModel(
     fun selectClass(classId: String?) {
         _state.value = _state.value.copy(selectedClassId = classId)
         if (classId != null) loadSubjects(classId)
+    }
+
+    // ── Period CRUD ────────────────────────────────────────────────────────────
+
+    fun createPeriod(assignmentId: String, weekday: Int, startTime: String, endTime: String, room: String, onDone: (() -> Unit)? = null) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isSaving = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isSaving = false, errorMessage = "Not signed in")
+                return@launch
+            }
+            when (val r = repository.createPeriod(token, CreatePeriodRequest(assignmentId, weekday, startTime, endTime, room))) {
+                is NetworkResult.Success -> {
+                    _state.value = _state.value.copy(isSaving = false, infoMessage = "Period created")
+                    onDone?.invoke()
+                    loadTimetable()
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = r.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = "Connection error. Check your internet.")
+                }
+            }
+        }
+    }
+
+    fun updatePeriod(periodId: String, weekday: Int?, startTime: String?, endTime: String?, room: String?, isActive: Boolean?, onDone: (() -> Unit)? = null) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isSaving = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isSaving = false, errorMessage = "Not signed in")
+                return@launch
+            }
+            when (val r = repository.updatePeriod(token, periodId, UpdatePeriodRequest(weekday, startTime, endTime, room, isActive))) {
+                is NetworkResult.Success -> {
+                    _state.value = _state.value.copy(isSaving = false, infoMessage = "Period updated")
+                    onDone?.invoke()
+                    loadTimetable()
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = r.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = "Connection error. Check your internet.")
+                }
+            }
+        }
+    }
+
+    fun deletePeriod(periodId: String) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isSaving = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isSaving = false, errorMessage = "Not signed in")
+                return@launch
+            }
+            when (val r = repository.deletePeriod(token, periodId)) {
+                is NetworkResult.Success -> {
+                    _state.value = _state.value.copy(isSaving = false, infoMessage = "Period deleted")
+                    loadTimetable()
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = r.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = "Connection error. Check your internet.")
+                }
+            }
+        }
+    }
+
+    // ── Period Exceptions ──────────────────────────────────────────────────────
+
+    fun loadExceptions(date: String? = null) {
+        viewModelScope.launch {
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) return@launch
+            when (val r = repository.listExceptions(token, date)) {
+                is NetworkResult.Success -> {
+                    _state.value = _state.value.copy(exceptions = r.data.data?.exceptions ?: emptyList())
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(errorMessage = r.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(errorMessage = "Connection error. Check your internet.")
+                }
+            }
+        }
+    }
+
+    fun createException(req: CreateExceptionRequest, onDone: (() -> Unit)? = null) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isSaving = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isSaving = false, errorMessage = "Not signed in")
+                return@launch
+            }
+            when (val r = repository.createException(token, req)) {
+                is NetworkResult.Success -> {
+                    _state.value = _state.value.copy(isSaving = false, infoMessage = "Exception created")
+                    onDone?.invoke()
+                    loadExceptions()
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = r.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = "Connection error. Check your internet.")
+                }
+            }
+        }
+    }
+
+    fun deleteException(id: String) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isSaving = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isSaving = false, errorMessage = "Not signed in")
+                return@launch
+            }
+            when (val r = repository.deleteException(token, id)) {
+                is NetworkResult.Success -> {
+                    _state.value = _state.value.copy(isSaving = false, infoMessage = "Exception deleted")
+                    loadExceptions()
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = r.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = "Connection error. Check your internet.")
+                }
+            }
+        }
+    }
+
+    // ── Change Requests (admin) ────────────────────────────────────────────────
+
+    fun loadChangeRequests(status: String? = null) {
+        viewModelScope.launch {
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) return@launch
+            when (val r = repository.listChangeRequests(token, status)) {
+                is NetworkResult.Success -> {
+                    _state.value = _state.value.copy(changeRequests = r.data.data?.requests ?: emptyList())
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(errorMessage = r.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(errorMessage = "Connection error. Check your internet.")
+                }
+            }
+        }
+    }
+
+    fun approveChangeRequest(id: String, adminNote: String = "") {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isSaving = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isSaving = false, errorMessage = "Not signed in")
+                return@launch
+            }
+            when (val r = repository.approveChangeRequest(token, id, ReviewRequest(adminNote))) {
+                is NetworkResult.Success -> {
+                    _state.value = _state.value.copy(isSaving = false, infoMessage = "Request approved")
+                    loadChangeRequests()
+                    loadTimetable()
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = r.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = "Connection error. Check your internet.")
+                }
+            }
+        }
+    }
+
+    fun rejectChangeRequest(id: String, adminNote: String = "") {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isSaving = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isSaving = false, errorMessage = "Not signed in")
+                return@launch
+            }
+            when (val r = repository.rejectChangeRequest(token, id, ReviewRequest(adminNote))) {
+                is NetworkResult.Success -> {
+                    _state.value = _state.value.copy(isSaving = false, infoMessage = "Request rejected")
+                    loadChangeRequests()
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = r.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = "Connection error. Check your internet.")
+                }
+            }
+        }
     }
 
     fun clearMessages() {

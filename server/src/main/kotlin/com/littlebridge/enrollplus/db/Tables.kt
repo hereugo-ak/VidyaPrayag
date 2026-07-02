@@ -1251,6 +1251,10 @@ object PeriodExceptionsTable : UUIDTable("period_exceptions", "id") {
     // assignment binding + display fallback (same demotion rule as periods).
     val assignmentId        = uuid("assignment_id").nullable()          // FK teacher_subject_assignments.id
     val note                = text("note").default("")
+    // Denormalised display columns (same pattern as TeacherPeriodsTable)
+    val className           = text("class_name").default("")
+    val section             = varchar("section", 8).default("A")
+    val subject             = text("subject").default("")
     val createdAt           = timestamp("created_at")
     val updatedAt           = timestamp("updated_at")
     init {
@@ -3122,6 +3126,33 @@ object SchoolDaySlotType {
     const val LAB       = "LAB"
     const val FREE      = "FREE"
     const val ZERO      = "ZERO"
+}
+
+// =====================================================================
+// timetable_change_requests
+//   Teacher-initiated requests to create/update/delete a recurring period.
+//   Admin reviews and approves/rejects. On approval the period is written
+//   to teacher_periods and the requesting teacher is notified.
+// =====================================================================
+object TimetableChangeRequestsTable : UUIDTable("timetable_change_requests", "id") {
+    val schoolId      = uuid("school_id")
+    val teacherId     = uuid("teacher_id")               // FK app_users.id (requester)
+    val assignmentId  = uuid("assignment_id").nullable() // FK teacher_subject_assignments.id
+    val periodId      = uuid("period_id").nullable()     // FK teacher_periods.id (for UPDATE/DELETE)
+    val kind          = varchar("kind", 16)              // NEW_PERIOD | UPDATE_PERIOD | DELETE_PERIOD
+    val weekday       = integer("weekday")               // 1=Mon … 7=Sun
+    val startTime     = time("start_time").nullable()    // null for DELETE
+    val endTime       = time("end_time").nullable()      // null for DELETE
+    val room          = text("room").default("")
+    val reason        = text("reason").default("")       // teacher's note
+    val status        = varchar("status", 16).default("PENDING") // PENDING | APPROVED | REJECTED
+    val adminNote     = text("admin_note").default("")
+    val reviewedBy    = uuid("reviewed_by").nullable()
+    val createdAt     = timestamp("created_at")
+    val reviewedAt    = timestamp("reviewed_at").nullable()
+    val className     = text("class_name").default("")   // denormalised for display
+    val section       = varchar("section", 8).default("A")
+    val subject       = text("subject").default("")
 }
 
 val SYSTEM_SCHOOL_ID: UUID = UUID(0, 0)

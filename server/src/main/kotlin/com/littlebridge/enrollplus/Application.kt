@@ -116,6 +116,8 @@ import com.littlebridge.enrollplus.feature.school.schoolRecordsRouting
 import com.littlebridge.enrollplus.feature.school.schoolStudentsRouting
 import com.littlebridge.enrollplus.feature.school.schoolClassesRouting
 import com.littlebridge.enrollplus.feature.school.schoolTimetableRouting
+import com.littlebridge.enrollplus.feature.school.periodExceptionRouting
+import com.littlebridge.enrollplus.feature.school.timetableChangeRequestRouting
 import com.littlebridge.enrollplus.feature.school.schoolDayConfigRouting
 import com.littlebridge.enrollplus.feature.school.nonTeachingStaffRouting
 import com.littlebridge.enrollplus.feature.school.schoolLessonPlanRouting
@@ -388,7 +390,9 @@ fun Application.module() {
         nonTeachingStaffRouting()    // /api/v1/school/staff[…] — RA-S17 non-teaching-staff vertical (school-scoped CRUD)
         schoolRecordsRouting()       // /api/v1/school/{attendance/summary,marks/summary,fees/ledger} — RA-52 admin Records rollups (school-scoped reads)
         schoolClassesRouting()       // /api/v1/school/classes[…] + /api/v1/school/subjects[…] — class + subject CRUD (admin)
-        schoolTimetableRouting()     // /api/v1/school/timetable — school-wide weekly schedule (all classes) from teacher_periods, for the Command Center calendar (read-only, additive)
+        schoolTimetableRouting()     // /api/v1/school/timetable[…] — school-wide weekly schedule + admin period CRUD (POST/PUT/DELETE)
+        periodExceptionRouting()     // /api/v1/school/timetable/exceptions[…] + /api/v1/teacher/timetable/exceptions[…] — one-off period overrides
+        timetableChangeRequestRouting() // /api/v1/school/timetable-requests[…] + /api/v1/teacher/timetable-requests[…] — teacher→admin approval workflow
         schoolLessonPlanRouting()    // /api/v1/school/lesson-plans — admin review of teacher lesson plans (read-only, school-scoped, filterable)
         mediaRouting()               // /api/v1/school/media/upload[…] — REAL binary uploads → Supabase Storage (kills URL placeholders)
 

@@ -32,8 +32,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.littlebridge.enrollplus.feature.admin.domain.model.CreateExceptionRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.CreatePeriodRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.PeriodExceptionDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolClassDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolSubjectDto
+import com.littlebridge.enrollplus.feature.admin.domain.model.TimetableChangeRequestDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.TimetablePeriodDto
 import com.littlebridge.enrollplus.feature.admin.presentation.ClassesSubjectsState
 import com.littlebridge.enrollplus.feature.admin.presentation.ClassesSubjectsViewModel
@@ -55,7 +59,7 @@ import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
 import org.koin.compose.viewmodel.koinViewModel
 
-private val TABS = listOf("Classes", "Subjects", "Bell Schedule", "Timetable")
+private val TABS = listOf("Classes", "Subjects", "Bell Schedule", "Timetable", "Exceptions", "Requests")
 private val WEEKDAY_NAMES = listOf("", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
 @Composable
@@ -90,6 +94,22 @@ fun ClassesSubjectsScreenV2(
             "Timetable" -> TimetableTab(
                 state = state,
                 onLoadTimetable = { filter -> viewModel.loadTimetable(filter) },
+                onCreatePeriod = { assignmentId, weekday, startTime, endTime, room, onDone ->
+                    viewModel.createPeriod(assignmentId, weekday, startTime, endTime, room, onDone)
+                },
+                onDeletePeriod = { id -> viewModel.deletePeriod(id) },
+            )
+            "Exceptions" -> ExceptionsTab(
+                state = state,
+                onLoadExceptions = { date -> viewModel.loadExceptions(date) },
+                onCreateException = { req, onDone -> viewModel.createException(req, onDone) },
+                onDeleteException = { id -> viewModel.deleteException(id) },
+            )
+            "Requests" -> ChangeRequestsTab(
+                state = state,
+                onLoadRequests = { status -> viewModel.loadChangeRequests(status) },
+                onApprove = { id, note -> viewModel.approveChangeRequest(id, note) },
+                onReject = { id, note -> viewModel.rejectChangeRequest(id, note) },
             )
         }
     }
@@ -440,8 +460,12 @@ private fun BellScheduleTab() {
 private fun TimetableTab(
     state: ClassesSubjectsState,
     onLoadTimetable: (String?) -> Unit,
+    onCreatePeriod: (assignmentId: String, weekday: Int, startTime: String, endTime: String, room: String, onDone: () -> Unit) -> Unit,
+    onDeletePeriod: (String) -> Unit,
 ) {
     var selectedClassFilter by remember { mutableStateOf<String?>(null) }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var deleteTargetId by remember { mutableStateOf<String?>(null) }
 
     VStateHost(
         loading = state.isLoading,
@@ -456,12 +480,20 @@ private fun TimetableTab(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             VSectionHeader("Timetable")
-            VButton(
-                text = "Load Timetable",
-                onClick = { onLoadTimetable(selectedClassFilter) },
-                variant = VButtonVariant.Primary,
-                tone = VButtonTone.Teal,
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                VButton(
+                    text = "Load",
+                    onClick = { onLoadTimetable(selectedClassFilter) },
+                    variant = VButtonVariant.Primary,
+                    tone = VButtonTone.Teal,
+                )
+                VButton(
+                    text = "Add Period",
+                    onClick = { showAddDialog = true },
+                    variant = VButtonVariant.Secondary,
+                    tone = VButtonTone.Teal,
+                )
+            }
             val tt = state.timetable
             if (tt != null) {
                 if (tt.classes.isNotEmpty()) {
@@ -490,7 +522,7 @@ private fun TimetableTab(
                     VEmptyState(
                         title = "No periods scheduled",
                         icon = VIcons.Calendar,
-                        body = "The timetable is empty. Assign teachers to periods to populate it.",
+                        body = "The timetable is empty. Add periods to populate it.",
                     )
                 }
                 tt.weekdays.forEach { day ->
@@ -501,7 +533,10 @@ private fun TimetableTab(
                         color = VTheme.colors.ink,
                     )
                     day.periods.forEach { period ->
-                        TimetablePeriodRow(period)
+                        TimetablePeriodRow(
+                            period = period,
+                            onDelete = { deleteTargetId = period.id },
+                        )
                     }
                     Spacer(Modifier.height(8.dp))
                 }
@@ -509,10 +544,33 @@ private fun TimetableTab(
             Spacer(Modifier.height(80.dp))
         }
     }
+
+    if (showAddDialog) {
+        PeriodEditDialog(
+            isSaving = state.isSaving,
+            onSave = { assignmentId, weekday, startTime, endTime, room ->
+                onCreatePeriod(assignmentId, weekday, startTime, endTime, room) { showAddDialog = false }
+            },
+            onDismiss = { showAddDialog = false },
+        )
+    }
+    deleteTargetId?.let { id ->
+        VConfirmDialog(
+            visible = true,
+            title = "Delete period?",
+            message = "This will remove the period from the recurring timetable.",
+            confirmLabel = "Delete",
+            onConfirm = { onDeletePeriod(id); deleteTargetId = null },
+            onDismiss = { deleteTargetId = null },
+        )
+    }
 }
 
 @Composable
-private fun TimetablePeriodRow(period: TimetablePeriodDto) {
+private fun TimetablePeriodRow(
+    period: TimetablePeriodDto,
+    onDelete: () -> Unit = {},
+) {
     VCard(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -534,8 +592,393 @@ private fun TimetablePeriodRow(period: TimetablePeriodDto) {
                     }
                 }
             }
-            if (period.room.isNotBlank()) {
-                VBadge(text = "Room ${period.room}", tone = VBadgeTone.Success)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (period.room.isNotBlank()) {
+                    VBadge(text = "Room ${period.room}", tone = VBadgeTone.Success)
+                }
+                Box(
+                    Modifier.size(28.dp).clip(CircleShape)
+                        .background(VTheme.colors.dangerInk.copy(alpha = 0.1f))
+                        .clickable { onDelete() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("×", color = VTheme.colors.dangerInk, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+// ── Period Edit Dialog ────────────────────────────────────────────────────────
+
+@Composable
+private fun PeriodEditDialog(
+    isSaving: Boolean,
+    onSave: (assignmentId: String, weekday: Int, startTime: String, endTime: String, room: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var assignmentId by remember { mutableStateOf("") }
+    var weekday by remember { mutableStateOf(1) }
+    var startTime by remember { mutableStateOf("09:00") }
+    var endTime by remember { mutableStateOf("10:00") }
+    var room by remember { mutableStateOf("") }
+
+    VCard(Modifier.fillMaxWidth().padding(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Add Period", style = VTheme.type.h3, fontWeight = FontWeight.Bold, color = VTheme.colors.ink)
+            VInput(
+                value = assignmentId,
+                onValueChange = { assignmentId = it },
+                label = "Assignment ID",
+                hint = "Teacher-Subject Assignment UUID",
+                placeholder = "uuid...",
+            )
+            Text("Weekday: ${WEEKDAY_NAMES.getOrElse(weekday) { "Day $weekday" }}", style = VTheme.type.body, color = VTheme.colors.ink2)
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                (1..7).forEach { day ->
+                    VBadge(
+                        text = WEEKDAY_NAMES[day],
+                        tone = if (weekday == day) VBadgeTone.Arctic else VBadgeTone.Neutral,
+                        modifier = Modifier.clickable { weekday = day },
+                    )
+                }
+            }
+            VInput(value = startTime, onValueChange = { startTime = it }, label = "Start Time", hint = "HH:mm", placeholder = "09:00")
+            VInput(value = endTime, onValueChange = { endTime = it }, label = "End Time", hint = "HH:mm", placeholder = "10:00")
+            VInput(value = room, onValueChange = { room = it }, label = "Room", hint = "e.g. 101", placeholder = "101")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                VButton(text = "Cancel", onClick = onDismiss, variant = VButtonVariant.Ghost)
+                VButton(
+                    text = "Save",
+                    onClick = { onSave(assignmentId.trim(), weekday, startTime.trim(), endTime.trim(), room.trim()) },
+                    variant = VButtonVariant.Primary,
+                    tone = VButtonTone.Teal,
+                    loading = isSaving,
+                )
+            }
+        }
+    }
+}
+
+// ── Exceptions Tab ────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ExceptionsTab(
+    state: ClassesSubjectsState,
+    onLoadExceptions: (String?) -> Unit,
+    onCreateException: (CreateExceptionRequest, () -> Unit) -> Unit,
+    onDeleteException: (String) -> Unit,
+) {
+    var showAddDialog by remember { mutableStateOf(false) }
+    var deleteTargetId by remember { mutableStateOf<String?>(null) }
+
+    VStateHost(
+        loading = state.isLoading,
+        error = state.errorMessage,
+        isEmpty = state.exceptions.isEmpty() && !state.isLoading,
+        emptyTitle = "No exceptions",
+        emptyBody = "Tap 'Load Exceptions' to view period overrides, or create one.",
+        emptyIcon = VIcons.Calendar,
+    ) {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            VSectionHeader("Period Exceptions")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                VButton(
+                    text = "Load",
+                    onClick = { onLoadExceptions(null) },
+                    variant = VButtonVariant.Primary,
+                    tone = VButtonTone.Teal,
+                )
+                VButton(
+                    text = "Add Exception",
+                    onClick = { showAddDialog = true },
+                    variant = VButtonVariant.Secondary,
+                    tone = VButtonTone.Teal,
+                )
+            }
+            state.exceptions.forEach { exc ->
+                ExceptionCard(
+                    exception = exc,
+                    onDelete = { deleteTargetId = exc.id },
+                )
+            }
+            Spacer(Modifier.height(80.dp))
+        }
+    }
+
+    if (showAddDialog) {
+        ExceptionEditDialog(
+            isSaving = state.isSaving,
+            onSave = { req ->
+                onCreateException(req) { showAddDialog = false }
+            },
+            onDismiss = { showAddDialog = false },
+        )
+    }
+    deleteTargetId?.let { id ->
+        VConfirmDialog(
+            visible = true,
+            title = "Delete exception?",
+            message = "This will remove the period override.",
+            confirmLabel = "Delete",
+            onConfirm = { onDeleteException(id); deleteTargetId = null },
+            onDismiss = { deleteTargetId = null },
+        )
+    }
+}
+
+@Composable
+private fun ExceptionCard(
+    exception: PeriodExceptionDto,
+    onDelete: () -> Unit,
+) {
+    VCard(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    VBadge(text = exception.kind, tone = when (exception.kind) {
+                        "CANCELLED" -> VBadgeTone.Danger
+                        "RESCHEDULED" -> VBadgeTone.Warning
+                        "ROOM_CHANGE" -> VBadgeTone.Accent
+                        "SUBSTITUTION" -> VBadgeTone.Arctic
+                        "EXTRA" -> VBadgeTone.Success
+                        else -> VBadgeTone.Neutral
+                    })
+                    Text(exception.date, style = VTheme.type.body, fontWeight = FontWeight.Medium, color = VTheme.colors.ink)
+                }
+                Spacer(Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (exception.className.isNotBlank()) VBadge(text = exception.className, tone = VBadgeTone.Arctic)
+                    if (exception.section.isNotBlank()) VBadge(text = exception.section, tone = VBadgeTone.Accent)
+                    if (exception.subject.isNotBlank()) Text(exception.subject, style = VTheme.type.caption, color = VTheme.colors.ink2)
+                }
+                if (exception.newStart != null) {
+                    Text("New time: ${exception.newStart}${exception.newEnd?.let { " – $it" } ?: ""}", style = VTheme.type.caption, color = VTheme.colors.ink3)
+                }
+                if (exception.newRoom != null) {
+                    Text("New room: ${exception.newRoom}", style = VTheme.type.caption, color = VTheme.colors.ink3)
+                }
+                if (exception.substituteTeacherName != null) {
+                    Text("Substitute: ${exception.substituteTeacherName}", style = VTheme.type.caption, color = VTheme.colors.ink3)
+                }
+                if (exception.note.isNotBlank()) {
+                    Text(exception.note, style = VTheme.type.caption, color = VTheme.colors.ink3)
+                }
+            }
+            Box(
+                Modifier.size(28.dp).clip(CircleShape)
+                    .background(VTheme.colors.dangerInk.copy(alpha = 0.1f))
+                    .clickable { onDelete() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("×", color = VTheme.colors.dangerInk, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExceptionEditDialog(
+    isSaving: Boolean,
+    onSave: (CreateExceptionRequest) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var periodId by remember { mutableStateOf("") }
+    var date by remember { mutableStateOf("") }
+    var kind by remember { mutableStateOf("CANCELLED") }
+    var newStart by remember { mutableStateOf("") }
+    var newEnd by remember { mutableStateOf("") }
+    var newRoom by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+
+    val kinds = listOf("CANCELLED", "RESCHEDULED", "ROOM_CHANGE", "SUBSTITUTION", "EXTRA")
+
+    VCard(Modifier.fillMaxWidth().padding(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Add Exception", style = VTheme.type.h3, fontWeight = FontWeight.Bold, color = VTheme.colors.ink)
+            VInput(value = periodId, onValueChange = { periodId = it }, label = "Period ID", hint = "Recurring period UUID (blank for EXTRA)", placeholder = "uuid...")
+            VInput(value = date, onValueChange = { date = it }, label = "Date", hint = "YYYY-MM-DD", placeholder = "2026-07-15")
+            Text("Kind: $kind", style = VTheme.type.body, color = VTheme.colors.ink2)
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                kinds.forEach { k ->
+                    VBadge(
+                        text = k,
+                        tone = if (kind == k) VBadgeTone.Arctic else VBadgeTone.Neutral,
+                        modifier = Modifier.clickable { kind = k },
+                    )
+                }
+            }
+            if (kind != "CANCELLED") {
+                VInput(value = newStart, onValueChange = { newStart = it }, label = "New Start", hint = "HH:mm", placeholder = "09:00")
+                VInput(value = newEnd, onValueChange = { newEnd = it }, label = "New End", hint = "HH:mm", placeholder = "10:00")
+            }
+            if (kind == "ROOM_CHANGE") {
+                VInput(value = newRoom, onValueChange = { newRoom = it }, label = "New Room", hint = "e.g. 102", placeholder = "102")
+            }
+            VInput(value = note, onValueChange = { note = it }, label = "Note", hint = "Optional", placeholder = "")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                VButton(text = "Cancel", onClick = onDismiss, variant = VButtonVariant.Ghost)
+                VButton(
+                    text = "Save",
+                    onClick = {
+                        onSave(
+                            CreateExceptionRequest(
+                                periodId = periodId.trim().ifBlank { null },
+                                date = date.trim(),
+                                kind = kind,
+                                newStart = newStart.trim().ifBlank { null },
+                                newEnd = newEnd.trim().ifBlank { null },
+                                newRoom = newRoom.trim().ifBlank { null },
+                                note = note.trim(),
+                            )
+                        )
+                    },
+                    variant = VButtonVariant.Primary,
+                    tone = VButtonTone.Teal,
+                    loading = isSaving,
+                )
+            }
+        }
+    }
+}
+
+// ── Change Requests Tab ───────────────────────────────────────────────────────
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ChangeRequestsTab(
+    state: ClassesSubjectsState,
+    onLoadRequests: (String?) -> Unit,
+    onApprove: (String, String) -> Unit,
+    onReject: (String, String) -> Unit,
+) {
+    var statusFilter by remember { mutableStateOf<String?>(null) }
+
+    VStateHost(
+        loading = state.isLoading,
+        error = state.errorMessage,
+        isEmpty = state.changeRequests.isEmpty() && !state.isLoading,
+        emptyTitle = "No change requests",
+        emptyBody = "Tap 'Load' to view teacher timetable change requests.",
+        emptyIcon = VIcons.Calendar,
+    ) {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            VSectionHeader("Timetable Change Requests")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                VButton(
+                    text = "Load",
+                    onClick = { onLoadRequests(statusFilter) },
+                    variant = VButtonVariant.Primary,
+                    tone = VButtonTone.Teal,
+                )
+            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("All" to null, "Pending" to "PENDING", "Approved" to "APPROVED", "Rejected" to "REJECTED").forEach { (label, value) ->
+                    VBadge(
+                        text = label,
+                        tone = if (statusFilter == value) VBadgeTone.Arctic else VBadgeTone.Neutral,
+                        modifier = Modifier.clickable {
+                            statusFilter = value
+                            onLoadRequests(value)
+                        },
+                    )
+                }
+            }
+            state.changeRequests.forEach { req ->
+                ChangeRequestCard(
+                    request = req,
+                    onApprove = { note -> onApprove(req.id, note) },
+                    onReject = { note -> onReject(req.id, note) },
+                )
+            }
+            Spacer(Modifier.height(80.dp))
+        }
+    }
+}
+
+@Composable
+private fun ChangeRequestCard(
+    request: TimetableChangeRequestDto,
+    onApprove: (String) -> Unit,
+    onReject: (String) -> Unit,
+) {
+    var adminNote by remember { mutableStateOf("") }
+    var showActions by remember { mutableStateOf(false) }
+
+    VCard(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                VBadge(text = request.kind, tone = VBadgeTone.Accent)
+                VBadge(
+                    text = request.status,
+                    tone = when (request.status) {
+                        "PENDING" -> VBadgeTone.Warning
+                        "APPROVED" -> VBadgeTone.Success
+                        "REJECTED" -> VBadgeTone.Danger
+                        else -> VBadgeTone.Neutral
+                    },
+                )
+                Text(WEEKDAY_NAMES.getOrElse(request.weekday) { "Day ${request.weekday}" }, style = VTheme.type.caption, color = VTheme.colors.ink3)
+            }
+            if (request.teacherName.isNotBlank()) {
+                Text("Teacher: ${request.teacherName}", style = VTheme.type.body, color = VTheme.colors.ink2)
+            }
+            if (request.className.isNotBlank()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    VBadge(text = request.className, tone = VBadgeTone.Arctic)
+                    if (request.section.isNotBlank()) VBadge(text = request.section, tone = VBadgeTone.Accent)
+                    if (request.subject.isNotBlank()) Text(request.subject, style = VTheme.type.caption, color = VTheme.colors.ink2)
+                }
+            }
+            if (request.startTime != null && request.endTime != null) {
+                Text("${request.startTime} – ${request.endTime}", style = VTheme.type.caption, color = VTheme.colors.ink3)
+            }
+            if (request.room.isNotBlank()) {
+                Text("Room: ${request.room}", style = VTheme.type.caption, color = VTheme.colors.ink3)
+            }
+            if (request.reason.isNotBlank()) {
+                Text("Reason: ${request.reason}", style = VTheme.type.caption, color = VTheme.colors.ink3)
+            }
+            if (request.adminNote.isNotBlank()) {
+                Text("Admin note: ${request.adminNote}", style = VTheme.type.caption, color = VTheme.colors.ink3)
+            }
+            if (request.status == "PENDING") {
+                if (!showActions) {
+                    VButton(
+                        text = "Review",
+                        onClick = { showActions = true },
+                        variant = VButtonVariant.Secondary,
+                        tone = VButtonTone.Teal,
+                    )
+                } else {
+                    VInput(
+                        value = adminNote,
+                        onValueChange = { adminNote = it },
+                        label = "Admin Note",
+                        hint = "Optional",
+                        placeholder = "",
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        VButton(
+                            text = "Approve",
+                            onClick = { onApprove(adminNote.trim()) },
+                            variant = VButtonVariant.Primary,
+                            tone = VButtonTone.Teal,
+                        )
+                        VButton(
+                            text = "Reject",
+                            onClick = { onReject(adminNote.trim()) },
+                            variant = VButtonVariant.Destructive,
+                        )
+                    }
+                }
             }
         }
     }
