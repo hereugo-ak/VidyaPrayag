@@ -148,6 +148,32 @@ enum class AiProvider(
         freeTierRpm = 15,
         freeTierRpd = 1_500,
         freeTierTpm = 1_000_000,
+    ),
+    NVIDIA_REASON(
+        code = "nvidia_reason",
+        defaultBaseUrl = "https://integrate.api.nvidia.com/v1",
+        defaultModelEnv = "AI_MODEL_NVIDIA_REASON",
+        // June 2026: NVIDIA NIM free tier ~40 RPM, 5K TPM, 1K RPD.
+        defaultModel = "meta/llama-3.3-70b-instruct",
+        tier = "reason",
+        noTraining = true,
+        freeTierRpm = 40,
+        freeTierRpd = 1_000,
+        freeTierTpm = 5_000,
+    ),
+    NVIDIA_FAST(
+        code = "nvidia_fast",
+        defaultBaseUrl = "https://integrate.api.nvidia.com/v1",
+        defaultModelEnv = "AI_MODEL_NVIDIA_FAST",
+        // June 2026: NVIDIA NIM 8B model ~100 RPM, 10K TPM.
+        defaultModel = "meta/llama-3.1-8b-instruct",
+        tier = "fast",
+        noTraining = true,
+        freeTierRpm = 100,
+        freeTierRpd = 1_000,
+        freeTierTpm = 10_000,
+        sharedApiKeyEnv = "AI_NVIDIA_REASON_API_KEY",
+        sharedBaseUrlEnv = "AI_NVIDIA_REASON_BASE_URL",
     );
 
     /** env var holding the raw API key for this provider. */

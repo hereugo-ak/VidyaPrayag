@@ -87,14 +87,14 @@ object AiService {
      *
      * PII filtering (GuardrailService) is applied on top of this at call time,
      * so for a PII prompt the REASON lane collapses to the no-training subset
-     * (Groq → Cerebras → OpenRouter).
+     * (Groq → NVIDIA → Cerebras → OpenRouter).
      */
     private fun laneProviders(lane: AiLane): List<AiProvider> = when (lane) {
-        AiLane.FAST_CHAT -> listOf(AiProvider.GROQ_FAST, AiProvider.CEREBRAS, AiProvider.GROQ, AiProvider.OPENROUTER)
-        AiLane.CLASSIFY  -> listOf(AiProvider.GROQ_FAST, AiProvider.GROQ, AiProvider.CEREBRAS, AiProvider.OPENROUTER)
-        AiLane.REASON    -> listOf(AiProvider.GROQ, AiProvider.GEMINI, AiProvider.SAMBANOVA, AiProvider.CEREBRAS,
+        AiLane.FAST_CHAT -> listOf(AiProvider.GROQ_FAST, AiProvider.NVIDIA_FAST, AiProvider.CEREBRAS, AiProvider.GROQ, AiProvider.OPENROUTER)
+        AiLane.CLASSIFY  -> listOf(AiProvider.GROQ_FAST, AiProvider.NVIDIA_FAST, AiProvider.GROQ, AiProvider.CEREBRAS, AiProvider.OPENROUTER)
+        AiLane.REASON    -> listOf(AiProvider.GROQ, AiProvider.NVIDIA_REASON, AiProvider.GEMINI, AiProvider.SAMBANOVA, AiProvider.CEREBRAS,
                                    AiProvider.OPENROUTER, AiProvider.MISTRAL)
-        AiLane.BATCH     -> listOf(AiProvider.GROQ, AiProvider.GEMINI, AiProvider.MISTRAL, AiProvider.OPENROUTER)
+        AiLane.BATCH     -> listOf(AiProvider.GROQ, AiProvider.NVIDIA_REASON, AiProvider.GEMINI, AiProvider.MISTRAL, AiProvider.OPENROUTER)
     }
 
     /**
@@ -617,5 +617,133 @@ object AiService {
         } else {
             AgentResult.unavailable("agent step cap reached and final response failed")
         }
+    }
+
+    /**
+     * Vision completion: sends a system prompt + user text + image to a
+     * vision-capable provider (Gemini Flash supports vision via the
+     * OpenAI-compatible endpoint). Goes through circuit breaker + rate limiter
+     * + usage logging, same as [complete].
+     *
+     * @param imageBase64 raw base64-encoded image (no data: prefix)
+     * @param imageMimeType e.g. "image/jpeg", "image/png"
+     */
+    suspend fun completeWithVision(
+        feature: String,
+        systemPrompt: String,
+        userText: String,
+        imageBase64: String,
+        imageMimeType: String = "image/jpeg",
+        schoolId: UUID? = null,
+        temperature: Double = 0.4,
+        maxTokens: Int = 1024,
+    ): AiResult {
+        val visionProviders = listOf(AiProvider.GEMINI, AiProvider.OPENROUTER)
+        var lastError: String? = null
+
+        for (provider in visionProviders) {
+            val model = KeyVault.modelFor(provider)
+
+            if (!CircuitBreaker.allow(provider.code, model)) {
+                log.debug("Vision: {} circuit OPEN, skipping", provider.code)
+                continue
+            }
+            val key = KeyVault.keyFor(provider)
+            if (key.isNullOrBlank()) continue
+            val baseUrl = KeyVault.baseUrlFor(provider)
+
+            val rlCheck = RateLimiter.check(provider.code, model, maxTokens + 1000, provider)
+            if (!rlCheck.allowed) {
+                log.debug("Vision: {} rate limited, skipping", provider.code)
+                lastError = "rate_limited: ${rlCheck.reason}"
+                continue
+            }
+
+            val extraHeaders = if (provider == AiProvider.OPENROUTER) {
+                mapOf(
+                    "HTTP-Referer" to "https://vidyaprayag.app",
+                    "X-Title" to "VidyaPrayag",
+                )
+            } else emptyMap()
+
+            val messages = listOf(
+                VisionLlmMessage(
+                    role = "system",
+                    content = listOf(VisionContentPart(type = "text", text = systemPrompt)),
+                ),
+                VisionLlmMessage(
+                    role = "user",
+                    content = listOf(
+                        VisionContentPart(type = "text", text = userText),
+                        VisionContentPart(
+                            type = "image_url",
+                            imageUrl = VisionImageUrl(url = "data:$imageMimeType;base64,$imageBase64"),
+                        ),
+                    ),
+                ),
+            )
+
+            val started = System.currentTimeMillis()
+            val result = llm.completeWithVision(
+                baseUrl = baseUrl,
+                apiKey = key,
+                model = model,
+                messages = messages,
+                temperature = temperature,
+                maxTokens = maxTokens,
+                extraHeaders = extraHeaders,
+            )
+            val latency = System.currentTimeMillis() - started
+
+            if (result.ok && !result.content.isNullOrBlank()) {
+                CircuitBreaker.recordSuccess(provider.code, model, latency)
+                RateLimiter.record(provider.code, model,
+                    result.inputTokens + result.outputTokens, provider)
+                logUsage(
+                    feature = feature,
+                    schoolId = schoolId,
+                    userId = null,
+                    lane = AiLane.REASON,
+                    providerUsed = provider.code,
+                    modelUsed = result.modelUsed ?: model,
+                    inTok = result.inputTokens,
+                    outTok = result.outputTokens,
+                    costUsd = 0.0,
+                    latencyMs = latency,
+                    status = "success",
+                    routing = "direct",
+                    errorMessage = null,
+                )
+                return AiResult(
+                    ok = true,
+                    content = result.content,
+                    providerUsed = provider.code,
+                    modelUsed = result.modelUsed ?: model,
+                    inputTokens = result.inputTokens,
+                    outputTokens = result.outputTokens,
+                )
+            } else {
+                CircuitBreaker.recordFailure(provider.code, model, rateLimited = false)
+                lastError = result.errorMessage
+                log.warn("Vision: {} failed: {} — trying next", provider.code, result.errorMessage)
+            }
+        }
+
+        logUsage(
+            feature = feature,
+            schoolId = schoolId,
+            userId = null,
+            lane = AiLane.REASON,
+            providerUsed = null,
+            modelUsed = null,
+            inTok = 0,
+            outTok = 0,
+            costUsd = 0.0,
+            latencyMs = 0,
+            status = "failed",
+            routing = "unavailable",
+            errorMessage = lastError,
+        )
+        return AiResult.unavailable(lastError ?: "No vision-capable provider available")
     }
 }

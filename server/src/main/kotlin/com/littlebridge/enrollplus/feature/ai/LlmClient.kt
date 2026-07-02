@@ -41,6 +41,9 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.slf4j.LoggerFactory
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -81,6 +84,35 @@ data class LlmMessage(
     val content: String? = null,
     @SerialName("tool_calls") val toolCalls: List<ToolCall>? = null,
     @SerialName("tool_call_id") val toolCallId: String? = null,
+)
+
+// ── Vision support (OpenAI-compatible content parts) ──────────────────────────
+
+@Serializable
+data class VisionContentPart(
+    val type: String,  // "text" | "image_url"
+    val text: String? = null,
+    @SerialName("image_url") val imageUrl: VisionImageUrl? = null,
+)
+
+@Serializable
+data class VisionImageUrl(
+    val url: String,
+)
+
+@Serializable
+data class VisionLlmMessage(
+    val role: String,
+    val content: List<VisionContentPart>,
+)
+
+@Serializable
+private data class VisionChatCompletionRequest(
+    val model: String,
+    val messages: List<VisionLlmMessage>,
+    val temperature: Double = 0.4,
+    @SerialName("max_tokens") val maxTokens: Int = 1024,
+    val stream: Boolean = false,
 )
 
 @Serializable
@@ -221,8 +253,12 @@ class LlmClient(
             return LlmResult.failure(kind, status = status, message = bodyText.take(500))
         }
 
+        return parseResponse(resp, model)
+    }
+
+    private suspend fun parseResponse(resp: HttpResponse, model: String): LlmResult {
         val parsed = runCatching { resp.body<ChatCompletionResponse>() }.getOrElse {
-            log.warn("LLM response parse failed from {}: {}", baseUrl, it.message)
+            log.warn("LLM response parse failed: {}", it.message)
             return LlmResult.failure(LlmErrorKind.EMPTY_RESPONSE, message = "parse failed")
         }
 
@@ -246,6 +282,44 @@ class LlmClient(
             toolCalls = toolCalls,
             finishReason = finishReason,
         )
+    }
+
+    /**
+     * Vision completion: sends messages with mixed text + image content parts.
+     * Uses the same OpenAI-compatible chat-completions endpoint, but with
+     * content as an array of typed parts instead of a plain string.
+     * Response shape is identical to [complete].
+     */
+    suspend fun completeWithVision(
+        baseUrl: String,
+        apiKey: String,
+        model: String,
+        messages: List<VisionLlmMessage>,
+        temperature: Double = 0.4,
+        maxTokens: Int = 1024,
+        extraHeaders: Map<String, String> = emptyMap(),
+    ): LlmResult {
+        val url = "${baseUrl.trimEnd('/')}/chat/completions"
+        val req = VisionChatCompletionRequest(
+            model = model,
+            messages = messages,
+            temperature = temperature,
+            maxTokens = maxTokens,
+        )
+        val body = jsonCodec.encodeToString(VisionChatCompletionRequest.serializer(), req)
+
+        val resp = try {
+            client.post(url) {
+                contentType(ContentType.Application.Json)
+                header(HttpHeaders.Authorization, "Bearer $apiKey")
+                extraHeaders.forEach { (k, v) -> header(k, v) }
+                setBody(body)
+            }
+        } catch (e: Exception) {
+            return LlmResult.failure(LlmErrorKind.NETWORK, message = e.message ?: "network error")
+        }
+
+        return parseResponse(resp, model)
     }
 
     companion object {

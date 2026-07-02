@@ -4,9 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.littlebridge.enrollplus.core.network.NetworkResult
 import com.littlebridge.enrollplus.core.prefs.PreferenceRepository
+import com.littlebridge.enrollplus.feature.admin.data.remote.TimetableImportApi
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreateSchoolDayConfigRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolDayConfigDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolDaySlotDto
+import com.littlebridge.enrollplus.feature.admin.domain.model.TimetableImportOcrRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.TimetableImportTextRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.UpdateSchoolDayConfigRequest
 import com.littlebridge.enrollplus.feature.admin.domain.repository.SchoolDayConfigRepository
 import com.littlebridge.enrollplus.util.AppLogger
@@ -27,6 +30,7 @@ data class SchoolDayConfigState(
 class SchoolDayConfigViewModel(
     private val repository: SchoolDayConfigRepository,
     private val preferenceRepository: PreferenceRepository,
+    private val importApi: TimetableImportApi? = null,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SchoolDayConfigState())
@@ -170,5 +174,86 @@ class SchoolDayConfigViewModel(
 
     fun clearMessages() {
         _state.value = _state.value.copy(errorMessage = null, infoMessage = null)
+    }
+
+    fun importOcr(
+        imageBase64: String,
+        mimeType: String = "image/jpeg",
+        onResult: (List<SchoolDaySlotDto>, String) -> Unit,
+        onError: (String) -> Unit,
+    ) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isSaving = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isSaving = false, errorMessage = "Not signed in")
+                onError("Not signed in")
+                return@launch
+            }
+            val api = importApi ?: run {
+                _state.value = _state.value.copy(isSaving = false, errorMessage = "Import API not configured")
+                onError("Import API not configured")
+                return@launch
+            }
+            when (val r = api.importOcr(token, TimetableImportOcrRequest(image = imageBase64, mimeType = mimeType))) {
+                is NetworkResult.Success -> {
+                    _state.value = _state.value.copy(isSaving = false)
+                    val data = r.data.data
+                    if (data != null && data.slots.isNotEmpty()) {
+                        onResult(data.slots, data.name)
+                    } else {
+                        onError(r.data.message ?: "No slots parsed from image")
+                    }
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = r.message)
+                    onError(r.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = "Connection error")
+                    onError("Connection error. Check your internet.")
+                }
+            }
+        }
+    }
+
+    fun importText(
+        text: String,
+        onResult: (List<SchoolDaySlotDto>, String) -> Unit,
+        onError: (String) -> Unit,
+    ) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isSaving = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isSaving = false, errorMessage = "Not signed in")
+                onError("Not signed in")
+                return@launch
+            }
+            val api = importApi ?: run {
+                _state.value = _state.value.copy(isSaving = false, errorMessage = "Import API not configured")
+                onError("Import API not configured")
+                return@launch
+            }
+            when (val r = api.importText(token, TimetableImportTextRequest(text = text))) {
+                is NetworkResult.Success -> {
+                    _state.value = _state.value.copy(isSaving = false)
+                    val data = r.data.data
+                    if (data != null && data.slots.isNotEmpty()) {
+                        onResult(data.slots, data.name)
+                    } else {
+                        onError(r.data.message ?: "No slots parsed from text")
+                    }
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = r.message)
+                    onError(r.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = "Connection error")
+                    onError("Connection error. Check your internet.")
+                }
+            }
+        }
     }
 }

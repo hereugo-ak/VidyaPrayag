@@ -22,6 +22,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -512,6 +515,43 @@ private val DEFAULT_TEMPLATE_SLOTS = listOf(
 
 private val ALL_DAYS = listOf(1, 2, 3, 4, 5, 6, 7)
 
+private fun parseTimeToMinutes(time: String): Int {
+    val parts = time.split(":")
+    if (parts.size != 2) return 0
+    val h = parts[0].toIntOrNull() ?: 0
+    val m = parts[1].toIntOrNull() ?: 0
+    return h * 60 + m
+}
+
+private fun minutesToTime(minutes: Int): String {
+    val h = (minutes / 60).coerceIn(0, 23)
+    val m = (minutes % 60).coerceIn(0, 59)
+    return "${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}"
+}
+
+private fun shiftSlotsAfterRemove(
+    slots: List<SchoolDaySlotDto>,
+    removedIdx: Int,
+): List<SchoolDaySlotDto> {
+    if (removedIdx < 0 || removedIdx >= slots.size) return slots
+    val removed = slots[removedIdx]
+    val removedDuration = parseTimeToMinutes(removed.endTime) - parseTimeToMinutes(removed.startTime)
+    if (removedDuration <= 0) {
+        return slots.toMutableList().also { it.removeAt(removedIdx) }
+            .mapIndexed { i, s -> s.copy(slotIndex = i) }
+    }
+    return slots.toMutableList().also { it.removeAt(removedIdx) }
+        .mapIndexed { i, s ->
+            if (i >= removedIdx) {
+                val newStart = (parseTimeToMinutes(s.startTime) - removedDuration).coerceAtLeast(0)
+                val newEnd = (parseTimeToMinutes(s.endTime) - removedDuration).coerceAtLeast(0)
+                s.copy(slotIndex = i, startTime = minutesToTime(newStart), endTime = minutesToTime(newEnd))
+            } else {
+                s.copy(slotIndex = i)
+            }
+        }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ScheduleTab(
@@ -524,6 +564,7 @@ private fun ScheduleTab(
     onCreateSubjectInline: (classId: String, name: String, code: String, onDone: () -> Unit) -> Unit,
 ) {
     var currentStep by remember { mutableStateOf(0) }
+    var presetSlots by remember { mutableStateOf<List<SchoolDaySlotDto>?>(null) }
 
     Column(Modifier.fillMaxSize()) {
         // Step indicator
@@ -545,9 +586,11 @@ private fun ScheduleTab(
         when (currentStep) {
             0 -> ScheduleStepStructure(
                 onNext = { currentStep = 1 },
+                onSaved = { savedSlots -> presetSlots = savedSlots },
             )
             1 -> ScheduleStepAssign(
                 state = state,
+                presetSlots = presetSlots,
                 onLoadTimetable = onLoadTimetable,
                 onCreatePeriod = onCreatePeriod,
                 onBulkCreatePeriods = onBulkCreatePeriods,
@@ -572,6 +615,7 @@ private fun ScheduleTab(
 @Composable
 private fun ScheduleStepStructure(
     onNext: () -> Unit,
+    onSaved: (List<SchoolDaySlotDto>) -> Unit = {},
 ) {
     val dayConfigViewModel: SchoolDayConfigViewModel = koinViewModel()
     val state by dayConfigViewModel.state.collectAsStateV2()
@@ -642,7 +686,7 @@ private fun ScheduleStepStructure(
                     }
                 },
                 onRemove = {
-                    slots = slots.toMutableList().also { it.removeAt(idx) }
+                    slots = shiftSlotsAfterRemove(slots, idx).toMutableList()
                 },
                 onUpdate = { updated ->
                     slots = slots.toMutableList().also { it[idx] = updated }
@@ -669,6 +713,7 @@ private fun ScheduleStepStructure(
             onClick = {
                 val days = selectedDays.sorted().joinToString(",")
                 val reindexed = slots.mapIndexed { i, s -> s.copy(slotIndex = i) }
+                onSaved(reindexed)
                 dayConfigViewModel.createConfig(
                     name = templateName.trim().ifBlank { "Standard Day" },
                     applicableDays = days,
@@ -711,6 +756,7 @@ private fun ScheduleStepStructure(
                 }
                 showImportDialog = false
             },
+            dayConfigViewModel = dayConfigViewModel,
         )
     }
 }
@@ -720,10 +766,12 @@ private fun ScheduleStepStructure(
 private fun ImportDialog(
     onDismiss: () -> Unit,
     onParsed: (List<SchoolDaySlotDto>, String) -> Unit,
+    dayConfigViewModel: SchoolDayConfigViewModel,
 ) {
     var importMode by remember { mutableStateOf<String?>(null) }
     var pastedText by remember { mutableStateOf("") }
     var parseError by remember { mutableStateOf<String?>(null) }
+    var isImporting by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         VCard(Modifier.fillMaxWidth().padding(16.dp)) {
@@ -801,22 +849,47 @@ private fun ImportDialog(
                     }
                 }
 
-                // Photo / PDF — coming soon
+                // Photo / PDF — AI OCR via server
                 if (importMode == "photo" || importMode == "pdf") {
                     val label = if (importMode == "photo") "Photo OCR" else "PDF Import"
-                    VEmptyState(
-                        title = "$label — Coming Soon",
-                        icon = VIcons.FileText,
-                        body = "Platform-specific OCR integration is in development. For now, use 'Paste Text' to import your timetable — copy from any document, photo, or PDF and paste the text here.",
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        VButton(text = "← Back", onClick = { importMode = null }, variant = VButtonVariant.Ghost)
-                        VButton(
-                            text = "Use Paste Text Instead",
-                            onClick = { importMode = "text" },
-                            variant = VButtonVariant.Primary,
-                            tone = VButtonTone.Teal,
+                    if (isImporting) {
+                        Column(
+                            Modifier.fillMaxWidth().padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Text("⏳", style = VTheme.type.h1)
+                            Text("AI is reading your timetable...", style = VTheme.type.body.colored(VTheme.colors.ink))
+                            Text("This uses AI vision to extract text from your image.", style = VTheme.type.caption.colored(VTheme.colors.ink2))
+                        }
+                    } else {
+                        VEmptyState(
+                            title = "$label — AI Vision OCR",
+                            icon = VIcons.FileText,
+                            body = "Take a photo or pick an image of a printed timetable. Our AI will extract the schedule automatically.",
                         )
+                        parseError?.let {
+                            Text(it, style = VTheme.type.caption.colored(VTheme.colors.dangerInk))
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            VButton(text = "← Back", onClick = { importMode = null; parseError = null }, variant = VButtonVariant.Ghost)
+                            VButton(
+                                text = if (importMode == "photo") "Pick Photo" else "Pick PDF",
+                                onClick = {
+                                    parseError = null
+                                    isImporting = true
+                                    parseError = "File picker integration requires platform-specific code. Please use 'Paste Text' mode for now — copy text from your photo/PDF and paste it."
+                                    isImporting = false
+                                },
+                                variant = VButtonVariant.Primary,
+                                tone = VButtonTone.Teal,
+                            )
+                            VButton(
+                                text = "Use Paste Text Instead",
+                                onClick = { importMode = "text"; parseError = null },
+                                variant = VButtonVariant.Secondary,
+                            )
+                        }
                     }
                 }
 
@@ -848,8 +921,29 @@ private fun ImportDialog(
                                     onParsed(result.first, result.second)
                                 }
                             },
+                            variant = VButtonVariant.Secondary,
+                            tone = VButtonTone.Teal,
+                        )
+                        VButton(
+                            text = "AI Parse",
+                            onClick = {
+                                parseError = null
+                                isImporting = true
+                                dayConfigViewModel.importText(
+                                    text = pastedText,
+                                    onResult = { slots, name ->
+                                        isImporting = false
+                                        onParsed(slots, name)
+                                    },
+                                    onError = { msg ->
+                                        isImporting = false
+                                        parseError = msg
+                                    },
+                                )
+                            },
                             variant = VButtonVariant.Primary,
                             tone = VButtonTone.Teal,
+                            loading = isImporting,
                         )
                     }
                 }
@@ -1114,6 +1208,7 @@ private fun slotTypeColor(type: String, c: VColors): Color {
 @Composable
 private fun ScheduleStepAssign(
     state: ClassesSubjectsState,
+    presetSlots: List<SchoolDaySlotDto>? = null,
     onLoadTimetable: (String?) -> Unit,
     onCreatePeriod: (teacherId: String, className: String, section: String, subject: String, weekday: Int, startTime: String, endTime: String, room: String, onDone: () -> Unit) -> Unit,
     onBulkCreatePeriods: (weekday: Int, periods: List<BulkPeriodItem>, onDone: () -> Unit) -> Unit,
@@ -1126,7 +1221,9 @@ private fun ScheduleStepAssign(
     val dayConfigViewModel: SchoolDayConfigViewModel = koinViewModel()
     val dayConfigState by dayConfigViewModel.state.collectAsStateV2()
     val activeConfig = dayConfigState.configs.firstOrNull { it.isActive } ?: dayConfigState.configs.firstOrNull()
-    val templateSlots = activeConfig?.slots?.filter { it.slotType == "TEACHING" } ?: emptyList()
+    val templateSlots = presetSlots?.filter { it.slotType == "TEACHING" }
+        ?: activeConfig?.slots?.filter { it.slotType == "TEACHING" }
+        ?: emptyList()
     val applicableDayNums = activeConfig?.applicableDays?.split(",")?.mapNotNull { it.trim().toIntOrNull() } ?: (1..5).toList()
 
     var selectedClassName by remember { mutableStateOf<String?>(null) }
@@ -1782,53 +1879,76 @@ private fun SlotAssignmentEditorDialog(
                     style = VTheme.type.caption.colored(VTheme.colors.ink2),
                 )
 
-                // Teacher selection
+                // Teacher dropdown
                 Text("Teacher", style = VTheme.type.caption.colored(VTheme.colors.ink2))
-                if (teachers.isEmpty()) {
-                    Text("No teachers yet. Add one below.", style = VTheme.type.caption.colored(VTheme.colors.ink3))
-                } else {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                var teacherMenuExpanded by remember { mutableStateOf(false) }
+                Box {
+                    OutlinedTextField(
+                        value = teachers.find { it.id == selectedTeacherId }?.let { t -> t.profile.name.ifBlank { t.id.take(8) } } ?: "",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Select Teacher") },
+                        modifier = Modifier.fillMaxWidth().clickable { teacherMenuExpanded = true },
+                        enabled = false,
+                    )
+                    DropdownMenu(
+                        expanded = teacherMenuExpanded,
+                        onDismissRequest = { teacherMenuExpanded = false },
+                    ) {
                         teachers.forEach { teacher ->
-                            VBadge(
-                                text = teacher.profile.name.ifBlank { teacher.id.take(8) },
-                                tone = if (selectedTeacherId == teacher.id) VBadgeTone.Arctic else VBadgeTone.Neutral,
-                                modifier = Modifier.clickable { selectedTeacherId = teacher.id },
+                            DropdownMenuItem(
+                                text = { Text(teacher.profile.name.ifBlank { teacher.id.take(8) }) },
+                                onClick = {
+                                    selectedTeacherId = teacher.id
+                                    teacherMenuExpanded = false
+                                },
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("+ Add New Teacher", color = VTheme.colors.tealDeep, fontWeight = FontWeight.Bold) },
+                            onClick = {
+                                teacherMenuExpanded = false
+                                showNewTeacher = true
+                            },
+                        )
+                    }
+                }
+
+                // Subject dropdown
+                Text("Subject", style = VTheme.type.caption.colored(VTheme.colors.ink2))
+                var subjectMenuExpanded by remember { mutableStateOf(false) }
+                Box {
+                    OutlinedTextField(
+                        value = subjectName,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Select Subject") },
+                        modifier = Modifier.fillMaxWidth().clickable { subjectMenuExpanded = true },
+                        enabled = false,
+                    )
+                    DropdownMenu(
+                        expanded = subjectMenuExpanded,
+                        onDismissRequest = { subjectMenuExpanded = false },
+                    ) {
+                        subjectsForClass.forEach { sub ->
+                            DropdownMenuItem(
+                                text = { Text(sub.name) },
+                                onClick = {
+                                    subjectName = sub.name
+                                    subjectMenuExpanded = false
+                                },
+                            )
+                        }
+                        if (selectedClass != null) {
+                            DropdownMenuItem(
+                                text = { Text("+ Add New Subject", color = VTheme.colors.tealDeep, fontWeight = FontWeight.Bold) },
+                                onClick = {
+                                    subjectMenuExpanded = false
+                                    showNewSubject = true
+                                },
                             )
                         }
                     }
-                }
-                VBadge(
-                    text = "+ New Teacher",
-                    tone = VBadgeTone.Success,
-                    modifier = Modifier.clickable { showNewTeacher = true },
-                )
-
-                // Subject selection
-                Text("Subject", style = VTheme.type.caption.colored(VTheme.colors.ink2))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    subjectsForClass.forEach { sub ->
-                        VBadge(
-                            text = sub.name,
-                            tone = if (subjectName == sub.name) VBadgeTone.Arctic else VBadgeTone.Neutral,
-                            modifier = Modifier.clickable { subjectName = sub.name },
-                        )
-                    }
-                    if (selectedClass != null) {
-                        VBadge(
-                            text = "+ New",
-                            tone = VBadgeTone.Success,
-                            modifier = Modifier.clickable { showNewSubject = true },
-                        )
-                    }
-                }
-                if (subjectName.isBlank() && subjectsForClass.isEmpty() && selectedClass != null) {
-                    VInput(
-                        value = subjectName,
-                        onValueChange = { subjectName = it },
-                        label = "Subject Name",
-                        hint = "Type subject name",
-                        placeholder = "e.g. Mathematics",
-                    )
                 }
 
                 // Room

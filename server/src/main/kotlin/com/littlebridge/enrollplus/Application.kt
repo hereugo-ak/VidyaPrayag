@@ -119,6 +119,7 @@ import com.littlebridge.enrollplus.feature.school.schoolTimetableRouting
 import com.littlebridge.enrollplus.feature.school.periodExceptionRouting
 import com.littlebridge.enrollplus.feature.school.timetableChangeRequestRouting
 import com.littlebridge.enrollplus.feature.school.schoolDayConfigRouting
+import com.littlebridge.enrollplus.feature.school.timetableImportRouting
 import com.littlebridge.enrollplus.feature.school.nonTeachingStaffRouting
 import com.littlebridge.enrollplus.feature.school.schoolLessonPlanRouting
 import com.littlebridge.enrollplus.feature.school.schoolRouting
@@ -490,5 +491,6 @@ fun Application.module() {
         // School Day Configuration (TIMETABLE_CLASS_TEACHER_PLAN.md Phase 0)
         //   /api/v1/school/day-config          — admin, school-scoped CRUD
         schoolDayConfigRouting()
+        timetableImportRouting()
     }
 }

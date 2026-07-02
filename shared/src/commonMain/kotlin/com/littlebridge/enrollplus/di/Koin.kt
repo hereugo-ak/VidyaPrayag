@@ -491,6 +491,14 @@ val commonModule = module {
         com.littlebridge.enrollplus.feature.admin.data.repository.SchoolDayConfigRepositoryImpl(get())
     }
 
+    // Timetable AI Import (OCR + text parsing)
+    single {
+        com.littlebridge.enrollplus.feature.admin.data.remote.TimetableImportApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+
     // Classes & Subjects management (consolidated admin screen)
     single {
         com.littlebridge.enrollplus.feature.admin.data.remote.SchoolClassesApi(
@@ -653,7 +661,7 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.event.presentation.TeacherEventRegistrationViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.event.presentation.AdminEventRegistrationViewModel(get(), get()) }
     // School Day Configuration (TIMETABLE_CLASS_TEACHER_PLAN.md Phase 0)
-    factory { com.littlebridge.enrollplus.feature.admin.presentation.SchoolDayConfigViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.admin.presentation.SchoolDayConfigViewModel(get(), get(), get()) }
     // Classes & Subjects consolidated management screen
     factory { com.littlebridge.enrollplus.feature.admin.presentation.ClassesSubjectsViewModel(get(), get(), get()) }
 }
