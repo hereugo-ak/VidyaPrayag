@@ -895,3 +895,99 @@ export interface UpdateSchoolDayConfigRequest {
   slots: SchoolDaySlotDto[];
   is_active: boolean;
 }
+
+// ── School Classes & Subjects (SchoolClassesRouting.kt) ──────────────────────
+export interface SchoolClassDto {
+  id: string;
+  code: string;
+  name: string;
+  sections: string[];
+  subject_count: number;
+}
+export interface SchoolClassListResponse {
+  classes: SchoolClassDto[];
+}
+export interface CreateSchoolClassRequest {
+  code: string;
+  name: string;
+  sections: string[];
+}
+export interface UpdateSchoolClassRequest {
+  code: string;
+  name: string;
+  sections: string[];
+}
+export interface SchoolSubjectDto {
+  id: string;
+  class_id: string;
+  name: string;
+  code: string;
+}
+export interface SchoolSubjectListResponse {
+  subjects: SchoolSubjectDto[];
+}
+export interface CreateSchoolSubjectRequest {
+  name: string;
+  code: string;
+}
+export interface UpdateSchoolSubjectRequest {
+  name: string;
+  code: string;
+}
+
+// ── Timetable Periods (SchoolTimetableRouting.kt) ────────────────────────────
+export interface PeriodDetailDto {
+  id: string;
+  teacher_id: string;
+  assignment_id: string | null;
+  weekday: number;
+  start_time: string;
+  end_time: string;
+  class_name: string;
+  section: string;
+  subject: string;
+  room: string;
+  is_active: boolean;
+  valid_from?: string | null;
+  valid_to?: string | null;
+}
+export interface CreatePeriodRequest {
+  teacher_id: string;
+  class_name: string;
+  section: string;
+  subject: string;
+  weekday: number;
+  start_time: string;
+  end_time: string;
+  room?: string;
+  valid_from?: string | null;
+  valid_to?: string | null;
+}
+export interface UpdatePeriodRequest {
+  weekday?: number;
+  start_time?: string;
+  end_time?: string;
+  room?: string;
+  is_active?: boolean;
+  valid_from?: string | null;
+  valid_to?: string | null;
+}
+export interface BulkPeriodItem {
+  teacher_id: string;
+  class_name: string;
+  section: string;
+  subject: string;
+  start_time: string;
+  end_time: string;
+  room?: string;
+}
+export interface BulkCreatePeriodsRequest {
+  weekday: number;
+  periods: BulkPeriodItem[];
+}
+export interface BulkCreatePeriodsResponse {
+  created: PeriodDetailDto[];
+  errors: string[];
+  created_count: number;
+  error_count: number;
+}

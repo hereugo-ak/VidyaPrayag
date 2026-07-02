@@ -79,6 +79,19 @@ import type {
   SchoolDayConfigListResponse,
   CreateSchoolDayConfigRequest,
   UpdateSchoolDayConfigRequest,
+  SchoolClassDto,
+  SchoolClassListResponse,
+  CreateSchoolClassRequest,
+  UpdateSchoolClassRequest,
+  SchoolSubjectDto,
+  SchoolSubjectListResponse,
+  CreateSchoolSubjectRequest,
+  UpdateSchoolSubjectRequest,
+  PeriodDetailDto,
+  CreatePeriodRequest,
+  UpdatePeriodRequest,
+  BulkCreatePeriodsRequest,
+  BulkCreatePeriodsResponse,
 } from "./types";
 
 interface Opts {
@@ -425,4 +438,32 @@ export const adminApi = {
     authRequest<SchoolDayConfigDto>(`/api/v1/school/day-config/${id}`, { method: "PUT", body }),
   schoolDayConfigDeactivate: (id: string) =>
     authRequest<unknown>(`/api/v1/school/day-config/${id}`, { method: "DELETE" }),
+
+  // ── School Classes & Subjects (SchoolClassesRouting.kt) ─────────────────────
+  schoolClasses: () =>
+    authRequest<SchoolClassListResponse>("/api/v1/school/classes"),
+  createSchoolClass: (body: CreateSchoolClassRequest) =>
+    authRequest<SchoolClassDto>("/api/v1/school/classes", { method: "POST", body }),
+  updateSchoolClass: (id: string, body: UpdateSchoolClassRequest) =>
+    authRequest<SchoolClassDto>(`/api/v1/school/classes/${id}`, { method: "PUT", body }),
+  deleteSchoolClass: (id: string) =>
+    authRequest<unknown>(`/api/v1/school/classes/${id}`, { method: "DELETE" }),
+  schoolSubjects: (classId: string) =>
+    authRequest<SchoolSubjectListResponse>(`/api/v1/school/classes/${classId}/subjects`),
+  createSchoolSubject: (classId: string, body: CreateSchoolSubjectRequest) =>
+    authRequest<SchoolSubjectDto>(`/api/v1/school/classes/${classId}/subjects`, { method: "POST", body }),
+  updateSchoolSubject: (id: string, body: UpdateSchoolSubjectRequest) =>
+    authRequest<SchoolSubjectDto>(`/api/v1/school/subjects/${id}`, { method: "PUT", body }),
+  deleteSchoolSubject: (id: string) =>
+    authRequest<unknown>(`/api/v1/school/subjects/${id}`, { method: "DELETE" }),
+
+  // ── Timetable Periods (SchoolTimetableRouting.kt) ───────────────────────────
+  createPeriod: (body: CreatePeriodRequest) =>
+    authRequest<PeriodDetailDto>("/api/v1/school/timetable/periods", { method: "POST", body }),
+  bulkCreatePeriods: (body: BulkCreatePeriodsRequest) =>
+    authRequest<BulkCreatePeriodsResponse>("/api/v1/school/timetable/periods/bulk", { method: "POST", body }),
+  updatePeriod: (id: string, body: UpdatePeriodRequest) =>
+    authRequest<PeriodDetailDto>(`/api/v1/school/timetable/periods/${id}`, { method: "PUT", body }),
+  deletePeriod: (id: string) =>
+    authRequest<unknown>(`/api/v1/school/timetable/periods/${id}`, { method: "DELETE" }),
 };
