@@ -2,6 +2,9 @@ package com.littlebridge.enrollplus.feature.teacher.domain.repository
 
 import com.littlebridge.enrollplus.core.model.ApiResponse
 import com.littlebridge.enrollplus.core.network.NetworkResult
+import com.littlebridge.enrollplus.feature.admin.domain.model.ChangeRequestListResponse
+import com.littlebridge.enrollplus.feature.admin.domain.model.CreateChangeRequestRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.TimetableChangeRequestDto
 import com.littlebridge.enrollplus.feature.teacher.domain.model.*
 
 interface TeacherRepository {
@@ -103,4 +106,8 @@ interface TeacherRepository {
     suspend fun saveLessonTemplate(token: String, request: SaveLessonTemplateRequest): NetworkResult<LessonTemplateDto>
     suspend fun deleteLessonTemplate(token: String, templateId: String): NetworkResult<ApiResponse<Unit>>
     suspend fun instantiateLessonFromTemplate(token: String, templateId: String, request: InstantiateFromTemplateRequest): NetworkResult<LessonPlanSingleResponse>
+
+    // Timetable change requests (teacher → admin approval workflow)
+    suspend fun getTimetableChangeRequests(token: String): NetworkResult<ChangeRequestListResponse>
+    suspend fun submitTimetableChangeRequest(token: String, request: CreateChangeRequestRequest): NetworkResult<ApiResponse<TimetableChangeRequestDto>>
 }

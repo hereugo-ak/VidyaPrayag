@@ -602,6 +602,7 @@ val viewModelModule = module {
     // AuthRepository, theme pref) — (TeacherRepository, PreferenceRepository, AuthRepository).
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherProfileActionsViewModel(get(), get(), get()) }
     factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherLeaveViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.teacher.presentation.TeacherTimetableViewModel(get(), get()) }
     // PEWS (Predictive Early Warning System) view models
     factory { com.littlebridge.enrollplus.feature.pews.presentation.PewsCohortViewModel(get(), get()) }
     factory { com.littlebridge.enrollplus.feature.pews.presentation.PewsStudentDetailViewModel(get(), get()) }

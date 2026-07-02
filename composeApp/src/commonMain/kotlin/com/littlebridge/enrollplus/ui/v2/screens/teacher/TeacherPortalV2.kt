@@ -209,6 +209,7 @@ fun TeacherPortalV2(
         VNavItem("home", "Home", VIcons.Home),
         VNavItem("update", "Update", VIcons.Edit3, badge = obligations.totalOutstanding),
         VNavItem("classes", "Classes", VIcons.Users),
+        VNavItem("timetable", "Timetable", VIcons.Calendar),
         VNavItem("profile", "Profile", VIcons.User),
     )
 
@@ -219,6 +220,7 @@ fun TeacherPortalV2(
     val subline = when (tab) {
         "update" -> "Mark & publish"
         "classes" -> "Your classes & students"
+        "timetable" -> "Your weekly timetable"
         "profile" -> schoolName.ifBlank { "Your account" }
         else -> schoolName
     }
@@ -289,6 +291,8 @@ fun TeacherPortalV2(
                 }
 
                 "classes" -> TeacherClassesScreenV2()
+
+                "timetable" -> TeacherTimetableScreenV2()
 
                 "profile" -> TeacherProfileScreenV2(onLogout = onLogout)
             }
