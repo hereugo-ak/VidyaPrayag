@@ -21,11 +21,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -86,6 +88,19 @@ fun TeacherHomeScreenV2(
     val today by todayViewModel.state.collectAsStateV2()
     val checkIn by checkInViewModel.state.collectAsStateV2()
     val obligations by obligationsViewModel.state.collectAsStateV2()
+
+    // Refresh obligations + today's schedule on appear + periodically (every 60s)
+    // so the attendance card and reminders stay in sync after marking attendance
+    // or returning from another tab.
+    LaunchedEffect(Unit) {
+        obligationsViewModel.load()
+        todayViewModel.load()
+        while (true) {
+            delay(60_000L)
+            obligationsViewModel.load()
+            todayViewModel.load()
+        }
+    }
 
     // First-login-of-day popup gate: show once per day, tracked in saveable state. It pops only when
     // the status has resolved as "not checked in" and the teacher hasn't dismissed it this session.

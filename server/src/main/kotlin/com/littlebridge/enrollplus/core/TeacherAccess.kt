@@ -232,7 +232,7 @@ suspend fun ApplicationCall.requireOwnedAssignment(
  * than silently widening to a name match.
  */
 suspend fun enrollmentsFor(assignment: OwnedAssignment): List<EnrolledStudent> {
-    val classId = assignment.classId ?: return emptyList()
+    val resolvedClassId = assignment.classId ?: resolveClassIdByNameInTxn(assignment) ?: return fallbackRosterByClassNamingInTxn(assignment)
     return dbQuery {
         // Two-step lookup (the established single-table pattern in this codebase —
         // there are no Exposed table-joins elsewhere, and EnrollmentsTable.studentId
@@ -240,11 +240,11 @@ suspend fun enrollmentsFor(assignment: OwnedAssignment): List<EnrolledStudent> {
         // available). 1) active enrollments for class+section; 2) batch-load the
         // students for identity, then stitch in memory.
         val enrollments = EnrollmentsTable.selectAll().where {
-            (EnrollmentsTable.classId eq classId) and
+            (EnrollmentsTable.classId eq resolvedClassId) and
                 (EnrollmentsTable.section eq assignment.section) and
                 (EnrollmentsTable.status eq "active")
         }.toList()
-        if (enrollments.isEmpty()) return@dbQuery emptyList<EnrolledStudent>()
+        if (enrollments.isEmpty()) return@dbQuery fallbackRosterByClassNamingInTxn(assignment)
 
         val studentIds = enrollments.map { it[EnrollmentsTable.studentId] }.distinct()
         val studentsById = StudentsTable.selectAll().where {
@@ -266,6 +266,37 @@ suspend fun enrollmentsFor(assignment: OwnedAssignment): List<EnrolledStudent> {
             )
         }.sortedWith(compareBy({ it.rollNumber ?: Int.MAX_VALUE }, { it.fullName }))
     }
+}
+
+/** Look up classId from SchoolClassesTable by school + class name (case-insensitive). */
+private suspend fun resolveClassIdByNameInTxn(a: OwnedAssignment): java.util.UUID? = dbQuery {
+    com.littlebridge.enrollplus.db.SchoolClassesTable.selectAll().where {
+        com.littlebridge.enrollplus.db.SchoolClassesTable.schoolId eq a.schoolId
+    }.firstOrNull {
+        ClassNaming.sameClassSection(
+            it[com.littlebridge.enrollplus.db.SchoolClassesTable.name], "", a.className, a.section
+        )
+    }?.get(com.littlebridge.enrollplus.db.SchoolClassesTable.id)?.value
+}
+
+/** Fallback: match students by ClassNaming on className + section (no enrollments needed). */
+private suspend fun fallbackRosterByClassNamingInTxn(a: OwnedAssignment): List<EnrolledStudent> = dbQuery {
+    StudentsTable.selectAll().where {
+        (StudentsTable.schoolId eq a.schoolId) and (StudentsTable.isActive eq true)
+    }.filter {
+        ClassNaming.sameClassSection(
+            it[StudentsTable.className], it[StudentsTable.section], a.className, a.section
+        )
+    }.map { s ->
+        EnrolledStudent(
+            studentId = s[StudentsTable.id].value,
+            studentCode = s[StudentsTable.studentCode],
+            fullName = s[StudentsTable.fullName],
+            rollNumber = s[StudentsTable.rollNumber]?.toIntOrNull(),
+            section = a.section,
+            enrollmentId = s[StudentsTable.id].value,
+        )
+    }.sortedWith(compareBy({ it.rollNumber ?: Int.MAX_VALUE }, { it.fullName }))
 }
 
 private fun org.jetbrains.exposed.sql.ResultRow.toOwnedAssignment() = OwnedAssignment(
