@@ -27,7 +27,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +51,7 @@ import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
 import com.littlebridge.enrollplus.ui.v2.theme.colored
 import com.littlebridge.enrollplus.util.todayIso
+import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -426,7 +426,7 @@ private fun AttendanceClassRow(p: ResolvedPeriodUi, onOpen: (assignmentId: Strin
 private fun ScheduleCard(today: TeacherTodayState, onOpenLessonPlan: (assignmentId: String, scope: String) -> Unit = { _, _ -> }) {
     val c = VTheme.colors
     val day = today.day
-    val periods = day?.periods.orEmpty().filter { !it.isCancelled }
+    val periods = day?.periods.orEmpty()
     val hasPeriods = periods.isNotEmpty()
     var face by remember { mutableStateOf(0) }
     val maxFace = if (hasPeriods) 1 else 0

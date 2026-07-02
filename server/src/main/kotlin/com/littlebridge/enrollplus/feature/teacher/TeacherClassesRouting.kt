@@ -485,9 +485,8 @@ private fun resolveClassIdByName(a: OwnedAssignment): java.util.UUID? {
     return SchoolClassesTable.selectAll().where {
         (SchoolClassesTable.schoolId eq a.schoolId)
     }.firstOrNull {
-        com.littlebridge.enrollplus.core.ClassNaming.sameClassSection(
-            it[SchoolClassesTable.name], "", a.className, a.section
-        )
+        com.littlebridge.enrollplus.core.ClassNaming.classKey(it[SchoolClassesTable.name]) ==
+            com.littlebridge.enrollplus.core.ClassNaming.classKey(a.className)
     }?.get(SchoolClassesTable.id)?.value
 }
 

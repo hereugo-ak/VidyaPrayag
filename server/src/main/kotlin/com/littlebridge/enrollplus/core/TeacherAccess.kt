@@ -227,9 +227,8 @@ suspend fun ApplicationCall.requireOwnedAssignment(
  *
  * Scope: enrollments.class_id == assignment.classId AND enrollments.section ==
  * assignment.section AND status == 'active', joined to students for identity.
- * If the assignment has no resolved class_id yet (unmigrated row), returns an
- * empty list — callers surface the "class not configured" empty state rather
- * than silently widening to a name match.
+ * When classId is null (unmigrated TSA row), resolves it from SchoolClassesTable
+ * by class name, then falls back to StudentsTable + ClassNaming if no enrollments.
  */
 suspend fun enrollmentsFor(assignment: OwnedAssignment): List<EnrolledStudent> {
     val resolvedClassId = assignment.classId ?: resolveClassIdByNameInTxn(assignment) ?: return fallbackRosterByClassNamingInTxn(assignment)
@@ -273,9 +272,8 @@ private suspend fun resolveClassIdByNameInTxn(a: OwnedAssignment): java.util.UUI
     com.littlebridge.enrollplus.db.SchoolClassesTable.selectAll().where {
         com.littlebridge.enrollplus.db.SchoolClassesTable.schoolId eq a.schoolId
     }.firstOrNull {
-        ClassNaming.sameClassSection(
-            it[com.littlebridge.enrollplus.db.SchoolClassesTable.name], "", a.className, a.section
-        )
+        ClassNaming.classKey(it[com.littlebridge.enrollplus.db.SchoolClassesTable.name]) ==
+            ClassNaming.classKey(a.className)
     }?.get(com.littlebridge.enrollplus.db.SchoolClassesTable.id)?.value
 }
 
