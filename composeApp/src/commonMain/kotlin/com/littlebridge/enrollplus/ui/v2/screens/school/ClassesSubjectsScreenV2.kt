@@ -24,6 +24,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -1725,7 +1728,7 @@ private fun ManualPeriodRow(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun ManualPeriodEditorDialog(
     state: ClassesSubjectsState,
@@ -1775,15 +1778,19 @@ private fun ManualPeriodEditorDialog(
                 // Teacher dropdown
                 Text("Teacher", style = VTheme.type.caption.colored(VTheme.colors.ink2))
                 var teacherMenuExpanded by remember { mutableStateOf(false) }
-                Box {
+                ExposedDropdownMenuBox(
+                    expanded = teacherMenuExpanded,
+                    onExpandedChange = { teacherMenuExpanded = it },
+                ) {
                     OutlinedTextField(
                         value = teachers.find { it.id == selectedTeacherId }?.let { t -> t.profile.name.ifBlank { t.id.take(8) } } ?: "",
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Select Teacher") },
-                        modifier = Modifier.fillMaxWidth().clickable { teacherMenuExpanded = true },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = teacherMenuExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
                     )
-                    DropdownMenu(
+                    ExposedDropdownMenu(
                         expanded = teacherMenuExpanded,
                         onDismissRequest = { teacherMenuExpanded = false },
                     ) {
@@ -1816,15 +1823,19 @@ private fun ManualPeriodEditorDialog(
                 // Subject dropdown
                 Text("Subject", style = VTheme.type.caption.colored(VTheme.colors.ink2))
                 var subjectMenuExpanded by remember { mutableStateOf(false) }
-                Box {
+                ExposedDropdownMenuBox(
+                    expanded = subjectMenuExpanded,
+                    onExpandedChange = { subjectMenuExpanded = it },
+                ) {
                     OutlinedTextField(
                         value = subjectName,
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Select Subject") },
-                        modifier = Modifier.fillMaxWidth().clickable { subjectMenuExpanded = true },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = subjectMenuExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
                     )
-                    DropdownMenu(
+                    ExposedDropdownMenu(
                         expanded = subjectMenuExpanded,
                         onDismissRequest = { subjectMenuExpanded = false },
                     ) {
@@ -1914,7 +1925,7 @@ private fun ManualPeriodEditorDialog(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun SlotAssignmentEditorDialog(
     state: ClassesSubjectsState,
@@ -1957,15 +1968,19 @@ private fun SlotAssignmentEditorDialog(
                 // Teacher dropdown
                 Text("Teacher", style = VTheme.type.caption.colored(VTheme.colors.ink2))
                 var teacherMenuExpanded by remember { mutableStateOf(false) }
-                Box {
+                ExposedDropdownMenuBox(
+                    expanded = teacherMenuExpanded,
+                    onExpandedChange = { teacherMenuExpanded = it },
+                ) {
                     OutlinedTextField(
                         value = teachers.find { it.id == selectedTeacherId }?.let { t -> t.profile.name.ifBlank { t.id.take(8) } } ?: "",
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Select Teacher") },
-                        modifier = Modifier.fillMaxWidth().clickable { teacherMenuExpanded = true },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = teacherMenuExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
                     )
-                    DropdownMenu(
+                    ExposedDropdownMenu(
                         expanded = teacherMenuExpanded,
                         onDismissRequest = { teacherMenuExpanded = false },
                     ) {
@@ -1998,15 +2013,19 @@ private fun SlotAssignmentEditorDialog(
                 // Subject dropdown
                 Text("Subject", style = VTheme.type.caption.colored(VTheme.colors.ink2))
                 var subjectMenuExpanded by remember { mutableStateOf(false) }
-                Box {
+                ExposedDropdownMenuBox(
+                    expanded = subjectMenuExpanded,
+                    onExpandedChange = { subjectMenuExpanded = it },
+                ) {
                     OutlinedTextField(
                         value = subjectName,
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Select Subject") },
-                        modifier = Modifier.fillMaxWidth().clickable { subjectMenuExpanded = true },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = subjectMenuExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
                     )
-                    DropdownMenu(
+                    ExposedDropdownMenu(
                         expanded = subjectMenuExpanded,
                         onDismissRequest = { subjectMenuExpanded = false },
                     ) {
