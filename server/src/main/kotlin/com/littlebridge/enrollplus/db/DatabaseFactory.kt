@@ -278,6 +278,23 @@ object DatabaseFactory {
         // AUTO_CREATE_TABLES is OFF in prod).
         IdCardTemplatesTable,
         IdCardsTable,                    // FK to templates
+        // Library Management (LIBRARY_MANAGEMENT_SPEC.md)
+        // Applied by docs/db/migration_104_library.sql (must run before deploy;
+        // AUTO_CREATE_TABLES is OFF in prod). Order matters for FKs: books → copies → issues,
+        // books → reservations, books → wishlist, books → discussions.
+        LibraryBooksTable,
+        LibraryBookCopiesTable,          // FK to books
+        LibraryIssuesTable,              // FK to books + copies
+        LibraryReservationsTable,        // FK to books
+        LibraryCategoriesTable,
+        LibrarySettingsTable,
+        LibraryAuditLogTable,
+        LibraryAnnouncementsTable,
+        LibraryWishlistTable,            // FK to books
+        LibraryReadingGoalsTable,
+        LibraryAcquisitionRequestsTable,
+        LibraryReadingBadgesTable,
+        LibraryBookDiscussionsTable,     // FK to books
         // Scheduled Messages (MESSAGE_SCHEDULING_PLAN.md §4)
         // Applied by docs/db/migration-104-scheduled-messages.sql (must run before
         // deploy; AUTO_CREATE_TABLES is OFF in prod).
@@ -292,6 +309,13 @@ object DatabaseFactory {
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */
     var isPostgres: Boolean = false
         private set
+
+    // ── Read replica support (spec §17 Connection Pool) ─────────────────────
+    // When READ_REPLICA_URL is configured, read-heavy queries (search, analytics,
+    // audit log, export) route to the replica via readQuery { }.
+    private var readReplicaDb: Database? = null
+
+    val hasReadReplica: Boolean get() = readReplicaDb != null
 
     fun init() {
         val dotenv = dotenv {
@@ -319,6 +343,19 @@ object DatabaseFactory {
         }
 
         Database.connect(dataSource)
+
+        // ── Read replica (optional, spec §17) ───────────────────────────────
+        val replicaUrl = resolve(dotenv, "READ_REPLICA_URL")
+        if (replicaUrl != null && isPostgres) {
+            val replicaDs = createPostgresDataSource(
+                replicaUrl,
+                user = resolve(dotenv, "READ_REPLICA_USER") ?: resolve(dotenv, "DATABASE_USER"),
+                password = resolve(dotenv, "READ_REPLICA_PASSWORD") ?: resolve(dotenv, "DATABASE_PASSWORD"),
+                poolSize = resolve(dotenv, "READ_REPLICA_POOL_SIZE")?.toIntOrNull() ?: 3
+            )
+            readReplicaDb = Database.connect(replicaDs)
+            println("DB_INIT: Read replica configured — read-heavy queries will route to replica.")
+        }
 
         val autoCreateRaw = resolve(dotenv, "AUTO_CREATE_TABLES")
         val autoCreate = autoCreateRaw.equals("true", ignoreCase = true)
@@ -516,4 +553,14 @@ object DatabaseFactory {
 
     suspend fun <T> dbQuery(block: suspend () -> T): T =
         newSuspendedTransaction(Dispatchers.IO) { block() }
+
+    /**
+     * Read-replica routing (spec §17): search and analytics queries route to
+     * the read replica if configured (READ_REPLICA_URL). Falls back to the
+     * primary connection when no replica is available.
+     */
+    suspend fun <T> readQuery(block: suspend () -> T): T =
+        newSuspendedTransaction(Dispatchers.IO, db = readReplicaDb) {
+            block()
+        }
 }

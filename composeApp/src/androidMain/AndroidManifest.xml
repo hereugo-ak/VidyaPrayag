@@ -27,11 +27,24 @@
             android:exported="true"
             android:name=".MainActivity"
             android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|screenLayout"
             android:theme="@style/Theme.VidyaPrayag.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Deep links: vidyaprayag://app/<path> — used by notification taps
+                 and future external linking. The scheme matches
+                 NotificationManagerHelper.DEEP_LINK_SCHEME. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="vidyaprayag" android:host="app" />
             </intent-filter>
         </activity>
 

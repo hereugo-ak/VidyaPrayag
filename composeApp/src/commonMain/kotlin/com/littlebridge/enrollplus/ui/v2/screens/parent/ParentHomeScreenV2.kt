@@ -97,6 +97,7 @@ fun ParentHomeScreenV2(
     onOpenTutorProgress: () -> Unit = {},
     onOpenScholarships: () -> Unit = {},
     onOpenIdCard: () -> Unit = {},
+    onOpenLibrary: () -> Unit = {},
     onOpenEvents: () -> Unit = {},
     viewModel: ParentDashboardViewModel = koinViewModel(),
     permissionVm: PermissionViewModel = koinViewModel(),
@@ -148,6 +149,7 @@ fun ParentHomeScreenV2(
         onOpenTutorProgress = onOpenTutorProgress,
         onOpenScholarships = onOpenScholarships,
         onOpenIdCard = onOpenIdCard,
+        onOpenLibrary = onOpenLibrary,
         onOpenEvents = onOpenEvents,
         nudge = nudgeState.nudge?.takeIf { nudgeState.visible },
         onNudgeAction = { action ->
@@ -195,6 +197,7 @@ private fun ParentDashboardContent(
     onOpenTutorProgress: () -> Unit = {},
     onOpenScholarships: () -> Unit = {},
     onOpenIdCard: () -> Unit = {},
+    onOpenLibrary: () -> Unit = {},
     onOpenEvents: () -> Unit = {},
     nudge: com.littlebridge.enrollplus.feature.pews.domain.model.PewsParentNudgeDto? = null,
     onNudgeAction: (com.littlebridge.enrollplus.feature.pews.domain.model.PewsParentActionDto) -> Unit = {},
@@ -373,6 +376,15 @@ private fun ParentDashboardContent(
                         subtitle = "View your child's digital school ID card",
                         icon = VIcons.IdCard,
                         onClick = onOpenIdCard,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    // ── Library ───────────────────────────────────────────────────────
+                    VActionCard(
+                        title = "Library",
+                        subtitle = "Search books, view issued books & reserve",
+                        icon = VIcons.BookOpen,
+                        onClick = onOpenLibrary,
                         modifier = Modifier.fillMaxWidth(),
                     )
 

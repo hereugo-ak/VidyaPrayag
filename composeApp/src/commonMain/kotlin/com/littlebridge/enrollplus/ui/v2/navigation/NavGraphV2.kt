@@ -77,6 +77,7 @@ fun NavGraphV2(
     val themeMode by preferenceRepository.getThemeMode().collectAsState(initial = "system")
     val customThemeId by preferenceRepository.getCustomThemeId().collectAsState(initial = null)
     val schoolBranding by brandingThemeManager.branding.collectAsState()
+    val fontScale by preferenceRepository.getFontScale().collectAsState(initial = 1f)
 
     val baseDef = resolveThemeDef(themeMode, customThemeId, entryRole, isAuthenticated)
     val resolvedDef = remember(baseDef, schoolBranding) {
@@ -105,7 +106,7 @@ fun NavGraphV2(
         transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(200)) },
         label = "theme-switch",
     ) { def ->
-        VTheme(themeDef = def) {
+        VTheme(themeDef = def, fontScale = fontScale) {
             // Phase 7: adapt system bars (status bar / nav bar) to match the
             // active theme — light icons on dark themes, dark icons on light.
             VStatusBarAdapter(def.colors.isNight)
@@ -146,6 +147,7 @@ private fun resolveThemeDef(
     return when (mode) {
         "light" -> VThemeRegistry.resolve("light")
         "dark" -> VThemeRegistry.resolve("dark")
+        "high_contrast" -> VThemeRegistry.resolve("high_contrast")
         "custom" -> VThemeRegistry.resolveInclusive(customId ?: "warm")
         else -> {
             // "system" — follow OS, but use role-based default on first launch
@@ -239,6 +241,16 @@ fun parseDeepLink(path: String, currentRole: EntryRole): DeepLinkTarget {
                     DeepLinkTarget.SchoolScreen(currentRole, "tutor")
                 else ->
                     DeepLinkTarget.ParentTab(EntryRole.Parent, "academics", "tutor")
+            }
+        }
+        "library" -> {
+            when (currentRole) {
+                EntryRole.SchoolAdmin, EntryRole.SuperAdmin ->
+                    DeepLinkTarget.SchoolScreen(currentRole, "library")
+                EntryRole.Teacher ->
+                    DeepLinkTarget.TeacherScreen(currentRole, "library")
+                else ->
+                    DeepLinkTarget.ParentTab(EntryRole.Parent, "home", "library")
             }
         }
         "events" -> {

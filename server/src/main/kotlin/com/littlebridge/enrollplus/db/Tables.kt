@@ -1866,6 +1866,12 @@ object NotificationPreferencesTable : UUIDTable("notification_preferences", "id"
     val userId     = uuid("user_id")
     val category   = varchar("category", 32)               // attendance|marks|announcement|leave|fees|...
     val enabled    = bool("enabled").default(true)
+    // Per-channel opt-out (spec §15 Notification Preferences).
+    // When null, falls back to the channel matrix default for the category.
+    val pushEnabled  = bool("push_enabled").nullable()
+    val inAppEnabled = bool("in_app_enabled").nullable()
+    val emailEnabled = bool("email_enabled").nullable()
+    val smsEnabled   = bool("sms_enabled").nullable()
     val sound      = varchar("sound", 64).nullable()       // sound resource name or null for default
     val createdAt  = timestamp("created_at")
     val updatedAt  = timestamp("updated_at")
@@ -3038,6 +3044,264 @@ object IdCardsTable : UUIDTable("id_cards", "id") {
 }
 
 // =====================================================================
+// Library Management (LIBRARY_MANAGEMENT_SPEC.md)
+// 13 tables for school library: books, copies, issues, reservations,
+// categories, settings, audit log, announcements, wishlist, reading goals,
+// acquisition requests, reading badges, book discussions.
+// Applied by docs/db/migration_104_library.sql (must run before deploy;
+// AUTO_CREATE_TABLES is OFF in prod).
+// ==============================================================
+object LibraryBooksTable : UUIDTable("library_books", "id") {
+    val schoolId        = uuid("school_id")
+    val isbn            = varchar("isbn", 20).nullable()
+    val title           = text("title")
+    val author          = text("author").nullable()
+    val publisher       = text("publisher").nullable()
+    val category        = varchar("category", 48).nullable()
+    val tags            = text("tags").nullable()           // JSON array string: ["tag1","tag2"]
+    val totalCopies     = integer("total_copies").default(1)
+    val availableCopies = integer("available_copies").default(1)
+    val shelfLocation   = varchar("shelf_location", 32).nullable()
+    val coverUrl        = text("cover_url").nullable()
+    val replacementCost = double("replacement_cost").nullable()
+    val seriesName      = varchar("series_name", 128).nullable()
+    val seriesNumber    = integer("series_number").nullable()
+    val language        = varchar("language", 8).default("en")
+    val isArchived      = bool("is_archived").default(false)
+    val synopsis        = text("synopsis").nullable()
+    val pageCount       = integer("page_count").nullable()
+    val deletedAt       = timestamp("deleted_at").nullable()
+    val createdAt       = timestamp("created_at")
+    val updatedAt       = timestamp("updated_at")
+
+    init {
+        index("idx_library_books_school", false, schoolId, deletedAt)
+        index("idx_library_books_category", false, schoolId, category)
+        index("idx_library_books_isbn", false, schoolId, isbn)
+    }
+}
+
+object LibraryBookCopiesTable : UUIDTable("library_book_copies", "id") {
+    val schoolId   = uuid("school_id")
+    val bookId     = uuid("book_id")
+    val copyNumber = integer("copy_number")
+    val barcode    = varchar("barcode", 64).nullable()
+    val condition  = varchar("condition", 16).default("new")      // new | good | fair | poor | damaged
+    val status     = varchar("status", 16).default("available")   // available | issued | lost | repair
+    val createdAt  = timestamp("created_at")
+    val updatedAt  = timestamp("updated_at")
+
+    init {
+        uniqueIndex("ux_library_copies_book_copynum", bookId, copyNumber)
+        index("idx_library_copies_book", false, bookId, status)
+        index("idx_library_copies_barcode", false, schoolId, barcode)
+    }
+}
+
+object LibraryIssuesTable : UUIDTable("library_issues", "id") {
+    val schoolId        = uuid("school_id")
+    val bookId          = uuid("book_id")
+    val copyId          = uuid("copy_id").nullable()
+    val borrowerId      = uuid("borrower_id")
+    val borrowerType    = varchar("borrower_type", 16)            // student | teacher
+    val borrowerName    = text("borrower_name")
+    val issueDate       = date("issue_date")
+    val dueDate         = date("due_date")
+    val returnDate      = date("return_date").nullable()
+    val returnCondition = varchar("return_condition", 16).nullable() // good | fair | damaged
+    val damageNotes     = text("damage_notes").nullable()
+    val renewalCount    = integer("renewal_count").default(0)
+    val fineAmount      = double("fine_amount").default(0.0)
+    val fineStatus      = varchar("fine_status", 16).default("none") // none | pending | paid | waived
+    val finePaidAt      = timestamp("fine_paid_at").nullable()
+    val fineWaivedBy    = uuid("fine_waived_by").nullable()
+    val fineWaivedReason = text("fine_waived_reason").nullable()
+    val status          = varchar("status", 16).default("issued")   // issued | returned | lost
+    val createdAt       = timestamp("created_at")
+    val updatedAt       = timestamp("updated_at")
+
+    init {
+        index("idx_library_issues_borrower", false, borrowerId, status)
+        index("idx_library_issues_book", false, bookId, status)
+        index("idx_library_issues_school_status", false, schoolId, status)
+        index("idx_library_issues_overdue", false, schoolId, dueDate)
+        index("idx_library_issues_due_date", false, dueDate)
+    }
+}
+
+object LibraryReservationsTable : UUIDTable("library_reservations", "id") {
+    val schoolId       = uuid("school_id")
+    val bookId         = uuid("book_id")
+    val reservedBy     = uuid("reserved_by")
+    val reservedByName = text("reserved_by_name")
+    val reservedByType = varchar("reserved_by_type", 16).default("student") // student | teacher | parent
+    val status         = varchar("status", 16).default("pending") // pending | notified | fulfilled | cancelled
+    val createdAt      = timestamp("created_at")
+    val fulfilledAt    = timestamp("fulfilled_at").nullable()
+
+    init {
+        index("idx_library_reservations_book", false, bookId, status)
+        index("idx_library_reservations_user", false, reservedBy, status)
+    }
+}
+
+object LibraryCategoriesTable : UUIDTable("library_categories", "id") {
+    val schoolId     = uuid("school_id")
+    val name         = varchar("name", 48)
+    val color        = varchar("color", 7).default("#6366f1")
+    val icon         = varchar("icon", 32).default("book")
+    val displayOrder = integer("display_order").default(0)
+    val createdAt    = timestamp("created_at")
+
+    init {
+        uniqueIndex("ux_library_categories_school_name", schoolId, name)
+        index("idx_library_categories_school", false, schoolId, displayOrder)
+    }
+}
+
+object LibrarySettingsTable : UUIDTable("library_settings", "id") {
+    val schoolId               = uuid("school_id")
+    val defaultLoanDays        = integer("default_loan_days").default(14)
+    val finePerDay             = double("fine_per_day").default(1.0)
+    val maxBooksPerStudent     = integer("max_books_per_student").default(3)
+    val maxRenewals            = integer("max_renewals").default(2)
+    val reservationTimeoutDays = integer("reservation_timeout_days").default(7)
+    val dueReminderDays        = integer("due_reminder_days").default(2)
+    val fineCapEnabled         = bool("fine_cap_enabled").default(true)
+    val quickIssueEnabled      = bool("quick_issue_enabled").default(true)
+    val bulkReturnEnabled      = bool("bulk_return_enabled").default(true)
+    val featuredBookId         = uuid("featured_book_id").nullable()
+    val featuredType           = varchar("featured_type", 16).nullable()  // WEEK | MONTH
+    val featuredUpdatedAt      = timestamp("featured_updated_at").nullable()
+    val leaderboardEnabled     = bool("leaderboard_enabled").default(false)
+    val createdAt              = timestamp("created_at")
+    val updatedAt              = timestamp("updated_at")
+
+    init {
+        uniqueIndex("ux_library_settings_school", schoolId)
+    }
+}
+
+object LibraryAuditLogTable : UUIDTable("library_audit_log", "id") {
+    val schoolId      = uuid("school_id")
+    val actorId       = uuid("actor_id").nullable()
+    val actorName     = text("actor_name")
+    val action        = varchar("action", 64)
+    val entityType    = varchar("entity_type", 32)
+    val entityId      = uuid("entity_id").nullable()
+    val metadata      = text("metadata").nullable()        // JSONB as text
+    val previousState = text("previous_state").nullable()  // JSONB as text
+    val newState      = text("new_state").nullable()       // JSONB as text
+    val hash          = varchar("hash", 64)
+    val createdAt     = timestamp("created_at")
+
+    init {
+        index("idx_library_audit_school", false, schoolId, createdAt)
+        index("idx_library_audit_entity", false, entityType, entityId)
+        index("idx_library_audit_actor", false, actorId, createdAt)
+    }
+}
+
+object LibraryAnnouncementsTable : UUIDTable("library_announcements", "id") {
+    val schoolId       = uuid("school_id")
+    val title          = text("title")
+    val message        = text("message")
+    val audience       = varchar("audience", 16).default("all")  // all | students | parents
+    val createdBy      = uuid("created_by").nullable()
+    val createdByName  = text("created_by_name")
+    val expiresAt      = timestamp("expires_at").nullable()
+    val isActive       = bool("is_active").default(true)
+    val createdAt      = timestamp("created_at")
+    val updatedAt      = timestamp("updated_at")
+
+    init {
+        index("idx_library_announcements_school", false, schoolId, isActive, expiresAt)
+    }
+}
+
+object LibraryWishlistTable : UUIDTable("library_wishlist", "id") {
+    val schoolId  = uuid("school_id")
+    val studentId = uuid("student_id")
+    val bookId    = uuid("book_id")
+    val createdAt = timestamp("created_at")
+
+    init {
+        uniqueIndex("ux_library_wishlist_student_book", schoolId, studentId, bookId)
+        index("idx_library_wishlist_student", false, studentId)
+        index("idx_library_wishlist_school", false, schoolId)
+    }
+}
+
+object LibraryReadingGoalsTable : UUIDTable("library_reading_goals", "id") {
+    val schoolId  = uuid("school_id")
+    val studentId = uuid("student_id")
+    val goalCount = integer("goal_count")
+    val period    = varchar("period", 16)    // monthly | quarterly | yearly
+    val targetYear = integer("target_year")
+    val createdAt = timestamp("created_at")
+    val updatedAt = timestamp("updated_at")
+
+    init {
+        uniqueIndex("ux_library_goals_student_period", schoolId, studentId, period, targetYear)
+        index("idx_library_reading_goals_student", false, studentId, targetYear)
+    }
+}
+
+object LibraryAcquisitionRequestsTable : UUIDTable("library_acquisition_requests", "id") {
+    val schoolId         = uuid("school_id")
+    val requestedBy      = uuid("requested_by")
+    val requestedByName  = text("requested_by_name")
+    val requestedByType  = varchar("requested_by_type", 16)   // student | teacher | parent | librarian
+    val title            = text("title")
+    val author           = text("author").nullable()
+    val isbn             = varchar("isbn", 20).nullable()
+    val publisher        = text("publisher").nullable()
+    val reason           = text("reason").nullable()
+    val estimatedCost    = double("estimated_cost").nullable()
+    val status           = varchar("status", 16).default("pending") // pending|approved|rejected|ordered|received
+    val approvedBy       = uuid("approved_by").nullable()
+    val approvedAt       = timestamp("approved_at").nullable()
+    val orderLink        = text("order_link").nullable()
+    val orderedAt        = timestamp("ordered_at").nullable()
+    val receivedAt       = timestamp("received_at").nullable()
+    val convertedBookId  = uuid("converted_book_id").nullable()
+    val createdAt        = timestamp("created_at")
+    val updatedAt        = timestamp("updated_at")
+
+    init {
+        index("idx_library_acquisition_school", false, schoolId, status)
+        index("idx_library_acquisition_requester", false, requestedBy)
+    }
+}
+
+object LibraryReadingBadgesTable : UUIDTable("library_reading_badges", "id") {
+    val schoolId  = uuid("school_id")
+    val studentId = uuid("student_id")
+    val badgeType = varchar("badge_type", 32)   // first_book|5_books|10_books|25_books|50_books|100_books|speed_reader|genre_explorer|streak_7|streak_30
+    val earnedAt  = timestamp("earned_at").default(java.time.Instant.now())
+
+    init {
+        uniqueIndex("ux_library_badges_student_type", schoolId, studentId, badgeType)
+        index("idx_library_badges_student", false, studentId)
+    }
+}
+
+object LibraryBookDiscussionsTable : UUIDTable("library_book_discussions", "id") {
+    val schoolId    = uuid("school_id")
+    val bookId      = uuid("book_id")
+    val studentId   = uuid("student_id")
+    val studentName = text("student_name")
+    val message     = text("message")
+    val createdAt   = timestamp("created_at")
+    val deletedAt   = timestamp("deleted_at").nullable()
+    val deletedBy   = uuid("deleted_by").nullable()
+
+    init {
+        index("idx_library_discussions_book", false, bookId, createdAt)
+        index("idx_library_discussions_school", false, schoolId)
+    }
+}
+
 // Scheduled Messages (MESSAGE_SCHEDULING_PLAN.md §4)
 //   Unified scheduling table for all schedulable message types
 //   (announcements, admin broadcasts, teacher class broadcasts).

@@ -33,6 +33,7 @@ class LocalStoragePreferenceManager : PreferenceRepository {
     private val refreshToken = MutableStateFlow(read(KEY_REFRESH))
     private val profileCompleted = MutableStateFlow(read(KEY_PROFILE)?.toBooleanStrictOrNull())
     private val userName = MutableStateFlow(read(KEY_USER_NAME))
+    private val fontScale = MutableStateFlow(read(KEY_FONT_SCALE)?.toFloatOrNull() ?: 1f)
 
     override fun getThemeName(): Flow<String> = themeName
     override suspend fun setThemeName(name: String) {
@@ -89,6 +90,13 @@ class LocalStoragePreferenceManager : PreferenceRepository {
         write(KEY_USER_NAME, v)
     }
 
+    override fun getFontScale(): Flow<Float> = fontScale
+    override suspend fun setFontScale(scale: Float) {
+        val clamped = scale.coerceIn(0.85f, 2f)
+        fontScale.value = clamped
+        write(KEY_FONT_SCALE, clamped.toString())
+    }
+
     override suspend fun clearSession() {
         userRole.value = "GUEST"
         userToken.value = null
@@ -114,6 +122,7 @@ class LocalStoragePreferenceManager : PreferenceRepository {
         const val KEY_REFRESH = "vp.refreshToken"
         const val KEY_PROFILE = "vp.profileCompleted"
         const val KEY_USER_NAME = "vp.userName"
+        const val KEY_FONT_SCALE = "vp.fontScale"
     }
 }
 

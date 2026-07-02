@@ -24,6 +24,7 @@ class PreferenceManager(
     // rotated. Cleared on logout so a re-login re-registers under the new user.
     private val FCM_TOKEN_KEY = stringPreferencesKey("fcm_token")
     private val NOTIFICATIONS_DECLINED_KEY = booleanPreferencesKey("notifications_declined")
+    private val FONT_SCALE_KEY = floatPreferencesKey("font_scale")
 
     override fun getThemeName(): Flow<String> {
         return dataStore.data.map { preferences ->
@@ -191,6 +192,19 @@ class PreferenceManager(
     override suspend fun setNotificationsDeclined(declined: Boolean) {
         dataStore.edit { preferences ->
             preferences[NOTIFICATIONS_DECLINED_KEY] = declined
+        }
+    }
+
+    // UIX-032: Font scale for accessibility (1.0 = default, 2.0 = 200%)
+    override fun getFontScale(): Flow<Float> {
+        return dataStore.data.map { preferences ->
+            preferences[FONT_SCALE_KEY] ?: 1f
+        }
+    }
+
+    override suspend fun setFontScale(scale: Float) {
+        dataStore.edit { preferences ->
+            preferences[FONT_SCALE_KEY] = scale.coerceIn(0.85f, 2f)
         }
     }
 

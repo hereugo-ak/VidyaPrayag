@@ -654,6 +654,19 @@ val viewModelModule = module {
     factory { com.littlebridge.enrollplus.feature.branding.presentation.BrandingViewModel(get(), get()) }
     // ID Card Generation (ID_CARD_GENERATION_SPEC.md)
     factory { com.littlebridge.enrollplus.feature.idcard.presentation.IdCardViewModel(get(), get()) }
+    // Library Management (LIBRARY_MANAGEMENT_SPEC.md)
+    single {
+        com.littlebridge.enrollplus.feature.library.data.remote.LibraryApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
+    single<com.littlebridge.enrollplus.feature.library.domain.repository.LibraryRepository> {
+        com.littlebridge.enrollplus.feature.library.data.repository.LibraryRepositoryImpl(get(), getOrNull())
+    }
+    factory { com.littlebridge.enrollplus.feature.library.presentation.SchoolLibraryViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.library.presentation.StudentLibraryViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.library.presentation.ParentLibraryViewModel(get(), get()) }
     // Message Scheduling (MESSAGE_SCHEDULING_PLAN.md §8)
     factory { com.littlebridge.enrollplus.feature.scheduling.presentation.ScheduledMessagesViewModel(get(), get()) }
     // Event Registration & RSVP System (EVENT_REGISTRATION_PLAN.md §4)

@@ -74,6 +74,7 @@ import com.littlebridge.enrollplus.feature.health.healthRouting
 import com.littlebridge.enrollplus.feature.healthcheck.healthCheckRouting
 import com.littlebridge.enrollplus.feature.idcard.idCardRouting
 import com.littlebridge.enrollplus.feature.idcard.IdCardExpiryCheckJob
+import com.littlebridge.enrollplus.feature.library.libraryRouting
 import com.littlebridge.enrollplus.feature.media.mediaRouting
 import com.littlebridge.enrollplus.feature.notification.api.notificationRouting
 import com.littlebridge.enrollplus.feature.notifications.notificationsRouting
@@ -224,6 +225,15 @@ fun main() {
     com.littlebridge.enrollplus.feature.transport.TransportJobScheduler.start(
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
     )
+
+    // Start the Library job scheduler (overdue notifications, due-date reminders,
+    // reservation expiry, announcement expiry, monthly audit log retention).
+    com.littlebridge.enrollplus.feature.library.LibraryJobScheduler.start(
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+    )
+
+    // Register event-driven cache invalidation for library (spec §17).
+    com.littlebridge.enrollplus.feature.library.LibraryCacheInit.register()
 
     embeddedServer(
         Netty,
@@ -483,6 +493,12 @@ fun Application.module() {
         //   /api/v1/school/branding{,/reset,/subdomain{,/check}}  — admin
         //   /api/v1/branding/{schoolId,/subdomain/{subdomain}}     — public
         brandingRouting()
+
+        // Library Management (LIBRARY_MANAGEMENT_SPEC.md)
+        //   /api/v1/school/library/*   — admin (books, issues, categories, settings, dashboard, audit, announcements, acquisitions)
+        //   /api/v1/parent/library/*   — parent (search, reserve, reservations)
+        //   /api/v1/student/library/*  — student (search, wishlist, goals, badges, discussions, acquisitions, reserve)
+        libraryRouting()
 
         // Message Scheduling (MESSAGE_SCHEDULING_PLAN.md §5)
         //   /api/v1/school/scheduled-messages          — admin, teacher

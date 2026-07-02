@@ -70,6 +70,7 @@ private enum class SchoolOverlay {
     ScholarshipManagement,
     BrandingKit,
     IdCards,
+    Library,
     ScheduledMessages,
     EventRegistration,
     ClassesSubjects,
@@ -122,6 +123,8 @@ fun SchoolPortalV2(
                     overlay = SchoolOverlay.TransportManagement
                 } else if (deepLinkTarget.screen == "report-card" || deepLinkTarget.screen == "report-review") {
                     overlay = SchoolOverlay.ReportPublish
+                } else if (deepLinkTarget.screen == "library") {
+                    overlay = SchoolOverlay.Library
                 } else if (deepLinkTarget.screen == "events") {
                     overlay = SchoolOverlay.EventRegistration
                 } else {
@@ -431,6 +434,13 @@ fun SchoolPortalV2(
                 )
                 return
             }
+            SchoolOverlay.Library -> {
+                SchoolLibraryScreen(
+                    onBack = { overlay = SchoolOverlay.None },
+                    modifier = modifier,
+                )
+                return
+            }
             SchoolOverlay.ScheduledMessages -> {
                 ScheduledMessagesScreenV2(
                     onBack = { overlay = SchoolOverlay.None },
@@ -571,6 +581,8 @@ fun SchoolPortalV2(
                         onOpenBranding = { overlay = SchoolOverlay.BrandingKit },
                         // ID Card Generation — templates, card generation, PDF export.
                         onOpenIdCards = { overlay = SchoolOverlay.IdCards },
+                        // Library Management — catalog, issues, returns, fines.
+                        onOpenLibrary = { overlay = SchoolOverlay.Library },
                         // Classes & Subjects — consolidated management (classes, subjects, bell schedule, timetable).
                         onOpenClassesSubjects = { overlay = SchoolOverlay.ClassesSubjects },
                     )

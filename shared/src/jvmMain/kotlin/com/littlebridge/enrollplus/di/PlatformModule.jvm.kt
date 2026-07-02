@@ -7,6 +7,8 @@ import com.littlebridge.enrollplus.core.prefs.PreferenceRepository
 import com.littlebridge.enrollplus.core.prefs.createDataStore
 import com.littlebridge.enrollplus.feature.schools.data.local.RoomSchoolLocalDataSource
 import com.littlebridge.enrollplus.feature.schools.data.local.SchoolLocalDataSource
+import com.littlebridge.enrollplus.feature.library.data.local.LibraryLocalDataSource
+import com.littlebridge.enrollplus.feature.library.data.local.RoomLibraryLocalDataSource
 import io.ktor.client.engine.okhttp.*
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -19,6 +21,10 @@ actual fun platformModule(): Module = module {
     single<AppDatabase> { get<DatabaseFactory>().createBuilder().build() }
     single { get<AppDatabase>().schoolDao() }
     single<SchoolLocalDataSource> { RoomSchoolLocalDataSource(get()) }
+    single { get<AppDatabase>().libraryBookDao() }
+    single { get<AppDatabase>().libraryCacheDao() }
+    single { get<AppDatabase>().libraryPendingActionDao() }
+    single<LibraryLocalDataSource> { RoomLibraryLocalDataSource(get(), get(), get()) }
 
     single {
         createDataStore {
