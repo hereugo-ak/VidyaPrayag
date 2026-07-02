@@ -316,7 +316,23 @@ class LlmClient(
                 setBody(body)
             }
         } catch (e: Exception) {
-            return LlmResult.failure(LlmErrorKind.NETWORK, message = e.message ?: "network error")
+            log.warn("LLM vision transport error to {}: {}", baseUrl, e.message)
+            return LlmResult.failure(LlmErrorKind.NETWORK, message = e.message)
+        }
+
+        if (!resp.status.isSuccess()) {
+            val status = resp.status.value
+            val bodyText = runCatching { resp.bodyAsText() }.getOrDefault("")
+            val kind = when {
+                status == 429 -> LlmErrorKind.RATE_LIMITED
+                status == 401 || status == 403 -> LlmErrorKind.AUTH_ERROR
+                status in 500..599 -> LlmErrorKind.SERVER_ERROR
+                status in 400..499 -> LlmErrorKind.BAD_REQUEST
+                else -> LlmErrorKind.UNKNOWN
+            }
+            log.warn("LLM vision provider {} returned {} ({}): {}", baseUrl, status, kind,
+                bodyText.take(300))
+            return LlmResult.failure(kind, status = status, message = bodyText.take(500))
         }
 
         return parseResponse(resp, model)

@@ -132,6 +132,19 @@ fun Route.timetableImportRouting() {
                 return@post
             }
 
+            // Size guard: ~10MB base64 limit (≈13.3M chars)
+            if (req.image.length > 13_300_000) {
+                call.fail("Image too large (max 10MB). Please use a smaller image.", HttpStatusCode.BadRequest, "IMAGE_TOO_LARGE")
+                return@post
+            }
+
+            // Mime type whitelist
+            val allowedMimes = setOf("image/jpeg", "image/png", "image/webp", "image/gif")
+            if (req.mimeType !in allowedMimes) {
+                call.fail("Unsupported image format: ${req.mimeType}. Supported: JPEG, PNG, WebP, GIF.", HttpStatusCode.BadRequest, "INVALID_MIME")
+                return@post
+            }
+
             val aiResult = AiService.completeWithVision(
                 feature = "timetable_import",
                 systemPrompt = OCR_SYSTEM_PROMPT,

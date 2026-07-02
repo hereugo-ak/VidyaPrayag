@@ -640,21 +640,27 @@ object AiService {
     ): AiResult {
         val visionProviders = listOf(AiProvider.GEMINI, AiProvider.OPENROUTER)
         var lastError: String? = null
+        var failedOver = false
 
         for (provider in visionProviders) {
             val model = KeyVault.modelFor(provider)
 
             if (!CircuitBreaker.allow(provider.code, model)) {
                 log.debug("Vision: {} circuit OPEN, skipping", provider.code)
+                failedOver = true
                 continue
             }
             val key = KeyVault.keyFor(provider)
-            if (key.isNullOrBlank()) continue
+            if (key.isNullOrBlank()) {
+                failedOver = true
+                continue
+            }
             val baseUrl = KeyVault.baseUrlFor(provider)
 
             val rlCheck = RateLimiter.check(provider.code, model, maxTokens + 1000, provider)
             if (!rlCheck.allowed) {
                 log.debug("Vision: {} rate limited, skipping", provider.code)
+                failedOver = true
                 lastError = "rate_limited: ${rlCheck.reason}"
                 continue
             }
@@ -696,9 +702,17 @@ object AiService {
             val latency = System.currentTimeMillis() - started
 
             if (result.ok && !result.content.isNullOrBlank()) {
+                val validated = GuardrailService.validateResponse(result.content)
+                if (validated == null) {
+                    CircuitBreaker.recordFailure(provider.code, model, rateLimited = false)
+                    lastError = "empty_after_validation"
+                    failedOver = true
+                    continue
+                }
                 CircuitBreaker.recordSuccess(provider.code, model, latency)
                 RateLimiter.record(provider.code, model,
                     result.inputTokens + result.outputTokens, provider)
+                val routing = if (failedOver) "failed_over" else "direct"
                 logUsage(
                     feature = feature,
                     schoolId = schoolId,
@@ -711,20 +725,23 @@ object AiService {
                     costUsd = 0.0,
                     latencyMs = latency,
                     status = "success",
-                    routing = "direct",
+                    routing = routing,
                     errorMessage = null,
                 )
                 return AiResult(
                     ok = true,
-                    content = result.content,
+                    content = validated,
                     providerUsed = provider.code,
                     modelUsed = result.modelUsed ?: model,
                     inputTokens = result.inputTokens,
                     outputTokens = result.outputTokens,
+                    routingDecision = routing,
                 )
             } else {
-                CircuitBreaker.recordFailure(provider.code, model, rateLimited = false)
+                val rateLimited = result.errorKind == LlmErrorKind.RATE_LIMITED
+                CircuitBreaker.recordFailure(provider.code, model, rateLimited = rateLimited)
                 lastError = result.errorMessage
+                failedOver = true
                 log.warn("Vision: {} failed: {} — trying next", provider.code, result.errorMessage)
             }
         }

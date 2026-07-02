@@ -876,10 +876,7 @@ private fun ImportDialog(
                             VButton(
                                 text = if (importMode == "photo") "Pick Photo" else "Pick PDF",
                                 onClick = {
-                                    parseError = null
-                                    isImporting = true
                                     parseError = "File picker integration requires platform-specific code. Please use 'Paste Text' mode for now — copy text from your photo/PDF and paste it."
-                                    isImporting = false
                                 },
                                 variant = VButtonVariant.Primary,
                                 tone = VButtonTone.Teal,
@@ -914,6 +911,7 @@ private fun ImportDialog(
                         VButton(
                             text = "Parse & Fill",
                             onClick = {
+                                parseError = null
                                 val result = parseTimetableText(pastedText)
                                 if (result.first.isEmpty()) {
                                     parseError = "Could not parse any slots. Make sure each line has a time range (e.g. 08:00-08:40) and a label."
@@ -927,6 +925,10 @@ private fun ImportDialog(
                         VButton(
                             text = "AI Parse",
                             onClick = {
+                                if (pastedText.isBlank()) {
+                                    parseError = "Please paste some timetable text first."
+                                    return@VButton
+                                }
                                 parseError = null
                                 isImporting = true
                                 dayConfigViewModel.importText(
@@ -1889,7 +1891,6 @@ private fun SlotAssignmentEditorDialog(
                         readOnly = true,
                         label = { Text("Select Teacher") },
                         modifier = Modifier.fillMaxWidth().clickable { teacherMenuExpanded = true },
-                        enabled = false,
                     )
                     DropdownMenu(
                         expanded = teacherMenuExpanded,
@@ -1924,7 +1925,6 @@ private fun SlotAssignmentEditorDialog(
                         readOnly = true,
                         label = { Text("Select Subject") },
                         modifier = Modifier.fillMaxWidth().clickable { subjectMenuExpanded = true },
-                        enabled = false,
                     )
                     DropdownMenu(
                         expanded = subjectMenuExpanded,
