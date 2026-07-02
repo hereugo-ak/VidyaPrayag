@@ -222,7 +222,7 @@ fun Route.teacherClassesRouting() {
                     return@get
                 }
 
-                val today = LocalDate.now()
+                val today = todayIst()
                 val weekday = today.dayOfWeek.value
                 val monthStart = today.minusDays(30)
 
@@ -248,7 +248,7 @@ fun Route.teacherClassesRouting() {
                 val ctx = call.requireTeacherContext() ?: return@get
                 val a = call.requireOwnedAssignment(ctx, call.parameters["assignmentId"]) ?: return@get
 
-                val today = LocalDate.now()
+                val today = todayIst()
                 val weekday = today.dayOfWeek.value
                 val monthStart = today.minusDays(30)
                 val weekStart = today.minusDays(6)

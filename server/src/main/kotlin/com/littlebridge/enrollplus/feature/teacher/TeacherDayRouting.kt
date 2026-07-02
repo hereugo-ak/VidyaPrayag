@@ -88,6 +88,7 @@ import org.jetbrains.exposed.sql.selectAll
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
@@ -636,10 +637,10 @@ fun Route.teacherDayRouting() {
                 val ctx = call.requireTeacherContext() ?: return@get
                 val date = call.request.queryParameters["date"]?.takeIf { it.isNotBlank() }
                     ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-                    ?: LocalDate.now()
+                    ?: todayIst()
 
                 val ownedIds = teacherAssignmentsFor(ctx).map { it.assignmentId }.toSet()
-                val isToday = date == LocalDate.now()
+                val isToday = date == todayIst()
 
                 val data = dbQuery {
                     resolveDayInTxn(
@@ -647,7 +648,7 @@ fun Route.teacherDayRouting() {
                         date = date,
                         ownedAssignmentIds = ownedIds,
                         assignmentScopes = HashMap(),
-                        nowProvider = if (isToday) LocalTime.now() else null,
+                        nowProvider = if (isToday) LocalTime.now(IST_ZONE) else null,
                     )
                 }
                 call.ok(data, message = "Resolved day loaded")
@@ -660,10 +661,10 @@ fun Route.teacherDayRouting() {
                 val ctx = call.requireTeacherContext() ?: return@get
                 val anchor = call.request.queryParameters["date"]?.takeIf { it.isNotBlank() }
                     ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-                    ?: LocalDate.now()
+                    ?: todayIst()
                 // Monday of the anchor's ISO week.
                 val weekStart = anchor.minusDays((anchor.dayOfWeek.value - 1).toLong())
-                val today = LocalDate.now()
+                val today = todayIst()
 
                 val ownedIds = teacherAssignmentsFor(ctx).map { it.assignmentId }.toSet()
 
@@ -676,7 +677,7 @@ fun Route.teacherDayRouting() {
                             date = d,
                             ownedAssignmentIds = ownedIds,
                             assignmentScopes = scopes,
-                            nowProvider = if (d == today) LocalTime.now() else null,
+                            nowProvider = if (d == today) LocalTime.now(IST_ZONE) else null,
                         )
                     }
                 }
@@ -710,7 +711,7 @@ fun Route.teacherDayRouting() {
                     )
                     return@post
                 }
-                val date = LocalDate.now() // server date — check-in is for "today"
+                val date = todayIst() // server date (IST) — check-in is for "today"
 
                 val data = dbQuery {
                     // Idempotency: return existing row if already checked in today.
@@ -759,7 +760,7 @@ fun Route.teacherDayRouting() {
                 val ctx = call.requireTeacherContext() ?: return@get
                 val date = call.request.queryParameters["date"]?.takeIf { it.isNotBlank() }
                     ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-                    ?: LocalDate.now()
+                    ?: todayIst()
 
                 val data = dbQuery {
                     val row = TeacherCheckInsTable
@@ -801,7 +802,7 @@ fun Route.teacherDayRouting() {
             // pre-scoped (assignmentId / refId) so taps land on the scoped tool.
             get("/obligations") {
                 val ctx = call.requireTeacherContext() ?: return@get
-                val today = LocalDate.now()
+                val today = todayIst()
                 val owned = teacherAssignmentsFor(ctx)
                 val ownedIds = owned.map { it.assignmentId }.toSet()
                 val ownedPairs = owned.map { it.className to it.section }.toSet()
@@ -814,7 +815,7 @@ fun Route.teacherDayRouting() {
                         date = today,
                         ownedAssignmentIds = ownedIds,
                         assignmentScopes = HashMap(),
-                        nowProvider = LocalTime.now(),
+                        nowProvider = LocalTime.now(IST_ZONE),
                     )
                     // Attendance-bearing periods = scheduled/active, not cancelled,
                     // with a real class scope. A holiday yields no periods → zero.
