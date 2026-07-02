@@ -494,58 +494,23 @@ private fun SubjectEditDialog(
 private val SCHEDULE_STEPS = listOf("1. Day Structure", "2. Assign", "3. Review")
 private val WEEKDAY_LABELS = listOf("", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
-private data class SchedulePreset(
-    val name: String,
-    val description: String,
-    val slots: List<SchoolDaySlotDto>,
+private val SLOT_TYPES = listOf("TEACHING", "BREAK", "ASSEMBLY", "LAB", "OTHER")
+
+private val DEFAULT_TEMPLATE_SLOTS = listOf(
+    SchoolDaySlotDto(0, "TEACHING", "Period 1", "08:00", "08:40"),
+    SchoolDaySlotDto(1, "TEACHING", "Period 2", "08:40", "09:20"),
+    SchoolDaySlotDto(2, "BREAK", "Short Break", "09:20", "09:35"),
+    SchoolDaySlotDto(3, "TEACHING", "Period 3", "09:35", "10:15"),
+    SchoolDaySlotDto(4, "TEACHING", "Period 4", "10:15", "10:55"),
+    SchoolDaySlotDto(5, "BREAK", "Lunch Break", "10:55", "11:25"),
+    SchoolDaySlotDto(6, "TEACHING", "Period 5", "11:25", "12:05"),
+    SchoolDaySlotDto(7, "TEACHING", "Period 6", "12:05", "12:45"),
+    SchoolDaySlotDto(8, "BREAK", "Short Break", "12:45", "13:00"),
+    SchoolDaySlotDto(9, "TEACHING", "Period 7", "13:00", "13:40"),
+    SchoolDaySlotDto(10, "TEACHING", "Period 8", "13:40", "14:20"),
 )
 
-private fun standardPresets(): List<SchedulePreset> = listOf(
-    SchedulePreset(
-        name = "8-Period Standard",
-        description = "8 periods × 40 min, 2 short breaks",
-        slots = listOf(
-            SchoolDaySlotDto(0, "TEACHING", "Period 1", "08:00", "08:40"),
-            SchoolDaySlotDto(1, "TEACHING", "Period 2", "08:40", "09:20"),
-            SchoolDaySlotDto(2, "BREAK", "Short Break", "09:20", "09:35"),
-            SchoolDaySlotDto(3, "TEACHING", "Period 3", "09:35", "10:15"),
-            SchoolDaySlotDto(4, "TEACHING", "Period 4", "10:15", "10:55"),
-            SchoolDaySlotDto(5, "BREAK", "Lunch Break", "10:55", "11:25"),
-            SchoolDaySlotDto(6, "TEACHING", "Period 5", "11:25", "12:05"),
-            SchoolDaySlotDto(7, "TEACHING", "Period 6", "12:05", "12:45"),
-            SchoolDaySlotDto(8, "BREAK", "Short Break", "12:45", "13:00"),
-            SchoolDaySlotDto(9, "TEACHING", "Period 7", "13:00", "13:40"),
-            SchoolDaySlotDto(10, "TEACHING", "Period 8", "13:40", "14:20"),
-        ),
-    ),
-    SchedulePreset(
-        name = "6-Period with Long Lunch",
-        description = "6 periods × 45 min, 1 long lunch",
-        slots = listOf(
-            SchoolDaySlotDto(0, "TEACHING", "Period 1", "09:00", "09:45"),
-            SchoolDaySlotDto(1, "TEACHING", "Period 2", "09:45", "10:30"),
-            SchoolDaySlotDto(2, "BREAK", "Short Break", "10:30", "10:45"),
-            SchoolDaySlotDto(3, "TEACHING", "Period 3", "10:45", "11:30"),
-            SchoolDaySlotDto(4, "TEACHING", "Period 4", "11:30", "12:15"),
-            SchoolDaySlotDto(5, "BREAK", "Lunch Break", "12:15", "13:00"),
-            SchoolDaySlotDto(6, "TEACHING", "Period 5", "13:00", "13:45"),
-            SchoolDaySlotDto(7, "TEACHING", "Period 6", "13:45", "14:30"),
-        ),
-    ),
-    SchedulePreset(
-        name = "4-Block (90 min)",
-        description = "4 blocks × 90 min, 2 breaks",
-        slots = listOf(
-            SchoolDaySlotDto(0, "TEACHING", "Block 1", "08:00", "09:30"),
-            SchoolDaySlotDto(1, "BREAK", "Short Break", "09:30", "09:45"),
-            SchoolDaySlotDto(2, "TEACHING", "Block 2", "09:45", "11:15"),
-            SchoolDaySlotDto(3, "BREAK", "Lunch Break", "11:15", "12:00"),
-            SchoolDaySlotDto(4, "TEACHING", "Block 3", "12:00", "13:30"),
-            SchoolDaySlotDto(5, "BREAK", "Short Break", "13:30", "13:45"),
-            SchoolDaySlotDto(6, "TEACHING", "Block 4", "13:45", "15:15"),
-        ),
-    ),
-)
+private val ALL_DAYS = listOf(1, 2, 3, 4, 5, 6, 7)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -602,128 +567,224 @@ private fun ScheduleTab(
 
 // ── Step 1: Day Structure (Presets + Config) ──────────────────────────────────
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ScheduleStepStructure(
     onNext: () -> Unit,
 ) {
-    val presets = remember { standardPresets() }
     val dayConfigViewModel: SchoolDayConfigViewModel = koinViewModel()
     val state by dayConfigViewModel.state.collectAsStateV2()
-    var selectedPresetIdx by remember { mutableStateOf(-1) }
-    var showCustomConfig by remember { mutableStateOf(false) }
+    var templateName by remember { mutableStateOf("Standard Day") }
+    var slots by remember { mutableStateOf(DEFAULT_TEMPLATE_SLOTS.toMutableList()) }
+    var selectedDays by remember { mutableStateOf(setOf(1, 2, 3, 4, 5)) }
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        VSectionHeader("Choose a Preset Template")
+        VSectionHeader("Day Structure Template")
+        Text("Customize every element below — add, remove, reorder, edit times and labels.", style = VTheme.type.caption.colored(VTheme.colors.ink2))
 
-        presets.forEachIndexed { idx, preset ->
-            PresetCard(
-                preset = preset,
-                isSelected = selectedPresetIdx == idx,
-                onTap = {
-                    selectedPresetIdx = idx
-                    showCustomConfig = false
-                },
-            )
-        }
-
-        // Custom option
-        PresetCard(
-            preset = SchedulePreset("Custom", "Build your own schedule from scratch", emptyList()),
-            isSelected = showCustomConfig,
-            onTap = {
-                showCustomConfig = true
-                selectedPresetIdx = -1
-            },
+        // Template name
+        VInput(
+            value = templateName,
+            onValueChange = { templateName = it },
+            label = "Template Name",
+            hint = "e.g. Standard Day, Half Day, Exam Day",
+            placeholder = "Standard Day",
         )
 
-        // Show preset preview or custom config
-        if (selectedPresetIdx >= 0) {
-            val preset = presets[selectedPresetIdx]
-            VSectionHeader("Preview — ${preset.name}")
-            DayTimelinePreview(slots = preset.slots)
+        // Applicable days
+        VSectionHeader("Applicable Days")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ALL_DAYS.forEach { day ->
+                val isSelected = day in selectedDays
+                VBadge(
+                    text = WEEKDAY_LABELS[day],
+                    tone = if (isSelected) VBadgeTone.Arctic else VBadgeTone.Neutral,
+                    modifier = Modifier.clickable {
+                        selectedDays = if (isSelected) selectedDays - day else selectedDays + day
+                    },
+                )
+            }
+        }
 
-            VButton(
-                text = "Use This Preset → Continue",
-                onClick = {
-                    dayConfigViewModel.createConfig(
-                        name = preset.name,
-                        applicableDays = "1,2,3,4,5",
-                        classLevel = "ALL",
-                        slots = preset.slots,
-                    ) { onNext() }
+        // Live timeline preview
+        VSectionHeader("Live Preview")
+        DayTimelinePreview(slots = slots)
+
+        // Editable slots
+        VSectionHeader("Slots (${slots.size})")
+        slots.forEachIndexed { idx, slot ->
+            EditableSlotCard(
+                slot = slot,
+                canMoveUp = idx > 0,
+                canMoveDown = idx < slots.size - 1,
+                onMoveUp = {
+                    slots = slots.toMutableList().also {
+                        val tmp = it[idx - 1]; it[idx - 1] = it[idx]; it[idx] = tmp
+                    }
                 },
-                full = true,
-                variant = VButtonVariant.Primary,
-                tone = VButtonTone.Teal,
-                loading = state.isSaving,
+                onMoveDown = {
+                    slots = slots.toMutableList().also {
+                        val tmp = it[idx + 1]; it[idx + 1] = it[idx]; it[idx] = tmp
+                    }
+                },
+                onRemove = {
+                    slots = slots.toMutableList().also { it.removeAt(idx) }
+                },
+                onUpdate = { updated ->
+                    slots = slots.toMutableList().also { it[idx] = updated }
+                },
             )
         }
 
-        if (showCustomConfig) {
-            SchoolDayConfigEmbeddedV2(
-                modifier = Modifier.fillMaxWidth(),
-            )
-            VButton(
-                text = "Continue →",
-                onClick = onNext,
-                full = true,
-                variant = VButtonVariant.Primary,
-                tone = VButtonTone.Teal,
-            )
+        // Add slot button
+        VButton(
+            text = "+ Add Slot",
+            onClick = {
+                val nextIdx = slots.size
+                val lastEnd = slots.lastOrNull()?.endTime ?: "08:00"
+                slots = (slots + SchoolDaySlotDto(nextIdx, "TEACHING", "New Period", lastEnd, "${lastEnd.take(2).toIntOrNull()?.plus(1) ?: 9}:00")).toMutableList()
+            },
+            full = true,
+            variant = VButtonVariant.Secondary,
+            tone = VButtonTone.Teal,
+        )
+
+        // Save & continue
+        VButton(
+            text = "Save Template & Continue →",
+            onClick = {
+                val days = selectedDays.sorted().joinToString(",")
+                val reindexed = slots.mapIndexed { i, s -> s.copy(slotIndex = i) }
+                dayConfigViewModel.createConfig(
+                    name = templateName.trim().ifBlank { "Standard Day" },
+                    applicableDays = days,
+                    classLevel = "ALL",
+                    slots = reindexed,
+                ) { onNext() }
+            },
+            full = true,
+            variant = VButtonVariant.Primary,
+            tone = VButtonTone.Teal,
+            loading = state.isSaving,
+        )
+
+        // Messages
+        state.infoMessage?.let {
+            Text(it, style = VTheme.type.caption.colored(VTheme.colors.successInk))
+        }
+        state.errorMessage?.let {
+            Text(it, style = VTheme.type.caption.colored(VTheme.colors.dangerInk))
         }
 
-        // Show existing configs
-        if (state.configs.isNotEmpty() && selectedPresetIdx < 0 && !showCustomConfig) {
+        // Existing configs
+        if (state.configs.isNotEmpty()) {
             VSectionHeader("Existing Configurations")
             state.configs.forEach { config ->
                 ExistingConfigCard(config = config)
             }
-            VButton(
-                text = "Continue →",
-                onClick = onNext,
-                full = true,
-                variant = VButtonVariant.Primary,
-                tone = VButtonTone.Teal,
-            )
         }
 
         Spacer(Modifier.height(80.dp))
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun PresetCard(
-    preset: SchedulePreset,
-    isSelected: Boolean,
-    onTap: () -> Unit,
+private fun EditableSlotCard(
+    slot: SchoolDaySlotDto,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onRemove: () -> Unit,
+    onUpdate: (SchoolDaySlotDto) -> Unit,
 ) {
     val c = VTheme.colors
-    VCard(
-        Modifier.fillMaxWidth().clickable { onTap() },
-        border = isSelected,
-    ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Box(
-                Modifier.size(40.dp).clip(CircleShape)
-                    .background(if (isSelected) c.teal.copy(alpha = 0.15f) else c.cream),
-                contentAlignment = Alignment.Center,
+    VCard(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Header row: color bar + label input + controls
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    if (preset.slots.isEmpty()) "+" else "✓",
-                    color = if (isSelected) c.tealDeep else c.ink2,
-                    fontWeight = FontWeight.Bold,
+                Box(
+                    Modifier.size(width = 4.dp, height = 36.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(slotTypeColor(slot.slotType, c)),
                 )
+                Box(Modifier.weight(1f)) {
+                    VInput(
+                        value = slot.label,
+                        onValueChange = { onUpdate(slot.copy(label = it)) },
+                        label = null,
+                        hint = null,
+                        placeholder = "Slot label",
+                    )
+                }
+                // Move up
+                Box(
+                    Modifier.size(28.dp).clip(CircleShape)
+                        .background(if (canMoveUp) c.teal.copy(alpha = 0.1f) else c.cream)
+                        .clickable(enabled = canMoveUp) { onMoveUp() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("↑", color = if (canMoveUp) c.tealDeep else c.ink3, fontWeight = FontWeight.Bold)
+                }
+                // Move down
+                Box(
+                    Modifier.size(28.dp).clip(CircleShape)
+                        .background(if (canMoveDown) c.teal.copy(alpha = 0.1f) else c.cream)
+                        .clickable(enabled = canMoveDown) { onMoveDown() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("↓", color = if (canMoveDown) c.tealDeep else c.ink3, fontWeight = FontWeight.Bold)
+                }
+                // Remove
+                Box(
+                    Modifier.size(28.dp).clip(CircleShape)
+                        .background(c.dangerInk.copy(alpha = 0.1f))
+                        .clickable { onRemove() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("×", color = c.dangerInk, fontWeight = FontWeight.Bold)
+                }
             }
-            Column(Modifier.weight(1f)) {
-                Text(preset.name, style = VTheme.type.bodyStrong.colored(c.ink))
-                Text(preset.description, style = VTheme.type.caption.colored(c.ink2))
+
+            // Type selector chips
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                SLOT_TYPES.forEach { type ->
+                    VBadge(
+                        text = type,
+                        tone = if (slot.slotType == type) VBadgeTone.Arctic else VBadgeTone.Neutral,
+                        modifier = Modifier.clickable { onUpdate(slot.copy(slotType = type)) },
+                    )
+                }
+            }
+
+            // Time inputs
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(Modifier.weight(1f)) {
+                    VInput(
+                        value = slot.startTime,
+                        onValueChange = { onUpdate(slot.copy(startTime = it)) },
+                        label = "Start",
+                        hint = "HH:mm",
+                        placeholder = "08:00",
+                    )
+                }
+                Box(Modifier.weight(1f)) {
+                    VInput(
+                        value = slot.endTime,
+                        onValueChange = { onUpdate(slot.copy(endTime = it)) },
+                        label = "End",
+                        hint = "HH:mm",
+                        placeholder = "08:40",
+                    )
+                }
             }
         }
     }
@@ -840,7 +901,7 @@ private fun ScheduleStepAssign(
     LaunchedEffect(Unit) { onLoadTimetable(null) }
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // Class filter
@@ -1258,7 +1319,7 @@ private fun ScheduleStepReview(
     LaunchedEffect(Unit) { if (tt == null) onLoadTimetable(null) }
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         VSectionHeader("Weekly Overview")
