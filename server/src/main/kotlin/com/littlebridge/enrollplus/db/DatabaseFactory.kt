@@ -283,6 +283,9 @@ object DatabaseFactory {
         ScheduledMessagesTable,
         SchoolDayConfigTable,
         SchoolDaySlotsTable,
+        // Timetable Change Requests (migration_108_timetable_management.sql)
+        // Teacher-initiated timetable change requests with admin review workflow.
+        TimetableChangeRequestsTable,
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */
