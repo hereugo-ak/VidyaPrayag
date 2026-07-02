@@ -21,8 +21,9 @@ import com.littlebridge.enrollplus.feature.schools.data.local.SchoolEntity
         LibraryBookEntity::class,
         LibraryCacheEntity::class,
         LibraryPendingActionEntity::class,
+        EventCacheEntity::class,
+        EventOutboxEntity::class,
     ],
-    entities = [SchoolEntity::class, EventCacheEntity::class, EventOutboxEntity::class],
     version = 2,
 )
 abstract class AppDatabase : RoomDatabase() {

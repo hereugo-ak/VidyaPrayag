@@ -379,6 +379,9 @@ private fun ParentDashboardContent(
                         subtitle = "Search books, view issued books & reserve",
                         icon = VIcons.BookOpen,
                         onClick = onOpenLibrary,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
                     // ── Event Registration ────────────────────────────────────────
                     VActionCard(
                         title = "School Events",

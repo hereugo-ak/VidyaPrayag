@@ -415,6 +415,11 @@ fun SchoolPortalV2(
             }
             SchoolOverlay.Library -> {
                 SchoolLibraryScreen(
+                    onBack = { overlay = SchoolOverlay.None },
+                    modifier = modifier,
+                )
+                return
+            }
             SchoolOverlay.ScheduledMessages -> {
                 ScheduledMessagesScreenV2(
                     onBack = { overlay = SchoolOverlay.None },
