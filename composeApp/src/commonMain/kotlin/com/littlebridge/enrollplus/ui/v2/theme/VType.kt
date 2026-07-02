@@ -50,7 +50,28 @@ data class VTypography(
     val data: TextStyle,      // 15 / 400
     val dataSm: TextStyle,    // 13 / 400
     val dataLg: TextStyle,    // 22 / 500 (hero numbers)
-)
+) {
+    /**
+     * UIX-032: Returns a new [VTypography] with all font sizes multiplied by [scale].
+     * Used for accessibility font scaling (1.0 = default, 2.0 = 200%).
+     * Line heights are scaled proportionally; letter-spacing (em-based) is preserved.
+     */
+    fun scaleBy(scale: Float): VTypography = copy(
+        h1 = h1.copy(fontSize = h1.fontSize * scale, lineHeight = h1.lineHeight * scale),
+        h2 = h2.copy(fontSize = h2.fontSize * scale, lineHeight = h2.lineHeight * scale),
+        h3 = h3.copy(fontSize = h3.fontSize * scale, lineHeight = h3.lineHeight * scale),
+        h4 = h4.copy(fontSize = h4.fontSize * scale, lineHeight = h4.lineHeight * scale),
+        body = body.copy(fontSize = body.fontSize * scale, lineHeight = body.lineHeight * scale),
+        bodyStrong = bodyStrong.copy(fontSize = bodyStrong.fontSize * scale, lineHeight = bodyStrong.lineHeight * scale),
+        caption = caption.copy(fontSize = caption.fontSize * scale, lineHeight = caption.lineHeight * scale),
+        label = label.copy(fontSize = label.fontSize * scale, lineHeight = label.lineHeight * scale),
+        labelStrong = labelStrong.copy(fontSize = labelStrong.fontSize * scale, lineHeight = labelStrong.lineHeight * scale),
+        inputLabel = inputLabel.copy(fontSize = inputLabel.fontSize * scale, lineHeight = inputLabel.lineHeight * scale),
+        data = data.copy(fontSize = data.fontSize * scale, lineHeight = data.lineHeight * scale),
+        dataSm = dataSm.copy(fontSize = dataSm.fontSize * scale, lineHeight = dataSm.lineHeight * scale),
+        dataLg = dataLg.copy(fontSize = dataLg.fontSize * scale, lineHeight = dataLg.lineHeight * scale),
+    )
+}
 
 /** The two bundled font families. Must be called from a @Composable context (loads resources). */
 @Composable

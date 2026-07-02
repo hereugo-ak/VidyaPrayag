@@ -51,6 +51,15 @@ object VThemeRegistry {
             isDark = false,
             icon = VIcons.Sparkles,
         ),
+        // UIX-031: High-contrast accessibility theme
+        VThemeDef(
+            id = "high_contrast",
+            displayName = "High Contrast",
+            description = "WCAG AAA accessibility",
+            colors = HighContrastVColors,
+            isDark = false,
+            icon = VIcons.Star,
+        ),
         // ── Add new custom themes below this line ──────────────────────────────
         // VThemeDef(
         //     id = "ocean",

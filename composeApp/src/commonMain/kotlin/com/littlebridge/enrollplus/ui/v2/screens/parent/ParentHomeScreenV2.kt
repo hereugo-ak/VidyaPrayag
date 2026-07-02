@@ -97,6 +97,7 @@ fun ParentHomeScreenV2(
     onOpenTutorProgress: () -> Unit = {},
     onOpenScholarships: () -> Unit = {},
     onOpenIdCard: () -> Unit = {},
+    onOpenLibrary: () -> Unit = {},
     viewModel: ParentDashboardViewModel = koinViewModel(),
     permissionVm: PermissionViewModel = koinViewModel(),
     nudgeViewModel: com.littlebridge.enrollplus.feature.pews.presentation.ParentNudgeViewModel = koinViewModel(),
@@ -147,6 +148,7 @@ fun ParentHomeScreenV2(
         onOpenTutorProgress = onOpenTutorProgress,
         onOpenScholarships = onOpenScholarships,
         onOpenIdCard = onOpenIdCard,
+        onOpenLibrary = onOpenLibrary,
         nudge = nudgeState.nudge?.takeIf { nudgeState.visible },
         onNudgeAction = { action ->
             // The server's deep-link targets map onto existing parent surfaces.
@@ -188,6 +190,7 @@ private fun ParentDashboardContent(
     onOpenTutorProgress: () -> Unit = {},
     onOpenScholarships: () -> Unit = {},
     onOpenIdCard: () -> Unit = {},
+    onOpenLibrary: () -> Unit = {},
     nudge: com.littlebridge.enrollplus.feature.pews.domain.model.PewsParentNudgeDto? = null,
     onNudgeAction: (com.littlebridge.enrollplus.feature.pews.domain.model.PewsParentActionDto) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -364,6 +367,15 @@ private fun ParentDashboardContent(
                         subtitle = "View your child's digital school ID card",
                         icon = VIcons.IdCard,
                         onClick = onOpenIdCard,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    // ── Library ───────────────────────────────────────────────────────
+                    VActionCard(
+                        title = "Library",
+                        subtitle = "Search books, view issued books & reserve",
+                        icon = VIcons.BookOpen,
+                        onClick = onOpenLibrary,
                         modifier = Modifier.fillMaxWidth(),
                     )
 

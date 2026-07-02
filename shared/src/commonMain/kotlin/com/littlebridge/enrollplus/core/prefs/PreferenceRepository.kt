@@ -55,5 +55,9 @@ interface PreferenceRepository {
     fun getNotificationsDeclined(): Flow<Boolean>
     suspend fun setNotificationsDeclined(declined: Boolean)
 
+    // UIX-032: Font scale for accessibility (1.0 = default, 2.0 = 200%)
+    fun getFontScale(): Flow<Float>
+    suspend fun setFontScale(scale: Float)
+
     suspend fun clearSession()
 }

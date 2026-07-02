@@ -4,5 +4,18 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<!-- Deep links: vidyaprayag://app/<path> — used by notification taps
+	     and future external linking. Matches AndroidManifest scheme. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.littlebridge.enrollplus.deeplink</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>vidyaprayag</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

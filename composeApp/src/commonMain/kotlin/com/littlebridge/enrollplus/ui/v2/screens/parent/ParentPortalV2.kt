@@ -53,7 +53,7 @@ import com.littlebridge.enrollplus.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Full-screen overlays a portal can push above its tab content (back returns to the tabs). */
-private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, Profile, Leave, Messages, LinkChild, Discovery, Health, Pulse, Transport, TutorChat, TutorProgress, DigitalIdCard }
+private enum class ParentOverlay { None, Notifications, Calendar, Scholarships, Profile, Leave, Messages, LinkChild, Discovery, Health, Pulse, Transport, TutorChat, TutorProgress, DigitalIdCard, Library }
 
 /**
  * ParentPortalV2 — the 5-tab parent shell, a faithful copy of `Parent.tsx → ParentApp`.
@@ -96,6 +96,7 @@ fun ParentPortalV2(
                     "notifications" -> overlay = ParentOverlay.Notifications
                     "calendar" -> overlay = ParentOverlay.Calendar
                     "transport" -> overlay = ParentOverlay.Transport
+                    "library" -> overlay = ParentOverlay.Library
                     else -> overlay = ParentOverlay.None
                 }
             }
@@ -237,6 +238,13 @@ fun ParentPortalV2(
             )
             return
         }
+        ParentOverlay.Library -> {
+            ParentLibraryScreenV2(
+                onBack = { overlay = ParentOverlay.None },
+                modifier = modifier,
+            )
+            return
+        }
         ParentOverlay.None -> Unit
     }
 
@@ -322,6 +330,7 @@ fun ParentPortalV2(
                     onOpenTutorProgress = { overlay = ParentOverlay.TutorProgress },
                     onOpenScholarships = { overlay = ParentOverlay.Scholarships },
                     onOpenIdCard = { overlay = ParentOverlay.DigitalIdCard },
+                    onOpenLibrary = { overlay = ParentOverlay.Library },
                 )
                 "academics" -> ParentAcademicsScreenV2(onOpenLeave = { overlay = ParentOverlay.Leave }, onOpenHealth = { overlay = ParentOverlay.Health })
                 "fees" -> ParentFeesScreenV2()

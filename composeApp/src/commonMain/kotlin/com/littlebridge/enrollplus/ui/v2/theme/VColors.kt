@@ -59,6 +59,10 @@ data class VColors(
 
     // Convenience: is this a dark (night) palette?
     val isNight: Boolean,
+
+    // UIX-031: High-contrast mode flag — when true, components may boost
+    // border widths, focus rings, and text emphasis beyond the default palette.
+    val isHighContrast: Boolean = false,
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -222,6 +226,44 @@ const val WCAG_AA_NORMAL = 4.5
 
 /** WCAG AA threshold for large text (3.0:1). */
 const val WCAG_AA_LARGE = 3.0
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UIX-031: High-contrast palette — WCAG AAA (7:1) where feasible
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** High-contrast light palette: pure black ink on pure white, thicker borders, vivid semantics. */
+val HighContrastVColors = VColors(
+    teal = Color(0xFF008275),
+    tealDeep = Color(0xFF004D44),
+    navy = Color(0xFF000000),
+    navyDeep = Color(0xFF000000),
+    lavender = Color(0xFFFFFFFF),
+    lavenderLight = Color(0xFFE0DCFA),
+    cream = Color(0xFFF0F0F0),
+    warmOrange = Color(0xFF7A2D00),
+    accent = Color(0xFF4A3FB8),
+    accentSoft = Color(0xFF6B5FDE),
+    accentDeep = Color(0xFF2E2480),
+    accentTint = Color(0xFFE8E6F8),
+    ink = Color(0xFF000000),
+    ink2 = Color(0xFF1A1A1A),
+    ink3 = Color(0xFF333333),
+    placeholder = Color(0xFF666666),
+    background = Color(0xFFFFFFFF),
+    card = Color(0xFFFFFFFF),
+    border1 = Color(0xFF000000),
+    border2 = Color(0xFF000000),
+    hairline = Color(0xFF666666),
+    shadowTint = Color(0xFF000000),
+    success = Color(0xFF00C853),
+    successInk = Color(0xFF003D11),
+    warning = Color(0xFFFF9800),
+    warningInk = Color(0xFF4A2900),
+    danger = Color(0xFFFF1744),
+    dangerInk = Color(0xFF8B0000),
+    isNight = false,
+    isHighContrast = true,
+)
 
 /** Returns true if the fg/bg pair meets WCAG AA for normal text. */
 fun meetsWCAGAA(fg: Color, bg: Color): Boolean = contrastRatio(fg, bg) >= WCAG_AA_NORMAL

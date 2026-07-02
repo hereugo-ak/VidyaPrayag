@@ -72,6 +72,8 @@ class MainViewModelTest {
         override suspend fun setFcmToken(token: String?) {}
         override fun getNotificationsDeclined(): Flow<Boolean> = flowOf(false)
         override suspend fun setNotificationsDeclined(declined: Boolean) {}
+        override fun getFontScale(): Flow<Float> = flowOf(1f)
+        override suspend fun setFontScale(scale: Float) {}
         override suspend fun clearSession() {}
         
         override fun getUserId(): Flow<String?> = flowOf(null)

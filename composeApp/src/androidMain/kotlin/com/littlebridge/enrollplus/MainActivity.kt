@@ -92,7 +92,16 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun extractDeepLink(intent: Intent): String? {
-        if (!intent.getBooleanExtra(NotificationManagerHelper.EXTRA_FROM_PUSH, false)) return null
-        return intent.getStringExtra(NotificationManagerHelper.EXTRA_DEEP_LINK)
+        // 1. Notification tap: raw path stored as extra by NotificationManagerHelper.
+        if (intent.getBooleanExtra(NotificationManagerHelper.EXTRA_FROM_PUSH, false)) {
+            return intent.getStringExtra(NotificationManagerHelper.EXTRA_DEEP_LINK)
+        }
+        // 2. External deep link: vidyaprayag://app/<path> URI from the intent-filter.
+        val data = intent.data
+        if (data != null && data.scheme == NotificationManagerHelper.DEEP_LINK_SCHEME && data.host == "app") {
+            val path = data.path
+            return if (!path.isNullOrBlank()) path else null
+        }
+        return null
     }
 }

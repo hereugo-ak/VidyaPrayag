@@ -39,6 +39,7 @@ class LocalStoragePreferenceManager : PreferenceRepository {
     private val userName = MutableStateFlow(read(KEY_USER_NAME))
     private val fcmToken = MutableStateFlow(read(KEY_FCM_TOKEN))
     private val notificationsDeclined = MutableStateFlow(read(KEY_NOTIF_DECLINED)?.toBooleanStrictOrNull() ?: false)
+    private val fontScale = MutableStateFlow(read(KEY_FONT_SCALE)?.toFloatOrNull() ?: 1f)
 
     override fun getThemeName(): Flow<String> = themeName
     override suspend fun setThemeName(name: String) {
@@ -107,6 +108,13 @@ class LocalStoragePreferenceManager : PreferenceRepository {
         write(KEY_NOTIF_DECLINED, declined.toString())
     }
 
+    override fun getFontScale(): Flow<Float> = fontScale
+    override suspend fun setFontScale(scale: Float) {
+        val clamped = scale.coerceIn(0.85f, 2f)
+        fontScale.value = clamped
+        write(KEY_FONT_SCALE, clamped.toString())
+    }
+
     override suspend fun clearSession() {
         userRole.value = "GUEST"
         userToken.value = null
@@ -138,6 +146,7 @@ class LocalStoragePreferenceManager : PreferenceRepository {
         const val KEY_USER_NAME = "vp.userName"
         const val KEY_FCM_TOKEN = "vp.fcmToken"
         const val KEY_NOTIF_DECLINED = "vp.notificationsDeclined"
+        const val KEY_FONT_SCALE = "vp.fontScale"
     }
 }
 

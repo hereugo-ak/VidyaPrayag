@@ -6,9 +6,12 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.sp
 
 /**
  * VidyaSetu design-system theme provider.
@@ -29,15 +32,20 @@ fun VTheme(
     themeDef: VThemeDef = VThemeRegistry.defaultTheme,
     typography: VTypography = vidyaSetuTypography(),
     dimens: VDimens = DefaultVDimens,
+    fontScale: Float = 1f,
     content: @Composable () -> Unit,
 ) {
     val colorScheme = materialColorSchemeFor(themeDef)
+    val scaledTypography = remember(typography, fontScale) {
+        typography.scaleBy(fontScale)
+    }
     MaterialTheme(colorScheme = colorScheme) {
         CompositionLocalProvider(
             LocalVColors provides themeDef.colors,
-            LocalVType provides typography,
+            LocalVType provides scaledTypography,
             LocalVDimens provides dimens,
             LocalVThemeDef provides themeDef,
+            LocalFontScale provides fontScale,
             content = content,
         )
     }
@@ -57,6 +65,10 @@ val LocalVDimens: ProvidableCompositionLocal<VDimens> =
 val LocalVThemeDef: ProvidableCompositionLocal<VThemeDef> =
     staticCompositionLocalOf { VThemeRegistry.defaultTheme }
 
+// UIX-032: Font scale factor (1.0 = default, 2.0 = 200% for accessibility)
+val LocalFontScale: ProvidableCompositionLocal<Float> =
+    staticCompositionLocalOf { 1f }
+
 // ── Ergonomic accessor object ────────────────────────────────────────────────
 
 object VTheme {
@@ -68,6 +80,8 @@ object VTheme {
         @Composable get() = LocalVDimens.current
     val themeDef: VThemeDef
         @Composable get() = LocalVThemeDef.current
+    val fontScale: Float
+        @Composable get() = LocalFontScale.current
 }
 
 /** Helper: a TextStyle colored with an explicit color (keeps call sites terse). */

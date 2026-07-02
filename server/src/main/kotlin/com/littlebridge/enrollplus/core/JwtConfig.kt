@@ -85,17 +85,24 @@ object JwtConfig {
             .build()
     }
 
-    /** Issue a signed access token. */
-    fun issueToken(userId: String, role: String, name: String): String =
-        JWT.create()
+    // Spec §16 Session timeout: admin/librarian 30 min, student/parent 24 hours.
+    private val ADMIN_ROLES = setOf("school_admin", "school_staff", "admin", "super_admin")
+    private const val ADMIN_EXPIRY_SECS = 30L * 60          // 30 minutes
+    private const val DEFAULT_EXPIRY_SECS = 24L * 60 * 60   // 24 hours
+
+    /** Issue a signed access token with role-based expiry. */
+    fun issueToken(userId: String, role: String, name: String): String {
+        val ttl = if (role in ADMIN_ROLES) ADMIN_EXPIRY_SECS else DEFAULT_EXPIRY_SECS
+        return JWT.create()
             .withIssuer(issuer)
             .withAudience(audience)
             .withSubject(userId)
             .withClaim("role", role)
             .withClaim("name", name)
             .withIssuedAt(Date())
-            .withExpiresAt(Date(System.currentTimeMillis() + expirySecs * 1000))
+            .withExpiresAt(Date(System.currentTimeMillis() + ttl * 1000))
             .sign(algorithm)
+    }
 
     /** Issue an opaque refresh token. In production, persist + rotate it. */
     fun issueRefreshToken(userId: String): String =

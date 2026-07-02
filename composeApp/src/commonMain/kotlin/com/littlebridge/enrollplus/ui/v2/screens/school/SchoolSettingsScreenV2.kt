@@ -79,6 +79,8 @@ fun SchoolSettingsScreenV2(
     onOpenBranding: () -> Unit = {},
     // ID Card Generation — templates, card generation, PDF export.
     onOpenIdCards: () -> Unit = {},
+    // Library Management — catalog, issues, returns, fines.
+    onOpenLibrary: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: InstitutionalProfileViewModel = koinViewModel(),
     preferenceRepository: PreferenceRepository = koinInject(),
@@ -105,6 +107,7 @@ fun SchoolSettingsScreenV2(
         onOpenScholarships = onOpenScholarships,
         onOpenBranding = onOpenBranding,
         onOpenIdCards = onOpenIdCards,
+        onOpenLibrary = onOpenLibrary,
         onRetry = viewModel::load,
         modifier = modifier.statusBarsPadding()
             .imePadding()
@@ -126,6 +129,7 @@ private fun SchoolSettingsContent(
     onOpenScholarships: () -> Unit,
     onOpenBranding: () -> Unit,
     onOpenIdCards: () -> Unit,
+    onOpenLibrary: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -185,6 +189,7 @@ private fun SchoolSettingsContent(
                 SettingRow(VIcons.Sparkles, "Scholarship Management", "Schemes, applications & renewals", false, onClick = onOpenScholarships),
                 SettingRow(VIcons.School, "Branding Kit", "Logo, colors & custom subdomain", false, onClick = onOpenBranding),
                 SettingRow(VIcons.IdCard, "ID Cards", "Templates, generation & PDF export", false, onClick = onOpenIdCards),
+                SettingRow(VIcons.BookOpen, "Library Management", "Catalog, issues, returns & fines", false, onClick = onOpenLibrary),
                 SettingRow(VIcons.Wallet, "Fee structure", "Edit heads & amounts for next cycle ", true),
                 SettingRow(VIcons.Bell, "Notifications", "Channels & quiet hours", true),
                 SettingRow(VIcons.Download, "Data export", "CSV / PDF / UDISE", true),

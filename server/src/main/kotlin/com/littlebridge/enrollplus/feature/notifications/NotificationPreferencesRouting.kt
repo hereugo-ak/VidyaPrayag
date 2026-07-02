@@ -25,6 +25,10 @@ import java.util.UUID
 data class NotificationPreferenceDto(
     val category: String,
     val enabled: Boolean = true,
+    val pushEnabled: Boolean? = null,
+    val inAppEnabled: Boolean? = null,
+    val emailEnabled: Boolean? = null,
+    val smsEnabled: Boolean? = null,
     val sound: String? = null
 )
 
@@ -37,6 +41,10 @@ data class NotificationPreferencesResponse(
 data class UpdatePreferenceRequest(
     val category: String,
     val enabled: Boolean,
+    val pushEnabled: Boolean? = null,
+    val inAppEnabled: Boolean? = null,
+    val emailEnabled: Boolean? = null,
+    val smsEnabled: Boolean? = null,
     val sound: String? = null
 )
 
@@ -56,6 +64,10 @@ fun Route.notificationPreferencesRouting() {
                             NotificationPreferenceDto(
                                 category = it[NotificationPreferencesTable.category],
                                 enabled = it[NotificationPreferencesTable.enabled],
+                                pushEnabled = it[NotificationPreferencesTable.pushEnabled],
+                                inAppEnabled = it[NotificationPreferencesTable.inAppEnabled],
+                                emailEnabled = it[NotificationPreferencesTable.emailEnabled],
+                                smsEnabled = it[NotificationPreferencesTable.smsEnabled],
                                 sound = it[NotificationPreferencesTable.sound]
                             )
                         }
@@ -85,6 +97,10 @@ fun Route.notificationPreferencesRouting() {
                             it[NotificationPreferencesTable.userId] = uid
                             it[NotificationPreferencesTable.category] = req.category
                             it[NotificationPreferencesTable.enabled] = req.enabled
+                            it[NotificationPreferencesTable.pushEnabled] = req.pushEnabled
+                            it[NotificationPreferencesTable.inAppEnabled] = req.inAppEnabled
+                            it[NotificationPreferencesTable.emailEnabled] = req.emailEnabled
+                            it[NotificationPreferencesTable.smsEnabled] = req.smsEnabled
                             it[NotificationPreferencesTable.sound] = req.sound
                             it[NotificationPreferencesTable.createdAt] = now
                             it[NotificationPreferencesTable.updatedAt] = now
@@ -95,13 +111,22 @@ fun Route.notificationPreferencesRouting() {
                             (NotificationPreferencesTable.category eq req.category)
                         }) {
                             it[NotificationPreferencesTable.enabled] = req.enabled
+                            it[NotificationPreferencesTable.pushEnabled] = req.pushEnabled
+                            it[NotificationPreferencesTable.inAppEnabled] = req.inAppEnabled
+                            it[NotificationPreferencesTable.emailEnabled] = req.emailEnabled
+                            it[NotificationPreferencesTable.smsEnabled] = req.smsEnabled
                             it[NotificationPreferencesTable.sound] = req.sound
                             it[NotificationPreferencesTable.updatedAt] = now
                         }
                     }
                 }
                 call.ok(
-                    NotificationPreferenceDto(category = req.category, enabled = req.enabled, sound = req.sound),
+                    NotificationPreferenceDto(
+                        category = req.category, enabled = req.enabled,
+                        pushEnabled = req.pushEnabled, inAppEnabled = req.inAppEnabled,
+                        emailEnabled = req.emailEnabled, smsEnabled = req.smsEnabled,
+                        sound = req.sound,
+                    ),
                     message = "Preference updated"
                 )
             }
