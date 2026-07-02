@@ -1137,6 +1137,7 @@ private fun ScheduleStepAssign(
     var deleteTargetId by remember { mutableStateOf<String?>(null) }
     var showCopyDayDialog by remember { mutableStateOf(false) }
     var showCopyClassDialog by remember { mutableStateOf(false) }
+    var showManualAddDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { onLoadTimetable(null) }
     LaunchedEffect(state.classes) {
@@ -1158,15 +1159,8 @@ private fun ScheduleStepAssign(
             VEmptyState(
                 title = "No day structure found",
                 icon = VIcons.Calendar,
-                body = "Go back to Step 1 and save a day structure template first.",
+                body = "You can still add periods manually below, or go back to Step 1 to create a day structure template.",
             )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.weight(1f)) {
-                    VButton(text = "← Back to Step 1", onClick = onBack, full = true, variant = VButtonVariant.Secondary, tone = VButtonTone.Navy)
-                }
-            }
-            Spacer(Modifier.height(80.dp))
-            return@Column
         }
 
         // ── Class selector ───────────────────────────────────────────────────
@@ -1216,19 +1210,48 @@ private fun ScheduleStepAssign(
         // ── Slot grid ────────────────────────────────────────────────────────
         VSectionHeader("${WEEKDAY_LABELS[selectedDay]} — ${selectedClassName ?: "—"} · $selectedSection")
 
+        // Find existing periods for this class+section+day
+        val dayData = tt?.weekdays?.find { it.weekday == selectedDay }
+        val existingPeriods = dayData?.periods?.filter {
+            it.className.equals(selectedClassName, ignoreCase = true) && it.section.equals(selectedSection, ignoreCase = true)
+        } ?: emptyList()
+
         if (templateSlots.isEmpty()) {
-            VEmptyState(
-                title = "No teaching slots",
-                icon = VIcons.Calendar,
-                body = "The day structure has no TEACHING slots. Go back to Step 1 and add some.",
+            // Manual mode — no DayConfig slots, show existing periods + manual add
+            if (existingPeriods.isEmpty()) {
+                VEmptyState(
+                    title = "No periods yet",
+                    icon = VIcons.Calendar,
+                    body = "Tap \"Add Period\" below to assign a teacher and subject to this day.",
+                )
+            } else {
+                Text(
+                    "${existingPeriods.size} period${if (existingPeriods.size > 1) "s" else ""} on ${WEEKDAY_LABELS[selectedDay]}",
+                    style = VTheme.type.caption.colored(c.ink2),
+                )
+                existingPeriods.sortedBy { it.startTime }.forEach { period ->
+                    ManualPeriodRow(
+                        period = period,
+                        onEdit = {
+                            editingPeriod = period
+                            showManualAddDialog = true
+                        },
+                        onDelete = { deleteTargetId = period.id },
+                    )
+                }
+            }
+            VButton(
+                text = "+ Add Period",
+                onClick = {
+                    editingPeriod = null
+                    showManualAddDialog = true
+                },
+                full = true,
+                variant = VButtonVariant.Primary,
+                tone = VButtonTone.Teal,
             )
         } else {
-            // Find existing periods for this class+section+day
-            val dayData = tt?.weekdays?.find { it.weekday == selectedDay }
-            val existingPeriods = dayData?.periods?.filter {
-                it.className.equals(selectedClassName, ignoreCase = true) && it.section.equals(selectedSection, ignoreCase = true)
-            } ?: emptyList()
-
+            // Slot-driven mode — DayConfig has TEACHING slots
             // Stats
             val assignedCount = templateSlots.count { slot ->
                 existingPeriods.any { it.startTime == slot.startTime && it.endTime == slot.endTime }
@@ -1250,6 +1273,24 @@ private fun ScheduleStepAssign(
                     },
                     onDelete = { matchedPeriod?.let { deleteTargetId = it.id } },
                 )
+            }
+            // Also show any periods that don't match any slot (orphaned)
+            val orphanedPeriods = existingPeriods.filter { p ->
+                templateSlots.none { it.startTime == p.startTime && it.endTime == p.endTime }
+            }
+            if (orphanedPeriods.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Text("Other periods (not in day structure)", style = VTheme.type.caption.colored(c.ink3))
+                orphanedPeriods.forEach { period ->
+                    ManualPeriodRow(
+                        period = period,
+                        onEdit = {
+                            editingPeriod = period
+                            showManualAddDialog = true
+                        },
+                        onDelete = { deleteTargetId = period.id },
+                    )
+                }
             }
         }
 
@@ -1398,6 +1439,35 @@ private fun ScheduleStepAssign(
             onDismiss = { showCopyClassDialog = false },
         )
     }
+
+    // ── Manual period editor dialog (no-slot fallback) ────────────────────
+    if (showManualAddDialog) {
+        ManualPeriodEditorDialog(
+            state = state,
+            editingPeriod = editingPeriod,
+            className = selectedClassName ?: "",
+            section = selectedSection,
+            weekday = selectedDay,
+            isSaving = state.isSaving,
+            onSave = { teacherId, subject, startTime, endTime, room ->
+                if (editingPeriod != null) {
+                    onDeletePeriod(editingPeriod!!.id)
+                }
+                onCreatePeriod(teacherId, selectedClassName ?: "", selectedSection, subject, selectedDay, startTime, endTime, room) {
+                    showManualAddDialog = false
+                    editingPeriod = null
+                }
+            },
+            onRemove = {
+                editingPeriod?.let { onDeletePeriod(it.id) }
+                showManualAddDialog = false
+                editingPeriod = null
+            },
+            onDismiss = { showManualAddDialog = false; editingPeriod = null },
+            onCreateTeacherInline = onCreateTeacherInline,
+            onCreateSubjectInline = onCreateSubjectInline,
+        )
+    }
 }
 
 @Composable
@@ -1464,6 +1534,211 @@ private fun SlotAssignmentRow(
                 VBadge(text = "Empty", tone = VBadgeTone.Neutral)
             }
         }
+    }
+}
+
+@Composable
+private fun ManualPeriodRow(
+    period: TimetablePeriodDto,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val c = VTheme.colors
+    VCard(
+        Modifier.fillMaxWidth().clickable { onEdit() },
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            // Time block
+            Column(
+                Modifier.width(72.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(period.startTime, style = VTheme.type.bodyStrong.colored(c.ink))
+                Text("↓", style = VTheme.type.caption.colored(c.ink3))
+                Text(period.endTime, style = VTheme.type.body.colored(c.ink2))
+            }
+
+            Box(Modifier.width(1.dp).height(48.dp).background(c.hairline))
+
+            // Content
+            Column(Modifier.weight(1f)) {
+                Text(period.subject, style = VTheme.type.bodyStrong.colored(c.ink))
+                if (period.teacherName.isNotBlank()) {
+                    Text(period.teacherName, style = VTheme.type.caption.colored(c.ink2))
+                }
+                if (period.room.isNotBlank()) {
+                    Text("Room ${period.room}", style = VTheme.type.caption.colored(c.ink3))
+                }
+            }
+
+            // Delete button
+            Box(
+                Modifier.size(28.dp).clip(CircleShape)
+                    .background(c.dangerInk.copy(alpha = 0.1f))
+                    .clickable { onDelete() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("×", color = c.dangerInk, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ManualPeriodEditorDialog(
+    state: ClassesSubjectsState,
+    editingPeriod: TimetablePeriodDto?,
+    className: String,
+    section: String,
+    weekday: Int,
+    isSaving: Boolean,
+    onSave: (teacherId: String, subject: String, startTime: String, endTime: String, room: String) -> Unit,
+    onRemove: () -> Unit,
+    onDismiss: () -> Unit,
+    onCreateTeacherInline: (name: String, identifier: String, onDone: () -> Unit) -> Unit,
+    onCreateSubjectInline: (classId: String, name: String, code: String, onDone: () -> Unit) -> Unit,
+) {
+    val teachers = state.teachers
+    val classes = state.classes
+    var selectedTeacherId by remember { mutableStateOf(editingPeriod?.teacherId ?: "") }
+    var subjectName by remember { mutableStateOf(editingPeriod?.subject ?: "") }
+    var startTime by remember { mutableStateOf(editingPeriod?.startTime ?: "09:00") }
+    var endTime by remember { mutableStateOf(editingPeriod?.endTime ?: "10:00") }
+    var room by remember { mutableStateOf(editingPeriod?.room ?: "") }
+    var showNewTeacher by remember { mutableStateOf(false) }
+    var showNewSubject by remember { mutableStateOf(false) }
+
+    val selectedClass = classes.find { it.name == className }
+    val subjectsForClass = selectedClass?.let { state.subjectsByClass[it.id] } ?: emptyList()
+
+    Dialog(onDismissRequest = onDismiss) {
+        VCard(Modifier.fillMaxWidth().padding(16.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Header
+                Text(
+                    "${WEEKDAY_LABELS[weekday]} — $className · $section",
+                    style = VTheme.type.h3, fontWeight = FontWeight.Bold, color = VTheme.colors.ink,
+                )
+
+                // Time inputs
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.weight(1f)) {
+                        VInput(value = startTime, onValueChange = { startTime = it }, label = "Start", hint = "HH:mm", placeholder = "09:00")
+                    }
+                    Box(Modifier.weight(1f)) {
+                        VInput(value = endTime, onValueChange = { endTime = it }, label = "End", hint = "HH:mm", placeholder = "10:00")
+                    }
+                }
+
+                // Teacher selection
+                Text("Teacher", style = VTheme.type.caption.colored(VTheme.colors.ink2))
+                if (teachers.isEmpty()) {
+                    Text("No teachers yet. Add one below.", style = VTheme.type.caption.colored(VTheme.colors.ink3))
+                } else {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        teachers.forEach { teacher ->
+                            VBadge(
+                                text = teacher.profile.name.ifBlank { teacher.id.take(8) },
+                                tone = if (selectedTeacherId == teacher.id) VBadgeTone.Arctic else VBadgeTone.Neutral,
+                                modifier = Modifier.clickable { selectedTeacherId = teacher.id },
+                            )
+                        }
+                    }
+                }
+                VBadge(
+                    text = "+ New Teacher",
+                    tone = VBadgeTone.Success,
+                    modifier = Modifier.clickable { showNewTeacher = true },
+                )
+
+                // Subject selection
+                Text("Subject", style = VTheme.type.caption.colored(VTheme.colors.ink2))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    subjectsForClass.forEach { sub ->
+                        VBadge(
+                            text = sub.name,
+                            tone = if (subjectName == sub.name) VBadgeTone.Arctic else VBadgeTone.Neutral,
+                            modifier = Modifier.clickable { subjectName = sub.name },
+                        )
+                    }
+                    if (selectedClass != null) {
+                        VBadge(
+                            text = "+ New",
+                            tone = VBadgeTone.Success,
+                            modifier = Modifier.clickable { showNewSubject = true },
+                        )
+                    }
+                }
+                if (subjectName.isBlank() && subjectsForClass.isEmpty() && selectedClass != null) {
+                    VInput(
+                        value = subjectName,
+                        onValueChange = { subjectName = it },
+                        label = "Subject Name",
+                        hint = "Type subject name",
+                        placeholder = "e.g. Mathematics",
+                    )
+                }
+
+                // Room
+                VInput(value = room, onValueChange = { room = it }, label = "Room", hint = "e.g. 101", placeholder = "101")
+
+                // Actions
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    VButton(text = "Cancel", onClick = onDismiss, variant = VButtonVariant.Ghost)
+                    if (editingPeriod != null) {
+                        VButton(
+                            text = "Remove",
+                            onClick = onRemove,
+                            variant = VButtonVariant.Destructive,
+                        )
+                    }
+                    VButton(
+                        text = if (editingPeriod != null) "Update" else "Add Period",
+                        onClick = {
+                            val tid = selectedTeacherId.ifBlank { return@VButton }
+                            val sn = subjectName.trim().ifBlank { return@VButton }
+                            val st = startTime.trim().ifBlank { return@VButton }
+                            val et = endTime.trim().ifBlank { return@VButton }
+                            onSave(tid, sn, st, et, room.trim())
+                        },
+                        variant = VButtonVariant.Primary,
+                        tone = VButtonTone.Teal,
+                        loading = isSaving,
+                    )
+                }
+            }
+        }
+    }
+
+    if (showNewTeacher) {
+        InlineCreateTeacherDialog(
+            isSaving = isSaving,
+            onCreate = { name, identifier ->
+                onCreateTeacherInline(name, identifier) {
+                    showNewTeacher = false
+                    selectedTeacherId = state.teachers.lastOrNull()?.id ?: ""
+                }
+            },
+            onDismiss = { showNewTeacher = false },
+        )
+    }
+
+    if (showNewSubject && selectedClass != null) {
+        InlineCreateSubjectDialog(
+            isSaving = isSaving,
+            onCreate = { name, code ->
+                onCreateSubjectInline(selectedClass.id, name, code) {
+                    showNewSubject = false
+                    subjectName = name
+                }
+            },
+            onDismiss = { showNewSubject = false },
+        )
     }
 }
 
