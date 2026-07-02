@@ -249,6 +249,7 @@ object DatabaseFactory {
         PewsRiskSnapshotsTable,
         PewsInterventionsTable,
         PewsConfigTable,
+        PewsNudgeSeenTable,
         PewsFeatureFlagsTable,
         PewsCaseFilesTable,
         PewsEffectivenessPriorsTable,

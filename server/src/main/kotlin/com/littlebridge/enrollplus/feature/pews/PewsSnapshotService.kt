@@ -602,6 +602,7 @@ class PewsSnapshotService {
         val leadingScore: Int? = null,
         val causeFamily: String? = null,
         val deltasJson: String? = null,
+        val hasOpenIntervention: Boolean = false,
     )
 
     /** The most recent run_date that has snapshots for a school (or null). */
@@ -724,7 +725,7 @@ class PewsSnapshotService {
         )
     }
 
-    /** Enrich stored snapshots with student identity (name/class/section). */
+    /** Enrich stored snapshots with student identity (name/class/section) + open intervention flag. */
     suspend fun enrichIdentity(
         schoolId: UUID, snaps: List<StoredSnapshot>,
     ): List<StoredSnapshot> {
@@ -739,11 +740,20 @@ class PewsSnapshotService {
                 )
             }
         }
+        // Batch-check for open/in_progress interventions
+        val openInterventionCodes = dbQuery {
+            com.littlebridge.enrollplus.db.PewsInterventionsTable.selectAll().where {
+                (com.littlebridge.enrollplus.db.PewsInterventionsTable.schoolId eq schoolId) and
+                    (com.littlebridge.enrollplus.db.PewsInterventionsTable.studentCode inList codes) and
+                    (com.littlebridge.enrollplus.db.PewsInterventionsTable.status inList listOf("open", "in_progress"))
+            }.map { it[com.littlebridge.enrollplus.db.PewsInterventionsTable.studentCode] }.toSet()
+        }
         return snaps.map { s ->
             val id = byCode[s.studentCode]
-            if (id == null) s else s.copy(
+            val enriched = if (id == null) s else s.copy(
                 studentName = id.first, className = id.second, section = id.third
             )
+            if (s.studentCode in openInterventionCodes) enriched.copy(hasOpenIntervention = true) else enriched
         }
     }
 

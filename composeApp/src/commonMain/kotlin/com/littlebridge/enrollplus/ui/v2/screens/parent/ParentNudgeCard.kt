@@ -59,6 +59,7 @@ import com.littlebridge.enrollplus.ui.v2.theme.colored
 fun ParentNudgeCard(
     nudge: PewsParentNudgeDto,
     onAction: (PewsParentActionDto) -> Unit,
+    onDismiss: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val c = VTheme.colors
@@ -116,6 +117,17 @@ fun ParentNudgeCard(
                     )
                 }
             }
+        }
+
+        // Dismiss row — "Got it" lets the parent clear the card after reading.
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            VButton(
+                text = "Got it",
+                onClick = onDismiss,
+                variant = VButtonVariant.Ghost,
+                size = VButtonSize.Sm,
+            )
         }
     }
 }

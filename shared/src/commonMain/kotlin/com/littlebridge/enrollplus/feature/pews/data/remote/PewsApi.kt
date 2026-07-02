@@ -181,4 +181,11 @@ class PewsApi(
     ): NetworkResult<ApiResponse<PewsParentNudgeDto>> = safeApiCall {
         client.get(getUrl("api/v1/parent/pews/$childId"))
     }
+
+    suspend fun ackParentNudge(
+        token: String,
+        childId: String,
+    ): NetworkResult<ApiResponse<Map<String, Boolean>>> = safeApiCall {
+        client.post(getUrl("api/v1/parent/pews/$childId/ack"))
+    }
 }

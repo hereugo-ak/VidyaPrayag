@@ -76,4 +76,7 @@ class PewsRepositoryImpl(
 
     override suspend fun getParentNudge(token: String, childId: String): NetworkResult<ApiResponse<PewsParentNudgeDto>> =
         api.getParentNudge(token, childId)
+
+    override suspend fun acknowledgeNudge(token: String, childId: String): NetworkResult<ApiResponse<Map<String, Boolean>>> =
+        api.ackParentNudge(token, childId)
 }

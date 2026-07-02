@@ -2616,6 +2616,15 @@ object PewsConfigTable : UUIDTable("pews_config", "id") {
     val updatedAt             = timestamp("updated_at")
 }
 
+/** Tracks when a parent has viewed the PEWS nudge for a child on a given run date. */
+object PewsNudgeSeenTable : UUIDTable("pews_nudge_seen", "id") {
+    val childId          = uuid("child_id")
+    val parentId         = uuid("parent_id")
+    val snapshotRunDate  = date("snapshot_run_date")
+    val seenAt           = timestamp("seen_at")
+    init { index("idx_pews_nudge_seen", false, childId, parentId, snapshotRunDate) }
+}
+
 // =====================================================================
 // PEWS 2.0 — Feature flags / kill switch (hot-reloadable via polling).
 // One row per module name. "global" = entire PEWS kill switch.
