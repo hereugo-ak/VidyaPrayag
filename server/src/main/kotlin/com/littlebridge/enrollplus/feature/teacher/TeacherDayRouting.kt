@@ -530,13 +530,29 @@ private fun resolveDayInTxn(
     resolved.sortWith(compareBy({ it.start }, { it.end }))
 
     // ── 7. attendanceMarked — ONE batched query (kills B-HOME-1 N+1) ────────────
-    // attendance_records.grade is "<className>-<section>" (TeacherRoutingTasks).
-    // A class counts as "marked" for the date if ANY student row exists for that
-    // grade. CANCELLED periods never solicit attendance, so they aren't marked.
+    // Attendance is saved with assignment_id (the typed FK). A class counts as
+    // "marked" for the date if ANY student row exists for that assignment_id.
+    // Fallback: also check the legacy grade column ("<className>-<section>") for
+    // rows written before the typed migration.
+    // CANCELLED periods never solicit attendance, so they aren't marked.
+    val assignmentIdsNeeded = resolved
+        .filter { it.status != KIND_CANCELLED && it.assignmentId != null }
+        .mapNotNull { it.assignmentId }
+        .toSet()
     val gradesNeeded = resolved
         .filter { it.status != KIND_CANCELLED && it.className.isNotBlank() }
         .map { "${it.className}-${it.section}" }
         .toSet()
+    val markedAssignmentIds: Set<UUID> = if (assignmentIdsNeeded.isEmpty()) {
+        emptySet()
+    } else {
+        AttendanceRecordsTable.selectAll().where {
+            (AttendanceRecordsTable.schoolId eq ctx.schoolId) and
+                (AttendanceRecordsTable.date eq date) and
+                (AttendanceRecordsTable.type eq "student") and
+                (AttendanceRecordsTable.assignmentId inList assignmentIdsNeeded.toList())
+        }.mapNotNull { it[AttendanceRecordsTable.assignmentId] }.toSet()
+    }
     val markedGrades: Set<String> = if (gradesNeeded.isEmpty()) {
         emptySet()
     } else {
@@ -591,7 +607,10 @@ private fun resolveDayInTxn(
             startTime = p.start.format(HHMM_DAY),
             endTime = p.end.format(HHMM_DAY),
             status = p.status,
-            attendanceMarked = p.status != KIND_CANCELLED && grade in markedGrades,
+            attendanceMarked = p.status != KIND_CANCELLED && (
+                (p.assignmentId != null && p.assignmentId in markedAssignmentIds) ||
+                grade in markedGrades
+            ),
             substituteTeacherName = p.substituteName,
             isSubstituteForMe = p.isSubstituteForMe,
             hasOverlap = idx in overlapped,
