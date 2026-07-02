@@ -4,10 +4,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.littlebridge.enrollplus.core.network.NetworkResult
 import com.littlebridge.enrollplus.core.prefs.PreferenceRepository
+import com.littlebridge.enrollplus.feature.admin.domain.model.BulkCreatePeriodsRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.BulkCreatePeriodsResponse
+import com.littlebridge.enrollplus.feature.admin.domain.model.BulkPeriodItem
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreateSchoolClassRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreateSchoolSubjectRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.CreateTeacherRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolClassDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolSubjectDto
+import com.littlebridge.enrollplus.feature.admin.domain.model.TeacherCardDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.ChangeRequestListResponse
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreateChangeRequestRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreateExceptionRequest
@@ -22,6 +27,7 @@ import com.littlebridge.enrollplus.feature.admin.domain.model.UpdatePeriodReques
 import com.littlebridge.enrollplus.feature.admin.domain.model.UpdateSchoolClassRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.UpdateSchoolSubjectRequest
 import com.littlebridge.enrollplus.feature.admin.domain.repository.SchoolClassesRepository
+import com.littlebridge.enrollplus.feature.admin.domain.repository.TeachersRepository
 import com.littlebridge.enrollplus.util.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +38,7 @@ import kotlinx.coroutines.launch
 data class ClassesSubjectsState(
     val classes: List<SchoolClassDto> = emptyList(),
     val subjectsByClass: Map<String, List<SchoolSubjectDto>> = emptyMap(),
+    val teachers: List<TeacherCardDto> = emptyList(),
     val timetable: TimetableDto? = null,
     val selectedClassId: String? = null,
     val exceptions: List<PeriodExceptionDto> = emptyList(),
@@ -45,6 +52,7 @@ data class ClassesSubjectsState(
 class ClassesSubjectsViewModel(
     private val repository: SchoolClassesRepository,
     private val preferenceRepository: PreferenceRepository,
+    private val teachersRepository: TeachersRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ClassesSubjectsState())
@@ -52,6 +60,53 @@ class ClassesSubjectsViewModel(
 
     init {
         loadClasses()
+        loadTeachers()
+    }
+
+    // ── Teachers (for timetable dropdowns) ─────────────────────────────────────
+
+    fun loadTeachers() {
+        viewModelScope.launch {
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) return@launch
+            when (val r = teachersRepository.getTeachers(token, page = 1, pageSize = 100)) {
+                is NetworkResult.Success -> {
+                    _state.value = _state.value.copy(teachers = r.data.data?.teachers ?: emptyList())
+                }
+                is NetworkResult.Error -> {
+                    AppLogger.e("ClassesVM", "teachers error: ${r.message}")
+                }
+                is NetworkResult.ConnectionError -> {}
+            }
+        }
+    }
+
+    fun createTeacherInline(name: String, identifier: String, onDone: (() -> Unit)? = null) {
+        if (name.isBlank() || identifier.isBlank()) {
+            _state.value = _state.value.copy(errorMessage = "Teacher name and identifier (email/phone) are required.")
+            return
+        }
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isSaving = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isSaving = false, errorMessage = "Not signed in")
+                return@launch
+            }
+            when (val r = teachersRepository.createTeacher(token, CreateTeacherRequest(name.trim(), identifier.trim()))) {
+                is NetworkResult.Success -> {
+                    _state.value = _state.value.copy(isSaving = false, infoMessage = "Teacher created")
+                    onDone?.invoke()
+                    loadTeachers()
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = r.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = "Connection error. Check your internet.")
+                }
+            }
+        }
     }
 
     // ── Classes ────────────────────────────────────────────────────────────────
@@ -297,7 +352,7 @@ class ClassesSubjectsViewModel(
 
     // ── Period CRUD ────────────────────────────────────────────────────────────
 
-    fun createPeriod(assignmentId: String, weekday: Int, startTime: String, endTime: String, room: String, onDone: (() -> Unit)? = null) {
+    fun createPeriod(teacherId: String, className: String, section: String, subject: String, weekday: Int, startTime: String, endTime: String, room: String, onDone: (() -> Unit)? = null) {
         viewModelScope.launch {
             _state.value = _state.value.copy(isSaving = true, errorMessage = null)
             val token = preferenceRepository.getUserToken().first()
@@ -305,9 +360,37 @@ class ClassesSubjectsViewModel(
                 _state.value = _state.value.copy(isSaving = false, errorMessage = "Not signed in")
                 return@launch
             }
-            when (val r = repository.createPeriod(token, CreatePeriodRequest(assignmentId, weekday, startTime, endTime, room))) {
+            when (val r = repository.createPeriod(token, CreatePeriodRequest(teacherId, className, section, subject, weekday, startTime, endTime, room))) {
                 is NetworkResult.Success -> {
                     _state.value = _state.value.copy(isSaving = false, infoMessage = "Period created")
+                    onDone?.invoke()
+                    loadTimetable()
+                }
+                is NetworkResult.Error -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = r.message)
+                }
+                is NetworkResult.ConnectionError -> {
+                    _state.value = _state.value.copy(isSaving = false, errorMessage = "Connection error. Check your internet.")
+                }
+            }
+        }
+    }
+
+    fun bulkCreatePeriods(weekday: Int, periods: List<BulkPeriodItem>, onDone: (() -> Unit)? = null) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isSaving = true, errorMessage = null)
+            val token = preferenceRepository.getUserToken().first()
+            if (token.isNullOrBlank()) {
+                _state.value = _state.value.copy(isSaving = false, errorMessage = "Not signed in")
+                return@launch
+            }
+            when (val r = repository.bulkCreatePeriods(token, BulkCreatePeriodsRequest(weekday, periods))) {
+                is NetworkResult.Success -> {
+                    val data = r.data.data
+                    val msg = if (data != null && data.errorCount > 0) {
+                        "${data.createdCount} periods created, ${data.errorCount} errors"
+                    } else "${data?.createdCount ?: 0} periods created"
+                    _state.value = _state.value.copy(isSaving = false, infoMessage = msg)
                     onDone?.invoke()
                     loadTimetable()
                 }

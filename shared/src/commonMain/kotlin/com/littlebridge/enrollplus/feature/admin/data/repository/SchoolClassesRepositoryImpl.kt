@@ -11,6 +11,8 @@ import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolSubjectDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolSubjectListResponse
 import com.littlebridge.enrollplus.feature.admin.domain.model.ChangeRequestListResponse
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreateChangeRequestRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.BulkCreatePeriodsRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.BulkCreatePeriodsResponse
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreateExceptionRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreatePeriodRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.PeriodDetailDto
@@ -41,6 +43,7 @@ class SchoolClassesRepositoryImpl(
     override suspend fun getTimetable(token: String, classFilter: String?) = api.getTimetable(token, classFilter)
 
     override suspend fun createPeriod(token: String, req: CreatePeriodRequest) = api.createPeriod(token, req)
+    override suspend fun bulkCreatePeriods(token: String, req: BulkCreatePeriodsRequest) = api.bulkCreatePeriods(token, req)
     override suspend fun updatePeriod(token: String, id: String, req: UpdatePeriodRequest) = api.updatePeriod(token, id, req)
     override suspend fun deletePeriod(token: String, id: String) = api.deletePeriod(token, id)
 

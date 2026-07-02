@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,11 +34,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.littlebridge.enrollplus.feature.admin.domain.model.BulkPeriodItem
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreateExceptionRequest
-import com.littlebridge.enrollplus.feature.admin.domain.model.CreatePeriodRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.PeriodExceptionDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolClassDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolSubjectDto
+import com.littlebridge.enrollplus.feature.admin.domain.model.TeacherCardDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.TimetableChangeRequestDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.TimetablePeriodDto
 import com.littlebridge.enrollplus.feature.admin.presentation.ClassesSubjectsState
@@ -58,14 +60,16 @@ import com.littlebridge.enrollplus.ui.v2.screens.VSectionHeader
 import com.littlebridge.enrollplus.ui.v2.screens.VStateHost
 import com.littlebridge.enrollplus.ui.v2.screens.collectAsStateV2
 import com.littlebridge.enrollplus.ui.v2.theme.VTheme
+import com.littlebridge.enrollplus.ui.v2.theme.colored
 import org.koin.compose.viewmodel.koinViewModel
 
-private val TABS = listOf("Classes", "Subjects", "Bell Schedule", "Timetable", "Exceptions", "Requests")
+private val TABS = listOf("Classes", "Subjects", "Schedule", "Exceptions & Requests")
 private val WEEKDAY_NAMES = listOf("", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
 @Composable
 fun ClassesSubjectsScreenV2(
     onBack: () -> Unit = {},
+    onOpenClassDetail: (SchoolClassDto) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ClassesSubjectsViewModel = koinViewModel(),
 ) {
@@ -80,6 +84,7 @@ fun ClassesSubjectsScreenV2(
         when (activeTab) {
             "Classes" -> ClassesTab(
                 state = state,
+                onOpenClass = onOpenClassDetail,
                 onCreate = { code, name, sections, onDone -> viewModel.createClass(code, name, sections, onDone) },
                 onUpdate = { id, code, name, sections, onDone -> viewModel.updateClass(id, code, name, sections, onDone) },
                 onDelete = { id -> viewModel.deleteClass(id) },
@@ -91,23 +96,28 @@ fun ClassesSubjectsScreenV2(
                 onUpdateSubject = { subjectId, classId, name, code, onDone -> viewModel.updateSubject(subjectId, classId, name, code, onDone) },
                 onDeleteSubject = { subjectId, classId -> viewModel.deleteSubject(subjectId, classId) },
             )
-            "Bell Schedule" -> BellScheduleTab()
-            "Timetable" -> TimetableTab(
+            "Schedule" -> ScheduleTab(
                 state = state,
                 onLoadTimetable = { filter -> viewModel.loadTimetable(filter) },
-                onCreatePeriod = { assignmentId, weekday, startTime, endTime, room, onDone ->
-                    viewModel.createPeriod(assignmentId, weekday, startTime, endTime, room, onDone)
+                onCreatePeriod = { teacherId, className, section, subject, weekday, startTime, endTime, room, onDone ->
+                    viewModel.createPeriod(teacherId, className, section, subject, weekday, startTime, endTime, room, onDone)
+                },
+                onBulkCreatePeriods = { weekday, periods, onDone ->
+                    viewModel.bulkCreatePeriods(weekday, periods, onDone)
                 },
                 onDeletePeriod = { id -> viewModel.deletePeriod(id) },
+                onCreateTeacherInline = { name, identifier, onDone ->
+                    viewModel.createTeacherInline(name, identifier, onDone)
+                },
+                onCreateSubjectInline = { classId, name, code, onDone ->
+                    viewModel.createSubject(classId, name, code, onDone)
+                },
             )
-            "Exceptions" -> ExceptionsTab(
+            "Exceptions & Requests" -> ExceptionsRequestsTab(
                 state = state,
                 onLoadExceptions = { date -> viewModel.loadExceptions(date) },
                 onCreateException = { req, onDone -> viewModel.createException(req, onDone) },
                 onDeleteException = { id -> viewModel.deleteException(id) },
-            )
-            "Requests" -> ChangeRequestsTab(
-                state = state,
                 onLoadRequests = { status -> viewModel.loadChangeRequests(status) },
                 onApprove = { id, note -> viewModel.approveChangeRequest(id, note) },
                 onReject = { id, note -> viewModel.rejectChangeRequest(id, note) },
@@ -121,6 +131,7 @@ fun ClassesSubjectsScreenV2(
 @Composable
 private fun ClassesTab(
     state: ClassesSubjectsState,
+    onOpenClass: (SchoolClassDto) -> Unit,
     onCreate: (code: String, name: String, sections: List<String>, onDone: () -> Unit) -> Unit,
     onUpdate: (id: String, code: String, name: String, sections: List<String>, onDone: () -> Unit) -> Unit,
     onDelete: (id: String) -> Unit,
@@ -151,6 +162,7 @@ private fun ClassesTab(
             state.classes.forEach { cls ->
                 ClassCard(
                     cls = cls,
+                    onOpen = { onOpenClass(cls) },
                     onEdit = { editingClass = cls },
                     onDelete = { deleteTarget = cls },
                 )
@@ -200,35 +212,58 @@ private fun ClassesTab(
 @Composable
 private fun ClassCard(
     cls: SchoolClassDto,
+    onOpen: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    VCard(Modifier.fillMaxWidth().clickable { onEdit() }) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(cls.name, style = VTheme.type.h3, fontWeight = FontWeight.Bold, color = VTheme.colors.ink)
-                    VBadge(text = cls.code, tone = VBadgeTone.Arctic)
+    VCard(Modifier.fillMaxWidth()) {
+        Column {
+            Row(
+                Modifier.fillMaxWidth().clickable { onOpen() },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(cls.name, style = VTheme.type.h3, fontWeight = FontWeight.Bold, color = VTheme.colors.ink)
+                        VBadge(text = cls.code, tone = VBadgeTone.Arctic)
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        cls.sections.forEach { s ->
+                            VBadge(text = s, tone = VBadgeTone.Accent)
+                        }
+                        if (cls.sections.isEmpty()) {
+                            Text("No sections", style = VTheme.type.caption, color = VTheme.colors.ink3)
+                        }
+                        Spacer(Modifier.width(4.dp))
+                        Text("${cls.subjectCount} subjects", style = VTheme.type.caption, color = VTheme.colors.ink3)
+                    }
                 }
-                Spacer(Modifier.height(4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    cls.sections.forEach { s ->
-                        VBadge(text = s, tone = VBadgeTone.Accent)
-                    }
-                    if (cls.sections.isEmpty()) {
-                        Text("No sections", style = VTheme.type.caption, color = VTheme.colors.ink3)
-                    }
-                    Spacer(Modifier.width(4.dp))
-                    Text("${cls.subjectCount} subjects", style = VTheme.type.caption, color = VTheme.colors.ink3)
+                Box(
+                    Modifier.size(32.dp).clip(CircleShape)
+                        .background(VTheme.colors.tealDeep.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("›", color = VTheme.colors.tealDeep, fontWeight = FontWeight.Bold, style = VTheme.type.h3)
                 }
             }
-            Box(
-                Modifier.size(32.dp).clip(CircleShape)
-                    .background(VTheme.colors.dangerInk.copy(alpha = 0.1f))
-                    .clickable { onDelete() },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("×", color = VTheme.colors.dangerInk, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                VButton(
+                    text = "Edit",
+                    onClick = onEdit,
+                    variant = VButtonVariant.Secondary,
+                    tone = VButtonTone.Teal,
+                )
+                Box(
+                    Modifier.size(32.dp).clip(CircleShape)
+                        .background(VTheme.colors.dangerInk.copy(alpha = 0.1f))
+                        .clickable { onDelete() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("×", color = VTheme.colors.dangerInk, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
@@ -449,116 +484,201 @@ private fun SubjectEditDialog(
     }
 }
 
-// ── Bell Schedule Tab ─────────────────────────────────────────────────────────
-
-@Composable
-private fun BellScheduleTab() {
-    SchoolDayConfigEmbeddedV2(
-        modifier = Modifier.fillMaxSize(),
-    )
-}
-
-// ── Timetable Tab ─────────────────────────────────────────────────────────────
+// ── Schedule Tab (merged Bell Schedule + Timetable) ──────────────────────────
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TimetableTab(
+private fun ScheduleTab(
     state: ClassesSubjectsState,
     onLoadTimetable: (String?) -> Unit,
-    onCreatePeriod: (assignmentId: String, weekday: Int, startTime: String, endTime: String, room: String, onDone: () -> Unit) -> Unit,
+    onCreatePeriod: (teacherId: String, className: String, section: String, subject: String, weekday: Int, startTime: String, endTime: String, room: String, onDone: () -> Unit) -> Unit,
+    onBulkCreatePeriods: (weekday: Int, periods: List<BulkPeriodItem>, onDone: () -> Unit) -> Unit,
     onDeletePeriod: (String) -> Unit,
+    onCreateTeacherInline: (name: String, identifier: String, onDone: () -> Unit) -> Unit,
+    onCreateSubjectInline: (classId: String, name: String, code: String, onDone: () -> Unit) -> Unit,
 ) {
-    var selectedClassFilter by remember { mutableStateOf<String?>(null) }
-    var showAddDialog by remember { mutableStateOf(false) }
-    var deleteTargetId by remember { mutableStateOf<String?>(null) }
+    var scheduleMode by remember { mutableStateOf("structure") }
 
-    VStateHost(
-        loading = state.isLoading,
-        error = state.errorMessage,
-        isEmpty = state.timetable == null && !state.isLoading,
-        emptyTitle = "No timetable loaded",
-        emptyBody = "Tap 'Load Timetable' to view the weekly schedule.",
-        emptyIcon = VIcons.Calendar,
-    ) {
-        Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+    Column(Modifier.fillMaxSize()) {
+        // Mode toggle: Day Structure | Assignments
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            VSectionHeader("Timetable")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                VButton(
-                    text = "Load",
-                    onClick = { onLoadTimetable(selectedClassFilter) },
-                    variant = VButtonVariant.Primary,
-                    tone = VButtonTone.Teal,
-                )
-                VButton(
-                    text = "Add Period",
-                    onClick = { showAddDialog = true },
-                    variant = VButtonVariant.Secondary,
-                    tone = VButtonTone.Teal,
+            listOf("structure" to "Day Structure", "assignments" to "Assignments").forEach { (mode, label) ->
+                VBadge(
+                    text = label,
+                    tone = if (scheduleMode == mode) VBadgeTone.Arctic else VBadgeTone.Neutral,
+                    modifier = Modifier.clickable { scheduleMode = mode },
                 )
             }
-            val tt = state.timetable
-            if (tt != null) {
-                if (tt.classes.isNotEmpty()) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        VBadge(
-                            text = "All",
-                            tone = if (selectedClassFilter == null) VBadgeTone.Arctic else VBadgeTone.Neutral,
-                            modifier = Modifier.clickable {
-                                selectedClassFilter = null
-                                onLoadTimetable(null)
-                            },
-                        )
-                        tt.classes.forEach { cls ->
-                            VBadge(
-                                text = cls,
-                                tone = if (selectedClassFilter == cls) VBadgeTone.Arctic else VBadgeTone.Neutral,
-                                modifier = Modifier.clickable {
-                                    selectedClassFilter = cls
-                                    onLoadTimetable(cls)
-                                },
-                            )
-                        }
-                    }
-                }
-                if (tt.weekdays.isEmpty()) {
-                    VEmptyState(
-                        title = "No periods scheduled",
-                        icon = VIcons.Calendar,
-                        body = "The timetable is empty. Add periods to populate it.",
-                    )
-                }
-                tt.weekdays.forEach { day ->
-                    Text(
-                        WEEKDAY_NAMES.getOrElse(day.weekday) { "Day ${day.weekday}" },
-                        style = VTheme.type.h3,
-                        fontWeight = FontWeight.Bold,
-                        color = VTheme.colors.ink,
-                    )
-                    day.periods.forEach { period ->
-                        TimetablePeriodRow(
-                            period = period,
-                            onDelete = { deleteTargetId = period.id },
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                }
-            }
-            Spacer(Modifier.height(80.dp))
+        }
+
+        when (scheduleMode) {
+            "structure" -> SchoolDayConfigEmbeddedV2(
+                modifier = Modifier.fillMaxSize(),
+            )
+            "assignments" -> TimetableAssignmentsContent(
+                state = state,
+                onLoadTimetable = onLoadTimetable,
+                onCreatePeriod = onCreatePeriod,
+                onBulkCreatePeriods = onBulkCreatePeriods,
+                onDeletePeriod = onDeletePeriod,
+                onCreateTeacherInline = onCreateTeacherInline,
+                onCreateSubjectInline = onCreateSubjectInline,
+            )
         }
     }
+}
 
-    if (showAddDialog) {
-        PeriodEditDialog(
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TimetableAssignmentsContent(
+    state: ClassesSubjectsState,
+    onLoadTimetable: (String?) -> Unit,
+    onCreatePeriod: (teacherId: String, className: String, section: String, subject: String, weekday: Int, startTime: String, endTime: String, room: String, onDone: () -> Unit) -> Unit,
+    onBulkCreatePeriods: (weekday: Int, periods: List<BulkPeriodItem>, onDone: () -> Unit) -> Unit,
+    onDeletePeriod: (String) -> Unit,
+    onCreateTeacherInline: (name: String, identifier: String, onDone: () -> Unit) -> Unit,
+    onCreateSubjectInline: (classId: String, name: String, code: String, onDone: () -> Unit) -> Unit,
+) {
+    var selectedClassFilter by remember { mutableStateOf<String?>(null) }
+    var selectedDay by remember { mutableStateOf(1) }
+    var showCellEditor by remember { mutableStateOf(false) }
+    var deleteTargetId by remember { mutableStateOf<String?>(null) }
+    var showBulkEditor by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) { onLoadTimetable(null) }
+
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        VSectionHeader("Timetable Grid")
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            VButton(
+                text = "Refresh",
+                onClick = { onLoadTimetable(selectedClassFilter) },
+                variant = VButtonVariant.Secondary,
+                tone = VButtonTone.Teal,
+            )
+            VButton(
+                text = "Bulk Fill Day",
+                onClick = { showBulkEditor = true },
+                variant = VButtonVariant.Secondary,
+                tone = VButtonTone.Teal,
+            )
+        }
+
+        val tt = state.timetable
+        if (tt != null && tt.classes.isNotEmpty()) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                VBadge(
+                    text = "All",
+                    tone = if (selectedClassFilter == null) VBadgeTone.Arctic else VBadgeTone.Neutral,
+                    modifier = Modifier.clickable {
+                        selectedClassFilter = null
+                        onLoadTimetable(null)
+                    },
+                )
+                tt.classes.forEach { cls ->
+                    VBadge(
+                        text = cls,
+                        tone = if (selectedClassFilter == cls) VBadgeTone.Arctic else VBadgeTone.Neutral,
+                        modifier = Modifier.clickable {
+                            selectedClassFilter = cls
+                            onLoadTimetable(cls)
+                        },
+                    )
+                }
+            }
+        }
+
+        if (tt == null || tt.weekdays.isEmpty()) {
+            VEmptyState(
+                title = "No timetable yet",
+                icon = VIcons.Calendar,
+                body = "Select a day and tap a time slot to start building your weekly schedule.",
+            )
+        } else {
+            Text("Select Day", style = VTheme.type.body, fontWeight = FontWeight.Medium, color = VTheme.colors.ink)
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                (1..7).forEach { day ->
+                    VBadge(
+                        text = WEEKDAY_NAMES[day],
+                        tone = if (selectedDay == day) VBadgeTone.Arctic else VBadgeTone.Neutral,
+                        modifier = Modifier.clickable { selectedDay = day },
+                    )
+                }
+            }
+
+            val dayData = tt.weekdays.find { it.weekday == selectedDay }
+            if (dayData == null || dayData.periods.isEmpty()) {
+                VEmptyState(
+                    title = "No periods for ${WEEKDAY_NAMES[selectedDay]}",
+                    icon = VIcons.Calendar,
+                    body = "Tap 'Add Period' to start filling this day.",
+                )
+            } else {
+                dayData.periods.forEach { period ->
+                    TimetablePeriodRow(
+                        period = period,
+                        onDelete = { deleteTargetId = period.id },
+                    )
+                }
+            }
+
+            VButton(
+                text = "+ Add Period",
+                onClick = { showCellEditor = true },
+                full = true,
+                variant = VButtonVariant.Primary,
+                tone = VButtonTone.Teal,
+            )
+        }
+
+        val info = state.infoMessage
+        if (info != null) {
+            Text(info, style = VTheme.type.caption.colored(VTheme.colors.successInk))
+        }
+        val err = state.errorMessage
+        if (err != null) {
+            Text(err, style = VTheme.type.caption.colored(VTheme.colors.dangerInk))
+        }
+
+        Spacer(Modifier.height(80.dp))
+    }
+
+    if (showCellEditor) {
+        CellEditorDialog(
+            state = state,
+            weekday = selectedDay,
             isSaving = state.isSaving,
-            onSave = { assignmentId, weekday, startTime, endTime, room ->
-                onCreatePeriod(assignmentId, weekday, startTime, endTime, room) { showAddDialog = false }
+            onSave = { teacherId, className, section, subject, startTime, endTime, room ->
+                onCreatePeriod(teacherId, className, section, subject, selectedDay, startTime, endTime, room) {
+                    showCellEditor = false
+                }
             },
-            onDismiss = { showAddDialog = false },
+            onDismiss = { showCellEditor = false },
+            onCreateTeacherInline = onCreateTeacherInline,
+            onCreateSubjectInline = onCreateSubjectInline,
         )
     }
+
+    if (showBulkEditor) {
+        BulkDayEditorDialog(
+            state = state,
+            weekday = selectedDay,
+            isSaving = state.isSaving,
+            onSave = { periods ->
+                onBulkCreatePeriods(selectedDay, periods) { showBulkEditor = false }
+            },
+            onDismiss = { showBulkEditor = false },
+            onCreateTeacherInline = onCreateTeacherInline,
+        )
+    }
+
     deleteTargetId?.let { id ->
         VConfirmDialog(
             visible = true,
@@ -614,84 +734,453 @@ private fun TimetablePeriodRow(
     }
 }
 
-// ── Period Edit Dialog ────────────────────────────────────────────────────────
-
-@Composable
-private fun PeriodEditDialog(
-    isSaving: Boolean,
-    onSave: (assignmentId: String, weekday: Int, startTime: String, endTime: String, room: String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var assignmentId by remember { mutableStateOf("") }
-    var weekday by remember { mutableStateOf(1) }
-    var startTime by remember { mutableStateOf("09:00") }
-    var endTime by remember { mutableStateOf("10:00") }
-    var room by remember { mutableStateOf("") }
-
-    Dialog(onDismissRequest = onDismiss) {
-    VCard(Modifier.fillMaxWidth().padding(16.dp)) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Add Period", style = VTheme.type.h3, fontWeight = FontWeight.Bold, color = VTheme.colors.ink)
-            VInput(
-                value = assignmentId,
-                onValueChange = { assignmentId = it },
-                label = "Assignment ID",
-                hint = "Teacher-Subject Assignment UUID",
-                placeholder = "uuid...",
-            )
-            Text("Weekday: ${WEEKDAY_NAMES.getOrElse(weekday) { "Day $weekday" }}", style = VTheme.type.body, color = VTheme.colors.ink2)
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                (1..7).forEach { day ->
-                    VBadge(
-                        text = WEEKDAY_NAMES[day],
-                        tone = if (weekday == day) VBadgeTone.Arctic else VBadgeTone.Neutral,
-                        modifier = Modifier.clickable { weekday = day },
-                    )
-                }
-            }
-            VInput(value = startTime, onValueChange = { startTime = it }, label = "Start Time", hint = "HH:mm", placeholder = "09:00")
-            VInput(value = endTime, onValueChange = { endTime = it }, label = "End Time", hint = "HH:mm", placeholder = "10:00")
-            VInput(value = room, onValueChange = { room = it }, label = "Room", hint = "e.g. 101", placeholder = "101")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                VButton(text = "Cancel", onClick = onDismiss, variant = VButtonVariant.Ghost)
-                VButton(
-                    text = "Save",
-                    onClick = { onSave(assignmentId.trim(), weekday, startTime.trim(), endTime.trim(), room.trim()) },
-                    variant = VButtonVariant.Primary,
-                    tone = VButtonTone.Teal,
-                    loading = isSaving,
-                )
-            }
-        }
-    }
-    }
-}
-
-// ── Exceptions Tab ────────────────────────────────────────────────────────────
+// ── Cell Editor Dialog (single period with dropdowns) ─────────────────────────
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ExceptionsTab(
+private fun CellEditorDialog(
+    state: ClassesSubjectsState,
+    weekday: Int,
+    isSaving: Boolean,
+    onSave: (teacherId: String, className: String, section: String, subject: String, startTime: String, endTime: String, room: String) -> Unit,
+    onDismiss: () -> Unit,
+    onCreateTeacherInline: (name: String, identifier: String, onDone: () -> Unit) -> Unit,
+    onCreateSubjectInline: (classId: String, name: String, code: String, onDone: () -> Unit) -> Unit,
+) {
+    var selectedTeacherId by remember { mutableStateOf<String?>(null) }
+    var selectedClassName by remember { mutableStateOf<String?>(null) }
+    var selectedSection by remember { mutableStateOf("A") }
+    var subjectName by remember { mutableStateOf("") }
+    var startTime by remember { mutableStateOf("09:00") }
+    var endTime by remember { mutableStateOf("10:00") }
+    var room by remember { mutableStateOf("") }
+    var showNewTeacher by remember { mutableStateOf(false) }
+    var showNewSubject by remember { mutableStateOf(false) }
+
+    val teachers = state.teachers
+    val classes = state.classes
+    val selectedClass = classes.find { it.name == selectedClassName }
+    val subjectsForClass = selectedClass?.let { state.subjectsByClass[it.id] } ?: emptyList()
+
+    Dialog(onDismissRequest = onDismiss) {
+        VCard(Modifier.fillMaxWidth().padding(16.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Add Period — ${WEEKDAY_NAMES[weekday]}", style = VTheme.type.h3, fontWeight = FontWeight.Bold, color = VTheme.colors.ink)
+
+                Text("Teacher", style = VTheme.type.caption, color = VTheme.colors.ink2)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    teachers.forEach { teacher ->
+                        VBadge(
+                            text = teacher.profile.name.ifBlank { teacher.id.take(8) },
+                            tone = if (selectedTeacherId == teacher.id) VBadgeTone.Arctic else VBadgeTone.Neutral,
+                            modifier = Modifier.clickable { selectedTeacherId = teacher.id },
+                        )
+                    }
+                    VBadge(
+                        text = "+ New",
+                        tone = VBadgeTone.Success,
+                        modifier = Modifier.clickable { showNewTeacher = true },
+                    )
+                }
+
+                Text("Class", style = VTheme.type.caption, color = VTheme.colors.ink2)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    classes.forEach { cls ->
+                        VBadge(
+                            text = cls.name,
+                            tone = if (selectedClassName == cls.name) VBadgeTone.Arctic else VBadgeTone.Neutral,
+                            modifier = Modifier.clickable {
+                                selectedClassName = cls.name
+                                selectedSection = cls.sections.firstOrNull() ?: "A"
+                                subjectName = ""
+                            },
+                        )
+                    }
+                }
+
+                if (selectedClass != null && selectedClass.sections.size > 1) {
+                    Text("Section", style = VTheme.type.caption, color = VTheme.colors.ink2)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        selectedClass.sections.forEach { sec ->
+                            VBadge(
+                                text = sec,
+                                tone = if (selectedSection == sec) VBadgeTone.Accent else VBadgeTone.Neutral,
+                                modifier = Modifier.clickable { selectedSection = sec },
+                            )
+                        }
+                    }
+                }
+
+                Text("Subject", style = VTheme.type.caption, color = VTheme.colors.ink2)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    subjectsForClass.forEach { sub ->
+                        VBadge(
+                            text = sub.name,
+                            tone = if (subjectName == sub.name) VBadgeTone.Arctic else VBadgeTone.Neutral,
+                            modifier = Modifier.clickable { subjectName = sub.name },
+                        )
+                    }
+                    if (selectedClass != null) {
+                        VBadge(
+                            text = "+ New",
+                            tone = VBadgeTone.Success,
+                            modifier = Modifier.clickable { showNewSubject = true },
+                        )
+                    }
+                }
+                if (subjectName.isBlank() && subjectsForClass.isEmpty() && selectedClass != null) {
+                    VInput(
+                        value = subjectName,
+                        onValueChange = { subjectName = it },
+                        label = "Subject Name",
+                        hint = "Type subject name",
+                        placeholder = "e.g. Mathematics",
+                    )
+                }
+
+                VInput(value = startTime, onValueChange = { startTime = it }, label = "Start Time", hint = "HH:mm", placeholder = "09:00")
+                VInput(value = endTime, onValueChange = { endTime = it }, label = "End Time", hint = "HH:mm", placeholder = "10:00")
+                VInput(value = room, onValueChange = { room = it }, label = "Room", hint = "e.g. 101", placeholder = "101")
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    VButton(text = "Cancel", onClick = onDismiss, variant = VButtonVariant.Ghost)
+                    VButton(
+                        text = "Save Period",
+                        onClick = {
+                            val tid = selectedTeacherId ?: return@VButton
+                            val cn = selectedClassName ?: return@VButton
+                            val sn = subjectName.trim().ifBlank { return@VButton }
+                            onSave(tid, cn, selectedSection, sn, startTime.trim(), endTime.trim(), room.trim())
+                        },
+                        variant = VButtonVariant.Primary,
+                        tone = VButtonTone.Teal,
+                        loading = isSaving,
+                    )
+                }
+            }
+        }
+    }
+
+    if (showNewTeacher) {
+        InlineCreateTeacherDialog(
+            isSaving = isSaving,
+            onCreate = { name, identifier ->
+                onCreateTeacherInline(name, identifier) {
+                    showNewTeacher = false
+                    selectedTeacherId = state.teachers.lastOrNull()?.id
+                }
+            },
+            onDismiss = { showNewTeacher = false },
+        )
+    }
+
+    if (showNewSubject && selectedClass != null) {
+        InlineCreateSubjectDialog(
+            isSaving = isSaving,
+            onCreate = { name, code ->
+                onCreateSubjectInline(selectedClass.id, name, code) {
+                    showNewSubject = false
+                    subjectName = name
+                }
+            },
+            onDismiss = { showNewSubject = false },
+        )
+    }
+}
+
+// ── Bulk Day Editor Dialog ────────────────────────────────────────────────────
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun BulkDayEditorDialog(
+    state: ClassesSubjectsState,
+    weekday: Int,
+    isSaving: Boolean,
+    onSave: (List<BulkPeriodItem>) -> Unit,
+    onDismiss: () -> Unit,
+    onCreateTeacherInline: (name: String, identifier: String, onDone: () -> Unit) -> Unit,
+) {
+    val teachers = state.teachers
+    val classes = state.classes
+    var periods by remember { mutableStateOf(listOf(BulkPeriodRow())) }
+    var showNewTeacher by remember { mutableStateOf(false) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        VCard(Modifier.fillMaxWidth().padding(16.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Bulk Fill — ${WEEKDAY_NAMES[weekday]}", style = VTheme.type.h3, fontWeight = FontWeight.Bold, color = VTheme.colors.ink)
+
+                periods.forEachIndexed { index, row ->
+                    BulkPeriodRowEditor(
+                        row = row,
+                        teachers = teachers,
+                        classes = classes,
+                        subjectsByClass = state.subjectsByClass,
+                        onUpdate = { updated ->
+                            periods = periods.toMutableList().also { it[index] = updated }
+                        },
+                        onRemove = {
+                            periods = periods.toMutableList().also { it.removeAt(index) }
+                        },
+                        canRemove = periods.size > 1,
+                    )
+                }
+
+                VButton(
+                    text = "+ Add Row",
+                    onClick = { periods = periods + BulkPeriodRow() },
+                    full = true,
+                    variant = VButtonVariant.Secondary,
+                    tone = VButtonTone.Teal,
+                )
+
+                VBadge(
+                    text = "+ New Teacher",
+                    tone = VBadgeTone.Success,
+                    modifier = Modifier.clickable { showNewTeacher = true },
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    VButton(text = "Cancel", onClick = onDismiss, variant = VButtonVariant.Ghost)
+                    VButton(
+                        text = "Save All (${periods.size})",
+                        onClick = {
+                            val items = periods.mapNotNull { row ->
+                                val tid = row.teacherId ?: return@mapNotNull null
+                                val cn = row.className ?: return@mapNotNull null
+                                val sn = row.subject.trim().ifBlank { return@mapNotNull null }
+                                BulkPeriodItem(
+                                    teacherId = tid,
+                                    className = cn,
+                                    section = row.section,
+                                    subject = sn,
+                                    startTime = row.startTime.trim(),
+                                    endTime = row.endTime.trim(),
+                                    room = row.room.trim(),
+                                )
+                            }
+                            if (items.isNotEmpty()) onSave(items)
+                        },
+                        variant = VButtonVariant.Primary,
+                        tone = VButtonTone.Teal,
+                        loading = isSaving,
+                    )
+                }
+            }
+        }
+    }
+
+    if (showNewTeacher) {
+        InlineCreateTeacherDialog(
+            isSaving = isSaving,
+            onCreate = { name, identifier ->
+                onCreateTeacherInline(name, identifier) {
+                    showNewTeacher = false
+                }
+            },
+            onDismiss = { showNewTeacher = false },
+        )
+    }
+}
+
+private data class BulkPeriodRow(
+    val teacherId: String? = null,
+    val className: String? = null,
+    val section: String = "A",
+    val subject: String = "",
+    val startTime: String = "09:00",
+    val endTime: String = "10:00",
+    val room: String = "",
+)
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun BulkPeriodRowEditor(
+    row: BulkPeriodRow,
+    teachers: List<TeacherCardDto>,
+    classes: List<SchoolClassDto>,
+    subjectsByClass: Map<String, List<SchoolSubjectDto>>,
+    onUpdate: (BulkPeriodRow) -> Unit,
+    onRemove: () -> Unit,
+    canRemove: Boolean,
+) {
+    val selectedClass = classes.find { it.name == row.className }
+    val subjectsForClass = selectedClass?.let { subjectsByClass[it.id] } ?: emptyList()
+
+    VCard(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                teachers.forEach { teacher ->
+                    VBadge(
+                        text = teacher.profile.name.ifBlank { teacher.id.take(8) },
+                        tone = if (row.teacherId == teacher.id) VBadgeTone.Arctic else VBadgeTone.Neutral,
+                        modifier = Modifier.clickable { onUpdate(row.copy(teacherId = teacher.id)) },
+                    )
+                }
+            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                classes.forEach { cls ->
+                    VBadge(
+                        text = cls.name,
+                        tone = if (row.className == cls.name) VBadgeTone.Arctic else VBadgeTone.Neutral,
+                        modifier = Modifier.clickable {
+                            onUpdate(row.copy(className = cls.name, section = cls.sections.firstOrNull() ?: "A", subject = ""))
+                        },
+                    )
+                }
+            }
+            if (selectedClass != null && selectedClass.sections.size > 1) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    selectedClass.sections.forEach { sec ->
+                        VBadge(
+                            text = sec,
+                            tone = if (row.section == sec) VBadgeTone.Accent else VBadgeTone.Neutral,
+                            modifier = Modifier.clickable { onUpdate(row.copy(section = sec)) },
+                        )
+                    }
+                }
+            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                subjectsForClass.forEach { sub ->
+                    VBadge(
+                        text = sub.name,
+                        tone = if (row.subject == sub.name) VBadgeTone.Arctic else VBadgeTone.Neutral,
+                        modifier = Modifier.clickable { onUpdate(row.copy(subject = sub.name)) },
+                    )
+                }
+            }
+            if (row.subject.isBlank() && subjectsForClass.isEmpty() && selectedClass != null) {
+                VInput(
+                    value = row.subject,
+                    onValueChange = { onUpdate(row.copy(subject = it)) },
+                    label = "Subject",
+                    hint = "Type subject name",
+                    placeholder = "e.g. Physics",
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                VInput(value = row.startTime, onValueChange = { onUpdate(row.copy(startTime = it)) }, label = "Start", hint = "HH:mm", placeholder = "09:00")
+                VInput(value = row.endTime, onValueChange = { onUpdate(row.copy(endTime = it)) }, label = "End", hint = "HH:mm", placeholder = "10:00")
+            }
+            VInput(value = row.room, onValueChange = { onUpdate(row.copy(room = it)) }, label = "Room", hint = "e.g. 101", placeholder = "101")
+            if (canRemove) {
+                VButton(text = "Remove", onClick = onRemove, variant = VButtonVariant.Destructive, full = true)
+            }
+        }
+    }
+}
+
+// ── Inline Create Dialogs ─────────────────────────────────────────────────────
+
+@Composable
+private fun InlineCreateTeacherDialog(
+    isSaving: Boolean,
+    onCreate: (name: String, identifier: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    var identifier by remember { mutableStateOf("") }
+
+    Dialog(onDismissRequest = onDismiss) {
+        VCard(Modifier.fillMaxWidth().padding(16.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("New Teacher", style = VTheme.type.h3, fontWeight = FontWeight.Bold, color = VTheme.colors.ink)
+                VInput(value = name, onValueChange = { name = it }, label = "Full Name", hint = "Teacher name", placeholder = "John Doe")
+                VInput(value = identifier, onValueChange = { identifier = it }, label = "Email or Phone", hint = "Login identifier", placeholder = "john@school.edu")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    VButton(text = "Cancel", onClick = onDismiss, variant = VButtonVariant.Ghost)
+                    VButton(
+                        text = "Create",
+                        onClick = { onCreate(name.trim(), identifier.trim()) },
+                        variant = VButtonVariant.Primary,
+                        tone = VButtonTone.Teal,
+                        loading = isSaving,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InlineCreateSubjectDialog(
+    isSaving: Boolean,
+    onCreate: (name: String, code: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+
+    Dialog(onDismissRequest = onDismiss) {
+        VCard(Modifier.fillMaxWidth().padding(16.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("New Subject", style = VTheme.type.h3, fontWeight = FontWeight.Bold, color = VTheme.colors.ink)
+                VInput(value = name, onValueChange = { name = it }, label = "Subject Name", hint = "e.g. Mathematics", placeholder = "Mathematics")
+                VInput(value = code, onValueChange = { code = it }, label = "Subject Code", hint = "e.g. MATH", placeholder = "MATH")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    VButton(text = "Cancel", onClick = onDismiss, variant = VButtonVariant.Ghost)
+                    VButton(
+                        text = "Create",
+                        onClick = { onCreate(name.trim(), code.trim()) },
+                        variant = VButtonVariant.Primary,
+                        tone = VButtonTone.Teal,
+                        loading = isSaving,
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ── Exceptions & Requests Tab (merged) ────────────────────────────────────────
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ExceptionsRequestsTab(
     state: ClassesSubjectsState,
     onLoadExceptions: (String?) -> Unit,
     onCreateException: (CreateExceptionRequest, () -> Unit) -> Unit,
     onDeleteException: (String) -> Unit,
+    onLoadRequests: (String?) -> Unit,
+    onApprove: (String, String) -> Unit,
+    onReject: (String, String) -> Unit,
 ) {
-    var showAddDialog by remember { mutableStateOf(false) }
-    var deleteTargetId by remember { mutableStateOf<String?>(null) }
+    var activeView by remember { mutableStateOf("exceptions") }
+    var statusFilter by remember { mutableStateOf<String?>(null) }
+    var showAddException by remember { mutableStateOf(false) }
+    var deleteExceptionTargetId by remember { mutableStateOf<String?>(null) }
 
-    VStateHost(
-        loading = state.isLoading,
-        error = state.errorMessage,
-        isEmpty = state.exceptions.isEmpty() && !state.isLoading,
-        emptyTitle = "No exceptions",
-        emptyBody = "Tap 'Load Exceptions' to view period overrides, or create one.",
-        emptyIcon = VIcons.Calendar,
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+        // View toggle: Exceptions | Pending | Approved | Rejected
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(
+                Triple("exceptions", "Exceptions", null as String?),
+                Triple("pending", "Pending", "PENDING"),
+                Triple("approved", "Approved", "APPROVED"),
+                Triple("rejected", "Rejected", "REJECTED"),
+            ).forEach { (key, label, statusValue) ->
+                val isSelected = if (key == "exceptions") activeView == "exceptions"
+                    else activeView == "requests" && statusFilter == statusValue
+                VBadge(
+                    text = label,
+                    tone = if (isSelected) VBadgeTone.Arctic else VBadgeTone.Neutral,
+                    modifier = Modifier.clickable {
+                        if (key == "exceptions") {
+                            activeView = "exceptions"
+                        } else {
+                            activeView = "requests"
+                            statusFilter = statusValue
+                            onLoadRequests(statusValue)
+                        }
+                    },
+                )
+            }
+        }
+
+        if (activeView == "exceptions") {
             VSectionHeader("Period Exceptions")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 VButton(
@@ -702,38 +1191,79 @@ private fun ExceptionsTab(
                 )
                 VButton(
                     text = "Add Exception",
-                    onClick = { showAddDialog = true },
+                    onClick = { showAddException = true },
                     variant = VButtonVariant.Secondary,
                     tone = VButtonTone.Teal,
+                )
+            }
+            if (state.exceptions.isEmpty() && !state.isLoading) {
+                VEmptyState(
+                    title = "No exceptions",
+                    icon = VIcons.Calendar,
+                    body = "Tap 'Load' to view period overrides, or create one.",
                 )
             }
             state.exceptions.forEach { exc ->
                 ExceptionCard(
                     exception = exc,
-                    onDelete = { deleteTargetId = exc.id },
+                    onDelete = { deleteExceptionTargetId = exc.id },
                 )
             }
-            Spacer(Modifier.height(80.dp))
+        } else {
+            VSectionHeader("Timetable Change Requests")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                VButton(
+                    text = "Load",
+                    onClick = { onLoadRequests(statusFilter) },
+                    variant = VButtonVariant.Primary,
+                    tone = VButtonTone.Teal,
+                )
+            }
+            if (state.changeRequests.isEmpty() && !state.isLoading) {
+                VEmptyState(
+                    title = "No change requests",
+                    icon = VIcons.Calendar,
+                    body = "Tap 'Load' to view teacher timetable change requests.",
+                )
+            }
+            state.changeRequests.forEach { req ->
+                ChangeRequestCard(
+                    request = req,
+                    onApprove = { note -> onApprove(req.id, note) },
+                    onReject = { note -> onReject(req.id, note) },
+                )
+            }
         }
+
+        val info = state.infoMessage
+        if (info != null) {
+            Text(info, style = VTheme.type.caption.colored(VTheme.colors.successInk))
+        }
+        val err = state.errorMessage
+        if (err != null) {
+            Text(err, style = VTheme.type.caption.colored(VTheme.colors.dangerInk))
+        }
+
+        Spacer(Modifier.height(80.dp))
     }
 
-    if (showAddDialog) {
+    if (showAddException) {
         ExceptionEditDialog(
             isSaving = state.isSaving,
             onSave = { req ->
-                onCreateException(req) { showAddDialog = false }
+                onCreateException(req) { showAddException = false }
             },
-            onDismiss = { showAddDialog = false },
+            onDismiss = { showAddException = false },
         )
     }
-    deleteTargetId?.let { id ->
+    deleteExceptionTargetId?.let { id ->
         VConfirmDialog(
             visible = true,
             title = "Delete exception?",
             message = "This will remove the period override.",
             confirmLabel = "Delete",
-            onConfirm = { onDeleteException(id); deleteTargetId = null },
-            onDismiss = { deleteTargetId = null },
+            onConfirm = { onDeleteException(id); deleteExceptionTargetId = null },
+            onDismiss = { deleteExceptionTargetId = null },
         )
     }
 }
@@ -855,62 +1385,7 @@ private fun ExceptionEditDialog(
     }
 }
 
-// ── Change Requests Tab ───────────────────────────────────────────────────────
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ChangeRequestsTab(
-    state: ClassesSubjectsState,
-    onLoadRequests: (String?) -> Unit,
-    onApprove: (String, String) -> Unit,
-    onReject: (String, String) -> Unit,
-) {
-    var statusFilter by remember { mutableStateOf<String?>(null) }
-
-    VStateHost(
-        loading = state.isLoading,
-        error = state.errorMessage,
-        isEmpty = state.changeRequests.isEmpty() && !state.isLoading,
-        emptyTitle = "No change requests",
-        emptyBody = "Tap 'Load' to view teacher timetable change requests.",
-        emptyIcon = VIcons.Calendar,
-    ) {
-        Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            VSectionHeader("Timetable Change Requests")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                VButton(
-                    text = "Load",
-                    onClick = { onLoadRequests(statusFilter) },
-                    variant = VButtonVariant.Primary,
-                    tone = VButtonTone.Teal,
-                )
-            }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("All" to null, "Pending" to "PENDING", "Approved" to "APPROVED", "Rejected" to "REJECTED").forEach { (label, value) ->
-                    VBadge(
-                        text = label,
-                        tone = if (statusFilter == value) VBadgeTone.Arctic else VBadgeTone.Neutral,
-                        modifier = Modifier.clickable {
-                            statusFilter = value
-                            onLoadRequests(value)
-                        },
-                    )
-                }
-            }
-            state.changeRequests.forEach { req ->
-                ChangeRequestCard(
-                    request = req,
-                    onApprove = { note -> onApprove(req.id, note) },
-                    onReject = { note -> onReject(req.id, note) },
-                )
-            }
-            Spacer(Modifier.height(80.dp))
-        }
-    }
-}
+// ── Change Request Card (shared by ExceptionsRequestsTab) ─────────────────────
 
 @Composable
 private fun ChangeRequestCard(

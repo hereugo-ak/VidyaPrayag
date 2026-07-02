@@ -95,13 +95,41 @@ data class TimetableDto(
 
 @Serializable
 data class CreatePeriodRequest(
-    @SerialName("assignment_id") val assignmentId: String,
+    @SerialName("teacher_id") val teacherId: String,
+    @SerialName("class_name") val className: String,
+    val section: String = "A",
+    val subject: String,
     val weekday: Int,                                   // 1=Mon … 7=Sun
     @SerialName("start_time") val startTime: String,    // "HH:mm"
     @SerialName("end_time") val endTime: String,        // "HH:mm"
     val room: String = "",
     @SerialName("valid_from") val validFrom: String? = null,  // YYYY-MM-DD
     @SerialName("valid_to") val validTo: String? = null,
+)
+
+@Serializable
+data class BulkPeriodItem(
+    @SerialName("teacher_id") val teacherId: String,
+    @SerialName("class_name") val className: String,
+    val section: String = "A",
+    val subject: String,
+    @SerialName("start_time") val startTime: String,
+    @SerialName("end_time") val endTime: String,
+    val room: String = "",
+)
+
+@Serializable
+data class BulkCreatePeriodsRequest(
+    val weekday: Int,
+    val periods: List<BulkPeriodItem>,
+)
+
+@Serializable
+data class BulkCreatePeriodsResponse(
+    val created: List<PeriodDetailDto> = emptyList(),
+    val errors: List<String> = emptyList(),
+    @SerialName("created_count") val createdCount: Int = 0,
+    @SerialName("error_count") val errorCount: Int = 0,
 )
 
 @Serializable
@@ -217,29 +245,54 @@ fun Route.schoolTimetableRouting() {
                 return@post
             }
 
-            val assignmentUuid = parseUuid(req.assignmentId)
-            if (assignmentUuid == null) {
-                call.fail("Valid assignment_id is required", HttpStatusCode.BadRequest)
+            val teacherUuid = parseUuid(req.teacherId)
+            if (teacherUuid == null) {
+                call.fail("Valid teacher_id is required", HttpStatusCode.BadRequest)
                 return@post
             }
 
             val period = dbQuery {
-                val asg = TeacherSubjectAssignmentsTable.selectAll().where {
-                    (TeacherSubjectAssignmentsTable.id eq assignmentUuid) and
-                        (TeacherSubjectAssignmentsTable.schoolId eq ctx.schoolId) and
-                        (TeacherSubjectAssignmentsTable.isActive eq true)
+                // Validate teacher belongs to this school
+                val teacherRow = AppUsersTable.selectAll().where {
+                    (AppUsersTable.id eq teacherUuid) and
+                        (AppUsersTable.schoolId eq ctx.schoolId) and
+                        (AppUsersTable.role eq "teacher")
                 }.firstOrNull() ?: return@dbQuery null
 
-                val teacherId = asg[TeacherSubjectAssignmentsTable.teacherId]
-                    ?: return@dbQuery null
-                val className = asg[TeacherSubjectAssignmentsTable.className]
-                val section = asg[TeacherSubjectAssignmentsTable.section]
-                val subject = asg[TeacherSubjectAssignmentsTable.subject]
+                // Find or create assignment for this teacher + class + section + subject
+                val existingAsg = TeacherSubjectAssignmentsTable.selectAll().where {
+                    (TeacherSubjectAssignmentsTable.schoolId eq ctx.schoolId) and
+                        (TeacherSubjectAssignmentsTable.teacherId eq teacherUuid) and
+                        (TeacherSubjectAssignmentsTable.className eq req.className) and
+                        (TeacherSubjectAssignmentsTable.section eq req.section) and
+                        (TeacherSubjectAssignmentsTable.subject eq req.subject) and
+                        (TeacherSubjectAssignmentsTable.isActive eq true)
+                }.firstOrNull()
+
+                val assignmentUuid = if (existingAsg != null) {
+                    existingAsg[TeacherSubjectAssignmentsTable.id].value
+                } else {
+                    // Create the assignment if it doesn't exist
+                    val newAsgId = UUID.randomUUID()
+                    TeacherSubjectAssignmentsTable.insert {
+                        it[TeacherSubjectAssignmentsTable.id] = newAsgId
+                        it[TeacherSubjectAssignmentsTable.schoolId] = ctx.schoolId
+                        it[TeacherSubjectAssignmentsTable.className] = req.className
+                        it[TeacherSubjectAssignmentsTable.section] = req.section
+                        it[TeacherSubjectAssignmentsTable.subject] = req.subject
+                        it[TeacherSubjectAssignmentsTable.teacherId] = teacherUuid
+                        it[TeacherSubjectAssignmentsTable.teacherName] = teacherRow[AppUsersTable.fullName]
+                        it[TeacherSubjectAssignmentsTable.isActive] = true
+                        it[TeacherSubjectAssignmentsTable.createdAt] = Instant.now()
+                        it[TeacherSubjectAssignmentsTable.updatedAt] = Instant.now()
+                    }
+                    newAsgId
+                }
 
                 // Double-booking check: same teacher, same weekday, same start time
                 val conflict = TeacherPeriodsTable.selectAll().where {
                     (TeacherPeriodsTable.schoolId eq ctx.schoolId) and
-                        (TeacherPeriodsTable.teacherId eq teacherId) and
+                        (TeacherPeriodsTable.teacherId eq teacherUuid) and
                         (TeacherPeriodsTable.weekday eq req.weekday) and
                         (TeacherPeriodsTable.startTime eq start) and
                         (TeacherPeriodsTable.isActive eq true)
@@ -250,14 +303,14 @@ fun Route.schoolTimetableRouting() {
                 TeacherPeriodsTable.insert {
                     it[TeacherPeriodsTable.id] = newId
                     it[TeacherPeriodsTable.schoolId] = ctx.schoolId
-                    it[TeacherPeriodsTable.teacherId] = teacherId
+                    it[TeacherPeriodsTable.teacherId] = teacherUuid
                     it[TeacherPeriodsTable.weekday] = req.weekday
                     it[TeacherPeriodsTable.startTime] = start
                     it[TeacherPeriodsTable.endTime] = end
                     it[TeacherPeriodsTable.assignmentId] = assignmentUuid
-                    it[TeacherPeriodsTable.className] = className
-                    it[TeacherPeriodsTable.section] = section
-                    it[TeacherPeriodsTable.subject] = subject
+                    it[TeacherPeriodsTable.className] = req.className
+                    it[TeacherPeriodsTable.section] = req.section
+                    it[TeacherPeriodsTable.subject] = req.subject
                     it[TeacherPeriodsTable.room] = req.room
                     it[TeacherPeriodsTable.isActive] = true
                     it[TeacherPeriodsTable.createdAt] = Instant.now()
@@ -265,14 +318,14 @@ fun Route.schoolTimetableRouting() {
 
                 PeriodDetailDto(
                     id = newId.toString(),
-                    teacherId = teacherId.toString(),
+                    teacherId = teacherUuid.toString(),
                     assignmentId = assignmentUuid.toString(),
                     weekday = req.weekday,
                     startTime = start.format(TT_HHMM),
                     endTime = end.format(TT_HHMM),
-                    className = className,
-                    section = section,
-                    subject = subject,
+                    className = req.className,
+                    section = req.section,
+                    subject = req.subject,
                     room = req.room,
                     isActive = true,
                 )
@@ -280,7 +333,7 @@ fun Route.schoolTimetableRouting() {
 
             if (period == null) {
                 call.fail(
-                    "Could not create period — assignment not found or teacher double-booked",
+                    "Could not create period — teacher not found or double-booked",
                     HttpStatusCode.Conflict,
                     "PERIOD_CONFLICT"
                 )
@@ -293,7 +346,7 @@ fun Route.schoolTimetableRouting() {
                     userId = parseUuid(period.teacherId)!!,
                     category = "timetable",
                     title = "New period assigned",
-                    body = "${period.subject} — ${period.className}-${period.section} on day $req.weekday at ${period.startTime}",
+                    body = "${period.subject} — ${period.className}-${period.section} on day ${period.weekday} at ${period.startTime}",
                     schoolId = ctx.schoolId,
                     refType = "teacher_period",
                     refId = period.id,
@@ -301,6 +354,133 @@ fun Route.schoolTimetableRouting() {
             }
 
             call.created(period, message = "Period created")
+        }
+
+        // ── POST /api/v1/school/timetable/periods/bulk — admin creates many periods for one day ──
+        post("/api/v1/school/timetable/periods/bulk") {
+            val ctx = call.requireSchoolAdmin() ?: return@post
+            val req = call.receive<BulkCreatePeriodsRequest>()
+
+            if (req.weekday !in 1..7) {
+                call.fail("weekday must be 1-7", HttpStatusCode.BadRequest)
+                return@post
+            }
+            if (req.periods.isEmpty()) {
+                call.fail("At least one period is required", HttpStatusCode.BadRequest)
+                return@post
+            }
+
+            val result = dbQuery {
+                val created = mutableListOf<PeriodDetailDto>()
+                val errors = mutableListOf<String>()
+
+                req.periods.forEach { item ->
+                    val start = parseTime(item.startTime)
+                    val end = parseTime(item.endTime)
+                    if (start == null || end == null || !start.isBefore(end)) {
+                        errors.add("Invalid time range: ${item.startTime}-${item.endTime} for ${item.subject}")
+                        return@forEach
+                    }
+
+                    val teacherUuid = parseUuid(item.teacherId)
+                    if (teacherUuid == null) {
+                        errors.add("Invalid teacher_id for ${item.subject}")
+                        return@forEach
+                    }
+
+                    val teacherRow = AppUsersTable.selectAll().where {
+                        (AppUsersTable.id eq teacherUuid) and
+                            (AppUsersTable.schoolId eq ctx.schoolId) and
+                            (AppUsersTable.role eq "teacher")
+                    }.firstOrNull()
+                    if (teacherRow == null) {
+                        errors.add("Teacher not found for ${item.subject}")
+                        return@forEach
+                    }
+
+                    // Find or create assignment
+                    val existingAsg = TeacherSubjectAssignmentsTable.selectAll().where {
+                        (TeacherSubjectAssignmentsTable.schoolId eq ctx.schoolId) and
+                            (TeacherSubjectAssignmentsTable.teacherId eq teacherUuid) and
+                            (TeacherSubjectAssignmentsTable.className eq item.className) and
+                            (TeacherSubjectAssignmentsTable.section eq item.section) and
+                            (TeacherSubjectAssignmentsTable.subject eq item.subject) and
+                            (TeacherSubjectAssignmentsTable.isActive eq true)
+                    }.firstOrNull()
+
+                    val assignmentUuid = if (existingAsg != null) {
+                        existingAsg[TeacherSubjectAssignmentsTable.id].value
+                    } else {
+                        val newAsgId = UUID.randomUUID()
+                        TeacherSubjectAssignmentsTable.insert {
+                            it[TeacherSubjectAssignmentsTable.id] = newAsgId
+                            it[TeacherSubjectAssignmentsTable.schoolId] = ctx.schoolId
+                            it[TeacherSubjectAssignmentsTable.className] = item.className
+                            it[TeacherSubjectAssignmentsTable.section] = item.section
+                            it[TeacherSubjectAssignmentsTable.subject] = item.subject
+                            it[TeacherSubjectAssignmentsTable.teacherId] = teacherUuid
+                            it[TeacherSubjectAssignmentsTable.teacherName] = teacherRow[AppUsersTable.fullName]
+                            it[TeacherSubjectAssignmentsTable.isActive] = true
+                            it[TeacherSubjectAssignmentsTable.createdAt] = Instant.now()
+                            it[TeacherSubjectAssignmentsTable.updatedAt] = Instant.now()
+                        }
+                        newAsgId
+                    }
+
+                    // Double-booking check
+                    val conflict = TeacherPeriodsTable.selectAll().where {
+                        (TeacherPeriodsTable.schoolId eq ctx.schoolId) and
+                            (TeacherPeriodsTable.teacherId eq teacherUuid) and
+                            (TeacherPeriodsTable.weekday eq req.weekday) and
+                            (TeacherPeriodsTable.startTime eq start) and
+                            (TeacherPeriodsTable.isActive eq true)
+                    }.firstOrNull()
+                    if (conflict != null) {
+                        errors.add("Double-booked: ${item.subject} at ${item.startTime}")
+                        return@forEach
+                    }
+
+                    val newId = UUID.randomUUID()
+                    TeacherPeriodsTable.insert {
+                        it[TeacherPeriodsTable.id] = newId
+                        it[TeacherPeriodsTable.schoolId] = ctx.schoolId
+                        it[TeacherPeriodsTable.teacherId] = teacherUuid
+                        it[TeacherPeriodsTable.weekday] = req.weekday
+                        it[TeacherPeriodsTable.startTime] = start
+                        it[TeacherPeriodsTable.endTime] = end
+                        it[TeacherPeriodsTable.assignmentId] = assignmentUuid
+                        it[TeacherPeriodsTable.className] = item.className
+                        it[TeacherPeriodsTable.section] = item.section
+                        it[TeacherPeriodsTable.subject] = item.subject
+                        it[TeacherPeriodsTable.room] = item.room
+                        it[TeacherPeriodsTable.isActive] = true
+                        it[TeacherPeriodsTable.createdAt] = Instant.now()
+                    }
+
+                    created += PeriodDetailDto(
+                        id = newId.toString(),
+                        teacherId = teacherUuid.toString(),
+                        assignmentId = assignmentUuid.toString(),
+                        weekday = req.weekday,
+                        startTime = start.format(TT_HHMM),
+                        endTime = end.format(TT_HHMM),
+                        className = item.className,
+                        section = item.section,
+                        subject = item.subject,
+                        room = item.room,
+                        isActive = true,
+                    )
+                }
+
+                BulkCreatePeriodsResponse(
+                    created = created,
+                    errors = errors,
+                    createdCount = created.size,
+                    errorCount = errors.size,
+                )
+            }
+
+            call.created(result, message = "Bulk periods processed: ${result.createdCount} created, ${result.errorCount} errors")
         }
 
         // ── PUT /api/v1/school/timetable/periods/{id} — admin updates a period ──

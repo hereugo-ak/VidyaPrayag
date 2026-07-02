@@ -654,7 +654,7 @@ val viewModelModule = module {
     // School Day Configuration (TIMETABLE_CLASS_TEACHER_PLAN.md Phase 0)
     factory { com.littlebridge.enrollplus.feature.admin.presentation.SchoolDayConfigViewModel(get(), get()) }
     // Classes & Subjects consolidated management screen
-    factory { com.littlebridge.enrollplus.feature.admin.presentation.ClassesSubjectsViewModel(get(), get()) }
+    factory { com.littlebridge.enrollplus.feature.admin.presentation.ClassesSubjectsViewModel(get(), get(), get()) }
 }
 
 fun initKoin(

@@ -73,6 +73,7 @@ private enum class SchoolOverlay {
     ScheduledMessages,
     EventRegistration,
     ClassesSubjects,
+    ClassDetail,
 }
 
 /**
@@ -143,6 +144,11 @@ fun SchoolPortalV2(
     // Alumni Management — selected alumni/campaign IDs for detail overlays.
     var selectedAlumniId by remember { mutableStateOf<String?>(null) }
     var selectedCampaignId by remember { mutableStateOf<String?>(null) }
+    // Class Detail — selected class info for the drill-down overlay.
+    var selectedClassId by remember { mutableStateOf<String?>(null) }
+    var selectedClassName by remember { mutableStateOf<String?>(null) }
+    // Track which overlay launched a student/teacher profile so back returns there.
+    var profileReturnOverlay by remember { mutableStateOf(SchoolOverlay.None) }
         // RA-S12 — the Comms badge counts message threads with unread messages
         // (GET /school/messages/threads), not a hardcoded literal.
         val messagesState by messagesViewModel.state.collectAsStateV2()
@@ -153,7 +159,19 @@ fun SchoolPortalV2(
         // the full-screen Notifications/Calendar overlay back to the admin tabs
         // instead of leaving the portal. Mirrors the React `onBack` wiring.
         BackHandler(enabled = overlay != SchoolOverlay.None) {
-            overlay = SchoolOverlay.None
+            when (overlay) {
+                SchoolOverlay.StudentProfile, SchoolOverlay.TeacherProfile -> {
+                    val returnTo = profileReturnOverlay
+                    profileReturnOverlay = SchoolOverlay.None
+                    overlay = returnTo
+                }
+                SchoolOverlay.ClassDetail -> {
+                    overlay = SchoolOverlay.ClassesSubjects
+                }
+                else -> {
+                    overlay = SchoolOverlay.None
+                }
+            }
         }
 
         when (overlay) {
@@ -253,10 +271,11 @@ fun SchoolPortalV2(
                 // the People tab. `onRemoved` also pops back so the roster refreshes.
                 val id = selectedStudentId
                 if (id == null) { overlay = SchoolOverlay.None; return }
+                val returnTo = profileReturnOverlay
                 StudentProfileScreenV2(
                     studentId = id,
-                    onBack = { overlay = SchoolOverlay.None },
-                    onRemoved = { overlay = SchoolOverlay.None
+                    onBack = { overlay = returnTo; profileReturnOverlay = SchoolOverlay.None },
+                    onRemoved = { overlay = returnTo; profileReturnOverlay = SchoolOverlay.None
                         studentRefreshKey++
                                 },
                     onOpenHealth = { sid, sname ->
@@ -295,10 +314,11 @@ fun SchoolPortalV2(
                 // RA-45 — single teacher detail (assignments/coverage).
                 val id = selectedTeacherId
                 if (id == null) { overlay = SchoolOverlay.None; return }
+                val returnTo = profileReturnOverlay
                 TeacherProfileScreenV2(
                     teacherId = id,
-                    onBack = { overlay = SchoolOverlay.None },
-                    onRemoved = { overlay = SchoolOverlay.None
+                    onBack = { overlay = returnTo; profileReturnOverlay = SchoolOverlay.None },
+                    onRemoved = { overlay = returnTo; profileReturnOverlay = SchoolOverlay.None
                         peopleRefreshKey++ },
                     // RA-TAM — Quick Action → reusable assignment module.
                     onOpenAssignments = { overlay = SchoolOverlay.TeacherAssignments },
@@ -428,6 +448,35 @@ fun SchoolPortalV2(
             SchoolOverlay.ClassesSubjects -> {
                 ClassesSubjectsScreenV2(
                     onBack = { overlay = SchoolOverlay.None },
+                    onOpenClassDetail = { cls ->
+                        selectedClassId = cls.id
+                        selectedClassName = cls.name
+                        overlay = SchoolOverlay.ClassDetail
+                    },
+                    modifier = modifier,
+                )
+                return
+            }
+            SchoolOverlay.ClassDetail -> {
+                val id = selectedClassId
+                val name = selectedClassName
+                if (id == null || name == null) { overlay = SchoolOverlay.None; return }
+                ClassDetailScreenV2(
+                    classId = id,
+                    className = name,
+                    onBack = {
+                        overlay = SchoolOverlay.ClassesSubjects
+                    },
+                    onOpenStudent = { sid ->
+                        selectedStudentId = sid
+                        profileReturnOverlay = SchoolOverlay.ClassDetail
+                        overlay = SchoolOverlay.StudentProfile
+                    },
+                    onOpenTeacher = { tid ->
+                        selectedTeacherId = tid
+                        profileReturnOverlay = SchoolOverlay.ClassDetail
+                        overlay = SchoolOverlay.TeacherProfile
+                    },
                     modifier = modifier,
                 )
                 return

@@ -11,6 +11,8 @@ import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolSubjectDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolSubjectListResponse
 import com.littlebridge.enrollplus.feature.admin.domain.model.ChangeRequestListResponse
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreateChangeRequestRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.BulkCreatePeriodsRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.BulkCreatePeriodsResponse
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreateExceptionRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreatePeriodRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.PeriodDetailDto
@@ -108,6 +110,14 @@ class SchoolClassesApi(
 
     suspend fun createPeriod(token: String, req: CreatePeriodRequest): NetworkResult<ApiResponse<PeriodDetailDto>> = safeApiCall {
         client.post(getUrl("api/v1/school/timetable/periods")) {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(req)
+        }
+    }
+
+    suspend fun bulkCreatePeriods(token: String, req: BulkCreatePeriodsRequest): NetworkResult<ApiResponse<BulkCreatePeriodsResponse>> = safeApiCall {
+        client.post(getUrl("api/v1/school/timetable/periods/bulk")) {
             bearerAuth(token)
             contentType(ContentType.Application.Json)
             setBody(req)

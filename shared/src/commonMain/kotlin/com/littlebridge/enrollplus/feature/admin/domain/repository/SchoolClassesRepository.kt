@@ -10,6 +10,8 @@ import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolSubjectDto
 import com.littlebridge.enrollplus.feature.admin.domain.model.SchoolSubjectListResponse
 import com.littlebridge.enrollplus.feature.admin.domain.model.ChangeRequestListResponse
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreateChangeRequestRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.BulkCreatePeriodsRequest
+import com.littlebridge.enrollplus.feature.admin.domain.model.BulkCreatePeriodsResponse
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreateExceptionRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.CreatePeriodRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.PeriodDetailDto
@@ -36,6 +38,7 @@ interface SchoolClassesRepository {
     suspend fun getTimetable(token: String, classFilter: String? = null): NetworkResult<ApiResponse<TimetableDto>>
 
     suspend fun createPeriod(token: String, req: CreatePeriodRequest): NetworkResult<ApiResponse<PeriodDetailDto>>
+    suspend fun bulkCreatePeriods(token: String, req: BulkCreatePeriodsRequest): NetworkResult<ApiResponse<BulkCreatePeriodsResponse>>
     suspend fun updatePeriod(token: String, id: String, req: UpdatePeriodRequest): NetworkResult<ApiResponse<PeriodDetailDto>>
     suspend fun deletePeriod(token: String, id: String): NetworkResult<ApiResponse<Unit>>
 

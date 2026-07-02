@@ -104,13 +104,41 @@ data class PeriodDetailDto(
 
 @Serializable
 data class CreatePeriodRequest(
-    @SerialName("assignment_id") val assignmentId: String,
+    @SerialName("teacher_id") val teacherId: String,
+    @SerialName("class_name") val className: String,
+    val section: String = "A",
+    val subject: String,
     val weekday: Int,
     @SerialName("start_time") val startTime: String,
     @SerialName("end_time") val endTime: String,
     val room: String = "",
     @SerialName("valid_from") val validFrom: String? = null,
     @SerialName("valid_to") val validTo: String? = null,
+)
+
+@Serializable
+data class BulkPeriodItem(
+    @SerialName("teacher_id") val teacherId: String,
+    @SerialName("class_name") val className: String,
+    val section: String = "A",
+    val subject: String,
+    @SerialName("start_time") val startTime: String,
+    @SerialName("end_time") val endTime: String,
+    val room: String = "",
+)
+
+@Serializable
+data class BulkCreatePeriodsRequest(
+    val weekday: Int,
+    val periods: List<BulkPeriodItem>,
+)
+
+@Serializable
+data class BulkCreatePeriodsResponse(
+    val created: List<PeriodDetailDto> = emptyList(),
+    val errors: List<String> = emptyList(),
+    @SerialName("created_count") val createdCount: Int = 0,
+    @SerialName("error_count") val errorCount: Int = 0,
 )
 
 @Serializable
