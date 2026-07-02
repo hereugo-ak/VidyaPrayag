@@ -92,6 +92,7 @@ import type {
   UpdatePeriodRequest,
   BulkCreatePeriodsRequest,
   BulkCreatePeriodsResponse,
+  CopySectionRequest,
 } from "./types";
 
 interface Opts {
@@ -466,4 +467,6 @@ export const adminApi = {
     authRequest<PeriodDetailDto>(`/api/v1/school/timetable/periods/${id}`, { method: "PUT", body }),
   deletePeriod: (id: string) =>
     authRequest<unknown>(`/api/v1/school/timetable/periods/${id}`, { method: "DELETE" }),
+  copySection: (body: CopySectionRequest) =>
+    authRequest<BulkCreatePeriodsResponse>("/api/v1/school/timetable/periods/copy-section", { method: "POST", body }),
 };

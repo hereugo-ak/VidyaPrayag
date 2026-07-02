@@ -144,6 +144,13 @@ data class UpdatePeriodRequest(
 )
 
 @Serializable
+data class CopySectionRequest(
+    @SerialName("class_name") val className: String,
+    @SerialName("from_section") val fromSection: String,
+    @SerialName("to_section") val toSection: String,
+)
+
+@Serializable
 data class PeriodDetailDto(
     val id: String,
     @SerialName("teacher_id") val teacherId: String,
@@ -259,14 +266,14 @@ fun Route.schoolTimetableRouting() {
                         (AppUsersTable.role eq "teacher")
                 }.firstOrNull() ?: return@dbQuery null
 
-                // Find or create assignment for this teacher + class + section + subject
+                // Find or create assignment — must match the ux_tsa_unique constraint columns
+                val teacherName = teacherRow[AppUsersTable.fullName]
                 val existingAsg = TeacherSubjectAssignmentsTable.selectAll().where {
                     (TeacherSubjectAssignmentsTable.schoolId eq ctx.schoolId) and
-                        (TeacherSubjectAssignmentsTable.teacherId eq teacherUuid) and
                         (TeacherSubjectAssignmentsTable.className eq req.className) and
                         (TeacherSubjectAssignmentsTable.section eq req.section) and
                         (TeacherSubjectAssignmentsTable.subject eq req.subject) and
-                        (TeacherSubjectAssignmentsTable.isActive eq true)
+                        (TeacherSubjectAssignmentsTable.teacherName eq teacherName)
                 }.firstOrNull()
 
                 val assignmentUuid = if (existingAsg != null) {
@@ -281,7 +288,7 @@ fun Route.schoolTimetableRouting() {
                         it[TeacherSubjectAssignmentsTable.section] = req.section
                         it[TeacherSubjectAssignmentsTable.subject] = req.subject
                         it[TeacherSubjectAssignmentsTable.teacherId] = teacherUuid
-                        it[TeacherSubjectAssignmentsTable.teacherName] = teacherRow[AppUsersTable.fullName]
+                        it[TeacherSubjectAssignmentsTable.teacherName] = teacherName
                         it[TeacherSubjectAssignmentsTable.isActive] = true
                         it[TeacherSubjectAssignmentsTable.createdAt] = Instant.now()
                         it[TeacherSubjectAssignmentsTable.updatedAt] = Instant.now()
@@ -398,14 +405,14 @@ fun Route.schoolTimetableRouting() {
                         return@forEach
                     }
 
-                    // Find or create assignment
+                    // Find or create assignment — must match the ux_tsa_unique constraint columns
+                    val teacherName = teacherRow[AppUsersTable.fullName]
                     val existingAsg = TeacherSubjectAssignmentsTable.selectAll().where {
                         (TeacherSubjectAssignmentsTable.schoolId eq ctx.schoolId) and
-                            (TeacherSubjectAssignmentsTable.teacherId eq teacherUuid) and
                             (TeacherSubjectAssignmentsTable.className eq item.className) and
                             (TeacherSubjectAssignmentsTable.section eq item.section) and
                             (TeacherSubjectAssignmentsTable.subject eq item.subject) and
-                            (TeacherSubjectAssignmentsTable.isActive eq true)
+                            (TeacherSubjectAssignmentsTable.teacherName eq teacherName)
                     }.firstOrNull()
 
                     val assignmentUuid = if (existingAsg != null) {
@@ -419,7 +426,7 @@ fun Route.schoolTimetableRouting() {
                             it[TeacherSubjectAssignmentsTable.section] = item.section
                             it[TeacherSubjectAssignmentsTable.subject] = item.subject
                             it[TeacherSubjectAssignmentsTable.teacherId] = teacherUuid
-                            it[TeacherSubjectAssignmentsTable.teacherName] = teacherRow[AppUsersTable.fullName]
+                            it[TeacherSubjectAssignmentsTable.teacherName] = teacherName
                             it[TeacherSubjectAssignmentsTable.isActive] = true
                             it[TeacherSubjectAssignmentsTable.createdAt] = Instant.now()
                             it[TeacherSubjectAssignmentsTable.updatedAt] = Instant.now()
@@ -584,6 +591,139 @@ fun Route.schoolTimetableRouting() {
             }
 
             call.ok(mapOf("id" to periodId.toString()), message = "Period deleted")
+        }
+
+        // ── POST /api/v1/school/timetable/periods/copy-section — copy all periods from one section to another ──
+        post("/api/v1/school/timetable/periods/copy-section") {
+            val ctx = call.requireSchoolAdmin() ?: return@post
+            val req = call.receive<CopySectionRequest>()
+
+            if (req.className.isBlank() || req.fromSection.isBlank() || req.toSection.isBlank()) {
+                call.fail("class_name, from_section, and to_section are required", HttpStatusCode.BadRequest)
+                return@post
+            }
+            if (req.fromSection == req.toSection) {
+                call.fail("from_section and to_section must be different", HttpStatusCode.BadRequest)
+                return@post
+            }
+
+            val result = dbQuery {
+                val created = mutableListOf<PeriodDetailDto>()
+                val errors = mutableListOf<String>()
+
+                // Fetch all source periods (all weekdays) for the source section
+                val sourcePeriods = TeacherPeriodsTable.selectAll().where {
+                    (TeacherPeriodsTable.schoolId eq ctx.schoolId) and
+                        (TeacherPeriodsTable.className eq req.className) and
+                        (TeacherPeriodsTable.section eq req.fromSection) and
+                        (TeacherPeriodsTable.isActive eq true)
+                }.orderBy(TeacherPeriodsTable.weekday to org.jetbrains.exposed.sql.SortOrder.ASC)
+                 .orderBy(TeacherPeriodsTable.startTime to org.jetbrains.exposed.sql.SortOrder.ASC)
+                 .toList()
+
+                if (sourcePeriods.isEmpty()) {
+                    errors.add("No active periods found for ${req.className} section ${req.fromSection}")
+                    return@dbQuery BulkCreatePeriodsResponse(created = created, errors = errors)
+                }
+
+                sourcePeriods.forEach { src ->
+                    val srcTeacherId = src[TeacherPeriodsTable.teacherId]
+                    val srcWeekday = src[TeacherPeriodsTable.weekday]
+                    val srcStart = src[TeacherPeriodsTable.startTime]
+                    val srcEnd = src[TeacherPeriodsTable.endTime]
+                    val srcSubject = src[TeacherPeriodsTable.subject]
+                    val srcRoom = src[TeacherPeriodsTable.room]
+
+                    // Check if target already has a period at this slot (same teacher, weekday, start time)
+                    val dupConflict = TeacherPeriodsTable.selectAll().where {
+                        (TeacherPeriodsTable.schoolId eq ctx.schoolId) and
+                            (TeacherPeriodsTable.teacherId eq srcTeacherId) and
+                            (TeacherPeriodsTable.weekday eq srcWeekday) and
+                            (TeacherPeriodsTable.startTime eq srcStart) and
+                            (TeacherPeriodsTable.className eq req.className) and
+                            (TeacherPeriodsTable.section eq req.toSection) and
+                            (TeacherPeriodsTable.isActive eq true)
+                    }.firstOrNull()
+                    if (dupConflict != null) {
+                        errors.add("Skipped: ${srcSubject} on day $srcWeekday at ${srcStart.format(TT_HHMM)} already exists in section ${req.toSection}")
+                        return@forEach
+                    }
+
+                    // Find or create assignment for the target section (same teacher, same subject, new section)
+                    val teacherRow = AppUsersTable.selectAll().where {
+                        (AppUsersTable.id eq srcTeacherId) and
+                            (AppUsersTable.schoolId eq ctx.schoolId)
+                    }.firstOrNull()
+                    val teacherName = teacherRow?.get(AppUsersTable.fullName) ?: ""
+
+                    val existingAsg = TeacherSubjectAssignmentsTable.selectAll().where {
+                        (TeacherSubjectAssignmentsTable.schoolId eq ctx.schoolId) and
+                            (TeacherSubjectAssignmentsTable.className eq req.className) and
+                            (TeacherSubjectAssignmentsTable.section eq req.toSection) and
+                            (TeacherSubjectAssignmentsTable.subject eq srcSubject) and
+                            (TeacherSubjectAssignmentsTable.teacherName eq teacherName)
+                    }.firstOrNull()
+
+                    val assignmentUuid = if (existingAsg != null) {
+                        existingAsg[TeacherSubjectAssignmentsTable.id].value
+                    } else {
+                        val newAsgId = UUID.randomUUID()
+                        TeacherSubjectAssignmentsTable.insert {
+                            it[TeacherSubjectAssignmentsTable.id] = newAsgId
+                            it[TeacherSubjectAssignmentsTable.schoolId] = ctx.schoolId
+                            it[TeacherSubjectAssignmentsTable.className] = req.className
+                            it[TeacherSubjectAssignmentsTable.section] = req.toSection
+                            it[TeacherSubjectAssignmentsTable.subject] = srcSubject
+                            it[TeacherSubjectAssignmentsTable.teacherId] = srcTeacherId
+                            it[TeacherSubjectAssignmentsTable.teacherName] = teacherName
+                            it[TeacherSubjectAssignmentsTable.isActive] = true
+                            it[TeacherSubjectAssignmentsTable.createdAt] = Instant.now()
+                            it[TeacherSubjectAssignmentsTable.updatedAt] = Instant.now()
+                        }
+                        newAsgId
+                    }
+
+                    val newId = UUID.randomUUID()
+                    TeacherPeriodsTable.insert {
+                        it[TeacherPeriodsTable.id] = newId
+                        it[TeacherPeriodsTable.schoolId] = ctx.schoolId
+                        it[TeacherPeriodsTable.teacherId] = srcTeacherId
+                        it[TeacherPeriodsTable.weekday] = srcWeekday
+                        it[TeacherPeriodsTable.startTime] = srcStart
+                        it[TeacherPeriodsTable.endTime] = srcEnd
+                        it[TeacherPeriodsTable.assignmentId] = assignmentUuid
+                        it[TeacherPeriodsTable.className] = req.className
+                        it[TeacherPeriodsTable.section] = req.toSection
+                        it[TeacherPeriodsTable.subject] = srcSubject
+                        it[TeacherPeriodsTable.room] = srcRoom
+                        it[TeacherPeriodsTable.isActive] = true
+                        it[TeacherPeriodsTable.createdAt] = Instant.now()
+                    }
+
+                    created += PeriodDetailDto(
+                        id = newId.toString(),
+                        teacherId = srcTeacherId.toString(),
+                        assignmentId = assignmentUuid.toString(),
+                        weekday = srcWeekday,
+                        startTime = srcStart.format(TT_HHMM),
+                        endTime = srcEnd.format(TT_HHMM),
+                        className = req.className,
+                        section = req.toSection,
+                        subject = srcSubject,
+                        room = srcRoom,
+                        isActive = true,
+                    )
+                }
+
+                BulkCreatePeriodsResponse(
+                    created = created,
+                    errors = errors,
+                    createdCount = created.size,
+                    errorCount = errors.size,
+                )
+            }
+
+            call.created(result, message = "Copied ${result.createdCount} periods from ${req.fromSection} to ${req.toSection}${if (result.errorCount > 0) ", ${result.errorCount} skipped" else ""}")
         }
     }
 }

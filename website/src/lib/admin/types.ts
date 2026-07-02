@@ -991,3 +991,8 @@ export interface BulkCreatePeriodsResponse {
   created_count: number;
   error_count: number;
 }
+export interface CopySectionRequest {
+  class_name: string;
+  from_section: string;
+  to_section: string;
+}

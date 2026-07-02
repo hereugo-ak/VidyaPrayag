@@ -11,6 +11,7 @@ import type {
   CreatePeriodRequest,
   UpdatePeriodRequest,
   BulkPeriodItem,
+  CopySectionRequest,
 } from "@/lib/admin/types";
 import { Card, EmptyState, FadeIn, Badge } from "@/components/admin/Primitives";
 import { DataTable, type Column } from "@/components/admin/DataTable";
@@ -599,6 +600,7 @@ function TimetableTab() {
   const [classFilter, setClassFilter] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<{ id: string; weekday: number; start_time: string; end_time: string; room: string } | null>(null);
 
   const weekdays = useMemo(() => ttData?.weekdays ?? [], [ttData]);
@@ -645,6 +647,9 @@ function TimetableTab() {
             </AdminButton>
             <AdminButton variant="ghost" onClick={() => setBulkOpen(true)}>
               <IconCalendar width={16} height={16} /> Bulk add
+            </AdminButton>
+            <AdminButton variant="ghost" onClick={() => setCopyOpen(true)}>
+              <IconBook width={16} height={16} /> Copy from section
             </AdminButton>
           </div>
         </div>
@@ -743,6 +748,12 @@ function TimetableTab() {
         onClose={() => setBulkOpen(false)}
         onDone={refresh}
         teachers={teachers}
+        classes={classes}
+      />
+      <CopySectionModal
+        open={copyOpen}
+        onClose={() => setCopyOpen(false)}
+        onDone={refresh}
         classes={classes}
       />
       {editTarget && (
@@ -1152,6 +1163,106 @@ function BulkCreateModal({
           <IconPlus width={14} height={14} /> Add another period
         </AdminButton>
 
+        {result && <p className="text-[13px] font-medium text-accent-deep">{result}</p>}
+        {err && <p className="text-[13px] font-medium text-danger">{err}</p>}
+      </div>
+    </Modal>
+  );
+}
+
+// ─────────────────────────── Copy From Section ───────────────────────────
+
+function CopySectionModal({
+  open,
+  onClose,
+  onDone,
+  classes,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onDone: () => Promise<void>;
+  classes: string[];
+}) {
+  const [className, setClassName] = useState("");
+  const [fromSection, setFromSection] = useState("");
+  const [toSection, setToSection] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  function reset() {
+    setClassName(""); setFromSection(""); setToSection("");
+    setResult(null); setErr(null);
+  }
+
+  async function submit() {
+    setErr(null);
+    setResult(null);
+    if (!className || !fromSection.trim() || !toSection.trim()) {
+      setErr("Class, from section, and to section are required.");
+      return;
+    }
+    if (fromSection.trim() === toSection.trim()) {
+      setErr("From and to sections must be different.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await adminApi.copySection({
+        class_name: className,
+        from_section: fromSection.trim(),
+        to_section: toSection.trim(),
+      } as CopySectionRequest);
+      setResult(`Copied ${res.created_count} periods from ${fromSection} to ${toSection}${res.errors.length ? `. Skipped: ${res.errors.length}` : ""}`);
+      await onDone();
+      if (res.error_count === 0 || res.created_count > 0) {
+        reset();
+        onClose();
+      }
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : "Copy failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Copy from section"
+      description="Copy all periods from one section to another within the same class. Useful when sections share the same timetable."
+      footer={
+        <>
+          <AdminButton variant="ghost" onClick={onClose}>Cancel</AdminButton>
+          <AdminButton onClick={submit} disabled={busy}>
+            {busy ? "Copying…" : "Copy periods"}
+          </AdminButton>
+        </>
+      }
+    >
+      <div className="grid gap-3.5">
+        <label className="block">
+          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-ink-3">Class</span>
+          <select
+            value={className}
+            onChange={(e) => setClassName(e.target.value)}
+            className="w-full rounded-xl border border-navy/12 bg-white/80 px-3.5 py-2.5 text-[14px] text-ink outline-none focus:border-accent"
+          >
+            <option value="">Select a class…</option>
+            {classes.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </label>
+        <div className="grid grid-cols-2 gap-3.5">
+          <ModalField label="From section" value={fromSection} onChange={setFromSection} placeholder="A" />
+          <ModalField label="To section" value={toSection} onChange={setToSection} placeholder="B" />
+        </div>
+        <div className="rounded-xl bg-navy/4 p-3 text-[12.5px] text-ink-3">
+          This will copy all active periods (all weekdays) from the source section to the target section.
+          Existing periods in the target section at the same time slots will be skipped.
+        </div>
         {result && <p className="text-[13px] font-medium text-accent-deep">{result}</p>}
         {err && <p className="text-[13px] font-medium text-danger">{err}</p>}
       </div>
