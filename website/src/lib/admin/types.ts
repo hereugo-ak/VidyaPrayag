@@ -406,6 +406,10 @@ export interface TriggerPulseResponse {
 export interface DevSendNotificationResponse {
   sent: boolean;
 }
+export interface TriggerPewsResponse {
+  schools_processed: number;
+  at_risk_count: number;
+}
 
 // ── Alumni Management (ALUMNI_MANAGEMENT_SPEC.md) ───────────────────────────
 export interface AlumniDto {

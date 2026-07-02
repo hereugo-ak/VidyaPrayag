@@ -78,8 +78,10 @@ enum class AiProvider(
         code = "groq",
         defaultBaseUrl = "https://api.groq.com/openai/v1",
         defaultModelEnv = "AI_MODEL_GROQ_REASON",
-        // June 2026: free tier = ~30 RPM, ~14,400 RPD, ~12K TPM on 70B.
-        defaultModel = "llama-3.3-70b-versatile",
+        // July 2026: llama-3.3-70b-versatile deprecated (shutdown Aug 16, 2026).
+        // Replaced with openai/gpt-oss-120b (Groq-recommended, same 120B MoE).
+        // Free tier = ~30 RPM, ~14,400 RPD, ~12K TPM.
+        defaultModel = "openai/gpt-oss-120b",
         tier = "reason",
         noTraining = true,
         freeTierRpm = 30,
@@ -90,9 +92,11 @@ enum class AiProvider(
         code = "groq_fast",
         defaultBaseUrl = "https://api.groq.com/openai/v1",
         defaultModelEnv = "AI_MODEL_GROQ_FAST",
-        // June 2026: llama-3.1-8b-instant = ~14,400 RPM, ~500K TPM.
+        // July 2026: llama-3.1-8b-instant deprecated (shutdown Aug 16, 2026).
+        // Replaced with openai/gpt-oss-20b (Groq-recommended 20B replacement).
+        // Free tier = ~14,400 RPM, ~500K TPM.
         // Shares the same API key and base URL as GROQ.
-        defaultModel = "llama-3.1-8b-instant",
+        defaultModel = "openai/gpt-oss-20b",
         tier = "fast",
         noTraining = true,
         freeTierRpm = 14_400,

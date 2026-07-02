@@ -11,6 +11,7 @@ import type {
   OtpProvidersResponse,
   TriggerPulseResponse,
   DevSendNotificationResponse,
+  TriggerPewsResponse,
 } from "@/lib/admin/types";
 
 export default function DevToolsPage() {
@@ -59,6 +60,10 @@ export default function DevToolsPage() {
 
       <FadeIn delay={0.15}>
         <SendNotificationCard />
+      </FadeIn>
+
+      <FadeIn delay={0.2}>
+        <PewsTriggerCard />
       </FadeIn>
     </div>
   );
@@ -366,6 +371,58 @@ function SendNotificationCard() {
             )}
           </div>
         </form>
+      </div>
+    </Card>
+  );
+}
+
+// ── PEWS Trigger Card ──────────────────────────────────────────────────────
+
+function PewsTriggerCard() {
+  const [triggering, setTriggering] = useState(false);
+  const [result, setResult] = useState<TriggerPewsResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleTrigger = async () => {
+    setTriggering(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await adminApi.triggerPews();
+      setResult(res);
+    } catch (e: unknown) {
+      setError((e as Error).message);
+    } finally {
+      setTriggering(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader
+        title="PEWS Pipeline Trigger"
+        subtitle="Manually run the Predictive Early Warning System pipeline (Sense → Reason → Act) for all active schools."
+        action={<IconWarning />}
+      />
+      <div className="px-6 pb-6 pt-4">
+        <div className="flex items-center gap-3">
+          <AdminButton onClick={handleTrigger} disabled={triggering}>
+            {triggering ? "Running pipeline…" : "Trigger PEWS now"}
+          </AdminButton>
+          {result && (
+            <div className="flex items-center gap-2">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success/10 text-success">
+                <IconCheck width={14} height={14} />
+              </span>
+              <span className="text-[12.5px] font-medium text-ink-2">
+                {result.schools_processed} schools processed, {result.at_risk_count} at-risk snapshots found
+              </span>
+            </div>
+          )}
+          {error && (
+            <span className="text-[12.5px] font-medium text-danger">{error}</span>
+          )}
+        </div>
       </div>
     </Card>
   );

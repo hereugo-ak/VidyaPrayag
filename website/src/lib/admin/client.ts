@@ -45,6 +45,7 @@ import type {
   UpdateOtpProviderResponse,
   TriggerPulseResponse,
   DevSendNotificationResponse,
+  TriggerPewsResponse,
   AlumniDto,
   AlumniListResponse,
   AlumniCampaignDto,
@@ -303,6 +304,8 @@ export const adminApi = {
     authRequest<TriggerPulseResponse>("/api/v1/admin/dev/trigger-pulse", { method: "POST" }),
   devSendNotification: (body: { user_id: string; title: string; body: string; deep_link?: string; category?: string; school_id?: string }) =>
     authRequest<DevSendNotificationResponse>("/api/v1/admin/dev/send-notification", { method: "POST", body }),
+  triggerPews: () =>
+    authRequest<TriggerPewsResponse>("/api/v1/admin/dev/trigger-pews", { method: "POST" }),
 
   // alumni management
   alumniList: (params?: { year?: number; profession?: string; city?: string; q?: string; page?: number; limit?: number }) => {
