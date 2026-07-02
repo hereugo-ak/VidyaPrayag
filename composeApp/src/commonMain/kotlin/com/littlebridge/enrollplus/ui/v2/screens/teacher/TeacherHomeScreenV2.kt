@@ -411,11 +411,18 @@ private fun AttendanceClassRow(p: ResolvedPeriodUi, onOpen: (assignmentId: Strin
 private fun ScheduleCard(today: TeacherTodayState, onOpenLessonPlan: (assignmentId: String, scope: String) -> Unit = { _, _ -> }) {
     val c = VTheme.colors
     val day = today.day
-    TCard(padding = 18.dp) {
+    val periods = day?.periods.orEmpty().filter { !it.isCancelled }
+    val hasPeriods = periods.isNotEmpty()
+    var face by remember { mutableStateOf(0) }
+    val maxFace = if (hasPeriods) 1 else 0
+
+    SwipeExpandCard(face = face, faceCount = maxFace + 1, onFaceChange = { face = it }, padding = 18.dp) { f ->
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TEyebrow("TODAY'S SCHEDULE", dot = c.accent)
                 Spacer(Modifier.weight(1f))
+                if (maxFace > 0) FaceDots(f, maxFace + 1)
+                Spacer(Modifier.width(8.dp))
                 Text(prettyDate(day?.date), style = VTheme.type.caption.colored(c.ink3).copy(fontSize = 11.sp))
             }
             Spacer(Modifier.height(12.dp))
@@ -424,18 +431,52 @@ private fun ScheduleCard(today: TeacherTodayState, onOpenLessonPlan: (assignment
                 day == null -> Text("Couldn't load your schedule.", style = VTheme.type.body.colored(c.ink2).copy(fontSize = 13.sp))
                 day.isHoliday -> HolidayRow(day)
                 day.periods.isEmpty() -> Text("No periods scheduled today.", style = VTheme.type.body.colored(c.ink2).copy(fontSize = 13.sp))
-                else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    day.periods.forEachIndexed { i, p ->
-                        SchedulePeriodRow(
-                            p,
-                            isNow = i == day.nowIndex,
-                            isNext = i == day.nextIndex,
-                            onOpenLessonPlan = onOpenLessonPlan,
-                        )
+                else -> when (f) {
+                    0 -> {
+                        // Compact face: current or next class only
+                        val currentPeriod = periods.getOrNull(day.nowIndex)
+                        val nextPeriod = periods.getOrNull(day.nextIndex)
+                        if (currentPeriod != null) {
+                            SchedulePeriodRow(
+                                currentPeriod,
+                                isNow = true,
+                                isNext = false,
+                                onOpenLessonPlan = onOpenLessonPlan,
+                            )
+                        } else if (nextPeriod != null) {
+                            SchedulePeriodRow(
+                                nextPeriod,
+                                isNow = false,
+                                isNext = true,
+                                onOpenLessonPlan = onOpenLessonPlan,
+                            )
+                        } else {
+                            // No current or next — show first period
+                            periods.firstOrNull()?.let {
+                                SchedulePeriodRow(it, isNow = false, isNext = false, onOpenLessonPlan = onOpenLessonPlan)
+                            } ?: Text("No periods scheduled today.", style = VTheme.type.body.colored(c.ink2).copy(fontSize = 13.sp))
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        TSwipeHint("Swipe to see full schedule →")
                     }
-                    if (day.bellSchedule.isNotEmpty()) {
-                        Spacer(Modifier.height(4.dp))
-                        BellScheduleSection(slots = day.bellSchedule)
+                    else -> {
+                        // Expanded face: all periods
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            periods.forEachIndexed { i, p ->
+                                SchedulePeriodRow(
+                                    p,
+                                    isNow = i == day.nowIndex,
+                                    isNext = i == day.nextIndex,
+                                    onOpenLessonPlan = onOpenLessonPlan,
+                                )
+                            }
+                            if (day.bellSchedule.isNotEmpty()) {
+                                Spacer(Modifier.height(4.dp))
+                                BellScheduleSection(slots = day.bellSchedule)
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        TSwipeHint("← Swipe back to current class")
                     }
                 }
             }
