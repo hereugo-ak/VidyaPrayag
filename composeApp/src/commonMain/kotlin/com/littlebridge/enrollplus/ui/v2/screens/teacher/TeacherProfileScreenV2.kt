@@ -367,7 +367,7 @@ private fun IdentityHero(p: TeacherProfile) {
                         style = VtT.h3.coloredV(VColors.white).copy(fontWeight = FontWeight.ExtraBold),
                     )
                     Spacer(Modifier.height(2.dp))
-                    Text("@${p.username}", style = VtT.body.coloredV(VColors.white.copy(alpha = 0.82f)))
+                    Text(if (p.username.contains("@")) p.username else "@${p.username}", style = VtT.body.coloredV(VColors.white.copy(alpha = 0.82f)))
                     if (p.schoolName.isNotBlank()) {
                         Spacer(Modifier.height(4.dp))
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {

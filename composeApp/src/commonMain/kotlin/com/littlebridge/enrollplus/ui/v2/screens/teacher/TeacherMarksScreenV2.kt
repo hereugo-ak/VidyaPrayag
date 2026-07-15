@@ -172,18 +172,27 @@ private fun CreateAssessmentComposer(viewModel: TeacherGradebookViewModel, onDon
             VInput(value = state.createName, onValueChange = viewModel::setCreateName, label = appString(StringKeys.TC_TEST_NAME), placeholder = appString(StringKeys.TC_TEST_NAME_PH))
             // Type chips
             Text(appString(StringKeys.TC_TYPE), style = VTypography.label, color = VColors.ink2)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 AssessmentType.ALL.forEach { t ->
                     val active = state.createType == t
                     Box(
                         Modifier
+                            .weight(1f)
                             .clip(VShapes.full)
                             .background(if (active) VColors.violetSoft else VColors.creamDeep)
                             .border(1.dp, if (active) VColors.violet.copy(alpha = 0.5f) else VColors.line, VShapes.full)
                             .clickable { viewModel.setCreateType(t) }
-                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                            .padding(vertical = 7.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Text(t.replaceFirstChar { it.uppercase() }, style = VTypography.caption, color = if (active) VColors.violet else VColors.ink2)
+                        Text(
+                            t.replaceFirstChar { it.uppercase() },
+                            style = VTypography.caption,
+                            color = if (active) VColors.violet else VColors.ink2,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
                     }
                 }
             }
@@ -320,8 +329,20 @@ private fun MarksGridMode(
                     VButton(appString(StringKeys.COMMON_BUTTON_RETRY), onClick = { viewModel.retryMarks() }, tone = VButtonTone.Lavender, size = VButtonSize.Sm)
                 } }
             }
-            else -> items(state.students, key = { it.studentId }) { s ->
-                MarkRow(s, maxMarks = state.maxMarks, readOnly = a?.isPublished == true, onMark = { v -> viewModel.setMark(s.studentId, v) }, onToggleAbsent = { viewModel.toggleAbsent(s.studentId) })
+            else -> {
+                val disambiguatedNames = remember(state.students) {
+                    val nameCounts = state.students.groupingBy { it.name }.eachCount()
+                    state.students.associate { s ->
+                        val disambiguated = if (nameCounts[s.name] > 1) {
+                            val suffix = s.rollNo.takeIf { it.isNotBlank() } ?: s.studentId.takeLast(4)
+                            "${s.name} · #$suffix"
+                        } else s.name
+                        s.studentId to disambiguated
+                    }
+                }
+                items(state.students, key = { it.studentId }) { s ->
+                    MarkRow(s, displayName = disambiguatedNames[s.studentId] ?: s.name, maxMarks = state.maxMarks, readOnly = a?.isPublished == true, onMark = { v -> viewModel.setMark(s.studentId, v) }, onToggleAbsent = { viewModel.toggleAbsent(s.studentId) })
+                }
             }
         }
 
@@ -379,7 +400,7 @@ private fun MarksGridMode(
 }
 
 @Composable
-private fun MarkRow(s: GradebookStudentMark, maxMarks: Int, readOnly: Boolean, onMark: (Float?) -> Unit, onToggleAbsent: () -> Unit) {
+private fun MarkRow(s: GradebookStudentMark, displayName: String, maxMarks: Int, readOnly: Boolean, onMark: (Float?) -> Unit, onToggleAbsent: () -> Unit) {
     VtCard {
         Row(
             Modifier.fillMaxWidth(),
@@ -387,8 +408,11 @@ private fun MarkRow(s: GradebookStudentMark, maxMarks: Int, readOnly: Boolean, o
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Column(Modifier.weight(1f)) {
-                Text(s.name, style = VTypography.caption, color = VColors.ink, maxLines = 1)
-                Text(appString(StringKeys.TC_ROLL_N, "n" to s.rollNo.toString()), style = VTypography.caption, color = VColors.ink3)
+                Text(displayName, style = VTypography.caption, color = VColors.ink, maxLines = 1)
+                Text(
+                    if (s.rollNo.isNotBlank()) appString(StringKeys.TC_ROLL_N, "n" to s.rollNo) else "—",
+                    style = VTypography.caption, color = VColors.ink3,
+                )
             }
             // AB toggle
             val abActive = s.isAbsent

@@ -207,8 +207,20 @@ private fun AttendanceBody(
             }
         }
 
+        // Bug 2+3: build a disambiguation map so duplicate display names get a suffix.
+        val disambiguatedNames = remember(students) {
+            val nameCounts = students.groupingBy { it.name }.eachCount()
+            students.associate { s ->
+                val base = s.name.takeIf { it.isNotBlank() && it.length > 1 } ?: "Student ${s.studentId.takeLast(4)}"
+                val disambiguated = if (nameCounts[s.name] > 1 && base == s.name) {
+                    val suffix = s.rollNo.takeIf { it.isNotBlank() } ?: s.studentId.takeLast(4)
+                    "$base · #$suffix"
+                } else base
+                s.studentId to disambiguated
+            }
+        }
         items(students, key = { it.studentId }) { s ->
-            AttendanceStudentRow(s, onSetStatus = { status -> viewModel.setStatus(s.studentId, status) })
+            AttendanceStudentRow(s, displayName = disambiguatedNames[s.studentId] ?: s.name, onSetStatus = { status -> viewModel.setStatus(s.studentId, status) })
         }
 
         // ── Save footer ──
@@ -245,9 +257,8 @@ private fun AttendanceBody(
 }
 
 @Composable
-private fun AttendanceStudentRow(s: StudentAttendance, onSetStatus: (String) -> Unit) {
+private fun AttendanceStudentRow(s: StudentAttendance, displayName: String, onSetStatus: (String) -> Unit) {
     val locked = s.isOnApprovedLeave
-    val displayName = s.name.takeIf { it.isNotBlank() && it.length > 1 } ?: s.studentId.take(8)
     val displayRoll = s.rollNo.takeIf { it.isNotBlank() } ?: "—"
     VtCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
