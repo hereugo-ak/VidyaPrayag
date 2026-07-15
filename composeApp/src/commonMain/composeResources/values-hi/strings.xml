@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">विद्याप्रयाग</string>
+    <string name="quizzes">क्विज़</string>
+    <string name="tests">परीक्षा</string>
+    <string name="homework">गृहकार्य</string>
+    <string name="timetable">समयसारिणी</string>
+    <string name="attendance">उपस्थिति</string>
+    <string name="marks">अंक</string>
+    <string name="curriculum">पाठ्यक्रम</string>
+    <string name="messages">संदेश</string>
+    <string name="profile">प्रोफ़ाइल</string>
+    <string name="classes">कक्षाएं</string>
+    <string name="create_test">परीक्षा बनाएं</string>
+    <string name="create_homework">गृहकार्य बनाएं</string>
+    <string name="mark_attendance">उपस्थिति दर्ज करें</string>
+    <string name="update">अपडेट</string>
+    <string name="due_date">नियत तिथि</string>
+    <string name="total_marks">कुल अंक</string>
+    <string name="test_date">परीक्षा तिथि</string>
+    <string name="subject">विषय</string>
+    <string name="class_name">कक्षा</string>
+    <string name="title">शीर्षक</string>
+    <string name="description">विवरण</string>
+    <string name="cancel">रद्द करें</string>
+    <string name="create">बनाएं</string>
+    <string name="retry">पुनः प्रयास करें</string>
+    <string name="no_students_enrolled">कोई छात्र नामांकित नहीं</string>
+</resources>

@@ -116,6 +116,31 @@ sealed interface Destination {
 
     @Serializable
     data object SyllabusCoverage : Destination
+
+    // ── Teacher Portal ──
+    @Serializable
+    data object TeacherHome : Destination
+
+    @Serializable
+    data object TeacherTimetable : Destination
+
+    @Serializable
+    data object TeacherClasses : Destination
+
+    @Serializable
+    data object TeacherMessages : Destination
+
+    @Serializable
+    data object TeacherProfile : Destination
+
+    @Serializable
+    data object TeacherMarks : Destination
+
+    @Serializable
+    data object TeacherHomework : Destination
+
+    @Serializable
+    data object TeacherCurriculum : Destination
 }
 
 @Composable
@@ -269,6 +294,39 @@ fun NavGraph(
 
         composable<Destination.SyllabusCoverage> {
             com.littlebridge.vidyaprayag.ui.screens.admin.SyllabusCoverageScreen()
+        }
+
+        // ── Teacher Portal ──
+        composable<Destination.TeacherHome> {
+            com.littlebridge.vidyaprayag.ui.screens.teacher.TeacherHomeScreen()
+        }
+
+        composable<Destination.TeacherTimetable> {
+            com.littlebridge.vidyaprayag.ui.screens.teacher.TeacherTimetableScreen()
+        }
+
+        composable<Destination.TeacherClasses> {
+            com.littlebridge.vidyaprayag.ui.screens.teacher.TeacherClassesScreen()
+        }
+
+        composable<Destination.TeacherMessages> {
+            com.littlebridge.vidyaprayag.ui.screens.teacher.TeacherMessagesScreen()
+        }
+
+        composable<Destination.TeacherProfile> {
+            com.littlebridge.vidyaprayag.ui.screens.teacher.TeacherProfileScreen()
+        }
+
+        composable<Destination.TeacherMarks> {
+            com.littlebridge.vidyaprayag.ui.screens.teacher.TeacherMarksScreen()
+        }
+
+        composable<Destination.TeacherHomework> {
+            com.littlebridge.vidyaprayag.ui.screens.teacher.TeacherHomeworkScreen()
+        }
+
+        composable<Destination.TeacherCurriculum> {
+            com.littlebridge.vidyaprayag.ui.screens.teacher.TeacherCurriculumScreen()
         }
     }
 }

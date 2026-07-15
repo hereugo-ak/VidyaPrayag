@@ -71,7 +71,10 @@ object DatabaseFactory {
         PtmClassProgressTable,
         MessageThreadsTable,
         MessagesTable,
-        ExamResultsTable
+        ExamResultsTable,
+        // Teacher ecosystem
+        com.littlebridge.vidyaprayag.feature.teacher.TeacherTestsTable,
+        com.littlebridge.vidyaprayag.feature.teacher.TeacherHomeworkTable
     )
 
     /** True when DATABASE_URL is set → we're talking to Postgres / Supabase. */

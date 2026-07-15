@@ -38,6 +38,14 @@ import com.littlebridge.vidyaprayag.feature.admin.presentation.TeacherPerformanc
 import com.littlebridge.vidyaprayag.feature.admin.presentation.ClassPerformanceViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.SyllabusCoverageViewModel
 import com.littlebridge.vidyaprayag.feature.admin.presentation.ResultsViewModel
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherHomeViewModel
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherTimetableViewModel
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherClassesViewModel
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherMarksViewModel
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherHomeworkViewModel
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherCurriculumViewModel
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherProfileViewModel
+import com.littlebridge.vidyaprayag.feature.teacher.presentation.TeacherMessagesViewModel
 import com.littlebridge.vidyaprayag.util.AppConfig
 import com.littlebridge.vidyaprayag.util.AppLogger
 import io.ktor.client.*
@@ -157,6 +165,12 @@ val commonModule = module {
             baseUrl = AppConfig.schoolBaseUrl
         )
     }
+    single {
+        com.littlebridge.vidyaprayag.feature.teacher.data.remote.TeacherApi(
+            client = get(),
+            baseUrl = AppConfig.schoolBaseUrl
+        )
+    }
 
     // Repositories
     single<SchoolRepository> { SchoolRepositoryImpl(get(), get()) }
@@ -202,6 +216,9 @@ val commonModule = module {
     single<com.littlebridge.vidyaprayag.feature.admin.domain.repository.UserProfileRepository> {
         com.littlebridge.vidyaprayag.feature.admin.data.repository.UserProfileRepositoryImpl(get())
     }
+    single<com.littlebridge.vidyaprayag.feature.teacher.domain.repository.TeacherRepository> {
+        com.littlebridge.vidyaprayag.feature.teacher.data.repository.TeacherRepositoryImpl(get())
+    }
 
     // UseCases
     factory { GetSchoolsUseCase(get()) }
@@ -241,6 +258,14 @@ val viewModelModule = module {
     factory { ClassPerformanceViewModel(get(), get()) }
     factory { SyllabusCoverageViewModel(get(), get()) }
     factory { ResultsViewModel(get(), get()) }
+    factory { TeacherHomeViewModel(get(), get()) }
+    factory { TeacherTimetableViewModel(get(), get()) }
+    factory { TeacherClassesViewModel(get(), get()) }
+    factory { TeacherMarksViewModel(get(), get()) }
+    factory { TeacherHomeworkViewModel(get(), get()) }
+    factory { TeacherCurriculumViewModel(get(), get()) }
+    factory { TeacherProfileViewModel(get(), get()) }
+    factory { TeacherMessagesViewModel(get(), get()) }
     factory { com.littlebridge.vidyaprayag.feature.content.presentation.LandingViewModel(get()) }
     factory { com.littlebridge.vidyaprayag.feature.auth.presentation.AuthViewModel(get()) }
 }
