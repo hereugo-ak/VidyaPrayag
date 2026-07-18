@@ -10,6 +10,7 @@ import com.littlebridge.enrollplus.feature.admin.domain.model.AdminDashboardAnal
 import com.littlebridge.enrollplus.feature.admin.domain.model.AdminDashboardOverview
 import com.littlebridge.enrollplus.feature.admin.domain.model.AdminDashboardSummary
 import com.littlebridge.enrollplus.feature.admin.domain.model.AdminHomeAnalytics
+import com.littlebridge.enrollplus.feature.admin.domain.model.AdminSetupProgress
 import com.littlebridge.enrollplus.feature.admin.domain.model.DailyDigest
 import com.littlebridge.enrollplus.feature.admin.domain.repository.AdminDashboardRepository
 import com.littlebridge.enrollplus.feature.teacher.domain.model.PaceSnapshotsResponse
@@ -38,6 +39,12 @@ class AdminDashboardRepositoryImpl(
 
     override suspend fun getDigest(token: String): NetworkResult<ApiResponse<DailyDigest>> =
         api.getDigest(token)
+
+    override suspend fun getSetupProgress(token: String): NetworkResult<ApiResponse<AdminSetupProgress>> =
+        api.getSetupProgress(token)
+
+    override suspend fun updateSetupStep(token: String, stepKey: String, status: String): NetworkResult<ApiResponse<AdminSetupProgress>> =
+        api.updateSetupStep(token, stepKey, status)
 
     // ── Agentic Syllabus — pace monitoring (admin) ───────────────────────────
     override suspend fun getPaceSnapshots(token: String, classId: String?, section: String?): NetworkResult<PaceSnapshotsResponse> =
