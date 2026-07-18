@@ -20,6 +20,8 @@ import com.littlebridge.enrollplus.feature.admin.domain.model.AdminDashboardAnal
 import com.littlebridge.enrollplus.feature.admin.domain.model.AdminDashboardOverview
 import com.littlebridge.enrollplus.feature.admin.domain.model.AdminDashboardSummary
 import com.littlebridge.enrollplus.feature.admin.domain.model.AdminHomeAnalytics
+import com.littlebridge.enrollplus.feature.admin.domain.model.AdminSetupProgress
+import com.littlebridge.enrollplus.feature.admin.domain.model.UpdateAdminSetupStepRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.DailyDigest
 import com.littlebridge.enrollplus.feature.teacher.domain.model.PaceSnapshotsResponse
 import com.littlebridge.enrollplus.feature.teacher.domain.model.PaceAlertsResponse
@@ -28,6 +30,8 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
+import io.ktor.client.request.put
+import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 
@@ -88,6 +92,23 @@ class AdminDashboardApi(
         token: String
     ): NetworkResult<ApiResponse<DailyDigest>> = safeApiCall {
         client.get(getUrl("api/admin/dashboard/digest"))
+    }
+
+    suspend fun getSetupProgress(
+        token: String,
+    ): NetworkResult<ApiResponse<AdminSetupProgress>> = safeApiCall {
+        client.get(getUrl("api/admin/setup"))
+    }
+
+    suspend fun updateSetupStep(
+        token: String,
+        stepKey: String,
+        status: String,
+    ): NetworkResult<ApiResponse<AdminSetupProgress>> = safeApiCall {
+        client.put(getUrl("api/admin/setup/$stepKey")) {
+            contentType(ContentType.Application.Json)
+            setBody(UpdateAdminSetupStepRequest(status))
+        }
     }
 
     // ── Agentic Syllabus — pace monitoring (admin) ───────────────────────────
