@@ -293,6 +293,21 @@ object OnboardingDraftsTable : UUIDTable("school_onboarding_drafts", "id") {
     }
 }
 
+/** Persistent, admin-specific ledger for the compact Home setup checklist. */
+object AdminSetupStepsTable : UUIDTable("admin_setup_steps", "id") {
+    val userId    = uuid("user_id")
+    val schoolId  = uuid("school_id")
+    val stepKey   = varchar("step_key", 32)
+    val status    = varchar("status", 16).default("IN_PROGRESS")
+    val startedAt = timestamp("started_at")
+    val completedAt = timestamp("completed_at").nullable()
+    val updatedAt = timestamp("updated_at")
+    init {
+        uniqueIndex("ux_admin_setup_user_step", userId, stepKey)
+        index("idx_admin_setup_school", isUnique = false, schoolId)
+    }
+}
+
 // =====================================================================
 // Classes + subjects
 // =====================================================================
