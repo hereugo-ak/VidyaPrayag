@@ -51,3 +51,26 @@ data class AdminHomeAnalytics(
     val breakdownTitle: String = "",
     val breakdown: List<HomeAnalyticsBreakdown> = emptyList(),
 )
+
+/** Backend-owned setup state shown only until all five school setup tasks have completed. */
+@Serializable
+data class AdminSetupStep(
+    val key: String = "",
+    val label: String = "",
+    val status: String = "PENDING", // PENDING | IN_PROGRESS | COMPLETED
+    val currentCount: Int = 0,
+    val targetCount: Int? = null,
+)
+
+@Serializable
+data class AdminSetupProgress(
+    val setupComplete: Boolean = false,
+    val completedSteps: Int = 0,
+    val totalSteps: Int = 5,
+    val steps: List<AdminSetupStep> = emptyList(),
+)
+
+@Serializable
+data class UpdateAdminSetupStepRequest(
+    val status: String,
+)
