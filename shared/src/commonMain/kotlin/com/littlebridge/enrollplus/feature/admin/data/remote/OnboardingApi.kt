@@ -9,6 +9,7 @@ import com.littlebridge.enrollplus.feature.admin.domain.model.OnboardingStatusRe
 import com.littlebridge.enrollplus.feature.admin.domain.model.OnboardingStepResponse
 import com.littlebridge.enrollplus.feature.admin.domain.model.OnboardingSubmitRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.OnboardingSubmitResponse
+import com.littlebridge.enrollplus.feature.admin.domain.model.SetupProgress
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.headers
@@ -100,7 +101,20 @@ class OnboardingApi(
         token: String
     ): NetworkResult<ApiResponse<OnboardingStatusResponse>> {
         return safeApiCall {
-            client.get(getUrl("api/v1/onboarding/status"))
+            client.get(getUrl("api/v1/onboarding/status")) {
+                headers { append("Authorization", "Bearer $token") }
+            }
+        }
+    }
+
+    /** Live, school-scoped operational setup state. Never inferred locally. */
+    suspend fun getSetupProgress(
+        token: String
+    ): NetworkResult<ApiResponse<SetupProgress>> {
+        return safeApiCall {
+            client.get(getUrl("api/v1/onboarding/setup-progress")) {
+                headers { append("Authorization", "Bearer $token") }
+            }
         }
     }
 

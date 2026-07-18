@@ -1,11 +1,14 @@
 package com.littlebridge.enrollplus.ui.v2.screens.school
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,6 +21,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -34,9 +38,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,9 +57,12 @@ import com.littlebridge.enrollplus.feature.admin.domain.model.AdminDashboardSumm
 import com.littlebridge.enrollplus.feature.admin.domain.model.DashboardActivity
 import com.littlebridge.enrollplus.feature.admin.domain.model.DashboardAlert
 import com.littlebridge.enrollplus.feature.admin.domain.model.DashboardQuickAction
+import com.littlebridge.enrollplus.feature.admin.domain.model.SetupProgress
+import com.littlebridge.enrollplus.feature.admin.domain.model.SetupProgressStep
 import com.littlebridge.enrollplus.feature.admin.presentation.AcademicCalendarPlatformViewModel
 import com.littlebridge.enrollplus.feature.admin.presentation.PinnedScreensViewModel
 import com.littlebridge.enrollplus.feature.admin.presentation.SchoolDashboardViewModel
+import com.littlebridge.enrollplus.feature.admin.presentation.SchoolSetupViewModel
 import com.littlebridge.enrollplus.feature.parent.presentation.NotificationsViewModel
 import com.littlebridge.enrollplus.platform.rememberNotificationPermissionLauncher
 import com.littlebridge.enrollplus.presentation.PermissionViewModel
@@ -85,6 +95,7 @@ fun SchoolHomeScreenV2(
     onOpenPinnedScreen: (String) -> Unit = {},
     onExit: () -> Unit = {},
     viewModel: SchoolDashboardViewModel = koinViewModel(),
+    setupViewModel: SchoolSetupViewModel = koinViewModel(),
     notificationsViewModel: NotificationsViewModel = koinViewModel(),
     calendarViewModel: AcademicCalendarPlatformViewModel = koinViewModel(),
     permissionVm: PermissionViewModel = koinViewModel(),
@@ -92,6 +103,7 @@ fun SchoolHomeScreenV2(
 ) {
     val state by viewModel.state.collectAsStateV2()
     val notifications by notificationsViewModel.state.collectAsStateV2()
+    val setupState by setupViewModel.state.collectAsStateV2()
     var analyticsType by remember { mutableStateOf<String?>(null) }
     var commandPaletteVisible by remember { mutableStateOf(false) }
 
@@ -104,12 +116,15 @@ fun SchoolHomeScreenV2(
             permissionLauncher.launch()
         }
     }
-    androidx.compose.runtime.LaunchedEffect(Unit) { permissionVm.checkNotificationPermission() }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        permissionVm.checkNotificationPermission()
+        setupViewModel.load(forceRefresh = true)
+    }
     androidx.compose.runtime.LaunchedEffect(state.pinnedScreens) { pinnedVm.setInitial(state.pinnedScreens) }
 
     VPullRefresh(
         isRefreshing = state.isRefreshing,
-        onRefresh = { viewModel.refresh(); calendarViewModel.refresh() },
+        onRefresh = { viewModel.refresh(); setupViewModel.load(forceRefresh = true); calendarViewModel.refresh() },
         modifier = modifier.fillMaxSize().background(AdminHomeTokens.Cream),
     ) {
         Box(Modifier.fillMaxSize()) {
@@ -131,6 +146,8 @@ fun SchoolHomeScreenV2(
                     activity = state.activity,
                     adminName = state.adminName,
                     unreadCount = notifications.unreadCount,
+                    setupProgress = setupState.progress?.takeUnless { it.setupComplete },
+                    onSetupStep = onOpenPinnedScreen,
                     onNotifications = onOpenNotifications,
                     onSearch = { commandPaletteVisible = true },
                     onKpi = { type -> analyticsType = type; viewModel.loadHomeAnalytics(type) },
@@ -178,6 +195,8 @@ private fun PremiumAdminHome(
     activity: AdminDashboardActivity?,
     adminName: String,
     unreadCount: Int,
+    setupProgress: SetupProgress?,
+    onSetupStep: (String) -> Unit,
     onNotifications: () -> Unit,
     onSearch: () -> Unit,
     onKpi: (String) -> Unit,
@@ -196,6 +215,9 @@ private fun PremiumAdminHome(
     ) {
         PremiumHeader(overview, adminName, unreadCount, onNotifications, onSearch)
         HeroCard(overview, summary)
+        setupProgress?.let { progress ->
+            SchoolSetupChecklistCard(progress = progress, onStepClick = onSetupStep)
+        }
         KeyMetrics(overview, summary, analytics, onKpi)
         OperationsDashboard(overview, summary, analytics, activity, onAlert, onAllAlerts)
         summary?.quickActions?.filter { it.enabled }?.takeIf { it.isNotEmpty() }?.let {
@@ -308,6 +330,150 @@ private fun HeroCard(overview: AdminDashboardOverview, summary: AdminDashboardSu
                 )
             }
         }
+    }
+}
+
+private data class SetupStepVisual(
+    val key: String,
+    val label: String,
+    val route: String,
+    val icon: ImageVector,
+)
+
+private val setupStepVisuals = listOf(
+    SetupStepVisual("add_teachers", "Add Teachers", "setup_add_teachers", VIcons.UserPlus),
+    SetupStepVisual("add_students", "Add Students", "setup_add_students", VIcons.UsersGroup),
+    SetupStepVisual("add_subjects", "Add Subjects", "setup_add_subjects", VIcons.BookOpen),
+    SetupStepVisual("create_classes", "Create Classes", "setup_create_classes", VIcons.School),
+    SetupStepVisual("create_timetable", "Create Timetable", "setup_create_timetable", VIcons.Calendar),
+)
+
+@Composable
+private fun SchoolSetupChecklistCard(
+    progress: SetupProgress,
+    onStepClick: (String) -> Unit,
+) {
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress.completionPercent.coerceIn(0, 100).toFloat(),
+        animationSpec = tween(650, easing = FastOutSlowInEasing),
+        label = "schoolSetupProgress",
+    )
+    val stepsByKey = progress.steps.associateBy { it.step }
+    val firstPending = setupStepVisuals.firstOrNull { stepsByKey[it.key]?.status != "done" }
+
+    Column(
+        Modifier.fillMaxWidth().shadow(12.dp, AdminHomeTokens.Xl, ambientColor = Color.Black.copy(alpha = .05f), spotColor = Color.Black.copy(alpha = .07f))
+            .clip(AdminHomeTokens.Xl).background(AdminHomeTokens.Card)
+            .border(1.dp, AdminHomeTokens.Line, AdminHomeTokens.Xl).padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            SetupProgressRing(animatedProgress, Modifier.size(42.dp))
+            Spacer(Modifier.size(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("School Setup", color = AdminHomeTokens.Ink, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+                Text(
+                    "${progress.completedSteps} of ${progress.totalSteps} completed",
+                    color = AdminHomeTokens.Ink3,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Box(
+                Modifier.size(48.dp).clip(CircleShape).background(AdminHomeTokens.VioletSoft)
+                    .clickable(
+                        enabled = firstPending != null,
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() },
+                    ) { firstPending?.let { onStepClick(it.route) } },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(VIcons.ChevronRight, "Continue school setup", tint = AdminHomeTokens.Violet, modifier = Modifier.size(20.dp))
+            }
+        }
+        Spacer(Modifier.height(2.dp))
+        setupStepVisuals.forEach { visual ->
+            val step = stepsByKey[visual.key] ?: SetupProgressStep(visual.key, "pending", 0)
+            SetupChecklistRow(visual, step) { onStepClick(visual.route) }
+        }
+    }
+}
+
+@Composable
+private fun SetupProgressRing(progress: Float, modifier: Modifier = Modifier) {
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val stroke = 3.dp.toPx()
+            drawArc(AdminHomeTokens.LineSoft, -90f, 360f, false, style = Stroke(stroke))
+            if (progress > 0f) {
+                drawArc(
+                    AdminHomeTokens.Violet,
+                    -90f,
+                    progress * 3.6f,
+                    false,
+                    style = Stroke(stroke, cap = StrokeCap.Round),
+                )
+            }
+        }
+        Box(Modifier.size(32.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
+            Text("${progress.roundToInt()}%", color = AdminHomeTokens.Violet, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
+        }
+    }
+}
+
+@Composable
+private fun SetupChecklistRow(
+    visual: SetupStepVisual,
+    step: SetupProgressStep,
+    onClick: () -> Unit,
+) {
+    val done = step.status == "done"
+    val active = step.status == "in_progress"
+    val iconColor = when {
+        done -> AdminHomeTokens.Mint
+        active -> AdminHomeTokens.Gold
+        else -> AdminHomeTokens.Violet
+    }
+    val badgeBackground = when {
+        done -> AdminHomeTokens.MintSoft
+        active -> AdminHomeTokens.GoldSoft
+        else -> AdminHomeTokens.SurfaceTint
+    }
+    val badgeTextColor = when {
+        done -> AdminHomeTokens.Success
+        active -> Color(0xFF8A6100)
+        else -> AdminHomeTokens.Ink3
+    }
+    val statusText = when (visual.key) {
+        "create_classes" -> "${step.count} created"
+        "create_timetable" -> "${step.count} periods"
+        else -> "${step.count} added"
+    }
+
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(AdminHomeTokens.Md)
+            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(Modifier.size(28.dp).clip(AdminHomeTokens.Sm).background(iconColor), contentAlignment = Alignment.Center) {
+            Icon(visual.icon, null, tint = Color.White, modifier = Modifier.size(15.dp))
+        }
+        Text(
+            visual.label,
+            color = if (done) AdminHomeTokens.Ink3 else AdminHomeTokens.Ink2,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            statusText,
+            color = badgeTextColor,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.clip(AdminHomeTokens.Full).background(badgeBackground).padding(horizontal = 8.dp, vertical = 4.dp),
+        )
     }
 }
 

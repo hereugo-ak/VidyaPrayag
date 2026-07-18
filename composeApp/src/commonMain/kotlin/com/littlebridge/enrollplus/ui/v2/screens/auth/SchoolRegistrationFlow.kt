@@ -9,25 +9,33 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -44,9 +52,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -66,6 +77,10 @@ import com.littlebridge.enrollplus.ui.v2.theme.shapePill
 import com.littlebridge.enrollplus.ui.components.VBackHeader as LegacyBackHeader
 import com.littlebridge.enrollplus.ui.components.VButton as LegacyButton
 import com.littlebridge.enrollplus.ui.components.VButtonVariant as LegacyButtonVariant
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import com.littlebridge.enrollplus.util.parseIsoDate
+import com.littlebridge.enrollplus.util.todayIso
 import org.koin.compose.viewmodel.koinViewModel
 
 private data class FieldError(val field: String, val message: String)
@@ -77,19 +92,20 @@ private fun validateName(name: String): String? {
     return null
 }
 
+private val emailPattern = Regex("^[A-Z0-9.!#\$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$", RegexOption.IGNORE_CASE)
+
 private fun validateEmail(email: String): String? {
     if (email.isBlank()) return "Email is required"
-    val trimmed = email.trim().lowercase()
-    if (!trimmed.contains("@")) return "Email must contain @ symbol"
-    val parts = trimmed.split("@")
-    if (parts.size != 2) return "Enter a valid email"
-    val local = parts[0]
-    val domain = parts[1]
-    if (local.isEmpty()) return "Enter a valid email"
-    if (!domain.contains(".") || domain.startsWith(".") || domain.endsWith(".")) return "Enter a valid email address"
-    val domainParts = domain.split(".")
-    if (domainParts.any { it.isEmpty() }) return "Enter a valid email address"
-    if (domainParts.last().length < 2) return "Enter a valid email address"
+    val value = email.trim()
+    val localPart = value.substringBefore('@', missingDelimiterValue = "")
+    if (
+        value.length > 254 ||
+        localPart.length !in 1..64 ||
+        localPart.startsWith('.') ||
+        localPart.endsWith('.') ||
+        value.contains("..") ||
+        !emailPattern.matches(value)
+    ) return "Enter a valid email address"
     return null
 }
 
@@ -97,16 +113,18 @@ private fun validatePhone(phone: String): String? {
     if (phone.isBlank()) return "Phone number is required"
     if (phone.length != 10) return "Phone must be exactly 10 digits"
     if (!phone.all { it.isDigit() }) return "Phone must contain only digits"
-    if (phone[0] == '0') return "Phone cannot start with 0"
+    if (phone.first() !in '6'..'9') return "Enter a valid Indian mobile number"
     return null
 }
 
 private fun validatePassword(password: String): String? {
     if (password.isBlank()) return "Password is required"
     if (password.length < 8) return "Must be at least 8 characters"
+    if (password.length > 128) return "Must be 128 characters or fewer"
     if (!password.any { it.isUpperCase() }) return "Must contain an uppercase letter"
+    if (!password.any { it.isLowerCase() }) return "Must contain a lowercase letter"
     if (!password.any { it.isDigit() }) return "Must contain a number"
-    if (!password.any { !it.isLetterOrDigit() }) return "Must contain a special character"
+    if (!password.any { !it.isLetterOrDigit() && !it.isWhitespace() }) return "Must contain a special character"
     return null
 }
 
@@ -132,6 +150,7 @@ private fun validatePrincipalPhone(phone: String): String? {
     if (phone.isBlank()) return "Principal phone is required"
     if (phone.length != 10) return "Phone must be exactly 10 digits"
     if (!phone.all { it.isDigit() }) return "Phone must contain only digits"
+    if (phone.first() !in '6'..'9') return "Enter a valid Indian mobile number"
     return null
 }
 
@@ -152,6 +171,7 @@ private fun VChip(
             .background(bg)
             .border(1.dp, border, VTheme.dimens.shapePill)
             .clickable { onClick() }
+            .heightIn(min = 48.dp)
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         Text(
@@ -259,9 +279,9 @@ private fun PasswordStrengthBar(password: String) {
     val strength = remember(password) {
         var score = 0
         if (password.length >= 8) score++
-        if (password.any { it.isUpperCase() }) score++
+        if (password.any { it.isUpperCase() } && password.any { it.isLowerCase() }) score++
         if (password.any { it.isDigit() }) score++
-        if (password.any { !it.isLetterOrDigit() }) score++
+        if (password.any { !it.isLetterOrDigit() && !it.isWhitespace() }) score++
         score
     }
     val color = when (strength) {
@@ -446,21 +466,31 @@ private fun StepTwoCreatePassword(
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 VInput(
                     label = "Create Password", value = state.password,
-                    onValueChange = { viewModel.update { s -> s.copy(password = it) }; validationErrors = validationErrors.filter { it.field != "password" } },
+                    onValueChange = { value ->
+                        if (value.length <= 128) {
+                            viewModel.update { s -> s.copy(password = value) }
+                            validationErrors = validationErrors.filter { it.field != "password" }
+                        }
+                    },
                     placeholder = "Min. 8 characters", keyboardType = KeyboardType.Password,
                     isPassword = true, passwordVisible = passwordVisible,
                     isError = getError("password") != null, errorText = getError("password"),
-                    trailing = { Icon(VIcons.Eye, contentDescription = "Toggle password", tint = c.ink3, modifier = Modifier.size(18.dp).clickable { passwordVisible = !passwordVisible }) },
+                    trailing = { Box(Modifier.size(48.dp).clickable { passwordVisible = !passwordVisible }, contentAlignment = Alignment.Center) { Icon(VIcons.Eye, contentDescription = "Toggle password", tint = c.ink3, modifier = Modifier.size(18.dp)) } },
                 )
                 if (state.password.isNotBlank()) PasswordStrengthBar(state.password)
                 VInput(
                     label = "Confirm Password", value = state.confirmPassword,
-                    onValueChange = { viewModel.update { s -> s.copy(confirmPassword = it) }; validationErrors = validationErrors.filter { it.field != "confirm" } },
+                    onValueChange = { value ->
+                        if (value.length <= 128) {
+                            viewModel.update { s -> s.copy(confirmPassword = value) }
+                            validationErrors = validationErrors.filter { it.field != "confirm" }
+                        }
+                    },
                     placeholder = "Re-enter password", keyboardType = KeyboardType.Password,
                     isPassword = true, passwordVisible = confirmPasswordVisible,
                     isError = getError("confirm") != null || (state.confirmPassword.isNotBlank() && state.password != state.confirmPassword),
                     errorText = getError("confirm") ?: if (state.confirmPassword.isNotBlank() && state.password != state.confirmPassword) "Passwords do not match" else null,
-                    trailing = { Icon(VIcons.Eye, contentDescription = "Toggle password", tint = c.ink3, modifier = Modifier.size(18.dp).clickable { confirmPasswordVisible = !confirmPasswordVisible }) },
+                    trailing = { Box(Modifier.size(48.dp).clickable { confirmPasswordVisible = !confirmPasswordVisible }, contentAlignment = Alignment.Center) { Icon(VIcons.Eye, contentDescription = "Toggle password", tint = c.ink3, modifier = Modifier.size(18.dp)) } },
                 )
                 Column(
                     modifier = Modifier.fillMaxWidth().clip(VTheme.dimens.shapeCard).background(c.accentTint).border(1.dp, c.accent.copy(alpha = 0.15f), VTheme.dimens.shapeCard).padding(16.dp),
@@ -468,9 +498,9 @@ private fun StepTwoCreatePassword(
                 ) {
                     Text(text = "Password requirements", style = VTheme.type.caption.copy(fontWeight = FontWeight.Bold).colored(c.ink))
                     PasswordRequirement("At least 8 characters", state.password.length >= 8)
-                    PasswordRequirement("One uppercase letter (A–Z)", state.password.any { it.isUpperCase() })
+                    PasswordRequirement("Uppercase and lowercase letters", state.password.any { it.isUpperCase() } && state.password.any { it.isLowerCase() })
                     PasswordRequirement("One number (0–9)", state.password.any { it.isDigit() })
-                    PasswordRequirement("One special character (!@#\$%)", state.password.any { !it.isLetterOrDigit() })
+                    PasswordRequirement("One special character (!@#\$%)", state.password.any { !it.isLetterOrDigit() && !it.isWhitespace() })
                 }
                 if (state.error != null) Text(text = state.error!!, style = VTheme.type.caption.colored(c.dangerInk))
                 LegacyButton(
@@ -571,6 +601,13 @@ private fun StepThreeSchoolIdentity(
 // Step 4: Academic Year
 // ════════════════════════════════════════════════════════════════════════════
 
+private fun academicYearOptions(): List<String> {
+    val currentYear = parseIsoDate(todayIso())?.first ?: return emptyList()
+    return listOf(currentYear, currentYear + 1).map { start ->
+        "$start-${((start + 1) % 100).toString().padStart(2, '0')}"
+    }
+}
+
 @Composable
 private fun StepFourAcademicYear(
     viewModel: RegistrationOnboardingViewModel,
@@ -611,7 +648,7 @@ private fun StepFourAcademicYear(
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 VSectionLabel("CURRENT ACADEMIC YEAR")
                 VChipGroup(
-                    options = listOf("2025-26", "2026-27"), selected = state.academicYearLabel,
+                    options = academicYearOptions(), selected = state.academicYearLabel,
                     onSelect = { viewModel.update { s -> s.copy(academicYearLabel = it) }; validationErrors = validationErrors.filter { it.field != "year" } },
                 )
                 if (getError("year") != null) Text(text = getError("year")!!, style = VTheme.type.caption.colored(c.dangerInk))
@@ -678,6 +715,15 @@ private fun StepFourAcademicYear(
 // Success screen
 // ════════════════════════════════════════════════════════════════════════════
 
+private enum class SuccessArtifact { Command, Admissions, Pews, Fees, Comms }
+
+private data class SuccessFeature(
+    val title: String,
+    val subtitle: String,
+    val accent: Color,
+    val artifact: SuccessArtifact,
+)
+
 @Composable
 private fun SuccessScreen(
     viewModel: RegistrationOnboardingViewModel,
@@ -685,70 +731,287 @@ private fun SuccessScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val c = VTheme.colors
-
-    val ringScale = remember { Animatable(0f) }
-    val iconScale = remember { Animatable(0f) }
-    val titleAlpha = remember { Animatable(0f) }
-    val subtitleAlpha = remember { Animatable(0f) }
-    val buttonAlpha = remember { Animatable(0f) }
+    val features = remember {
+        listOf(
+            SuccessFeature("Command Desk", "A calm, live view of your entire school.", Color(0xFF6546E8), SuccessArtifact.Command),
+            SuccessFeature("Admissions CRM", "Move every applicant forward with clarity.", Color(0xFF22B982), SuccessArtifact.Admissions),
+            SuccessFeature("PEWS Alerts", "See risk early and intervene with confidence.", Color(0xFFF34D6D), SuccessArtifact.Pews),
+            SuccessFeature("Fee Collection", "Real-time collections without spreadsheet work.", Color(0xFFE6A400), SuccessArtifact.Fees),
+            SuccessFeature("Communication Hub", "Reach every family from one trusted channel.", Color(0xFF1BA9E8), SuccessArtifact.Comms),
+        )
+    }
+    val pagerState = rememberPagerState(pageCount = { features.size })
+    val congrats = remember { Animatable(0f) }
+    val headline = remember { Animatable(0f) }
+    val subtitle = remember { Animatable(0f) }
+    val carousel = remember { Animatable(0f) }
+    val dots = remember { Animatable(0f) }
+    val bottom = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
-        ringScale.animateTo(1f, tween(500, easing = FastOutSlowInEasing))
-        iconScale.animateTo(1f, tween(350, easing = FastOutSlowInEasing))
-        titleAlpha.animateTo(1f, tween(400))
-        subtitleAlpha.animateTo(1f, tween(400))
-        buttonAlpha.animateTo(1f, tween(400))
+        listOf(
+            150L to congrats,
+            300L to headline,
+            450L to subtitle,
+            600L to carousel,
+            750L to dots,
+            900L to bottom,
+        ).forEach { (delayMillis, animation) ->
+            launch {
+                delay(delayMillis)
+                animation.animateTo(1f, tween(500, easing = FastOutSlowInEasing))
+            }
+        }
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .scale(ringScale.value)
-                        .background(c.successInk.copy(alpha = 0.08f), CircleShape),
-                )
-                Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .scale(iconScale.value)
-                        .background(c.successInk, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(VIcons.CheckCircle, contentDescription = null, tint = c.card, modifier = Modifier.size(36.dp))
-                }
-            }
-
+            Text("Enroll", style = VTheme.type.body.copy(fontSize = 17.sp, fontWeight = FontWeight.ExtraBold).colored(c.ink))
+            Text("+", style = VTheme.type.body.copy(fontSize = 17.sp, fontWeight = FontWeight.ExtraBold).colored(c.accent))
+        }
+        Column(Modifier.padding(horizontal = 24.dp)) {
             Text(
-                text = "School Registered!",
-                style = VTheme.type.h2.copy(fontSize = 24.sp, fontWeight = FontWeight.ExtraBold).colored(c.ink),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.alpha(titleAlpha.value),
-            )
-            Text(
-                text = "Welcome to Enroll+!\nYour school management portal is ready.",
-                style = VTheme.type.body.copy(fontSize = 15.sp, lineHeight = 24.sp).colored(c.ink3),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.alpha(subtitleAlpha.value),
+                "CONGRATULATIONS",
+                style = VTheme.type.caption.copy(fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp).colored(c.accent),
+                modifier = Modifier.premiumEntrance(congrats.value),
             )
             Spacer(Modifier.height(8.dp))
+            Text(
+                "Your school is ready to run beautifully.",
+                style = VTheme.type.h2.copy(fontSize = 26.sp, lineHeight = 31.sp, fontWeight = FontWeight.ExtraBold).colored(c.ink),
+                modifier = Modifier.premiumEntrance(headline.value),
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "A focused operating system for your team, families and every school day.",
+                style = VTheme.type.body.copy(fontSize = 13.sp, lineHeight = 19.sp).colored(c.ink3),
+                modifier = Modifier.premiumEntrance(subtitle.value),
+            )
+        }
+        Spacer(Modifier.height(18.dp))
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth().height(286.dp).premiumEntrance(carousel.value),
+            contentPadding = PaddingValues(horizontal = 28.dp),
+            pageSpacing = 14.dp,
+            beyondViewportPageCount = 1,
+        ) { page ->
+            val offset = ((page - pagerState.currentPage) + pagerState.currentPageOffsetFraction).coerceIn(-1f, 1f)
+            val distance = kotlin.math.abs(offset)
+            SuccessFeatureCard(
+                feature = features[page],
+                modifier = Modifier.graphicsLayer {
+                    scaleX = 1f - 0.08f * distance
+                    scaleY = 1f - 0.08f * distance
+                    alpha = 1f - 0.4f * distance
+                },
+            )
+        }
+        Row(
+            Modifier.fillMaxWidth().height(28.dp).premiumEntrance(dots.value),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            repeat(features.size) { index ->
+                val selected = pagerState.currentPage == index
+                Box(
+                    Modifier.padding(horizontal = 3.dp).height(6.dp).width(if (selected) 22.dp else 6.dp)
+                        .clip(CircleShape).background(if (selected) c.accent else c.hairline),
+                )
+            }
+        }
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp).premiumEntrance(bottom.value),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.card)
+                    .border(1.dp, c.hairline, RoundedCornerShape(16.dp)).padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Box(Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(c.accent), contentAlignment = Alignment.Center) {
+                    Text(state.schoolName.trim().firstOrNull()?.uppercase() ?: "S", color = c.card, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(state.schoolName.ifBlank { "Your school" }, style = VTheme.type.body.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold).colored(c.ink), maxLines = 1)
+                    Text("Workspace activated", style = VTheme.type.caption.copy(fontSize = 11.sp).colored(c.ink3))
+                }
+                Row(
+                    Modifier.clip(VTheme.dimens.shapePill).background(c.successInk.copy(alpha = .1f)).padding(horizontal = 9.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    Box(Modifier.size(6.dp).clip(CircleShape).background(c.successInk))
+                    Text("ONBOARDED", style = VTheme.type.caption.copy(fontSize = 9.sp, fontWeight = FontWeight.ExtraBold).colored(c.successInk))
+                }
+            }
             LegacyButton(
-                text = "Continue to Home",
+                text = "Enter your command desk",
                 onClick = { viewModel.completeOnboarding(onComplete) },
                 loading = state.isLoading,
                 icon = Icons.AutoMirrored.Filled.ArrowForward,
-                modifier = Modifier.alpha(buttonAlpha.value).fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
             )
-            if (state.error != null) Text(text = state.error!!, style = VTheme.type.caption.colored(c.dangerInk))
+            if (state.error != null) Text(state.error!!, style = VTheme.type.caption.colored(c.dangerInk), textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            Text("Your setup checklist is waiting on the dashboard.", style = VTheme.type.caption.copy(fontSize = 11.sp).colored(c.ink3), textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+private fun Modifier.premiumEntrance(progress: Float): Modifier = graphicsLayer {
+    alpha = progress
+    translationY = (1f - progress) * 14f
+}
+
+@Composable
+private fun SuccessFeatureCard(feature: SuccessFeature, modifier: Modifier = Modifier) {
+    val c = VTheme.colors
+    Column(
+        modifier.fillMaxSize().clip(RoundedCornerShape(24.dp)).background(c.card)
+            .border(1.dp, feature.accent.copy(alpha = .16f), RoundedCornerShape(24.dp)),
+    ) {
+        Box(
+            Modifier.fillMaxWidth().height(194.dp)
+                .background(Brush.linearGradient(listOf(feature.accent.copy(alpha = .9f), feature.accent))),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(Modifier.size(176.dp).clip(CircleShape).background(Color.White.copy(alpha = .08f)))
+            SuccessArtifactView(feature.artifact)
+        }
+        Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 13.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(Modifier.size(7.dp).clip(CircleShape).background(feature.accent))
+                Text(feature.title, style = VTheme.type.body.copy(fontSize = 16.sp, fontWeight = FontWeight.ExtraBold).colored(c.ink))
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(feature.subtitle, style = VTheme.type.caption.copy(fontSize = 12.sp).colored(c.ink3), maxLines = 2)
+        }
+    }
+}
+
+@Composable
+private fun SuccessArtifactView(type: SuccessArtifact) {
+    when (type) {
+        SuccessArtifact.Command -> CommandArtifact()
+        SuccessArtifact.Admissions -> AdmissionsArtifact()
+        SuccessArtifact.Pews -> PewsArtifact()
+        SuccessArtifact.Fees -> FeesArtifact()
+        SuccessArtifact.Comms -> CommsArtifact()
+    }
+}
+
+@Composable
+private fun GlassPanel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier.clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = .17f))
+            .border(1.dp, Color.White.copy(alpha = .24f), RoundedCornerShape(16.dp)).padding(14.dp),
+        content = content,
+    )
+}
+
+@Composable
+private fun CommandArtifact() {
+    Box(Modifier.fillMaxSize().padding(26.dp)) {
+        GlassPanel(Modifier.fillMaxWidth().align(Alignment.Center)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Icon(VIcons.Sparkles, null, tint = Color.White, modifier = Modifier.size(22.dp))
+                Box(Modifier.width(42.dp).height(8.dp).clip(CircleShape).background(Color.White.copy(alpha = .35f)))
+            }
+            Spacer(Modifier.height(18.dp))
+            repeat(3) { index ->
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Box(Modifier.size(20.dp).clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha = .25f + index * .08f)))
+                    Box(Modifier.weight(1f).height(7.dp).clip(CircleShape).background(Color.White.copy(alpha = .65f)))
+                }
+                if (index < 2) Spacer(Modifier.height(10.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdmissionsArtifact() {
+    GlassPanel(Modifier.widthIn(max = 250.dp).fillMaxWidth().padding(horizontal = 24.dp)) {
+        repeat(3) { index ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                Box(Modifier.size(26.dp).clip(CircleShape).background(Color.White.copy(alpha = .28f)), contentAlignment = Alignment.Center) {
+                    Icon(VIcons.User, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(Modifier.fillMaxWidth(if (index == 1) .72f else .9f).height(6.dp).clip(CircleShape).background(Color.White.copy(alpha = .72f)))
+                    Box(Modifier.fillMaxWidth(.5f).height(4.dp).clip(CircleShape).background(Color.White.copy(alpha = .3f)))
+                }
+                Icon(VIcons.Check, null, tint = Color.White, modifier = Modifier.size(15.dp))
+            }
+            if (index < 2) Spacer(Modifier.height(10.dp))
+        }
+    }
+}
+
+@Composable
+private fun PewsArtifact() {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+        Box(Modifier.size(100.dp), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.fillMaxSize()) {
+                drawArc(Color.White.copy(alpha = .2f), -90f, 360f, false, style = Stroke(10.dp.toPx()))
+                drawArc(Color.White, -90f, 250f, false, style = Stroke(10.dp.toPx(), cap = StrokeCap.Round))
+            }
+            Icon(VIcons.AlertTriangle, null, tint = Color.White, modifier = Modifier.size(28.dp))
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            listOf(.9f, .65f, .4f).forEach { width -> Box(Modifier.width(72.dp * width).height(8.dp).clip(CircleShape).background(Color.White.copy(alpha = .75f))) }
+            Text("EARLY SIGNALS", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
+        }
+    }
+}
+
+@Composable
+private fun FeesArtifact() {
+    GlassPanel(Modifier.fillMaxWidth().padding(horizontal = 26.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(VIcons.Wallet, null, tint = Color.White, modifier = Modifier.size(24.dp))
+            Text("LIVE COLLECTIONS", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+        }
+        Spacer(Modifier.height(14.dp))
+        Box(Modifier.fillMaxWidth().height(7.dp).clip(CircleShape).background(Color.White.copy(alpha = .2f))) {
+            Box(Modifier.fillMaxWidth(.72f).fillMaxHeight().clip(CircleShape).background(Color.White))
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("RECEIPTS", "RECONCILIATION").forEach {
+                Text(
+                    it,
+                    color = Color.White,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.clip(CircleShape).background(Color.White.copy(alpha = .16f))
+                        .padding(horizontal = 9.dp, vertical = 5.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommsArtifact() {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 32.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        listOf(false, true, false).forEachIndexed { index, sent ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = if (sent) Arrangement.End else Arrangement.Start) {
+                Column(
+                    Modifier.fillMaxWidth(if (index == 1) .62f else .72f).clip(RoundedCornerShape(13.dp))
+                        .background(Color.White.copy(alpha = if (sent) .32f else .18f)).padding(11.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    Box(Modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(Color.White.copy(alpha = .8f)))
+                    Box(Modifier.fillMaxWidth(.65f).height(5.dp).clip(CircleShape).background(Color.White.copy(alpha = .4f)))
+                }
+            }
         }
     }
 }

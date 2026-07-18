@@ -11,6 +11,7 @@ import com.littlebridge.enrollplus.feature.admin.domain.model.OnboardingStatusRe
 import com.littlebridge.enrollplus.feature.admin.domain.model.OnboardingStepResponse
 import com.littlebridge.enrollplus.feature.admin.domain.model.OnboardingSubmitRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.OnboardingSubmitResponse
+import com.littlebridge.enrollplus.feature.admin.domain.model.SetupProgress
 import com.littlebridge.enrollplus.feature.admin.domain.repository.OnboardingRepository
 
 /**
@@ -101,6 +102,22 @@ class OnboardingRepositoryImpl(
                 }
             }
             is NetworkResult.Error -> NetworkResult.Error(r.message, r.code)
+            is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
+        }
+    }
+
+    override suspend fun getSetupProgress(token: String): NetworkResult<SetupProgress> {
+        return when (val result = api.getSetupProgress(token)) {
+            is NetworkResult.Success -> {
+                val envelope = result.data
+                val data = envelope.data
+                when {
+                    !envelope.success -> NetworkResult.Error(envelope.message.ifBlank { "Failed to fetch school setup progress" })
+                    data == null -> NetworkResult.Error("No data in response")
+                    else -> NetworkResult.Success(data)
+                }
+            }
+            is NetworkResult.Error -> NetworkResult.Error(result.message, result.code)
             is NetworkResult.ConnectionError -> NetworkResult.ConnectionError
         }
     }

@@ -207,7 +207,21 @@ data class LogoutDto(
 // ============================================================
 // Helpers
 // ============================================================
-private fun isEmail(id: String) = id.contains("@")
+private val EMAIL_PATTERN = Regex("^[A-Z0-9.!#\$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$", RegexOption.IGNORE_CASE)
+private fun isEmail(id: String): Boolean {
+    val localPart = id.substringBefore('@', missingDelimiterValue = "")
+    return id.length <= 254 &&
+        localPart.length in 1..64 &&
+        !localPart.startsWith('.') &&
+        !localPart.endsWith('.') &&
+        !id.contains("..") &&
+        EMAIL_PATTERN.matches(id)
+}
+
+private fun isValidIndianMobile(value: String): Boolean {
+    val compact = value.trim().replace(" ", "").replace("-", "")
+    return Regex("^(?:\\+91|91)?[6-9][0-9]{9}$").matches(compact)
+}
 
 /** Normalise raw identifier text per the rules in the file header. */
 internal fun normaliseIdentifier(raw: String): String {
@@ -524,10 +538,19 @@ fun Route.authRouting() {
                 call.fail("Password must be at least 8 characters", HttpStatusCode.BadRequest, "PASSWORD_TOO_SHORT")
                 return@post
             }
+            if (req.password.length > 128) {
+                call.fail("Password must be 128 characters or fewer", HttpStatusCode.BadRequest, "PASSWORD_TOO_LONG")
+                return@post
+            }
+            if (!req.contactPhone.isNullOrBlank() && !isValidIndianMobile(req.contactPhone)) {
+                call.fail("Enter a valid Indian mobile number", HttpStatusCode.BadRequest, "INVALID_PHONE")
+                return@post
+            }
             if (!req.password.any { it.isUpperCase() } ||
                 !req.password.any { it.isLowerCase() } ||
-                !req.password.any { it.isDigit() }) {
-                call.fail("Password must contain at least one uppercase letter, one lowercase letter, and one digit", HttpStatusCode.BadRequest, "PASSWORD_TOO_WEAK")
+                !req.password.any { it.isDigit() } ||
+                !req.password.any { !it.isLetterOrDigit() && !it.isWhitespace() }) {
+                call.fail("Password must contain uppercase, lowercase, number, and special characters", HttpStatusCode.BadRequest, "PASSWORD_TOO_WEAK")
                 return@post
             }
 

@@ -7,6 +7,7 @@ import com.littlebridge.enrollplus.feature.admin.domain.model.OnboardingStatusRe
 import com.littlebridge.enrollplus.feature.admin.domain.model.OnboardingStepResponse
 import com.littlebridge.enrollplus.feature.admin.domain.model.OnboardingSubmitRequest
 import com.littlebridge.enrollplus.feature.admin.domain.model.OnboardingSubmitResponse
+import com.littlebridge.enrollplus.feature.admin.domain.model.SetupProgress
 
 /**
  * Domain-layer abstraction over the school onboarding endpoints.
@@ -53,6 +54,9 @@ interface OnboardingRepository {
      * resume a returning admin at the first incomplete step.
      */
     suspend fun getStatus(token: String): NetworkResult<OnboardingStatusResponse>
+
+    /** Returns setup checklist state derived from current school-scoped DB rows. */
+    suspend fun getSetupProgress(token: String): NetworkResult<SetupProgress>
 
     /** Idempotently finalizes onboarding (status → active, profile_completed=true). */
     suspend fun completeOnboarding(token: String): NetworkResult<OnboardingCompletionResponse>

@@ -134,6 +134,23 @@ data class OnboardingCompletionResponse(
     @SerialName("onboarding_status") val onboardingStatus: String = "active"
 )
 
+// ---------- GET /setup-progress response ----------
+@Serializable
+data class SetupProgressStep(
+    val step: String,
+    val status: String,
+    val count: Int,
+)
+
+@Serializable
+data class SetupProgress(
+    val setupComplete: Boolean = false,
+    val steps: List<SetupProgressStep> = emptyList(),
+    val completedSteps: Int = 0,
+    val totalSteps: Int = 5,
+    val completionPercent: Int = 0,
+)
+
 // ---------- Payload key constants (matches server field schemas) ----------
 object ObPayloadKeys {
     // BASIC step
