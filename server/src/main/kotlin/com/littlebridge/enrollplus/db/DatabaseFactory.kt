@@ -123,6 +123,7 @@ object DatabaseFactory {
         AppConfigTable,
         SchoolsTable,
         OnboardingDraftsTable,
+        AdminSetupStepsTable,
         SchoolClassesTable,
         SchoolSubjectsTable,
         TeacherSubjectAssignmentsTable,
