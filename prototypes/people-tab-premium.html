@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enroll+ — People Tab Premium Prototype</title>
+<link rel="stylesheet" href="people-tab-premium.css">
+</head>
+<body>
+<div class="phone">
+<div class="side-btn-l"></div>
+<div class="side-btn-l2"></div>
+<div class="side-btn-l3"></div>
+
+<!-- Status Bar -->
+<div class="status-bar">
+  <span class="sb-time">9:41</span>
+  <div class="sb-icons">
+    <svg viewBox="0 0 24 24" fill="var(--ink)"><path d="M2 9h2v6H2zM6 7h2v10H6zM10 5h2v14h-2zM14 3h2v18h-2zM18 5h2v14h-2z"/></svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"><path d="M5 12.55a11 11 0 0 1 14 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><path d="M12 20h.01"/></svg>
+    <div class="sb-batt"><div class="sb-batt-f"></div></div>
+  </div>
+</div>
+
+<!-- Screen (scrollable content) -->
+<div class="screen">
+
+<!-- ════════════════════════════════════════════════════════════════════
+     VIEW: PEOPLE TAB (Main)
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="view active" id="view-people">
+  <div class="ppl-hdr">
+    <div class="ppl-top">
+      <span class="ppl-brand">Enroll+</span>
+      <div class="ppl-bell" onclick="alert('Notifications')">
+        <svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <div class="ppl-bell-dot"></div>
+      </div>
+    </div>
+    <div class="ppl-greeting">Hi Admin</div>
+    <div class="ppl-title">People <span class="light">Directory</span></div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" data-subtab="teachers" onclick="switchSubTab('teachers')">Teachers</button>
+    <button class="tab" data-subtab="students" onclick="switchSubTab('students')">Students</button>
+    <button class="tab" data-subtab="staff" onclick="switchSubTab('staff')">Staff</button>
+  </div>
+
+  <!-- ─── Teachers sub-tab ─── -->
+  <div class="subtab-content" id="subtab-teachers">
+    <div class="search-row">
+      <div class="si"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input type="text" placeholder="Search teachers…"></div>
+      <button class="btn-p-sm" onclick="openSheet('sheet-add-teacher')"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add</button>
+    </div>
+    <div class="frow">
+      <div class="fchip" onclick="this.classList.toggle('active')">Subject <span class="cc">5</span></div>
+      <div class="fchip" onclick="this.classList.toggle('active')">Grade <span class="cc">8</span></div>
+      <div class="fchip" onclick="this.classList.toggle('active')">Availability <span class="cc">2</span></div>
+    </div>
+    <div class="list">
+      <div class="card" onclick="showView('view-teacher-profile')">
+        <div class="tr"><div class="av av-violet">PS</div><div class="info"><div class="nm">Priya Sharma</div><div class="sub">Mathematics · Grades 9–12 · Senior Teacher</div><div class="bgs"><span class="badge success"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Active</span><span class="badge accent">12 yrs exp</span></div></div>
+          <div class="acts" onclick="event.stopPropagation()"><div class="act-btn act-call" title="Call" onclick="alert('Calling Priya…')"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div><div class="act-btn act-msg" title="Message" onclick="alert('Message Priya…')"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="act-btn act-assign" onclick="showView('view-teacher-assignments')" title="Assign classes"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div></div>
+        </div>
+        <div class="subj-tags"><span class="subj-tag violet">Math</span><span class="subj-tag teal">Physics</span><span class="subj-tag sky">Statistics</span></div>
+        <div class="br"><div class="mi"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><b>142</b> students</div><div class="mi"><svg viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg><b>6</b> classes</div><div class="mi"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><b>94%</b> att.</div><div class="rating"><svg viewBox="0 0 24 24"><path d="M12 2 15.09 8.26 22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>4.9</div></div>
+      </div>
+      <div class="card" onclick="showView('view-teacher-profile')">
+        <div class="tr"><div class="av av-mint">RK</div><div class="info"><div class="nm">Rahul Verma</div><div class="sub">Physics · Grades 10–12 · Teacher</div><div class="bgs"><span class="badge success"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Active</span><span class="badge teal">8 yrs exp</span></div></div>
+          <div class="acts" onclick="event.stopPropagation()"><div class="act-btn act-call" title="Call" onclick="alert('Calling Rahul…')"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div><div class="act-btn act-msg" title="Message" onclick="alert('Message Rahul…')"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="act-btn act-assign" onclick="showView('view-teacher-assignments')" title="Assign classes"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div></div>
+        </div>
+        <div class="subj-tags"><span class="subj-tag teal">Physics</span><span class="subj-tag sky">Chemistry</span></div>
+        <div class="br"><div class="mi"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><b>98</b> students</div><div class="mi"><svg viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg><b>4</b> classes</div><div class="mi"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><b>91%</b> att.</div><div class="rating"><svg viewBox="0 0 24 24"><path d="M12 2 15.09 8.26 22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>4.6</div></div>
+      </div>
+      <div class="card" onclick="showView('view-teacher-profile')">
+        <div class="tr"><div class="av av-gold">AN</div><div class="info"><div class="nm">Anita Nair</div><div class="sub">English · Grades 6–10 · Teacher</div><div class="bgs"><span class="badge warning"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>On leave</span><span class="badge peach">Returns Mar 15</span></div></div>
+          <div class="acts" onclick="event.stopPropagation()"><div class="act-btn act-call" title="Call" onclick="alert('Calling Anita…')"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div><div class="act-btn act-msg" title="Message" onclick="alert('Message Anita…')"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="act-btn act-assign" onclick="showView('view-teacher-assignments')" title="Assign classes"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div></div>
+        </div>
+        <div class="subj-tags"><span class="subj-tag peach">English</span><span class="subj-tag violet">Literature</span></div>
+        <div class="br"><div class="mi"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><b>120</b> students</div><div class="mi"><svg viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg><b>5</b> classes</div><div class="mi"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><b>87%</b> att.</div><div class="rating"><svg viewBox="0 0 24 24"><path d="M12 2 15.09 8.26 22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>4.7</div></div>
+      </div>
+    </div>
+    <div class="load-more"><button onclick="this.textContent='Loading…'">Load more</button></div>
+  </div>
+
+  <!-- ─── Students sub-tab ─── -->
+  <div class="subtab-content hidden" id="subtab-students">
+    <div class="search-row">
+      <div class="si"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input type="text" placeholder="Search students…"></div>
+      <div class="btn-more" onclick="toggleDropdown('student-more')" id="student-more-btn"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg></div>
+      <div id="student-more-dropdown" class="dropdown hidden" style="right:24px;top:52px;">
+        <div class="dd-item" onclick="closeDropdown('student-more');openSheet('sheet-add-student')"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add Student</div>
+        <div class="dd-item" onclick="closeDropdown('student-more');openSheet('sheet-import-students')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import CSV</div>
+        <div class="dd-item" onclick="closeDropdown('student-more');openSheet('sheet-graduate')"><svg viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>Graduate to Alumni</div>
+      </div>
+    </div>
+    <div class="frow">
+      <div class="fchip" onclick="this.classList.toggle('active')">Class <span class="cc">10</span></div>
+      <div class="fchip" onclick="this.classList.toggle('active')">Section <span class="cc">4</span></div>
+      <div class="fchip" onclick="this.classList.toggle('active')">Status <span class="cc">3</span></div>
+    </div>
+    <div class="link-banner" onclick="showView('view-link-requests')">
+      <div class="lb-ic"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div>
+      <div class="lb-txt"><div class="t">3 pending link requests</div><div class="s">Tap to review parent→child approvals</div></div>
+      <svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+    </div>
+    <div class="list">
+      <div class="card" onclick="showView('view-student-profile')">
+        <div class="tr"><div class="av av-sky">AS</div><div class="info"><div class="nm">Aarav Singh</div><div class="sub">Class 10-A · Roll 05 · Sec A</div><div class="bgs"><span class="badge success"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Active</span><span class="badge accent">85% avg</span></div></div>
+          <div class="acts" onclick="event.stopPropagation()"><div class="act-btn act-call" title="Call parent" onclick="alert('Calling parent…')"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div><div class="act-btn act-msg" title="Message parent" onclick="alert('Messaging parent…')"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div></div>
+        </div>
+        <div class="subj-tags"><span class="subj-tag violet">Math 92</span><span class="subj-tag teal">Physics 88</span><span class="subj-tag sky">English 85</span></div>
+        <div class="br"><div class="mi"><svg viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>STU2024001</div><div class="mi"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><b>92%</b> att.</div><div class="mi" style="color:var(--success-ink)"><svg viewBox="0 0 24 24" style="stroke:var(--success-ink)"><path d="M20 6 9 17l-5-5"/></svg>Fees paid</div></div>
+      </div>
+      <div class="card" onclick="showView('view-student-profile')">
+        <div class="tr"><div class="av av-peach">DP</div><div class="info"><div class="nm">Diya Patel</div><div class="sub">Class 9-B · Roll 12 · Sec B</div><div class="bgs"><span class="badge success"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Active</span><span class="badge accent">New</span><span class="badge sky">78% avg</span></div></div>
+          <div class="acts" onclick="event.stopPropagation()"><div class="act-btn act-call" title="Call parent" onclick="alert('Calling parent…')"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div><div class="act-btn act-msg" title="Message parent" onclick="alert('Messaging parent…')"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div></div>
+        </div>
+        <div class="subj-tags"><span class="subj-tag peach">Math 75</span><span class="subj-tag violet">Science 82</span><span class="subj-tag teal">English 78</span></div>
+        <div class="br"><div class="mi"><svg viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>STU2024015</div><div class="mi"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><b>88%</b> att.</div><div class="mi" style="color:var(--warning-ink)"><svg viewBox="0 0 24 24" style="stroke:var(--warning-ink)"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>Fees pending</div></div>
+      </div>
+      <div class="card" onclick="showView('view-student-profile')">
+        <div class="tr"><div class="av av-violet">VK</div><div class="info"><div class="nm">Vihaan Kapoor</div><div class="sub">Class 12-A · Roll 01 · Sec A</div><div class="bgs"><span class="badge neutral">Inactive</span><span class="badge peach">72% avg</span></div></div>
+          <div class="acts" onclick="event.stopPropagation()"><div class="act-btn act-call" title="Call parent" onclick="alert('Calling parent…')"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div><div class="act-btn act-msg" title="Message parent" onclick="alert('Messaging parent…')"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div></div>
+        </div>
+        <div class="subj-tags"><span class="subj-tag sky">Math 68</span><span class="subj-tag peach">Physics 75</span><span class="subj-tag teal">Chem 72</span></div>
+        <div class="br"><div class="mi"><svg viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>STU2024003</div><div class="mi"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><b>76%</b> att.</div><div class="mi" style="color:var(--danger-ink)"><svg viewBox="0 0 24 24" style="stroke:var(--danger-ink)"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>Fees overdue</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Staff sub-tab ─── -->
+  <div class="subtab-content hidden" id="subtab-staff">
+    <div class="search-row">
+      <div class="si"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input type="text" placeholder="Search staff…"></div>
+      <button class="btn-p-sm" onclick="openSheet('sheet-add-staff')"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add</button>
+    </div>
+    <div class="frow">
+      <div class="fchip" onclick="this.classList.toggle('active')">Department <span class="cc">4</span></div>
+      <div class="fchip" onclick="this.classList.toggle('active')">Role <span class="cc">6</span></div>
+      <div class="fchip" onclick="this.classList.toggle('active')">Status <span class="cc">2</span></div>
+    </div>
+    <div class="list">
+      <div class="card" onclick="showView('view-staff-profile')">
+        <div class="tr"><div class="av av-peach">MJ</div><div class="info"><div class="nm">Meena Joshi</div><div class="sub">Librarian · Administration</div><div class="bgs"><span class="badge success"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Active</span><span class="badge peach">4 yrs svc</span></div></div>
+          <div class="acts" onclick="event.stopPropagation()"><div class="act-btn act-call" title="Call" onclick="alert('Calling Meena…')"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div><div class="act-btn act-msg" title="Message" onclick="alert('Messaging Meena…')"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div></div>
+        </div>
+        <div class="subj-tags"><span class="subj-tag peach">Library</span><span class="subj-tag violet">Admin</span></div>
+        <div class="br"><div class="mi"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>+91 98765 43210</div><div class="mi"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>meena@school.edu</div></div>
+      </div>
+      <div class="card" onclick="showView('view-staff-profile')">
+        <div class="tr"><div class="av av-sky">RT</div><div class="info"><div class="nm">Rajesh Tiwari</div><div class="sub">Accountant · Finance</div><div class="bgs"><span class="badge success"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Active</span><span class="badge sky">6 yrs svc</span></div></div>
+          <div class="acts" onclick="event.stopPropagation()"><div class="act-btn act-call" title="Call" onclick="alert('Calling Rajesh…')"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div><div class="act-btn act-msg" title="Message" onclick="alert('Messaging Rajesh…')"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div></div>
+        </div>
+        <div class="subj-tags"><span class="subj-tag sky">Finance</span><span class="subj-tag teal">Accounts</span></div>
+        <div class="br"><div class="mi"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>+91 99876 54321</div><div class="mi"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>rajesh@school.edu</div></div>
+      </div>
+      <div class="card" onclick="showView('view-staff-profile')">
+        <div class="tr"><div class="av av-mint">SK</div><div class="info"><div class="nm">Suresh Kumar</div><div class="sub">Transport Coordinator · Operations</div><div class="bgs"><span class="badge success"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Active</span><span class="badge teal">9 yrs svc</span></div></div>
+          <div class="acts" onclick="event.stopPropagation()"><div class="act-btn act-call" title="Call" onclick="alert('Calling Suresh…')"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div><div class="act-btn act-msg" title="Message" onclick="alert('Messaging Suresh…')"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div></div>
+        </div>
+        <div class="subj-tags"><span class="subj-tag teal">Transport</span><span class="subj-tag sky">Logistics</span></div>
+        <div class="br"><div class="mi"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>+91 98765 99999</div><div class="mi"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>suresh@school.edu</div></div>
+      </div>
+      <div class="load-more"><button onclick="this.textContent='Loading…'">Load more</button></div>
+    </div>
+  </div>
+</div>
+<!-- END VIEW: PEOPLE TAB -->
+
+<!-- ════════════════════════════════════════════════════════════════════
+     VIEW: TEACHER PROFILE
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="view" id="view-teacher-profile">
+  <div class="back-hdr">
+    <div class="back-btn" onclick="showView('view-people')"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></div>
+    <h2>Teacher Profile</h2>
+  </div>
+  <div class="pbody">
+    <!-- Hero -->
+    <div class="hero">
+      <div class="ht">
+        <div class="ha av-violet">PS</div>
+        <div class="hi"><h2>Priya Sharma</h2><div class="sub">Senior Teacher · Mathematics</div><div class="hbs"><span class="badge success"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Active</span></div></div>
+      </div>
+      <div class="hfs">
+        <div class="hf"><div class="fi"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><div><div class="fv">12 yrs</div><div class="fl">Experience</div></div></div>
+        <div class="hf"><div class="fi"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><div><div class="fv">Aug 2019</div><div class="fl">Joined</div></div></div>
+      </div>
+    </div>
+    <!-- Quick Actions -->
+    <div><div class="sh">Quick Actions</div>
+      <div class="qa" onclick="showView('view-teacher-assignments')" style="margin-top:8px">
+        <div class="qai"><svg viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div>
+        <div class="qat"><div class="qt">Assignments</div><div class="qs">Manage classes &amp; subjects</div></div>
+        <svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+      </div>
+    </div>
+    <!-- KPI Carousel -->
+    <div><div class="sh">Overview</div><div class="kpi-scroll" style="margin-top:8px">
+      <div class="kpi"><div class="ki" style="background:rgba(91,65,213,.12)"><svg viewBox="0 0 24 24" style="stroke:var(--accent)"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div><div class="kv">142</div><div class="kl">Students</div><div class="ks">Across classes</div></div>
+      <div class="kpi"><div class="ki" style="background:var(--success-soft)"><svg viewBox="0 0 24 24" style="stroke:var(--success)"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div><div class="kv">6</div><div class="kl">Classes</div><div class="ks">Sections taught</div></div>
+      <div class="kpi"><div class="ki" style="background:var(--warning-soft)"><svg viewBox="0 0 24 24" style="stroke:var(--warning)"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div><div class="kv">3</div><div class="kl">Subjects</div><div class="ks">Covered</div></div>
+      <div class="kpi"><div class="ki" style="background:var(--success-soft)"><svg viewBox="0 0 24 24" style="stroke:var(--success)"><path d="M20 6 9 17l-5-5"/></svg></div><div class="kv">94%</div><div class="kl">Attendance</div><div class="ks">Personal</div></div>
+      <div class="kpi"><div class="ki" style="background:rgba(91,65,213,.12)"><svg viewBox="0 0 24 24" style="stroke:var(--accent)"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div><div class="kv">87%</div><div class="kl">Assignments</div><div class="ks">Completion</div></div>
+    </div></div>
+    <!-- Performance -->
+    <div><div class="sh">Performance</div><div class="dc" style="margin-top:8px">
+      <div class="mb"><div class="bt"><span>Attendance</span><span>94%</span></div><div class="btr"><div class="bf" style="width:94%;background:var(--success)"></div></div></div>
+      <div class="mb"><div class="bt"><span>Assignment Completion</span><span>87%</span></div><div class="btr"><div class="bf" style="width:87%;background:var(--accent)"></div></div></div>
+      <div class="mb"><div class="bt"><span>Parent Satisfaction</span><span>91%</span></div><div class="btr"><div class="bf" style="width:91%;background:var(--warning)"></div></div></div>
+    </div></div>
+    <!-- Teaching Portfolio -->
+    <div><div class="sh">Teaching Portfolio</div><div class="kpi-scroll" style="margin-top:8px">
+      <div class="kpi"><div class="ki" style="background:var(--sky-soft)"><svg viewBox="0 0 24 24" style="stroke:var(--sky)"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div><div class="kv" style="font-size:14px">Mathematics</div><div class="kl">Class 9-A · 10-A</div><div class="ks">42 students</div></div>
+      <div class="kpi"><div class="ki" style="background:var(--sky-soft)"><svg viewBox="0 0 24 24" style="stroke:var(--sky)"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div><div class="kv" style="font-size:14px">Mathematics</div><div class="kl">Class 11-B · 12-B</div><div class="ks">38 students</div></div>
+    </div></div>
+    <!-- Insights -->
+    <div class="insight"><div class="il">AI Insight</div><div class="it">Priya consistently exceeds assignment completion targets. Her 9-A class shows 23% improvement in test scores this term. Consider mentoring newer teachers.</div></div>
+    <!-- Activity Timeline -->
+    <div><div class="sh">Recent Activity</div><div class="dc" style="margin-top:8px">
+      <div class="tl-item"><div class="tl-dot" style="background:var(--success)"></div><div class="tl-c"><div class="tl-t">Submitted Q2 report cards for Class 9-A</div><div class="tl-time">2 hours ago</div></div></div>
+      <div class="tl-item"><div class="tl-dot" style="background:var(--accent)"></div><div class="tl-c"><div class="tl-t">Marked attendance for 6 classes</div><div class="tl-time">Today, 9:15 AM</div></div></div>
+      <div class="tl-item"><div class="tl-dot" style="background:var(--warning)"></div><div class="tl-c"><div class="tl-t">Updated syllabus coverage for Algebra</div><div class="tl-time">Yesterday</div></div></div>
+    </div></div>
+    <!-- Achievements -->
+    <div><div class="sh">Achievements</div><div class="kpi-scroll" style="margin-top:8px">
+      <div class="ach"><div class="ai" style="background:var(--warning-soft)"><svg viewBox="0 0 24 24" style="stroke:var(--warning)"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg></div><div class="at">Top Educator</div><div class="ad">Q2 2024</div></div>
+      <div class="ach"><div class="ai" style="background:var(--success-soft)"><svg viewBox="0 0 24 24" style="stroke:var(--success)"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><div class="at">100% Attendance</div><div class="ad">March 2024</div></div>
+      <div class="ach"><div class="ai" style="background:rgba(91,65,213,.12)"><svg viewBox="0 0 24 24" style="stroke:var(--accent)"><path d="M12 2 15.09 8.26 22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div><div class="at">5-Star Rating</div><div class="ad">Parent feedback</div></div>
+    </div></div>
+    <!-- Professional Details -->
+    <div><div class="sh">Professional Details</div><div class="dc" style="margin-top:8px">
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div><div class="drl">Designation</div><div class="drv">Senior Teacher</div></div>
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div><div class="drl">Role</div><div class="drv">Teacher</div></div>
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div><div class="drl">Email</div><div class="drv">priya.sharma@school.edu</div></div>
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div><div class="drl">Phone</div><div class="drv">+91 98765 12345</div></div>
+    </div></div>
+    <!-- Danger Zone -->
+    <div class="dz"><div class="dt">Danger Zone</div><div class="dd">Removing this teacher will unassign all classes and revoke access. This cannot be undone.</div><button class="btn-danger" onclick="openConfirm('confirm-remove-teacher')"><svg viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Remove Teacher</button></div>
+  </div>
+</div>
+<!-- END VIEW: TEACHER PROFILE -->
+
+<!-- ════════════════════════════════════════════════════════════════════
+     VIEW: TEACHER ASSIGNMENTS
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="view" id="view-teacher-assignments">
+  <div class="back-hdr">
+    <div class="back-btn" onclick="showView('view-teacher-profile')"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></div>
+    <h2>Assignment Management</h2>
+  </div>
+  <div class="pbody">
+    <!-- Teacher Header -->
+    <div class="hero">
+      <div class="ht"><div class="ha av-violet">PS</div><div class="hi"><h2>Priya Sharma</h2><div class="sub">Mathematics Teacher</div><div class="hbs"><span class="badge accent">6 Classes</span><span class="badge success">3 Subjects</span></div></div></div>
+    </div>
+    <!-- KPI Carousel -->
+    <div><div class="sh">Assignment Summary</div><div class="kpi-scroll" style="margin-top:8px">
+      <div class="kpi"><div class="ki" style="background:rgba(91,65,213,.12)"><svg viewBox="0 0 24 24" style="stroke:var(--accent)"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div><div class="kv">6</div><div class="kl">Classes</div><div class="ks">Active</div></div>
+      <div class="kpi"><div class="ki" style="background:var(--warning-soft)"><svg viewBox="0 0 24 24" style="stroke:var(--warning)"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div><div class="kv">3</div><div class="kl">Subjects</div><div class="ks">Covered</div></div>
+      <div class="kpi"><div class="ki" style="background:var(--success-soft)"><svg viewBox="0 0 24 24" style="stroke:var(--success)"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div><div class="kv">142</div><div class="kl">Students</div><div class="ks">Taught</div></div>
+      <div class="kpi"><div class="ki" style="background:rgba(91,65,213,.12)"><svg viewBox="0 0 24 24" style="stroke:var(--accent)"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div><div class="kv">8</div><div class="kl">Sections</div><div class="ks">Across classes</div></div>
+    </div></div>
+    <!-- Current Assignments -->
+    <div><div class="sh">Current Assignments</div><div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+      <div class="as-card"><div class="asi"><svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div><div class="asv"><div class="ast">Mathematics</div><div class="ass">Class 9-A</div><div class="asm"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>42 students</div></div><button class="btn-rm-sm" onclick="openConfirm('confirm-remove-assignment')">Remove</button></div>
+      <div class="as-card"><div class="asi"><svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div><div class="asv"><div class="ast">Mathematics</div><div class="ass">Class 10-A</div><div class="asm"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>38 students</div></div><button class="btn-rm-sm" onclick="openConfirm('confirm-remove-assignment')">Remove</button></div>
+      <div class="as-card"><div class="asi"><svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div><div class="asv"><div class="ast">Mathematics</div><div class="ass">Class 11-B</div><div class="asm"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>35 students</div></div><button class="btn-rm-sm" onclick="openConfirm('confirm-remove-assignment')">Remove</button></div>
+    </div></div>
+    <!-- Add Assignment -->
+    <div class="aa-card"><div class="sh" style="margin-bottom:12px">Add New Assignment</div>
+      <div class="fg"><label class="flb">Subject</label><select class="fin" onchange="this.style.color='var(--ink)'"><option value="">Select subject…</option><option>Mathematics</option><option>Physics</option><option>Chemistry</option><option>Biology</option><option>English</option></select></div>
+      <div class="fg"><label class="flb">Classes</label><div class="tg"><div class="tch" onclick="toggleChip(this)">9-A</div><div class="tch" onclick="toggleChip(this)">9-B</div><div class="tch" onclick="toggleChip(this)">10-A</div><div class="tch" onclick="toggleChip(this)">10-B</div><div class="tch" onclick="toggleChip(this)">11-A</div><div class="tch" onclick="toggleChip(this)">11-B</div></div></div>
+      <div class="fg"><label class="flb">Sections</label><div class="tg"><div class="tch" onclick="toggleChip(this)">A</div><div class="tch" onclick="toggleChip(this)">B</div><div class="tch" onclick="toggleChip(this)">C</div></div></div>
+      <div style="display:flex;gap:8px;margin-top:4px"><button class="btn-g" style="flex:1" onclick="this.closest('.aa-card').querySelectorAll('.tch').forEach(t=>t.classList.remove('selected'))">Reset</button><button class="btn-p" style="flex:1" onclick="alert('Assignment saved!')">Save Assignment</button></div>
+    </div>
+    <!-- Workload Insights -->
+    <div class="insight"><div class="il">Workload Insight</div><div class="it">Priya teaches 142 students across 6 classes. Workload is balanced. Consider adding 1 more section to optimize coverage.</div></div>
+    <!-- Distribution -->
+    <div><div class="sh">Subject Distribution</div><div class="dc" style="margin-top:8px">
+      <div class="dist-bar"><div class="dl">Math</div><div class="dt"><div class="df" style="width:60%;background:var(--accent)">60%</div></div></div>
+      <div class="dist-bar"><div class="dl">Physics</div><div class="dt"><div class="df" style="width:25%;background:var(--sky)">25%</div></div></div>
+      <div class="dist-bar"><div class="dl">Other</div><div class="dt"><div class="df" style="width:15%;background:var(--success)">15%</div></div></div>
+    </div></div>
+  </div>
+</div>
+<!-- END VIEW: TEACHER ASSIGNMENTS -->
+
+<!-- ════════════════════════════════════════════════════════════════════
+     VIEW: STUDENT PROFILE
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="view" id="view-student-profile">
+  <div class="back-hdr">
+    <div class="back-btn" onclick="showView('view-people')"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></div>
+    <h2>Student Profile</h2>
+    <div class="hdr-act" onclick="openSheet('sheet-edit-student')" title="Edit"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
+  </div>
+  <div class="pbody">
+    <!-- Hero -->
+    <div class="hero">
+      <div class="ht"><div class="ha av-sky">AS</div><div class="hi"><h2>Aarav Singh</h2><div class="sub">Class 10-A · Sec A</div><div class="hbs"><span class="badge success"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Active</span></div></div></div>
+      <div class="hfs"><div class="hf"><div class="fi"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div><div><div class="fv">STU2024001</div><div class="fl">Admission No</div></div></div><div class="hf"><div class="fi"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div><div class="fv">05</div><div class="fl">Roll No</div></div></div></div>
+    </div>
+    <!-- KPI Carousel -->
+    <div><div class="sh">Overview</div><div class="kpi-scroll" style="margin-top:8px">
+      <div class="kpi"><div class="ki" style="background:var(--success-soft)"><svg viewBox="0 0 24 24" style="stroke:var(--success)"><path d="M20 6 9 17l-5-5"/></svg></div><div class="kv">92%</div><div class="kl">Attendance</div><div class="ks">Overall</div></div>
+      <div class="kpi"><div class="ki" style="background:rgba(91,65,213,.12)"><svg viewBox="0 0 24 24" style="stroke:var(--accent)"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div><div class="kv">7</div><div class="kl">Teachers</div><div class="ks">Connected</div></div>
+      <div class="kpi"><div class="ki" style="background:var(--warning-soft)"><svg viewBox="0 0 24 24" style="stroke:var(--warning)"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div><div class="kv">2</div><div class="kl">Parents</div><div class="ks">Linked</div></div>
+      <div class="kpi"><div class="ki" style="background:rgba(91,65,213,.12)"><svg viewBox="0 0 24 24" style="stroke:var(--accent)"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div><div class="kv">8</div><div class="kl">Subjects</div><div class="ks">Studied</div></div>
+      <div class="kpi"><div class="ki" style="background:var(--success-soft)"><svg viewBox="0 0 24 24" style="stroke:var(--success)"><path d="M12 2 15.09 8.26 22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div><div class="kv">85%</div><div class="kl">Academic</div><div class="ks">Average</div></div>
+    </div></div>
+    <!-- Academic Overview -->
+    <div><div class="sh">Academic Overview</div><div class="dc" style="margin-top:8px">
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div><div class="drl">Class</div><div class="drv">10</div></div>
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div><div class="drl">Section</div><div class="drv">A</div></div>
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="drl">Roll Number</div><div class="drv">05</div></div>
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><div class="drl">Admission Date</div><div class="drv">15 Jun 2022</div></div>
+    </div></div>
+    <!-- Teacher Connections -->
+    <div><div class="sh">Teacher Connections</div><div class="dc" style="margin-top:8px">
+      <div class="dr"><div class="dri"><div class="av av-violet" style="width:28px;height:28px;font-size:10px">PS</div></div><div class="drl">Priya Sharma</div><div class="drv">Mathematics</div></div>
+      <div class="dr"><div class="dri"><div class="av av-mint" style="width:28px;height:28px;font-size:10px">RK</div></div><div class="drl">Rahul Verma</div><div class="drv">Physics</div></div>
+      <div class="dr"><div class="dri"><div class="av av-gold" style="width:28px;height:28px;font-size:10px">AN</div></div><div class="drl">Anita Nair</div><div class="drv">English</div></div>
+    </div></div>
+    <!-- Parent Connections -->
+    <div><div class="sh">Parent Connections</div><div class="dc" style="margin-top:8px">
+      <div class="dr"><div class="dri"><div class="av av-coral" style="width:28px;height:28px;font-size:10px">RS</div></div><div class="drl">Rohan Singh (Father)</div><div class="drv">+91 98765 11111</div></div>
+      <div class="dr"><div class="dri"><div class="av av-sky" style="width:28px;height:28px;font-size:10px">NS</div></div><div class="drl">Neha Singh (Mother)</div><div class="drv">+91 98765 22222</div></div>
+    </div></div>
+    <!-- Attendance Overview -->
+    <div><div class="sh">Attendance Overview</div><div class="dc" style="margin-top:8px">
+      <div class="mb"><div class="bt"><span>Overall Attendance</span><span>92%</span></div><div class="btr"><div class="bf" style="width:92%;background:var(--success)"></div></div></div>
+      <div class="mb"><div class="bt"><span>This Term</span><span>89%</span></div><div class="btr"><div class="bf" style="width:89%;background:var(--accent)"></div></div></div>
+    </div></div>
+    <!-- Marks -->
+    <div><div class="sh">Recent Marks</div><div class="dc" style="margin-top:8px">
+      <div class="marks-row"><div class="ms">Mathematics</div><div class="msc">92/100</div></div>
+      <div class="marks-row"><div class="ms">Physics</div><div class="msc">88/100</div></div>
+      <div class="marks-row"><div class="ms">English</div><div class="msc">85/100</div></div>
+      <div class="marks-row"><div class="ms">Chemistry</div><div class="msc">79/100</div></div>
+    </div></div>
+    <!-- Leave -->
+    <div><div class="sh">Leave Records</div><div class="dc" style="margin-top:8px">
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><div class="drl">Total Leave Days</div><div class="drv">6</div></div>
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><div class="drl">Pending Requests</div><div class="drv">1</div></div>
+    </div></div>
+    <!-- Fees -->
+    <div><div class="sh">Fees Status</div><div class="dc" style="margin-top:8px">
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div class="drl">Term 1</div><div class="drv" style="color:var(--success)">Paid</div></div>
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div class="drl">Term 2</div><div class="drv" style="color:var(--warning)">Pending</div></div>
+    </div></div>
+    <!-- Contact -->
+    <div><div class="sh">Contact Information</div><div class="dc" style="margin-top:8px">
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div><div class="drl">Father's Phone</div><div class="drv">+91 98765 11111</div></div>
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div><div class="drl">Mother's Phone</div><div class="drv">+91 98765 22222</div></div>
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div><div class="drl">Address</div><div class="drv">123 MG Road, Bangalore</div></div>
+    </div></div>
+    <!-- Health Records Action -->
+    <div class="qa" onclick="alert('Opening Health Records…')"><div class="qai"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div><div class="qat"><div class="qt">Health Records</div><div class="qs">View medical history &amp; checkups</div></div><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div>
+    <!-- Danger Zone -->
+    <div class="dz"><div class="dt">Danger Zone</div><div class="dd">Removing this student will archive all records. This cannot be undone.</div><button class="btn-danger" onclick="openConfirm('confirm-remove-student')"><svg viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Remove Student</button></div>
+  </div>
+</div>
+<!-- END VIEW: STUDENT PROFILE -->
+
+<!-- ════════════════════════════════════════════════════════════════════
+     VIEW: STAFF PROFILE
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="view" id="view-staff-profile">
+  <div class="back-hdr">
+    <div class="back-btn" onclick="showView('view-people')"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></div>
+    <h2>Staff Profile</h2>
+  </div>
+  <div class="pbody">
+    <!-- Hero -->
+    <div class="hero">
+      <div class="ht"><div class="ha av-coral">MJ</div><div class="hi"><h2>Meena Joshi</h2><div class="sub">Librarian · Administration</div><div class="hbs"><span class="badge success"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Active</span></div></div></div>
+      <div class="hfs"><div class="hf"><div class="fi"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><div><div class="fv">Jan 2020</div><div class="fl">Joined</div></div></div></div>
+    </div>
+    <!-- Contact Information -->
+    <div><div class="sh">Contact Information</div><div class="dc" style="margin-top:8px">
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div><div class="drl">Phone</div><div class="drv">+91 98765 43210</div></div>
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div><div class="drl">Email</div><div class="drv">meena.joshi@school.edu</div></div>
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div><div class="drl">Address</div><div class="drv">45 Park Street, Bangalore</div></div>
+    </div></div>
+    <!-- Professional Details -->
+    <div><div class="sh">Professional Details</div><div class="dc" style="margin-top:8px">
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg></div><div class="drl">Role</div><div class="drv">Librarian</div></div>
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><div class="drl">Department</div><div class="drv">Administration</div></div>
+      <div class="dr"><div class="dri"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><div class="drl">Joined</div><div class="drv">Jan 2020</div></div>
+    </div></div>
+    <!-- Danger Zone -->
+    <div class="dz"><div class="dt">Danger Zone</div><div class="dd">Removing this staff member will revoke access immediately. This cannot be undone.</div><button class="btn-danger" onclick="openConfirm('confirm-remove-staff')"><svg viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Remove Staff</button></div>
+  </div>
+</div>
+<!-- END VIEW: STAFF PROFILE -->
+
+<!-- ════════════════════════════════════════════════════════════════════
+     VIEW: LINK REQUESTS
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="view" id="view-link-requests">
+  <div class="back-hdr">
+    <div class="back-btn" onclick="showView('view-people')"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></div>
+    <h2>Link Requests</h2>
+  </div>
+  <div class="pbody">
+    <p class="hint" style="margin-bottom:4px">Parents requesting access to a student's records. Approving grants the parent attendance, marks and syllabus for the matched student.</p>
+    <div class="tag-tabs">
+      <div class="tag-tab active" onclick="document.querySelectorAll('.tag-tab').forEach(t=>t.classList.remove('active'));this.classList.add('active')">Pending</div>
+      <div class="tag-tab" onclick="document.querySelectorAll('.tag-tab').forEach(t=>t.classList.remove('active'));this.classList.add('active')">Needs review (1)</div>
+    </div>
+    <div class="sh">Pending Requests</div>
+    <!-- Request 1 -->
+    <div class="lr-card">
+      <div class="lrt"><div class="av av-sky" style="width:40px;height:40px;font-size:13px">AS</div><div class="lri">
+        <div class="lrn">Aarav Singh</div><div class="lrm">Class 10-A · Roll 05</div>
+        <div class="lrp">Requested by Rohan Singh (Father) · +91 98765 11111</div>
+      </div></div>
+      <div class="lra"><button class="btn-s" style="color:var(--ink-2)" onclick="this.closest('.lr-card').style.opacity=.4">Reject</button><button class="btn-p" style="font-size:14px;padding:12px" onclick="this.closest('.lr-card').style.opacity=.4;this.textContent='Approved'">Approve</button></div>
+    </div>
+    <!-- Request 2 -->
+    <div class="lr-card">
+      <div class="lrt"><div class="av av-coral" style="width:40px;height:40px;font-size:13px">DP</div><div class="lri">
+        <div class="lrn">Diya Patel</div><div class="lrm">Class 9-B · Roll 12</div>
+        <div class="lrp">Requested by Smita Patel (Mother) · +91 99876 55555</div>
+      </div></div>
+      <div class="lra"><button class="btn-s" style="color:var(--ink-2)" onclick="this.closest('.lr-card').style.opacity=.4">Reject</button><button class="btn-p" style="font-size:14px;padding:12px" onclick="this.closest('.lr-card').style.opacity=.4;this.textContent='Approved'">Approve</button></div>
+    </div>
+    <!-- Request 3 (Needs Review) -->
+    <div class="lr-card" style="border:1px solid var(--warning-soft)">
+      <div class="lrt"><div class="av av-violet" style="width:40px;height:40px;font-size:13px">VK</div><div class="lri">
+        <div class="lrn">Vihaan Kapoor</div><div class="lrm">Class 12-A · Roll 01</div>
+        <div class="lrp">Requested by Anil Kapoor (Father) · +91 98765 33333</div>
+        <div class="lrr">⚠ Phone number doesn't match the registered parent. Verify identity before approving.</div>
+      </div></div>
+      <div class="lra"><button class="btn-s" style="color:var(--ink-2)" onclick="this.closest('.lr-card').style.opacity=.4">Reject</button><button class="btn-p" style="font-size:14px;padding:12px" onclick="this.closest('.lr-card').style.opacity=.4;this.textContent='Approved'">Approve</button></div>
+    </div>
+  </div>
+</div>
+<!-- END VIEW: LINK REQUESTS -->
+
+</div><!-- /screen -->
+
+<!-- Home Indicator -->
+<div class="home-ind"></div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     BOTTOM SHEETS
+     ════════════════════════════════════════════════════════════════════ -->
+
+<!-- Add Teacher Sheet -->
+<div class="sheet" id="sheet-add-teacher">
+  <div class="sh-handle"></div>
+  <div class="sh-hdr"><div class="sh-hdr-txt"><h3>Add Teacher</h3><div class="sh-sub">Create a new teacher account</div></div><div class="sh-close" onclick="closeSheet()"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></div></div>
+  <div class="sh-body">
+    <div class="fg"><label class="flb">Full Name</label><input class="fin" type="text" placeholder="e.g. Priya Sharma"></div>
+    <div class="fg"><label class="flb">Email or Phone</label><input class="fin" type="text" placeholder="e.g. priya@school.edu"></div>
+    <div class="fg"><label class="flb">Initial Password (if email)</label><input class="fin" type="text" placeholder="Auto-generated if blank"></div>
+    <div class="fg"><label class="flb">Assign Class</label><select class="fin"><option value="">Select class…</option><option>9-A</option><option>10-A</option><option>11-B</option></select></div>
+    <div class="fg"><label class="flb">Section</label><select class="fin"><option value="">Select section…</option><option>A</option><option>B</option></select></div>
+    <div style="display:flex;gap:8px;margin-top:4px"><button class="btn-g" style="flex:1" onclick="closeSheet()">Cancel</button><button class="btn-p" style="flex:1" onclick="closeSheet();alert('Teacher added!')">Add Teacher</button></div>
+  </div>
+</div>
+
+<!-- Add Staff Sheet -->
+<div class="sheet" id="sheet-add-staff">
+  <div class="sh-handle"></div>
+  <div class="sh-hdr"><div class="sh-hdr-txt"><h3>Add Staff</h3><div class="sh-sub">Create a non-teaching staff record</div></div><div class="sh-close" onclick="closeSheet()"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></div></div>
+  <div class="sh-body">
+    <div class="fg"><label class="flb">Full Name</label><input class="fin" type="text" placeholder="e.g. Meena Joshi"></div>
+    <div class="fg"><label class="flb">Role</label><input class="fin" type="text" placeholder="e.g. Librarian"></div>
+    <div class="fg"><label class="flb">Department</label><select class="fin"><option value="">Select department…</option><option>Administration</option><option>Finance</option><option>Maintenance</option><option>Transport</option></select></div>
+    <div class="fg"><label class="flb">Phone</label><input class="fin" type="text" placeholder="+91 98765 43210"></div>
+    <div class="fg"><label class="flb">Email</label><input class="fin" type="text" placeholder="meena@school.edu"></div>
+    <div style="display:flex;gap:8px;margin-top:4px"><button class="btn-g" style="flex:1" onclick="closeSheet()">Cancel</button><button class="btn-p" style="flex:1" onclick="closeSheet();alert('Staff added!')">Add Staff</button></div>
+  </div>
+</div>
+
+<!-- Add Student Sheet -->
+<div class="sheet" id="sheet-add-student">
+  <div class="sh-handle"></div>
+  <div class="sh-hdr"><div class="sh-hdr-txt"><h3>Add Student</h3><div class="sh-sub">Manually add a single student</div></div><div class="sh-close" onclick="closeSheet()"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></div></div>
+  <div class="sh-body">
+    <div class="fg"><label class="flb">Student Name</label><input class="fin" type="text" placeholder="e.g. Aarav Singh"></div>
+    <div class="fg"><label class="flb">Class</label><select class="fin"><option value="">Select class…</option><option>9</option><option>10</option><option>11</option><option>12</option></select></div>
+    <div class="fg"><label class="flb">Section</label><select class="fin"><option value="">Select section…</option><option>A</option><option>B</option><option>C</option></select></div>
+    <div class="fg"><label class="flb">Roll Number</label><input class="fin" type="text" placeholder="e.g. 05"></div>
+    <div class="fg"><label class="flb">Parent Phone</label><input class="fin" type="text" placeholder="+91 98765 11111"></div>
+    <div class="fg"><label class="flb">Admission Date</label><input class="fin" type="date"></div>
+    <div style="display:flex;gap:8px;margin-top:4px"><button class="btn-g" style="flex:1" onclick="closeSheet()">Cancel</button><button class="btn-p" style="flex:1" onclick="closeSheet();alert('Student added!')">Add Student</button></div>
+  </div>
+</div>
+
+<!-- Import Students Sheet -->
+<div class="sheet" id="sheet-import-students">
+  <div class="sh-handle"></div>
+  <div class="sh-hdr"><div class="sh-hdr-txt"><h3>Import Students</h3><div class="sh-sub">Bulk import via CSV file</div></div><div class="sh-close" onclick="closeSheet()"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></div></div>
+  <div class="sh-body">
+    <div class="csv-upload" onclick="alert('File picker would open here')">
+      <div class="cui"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+      <div class="cut">Upload CSV File</div><div class="cus">Click to browse or drag &amp; drop</div>
+    </div>
+    <div class="fg"><label class="flb">Or paste CSV content</label><textarea class="fin" rows="4" placeholder="name,class,section,roll_number,parent_phone&#10;Aarav Singh,10,A,05,+919876511111" style="resize:vertical;font-family:monospace;font-size:12px"></textarea></div>
+    <div class="fg"><a href="#" onclick="alert('Template downloaded!');return false" style="font-size:13px;font-weight:600;color:var(--accent);text-decoration:none">Download CSV Template</a></div>
+    <div style="display:flex;gap:8px;margin-top:4px"><button class="btn-g" style="flex:1" onclick="closeSheet()">Cancel</button><button class="btn-p" style="flex:1" onclick="closeSheet();alert('Importing students…')">Import</button></div>
+  </div>
+</div>
+
+<!-- Graduate Sheet -->
+<div class="sheet" id="sheet-graduate">
+  <div class="sh-handle"></div>
+  <div class="sh-hdr"><div class="sh-hdr-txt"><h3>Graduate to Alumni</h3><div class="sh-sub">Move selected students to alumni status</div></div><div class="sh-close" onclick="closeSheet()"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></div></div>
+  <div class="sh-body">
+    <div class="fg"><label class="flb">Graduating Class</label><select class="fin"><option value="">Select class…</option><option>Class 12 (2024)</option><option>Class 10 (2024)</option></select></div>
+    <div class="fg"><label class="flb">Academic Year</label><input class="fin" type="text" value="2024-25" readonly></div>
+    <div class="fg"><label class="flb">Students to graduate</label><div class="hint">3 students selected from Class 12-A</div></div>
+    <div style="display:flex;gap:8px;margin-top:4px"><button class="btn-g" style="flex:1" onclick="closeSheet()">Cancel</button><button class="btn-p" style="flex:1" onclick="closeSheet();alert('Students graduated to alumni!')">Confirm Graduation</button></div>
+  </div>
+</div>
+
+<!-- Edit Student Sheet -->
+<div class="sheet" id="sheet-edit-student">
+  <div class="sh-handle"></div>
+  <div class="sh-hdr"><div class="sh-hdr-txt"><h3>Edit Student</h3><div class="sh-sub">Update student details</div></div><div class="sh-close" onclick="closeSheet()"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></div></div>
+  <div class="sh-body">
+    <div class="fg"><label class="flb">Student Name</label><input class="fin" type="text" value="Aarav Singh"></div>
+    <div class="fg"><label class="flb">Class</label><select class="fin"><option>9</option><option selected>10</option><option>11</option><option>12</option></select></div>
+    <div class="fg"><label class="flb">Section</label><select class="fin"><option selected>A</option><option>B</option><option>C</option></select></div>
+    <div class="fg"><label class="flb">Roll Number</label><input class="fin" type="text" value="05"></div>
+    <div class="fg"><label class="flb">Parent Phone</label><input class="fin" type="text" value="+91 98765 11111"></div>
+    <div style="display:flex;gap:8px;margin-top:4px"><button class="btn-g" style="flex:1" onclick="closeSheet()">Cancel</button><button class="btn-p" style="flex:1" onclick="closeSheet();alert('Student updated!')">Save Changes</button></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     CONFIRMATION DIALOGS
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="conf-bg" id="confirm-remove-teacher">
+  <div class="conf-dlg">
+    <div class="ci"><svg viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+    <h3>Remove Teacher?</h3>
+    <p>This will unassign all classes and revoke access for Priya Sharma. This cannot be undone.</p>
+    <div class="ca"><button class="btn-s" onclick="closeConfirm('confirm-remove-teacher')">Cancel</button><button class="btn-danger" style="border-radius:var(--r-md);padding:12px" onclick="closeConfirm('confirm-remove-teacher');showView('view-people');alert('Teacher removed')">Remove</button></div>
+  </div>
+</div>
+
+<div class="conf-bg" id="confirm-remove-student">
+  <div class="conf-dlg">
+    <div class="ci"><svg viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+    <h3>Remove Student?</h3>
+    <p>This will archive all records for Aarav Singh. This cannot be undone.</p>
+    <div class="ca"><button class="btn-s" onclick="closeConfirm('confirm-remove-student')">Cancel</button><button class="btn-danger" style="border-radius:var(--r-md);padding:12px" onclick="closeConfirm('confirm-remove-student');showView('view-people');alert('Student removed')">Remove</button></div>
+  </div>
+</div>
+
+<div class="conf-bg" id="confirm-remove-staff">
+  <div class="conf-dlg">
+    <div class="ci"><svg viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+    <h3>Remove Staff?</h3>
+    <p>This will revoke access for Meena Joshi immediately. This cannot be undone.</p>
+    <div class="ca"><button class="btn-s" onclick="closeConfirm('confirm-remove-staff')">Cancel</button><button class="btn-danger" style="border-radius:var(--r-md);padding:12px" onclick="closeConfirm('confirm-remove-staff');showView('view-people');alert('Staff removed')">Remove</button></div>
+  </div>
+</div>
+
+<div class="conf-bg" id="confirm-remove-assignment">
+  <div class="conf-dlg">
+    <div class="ci"><svg viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+    <h3>Remove Assignment?</h3>
+    <p>This will unassign this class from the teacher. Students will need to be reassigned.</p>
+    <div class="ca"><button class="btn-s" onclick="closeConfirm('confirm-remove-assignment')">Cancel</button><button class="btn-danger" style="border-radius:var(--r-md);padding:12px" onclick="closeConfirm('confirm-remove-assignment');alert('Assignment removed')">Remove</button></div>
+  </div>
+</div>
+
+<!-- Sheet Overlay Background -->
+<div class="overlay-bg" id="overlay-bg" onclick="closeSheet()"></div>
+
+</div><!-- /phone -->
+
+<script src="people-tab-premium.js"></script>
+</body>
+</html>
