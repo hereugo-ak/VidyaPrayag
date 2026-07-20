@@ -321,7 +321,7 @@ private fun ensureSchoolForUser(uid: UUID): UUID {
         it[contactEmail] = basics["contact_email"]
         it[contactPhone] = basics["contact_phone"]
         it[fullAddress] = basics["full_address"]
-        it[city] = city
+        it[SchoolsTable.city] = city
         it[district] = basics["district"] ?: "Unknown"
         it[state] = derivedState
         it[pincode] = basics["pincode"]

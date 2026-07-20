@@ -220,7 +220,7 @@ fun Route.schoolProfileRouting() {
                         req.principalPhone?.let { v -> it[principalPhone] = v.ifBlank { null } }
                         req.principalEmail?.let { v -> it[principalEmail] = v.ifBlank { null } }
                         req.fullAddress?.let { v -> it[fullAddress] = v.ifBlank { null } }
-                        req.pincode?.let { v -> it[pincode] = v.ifBlank { null } }
+                        req.pincode?.let { v -> it[SchoolsTable.pincode] = v.ifBlank { null } }
                         req.logoUrl?.let { v -> it[logoUrl] = v.ifBlank { null } }
                         req.coverImageUrl?.let { v -> it[coverImageUrl] = v.ifBlank { null } }
                         // Geo + richer institutional columns (all nullable).

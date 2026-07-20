@@ -50,8 +50,8 @@
     <div class="act-row">
       <span class="act-row-lbl">Announcements</span>
       <div class="act-row-btns">
-        <button class="btn-sm ghost"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Scheduled</button>
-        <button class="btn-sm primary"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New</button>
+        <button class="btn-sm ghost" onclick="openOverlay('scheduled')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Scheduled</button>
+        <button class="btn-sm primary" onclick="openOverlay('create')"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New</button>
       </div>
     </div>
     <div class="fchips">
@@ -62,7 +62,7 @@
       <div class="fchip" onclick="toggleChip(this)">Update</div>
       <div class="fchip" onclick="toggleChip(this)">Reminder</div>
     </div>
-    <div class="card" onclick="alert('Open announcement detail')">
+    <div class="card" onclick="openAnnouncement('Annual Sports Day Registration Open')">
       <div class="ann-card">
         <div class="ann-icon violet"><svg viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg></div>
         <div class="ann-body">
@@ -75,7 +75,7 @@
         </div>
       </div>
     </div>
-    <div class="card" onclick="alert('Open announcement detail')">
+    <div class="card" onclick="openAnnouncement('Holi Holiday — School Closed')">
       <div class="ann-card">
         <div class="ann-icon gold"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
         <div class="ann-body">
@@ -88,7 +88,7 @@
         </div>
       </div>
     </div>
-    <div class="card" onclick="alert('Open announcement detail')">
+    <div class="card" onclick="openAnnouncement('Parent-Teacher Meeting — Class 9 & 10')">
       <div class="ann-card">
         <div class="ann-icon teal"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
         <div class="ann-body">
@@ -101,7 +101,7 @@
         </div>
       </div>
     </div>
-    <div class="card" onclick="alert('Open announcement detail')">
+    <div class="card" onclick="openAnnouncement('Inter-School Science Fair — Volunteers Needed')">
       <div class="ann-card">
         <div class="ann-icon peach"><svg viewBox="0 0 24 24"><path d="M20 12v9H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg></div>
         <div class="ann-body">
@@ -114,7 +114,7 @@
         </div>
       </div>
     </div>
-    <div class="card" onclick="alert('Open announcement detail')">
+    <div class="card" onclick="openAnnouncement('Fee Payment Deadline — Q4 Installment')">
       <div class="ann-card">
         <div class="ann-icon sky"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
         <div class="ann-body">
@@ -127,7 +127,7 @@
         </div>
       </div>
     </div>
-    <div class="load-more"><button onclick="this.textContent='Loading…'">Load more</button></div>
+    <div class="load-more"><button onclick="loadMore(this)">Load more</button></div>
   </div>
 
   <!-- ═══ MESSAGES SUB-TAB ═══ -->
@@ -135,10 +135,10 @@
     <div class="act-row">
       <span class="act-row-lbl">Messages</span>
       <div class="act-row-btns">
-        <button class="btn-sm primary"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New</button>
+        <button class="btn-sm primary" onclick="openOverlay('messages')"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New</button>
       </div>
     </div>
-    <div class="card" onclick="alert('Open message thread')">
+    <div class="card" onclick="openOverlay('messages')">
       <div class="msg-card">
         <div class="msg-av violet">PS</div>
         <div class="msg-body">
@@ -151,7 +151,7 @@
         <div class="msg-badge">3</div>
       </div>
     </div>
-    <div class="card" onclick="alert('Open message thread')">
+    <div class="card" onclick="openOverlay('messages')">
       <div class="msg-card">
         <div class="msg-av teal">RK</div>
         <div class="msg-body">
@@ -164,7 +164,7 @@
         <div class="msg-badge">1</div>
       </div>
     </div>
-    <div class="card" onclick="alert('Open message thread')">
+    <div class="card" onclick="openOverlay('messages')">
       <div class="msg-card">
         <div class="msg-av sky">DP</div>
         <div class="msg-body">
@@ -176,7 +176,7 @@
         </div>
       </div>
     </div>
-    <div class="card" onclick="alert('Open message thread')">
+    <div class="card" onclick="openOverlay('messages')">
       <div class="msg-card">
         <div class="msg-av peach">MJ</div>
         <div class="msg-body">
@@ -188,7 +188,7 @@
         </div>
       </div>
     </div>
-    <div class="card" onclick="alert('Open message thread')">
+    <div class="card" onclick="openOverlay('messages')">
       <div class="msg-card">
         <div class="msg-av gold">RT</div>
         <div class="msg-body">
@@ -200,7 +200,7 @@
         </div>
       </div>
     </div>
-    <div class="card" onclick="alert('Open all messages')">
+    <div class="card" onclick="openOverlay('messages')">
       <div class="entry-card">
         <div class="entry-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
         <div class="entry-body">
@@ -217,11 +217,11 @@
     <div class="act-row">
       <span class="act-row-lbl">Parent-Teacher Meetings</span>
       <div class="act-row-btns">
-        <button class="btn-sm primary"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Schedule</button>
+        <button class="btn-sm primary" onclick="openOverlay('ptm')"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Schedule</button>
       </div>
     </div>
     <!-- Active PTM -->
-    <div class="card" onclick="alert('Open PTM detail')">
+    <div class="card" onclick="openOverlay('ptm')">
       <div class="ptm-card">
         <div class="ptm-icon mint"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
         <div class="ptm-body">
@@ -239,7 +239,7 @@
     </div>
     <!-- PTM History -->
     <div class="section-lbl">History</div>
-    <div class="card" onclick="alert('Open PTM detail')">
+    <div class="card" onclick="openOverlay('ptm')">
       <div class="ptm-card">
         <div class="ptm-icon sky"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
         <div class="ptm-body">
@@ -254,7 +254,7 @@
         </div>
       </div>
     </div>
-    <div class="card" onclick="alert('Open PTM detail')">
+    <div class="card" onclick="openOverlay('ptm')">
       <div class="ptm-card">
         <div class="ptm-icon sky"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
         <div class="ptm-body">
@@ -269,7 +269,7 @@
         </div>
       </div>
     </div>
-    <div class="card" onclick="alert('Open PTM detail')">
+    <div class="card" onclick="openOverlay('ptm')">
       <div class="ptm-card">
         <div class="ptm-icon sky"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
         <div class="ptm-body">
@@ -284,7 +284,7 @@
         </div>
       </div>
     </div>
-    <div class="card" onclick="alert('Open all PTM')">
+    <div class="card" onclick="openOverlay('ptm')">
       <div class="entry-card">
         <div class="entry-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
         <div class="entry-body">
@@ -331,7 +331,7 @@
     </div>
 
     <div class="section-lbl">Recent Deliveries</div>
-    <div class="card" onclick="alert('Open delivery log')">
+    <div class="card" onclick="openOverlay('delivery')">
       <div class="notif-card">
         <div class="notif-icon push"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
         <div class="notif-body">
@@ -344,7 +344,7 @@
         </div>
       </div>
     </div>
-    <div class="card" onclick="alert('Open delivery log')">
+    <div class="card" onclick="openOverlay('delivery')">
       <div class="notif-card">
         <div class="notif-icon whatsapp"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
         <div class="notif-body">
@@ -357,7 +357,7 @@
         </div>
       </div>
     </div>
-    <div class="card" onclick="alert('Open delivery log')">
+    <div class="card" onclick="openOverlay('delivery')">
       <div class="notif-card">
         <div class="notif-icon email"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div>
         <div class="notif-body">
@@ -370,7 +370,7 @@
         </div>
       </div>
     </div>
-    <div class="card" onclick="alert('Open delivery log')">
+    <div class="card" onclick="openOverlay('delivery')">
       <div class="notif-card">
         <div class="notif-icon sms"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
         <div class="notif-body">
@@ -381,6 +381,26 @@
           <div class="notif-desc">SMS to Class 9 & 10 parents</div>
           <div class="notif-status failed"><span class="dot"></span>Failed · 4 bounced</div>
         </div>
+      </div>
+    </div>
+    <div class="card" onclick="openOverlay('notifications')">
+      <div class="entry-card">
+        <div class="entry-icon"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+        <div class="entry-body">
+          <div class="entry-title">See All Notifications</div>
+          <div class="entry-desc">View full notification inbox and preferences</div>
+        </div>
+        <svg class="entry-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+      </div>
+    </div>
+    <div class="card" onclick="openOverlay('preferences')">
+      <div class="entry-card">
+        <div class="entry-icon"><svg viewBox="0 0 24 24"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 16v-4M12 8h.01"/></svg></div>
+        <div class="entry-body">
+          <div class="entry-title">Notification Preferences</div>
+          <div class="entry-desc">Manage channel settings per category</div>
+        </div>
+        <svg class="entry-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
       </div>
     </div>
   </div>
@@ -397,7 +417,25 @@
 </div>
 </div><!-- /phone -->
 
+<div id="toast" style="position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none"></div>
+
 <script>
+function toast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg;t.style.opacity='1';
+  clearTimeout(window._toastTimer);
+  window._toastTimer=setTimeout(function(){t.style.opacity='0'},2000);
+}
+function openOverlay(name){
+  window.location.href='comms-overlays-premium.html#'+name;
+}
+function openAnnouncement(title){
+  toast('Opening: '+title);
+}
+function loadMore(btn){
+  btn.textContent='Loading…';
+  setTimeout(function(){btn.textContent='No more announcements'},1000);
+}
 function switchTab(name){
   document.querySelectorAll('.subtab-content').forEach(el=>el.classList.add('hidden'));
   document.getElementById('tab-'+name).classList.remove('hidden');

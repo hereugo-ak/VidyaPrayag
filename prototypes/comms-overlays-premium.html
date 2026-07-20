@@ -44,14 +44,14 @@
   <!-- Inbox View -->
   <div id="msg-inbox" style="display:flex;flex-direction:column;flex:1">
     <div class="back-hdr">
-      <button class="back-btn" onclick="alert('Back to Comms tab')"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+      <button class="back-btn" onclick="goBack()"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
       <div class="back-title">Messages</div>
       <div class="back-actions">
-        <button class="back-action-btn" onclick="alert('Mark all read')"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></button>
+        <button class="back-action-btn" onclick="markAllRead()"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></button>
       </div>
     </div>
     <div class="scroll-body" style="padding-bottom:80px">
-      <div class="thread-row" onclick="openConversation()">
+      <div class="thread-row" data-thread="t1" onclick="openConversation('t1')">
         <div class="thread-av violet">PS</div>
         <div class="thread-body">
           <div class="thread-top">
@@ -62,7 +62,7 @@
         </div>
         <div class="thread-badge">3</div>
       </div>
-      <div class="thread-row" onclick="openConversation()">
+      <div class="thread-row" data-thread="t2" onclick="openConversation('t2')">
         <div class="thread-av teal">RK</div>
         <div class="thread-body">
           <div class="thread-top">
@@ -73,7 +73,7 @@
         </div>
         <div class="thread-badge">1</div>
       </div>
-      <div class="thread-row" onclick="openConversation()">
+      <div class="thread-row" data-thread="t3" onclick="openConversation('t3')">
         <div class="thread-av sky">DP</div>
         <div class="thread-body">
           <div class="thread-top">
@@ -83,7 +83,7 @@
           <div class="thread-preview">Thank you for the quick response about the admission process...</div>
         </div>
       </div>
-      <div class="thread-row" onclick="openConversation()">
+      <div class="thread-row" data-thread="t4" onclick="openConversation('t4')">
         <div class="thread-av peach">MJ</div>
         <div class="thread-body">
           <div class="thread-top">
@@ -93,7 +93,7 @@
           <div class="thread-preview">The new book order has been catalogued. 47 titles added to fiction.</div>
         </div>
       </div>
-      <div class="thread-row" onclick="openConversation()">
+      <div class="thread-row" data-thread="t5" onclick="openConversation('t5')">
         <div class="thread-av gold">RT</div>
         <div class="thread-body">
           <div class="thread-top">
@@ -103,7 +103,7 @@
           <div class="thread-preview">Fee collection for March is at 78%. 12 students have overdue payments.</div>
         </div>
       </div>
-      <div class="thread-row" onclick="openConversation()">
+      <div class="thread-row" data-thread="t6" onclick="openConversation('t6')">
         <div class="thread-av violet">SN</div>
         <div class="thread-body">
           <div class="thread-top">
@@ -113,7 +113,7 @@
           <div class="thread-preview">Can you please share the syllabus for Class 7 Science? We want to...</div>
         </div>
       </div>
-      <div class="thread-row" onclick="openConversation()">
+      <div class="thread-row" data-thread="t7" onclick="openConversation('t7')">
         <div class="thread-av teal">AK</div>
         <div class="thread-body">
           <div class="thread-top">
@@ -160,21 +160,21 @@
         <div class="compose-sheet-title">New Message</div>
         <button class="compose-sheet-close" onclick="closeComposeNew()"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
-      <input class="compose-search" placeholder="Search recipient…" id="recipient-search">
+      <input class="compose-search" placeholder="Search recipient…" id="recipient-search" oninput="filterRecipient()">
       <div class="compose-recipient-list">
-        <div class="compose-recipient" onclick="alert('Selected: Priya Sharma')">
+        <div class="compose-recipient" onclick="selectRecipient('Priya Sharma')">
           <div class="thread-av violet" style="width:40px;height:40px;font-size:12px">PS</div>
           <div><div style="font-size:14px;font-weight:600;color:var(--ink)">Priya Sharma</div><div style="font-size:12px;color:var(--ink-3)">Parent · Class 7-A</div></div>
         </div>
-        <div class="compose-recipient" onclick="alert('Selected: Rahul Verma')">
+        <div class="compose-recipient" onclick="selectRecipient('Rahul Verma')">
           <div class="thread-av teal" style="width:40px;height:40px;font-size:12px">RK</div>
           <div><div style="font-size:14px;font-weight:600;color:var(--ink)">Rahul Verma</div><div style="font-size:12px;color:var(--ink-3)">Teacher · Physics</div></div>
         </div>
-        <div class="compose-recipient" onclick="alert('Selected: All Class 7-A Parents')">
+        <div class="compose-recipient" onclick="selectRecipient('Class 7-A Parents')">
           <div class="thread-av sky" style="width:40px;height:40px;font-size:12px">7A</div>
           <div><div style="font-size:14px;font-weight:600;color:var(--ink)">Class 7-A Parents</div><div style="font-size:12px;color:var(--ink-3)">Group · 32 recipients</div></div>
         </div>
-        <div class="compose-recipient" onclick="alert('Selected: All Teachers')">
+        <div class="compose-recipient" onclick="selectRecipient('All Teachers')">
           <div class="thread-av peach" style="width:40px;height:40px;font-size:12px">TC</div>
           <div><div style="font-size:14px;font-weight:600;color:var(--ink)">All Teachers</div><div style="font-size:12px;color:var(--ink-3)">Group · 24 recipients</div></div>
         </div>
@@ -188,14 +188,38 @@
      ═════════════════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-ptm">
   <div class="back-hdr">
-    <button class="back-btn" onclick="alert('Back to Comms tab')"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+    <button class="back-btn" onclick="goBack()"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
     <div class="back-title">Schedule PTM</div>
   </div>
   <div class="scroll-body">
     <!-- Schedule new PTM button -->
-    <button class="btn teal full" style="margin-bottom:12px" onclick="alert('Open PTM composer')">
+    <button class="btn teal full" style="margin-bottom:12px" onclick="togglePtmComposer()">
       <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Schedule New PTM
     </button>
+
+    <!-- PTM Composer (hidden by default) -->
+    <div id="ptm-composer" style="display:none;background:var(--card);border:1px solid var(--hairline);border-radius:var(--r-card);padding:16px;margin-bottom:12px">
+      <div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:12px">New PTM Event</div>
+      <div class="input-group" style="margin-bottom:10px">
+        <label class="input-lbl">Title</label>
+        <input class="input" id="ptm-title" placeholder="e.g. Class 8 PTM">
+      </div>
+      <div class="input-group" style="margin-bottom:10px">
+        <label class="input-lbl">Date</label>
+        <input class="input" type="date" id="ptm-date" value="2025-04-05">
+      </div>
+      <div class="input-group" style="margin-bottom:12px">
+        <label class="input-lbl">Slot Duration</label>
+        <select class="input" id="ptm-slot" style="appearance:auto">
+          <option value="">Select duration…</option>
+          <option value="10">10 minutes</option>
+          <option value="15">15 minutes</option>
+          <option value="20">20 minutes</option>
+          <option value="30">30 minutes</option>
+        </select>
+      </div>
+      <button class="btn primary full" onclick="createPtm()">Create PTM</button>
+    </div>
 
     <!-- Active Event Banner -->
     <div class="card" style="margin-bottom:12px">
@@ -216,7 +240,7 @@
 
     <!-- History -->
     <div class="section-lbl">History</div>
-    <div class="card" style="margin-bottom:12px">
+    <div class="card" style="margin-bottom:12px" id="ptm-history-list">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--hairline)">
         <div><div style="font-size:14px;font-weight:600;color:var(--ink)">Class 11 & 12 PTM</div><div style="font-size:12px;color:var(--ink-3);margin-top:2px">Feb 15, 2025</div></div>
         <div style="font-size:14px;font-weight:600;color:var(--ink-2);font-family:var(--mono)">52/60</div>
@@ -262,7 +286,7 @@
      ═════════════════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-scheduled">
   <div class="back-hdr">
-    <button class="back-btn" onclick="alert('Back to Comms tab')"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+    <button class="back-btn" onclick="goBack()"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
     <div class="back-title">Scheduled Messages</div>
   </div>
   <div class="scroll-body">
@@ -289,8 +313,8 @@
         <span class="smsg-meta-txt">All School</span>
       </div>
       <div class="smsg-actions">
-        <button class="btn primary sm" style="flex:1" onclick="alert('Dispatch now')">Send now</button>
-        <button class="btn ghost sm" style="flex:1" onclick="alert('Cancel scheduled message')">Cancel</button>
+        <button class="btn primary sm" style="flex:1" onclick="dispatchSched(this)">Send now</button>
+        <button class="btn ghost sm" style="flex:1" onclick="cancelSched(this)">Cancel</button>
       </div>
     </div>
 
@@ -307,8 +331,8 @@
         <span class="smsg-meta-txt">Overdue Parents · 12</span>
       </div>
       <div class="smsg-actions">
-        <button class="btn primary sm" style="flex:1" onclick="alert('Dispatch now')">Send now</button>
-        <button class="btn ghost sm" style="flex:1" onclick="alert('Cancel scheduled message')">Cancel</button>
+        <button class="btn primary sm" style="flex:1" onclick="dispatchSched(this)">Send now</button>
+        <button class="btn ghost sm" style="flex:1" onclick="cancelSched(this)">Cancel</button>
       </div>
     </div>
 
@@ -362,7 +386,7 @@
      ═════════════════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-create">
   <div class="back-hdr">
-    <button class="back-btn" onclick="alert('Back to Comms tab')"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+    <button class="back-btn" onclick="createStep(-1)"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
     <div class="back-title">Create Event</div>
   </div>
   <!-- Step Progress -->
@@ -439,7 +463,7 @@
   <div class="footer-bar">
     <button class="btn secondary" id="create-back" onclick="createStep(-1)" style="display:none">Back</button>
     <button class="btn primary" id="create-next" onclick="createStep(1)" style="flex:1">Continue</button>
-    <button class="btn teal" id="create-publish" onclick="alert('Published!')" style="display:none">Publish</button>
+    <button class="btn teal" id="create-publish" onclick="publishEvent()" style="display:none">Publish</button>
   </div>
 </div>
 
@@ -448,11 +472,11 @@
      ═════════════════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-notifications">
   <div class="back-hdr">
-    <button class="back-btn" onclick="alert('Back to Comms tab')"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+    <button class="back-btn" onclick="goBack()"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
     <div class="back-title">Notifications</div>
     <div class="back-actions">
-      <button class="back-action-btn" onclick="alert('Mark all read')"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></button>
-      <button class="back-action-btn" onclick="alert('Clear all')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+      <button class="back-action-btn" onclick="markAllNotifsRead()"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></button>
+      <button class="back-action-btn" onclick="clearAllNotifs()"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
     </div>
   </div>
   <div class="scroll-body" style="background:var(--cream)">
@@ -469,8 +493,8 @@
     </div>
     <!-- Filter pills -->
     <div style="display:flex;gap:8px;margin-bottom:12px">
-      <div class="aud-chip active" style="background:var(--ink);color:#fff" onclick="this.style.background='var(--ink)';this.style.color='#fff';this.nextElementSibling.style.background='var(--surface)';this.nextElementSibling.style.color='var(--ink-2)'">All</div>
-      <div class="aud-chip inactive" onclick="this.style.background='var(--ink)';this.style.color='#fff';this.previousElementSibling.style.background='var(--surface)';this.previousElementSibling.style.color='var(--ink-2)'">Unread · 7</div>
+      <div class="aud-chip active" style="background:var(--ink);color:#fff" onclick="filterNotifs(this,'all')">All</div>
+      <div class="aud-chip inactive" onclick="filterNotifs(this,'unread')">Unread · 7</div>
     </div>
     <!-- Notification items -->
     <div class="notif-row unread" onclick="this.classList.remove('unread')">
@@ -497,14 +521,14 @@
       </div>
       <div class="notif-unread-dot"></div>
     </div>
-    <div class="notif-row" onclick="alert('Open notification')">
+    <div class="notif-row" onclick="this.classList.remove('unread');var d=this.querySelector('.notif-unread-dot');if(d)d.remove()">
       <div class="notif-icon teal"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
       <div class="notif-body">
         <div class="notif-top"><div class="notif-title">Fee Payment Received</div><div class="notif-time">Yesterday</div></div>
         <div class="notif-desc">Q3 fee payment of ₹15,000 received from Aarav Sharma's parent.</div>
       </div>
     </div>
-    <div class="notif-row" onclick="alert('Open notification')">
+    <div class="notif-row" onclick="this.classList.remove('unread');var d=this.querySelector('.notif-unread-dot');if(d)d.remove()">
       <div class="notif-icon peach"><svg viewBox="0 0 24 24"><path d="M20 12v9H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg></div>
       <div class="notif-body">
         <div class="notif-top"><div class="notif-title">Inter-School Science Fair</div><div class="notif-time">Mar 08</div></div>
@@ -523,7 +547,7 @@
      ═════════════════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-preferences">
   <div class="back-hdr">
-    <button class="back-btn" onclick="alert('Back to Notifications')"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+    <button class="back-btn" onclick="showOverlay('notifications',document.querySelector('.overlay-nav button:nth-child(5)'))"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
     <div class="back-title">Notification Preferences</div>
   </div>
   <div class="scroll-body">
@@ -538,7 +562,7 @@
             <span class="pref-ch off">SMS</span>
           </div>
         </div>
-        <button class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button>
+        <button class="toggle on" onclick="togglePref(this)"></button>
       </div>
       <div class="pref-row">
         <div class="pref-info">
@@ -550,7 +574,7 @@
             <span class="pref-ch off">SMS</span>
           </div>
         </div>
-        <button class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button>
+        <button class="toggle on" onclick="togglePref(this)"></button>
       </div>
       <div class="pref-row">
         <div class="pref-info">
@@ -562,7 +586,7 @@
             <span class="pref-ch on">SMS</span>
           </div>
         </div>
-        <button class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button>
+        <button class="toggle on" onclick="togglePref(this)"></button>
       </div>
       <div class="pref-row">
         <div class="pref-info">
@@ -574,7 +598,7 @@
             <span class="pref-ch off">SMS</span>
           </div>
         </div>
-        <button class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button>
+        <button class="toggle on" onclick="togglePref(this)"></button>
       </div>
       <div class="pref-row">
         <div class="pref-info">
@@ -586,7 +610,7 @@
             <span class="pref-ch off">SMS</span>
           </div>
         </div>
-        <button class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button>
+        <button class="toggle on" onclick="togglePref(this)"></button>
       </div>
       <div class="pref-row">
         <div class="pref-info">
@@ -598,7 +622,7 @@
             <span class="pref-ch off">SMS</span>
           </div>
         </div>
-        <button class="toggle off" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button>
+        <button class="toggle off" onclick="togglePref(this)"></button>
       </div>
       <div class="pref-row">
         <div class="pref-info">
@@ -610,7 +634,7 @@
             <span class="pref-ch off">SMS</span>
           </div>
         </div>
-        <button class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button>
+        <button class="toggle on" onclick="togglePref(this)"></button>
       </div>
       <div class="pref-row">
         <div class="pref-info">
@@ -622,10 +646,10 @@
             <span class="pref-ch off">SMS</span>
           </div>
         </div>
-        <button class="toggle off" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button>
+        <button class="toggle off" onclick="togglePref(this)"></button>
       </div>
     </div>
-    <div style="margin-top:12px;font-size:13px;color:var(--success-ink);text-align:center">Preference saved</div>
+    <div style="margin-top:12px;font-size:13px;color:var(--success-ink);text-align:center;opacity:0;transition:opacity .3s" id="pref-saved-msg">Preference saved</div>
   </div>
 </div>
 
@@ -634,7 +658,7 @@
      ═════════════════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-delivery">
   <div class="back-hdr">
-    <button class="back-btn" onclick="alert('Back to Comms tab')"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+    <button class="back-btn" onclick="goBack()"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
     <div class="back-title">Delivery Log</div>
   </div>
   <div class="scroll-body">
@@ -715,16 +739,73 @@
 
 </div><!-- /phone -->
 
+<!-- Toast -->
+<div id="toast" style="position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none"></div>
+
 <script>
+function toast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg;t.style.opacity='1';
+  clearTimeout(window._toastTimer);
+  window._toastTimer=setTimeout(function(){t.style.opacity='0'},2000);
+}
 function showOverlay(name,btn){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-'+name).classList.add('active');
   document.querySelectorAll('.overlay-nav button').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
 }
-function openConversation(){
+function goBack(){
+  toast('Returning to Comms tab…');
+  setTimeout(function(){window.location.href='comms-tab-premium.html'},600);
+}
+// ── Messages ──
+var threadData=[
+  {id:'t1',name:'Priya Sharma (Parent)',av:'PS',color:'violet',time:'10:42 AM',preview:"Hi, I wanted to discuss Aarav's performance in the last test...",unread:3,
+   msgs:[{who:'theirs',txt:"Hi, I wanted to discuss Aarav's performance in the last test. He seems to be struggling with some concepts.",t:'10:30 AM'},
+     {who:'mine',txt:"Hi Priya, thanks for reaching out. I noticed the same — let's schedule a call.",t:'10:35 AM'},
+     {who:'theirs',txt:'That would be great. Are you available tomorrow afternoon?',t:'10:42 AM'},
+     {who:'mine',txt:"Yes, 2 PM works. I'll send you a calendar invite.",t:'10:45 AM'},
+     {who:'theirs',txt:'Perfect, thank you! Also, could you share the topics covered so I can help him at home?',t:'10:48 AM'},
+     {who:'mine',txt:"Absolutely. I'll email the syllabus and some practice worksheets today.",t:'10:50 AM'}]},
+  {id:'t2',name:'Rahul Verma (Teacher)',av:'RK',color:'teal',time:'9:15 AM',preview:'The physics lab equipment has arrived. Can we schedule a setup session?',unread:1,
+   msgs:[{who:'theirs',txt:'The physics lab equipment has arrived. Can we schedule a setup session?',t:'9:15 AM'}]},
+  {id:'t3',name:"Diya's Mother",av:'DP',color:'sky',time:'Yesterday',preview:'Thank you for the quick response about the admission process...',unread:0,
+   msgs:[{who:'theirs',txt:'Thank you for the quick response about the admission process...',t:'Yesterday'}]},
+  {id:'t4',name:'Meena Joshi (Librarian)',av:'MJ',color:'peach',time:'Mar 11',preview:'The new book order has been catalogued. 47 titles added to fiction.',unread:0,
+   msgs:[{who:'theirs',txt:'The new book order has been catalogued. 47 titles added to fiction.',t:'Mar 11'}]},
+  {id:'t5',name:'Rajesh Tiwari (Accounts)',av:'RT',color:'gold',time:'Mar 10',preview:'Fee collection for March is at 78%. 12 students have overdue payments.',unread:0,
+   msgs:[{who:'theirs',txt:'Fee collection for March is at 78%. 12 students have overdue payments.',t:'Mar 10'}]},
+  {id:'t6',name:'Sneha Nair (Parent)',av:'SN',color:'violet',time:'Mar 09',preview:'Can you please share the syllabus for Class 7 Science? We want to...',unread:0,
+   msgs:[{who:'theirs',txt:'Can you please share the syllabus for Class 7 Science? We want to...',t:'Mar 09'}]},
+  {id:'t7',name:'Amit Kumar (Teacher)',av:'AK',color:'teal',time:'Mar 08',preview:'Submitted the quarterly lesson plans for Class 10 Mathematics.',unread:0,
+   msgs:[{who:'theirs',txt:'Submitted the quarterly lesson plans for Class 10 Mathematics.',t:'Mar 08'}]}
+];
+var currentThreadId=null;
+function openConversation(threadId){
+  var t=threadData.find(function(x){return x.id===threadId})||threadData[0];
+  currentThreadId=t.id;
+  // Clear unread badge
+  t.unread=0;
+  var row=document.querySelector('[data-thread="'+t.id+'"]');
+  if(row){var badge=row.querySelector('.thread-badge');if(badge)badge.remove();var prev=row.querySelector('.thread-preview.unread');if(prev)prev.classList.remove('unread')}
+  // Set header
+  document.querySelector('#msg-conversation .back-title').textContent=t.name;
+  var avEl=document.querySelector('#msg-conversation .back-actions .thread-av');
+  avEl.className='thread-av '+t.color;avEl.textContent=t.av;
+  // Render messages
+  var chat=document.querySelector('#msg-conversation .scroll-body');
+  chat.innerHTML='<div class="chat-date">Today</div>';
+  t.msgs.forEach(function(m){
+    var d=document.createElement('div');d.className='bubble '+m.who;
+    d.innerHTML=m.txt+'<div class="bubble-time">'+m.t+'</div>';
+    chat.appendChild(d);
+  });
+  var sp=document.createElement('div');sp.style.flex='1';chat.appendChild(sp);
   document.getElementById('msg-inbox').style.display='none';
   document.getElementById('msg-conversation').style.display='flex';
+  // Scroll to bottom
+  setTimeout(function(){chat.scrollTop=chat.scrollHeight},50);
 }
 function closeConversation(){
   document.getElementById('msg-conversation').style.display='none';
@@ -732,21 +813,77 @@ function closeConversation(){
 }
 function sendMessage(){
   var input=document.getElementById('compose-text');
-  if(input.value.trim()){
-    var chat=document.querySelector('#msg-conversation .scroll-body');
-    var div=document.createElement('div');
-    div.className='bubble mine';
-    div.innerHTML=input.value+'<div class="bubble-time">Now</div>';
-    chat.insertBefore(div,chat.lastElementChild);
-    input.value='';
-  }
+  if(!input.value.trim())return;
+  var t=threadData.find(function(x){return x.id===currentThreadId});
+  var chat=document.querySelector('#msg-conversation .scroll-body');
+  var sp=chat.lastElementChild;
+  var d=document.createElement('div');d.className='bubble mine';
+  d.innerHTML=input.value+'<div class="bubble-time">Now</div>';
+  chat.insertBefore(d,sp);
+  if(t){t.msgs.push({who:'mine',txt:input.value,t:'Now'});t.preview=input.value}
+  input.value='';
+  chat.scrollTop=chat.scrollHeight;
+  // Simulate auto-reply after 1.5s
+  setTimeout(function(){
+    if(t&&currentThreadId===t.id){
+      var d2=document.createElement('div');d2.className='bubble theirs';
+      d2.innerHTML='Got it, thank you!<div class="bubble-time">Now</div>';
+      chat.insertBefore(d2,chat.lastElementChild);
+      chat.scrollTop=chat.scrollHeight;
+    }
+  },1500);
 }
-function openComposeNew(){
-  document.getElementById('msg-compose-new').style.display='block';
+function markAllRead(){
+  document.querySelectorAll('#msg-inbox .thread-badge').forEach(function(b){b.remove()});
+  document.querySelectorAll('#msg-inbox .thread-preview.unread').forEach(function(p){p.classList.remove('unread')});
+  threadData.forEach(function(t){t.unread=0});
+  toast('All messages marked as read');
 }
-function closeComposeNew(e){
-  if(!e||e.target.id==='msg-compose-new')document.getElementById('msg-compose-new').style.display='none';
+function openComposeNew(){document.getElementById('msg-compose-new').style.display='block'}
+function closeComposeNew(e){if(!e||e.target.id==='msg-compose-new')document.getElementById('msg-compose-new').style.display='none'}
+function selectRecipient(name){
+  closeComposeNew();
+  toast('New conversation with '+name);
+  // Create a new thread and open it
+  var newId='t'+(threadData.length+1);
+  var initials=name.split(' ').map(function(w){return w[0]}).join('').slice(0,2).toUpperCase();
+  threadData.unshift({id:newId,name:name,av:initials,color:'violet',time:'Now',preview:'Start typing…',unread:0,msgs:[]});
+  // Prepend to inbox list
+  var list=document.querySelector('#msg-inbox .scroll-body');
+  var row=document.createElement('div');
+  row.className='thread-row';row.setAttribute('data-thread',newId);row.onclick=function(){openConversation(newId)};
+  row.innerHTML='<div class="thread-av violet">'+initials+'</div><div class="thread-body"><div class="thread-top"><div class="thread-name">'+name+'</div><div class="thread-time">Now</div></div><div class="thread-preview">Start typing…</div></div>';
+  list.insertBefore(row,list.firstChild);
+  openConversation(newId);
 }
+function filterRecipient(){
+  var q=document.getElementById('recipient-search').value.toLowerCase();
+  document.querySelectorAll('#msg-compose-new .compose-recipient').forEach(function(r){
+    var name=r.querySelector('div > div:first-child').textContent.toLowerCase();
+    r.style.display=name.indexOf(q)>-1?'flex':'none';
+  });
+}
+// ── PTM ──
+function togglePtmComposer(){
+  var c=document.getElementById('ptm-composer');
+  if(c.style.display==='none'||!c.style.display){c.style.display='block';toast('PTM composer opened')}
+  else{c.style.display='none'}
+}
+function createPtm(){
+  var title=document.getElementById('ptm-title').value;
+  var date=document.getElementById('ptm-date').value;
+  var slot=document.getElementById('ptm-slot').value;
+  if(!title||!date||!slot){toast('Title, date and slot are required');return}
+  toast('PTM "'+title+'" scheduled for '+date);
+  document.getElementById('ptm-composer').style.display='none';
+  // Add to history
+  var hist=document.getElementById('ptm-history-list');
+  var row=document.createElement('div');
+  row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--hairline)';
+  row.innerHTML='<div><div style="font-size:14px;font-weight:600;color:var(--ink)">'+title+'</div><div style="font-size:12px;color:var(--ink-3);margin-top:2px">'+date+'</div></div><div style="font-size:14px;font-weight:600;color:var(--ink-2);font-family:var(--mono)">0/0</div>';
+  hist.insertBefore(row,hist.firstChild);
+}
+// ── Scheduled Messages ──
 function filterSched(el,status){
   el.parentElement.querySelectorAll('.fchip').forEach(c=>c.classList.remove('active'));
   el.classList.add('active');
@@ -755,11 +892,26 @@ function filterSched(el,status){
     else item.style.display='none';
   });
 }
+function dispatchSched(btn){
+  var card=btn.closest('.sched-item');
+  card.querySelector('.badge').className='badge success';
+  card.querySelector('.badge').textContent='Dispatched';
+  card.querySelector('.smsg-actions').remove();
+  toast('Message dispatched immediately');
+}
+function cancelSched(btn){
+  var card=btn.closest('.sched-item');
+  card.querySelector('.badge').className='badge neutral';
+  card.querySelector('.badge').textContent='Cancelled';
+  card.querySelector('.smsg-actions').remove();
+  toast('Scheduled message cancelled');
+}
+// ── Create Event ──
 var createStepNum=1;
 function createStep(dir){
   createStepNum+=dir;
-  if(createStepNum<1)createStepNum=1;
-  if(createStepNum>3)createStepNum=3;
+  if(createStepNum<1){goBack();return}
+  if(createStepNum>3)return;
   document.getElementById('step-num').textContent=createStepNum;
   for(var i=1;i<=3;i++){
     document.getElementById('create-step-'+i).style.display=i===createStepNum?'block':'none';
@@ -777,6 +929,50 @@ function selectAudience(el){
   el.parentElement.querySelectorAll('.aud-chip').forEach(c=>{c.classList.remove('active');c.classList.add('inactive')});
   el.classList.add('active');el.classList.remove('inactive');
 }
+function publishEvent(){
+  var title=document.querySelector('#create-step-1 .input').value||'Untitled Event';
+  toast('"'+title+'" published successfully!');
+  setTimeout(function(){goBack()},1000);
+}
+// ── Notifications ──
+var unreadCount=7;
+function markAllNotifsRead(){
+  document.querySelectorAll('#screen-notifications .notif-row.unread').forEach(r=>r.classList.remove('unread'));
+  document.querySelectorAll('#screen-notifications .notif-unread-dot').forEach(d=>d.remove());
+  unreadCount=0;
+  document.querySelector('.hero-count').textContent='0';
+  toast('All notifications marked as read');
+}
+function clearAllNotifs(){
+  document.querySelectorAll('#screen-notifications .notif-row').forEach(r=>r.remove());
+  unreadCount=0;
+  document.querySelector('.hero-count').textContent='0';
+  toast('All notifications cleared');
+}
+function filterNotifs(el,filter){
+  el.parentElement.querySelectorAll('.aud-chip').forEach(c=>{
+    c.classList.remove('active');c.classList.add('inactive');
+    c.style.background='';c.style.color='';
+  });
+  el.classList.add('active');el.classList.remove('inactive');
+  el.style.background='var(--ink)';el.style.color='#fff';
+  document.querySelectorAll('#screen-notifications .notif-row').forEach(r=>{
+    if(filter==='all')r.style.display='flex';
+    else if(filter==='unread')r.style.display=r.classList.contains('unread')?'flex':'none';
+  });
+}
+// ── Notification Preferences ──
+function togglePref(btn){
+  btn.classList.toggle('on');btn.classList.toggle('off');
+  var cat=btn.closest('.pref-row').querySelector('.pref-cat').textContent;
+  var enabled=btn.classList.contains('on');
+  toast(cat+' '+(enabled?'enabled':'disabled'));
+  var msg=document.getElementById('pref-saved-msg');
+  msg.style.opacity='1';
+  clearTimeout(window._prefTimer);
+  window._prefTimer=setTimeout(function(){msg.style.opacity='0'},1500);
+}
+// ── Delivery Log ──
 function filterDelivery(el,channel){
   el.parentElement.querySelectorAll('.fchip').forEach(c=>c.classList.remove('active'));
   el.classList.add('active');
@@ -792,6 +988,14 @@ function filterDeliveryStatus(el,status){
     if(status==='all'||item.dataset.status===status)item.style.display='flex';
     else item.style.display='none';
   });
+}
+// ── Hash-based auto-switch ──
+if(window.location.hash){
+  var hash=window.location.hash.slice(1);
+  var map={messages:'messages',ptm:'ptm',scheduled:'scheduled',create:'create',notifications:'notifications',preferences:'preferences',delivery:'delivery'};
+  if(map[hash]){
+    showOverlay(map[hash]);
+  }
 }
 </script>
 </body>

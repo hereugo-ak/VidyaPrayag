@@ -336,7 +336,7 @@ data class TeacherProfileDto(
  * conservative, clearly-derived value rather than fabricating data — the UI
  * shows honest empty states for the narrative sections.
  */
-private fun buildTeacherProfile(schoolId: UUID, teacherId: UUID): TeacherProfileDto? {
+private suspend fun buildTeacherProfile(schoolId: UUID, teacherId: UUID): TeacherProfileDto? {
     val row = AppUsersTable.selectAll().where {
         (AppUsersTable.id eq teacherId) and
             (AppUsersTable.schoolId eq schoolId) and
