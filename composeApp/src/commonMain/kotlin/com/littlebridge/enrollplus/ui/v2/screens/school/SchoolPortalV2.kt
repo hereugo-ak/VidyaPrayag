@@ -263,8 +263,6 @@ fun SchoolPortalV2(
     var selectedClassName by remember { mutableStateOf<String?>(null) }
     // Track which overlay launched a student/teacher profile so back returns there.
     var profileReturnOverlay by remember { mutableStateOf(SchoolOverlay.None) }
-    // Bug 11: when true, TeacherProfileScreenV2 opens in edit mode.
-    var teacherProfileStartInEdit by remember { mutableStateOf(false) }
         // RA-S12 — the Comms badge counts message threads with unread messages
         // (GET /school/messages/threads), not a hardcoded literal.
         val messagesState by messagesViewModel.state.collectAsStateV2()
@@ -473,11 +471,8 @@ fun SchoolPortalV2(
                 val returnTo = profileReturnOverlay
                 TeacherProfileScreenV2(
                     teacherId = id,
-                    initialEditMode = teacherProfileStartInEdit,
-                    onBack = { overlay = returnTo; profileReturnOverlay = SchoolOverlay.None
-                        teacherProfileStartInEdit = false },
+                    onBack = { overlay = returnTo; profileReturnOverlay = SchoolOverlay.None },
                     onRemoved = { overlay = returnTo; profileReturnOverlay = SchoolOverlay.None
-                        teacherProfileStartInEdit = false
                         peopleRefreshKey++ },
                     // RA-TAM — Quick Action → reusable assignment module.
                     onOpenAssignments = { overlay = SchoolOverlay.TeacherAssignments },
@@ -792,8 +787,7 @@ fun SchoolPortalV2(
                         // RA-S17 — People is now a 3-sub-tab roster; rows open the
                         // matching profile overlay (delete-in-profile lives there).
                         onOpenStudent = { id -> selectedStudentId = id; overlay = SchoolOverlay.StudentProfile },
-                        onOpenTeacher = { id -> selectedTeacherId = id; teacherProfileStartInEdit = false; overlay = SchoolOverlay.TeacherProfile },
-                        onEditTeacher = { id -> selectedTeacherId = id; teacherProfileStartInEdit = true; overlay = SchoolOverlay.TeacherProfile },
+                        onOpenTeacher = { id -> selectedTeacherId = id; overlay = SchoolOverlay.TeacherProfile },
                         // RA-TAM — Teacher Listing entry point into the reusable module.
                         onAssignClasses = { id -> selectedTeacherId = id; overlay = SchoolOverlay.TeacherAssignments },
                         onOpenStaff = { id -> selectedStaffId = id; overlay = SchoolOverlay.Staff },
